@@ -7,11 +7,11 @@ import unittest
 
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import ec, utils
-from tx_engine import Script, Tx, TxIn, TxOut
+from tx_engine import Script, Tx, TxIn, TxOut, Wallet
 
 from checked_wallet import sign_payment
 from handwritten import GROUP_ORDER_R1
-from p2pkh_r1 import locking_script_from_public_key
+from p2pkh_r1 import locking_script_from_public_key, public_key_hash160, recognize
 from replay_payment import replay
 from test_native import signer
 from test_universal import check
@@ -25,6 +25,48 @@ def fixture_signature(key, digest):
 
 
 class OrdinaryPaymentTest(unittest.TestCase):
+    def test_p2pkh_funds_r1_then_r1_pays_a_new_r1_owner(self):
+        # Only the initial UTXO is supplied synthetically. Every subsequent
+        # input spends the bytes of the preceding fully signed transaction.
+        source = Wallet.from_int("BSV_Testnet", 11)
+        source_lock = source.get_locking_script()
+        seed = Tx(2, [TxIn("88" * 32, 0, Script())], [TxOut(106_000, source_lock)], 0)
+        key_a, pub_a, _ = signer(7)
+        key_b, pub_b, _ = signer(19)
+
+        def r1_lock(public_key):
+            raw = locking_script_from_public_key(public_key)
+            self.assertEqual(recognize(raw), public_key_hash160(public_key))
+            script = Script()
+            script.append_data(raw)
+            return script
+
+        lock_a = r1_lock(pub_a)
+        lock_b = r1_lock(pub_b)
+        self.assertNotEqual(lock_a.raw_serialize(), lock_b.raw_serialize())
+        funding = Tx(2, [TxIn(seed.id(), 0, Script())],
+                     [TxOut(5_000, source_lock), TxOut(100_000, lock_a)], 0)
+        funding = source.sign_tx_sighash(0, seed, funding, 0x41)
+        funding.validate([seed])
+        check(funding, [seed], 0)
+
+        with tempfile.TemporaryDirectory() as directory:
+            ledger = Path(directory) / "history.sqlite"
+            transfer = sign_payment(funding, 1, [TxOut(99_000, lock_b)], 1_000,
+                                    pub_a, lambda digest: fixture_signature(key_a, digest), ledger)
+            final = sign_payment(transfer, 0, [TxOut(98_000, source_lock)], 1_000,
+                                 pub_b, lambda digest: fixture_signature(key_b, digest), ledger)
+        for label, parent, vout, tx in (("A_to_B", funding, 1, transfer),
+                                       ("B_to_P2PKH", transfer, 0, final)):
+            inp = tx.tx_ins[0]
+            self.assertEqual((inp.prev_tx, inp.prev_index), (parent.id(), vout))
+            literal = Script()
+            literal.append_pushdata(parent.serialize())
+            self.assertTrue(inp.script_sig.raw_serialize().startswith(literal.raw_serialize()))
+            check(tx, [parent], 0)
+            print("R1_CHAIN", label, "parent", parent.id(), "vout", vout,
+                  "signed", tx.id(), "parent_bytes", len(parent.serialize()), flush=True)
+
     def test_public_vector(self):
         parent, signed = replay()
         check(signed, [parent], 0)

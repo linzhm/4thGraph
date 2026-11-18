@@ -11,6 +11,12 @@ P2PKH-R1 定义一种 BSV 锁定脚本模板。付款人把收款人的 P-256 �
 
 常规 P2PKH 让付款人只凭收款人的公钥哈希创建输出。BSV 原生签名检查使用 secp256k1，而 Apple Secure Enclave 等签名器提供 NIST P-256（secp256r1）。P2PKH-R1 保留按公钥哈希收款的方式，在 Script 中验证 P-256 签名，并用 Push TX 将授权绑定到节点实际验证的交易。收款方可以使用任何满足本文接口的 P-256 签名器，链上无需识别设备品牌。本草案定义输出模板和解锁约定；地址编码、收款请求传输、硬件证明以及后继输出延续规则均在范围之外。[BRC-16](https://github.com/bsv-blockchain/BRCs/blob/master/scripts/0016.md) · [BRC-21](https://github.com/bsv-blockchain/BRCs/blob/master/scripts/0021.md) · [Apple 签名接口](https://developer.apple.com/documentation/cryptokit/secureenclave/p256/signing/privatekey)
 
+## 任意来源的付款与连续 R1 花费
+
+创建新输出时，付款人可以把 R1 收款人的锁直接写入 `scriptPubKey`。已有输入分别按其引用的旧输出规则解锁。例如，普通 P2PKH 输入由原 secp256k1 钥匙签名，新输出可支付给 R1 公钥 A。A 后续可以支付给另一把 R1 公钥 B；B 下次花费时再用自己的钥匙签署。每次花费 R1 输出，解锁第一项都是该 outpoint 指向的完整直接父交易。父交易自身的输入可使用其他脚本，其余输出也可使用不同模板。单输入便利接口 `sign_payment` 用于花费 R1 输出；创建第一笔 R1 收款交易时由原输入的钱包签署。
+
+离线用例从一个合成 P2PKH UTXO 出发，随后依次引用三笔交易中对应的真实序列化字节。第一笔把 100,000 聪付给 A（输出 1），第二笔由 A 把 99,000 聪付给 B（输出 0），第三笔由 B 把 98,000 聪付回普通 P2PKH。用例逐笔验证签名和前序输出，并检查两次 R1 花费的第一项各自等于完整父交易的一次直接推送。[交易链验收代码](../../research/secure-enclave-p256/test_spend_example.py)
+
 ## 快速上手：花费一笔普通付款
 
 假设钱包收到一笔 100,000 聪的 P2PKH-R1 输出，位于父交易的 `vout=0`。现在向一个普通 P2PKH 收款脚本付 99,000 聪，剩余 1,000 聪作为本例手续费，找零为零。这笔花费只有一个输入和一个输出。

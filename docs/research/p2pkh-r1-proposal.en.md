@@ -11,6 +11,12 @@ P2PKH-R1 defines a BSV locking script template. A payer commits an output to a r
 
 Conventional P2PKH lets a payer create an output knowing only the recipient’s public-key hash. BSV’s native signature check uses secp256k1. Signers such as Apple’s Secure Enclave offer NIST P-256 (secp256r1). P2PKH-R1 retains the public-key-hash payment model, verifies the P-256 signature in Script, and uses Push TX to bind the authorization to the transaction verified by the node. Any signer providing the specified P-256 interface can be used. On-chain verification requires no device identification. Address encoding, payment-request transport, hardware attestation and successor-output covenants are outside the scope of this template. [BRC-16](https://github.com/bsv-blockchain/BRCs/blob/master/scripts/0016.md) · [BRC-21](https://github.com/bsv-blockchain/BRCs/blob/master/scripts/0021.md) · [Apple signing API](https://developer.apple.com/documentation/cryptokit/secureenclave/p256/signing/privatekey)
 
+## Funding from other scripts and paying another R1 owner
+
+A payer creates a new R1 output by putting the recipient’s locking script in the output’s `scriptPubKey`. Each input satisfies the existing lock on the output it references. For example, the original secp256k1 key signs a P2PKH input while the new output pays R1 key A. A can later pay R1 key B, and B can sign the following spend. On each R1 spend, the first unlocking item is the complete direct parent referenced by the outpoint. The parent’s own inputs and other outputs may use different script types. The single-input `sign_payment` helper spends an R1 output. The source wallet signs the initial funding transaction according to its existing input type.
+
+The offline test starts at a synthetic P2PKH UTXO and connects three signed transactions. The first pays A 100,000 satoshis at output 1. A then pays B 99,000 at output 0. Finally, B pays 98,000 to conventional P2PKH. The test validates each spend against its actual previous output and checks the literal full-parent push on both R1 spends. [Transaction chain test](../../research/secure-enclave-p256/test_spend_example.py)
+
 ## Quick start: spend an ordinary payment
 
 Suppose the wallet owns output 0 of a parent transaction. It holds 100,000 satoshis under P2PKH-R1. The wallet pays 99,000 satoshis to a conventional P2PKH recipient and approves a fixture fee of 1,000 satoshis. There is no change. The payment has one input and one output.
