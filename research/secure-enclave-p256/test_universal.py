@@ -1,6 +1,8 @@
 """Input-level acceptance on the released BSV interpreter, with supplied local UTXOs."""
 from dataclasses import replace
 import os
+import json
+from time import perf_counter_ns
 from pathlib import Path
 import unittest
 
@@ -110,3 +112,27 @@ class UniversalTests(unittest.TestCase):
         a, sig = self.data(ps, 252, [900], 0x61)
         check(child(ps, [900], {252: self.unlock(ps, 252, a, sig)}), ps, 252)
         print("UNIVERSAL_LOCK_BYTES", len(self.lock.raw_serialize()), flush=True)
+
+    def test_small_sample(self):
+        # End-to-end loopback RPC time, including transaction encoding and HTTP.
+        # All keys, signatures, spend objects and native proof inputs are prepared first.
+        ps = [self.fee, self.p]
+        cases = {}
+        for name, flag, amounts in (("bip143_all", 0x41, [800, 500]), ("otda_all", 0x61, [800, 500]),
+                                    ("bip143_unpaired", 0x43, [900]), ("otda_unpaired", 0x63, [900])):
+            a, sig = self.data(ps, 1, amounts, flag)
+            w = self.unlock(ps, 1, a, sig)
+            tx = child(ps, amounts, {1: w})
+            check(tx, ps, 1)
+            cases[name] = (tx, {"elapsed_ns": 0, "count": 0, "preimage": len(a.preimage),
+                                "unlock": len(w.raw_serialize()), "lock": len(self.lock.raw_serialize())})
+        for i in range(32):
+            names = list(cases)
+            names = names[i % 4:] + names[:i % 4]
+            for name in names:
+                tx, stats = cases[name]
+                start = perf_counter_ns()
+                check(tx, ps, 1)
+                stats["elapsed_ns"] += perf_counter_ns() - start
+                stats["count"] += 1
+        print("UNIVERSAL_RPC_SAMPLE", json.dumps({k: v[1] for k, v in cases.items()}, sort_keys=True), flush=True)

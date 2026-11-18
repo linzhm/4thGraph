@@ -1,5 +1,7 @@
 # P2PKH-R1 付款锁
 
+**v7 通用锁**可从同一个 UTXO 选择 BIP143 或 OTDA。显式传入 `version=7`，用 `universal.authorization` 构造花费时应签的摘要。本文后续的四项解锁、固定 158 字节和标签签名描述 v2–v4。[通用锁接口、无配对 SINGLE、原生测试及字节对照](../../docs/research/p2pkh-r1-universal.md)
+
 这个研究模板实现普通持有人付款。付款人把收款人的 P-256 公钥哈希写入锁定脚本。收款人可签署带多个输入、多个收款输出及找零的交易；新输出可使用其他锁定脚本。默认签名类型是 `ALL|FORKID`（0x41）。[手写 Bitcoin Script](./payment.asm) · [Python 装配入口](./handwritten.py) · [交易测试](./test_handwritten.py)
 
 **实测大小是主要取舍。** 默认 v2 锁定脚本为 **88,188 字节**，v1 为 214,973 字节。BSV 节点的原生 `CHECKSIG` 使用 secp256k1，Secure Enclave 使用 NIST P-256（secp256r1）。本模板把 P-256 验签展开为 BSV 整数运算，用原生 `CHECKSIG` 绑定当前交易。标准 P2PKH 的所有者模型得以保留，但不能沿用其 25 字节脚本或标准地址编码。此大小是本参考实现的测量值，并非 P-256 验签的理论下限。[BSV 节点 CPubKey::Verify](https://github.com/bitcoin-sv/bitcoin-sv/blob/6504a3aff65ba97c0f6c80962b033e35ecbfed4b/src/pubkey.cpp#L183-L214) · [Apple SecureEnclave.P256.Signing.PrivateKey](https://developer.apple.com/documentation/cryptokit/secureenclave/p256/signing/privatekey)
