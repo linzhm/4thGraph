@@ -44,7 +44,7 @@ class UniversalTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.key, cls.pub, owner = signer()
-        cls.lock = locking_script(owner, UNIVERSAL_FLAGS, version=7)
+        cls.lock = locking_script(owner, version=8)
         cls.p = parent(cls.lock, 1000, "22")
         cls.fee = parent(TRUE, 500, "33")
 
@@ -173,7 +173,7 @@ class UniversalTests(unittest.TestCase):
         for x, y in ((0, 0), (prime, 1), (1, prime)):
             invalid = bytes([4]) + x.to_bytes(32, "big") + y.to_bytes(32, "big")
             owner = new("ripemd160", sha256(invalid).digest()).digest()
-            ps = [parent(locking_script(owner, version=7), 1000, "22")]
+            ps = [parent(locking_script(owner, version=8), 1000, "22")]
             a = authorization(child(ps, [900]), 0, 1000, 0x41)
             w = universal_unlocking_script(ps[0].serialize(), a, invalid, sign(a, key))
             check(child(ps, [900], {0: w}), ps, 0, False)

@@ -5,7 +5,7 @@ import re
 
 from cryptography.hazmat.primitives.asymmetric import ec
 
-from handwritten import match_locking_script
+from handwritten import UNIVERSAL_FLAGS, match_locking_script
 import p2pkh_r1
 
 
@@ -51,11 +51,11 @@ def identify_locking_script(raw: bytes) -> LockIdentity | None:
         return None
 
     if len(raw) == p2pkh_r1.SCRIPT_SIZE:
-        payment = p2pkh_r1.recognize(raw)
-        if payment is None:
+        owner = p2pkh_r1.recognize(raw)
+        if owner is None:
             return None
-        return LockIdentity("P2PKH-R1", "secp256r1", owner_hash160=payment.owner_hash160,
-                            template_version=7, allowed_types=payment.allowed_types)
+        return LockIdentity("P2PKH-R1", "secp256r1", owner_hash160=owner,
+                            template_version=8, allowed_types=tuple(UNIVERSAL_FLAGS))
 
     # Match the exact R1 program (including its fixed verifier suffix) before
     # extracting its parameter slots. Embedded curve constants have no owner role.

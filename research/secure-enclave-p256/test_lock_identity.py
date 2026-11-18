@@ -36,7 +36,7 @@ class LockIdentityTests(unittest.TestCase):
     def test_r1_versions_and_helper_key(self):
         key = public(ec.SECP256R1(), serialization.PublicFormat.UncompressedPoint)
         helper = bytes.fromhex("0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798")
-        for version in range(1, 8):
+        for version in range(1, 9):
             flags = tuple(flags_for(version))
             raw = locking_script(h160(key), flags, version=version).raw_serialize()
             result = identify_locking_script(raw)

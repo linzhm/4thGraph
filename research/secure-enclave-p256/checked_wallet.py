@@ -1,4 +1,4 @@
-"""Checked wallet entry point for v7. Only the supplied signer holds a private key."""
+"""Checked wallet entry point for P2PKH-R1. Only the supplied signer holds a private key."""
 from contextlib import closing
 from hashlib import new, sha256
 import sqlite3
@@ -32,7 +32,7 @@ def sign_spend(tx, index, parent, requested_type, pubkey, sign_digest, history_p
         raise ValueError("parent outpoint mismatch")
     output = parent.tx_outs[txin.prev_index]
     lock = match_locking_script(output.script_pubkey.raw_serialize())
-    if lock is None or lock.version != 7 or requested_type not in lock.allowed_types:
+    if lock is None or lock.version not in (7, 8) or requested_type not in lock.allowed_types:
         raise ValueError("unrecognized template or disallowed sighash")
     if len(pubkey) != 65 or pubkey[0] != 4:
         raise ValueError("expected uncompressed X9.63 P-256 key")

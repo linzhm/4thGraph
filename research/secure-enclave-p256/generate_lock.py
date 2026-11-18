@@ -5,9 +5,7 @@ import json
 import re
 import sys
 
-from handwritten import UNIVERSAL_FLAGS
-from p2pkh_r1 import locking_script_from_owner_hash, public_key_hash160
-from lock_identity import identify_locking_script
+from p2pkh_r1 import locking_script_from_owner_hash, public_key_hash160, recognize
 
 
 def owner_from_key(value):
@@ -26,37 +24,23 @@ def owner_from_hash(value):
     return bytes.fromhex(value)
 
 
-def parse_policy(value):
-    if re.fullmatch(r"[0-9a-fA-F]{2}(,[0-9a-fA-F]{2})*", value) is None:
-        raise argparse.ArgumentTypeError("expected comma-separated two-digit hex sighash types")
-    flags = {int(field, 16) for field in value.split(",")}
-    if not flags.issubset(UNIVERSAL_FLAGS):
-        raise argparse.ArgumentTypeError("unsupported v7 sighash type")
-    return sorted(flags)
-
-
 def main():
     parser = argparse.ArgumentParser(description=__doc__, allow_abbrev=False)
     owner = parser.add_mutually_exclusive_group(required=True)
     owner.add_argument("--public-key", type=owner_from_key, dest="key_hash", metavar="HEX")
     owner.add_argument("--owner-hash160", type=owner_from_hash, metavar="HEX")
-    parser.add_argument("--allow", type=parse_policy, default=sorted(UNIVERSAL_FLAGS), metavar="HEX[,HEX...]")
     parser.add_argument("--format", choices=("manifest", "raw"), default="manifest")
     args = parser.parse_args()
     owner_hash = args.key_hash if args.key_hash is not None else args.owner_hash160
-    raw = locking_script_from_owner_hash(owner_hash, args.allow)
-    lock = identify_locking_script(raw)
-    if (lock is None or lock.script_type != "P2PKH-R1" or lock.template_version != 7
-            or lock.owner_hash160 != owner_hash or sorted(lock.allowed_types) != args.allow):
-        raise RuntimeError("generated script failed template or payment parameter verification")
+    raw = locking_script_from_owner_hash(owner_hash)
+    if recognize(raw) != owner_hash:
+        raise RuntimeError("generated script failed owner or template verification")
     if args.format == "raw":
         sys.stdout.buffer.write(raw)
         return
     print(json.dumps({
-        "template": lock.script_type,
-        "version": lock.template_version,
-        "owner_hash160": lock.owner_hash160.hex(),
-        "allowed_types": [f"{flag:02x}" for flag in args.allow],
+        "template": "P2PKH-R1",
+        "owner_hash160": owner_hash.hex(),
         "script_bytes": len(raw),
         "script_sha256": sha256(raw).hexdigest(),
     }, indent=2))

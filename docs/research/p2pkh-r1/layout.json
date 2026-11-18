@@ -1,76 +1,17 @@
 {
   "template": "P2PKH-R1",
   "base_script_hex_file": "template.hex",
-  "script_bytes": 59811,
-  "base_script_sha256": "fdf704ef5eb008f6916b2b7f149f94fd410b124505cde8c0648e0710d3ed384e",
+  "script_bytes": 59706,
+  "prefix_hex": "760052a5696b8201209d",
   "owner_hash160": {
-    "offset": 437,
+    "offset": 332,
     "length": 20
   },
-  "sighash_opcodes": {
-    "disabled": "00",
-    "enabled": "51"
-  },
-  "sighash_offsets": {
-    "41": 307,
-    "42": 326,
-    "43": 346,
-    "61": 366,
-    "62": 386,
-    "63": 406,
-    "c1": 316,
-    "c2": 336,
-    "c3": 356,
-    "e1": 376,
-    "e2": 396,
-    "e3": 416
-  },
-  "vectors": [
-    {
-      "id": "A",
-      "owner_hash160": "000102030405060708090a0b0c0d0e0f10111213",
-      "allowed_types": [
-        "41",
-        "61"
-      ],
-      "script_sha256": "6ac6c4dbbf77bb0a73cf2136338c5d81a3c2674f71929f9c2dd196064be6b952"
-    },
-    {
-      "id": "B",
-      "owner_hash160": "1111111111111111111111111111111111111111",
-      "allowed_types": [
-        "42",
-        "e3"
-      ],
-      "script_sha256": "92599b5ff408dbbeb92241bc89e7ce932bdddfd318907c8099db5ba348ef8d52"
-    },
-    {
-      "id": "C",
-      "public_key_x963": "046b17d1f2e12c4247f8bce6e563a440f277037d812deb33a0f4a13945d898c2964fe342e2fe1a7f9b8ee7eb4a7c0f9e162bce33576b315ececbb6406837bf51f5",
-      "owner_hash160": "4ceab2c8be16c1d4c6b4147d39aa449c2d63f184",
-      "allowed_types": [
-        "41",
-        "c1",
-        "42",
-        "c2",
-        "43",
-        "c3",
-        "61",
-        "e1",
-        "62",
-        "e2",
-        "63",
-        "e3"
-      ],
-      "script_sha256": "fdf704ef5eb008f6916b2b7f149f94fd410b124505cde8c0648e0710d3ed384e"
-    }
-  ],
-  "prefix_hex": "760052a5696b8201209d",
-  "fixed_bytes_length": 59779,
-  "fixed_bytes_sha256": "ff3a133504b7ad932bef9c3956972defeb449ed9c78450d04bda324a7c19fa03",
-  "ordinary_fixed_bytes_length": 59791,
-  "ordinary_fixed_bytes_sha256": "41c2aa447c2241e9e3c3c37da3a6b17f113a9aa2c024dc3ae62a73b8d3bdf0e8",
-  "default_allowed_types": [
+  "fixed_bytes_length": 59686,
+  "fixed_bytes_sha256": "95bebb421328f7710133c35925231673e7f3f921b31203ce0f02fe1c6825e892",
+  "base_vector_id": "C",
+  "base_script_sha256": "bef784e131b6095c604523f9b4d2d1a5af8b9eb548353f971bece7695631f9b3",
+  "supported_sighash_types": [
     "41",
     "c1",
     "42",
@@ -84,5 +25,22 @@
     "63",
     "e3"
   ],
-  "base_vector_id": "C"
+  "vectors": [
+    {
+      "id": "A",
+      "owner_hash160": "000102030405060708090a0b0c0d0e0f10111213",
+      "script_sha256": "4047136fffb756ffe667bd5329f3990f16acc876649d33bb96c387820717e72f"
+    },
+    {
+      "id": "B",
+      "owner_hash160": "1111111111111111111111111111111111111111",
+      "script_sha256": "9832bb1a757075188281c4f21f4666c95cb574821f1741914adcbe3f5538d951"
+    },
+    {
+      "id": "C",
+      "public_key_x963": "046b17d1f2e12c4247f8bce6e563a440f277037d812deb33a0f4a13945d898c2964fe342e2fe1a7f9b8ee7eb4a7c0f9e162bce33576b315ececbb6406837bf51f5",
+      "owner_hash160": "4ceab2c8be16c1d4c6b4147d39aa449c2d63f184",
+      "script_sha256": "bef784e131b6095c604523f9b4d2d1a5af8b9eb548353f971bece7695631f9b3"
+    }
+  ]
 }
