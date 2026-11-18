@@ -2,6 +2,21 @@
 
 同一 v7 输出可以在花费时按签名类型选 BIP143 或 OTDA。创建输出时将允许的类型写入模板。默认许可 `0x41`、`0x61` 两种 ALL；可以显式选取 12 种类型的任一非空子集。每笔交易有一个 `nVersion`，每个原生签名有自己的类型字节。Chronicle 激活后，`0x20` 选择 OTDA，`0x40` 是 ForkID，`0x80` 是 ANYONECANPAY。[节点分派](https://github.com/bitcoin-sv/bitcoin-sv/blob/6504a3aff65ba97c0f6c80962b033e35ecbfed4b/src/script/interpreter.cpp#L2112-L2124) · [Chronicle 规范](https://docs.bsvblockchain.org/network-topology/nodes/sv-node/chronicle-release)
 
+## 选型决定
+
+本研究选用 **v7 通用锁、4 位分表、手写 PUSHTX 绑定**。钱包显式传入 `version=7`。固定基点的 16 项表可以逐项与独立曲线库核对，另一张表只依赖本次花费揭示的公钥。BIP143、OTDA 和伴随授权复用同一份 R1 验签主体。选择依据是这份布局已有原生节点上的分支验收、表项可独立检验；百万次测试中获得的速度差属于旧签名格式。[窗口汇编](../../research/secure-enclave-p256/window-4.asm) · [表项测试](../../research/secure-enclave-p256/test_windows.py)
+
+| 版本 | 主要差异 | 完整锁 B | 相对上一行 |
+| --- | --- | ---: | ---: |
+| v3 | 旧签名格式，2 位联合表 | 62,051 | — |
+| v4 | 相同格式，4 位分表 | 61,717 | −334 |
+| v5 | 4 位分表，BIP143 原生摘要，花费者提供求逆值 | 59,431 | −2,286 |
+| v7 | 4 位分表，通用摘要和无配对 SINGLE 路径 | 59,811 | +380 |
+
+v4 仅 `INVERT_SCALAR` 就展开 255 次模平方和 168 次额外模乘，各 5 字节，共 2,115 字节。v5/v7 在锁内检查 32 字节的求逆提示，并把一次双 SHA-256 得到的数值摘要供 R1 验签和原生绑定共同使用。v4 至 v7 完整锁净省 1,906 字节。表中比较的是锁定脚本；提示及其推栈编码计入解锁脚本。[公共运算块](../../research/secure-enclave-p256/payment.asm) · [旧版入口](../../research/secure-enclave-p256/tagged-lock.asm) · [通用入口](../../research/secure-enclave-p256/universal.asm)
+
+nChain 的标准 `pushtx` 可用于固定 sighash 的原像或摘要绑定。上游在生成脚本时把所选类型字节写进程序。v7 在花费时选择类型，还依赖两处执行路径的 `OP_CODESEPARATOR` 来区分普通授权和伴随授权。直接替换会改变这些签名边界。上游固定版本继续用于独立对照；普通付款也无需添加 PELS 的后继输出延续约束。下文列出两种绑定片段实测的锁定与解锁字节。[nChain PUSHTX 源码](https://github.com/nchain-innovation/zkscript_package/blob/fc20fb743edbc5bc5aba9d16625d50d1f50a3ef4/src/zkscript/transaction_introspection/transaction_introspection.py)
+
 ## 钱包与锁的接口
 
 ```python
