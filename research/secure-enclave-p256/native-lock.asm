@@ -26,5 +26,5 @@ block LOCK
   OP_DUP 5 OP_PICK OP_MUL @N OP_MOD OP_1 OP_NUMEQUALVERIFY
   @VERIFY_R1_POINT
   # Shared numeric z; alt still contains the selected one-byte flag.
-  OP_FROMALTSTACK @K1_BIND_DIGEST
+  OP_FROMALTSTACK @K1_BIND_DIGEST_STANDARD
 end

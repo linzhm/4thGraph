@@ -13,15 +13,19 @@ SOURCES = {
     4: ("payment.asm", "tagged-lock.asm", "window-4.asm"),
     5: ("payment.asm", "native-lock.asm", "bip143.asm", "window-4.asm"),
     6: ("payment.asm", "native-lock.asm", "otda.asm", "window-4.asm"),
+    7: ("payment.asm", "universal.asm", "window-4.asm"),
 }
 FLAGS = {0x41: "ALL", 0xC1: "ALL_ACP", 0x42: "NONE", 0xC2: "NONE_ACP", 0x43: "SINGLE", 0xC3: "SINGLE_ACP"}
 
 
 OTDA_FLAGS = {flag | 0x20: name for flag, name in FLAGS.items()}
+UNIVERSAL_FLAGS = {**FLAGS, **{flag: "OTDA_" + name for flag, name in OTDA_FLAGS.items()}}
 GROUP_ORDER_R1 = 0xffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc632551
 
 
 def flags_for(version):
+    if version == 7:
+        return UNIVERSAL_FLAGS
     return OTDA_FLAGS if version == 6 else FLAGS
 
 
@@ -101,7 +105,7 @@ def _assembly(version):
 @cache
 def _template(version):
     blocks, emit = _assembly(version)
-    # All seven template parameters occur directly in LOCK. The 20-byte hash
+    # Template parameters occur directly in LOCK. The 20-byte hash
     # payload follows a fixed direct push. Each policy bit is exactly one opcode.
     skeleton = bytearray()
     owner_offset = None
@@ -141,7 +145,8 @@ def _locking_bytes(owner_hash160, allowed, version):
 
 
 def locking_script(owner_hash160: bytes, allowed_types=None, *, version=2) -> Script:
-    allowed = {0x61 if version == 6 else 0x41} if allowed_types is None else set(allowed_types)
+    default = {0x41, 0x61} if version == 7 else {0x61 if version == 6 else 0x41}
+    allowed = default if allowed_types is None else set(allowed_types)
     if len(owner_hash160) != 20 or not allowed or not allowed.issubset(flags_for(version)):
         raise ValueError("expected a 20-byte owner hash and supported ForkID types")
     out = Script()
@@ -165,7 +170,7 @@ def _matcher(version):
 
 def match_locking_script(raw: bytes) -> PaymentLock | None:
     """Match a raw scriptPubKey (no CompactSize prefix) against a known version."""
-    for version in (2, 3, 4, 5, 6, 1):
+    for version in (7, 2, 3, 4, 5, 6, 1):
         size, header, end, suffix = _matcher(version)
         if len(raw) != size:
             continue

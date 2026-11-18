@@ -27,6 +27,9 @@ jobs:
       - name: Time native digest profiles on the same runner
         working-directory: research/secure-enclave-p256
         run: python test_native.py
+      - name: Verify universal spends on an isolated BSV 1.2.3 interpreter
+        working-directory: research/secure-enclave-p256
+        run: bash verify-regtest.sh
       - name: Check the pinned nChain PUSHTX reference
         uses: actions/checkout@v4
         with:

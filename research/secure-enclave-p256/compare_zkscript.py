@@ -37,7 +37,7 @@ class ReferenceTests(unittest.TestCase):
         _, emit = _assembly(5)
         manual = Script()
         manual.append_data(push(bytes([flag])) + emit("OP_TOALTSTACK") + emit("OP_HASH256")
-                           + emit("@UINT256BE") + emit("@K1_BIND_DIGEST"))
+                           + emit("@UINT256BE") + emit("@K1_BIND_DIGEST_STANDARD"))
         upstream = TransactionIntrospection.pushtx(
             sighash_flags=flag, is_opcodeseparator=True, is_checksigverify=False,
             verify_constants=True, clean_constants=True, is_sig_hash_preimage=True)
