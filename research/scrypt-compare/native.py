@@ -18,7 +18,10 @@ def compact(n):
 
 unsigned = bytes.fromhex(fixture["unsigned_tx_hex"])
 assert unsigned[4] == 1 and unsigned[41] == 0
-for name in ("pels","scrypt"):
+names = ["pels", "scrypt"]
+if (tmp / "eight-lock.bin").exists():
+    names.append("eight")
+for name in names:
     lock = (tmp / (name + "-lock.bin")).read_bytes()
     witness = (tmp / (name + "-unlock.bin")).read_bytes()
     tx = unsigned[:41] + compact(len(witness)) + witness + unsigned[42:]

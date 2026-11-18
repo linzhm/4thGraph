@@ -5,6 +5,7 @@ on:
     paths: ['research/scrypt-compare/**', '.github/workflows/scrypt-compare.yml']
 permissions:
   contents: read
+  actions: read
 jobs:
   compare:
     runs-on: ubuntu-24.04
@@ -56,10 +57,24 @@ jobs:
             ${{ runner.temp }}/pels-lock.bin
             ${{ runner.temp }}/pels-unlock.bin
           retention-days: 7
+      - name: Retrieve the original compiled eight-method artifact for the joint replay
+        if: contains(github.event.head_commit.message, '[replay-eight]')
+        uses: actions/download-artifact@v4
+        with:
+          name: measured-script-bytes
+          run-id: 44395521127
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/eight
       - name: Check both inputs on an isolated BSV Node 1.2.3
         run: |
+          if test -d "$RUNNER_TEMP/eight"; then
+            cmp "$RUNNER_TEMP/eight/pels-lock.bin" "$RUNNER_TEMP/pels-lock.bin"
+            cmp "$RUNNER_TEMP/eight/pels-unlock.bin" "$RUNNER_TEMP/pels-unlock.bin"
+            cp "$RUNNER_TEMP/eight/scrypt-lock.bin" "$RUNNER_TEMP/eight-lock.bin"
+            cp "$RUNNER_TEMP/eight/scrypt-unlock.bin" "$RUNNER_TEMP/eight-unlock.bin"
+          fi
           sed -e 's/-maxtxsizepolicy=100000000/-maxtxsizepolicy=100000000 -maxscriptsizepolicy=6000000/' \
               -e 's/-maxstdtxvalidationduration=1000 /-maxstdtxvalidationduration=10000 /' \
-              -e 's/-maxnonstdtxvalidationduration=2000 /-maxnonstdtxvalidationduration=11000 /' \
+              -e 's/-maxnonstdtxvalidationduration=2000 /-maxnonstdtxvalidationduration=11000 -maxtxnvalidatorasynctasksrunduration=12000 /' \
               -e 's|python -m unittest -v test_payment|python research/scrypt-compare/native.py|' reference/verify.sh > "$RUNNER_TEMP/compare-native.sh"
           bash "$RUNNER_TEMP/compare-native.sh"
