@@ -129,7 +129,7 @@ class DigestPaymentTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     child(parents, [900], {1: w}).validate(parents)
             else:
-                # Engine 0.13.1 raises here; the pinned BSV node returns uint256(1).
+                # The OTDA digest is a sentinel with no serialized preimage.
                 with self.assertRaises(ValueError):
                     sig_hash_preimage(child(parents, [900]), 1, SUFFIX, 1000, flag)
 

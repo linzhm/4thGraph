@@ -9,7 +9,7 @@ import unittest
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import ec, utils
 import requests
-from tx_engine import Script, Tx, TxIn, TxOut
+from tx_engine import Script, Tx, TxIn, TxOut, sig_hash, sig_hash_preimage
 
 from handwritten import UNIVERSAL_FLAGS, locking_script, match_locking_script, replace_owner_hash160
 from test_native import TRUE, child, parent, signer
@@ -62,7 +62,9 @@ class UniversalTests(unittest.TestCase):
                 with self.subTest(ix=ix, flag=hex(flag)):
                     a, sig = self.data(parents, ix, [650, 700], flag)
                     w = self.unlock(parents, ix, a, sig)
-                    check(child(parents, [650, 700], {ix: w}), parents, ix)
+                    tx = child(parents, [650, 700], {ix: w})
+                    tx.validate(parents)
+                    check(tx, parents, ix)
                     values = [650, 700]
                     values[ix] -= 1
                     check(child(parents, values, {ix: w}), parents, ix, valid=(flag & 31 == 2))
@@ -74,7 +76,14 @@ class UniversalTests(unittest.TestCase):
                 a, sig = self.data(parents, 1, [900], flag)
                 self.assertEqual(a.companion, bool(flag & 0x20))
                 w = self.unlock(parents, 1, a, sig)
-                check(child(parents, [900], {1: w}), parents, 1)
+                tx = child(parents, [900], {1: w})
+                tx.validate(parents)
+                check(tx, parents, 1)
+                if a.companion:
+                    script = Script.parse_string("OP_CHECKSIG")
+                    self.assertEqual(bytes(sig_hash(tx, 1, script, 1000, flag)), b"\x01" + bytes(31))
+                    with self.assertRaises(ValueError):
+                        sig_hash_preimage(tx, 1, script, 1000, flag)
                 check(child(parents, [899], {1: w}), parents, 1)
                 check(child(parents, [898, 1], {1: w}), parents, 1, False)
                 if a.companion:
@@ -99,6 +108,7 @@ class UniversalTests(unittest.TestCase):
         wa = self.unlock(ps, 0, *self.data(ps, 0, [900], 0x42))
         wb = self.unlock(ps, 1, *self.data(ps, 1, [900], 0x61))
         tx = child(ps, [900], {0: wa, 1: wb})
+        tx.validate(ps)
         check(tx, ps, 0)
         check(tx, ps, 1)
 
