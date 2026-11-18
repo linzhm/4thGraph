@@ -7,15 +7,15 @@ import re
 from cryptography.hazmat.primitives.asymmetric import ec
 
 
-SCRIPT_SIZE = 59706
-OWNER_START = 332
-OWNER_END = 352
+SCRIPT_SIZE = 59582
+OWNER_START = 208
+OWNER_END = 228
 _OWNER_PATTERN = re.compile(
-    rb"\x76\x00\x52\xa5\x69\x6b\x82\x01\x20\x9d.{322}(?P<owner_hash160>.{20}).{59354}",
+    rb"\x76\x00\x52\xa5\x69\x76\x6b\x7c\x82\x01.{198}(?P<owner_hash160>.{20}).{59354}",
     re.DOTALL,
 )
-_FIXED_HASH = bytes.fromhex("95bebb421328f7710133c35925231673e7f3f921b31203ce0f02fe1c6825e892")
-_BASE_HASH = bytes.fromhex("bef784e131b6095c604523f9b4d2d1a5af8b9eb548353f971bece7695631f9b3")
+_FIXED_HASH = bytes.fromhex("2129d374594069d08a9b2127555f48ea21c75fb06d1ad5e77c68ad251e97f784")
+_BASE_HASH = bytes.fromhex("b3acd6b92a23120bd24432ada2b1cac013fe06381d7ea96ac6c5a73c493f4287")
 
 
 def public_key_hash160(public_key: bytes) -> bytes:
@@ -28,7 +28,7 @@ def public_key_hash160(public_key: bytes) -> bytes:
 
 @cache
 def _base_program() -> bytes:
-    path = Path(__file__).resolve().parents[2] / "docs/research/p2pkh-r1/template.hex"
+    path = Path(__file__).resolve().parents[2] / "docs/research/p2pkh-r1-current-input/template.hex"
     raw = bytes.fromhex(path.read_text(encoding="ascii"))
     if len(raw) != SCRIPT_SIZE or sha256(raw).digest() != _BASE_HASH:
         raise ValueError("canonical P2PKH-R1 fixture mismatch")

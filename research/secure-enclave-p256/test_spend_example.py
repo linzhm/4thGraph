@@ -10,12 +10,16 @@ from cryptography.hazmat.primitives.asymmetric import ec, utils
 from tx_engine import Script, Tx, TxIn, TxOut, Wallet
 
 from checked_wallet import sign_payment
-from handwritten import GROUP_ORDER_R1
-from p2pkh_r1 import locking_script_from_public_key, public_key_hash160, recognize
+from handwritten import GROUP_ORDER_R1, locking_script, match_locking_script
+from p2pkh_r1 import public_key_hash160
 from replay_payment import replay
 from test_native import signer
 from test_universal import check
 from universal import authorization, universal_unlocking_script
+
+
+def archived_lock(public_key):
+    return locking_script(public_key_hash160(public_key), version=8).raw_serialize()
 
 
 def fixture_signature(key, digest):
@@ -35,8 +39,8 @@ class OrdinaryPaymentTest(unittest.TestCase):
         key_b, pub_b, _ = signer(19)
 
         def r1_lock(public_key):
-            raw = locking_script_from_public_key(public_key)
-            self.assertEqual(recognize(raw), public_key_hash160(public_key))
+            raw = archived_lock(public_key)
+            self.assertEqual(match_locking_script(raw).owner_hash160, public_key_hash160(public_key))
             script = Script()
             script.append_data(raw)
             return script
@@ -130,7 +134,7 @@ class OrdinaryPaymentTest(unittest.TestCase):
     def test_complete_parent_is_one_literal_push(self):
         key, pubkey, _ = signer(1)
         lock = Script()
-        lock.append_data(locking_script_from_public_key(pubkey))
+        lock.append_data(archived_lock(pubkey))
         other = Script.parse_string("OP_1")
         outputs = [TxOut(99_000, other)]
 
@@ -170,7 +174,7 @@ class OrdinaryPaymentTest(unittest.TestCase):
     def test_complete_payment(self):
         key, pubkey, _ = signer(1)  # Public P-256 generator point, for this fixture only.
         parent_lock = Script()
-        parent_lock.append_data(locking_script_from_public_key(pubkey))
+        parent_lock.append_data(archived_lock(pubkey))
         parent = Tx(2, [TxIn("22" * 32, 0, Script())], [TxOut(100_000, parent_lock)], 0)
         destination = Script.parse_string(
             "OP_DUP OP_HASH160 0x000102030405060708090a0b0c0d0e0f10111213 OP_EQUALVERIFY OP_CHECKSIG"

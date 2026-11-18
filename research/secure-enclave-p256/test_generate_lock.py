@@ -33,7 +33,7 @@ class GenerateLockTest(unittest.TestCase):
         manifest = run_cli("--owner-hash160", owner)
         self.assertEqual(manifest.returncode, 0, manifest.stderr)
         self.assertEqual(json.loads(manifest.stdout), {
-            "template": "P2PKH-R1", "owner_hash160": owner, "script_bytes": 59706,
+            "template": "P2PKH-R1", "owner_hash160": owner, "script_bytes": 59582,
             "script_sha256": sha256(generated.stdout).hexdigest(),
         })
         self.assertEqual(generated.stdout, locking_script_from_public_key(bytes.fromhex(PUBLIC)))
@@ -54,7 +54,7 @@ class GenerateLockTest(unittest.TestCase):
                 self.assertEqual(result.stdout, b"")
 
     def test_portable_vectors_and_program_fingerprint(self):
-        directory = CLI.parents[2] / "docs/research/p2pkh-r1"
+        directory = CLI.parents[2] / "docs/research/p2pkh-r1-current-input"
         layout = json.loads((directory / "layout.json").read_text())
         base = bytes.fromhex((directory / layout["base_script_hex_file"]).read_text())
         start = layout["owner_hash160"]["offset"]
@@ -67,7 +67,7 @@ class GenerateLockTest(unittest.TestCase):
         self.assertEqual({int(f, 16) for f in layout["supported_sighash_types"]}, set(UNIVERSAL_FLAGS))
         for vector in layout["vectors"]:
             owner = bytes.fromhex(vector["owner_hash160"])
-            assembled = locking_script(owner, version=8).raw_serialize()
+            assembled = locking_script(owner, version=9).raw_serialize()
             self.assertEqual(assembled, base[:start] + owner + base[end:])
             self.assertEqual(len(assembled), layout["script_bytes"])
             self.assertEqual(sha256(assembled).hexdigest(), vector["script_sha256"])
@@ -81,4 +81,4 @@ class GenerateLockTest(unittest.TestCase):
         self.assertIsNone(recognize(base + b"0"))
         self.assertIsNone(recognize(base[:-1]))
         with self.assertRaises(ValueError):
-            locking_script(bytes(20), (0x41,), version=8)
+            locking_script(bytes(20), (0x41,), version=9)

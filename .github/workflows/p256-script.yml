@@ -5,6 +5,7 @@ on:
     paths:
       - 'research/secure-enclave-p256/**'
       - 'docs/research/p2pkh-r1/**'
+      - 'docs/research/p2pkh-r1-current-input/**'
       - '.github/workflows/p256-script.yml'
 
 permissions:
@@ -48,7 +49,7 @@ jobs:
           python generate_lock.py --owner-hash160 "$OWNER_HASH" > "$RUNNER_TEMP/manifest.json"
           python generate_lock.py --owner-hash160 "$OWNER_HASH" --format raw > "$RUNNER_TEMP/scriptPubKey.bin"
           cd "$RUNNER_TEMP"
-          python -c 'import hashlib, json, pathlib; b=pathlib.Path("scriptPubKey.bin").read_bytes(); m=json.loads(pathlib.Path("manifest.json").read_text()); assert len(b)==m["script_bytes"]==59706 and hashlib.sha256(b).hexdigest()==m["script_sha256"]'
+          python -c 'import hashlib, json, pathlib; b=pathlib.Path("scriptPubKey.bin").read_bytes(); m=json.loads(pathlib.Path("manifest.json").read_text()); assert len(b)==m["script_bytes"]==59582 and hashlib.sha256(b).hexdigest()==m["script_sha256"]'
           cat manifest.json
       - uses: actions/upload-artifact@v4
         with:

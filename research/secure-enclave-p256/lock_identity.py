@@ -55,7 +55,7 @@ def identify_locking_script(raw: bytes) -> LockIdentity | None:
         if owner is None:
             return None
         return LockIdentity("P2PKH-R1", "secp256r1", owner_hash160=owner,
-                            template_version=8, allowed_types=tuple(UNIVERSAL_FLAGS))
+                            template_version=9, allowed_types=tuple(UNIVERSAL_FLAGS))
 
     # Match the exact R1 program (including its fixed verifier suffix) before
     # extracting its parameter slots. Embedded curve constants have no owner role.

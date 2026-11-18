@@ -1,5 +1,9 @@
 # P2PKH-R1 付款锁
 
+当前付款模板在 ForkID ALL 下只需 326 字节解锁数据。使用 `generate_lock.py` 生成新输出，使用 `checked_wallet.sign_payment` 花费。规范、字节向量与验收结果见[中文 RFC](../../docs/research/p2pkh-r1-proposal.zh-CN.md) 或 [English RFC](../../docs/research/p2pkh-r1-proposal.en.md)。
+
+## 早期研究记录
+
 **v7 通用锁**可从同一个 UTXO 选择 BIP143 或 OTDA。显式传入 `version=7`，用 `universal.authorization` 构造花费时应签的摘要。本文后续的四项解锁、固定 158 字节和标签签名描述 v2–v4。[通用锁接口、无配对 SINGLE、原生测试及字节对照](../../docs/research/p2pkh-r1-universal.md)
 
 这个研究模板实现普通持有人付款。付款人把收款人的 P-256 公钥哈希写入锁定脚本。收款人可签署带多个输入、多个收款输出及找零的交易；新输出可使用其他锁定脚本。默认签名类型是 `ALL|FORKID`（0x41）。[手写 Bitcoin Script](./payment.asm) · [Python 装配入口](./handwritten.py) · [交易测试](./test_handwritten.py)

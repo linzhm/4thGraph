@@ -1,0 +1,46 @@
+{
+  "template": "P2PKH-R1",
+  "base_script_hex_file": "template.hex",
+  "script_bytes": 59582,
+  "prefix_hex": "760052a569766b7c8201",
+  "owner_hash160": {
+    "offset": 208,
+    "length": 20
+  },
+  "fixed_bytes_length": 59562,
+  "fixed_bytes_sha256": "2129d374594069d08a9b2127555f48ea21c75fb06d1ad5e77c68ad251e97f784",
+  "base_vector_id": "C",
+  "base_script_sha256": "b3acd6b92a23120bd24432ada2b1cac013fe06381d7ea96ac6c5a73c493f4287",
+  "supported_sighash_types": [
+    "41",
+    "c1",
+    "42",
+    "c2",
+    "43",
+    "c3",
+    "61",
+    "e1",
+    "62",
+    "e2",
+    "63",
+    "e3"
+  ],
+  "vectors": [
+    {
+      "id": "A",
+      "owner_hash160": "000102030405060708090a0b0c0d0e0f10111213",
+      "script_sha256": "4a968ab40f2d536b62ff8e26978d74001d612399d517dae1a861f6745a370ea9"
+    },
+    {
+      "id": "B",
+      "owner_hash160": "1111111111111111111111111111111111111111",
+      "script_sha256": "de988f370887958a2858c39b3c24f6b1b5d4b7f737fb84340094b1f818dce63d"
+    },
+    {
+      "id": "C",
+      "public_key_x963": "046b17d1f2e12c4247f8bce6e563a440f277037d812deb33a0f4a13945d898c2964fe342e2fe1a7f9b8ee7eb4a7c0f9e162bce33576b315ececbb6406837bf51f5",
+      "owner_hash160": "4ceab2c8be16c1d4c6b4147d39aa449c2d63f184",
+      "script_sha256": "b3acd6b92a23120bd24432ada2b1cac013fe06381d7ea96ac6c5a73c493f4287"
+    }
+  ]
+}
