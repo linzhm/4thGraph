@@ -23,7 +23,24 @@ jobs:
       - run: python -m pip install --only-binary=tx-engine tx-engine==0.13.1
       - name: Validate handwritten Script locally in the Rust engine
         working-directory: research/secure-enclave-p256
-        run: python -m unittest -v test_handwritten test_windows test_native test_checked_wallet test_lock_identity
+        run: python -m unittest -v test_handwritten test_windows test_native test_checked_wallet test_lock_identity test_generate_lock
+      - name: Generate the public example and verify its manifest
+        working-directory: research/secure-enclave-p256
+        env:
+          OWNER_HASH: '000102030405060708090a0b0c0d0e0f10111213'
+        run: |
+          python generate_lock.py --owner-hash160 "$OWNER_HASH" > "$RUNNER_TEMP/manifest.json"
+          python generate_lock.py --owner-hash160 "$OWNER_HASH" --format raw > "$RUNNER_TEMP/scriptPubKey.bin"
+          cd "$RUNNER_TEMP"
+          python -c 'import hashlib, json, pathlib; b=pathlib.Path("scriptPubKey.bin").read_bytes(); m=json.loads(pathlib.Path("manifest.json").read_text()); assert len(b)==m["script_bytes"]==59811 and hashlib.sha256(b).hexdigest()==m["script_sha256"]'
+          cat manifest.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: p2pkh-r1-v7-public-example
+          path: |
+            ${{ runner.temp }}/manifest.json
+            ${{ runner.temp }}/scriptPubKey.bin
+          if-no-files-found: error
       - name: Time native digest profiles on the same runner
         working-directory: research/secure-enclave-p256
         run: python test_native.py
