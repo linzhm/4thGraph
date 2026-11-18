@@ -25,7 +25,7 @@
 | `ALL + ANYONECANPAY`（0xc1） | 32 字节零 | 32 字节零 | 全部输出的有序摘要 |
 | `SINGLE + ANYONECANPAY`（0xc3） | 32 字节零 | 32 字节零 | 同索引输出摘要，越界为 32 字节零 |
 
-`NONE` 的 `hashOutputs` 为零，无法支撑这里的延续规则。表中的“零”指字段取全零常量。每一行还直接写入交易版本、当前 outpoint、当前执行的 `scriptCode`（含序列化长度）、当前所花 UTXO 的金额、当前 sequence、交易锁定时间及签名类型。金额是当前输入单独的 8 字节字段。原像没有独立的输入位置、输入总数或输出总数字段；其他输入的解锁脚本、签名和逐项金额也不在其中。[节点聚合和原像构造](https://github.com/bitcoin-sv/bitcoin-sv/blob/6504a3aff65ba97c0f6c80962b033e35ecbfed4b/src/script/interpreter.cpp#L1960-L1982) · [字段写入顺序](https://github.com/bitcoin-sv/bitcoin-sv/blob/6504a3aff65ba97c0f6c80962b033e35ecbfed4b/src/script/interpreter.cpp#L2034-L2084)
+`NONE` 的 `hashOutputs` 为零，无法支撑这里的延续规则。持有人付款可以显式选择这种授权：`0x42` 保留全部输入 outpoint，`0xc2` 只绑定当前输入，两者均允许替换全部输出。[手写 P-256 付款锁的六种模式](../../research/secure-enclave-p256/README.md)表中的“零”指字段取全零常量。每一行还直接写入交易版本、当前 outpoint、当前执行的 `scriptCode`（含序列化长度）、当前所花 UTXO 的金额、当前 sequence、交易锁定时间及签名类型。金额是当前输入单独的 8 字节字段。原像没有独立的输入位置、输入总数或输出总数字段；其他输入的解锁脚本、签名和逐项金额也不在其中。[节点聚合和原像构造](https://github.com/bitcoin-sv/bitcoin-sv/blob/6504a3aff65ba97c0f6c80962b033e35ecbfed4b/src/script/interpreter.cpp#L1960-L1982) · [字段写入顺序](https://github.com/bitcoin-sv/bitcoin-sv/blob/6504a3aff65ba97c0f6c80962b033e35ecbfed4b/src/script/interpreter.cpp#L2034-L2084)
 
 节点对 outpoint 逐项写入 32 字节交易标识（线序）和 4 字节小端输出序号。节点对输出逐项写入 `E(v,s) = LE64(v) || CompactSize(len(s)) || s`，其中金额以聪计，脚本长度以字节计。两种聚合都**不带向量开头的数量前缀**，每个输出内部仍有脚本长度前缀。完整交易序列化则包含输入和输出向量的数量。下文的摘要等式假设双 SHA-256 具有相应的抗碰撞及抗第二原像性。[BSV 交易类型与序列化](https://github.com/bitcoin-sv/bitcoin-sv/blob/6504a3aff65ba97c0f6c80962b033e35ecbfed4b/src/primitives/transaction.h) · [CompactSize 编解码规则](https://github.com/bitcoin-sv/bitcoin-sv/blob/6504a3aff65ba97c0f6c80962b033e35ecbfed4b/src/serialize.h#L296-L340)
 

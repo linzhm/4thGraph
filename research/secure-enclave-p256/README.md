@@ -1,14 +1,14 @@
 # 用 Apple Secure Enclave 公钥收取 BSV
 
-这个研究模板实现普通持有人付款。付款人把收款人的 P-256 公钥哈希写入锁定脚本。收款人可签署带多个输入、多个收款输出及找零的交易；新输出可使用其他锁定脚本。默认签名类型是 `ALL|FORKID`（0x41）。[锁定与解锁脚本生成器](./script.mjs) · [可复现的交易材料](./fixture.mjs)
+这个研究模板实现普通持有人付款。付款人把收款人的 P-256 公钥哈希写入锁定脚本。收款人可签署带多个输入、多个收款输出及找零的交易；新输出可使用其他锁定脚本。默认签名类型是 `ALL|FORKID`（0x41）。[手写 Bitcoin Script](./payment.asm) · [Python 装配入口](./handwritten.py) · [交易测试](./test_handwritten.py)
 
-**实测大小是主要取舍。** 默认锁定脚本为 **339,383 字节**。BSV 节点的原生 `CHECKSIG` 使用 secp256k1，Secure Enclave 使用 NIST P-256（secp256r1）。本模板把 P-256 验签展开为 BSV 整数运算，用原生 `CHECKSIG` 绑定当前交易。标准 P2PKH 的所有者模型得以保留，但不能沿用其 25 字节脚本或标准地址编码。此大小是本参考实现的测量值，并非 P-256 验签的理论下限。[BSV 节点 CPubKey::Verify](https://github.com/bitcoin-sv/bitcoin-sv/blob/6504a3aff65ba97c0f6c80962b033e35ecbfed4b/src/pubkey.cpp#L183-L214) · [Apple SecureEnclave.P256.Signing.PrivateKey](https://developer.apple.com/documentation/cryptokit/secureenclave/p256/signing/privatekey)
+**实测大小是主要取舍。** 默认锁定脚本为 **214,973 字节**。BSV 节点的原生 `CHECKSIG` 使用 secp256k1，Secure Enclave 使用 NIST P-256（secp256r1）。本模板把 P-256 验签展开为 BSV 整数运算，用原生 `CHECKSIG` 绑定当前交易。标准 P2PKH 的所有者模型得以保留，但不能沿用其 25 字节脚本或标准地址编码。此大小是本参考实现的测量值，并非 P-256 验签的理论下限。[BSV 节点 CPubKey::Verify](https://github.com/bitcoin-sv/bitcoin-sv/blob/6504a3aff65ba97c0f6c80962b033e35ecbfed4b/src/pubkey.cpp#L183-L214) · [Apple SecureEnclave.P256.Signing.PrivateKey](https://developer.apple.com/documentation/cryptokit/secureenclave/p256/signing/privatekey)
 
 ## 锁定参数与解锁栈
 
-`lockingScriptHex(ownerHash160, allowedTypes = [0x41])` 返回可直接序列化进交易输出的十六进制 Script。所有者标识为 `RIPEMD160(SHA256(Q))`，对完整的 65 字节非压缩 X9.63 公钥求哈希，含开头的 `04`。同一公钥采用另一种编码会产生不同哈希。付款时应确切约定模板和允许的类型。普通付款只需默认值。[Apple 公钥编码](https://developer.apple.com/documentation/cryptokit/p256/signing/publickey/x963representation)
+`locking_script(owner_hash160, allowed_types=(0x41,))` 返回 chain-gang 的 `Script`；`.raw_serialize()` 给出可写入输出的操作码字节。所有者标识为 `RIPEMD160(SHA256(Q))`，对完整的 65 字节非压缩 X9.63 公钥求哈希，含开头的 `04`。同一公钥采用另一种编码会产生不同哈希。付款时应确切约定模板和允许的类型。普通付款只需默认值。[Apple 公钥编码](https://developer.apple.com/documentation/cryptokit/p256/signing/publickey/x963representation)
 
-`unlockingScriptHex(parentHex, preimageHex, x963PublicKeyHex, rawSignatureHex)` 返回四次规范压栈组成的解锁脚本。顺序从栈底到栈顶：
+`unlocking_script(parent, preimage, pubkey, signature)` 接收四段原始 bytes，返回四次压栈组成的解锁脚本。顺序从栈底到栈顶：
 
 | 栈项 | 格式及用途 |
 | --- | --- |
@@ -21,7 +21,7 @@
 
 ## 脚本怎样执行
 
-以下是生成器的逻辑形态，方括号表示生成器实际展开的子程序。输出字节码只包含节点支持的操作码。
+`payment.asm` 是付款锁的源文件。`LOCK` 给出执行顺序，`ADD_POINTS` 写明有限域运算与栈槽，`SCALAR_STEP` 写明每个标量位的处理。`@` 引用命名操作码块或常量，`repeat` 在装配时复制固定次数。Python 直接连接这些指令，`tx-engine` 负责操作码编码和 Rust 执行。下图按功能概括源码。
 
 ```text
 scriptSig     <parentTx> <P> <Q> <r||s>
@@ -72,26 +72,45 @@ func signSpend(preimage: Data, key: SecureEnclave.P256.Signing.PrivateKey) throw
 | `0xc1 ALL\|FORKID\|ANYONECANPAY` | 所有输出固定，可以另加满足自身授权的手续费输入。 |
 | `0x43 SINGLE\|FORKID` | 输入引用顺序固定，仅同索引输出受输出承诺覆盖。 |
 | `0xc3 SINGLE\|FORKID\|ANYONECANPAY` | 签署当前输入及其配对输出，可将二者一起调位。 |
+| `0x42 NONE\|FORKID` | 持有人授权花费该输入，所有输出均可替换，包括收款人、金额及输出数量。全部输入的 outpoint 及顺序仍固定。 |
+| `0xc2 NONE\|FORKID\|ANYONECANPAY` | 所有输出均可替换，其他输入也可以增加、替换或移除，只要交易整体有效。 |
 
-可在创建输出时显式传入多项，所有者签名时从中选择。模板对两种 SINGLE 模式都拒绝缺失配对输出；金额和收款脚本由持有人签署，不要求复制当前锁。四种模式仍直接承诺当前 outpoint、金额、sequence、版本、锁定时间、类型和本次执行的 scriptCode。[BSV ForkID 实现](https://github.com/bitcoin-sv/bitcoin-sv/blob/6504a3aff65ba97c0f6c80962b033e35ecbfed4b/src/script/interpreter.cpp#L2034-L2084)
+可在创建输出时显式传入多项，所有者签名时从中选择。两种 NONE 模式的 `hashOutputs`、`hashSequence` 均为 32 字节零。其中 `0x42` 仍写入真实 `hashPrevouts`，`0xc2` 将其置零。NONE 不要求同索引输出，交易本身仍需至少一个合法输出。两种 SINGLE 模式均要求同索引输出存在。六种模式均直接承诺当前 outpoint、金额、sequence、版本、锁定时间、类型和本次执行的 scriptCode。[BSV ForkID 实现](https://github.com/bitcoin-sv/bitcoin-sv/blob/6504a3aff65ba97c0f6c80962b033e35ecbfed4b/src/script/interpreter.cpp#L2034-L2084)
 
-## 离线验证与边界
+## 两个输入分别授权
 
-默认样本使用合成父交易，目标输入金额为 1,000 聪。子交易有两个输入、两个输出；公开样本签名授权 800 聪和 300 聪两个输出。第二个输入代表另一资金来源，夹具只验证输入 0。生成的真实操作码已在独立的轻量指令解释器中核对 14 个正反场景：
+A 提供输入 0，B 提供输入 1。A 的 P-256 签名选择 `NONE`，B 的锁由另一把钥匙控制并固定允许的签名类型。节点分别执行两把锁，两者都成功才能花费两个 UTXO。下表均复用原始签名，且变更后总金额合法。
 
-| 改动 | 预期与本次结果 |
-| --- | --- |
-| 正确的 ALL 材料；随后把找零从 300 改为 299 聪或追加输入，复用旧材料 | 原交易通过，两个改动均拒绝 |
-| 替换父交易、换公钥、令 s 为零，或挪用另一份交易授权 | 四项均拒绝 |
-| 固定仅允许 ALL 的锁，提交有效的 SINGLE 授权 | 拒绝 |
-| 显式允许 SINGLE，同索引输出存在；修改其他输出；修改同索引输出；缺少配对输出 | 依次通过、通过、拒绝、拒绝 |
-| 显式允许 ALL+ACP 或 SINGLE+ACP 后追加输入 | 两项均通过 |
+| A 签名 | B 签名 | 仅改输出 0 | 仅改输出 1 | 移除 B 并改付任意合法输出 |
+| --- | --- | --- | --- | --- |
+| `NONE` | `SINGLE` | 通过 | 拒绝 | 拒绝 |
+| `NONE` | `ALL` | 拒绝 | 拒绝 | 拒绝 |
+| `NONE+ANYONECANPAY` | `SINGLE` | 通过 | 拒绝 | 通过 |
+| `NONE+ANYONECANPAY` | `ALL` | 拒绝 | 拒绝 | 通过 |
 
-可复现样本使用 Node.js 标准库，含原像、脚本哈希和 OpenSSL P-256 验签断言。第二条命令生成原生 BSV 节点 `verifyscript` 的 JSON 请求，含相同解锁脚本下的原交易及改找零交易，预期分别为 `ok`、`error`。该命令只写标准输出，样本不需要真实 UTXO。[节点 RPC 参数及返回值](https://github.com/bitcoin-sv/bitcoin-sv/blob/6504a3aff65ba97c0f6c80962b033e35ecbfed4b/src/rpc/misc.cpp#L506-L603)
+`NONE` 保留 `hashPrevouts`。如果 A 的签名必须交由 B 决定去向，A 的钱包应在签名前核对 B 的具体 outpoint、它在输入列表的位置以及该 UTXO 的真实锁定条件。B 的每条可用花费路径都须提供业务所需的输出约束。此时移除或替换 B 都会使原 A 签名失效。A 若使用 `NONE+ANYONECANPAY`，持有该签名的一方可以单独花费 A；B 的签名即使覆盖全部输出，其约束也只在实际花费 B 时生效。
 
-```sh
-node research/secure-enclave-p256/fixture.mjs
-node research/secure-enclave-p256/fixture.mjs --rpc > p256-verifyscript.json
+B 用 `SINGLE` 时，业务应把希望保护的收款安排在与 **B 的输入位置**相同的输出位置。B 用 `ALL` 时，A 可以先授权确定的输入组合，B 再确定并签署全部输出。两笔输入的聪在整笔交易中共同结算，协议没有逐聪指定哪个输入支付哪个输出。[两把独立密钥的交易验收](./test_handwritten.py)
+
+## 装配与云端验收
+
+```python
+from handwritten import FLAGS, locking_script
+
+default_lock = locking_script(owner_hash160)
+all_six = locking_script(owner_hash160, allowed_types=tuple(FLAGS))
+all_and_none = locking_script(owner_hash160, allowed_types=(0x41, 0x42))
+locking_bytes = all_six.raw_serialize()
 ```
 
-本次核验覆盖合成 ECDSA 签名和已生成操作码。尚未取得 Apple 硬件签名、BSV 原生节点执行结果或节点接收策略及执行时间的实测值。轻量解释器只用于本次交叉检查，不构成共识实现。此模板的交付状态为研究参考实现。
+测试使用 Python 3.12 和 `tx-engine==0.13.1`。软件 P-256 密钥生成与 CryptoKit 相同格式的签名；Rust 引擎对实际序列化的子交易执行 `Tx.validate(parents)`，包括手续费输入。修改交易的用例复用原来的完整解锁脚本，避免重新签名掩盖覆盖范围。测试还复核了迁移前的原像、公钥与签名向量。[chain-gang 的交易 API](https://github.com/nchain-innovation/chain-gang/blob/v0.13.1/docs/Python-API.md) · [六种模式的验收记录](https://github.com/linzhm/bsv-script-lab/actions/runs/44334209706)
+
+```sh
+python -m pip install tx-engine==0.13.1
+cd research/secure-enclave-p256
+python -m unittest -v test_handwritten
+```
+
+`zkscript_package` 提供交易内省工具和曲线运算积木，其专用标量乘法针对 secp256k1。本项目在独立测试中对照固定版本的 `TransactionIntrospection.pushtx`，付款锁本身由手写 ASM 装配。复现该项对照时，将固定版本的上游 checkout 根目录加入 `PYTHONPATH`，再运行 `python -m unittest -v compare_zkscript`。[nChain 的 PUSHTX 实现](https://github.com/nchain-innovation/zkscript_package/blob/fc20fb743edbc5bc5aba9d16625d50d1f50a3ef4/src/zkscript/transaction_introspection/transaction_introspection.py) · [上游曲线支持](https://github.com/nchain-innovation/zkscript_package/blob/fc20fb743edbc5bc5aba9d16625d50d1f50a3ef4/docs/secp256k1.md) · [分支验收工作流](../../.github/workflows/p256-script.yml)
+
+默认锁与六模式锁的长度相同，允许位均占一个操作码。两者锁定字节和父交易标识不同，签名须使用对应输出的实际 outpoint。上一版 JavaScript 生成器及其交易夹具可在历史提交复查。Apple Secure Enclave 真机签署、BSV 原生节点执行、矿工接收策略及费用仍待实测。[历史版本](https://github.com/linzhm/bsv-script-lab/tree/f9c49cec9baff8246ceacb09525a612d06543448/research/secure-enclave-p256)

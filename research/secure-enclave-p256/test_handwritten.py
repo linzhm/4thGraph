@@ -35,18 +35,23 @@ class PaymentTests(unittest.TestCase):
         cls.extra = parent(Script.parse_string("OP_1"), 400, "33")
         print(f"tx-engine {version('tx-engine')}; default lock {len(cls.default.tx_outs[0].script_pubkey.raw_serialize())} bytes; six-type lock {len(lock.raw_serialize())} bytes", flush=True)
 
-    def witness(self, flag, parents, amounts, index=0, parent_bytes=None, sig_override=None):
+    def witness(self, flag, parents, amounts, index=0, parent_bytes=None, sig_override=None, claimed_type=None, key=None):
         tx = spend(parents, amounts, index=index)
         # Only the single final OP_CHECKSIG is after the executed separator.
-        p = sig_hash_preimage(tx, index, Script.parse_string("OP_CHECKSIG"), 1000, SIGHASH(flag))
+        amount = parents[index].tx_outs[0].amount
+        p = sig_hash_preimage(tx, index, Script.parse_string("OP_CHECKSIG"), amount, SIGHASH(flag))
         self.assertEqual(len(p), 158)
         self.assertEqual(p[68:100], parents[index].hash())
         self.assertEqual(p[-4:], flag.to_bytes(4, "little"))
         digest = hashlib.sha256(b"BSV/SecureEnclave/P256/v1\x00" + p).digest()
-        der = self.key.sign(digest, ec.ECDSA(utils.Prehashed(hashes.SHA256())))
+        key = self.key if key is None else key
+        pub = key.public_key().public_bytes(serialization.Encoding.X962, serialization.PublicFormat.UncompressedPoint)
+        der = key.sign(digest, ec.ECDSA(utils.Prehashed(hashes.SHA256())))
         r, s = utils.decode_dss_signature(der)
         sig = r.to_bytes(32, "big") + s.to_bytes(32, "big")
-        return unlocking_script(parent_bytes or parents[index].serialize(), p, self.pub, sig_override or sig)
+        if claimed_type is not None:
+            p = p[:-4] + claimed_type.to_bytes(4, "little")
+        return unlocking_script(parent_bytes or parents[index].serialize(), p, pub, sig_override or sig)
 
     def expect(self, valid, parents, amounts, unlock, index=0, sequences=None):
         tx = spend(parents, amounts, unlock, index, sequences)
@@ -70,6 +75,25 @@ class PaymentTests(unittest.TestCase):
                 self.expect(False, parents, [800, 300], sig, sequences=[0xfffffffe, 0xffffffff])
                 self.expect(flag != 0x41, parents, [800, 300], sig, sequences=[0xffffffff, 0xfffffffe])
 
+    def test_retarget_recipients(self):
+        parents = [self.funding, self.fee]
+        destination = Script.parse_string("OP_DUP OP_HASH160 0x" + "ab" * 20 + " OP_EQUALVERIFY OP_CHECKSIG")
+        for flag in FLAGS:
+            with self.subTest(flag=hex(flag)):
+                sig = self.witness(flag, parents, [800, 300])
+                inputs = [TxIn(parents[0].id(), 0, sig), TxIn(parents[1].id(), 0, Script())]
+                retargeted = Tx(1, inputs, [TxOut(1100, destination)], 0)
+                if (flag & 31) == 2:
+                    retargeted.validate(parents)
+                else:
+                    with self.assertRaisesRegex(ValueError, "Error evaluating the script"):
+                        retargeted.validate(parents)
+
+    def test_signed_type_cannot_be_changed_to_none(self):
+        parents = [self.funding, self.fee]
+        sig = self.witness(0x41, parents, [800, 300], claimed_type=0x42)
+        self.expect(False, parents, [800, 300], sig)
+
     def test_single_missing_pair_and_none_unpaired(self):
         parents = [self.fee, self.funding]
         for flag in (0x42, 0xc2, 0x43, 0xc3):
@@ -87,6 +111,37 @@ class PaymentTests(unittest.TestCase):
         parents = [self.funding, self.fee]
         for override in ({"parent_bytes": self.fee.serialize()}, {"sig_override": bytes(64)}):
             self.expect(False, parents, [800, 300], self.witness(0x41, parents, [800, 300], **override))
+
+    def test_two_independent_authorizations(self):
+        controller = ec.derive_private_key(13, ec.SECP256R1())
+        pub = controller.public_key().public_bytes(serialization.Encoding.X962,
+                                                  serialization.PublicFormat.UncompressedPoint)
+        owner = hashlib.new("ripemd160", hashlib.sha256(pub).digest()).digest()
+        # B has a different private key. Each B lock permits exactly its designated mode.
+        for b_flag in (0x43, 0x41):
+            b = parent(locking_script(owner, (b_flag,)), 500, "55")
+            parents = [self.funding, b]
+            for a_flag in (0x42, 0xc2):
+                with self.subTest(a=hex(a_flag), b=hex(b_flag)):
+                    amounts = [800, 300]
+                    a_sig = self.witness(a_flag, parents, amounts)
+                    b_sig = self.witness(b_flag, parents, amounts, index=1, key=controller)
+                    inputs = [TxIn(self.funding.id(), 0, a_sig), TxIn(b.id(), 0, b_sig)]
+
+                    def child(values):
+                        return Tx(1, inputs, [TxOut(v, Script.parse_string("OP_1")) for v in values], 0)
+
+                    child(amounts).validate(parents)
+                    if b_flag == 0x43:
+                        child([799, 300]).validate(parents)
+                    else:
+                        with self.assertRaisesRegex(ValueError, "Error evaluating the script"):
+                            child([799, 300]).validate(parents)
+                    with self.assertRaisesRegex(ValueError, "Error evaluating the script"):
+                        child([800, 299]).validate(parents)
+                    # Strip B and its signature. Keep the original A scriptSig, replace all outputs.
+                    # 900 sat is affordable by A alone, so failure cannot be due to overspending.
+                    self.expect(a_flag == 0xc2, [self.funding], [900], a_sig)
 
     def test_prior_secure_enclave_format_vector(self):
         p = bytes.fromhex("010000006906346983736310bedde3e7d86af3999a4eb87295f429e8e58189cfa7f25875752adad0a7b9ceca853768aebb6965eca126a62965f698a0c1bc43d83db632ad09dc2a9f5ac84e9f40a7b8113b958fef4bbf8cc9c00d03d0f4f7b728e8aa88270000000001ace803000000000000ffffffff10a6bf93b4eca215f9f7201a9e2fb6c4a6b53e094c6c1750c43c97ed86bbbdd00000000041000000")

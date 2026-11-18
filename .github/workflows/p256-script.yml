@@ -24,3 +24,15 @@ jobs:
       - name: Validate handwritten Script locally in the Rust engine
         working-directory: research/secure-enclave-p256
         run: python -m unittest -v test_handwritten
+      - name: Check the pinned nChain PUSHTX reference
+        uses: actions/checkout@v4
+        with:
+          repository: nchain-innovation/zkscript_package
+          ref: fc20fb743edbc5bc5aba9d16625d50d1f50a3ef4
+          path: .reference/zkscript
+          persist-credentials: false
+      - name: Cross-check six ForkID modes against the nChain reference
+        working-directory: research/secure-enclave-p256
+        env:
+          PYTHONPATH: ${{ github.workspace }}/.reference/zkscript
+        run: python -m unittest -v compare_zkscript
