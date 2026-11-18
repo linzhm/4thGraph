@@ -34,14 +34,27 @@ jobs:
         working-directory: upstream/tests
         run: |
           npx --yes scrypt-cli@0.2.3 compile --include contracts/heavy/secp256r1.ts --exclude __none__
-          test -s artifacts/heavy/secp256r1.json || find artifacts -name 'secp256r1.json'
+          test -s artifacts/contracts/heavy/secp256r1.json
       - name: Measure serialized scripts with the public R1 vector
         working-directory: upstream
         run: |
           artifact=$(find tests/artifacts -name secp256r1.json -print -quit)
           test -n "$artifact"
           node --max-old-space-size=6500 ../research/scrypt-compare/measure.cjs "$artifact" ../template/spend-all.json
+      - name: Preserve the measured scripts
+        uses: actions/upload-artifact@v4
+        with:
+          name: measured-script-bytes
+          path: |
+            ${{ runner.temp }}/scrypt-lock.bin
+            ${{ runner.temp }}/scrypt-unlock.bin
+            ${{ runner.temp }}/pels-lock.bin
+            ${{ runner.temp }}/pels-unlock.bin
+          retention-days: 7
       - name: Check both inputs on an isolated BSV Node 1.2.3
         run: |
-          sed 's/python -m unittest -v test_payment/python research\/scrypt-compare\/native.py/' reference/verify.sh > "$RUNNER_TEMP/compare-native.sh"
+          sed -e 's/-maxtxsizepolicy=100000000/-maxtxsizepolicy=100000000 -maxscriptsizepolicy=6000000/' \
+              -e 's/-maxstdtxvalidationduration=1000 /-maxstdtxvalidationduration=10000 /' \
+              -e 's/-maxnonstdtxvalidationduration=2000 /-maxnonstdtxvalidationduration=11000 /' \
+              -e 's|python -m unittest -v test_payment|python research/scrypt-compare/native.py|' reference/verify.sh > "$RUNNER_TEMP/compare-native.sh"
           bash "$RUNNER_TEMP/compare-native.sh"
