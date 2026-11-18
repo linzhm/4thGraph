@@ -1,7 +1,7 @@
 """Reproducible synthetic single-input payment. The test signer is software-only."""
 import json
 from pathlib import Path
-from hashlib import shake_256
+from hashlib import sha256, shake_256
 import tempfile
 import unittest
 
@@ -10,6 +10,7 @@ from cryptography.hazmat.primitives.asymmetric import ec, utils
 from tx_engine import Script, Tx, TxIn, TxOut
 
 from checked_wallet import sign_payment
+from handwritten import GROUP_ORDER_R1
 from p2pkh_r1 import locking_script_from_public_key
 from replay_payment import replay
 from test_native import signer
@@ -43,6 +44,46 @@ class OrdinaryPaymentTest(unittest.TestCase):
         for name, auth, tx in (("BIP143_ALL", bip143, ordinary), ("OTDA_ALL", otda, chronicle)):
             print("CHRONICLE_VECTOR_SIZE", name, "preimage", len(auth.preimage),
                   "unlock", len(tx.tx_ins[0].script_sig.raw_serialize()), "transaction", len(tx.serialize()))
+
+    def test_functional_bip143_preimage_with_literal_parent(self):
+        # Candidate witness encoding for authorized version-2 BIP143 ALL spends.
+        # The first item is always a literal full parent. The lock is canonical.
+        key, pub, _ = signer(1)
+        first, ordinary = replay()
+        other = Script.parse_string("OP_1")
+        r1 = first.tx_outs[0]
+        second = Tx(2, [TxIn("66" * 32, 0, Script()), TxIn("77" * 32, 2, Script())],
+                    [r1, TxOut(700, other), r1], 0)
+        for parent, vout in ((first, 0), (second, 2)):
+            with self.subTest(vout=vout):
+                unsigned = Tx(2, [TxIn(parent.id(), vout, Script())], ordinary.tx_outs, 0)
+                amount = parent.tx_outs[vout].amount
+                auth = authorization(unsigned, 0, amount, 0x41)
+                raw_parent = parent.serialize()
+                self.assertEqual(auth.preimage[68:100], sha256(sha256(raw_parent).digest()).digest())
+                signature = fixture_signature(key, auth.digest())
+                baseline = universal_unlocking_script(raw_parent, auth, pub, signature)
+                candidate = Script()
+                candidate.append_pushdata(raw_parent)
+                candidate.append_data(Script.parse_string("OP_DUP OP_HASH256").raw_serialize())
+                candidate.append_pushdata(auth.preimage[:68])
+                candidate.append_data(Script.parse_string("OP_SWAP OP_CAT").raw_serialize())
+                candidate.append_pushdata(auth.preimage[100:])
+                candidate.append_data(Script.parse_string("OP_CAT").raw_serialize())
+                s = int.from_bytes(signature[32:], "big")
+                inverse = pow(s, -1, GROUP_ORDER_R1).to_bytes(32, "little")
+                for field in (pub, signature, bytes(4), inverse):
+                    candidate.append_pushdata(field)
+                candidate.append_byte(0)  # Ordinary selector.
+                sizes = []
+                for unlock in (baseline, candidate):
+                    tx = Tx(2, [TxIn(parent.id(), vout, unlock)], ordinary.tx_outs, 0)
+                    tx.validate([parent])
+                    check(tx, [parent], 0)
+                    sizes.append((len(unlock.raw_serialize()), len(tx.serialize())))
+                self.assertEqual(sizes[0][0] - sizes[1][0], 27)
+                self.assertEqual(sizes[0][1] - sizes[1][1], 27)
+                print("BIP143_FUNCTIONAL_WITNESS", vout, len(raw_parent), sizes, flush=True)
 
     def test_complete_parent_is_one_literal_push(self):
         key, pubkey, _ = signer(1)
