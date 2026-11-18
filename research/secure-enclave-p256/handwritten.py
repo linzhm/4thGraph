@@ -145,7 +145,7 @@ def _locking_bytes(owner_hash160, allowed, version):
 
 
 def locking_script(owner_hash160: bytes, allowed_types=None, *, version=2) -> Script:
-    default = {0x41, 0x61} if version == 7 else {0x61 if version == 6 else 0x41}
+    default = UNIVERSAL_FLAGS if version == 7 else {0x61 if version == 6 else 0x41}
     allowed = default if allowed_types is None else set(allowed_types)
     if len(owner_hash160) != 20 or not allowed or not allowed.issubset(flags_for(version)):
         raise ValueError("expected a 20-byte owner hash and supported ForkID types")

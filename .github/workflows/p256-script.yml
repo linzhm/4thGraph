@@ -28,7 +28,7 @@ jobs:
       - name: Generate the public example and verify its manifest
         working-directory: research/secure-enclave-p256
         env:
-          OWNER_HASH: '000102030405060708090a0b0c0d0e0f10111213'
+          OWNER_HASH: '4ceab2c8be16c1d4c6b4147d39aa449c2d63f184'
         run: |
           python generate_lock.py --owner-hash160 "$OWNER_HASH" > "$RUNNER_TEMP/manifest.json"
           python generate_lock.py --owner-hash160 "$OWNER_HASH" --format raw > "$RUNNER_TEMP/scriptPubKey.bin"

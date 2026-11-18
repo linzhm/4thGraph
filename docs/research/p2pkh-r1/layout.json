@@ -2,7 +2,7 @@
   "template": "P2PKH-R1",
   "base_script_hex_file": "template.hex",
   "script_bytes": 59811,
-  "base_script_sha256": "6ac6c4dbbf77bb0a73cf2136338c5d81a3c2674f71929f9c2dd196064be6b952",
+  "base_script_sha256": "fdf704ef5eb008f6916b2b7f149f94fd410b124505cde8c0648e0710d3ed384e",
   "owner_hash160": {
     "offset": 437,
     "length": 20
@@ -50,12 +50,39 @@
       "owner_hash160": "4ceab2c8be16c1d4c6b4147d39aa449c2d63f184",
       "allowed_types": [
         "41",
-        "61"
+        "c1",
+        "42",
+        "c2",
+        "43",
+        "c3",
+        "61",
+        "e1",
+        "62",
+        "e2",
+        "63",
+        "e3"
       ],
-      "script_sha256": "d51fe5b647c9c82953e3ccfff5ca1d66d02c0a62238d5b31cdd2785f93d4db90"
+      "script_sha256": "fdf704ef5eb008f6916b2b7f149f94fd410b124505cde8c0648e0710d3ed384e"
     }
   ],
   "prefix_hex": "760052a5696b8201209d",
   "fixed_bytes_length": 59779,
-  "fixed_bytes_sha256": "ff3a133504b7ad932bef9c3956972defeb449ed9c78450d04bda324a7c19fa03"
+  "fixed_bytes_sha256": "ff3a133504b7ad932bef9c3956972defeb449ed9c78450d04bda324a7c19fa03",
+  "ordinary_fixed_bytes_length": 59791,
+  "ordinary_fixed_bytes_sha256": "41c2aa447c2241e9e3c3c37da3a6b17f113a9aa2c024dc3ae62a73b8d3bdf0e8",
+  "default_allowed_types": [
+    "41",
+    "c1",
+    "42",
+    "c2",
+    "43",
+    "c3",
+    "61",
+    "e1",
+    "62",
+    "e2",
+    "63",
+    "e3"
+  ],
+  "base_vector_id": "C"
 }

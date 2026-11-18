@@ -8,7 +8,7 @@ import unittest
 
 from handwritten import locking_script
 from lock_identity import identify_locking_script
-from p2pkh_r1 import locking_script_from_public_key, public_key_hash160, recognize
+from p2pkh_r1 import locking_script_from_public_key, public_key_hash160, recognize, recognize_ordinary
 
 
 CLI = Path(__file__).with_name("generate_lock.py")
@@ -27,14 +27,15 @@ class GenerateLockTest(unittest.TestCase):
         owner = new("ripemd160", sha256(bytes.fromhex(PUBLIC)).digest()).hexdigest()
         generated = run_cli("--public-key", PUBLIC, "--format", "raw")
         self.assertEqual(generated.returncode, 0, generated.stderr)
-        equivalent = run_cli("--owner-hash160", owner, "--allow", "61,41", "--format", "raw")
+        equivalent = run_cli("--owner-hash160", owner, "--format", "raw")
         self.assertEqual(equivalent.returncode, 0, equivalent.stderr)
         self.assertEqual(generated.stdout, equivalent.stdout)
         manifest = run_cli("--owner-hash160", owner)
         self.assertEqual(manifest.returncode, 0, manifest.stderr)
         self.assertEqual(json.loads(manifest.stdout), {
             "template": "P2PKH-R1", "version": 7, "owner_hash160": owner,
-            "allowed_types": ["41", "61"], "script_bytes": 59811,
+            "allowed_types": ["41", "42", "43", "61", "62", "63", "c1", "c2", "c3", "e1", "e2", "e3"],
+            "script_bytes": 59811,
             "script_sha256": sha256(generated.stdout).hexdigest(),
         })
         custom = run_cli("--owner-hash160", owner, "--allow", "42,e3", "--format", "raw")
@@ -65,6 +66,9 @@ class GenerateLockTest(unittest.TestCase):
         fixed = bytes(value for i, value in enumerate(base) if i not in variable)
         self.assertEqual(len(fixed), metadata["fixed_bytes_length"])
         self.assertEqual(sha256(fixed).hexdigest(), metadata["fixed_bytes_sha256"])
+        self.assertEqual(metadata["ordinary_fixed_bytes_length"], len(base) - owner["length"])
+        ordinary = base[:owner["offset"]] + base[owner["offset"] + owner["length"]:]
+        self.assertEqual(sha256(ordinary).hexdigest(), metadata["ordinary_fixed_bytes_sha256"])
         self.assertTrue(base.startswith(bytes.fromhex(metadata["prefix_hex"])))
         for vector in metadata["vectors"]:
             owner_hash = bytes.fromhex(vector["owner_hash160"])
@@ -77,6 +81,8 @@ class GenerateLockTest(unittest.TestCase):
             if "public_key_x963" in vector:
                 q = bytes.fromhex(vector["public_key_x963"])
                 self.assertEqual(public_key_hash160(q), owner_hash)
+                self.assertEqual(recognize_ordinary(assembled), owner_hash)
+                self.assertEqual(assembled, locking_script(owner_hash, version=7).raw_serialize())
                 self.assertEqual(locking_script_from_public_key(q), assembled)
                 self.assertEqual(locking_script_from_public_key(q, reversed(flags)), assembled)
 
@@ -87,11 +93,13 @@ class GenerateLockTest(unittest.TestCase):
             changed = bytearray(base)
             changed[i] ^= 1
             self.assertIsNone(recognize(bytes(changed)))
+            self.assertIsNone(recognize_ordinary(bytes(changed)))
         for flags in ((0x42,), (0xe3,), (0xc1, 0x61, 0x43)):
             raw = locking_script_from_public_key(q, flags)
+            self.assertIsNone(recognize_ordinary(raw))
             self.assertEqual(set(recognize(raw).allowed_types), set(flags))
             self.assertEqual(raw, locking_script(public_key_hash160(q), flags, version=7).raw_serialize())
-        disabled = bytearray(base)
+        disabled = bytearray(locking_script_from_public_key(q, (0x41, 0x61)))
         disabled[307] = disabled[366] = 0
         self.assertIsNone(recognize(bytes(disabled)))
         disabled[307] = 1

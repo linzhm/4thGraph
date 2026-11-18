@@ -40,7 +40,7 @@ def main():
     owner = parser.add_mutually_exclusive_group(required=True)
     owner.add_argument("--public-key", type=owner_from_key, dest="key_hash", metavar="HEX")
     owner.add_argument("--owner-hash160", type=owner_from_hash, metavar="HEX")
-    parser.add_argument("--allow", type=parse_policy, default="41,61", metavar="HEX[,HEX...]")
+    parser.add_argument("--allow", type=parse_policy, default=sorted(UNIVERSAL_FLAGS), metavar="HEX[,HEX...]")
     parser.add_argument("--format", choices=("manifest", "raw"), default="manifest")
     args = parser.parse_args()
     owner_hash = args.key_hash if args.key_hash is not None else args.owner_hash160
