@@ -16,8 +16,17 @@ mkdir "$data"
 "$node_bin" -regtest -server -rpcport=18443 -minminingtxfee=0.000005 -datadir="$data" -listen=0 -connect=0 -dnsseed=0 -discover=0 \
   -genesisactivationheight=1 -chronicleactivationheight=2 -excessiveblocksize=1000000000 \
   -maxstackmemoryusageconsensus=100000000 -maxtxsizepolicy=100000000 -maxstdtxvalidationduration=1000 \
-  -maxnonstdtxvalidationduration=2000 -daemon
-trap '"$cli" -regtest -rpcport=18443 -datadir="$data" stop >/dev/null || true' EXIT
-"$cli" -regtest -rpcport=18443 -datadir="$data" -rpcwait getblockcount
+  -maxnonstdtxvalidationduration=2000 -printtoconsole >"$node_dir/node.log" 2>&1 &
+node_pid=$!
+trap 'kill "$node_pid" 2>/dev/null || true; wait "$node_pid" || true' EXIT
 export REGTEST_COOKIE="$data/regtest/.cookie"
-python -m unittest -v test_universal
+for attempt in {1..60}; do
+  if ! kill -0 "$node_pid" 2>/dev/null; then tail -60 "$node_dir/node.log"; exit 1; fi
+  if [[ -s "$REGTEST_COOKIE" ]] && "$cli" -regtest -rpcport=18443 -datadir="$data" getblockcount >/dev/null 2>&1; then
+    python -m unittest -v test_universal
+    exit 0
+  fi
+  sleep 1
+done
+tail -60 "$node_dir/node.log"
+exit 1
