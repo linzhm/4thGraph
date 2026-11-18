@@ -123,10 +123,7 @@ class CurrentInputTests(unittest.TestCase):
                     check(tx, parents, 1)
                     if auth.companion:
                         self.assertEqual(len(auth.preimage), 163)
-                        with self.assertRaisesRegex(ValueError, "Top of stack is false"):
-                            tx.validate(parents)
-                    else:
-                        tx.validate(parents)
+                    tx.validate(parents)
                     if paired:
                         # Re-use the approval after changing the paired amount:
                         # ALL/SINGLE cover it, NONE intentionally leaves it free.
@@ -153,6 +150,4 @@ class CurrentInputTests(unittest.TestCase):
                       digest_hex=auth.digest().hex(), signature_hex=sig.hex(),
                       script_sig_hex=unlocking.raw_serialize().hex(), signed_txid=signed.id())
         fixture = Path(__file__).resolve().parents[1] / "template/spend-all.json"
-        if fixture.exists():
-            self.assertEqual(vector, json.loads(fixture.read_text()))
-        print("R1_SDK_VECTOR", json.dumps(vector, separators=(",", ":")), flush=True)
+        self.assertEqual(vector, json.loads(fixture.read_text()))
