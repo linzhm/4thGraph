@@ -21,6 +21,7 @@ def spend(parents, amounts, unlock=None, index=0, sequences=None):
 
 
 class PaymentTests(unittest.TestCase):
+    lock_version = 2
     @classmethod
     def setUpClass(cls):
         # Public fixture key, never a wallet credential.
@@ -28,8 +29,8 @@ class PaymentTests(unittest.TestCase):
         cls.pub = cls.key.public_key().public_bytes(serialization.Encoding.X962,
                                                     serialization.PublicFormat.UncompressedPoint)
         owner = hashlib.new("ripemd160", hashlib.sha256(cls.pub).digest()).digest()
-        cls.default = parent(locking_script(owner), 1000, "11")
-        lock = locking_script(owner, tuple(FLAGS))
+        cls.default = parent(locking_script(owner, version=cls.lock_version), 1000, "11")
+        lock = locking_script(owner, tuple(FLAGS), version=cls.lock_version)
         cls.funding = parent(lock, 1000, "11")
         cls.fee = parent(Script.parse_string("OP_1"), 500, "22")
         cls.extra = parent(Script.parse_string("OP_1"), 400, "33")
@@ -119,7 +120,7 @@ class PaymentTests(unittest.TestCase):
         owner = hashlib.new("ripemd160", hashlib.sha256(pub).digest()).digest()
         # B has a different private key. Each B lock permits exactly its designated mode.
         for b_flag in (0x43, 0x41):
-            b = parent(locking_script(owner, (b_flag,)), 500, "55")
+            b = parent(locking_script(owner, (b_flag,), version=self.lock_version), 500, "55")
             parents = [self.funding, b]
             for a_flag in (0x42, 0xc2):
                 with self.subTest(a=hex(a_flag), b=hex(b_flag)):
@@ -146,7 +147,7 @@ class PaymentTests(unittest.TestCase):
     def test_template_round_trip(self):
         owner = bytes(range(20))  # Includes a newline, NUL and other binary bytes.
         other = bytes(reversed(owner))
-        for ver, size in ((1, 214973), (2, 88188)):
+        for ver, size in ((1, 214973), (2, 88188), (3, 62051), (4, 61717)):
             for mask in range(1, 64):
                 flags = tuple(flag for bit, flag in enumerate(FLAGS) if mask & (1 << bit))
                 raw = locking_script(owner, flags, version=ver).raw_serialize()
@@ -154,13 +155,13 @@ class PaymentTests(unittest.TestCase):
                 self.assertEqual(match_locking_script(raw), PaymentLock(ver, owner, flags))
                 replaced = replace_owner_hash160(raw, other)
                 self.assertEqual(replaced, locking_script(other, flags, version=ver).raw_serialize())
-            if ver == 2:
+            if ver >= 2:
                 self.assertEqual(raw[:24], bytes.fromhex("78a914") + owner + b"\x88")
 
     def test_reject_other_scripts(self):
         owner = bytes(range(20))
         p2pkh = b"\x76\xa9\x14" + owner + b"\x88\xac"
-        for ver in (1, 2):
+        for ver in (1, 2, 3, 4):
             a = locking_script(owner, (0x41,), version=ver).raw_serialize()
             b = locking_script(owner, (0x42,), version=ver).raw_serialize()
             slot = next(i for i, (x, y) in enumerate(zip(a, b)) if x == 0x51 and y == 0)
@@ -191,7 +192,7 @@ class PaymentTests(unittest.TestCase):
             key = ec.derive_private_key(secret, ec.SECP256R1())
             pub = key.public_key().public_bytes(serialization.Encoding.X962, serialization.PublicFormat.UncompressedPoint)
             owner = hashlib.new("ripemd160", hashlib.sha256(pub).digest()).digest()
-            for ver in (1, 2):
+            for ver in (1, 2, 3, 4):
                 parents = [parent(locking_script(owner, version=ver), 1000, "66")]
                 self.expect(True, parents, [900], self.witness(0x41, parents, [900], key=key))
 

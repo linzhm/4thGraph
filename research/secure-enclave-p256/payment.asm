@@ -1,7 +1,7 @@
 # Secure Enclave P-256 payment lock. Stack comments run bottom -> top.
 # All OP_* tokens below are literal BSV Script. @ names expand named text;
 # "repeat N NAME" copies that same block N times when assembling.
-# Version 2. The owner and the six allow bits are the only template parameters.
+# P2PKH-R1 versions 2–4 share this verifier. The owner and the six allow bits are the only template parameters.
 
 # number is an unsigned integer in hex, encoded as a minimal ScriptNum.
 number FIELD ffffffff00000001000000000000000000000000ffffffffffffffffffffffff
@@ -226,20 +226,14 @@ block LOCK
   5 OP_PICK OP_MUL @N OP_MOD OP_TOALTSTACK
   OP_DROP OP_ROT OP_DROP OP_TOALTSTACK OP_TOALTSTACK
   @B3 OP_SWAP
-  OP_0 OP_1 OP_0 @GX @GY OP_1 OP_FROMALTSTACK OP_FROMALTSTACK OP_1
-  5 OP_PICK 5 OP_PICK 5 OP_PICK 5 OP_PICK 5 OP_PICK 5 OP_PICK @ADD_POINTS
-  # p 3b r O G Q (G+Q), then build a fixed 256-entry digit stack, MSB on top.
-  OP_FROMALTSTACK OP_FROMALTSTACK OP_SWAP
-  repeat 256 DIGIT
-  OP_2DROP OP_0 OP_1 OP_0
-  repeat 256 SCALAR_STEP
+  @WINDOW
   # Reject infinity; X/Z is r, or r+n if below p.
   OP_DUP OP_VERIFY
-  OP_DUP 16 OP_PICK @M 3 OP_PICK OP_NUMEQUAL OP_TOALTSTACK
-  15 OP_PICK @N OP_ADD OP_DUP @FIELD OP_LESSTHAN OP_TOALTSTACK
+  OP_DUP @COPY_R_LOW @M 3 OP_PICK OP_NUMEQUAL OP_TOALTSTACK
+  @COPY_R_HIGH @N OP_ADD OP_DUP @FIELD OP_LESSTHAN OP_TOALTSTACK
   1 OP_PICK @M 3 OP_PICK OP_NUMEQUAL OP_FROMALTSTACK OP_BOOLAND
   OP_FROMALTSTACK OP_BOOLOR OP_VERIFY
-  repeat 9 DROP_TWO
+  @CLEAR_POINTS
   OP_FROMALTSTACK
 
   # P -> native public-parameter signature. WP1605 section 1.1, k=a=1.

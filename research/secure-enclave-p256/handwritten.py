@@ -6,7 +6,12 @@ import re
 
 from tx_engine import Script
 
-SOURCES = {1: Path(__file__).with_name("payment-v1.asm"), 2: Path(__file__).with_name("payment.asm")}
+SOURCES = {
+    1: ("payment-v1.asm",),
+    2: ("payment.asm", "window-1.asm"),
+    3: ("payment.asm", "window-2.asm"),
+    4: ("payment.asm", "window-4.asm"),
+}
 FLAGS = {0x41: "ALL", 0xC1: "ALL_ACP", 0x42: "NONE", 0xC2: "NONE_ACP", 0x43: "SINGLE", 0xC3: "SINGLE_ACP"}
 
 
@@ -18,6 +23,7 @@ def push(data: bytes) -> bytes:
 
 @dataclass(frozen=True)
 class PaymentLock:
+    template_name = "P2PKH-R1"
     version: int
     owner_hash160: bytes
     allowed_types: tuple[int, ...]
@@ -31,7 +37,8 @@ def _template(version):
     values = {}
     blocks = {}
     current = None
-    for lineno, line in enumerate(SOURCES[version].read_text(encoding="utf-8").splitlines(), 1):
+    source = "\n".join(Path(__file__).with_name(name).read_text(encoding="utf-8") for name in SOURCES[version])
+    for lineno, line in enumerate(source.splitlines(), 1):
         tokens = line.partition("#")[0].split()
         if not tokens:
             continue
@@ -139,7 +146,7 @@ def _matcher(version):
 
 def match_locking_script(raw: bytes) -> PaymentLock | None:
     """Match a raw scriptPubKey (no CompactSize prefix) against a known version."""
-    for version in (2, 1):
+    for version in (2, 3, 4, 1):
         size, header, end, suffix = _matcher(version)
         if len(raw) != size:
             continue
