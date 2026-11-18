@@ -1,6 +1,6 @@
 # P2PKH-R1 通用摘要与 `SINGLE` 边界
 
-生成完整付款脚本、读取权限及构造解锁栈，见 [中文初步方案](./p2pkh-r1-proposal.zh-CN.md) · [English proposal](./p2pkh-r1-proposal.en.md)。
+本文保留可配置类型的研究测量。普通付款模板采用固定的签名类型检查，完整锁为 59,706 字节，唯一可替换字段是收款人哈希。当前生成、识别与花费规范见 [中文初步方案](./p2pkh-r1-proposal.zh-CN.md) · [English proposal](./p2pkh-r1-proposal.en.md)。
 
 同一 v7 输出可以在花费时按签名类型选 BIP143 或 OTDA。创建输出时将允许的类型写入模板。本报告原先使用仅许可两种 ALL 的实验设置。普通 P2PKH-R1 收款现已开放全部十二种类型，签名钱包可默认选 ALL。每笔交易有一个 `nVersion`，每个原生签名有自己的类型字节。Chronicle 激活后，`0x20` 选择 OTDA，`0x40` 是 ForkID，`0x80` 是 ANYONECANPAY。[节点分派](https://github.com/bitcoin-sv/bitcoin-sv/blob/6504a3aff65ba97c0f6c80962b033e35ecbfed4b/src/script/interpreter.cpp#L2112-L2124) · [Chronicle 规范](https://docs.bsvblockchain.org/network-topology/nodes/sv-node/chronicle-release)
 
