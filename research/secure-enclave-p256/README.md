@@ -23,6 +23,30 @@ if lock is not None:
 
 替换函数返回一份可用于**新输出**的原始锁定脚本，版本和签名权限沿用原值。已有 UTXO 的控制权仍由它创建时的那份脚本决定。若用十六进制文本建立索引，可先检查 v2 的长度和开头 `78a914`，解码后再调用完整识别器。
 
+### 从原始锁定脚本识别付款类型
+
+钱包或索引器可将单个输出的原始 `scriptPubKey` 字节交给 `identify_locking_script`。十六进制输入先用 `bytes.fromhex` 解码，交易序列化中脚本前面的 CompactSize 长度由交易解析器去除。匹配结果区分脚本类型、曲线和所有者字段。[识别器](./lock_identity.py) · [验收](./test_lock_identity.py)
+
+| 识别类型 | 所有者字段 | 提取规则 |
+| --- | --- | --- |
+| P2PK | `owner_public_key` | 全脚本匹配规范的直接推送及尾部 CHECKSIG，并在 secp256k1 上验证 SEC1 公钥 |
+| P2PKH | `owner_hash160` | 全脚本匹配 `76 a9 14 <20字节> 88 ac` |
+| P2PKH-R1 | `owner_hash160` | 逐版本匹配完整模板，包括固定后缀；同时返回 `template_version` 与 `allowed_types` |
+
+v7 的快速筛选条件为**长度 59,811 字节**且开头为 `76 00 52 a5 69 6b 82 01 20 9d`。这十个字节是已有操作码。输出类型应以完整匹配结果为准。正则按二进制运行并用 `fullmatch` 锚定边界，例如 P2PKH 使用 `rb"\x76\xa9\x14(?P<owner_hash160>.{20})\x88\xac"` 并启用 `re.DOTALL`。R1 的正则从汇编槽位生成，固定尾部直接比较字节。
+
+```python
+from lock_identity import identify_locking_script, matches_owner_key
+
+lock = identify_locking_script(script_pubkey_bytes)
+if lock is not None:
+    print(lock.script_type, lock.template_version, lock.owner_hash160, lock.owner_public_key)
+    # candidate_pubkey 是从钱包或已解析的解锁数据另外取得的公钥。
+    is_owner = matches_owner_key(lock, candidate_pubkey)
+```
+
+R1 锁中 PUSHTX 的固定公钥属于验证程序。只有模板声明的所有者槽位参与提取。接口只返回公开字段，不扫描、提取或记录私钥；单独的私钥标量、公钥字节串或未知脚本作为锁定脚本输入均返回 `None`。公钥是否为业务上的一次性钥匙需要钱包元数据；曲线点编码本身不包含该角色。识别脚本类型也不证明提交者控制相应钥匙。
+
 ## 两种窗口候选与计时
 
 显式选择 `locking_script(owner_hash160, version=3)` 使用 2 位联合表，选择 `version=4` 使用 4 位分表。两个版本都沿用 4 项解锁、相同的消息标签、6 种可配置的 ForkID 类型及完整模板识别。原有调用默认产生 v2。[2 位联合表](./window-2.asm) · [4 位分表](./window-4.asm)
