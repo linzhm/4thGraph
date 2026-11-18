@@ -4,6 +4,7 @@ on:
     branches: [research/pels-transaction-bounds]
     paths:
       - 'research/secure-enclave-p256/**'
+      - 'docs/research/p2pkh-r1/**'
       - '.github/workflows/p256-script.yml'
 
 permissions:

@@ -1,13 +1,12 @@
-"""Generate the v7 P2PKH-R1 scriptPubKey from public payment parameters."""
+"""Generate the P2PKH-R1 scriptPubKey from public payment parameters."""
 import argparse
-from hashlib import new, sha256
+from hashlib import sha256
 import json
 import re
 import sys
 
-from cryptography.hazmat.primitives.asymmetric import ec
-
-from handwritten import UNIVERSAL_FLAGS, locking_script
+from handwritten import UNIVERSAL_FLAGS
+from p2pkh_r1 import locking_script_from_owner_hash, public_key_hash160
 from lock_identity import identify_locking_script
 
 
@@ -16,10 +15,9 @@ def owner_from_key(value):
         raise argparse.ArgumentTypeError("expected a 65-byte uncompressed P-256 public key in hex")
     encoded = bytes.fromhex(value)
     try:
-        ec.EllipticCurvePublicKey.from_encoded_point(ec.SECP256R1(), encoded)
+        return public_key_hash160(encoded)
     except ValueError as exc:
         raise argparse.ArgumentTypeError("point is outside the P-256 curve") from exc
-    return new("ripemd160", sha256(encoded).digest()).digest()
 
 
 def owner_from_hash(value):
@@ -46,7 +44,7 @@ def main():
     parser.add_argument("--format", choices=("manifest", "raw"), default="manifest")
     args = parser.parse_args()
     owner_hash = args.key_hash if args.key_hash is not None else args.owner_hash160
-    raw = locking_script(owner_hash, args.allow, version=7).raw_serialize()
+    raw = locking_script_from_owner_hash(owner_hash, args.allow)
     lock = identify_locking_script(raw)
     if (lock is None or lock.script_type != "P2PKH-R1" or lock.template_version != 7
             or lock.owner_hash160 != owner_hash or sorted(lock.allowed_types) != args.allow):

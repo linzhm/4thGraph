@@ -1,0 +1,61 @@
+{
+  "template": "P2PKH-R1",
+  "base_script_hex_file": "template.hex",
+  "script_bytes": 59811,
+  "base_script_sha256": "6ac6c4dbbf77bb0a73cf2136338c5d81a3c2674f71929f9c2dd196064be6b952",
+  "owner_hash160": {
+    "offset": 437,
+    "length": 20
+  },
+  "sighash_opcodes": {
+    "disabled": "00",
+    "enabled": "51"
+  },
+  "sighash_offsets": {
+    "41": 307,
+    "42": 326,
+    "43": 346,
+    "61": 366,
+    "62": 386,
+    "63": 406,
+    "c1": 316,
+    "c2": 336,
+    "c3": 356,
+    "e1": 376,
+    "e2": 396,
+    "e3": 416
+  },
+  "vectors": [
+    {
+      "id": "A",
+      "owner_hash160": "000102030405060708090a0b0c0d0e0f10111213",
+      "allowed_types": [
+        "41",
+        "61"
+      ],
+      "script_sha256": "6ac6c4dbbf77bb0a73cf2136338c5d81a3c2674f71929f9c2dd196064be6b952"
+    },
+    {
+      "id": "B",
+      "owner_hash160": "1111111111111111111111111111111111111111",
+      "allowed_types": [
+        "42",
+        "e3"
+      ],
+      "script_sha256": "92599b5ff408dbbeb92241bc89e7ce932bdddfd318907c8099db5ba348ef8d52"
+    },
+    {
+      "id": "C",
+      "public_key_x963": "046b17d1f2e12c4247f8bce6e563a440f277037d812deb33a0f4a13945d898c2964fe342e2fe1a7f9b8ee7eb4a7c0f9e162bce33576b315ececbb6406837bf51f5",
+      "owner_hash160": "4ceab2c8be16c1d4c6b4147d39aa449c2d63f184",
+      "allowed_types": [
+        "41",
+        "61"
+      ],
+      "script_sha256": "d51fe5b647c9c82953e3ccfff5ca1d66d02c0a62238d5b31cdd2785f93d4db90"
+    }
+  ],
+  "prefix_hex": "760052a5696b8201209d",
+  "fixed_bytes_length": 59779,
+  "fixed_bytes_sha256": "ff3a133504b7ad932bef9c3956972defeb449ed9c78450d04bda324a7c19fa03"
+}

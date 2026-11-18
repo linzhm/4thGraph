@@ -6,6 +6,7 @@ import re
 from cryptography.hazmat.primitives.asymmetric import ec
 
 from handwritten import match_locking_script
+import p2pkh_r1
 
 
 # Call fullmatch on bytes. Push lengths and all opcodes outside each capture are fixed.
@@ -48,6 +49,13 @@ def identify_locking_script(raw: bytes) -> LockIdentity | None:
             if _valid_public_key(key, ec.SECP256K1()):
                 return LockIdentity("P2PK", "secp256k1", owner_public_key=key)
         return None
+
+    if len(raw) == p2pkh_r1.SCRIPT_SIZE:
+        payment = p2pkh_r1.recognize(raw)
+        if payment is None:
+            return None
+        return LockIdentity("P2PKH-R1", "secp256r1", owner_hash160=payment.owner_hash160,
+                            template_version=7, allowed_types=payment.allowed_types)
 
     # Match the exact R1 program (including its fixed verifier suffix) before
     # extracting its parameter slots. Embedded curve constants have no owner role.

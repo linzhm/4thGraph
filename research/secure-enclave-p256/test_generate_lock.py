@@ -6,7 +6,9 @@ import subprocess
 import sys
 import unittest
 
+from handwritten import locking_script
 from lock_identity import identify_locking_script
+from p2pkh_r1 import locking_script_from_public_key, public_key_hash160, recognize
 
 
 CLI = Path(__file__).with_name("generate_lock.py")
@@ -51,3 +53,49 @@ class GenerateLockTest(unittest.TestCase):
                 result = run_cli(*args)
                 self.assertNotEqual(result.returncode, 0)
                 self.assertEqual(result.stdout, b"")
+
+    def test_portable_receiving_vectors(self):
+        directory = CLI.parents[2] / "docs/research/p2pkh-r1"
+        metadata = json.loads((directory / "layout.json").read_text())
+        base = bytes.fromhex((directory / metadata["base_script_hex_file"]).read_text())
+        self.assertEqual(sha256(base).hexdigest(), metadata["base_script_sha256"])
+        slots = metadata["sighash_offsets"]
+        owner = metadata["owner_hash160"]
+        variable = set(slots.values()) | set(range(owner["offset"], owner["offset"] + owner["length"]))
+        fixed = bytes(value for i, value in enumerate(base) if i not in variable)
+        self.assertEqual(len(fixed), metadata["fixed_bytes_length"])
+        self.assertEqual(sha256(fixed).hexdigest(), metadata["fixed_bytes_sha256"])
+        self.assertTrue(base.startswith(bytes.fromhex(metadata["prefix_hex"])))
+        for vector in metadata["vectors"]:
+            owner_hash = bytes.fromhex(vector["owner_hash160"])
+            flags = tuple(int(t, 16) for t in vector["allowed_types"])
+            assembled = locking_script(owner_hash, flags, version=7).raw_serialize()
+            self.assertEqual(len(assembled), metadata["script_bytes"])
+            self.assertEqual(sha256(assembled).hexdigest(), vector["script_sha256"])
+            self.assertEqual(recognize(assembled).owner_hash160, owner_hash)
+            self.assertEqual(set(recognize(assembled).allowed_types), set(flags))
+            if "public_key_x963" in vector:
+                q = bytes.fromhex(vector["public_key_x963"])
+                self.assertEqual(public_key_hash160(q), owner_hash)
+                self.assertEqual(locking_script_from_public_key(q), assembled)
+                self.assertEqual(locking_script_from_public_key(q, reversed(flags)), assembled)
+
+    def test_fixed_digest_and_policy_boundaries(self):
+        q = bytes.fromhex(PUBLIC)
+        base = locking_script_from_public_key(q)
+        for i in (0, 100, 306, 308, 436, 457, len(base) - 1):
+            changed = bytearray(base)
+            changed[i] ^= 1
+            self.assertIsNone(recognize(bytes(changed)))
+        for flags in ((0x42,), (0xe3,), (0xc1, 0x61, 0x43)):
+            raw = locking_script_from_public_key(q, flags)
+            self.assertEqual(set(recognize(raw).allowed_types), set(flags))
+            self.assertEqual(raw, locking_script(public_key_hash160(q), flags, version=7).raw_serialize())
+        disabled = bytearray(base)
+        disabled[307] = disabled[366] = 0
+        self.assertIsNone(recognize(bytes(disabled)))
+        disabled[307] = 1
+        self.assertIsNone(recognize(bytes(disabled)))
+        for invalid in (q[1:], b"\x04" + bytes(64), bytes(32)):
+            with self.assertRaises(ValueError):
+                locking_script_from_public_key(invalid)
