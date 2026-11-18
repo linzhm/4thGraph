@@ -46,3 +46,16 @@ PELS 是后继输出延续规则；PUSHTX 是使用原生 CHECKSIG 的交易绑�
 ## 通用锁验收
 
 v7 实测为 **59,811 B**。在无 P2P 连接的 BSV Node 1.2.3 regtest 上，通过只读 `verifyscript` RPC 提供序列化交易、输入索引、真实前序输出脚本和金额，并显式启用 Genesis、Chronicle 和 ForkID 规则。验收覆盖同一把锁的 12 个类型、两种输入位置、两种摘要在同笔交易混用、253 个输入的 CompactSize 前缀及错误位置提示。无配对 43/c3/63/e3 均通过；增加配对输出、移用到不同 outpoint、混用不同 `scriptCode` 的授权均按预期被拒绝。chain-gang 0.13.1 对无配对 OTDA SINGLE 的原像请求返回错误，本边界采用原生节点实测。真机 Secure Enclave 和矿工接收策略仍待实测。[原生节点验收日志](https://github.com/linzhm/bsv-script-lab/actions/runs/44350272745/job/134963678908) · [原生验收代码](../../research/secure-enclave-p256/test_universal.py)
+
+### 通用锁的小样本
+
+在同一台 runner 上，各路径先预热，再交替进行 32 次本机 RPC 验证。交易有两个输入，当前输入位置为 1；ALL 组有两个输出，无配对 SINGLE 组只有输出 0。计时包含客户端序列化、HTTP 往返、原生节点检查和结果读取。各路径均使用同一把 59,811 字节的锁。这组小样本主要用于确认可运行性，不能和 chain-gang 在进程内的每次验证耗时直接比较。[本机 RPC 样本及所有 CI 结果](https://github.com/linzhm/bsv-script-lab/actions/runs/44350574355/job/134964757191)
+
+| 路径 | 手机所签原像 B | 解锁脚本 B | RPC 平均 ms |
+| --- | ---: | ---: | ---: |
+| BIP143 ALL | 159 | 60,207 | 22.17 |
+| OTDA ALL | 118 | 60,166 | 22.21 |
+| BIP143 SINGLE，无配对 | 159 | 60,207 | 22.02 |
+| OTDA SINGLE，无配对 | 163 | 60,211 | 22.14 |
+
+最后一行的 163 字节属于伴随 BIP143 授权；原生 OTDA 检查取常量摘要。测试代码提交为 [265c698297f56c5116f853b9be9092e93d8a43b7](https://github.com/linzhm/bsv-script-lab/commit/265c698297f56c5116f853b9be9092e93d8a43b7)。
