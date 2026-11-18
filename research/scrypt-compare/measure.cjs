@@ -3,14 +3,16 @@ const crypto = require('node:crypto')
 const path = require('node:path')
 const { buildContractClass } = require(path.join(process.cwd(), 'node_modules/scryptlib'))
 const artifact = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'))
-if (artifact.contract !== 'SECP256R1Test') throw new Error('unexpected artifact')
+const only = process.env.CASE === 'verifyOnly'
+if (artifact.contract !== (only ? 'VerifyOnly' : 'SECP256R1Test')) throw new Error('unexpected artifact')
 const v = JSON.parse(fs.readFileSync(process.argv[3], 'utf8'))
 const instance = new (buildContractClass(artifact))()
 const integer = x => BigInt('0x' + x)
 const sig = { r: integer(v.signature_hex.slice(0, 64)), s: integer(v.signature_hex.slice(64)) }
 const q = v.public_key_x963
 const pub = { x: integer(q.slice(2, 66)), y: integer(q.slice(66)) }
-const call = instance.verifySig(integer(v.digest_hex), sig, pub, true)
+const inputs = [integer(v.digest_hex), sig, pub]
+const call = only ? instance.verifySig(...inputs) : instance.verifySig(...inputs, true)
 const out = process.env.RUNNER_TEMP
 function save(name, hex) {
   const bytes = Buffer.from(hex, 'hex')

@@ -10,6 +10,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     env:
+      CASE: ${{ contains(github.event.head_commit.message, '[verify-only]') && 'verifyOnly' || 'secp256r1' }}
       GHCRTS: '-N2'
     steps:
       - uses: actions/checkout@v4
@@ -30,15 +31,19 @@ jobs:
           npm ci --no-audit --no-fund
           npm run build
           npx --yes scrypt-cli@0.2.3 compile --asm --noArtifact
-      - name: Compile the unchanged eight-method R1 test contract
+          python ../research/scrypt-compare/check-optimization.py
+      - name: Compile the selected test harness
         working-directory: upstream/tests
         run: |
-          npx --yes scrypt-cli@0.2.3 compile --include contracts/heavy/secp256r1.ts --exclude __none__
-          test -s artifacts/contracts/heavy/secp256r1.json
+          if [[ "$CASE" == "verifyOnly" ]]; then
+            cp ../../research/scrypt-compare/verifyOnly.ts contracts/heavy/verifyOnly.ts
+          fi
+          npx --yes scrypt-cli@0.2.3 compile --include "contracts/heavy/$CASE.ts" --exclude __none__
+          test -s "artifacts/contracts/heavy/$CASE.json"
       - name: Measure serialized scripts with the public R1 vector
         working-directory: upstream
         run: |
-          artifact=$(find tests/artifacts -name secp256r1.json -print -quit)
+          artifact="tests/artifacts/contracts/heavy/$CASE.json"
           test -n "$artifact"
           node --max-old-space-size=6500 ../research/scrypt-compare/measure.cjs "$artifact" ../template/spend-all.json
       - name: Preserve the measured scripts
