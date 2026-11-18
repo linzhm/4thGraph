@@ -23,7 +23,7 @@ def sign(auth, key):
 
 
 def check(tx, parents, ix, valid=True):
-    out = parents[ix].tx_outs[0]
+    out = parents[ix].tx_outs[tx.tx_ins[ix].prev_index]
     cookie = Path(os.environ["REGTEST_COOKIE"]).read_text().strip().split(":", 1)
     flags = sum(1 << b for b in (1, 2, 3, 16, 18, 19, 20, 21))
     request = dict(tx=tx.serialize().hex(), n=ix, flags=flags, reportflags=True,

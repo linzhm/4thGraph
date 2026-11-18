@@ -156,7 +156,7 @@ sha256sum scriptPubKey.bin
 
 这次选择 OTDA 节省 **68 字节**。OTDA 序列化的长度随交易结构变化；BIP143 ALL 对输入和输出集合使用定长哈希。钱包应分别计算目标交易的原像长度。普通单输入示例继续用 BIP143 ALL，完整父交易仍是其主要开销。
 
-**功能性解锁脚本值得优先试验。** Chronicle 放宽了解锁脚本只推数据的限制。对同一份 **59,768 字节**的公开父交易，直接推入需 **59,771 字节**。它包含 64 份连续相同的 830 字节四位窗口程序。试验在解锁侧重建这段重复数据，再与其前后字节拼接，构造程序只需 **7,501 字节**，该数据项少 **52,270 字节**。双引擎在独立的哈希相等测试锁上核对了完整重建结果。公布的付款向量仍采用直接推入；采用新编码前，需要在完整 R1 花费上验证所有者授权、执行成本、适用的激活与接收策略，以及钱包对两种解锁格式的识别。压缩比例取决于父交易内容。[数据项试验](../../research/secure-enclave-p256/test_spend_example.py) · [升级说明 §3](https://docs.bsvblockchain.org/network-topology/nodes/sv-node/chronicle-release)
+**父交易是一个原始数据项。** 解锁栈第 1 项必须用一次数据推送写入当前 outpoint 所引用的完整父交易序列化字节。钱包按实际字节长度编码推送前缀，保留所有输入、输出、脚本和锁定时间；被花费的输出由 outpoint 的 vout 定位。父交易数据的大小受适用的交易与脚本大小限制。实现无需在父交易中搜索重复字段或识别其他输出的模板。规范样例的父交易为 59,768 字节，推送占 59,771 字节（含 3 字节前缀）。测试覆盖 65,535 字节推送边界两侧，以及同一父交易含两个 R1 输出的情况。[解锁构造](../../research/secure-enclave-p256/universal.py) · [完整花费用例](../../research/secure-enclave-p256/test_spend_example.py)
 
 **锁内指令的机会较小。** 例如，在已验证长度足够的原像上，取偏移 68 起的 32 字节，可以把两次 `OP_SPLIT` 加栈清理换成 `OP_SUBSTR`，单处静态编码由 8 字节降到 5 字节。它需要相应的 UTXO 规则，并会改变模板指纹。数值移位也值得针对四位窗口计时，但 `OP_16 OP_DIV` 和 `OP_4 OP_RSHIFTNUM` 都是两字节。更大的 ScriptNum 上限对当前 P-256 运算没有直接体积收益。原生签名的 low-S 放宽也不会替代 R1 验签或让硬件少签一次。[节点操作码实现](https://github.com/bitcoin-sv/bitcoin-sv/blob/6504a3aff65ba97c0f6c80962b033e35ecbfed4b/src/script/interpreter.cpp#L609-L637) · [四位窗口汇编](../../research/secure-enclave-p256/window-4.asm)
 
