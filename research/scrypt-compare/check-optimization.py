@@ -7,8 +7,8 @@ config = json.loads(Path(".asm/asm.json").read_text())["SECP256R1"]
 source, = [p.read_text() for p in Path("artifacts").rglob("*.scrypt")
            if re.search(r"(?m)^\s*library SECP256R1\s*\{", p.read_text())]
 for fn, body in config.items():
-    match = re.search(r"function\s+" + fn + r"\s*\([^)]*\)[^{}]*\{\s*asm\s*\{([^}]+)\}", source)
-    if not match or match.group(1).split() != body.split():
+    match = re.search(r"function\s+" + fn + r"\s*\([^)]*\)[^{}]*\{\s*asm\s*\{", source)
+    if not match or source[match.end():].split()[:len(body.split()) + 1] != body.split() + ["}"]:
         raise ValueError(f"ASM override differs: {fn}")
     print("VERIFIED_ASM", fn, len(body.split()), "tokens")
 cli, = [p for p in (Path.home()/".npm/_npx").glob("*/node_modules/scrypt-cli/src/lib/compile.js")
