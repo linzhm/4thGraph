@@ -1,0 +1,47 @@
+name: Compare the sCrypt P-256 test contract
+on:
+  push:
+    branches: [research/pels-transaction-bounds]
+    paths: ['research/scrypt-compare/**', '.github/workflows/scrypt-compare.yml']
+permissions:
+  contents: read
+jobs:
+  compare:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      GHCRTS: '-N2'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: sCrypt-Inc/scrypt-ts-lib
+          ref: fc71404fb82bc513dba3908bf47fc231a169787c
+          path: upstream
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install the upstream locked dependencies and compile its library
+        working-directory: upstream
+        run: |
+          npm ci --no-audit --no-fund
+          npm run build
+          npx --yes scrypt-cli@0.2.3 compile --asm --noArtifact
+      - name: Compile the unchanged eight-method R1 test contract
+        working-directory: upstream/tests
+        run: |
+          npx --yes scrypt-cli@0.2.3 compile --include contracts/heavy/secp256r1.ts --exclude __none__
+          test -s artifacts/heavy/secp256r1.json || find artifacts -name 'secp256r1.json'
+      - name: Measure serialized scripts with the public R1 vector
+        working-directory: upstream
+        run: |
+          artifact=$(find tests/artifacts -name secp256r1.json -print -quit)
+          test -n "$artifact"
+          node --max-old-space-size=6500 ../research/scrypt-compare/measure.cjs "$artifact" ../template/spend-all.json
+      - name: Check both inputs on an isolated BSV Node 1.2.3
+        run: |
+          sed 's/python -m unittest -v test_payment/python research\/scrypt-compare\/native.py/' reference/verify.sh > "$RUNNER_TEMP/compare-native.sh"
+          bash "$RUNNER_TEMP/compare-native.sh"
