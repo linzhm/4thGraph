@@ -1,12 +1,11 @@
 # Secure Enclave P-256 payment lock. Stack comments run bottom -> top.
 # All OP_* tokens below are literal BSV Script. @ names expand named text;
 # "repeat N NAME" copies that same block N times when assembling.
-# owner and the six allow bits are the only template parameters.
+# Version 2. The owner and the six allow bits are the only template parameters.
 
 # number is an unsigned integer in hex, encoded as a minimal ScriptNum.
 number FIELD ffffffff00000001000000000000000000000000ffffffffffffffffffffffff
 number N ffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc632551
-number N_MINUS_2 ffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc63254f
 number B 5ac635d8aa3a93e7b3ebbd55769886bc651d06b0cc53b0f63bce3c3e27d2604b
 number B3 1052a18afeafbbb61bc3380063c994352f57141164fb12e2b36ab4ba777720e2
 number GX 6b17d1f2e12c4247f8bce6e563a440f277037d812deb33a0f4a13945d898c296
@@ -37,9 +36,7 @@ block F
   OP_DEPTH OP_1SUB OP_PICK OP_MOD
 end
 block POS
-  @F OP_DUP OP_0 OP_LESSTHAN OP_IF
-    OP_DEPTH OP_1SUB OP_PICK OP_ADD
-  OP_ENDIF
+  OP_DEPTH OP_1SUB OP_PICK OP_TUCK OP_MOD OP_OVER OP_ADD OP_SWAP OP_MOD
 end
 block M
   OP_MUL @F
@@ -47,39 +44,115 @@ end
 
 # Complete addition in homogeneous projective coordinates, RCB Appendix A.1.
 # In: ... X Y Z U V W. Out: ... X3 Y3 Z3. Infinity is (0,1,0).
-# Each line appends its annotated temporary. No supplied gradients or point hints.
+# Reduce the three results modulo p. Each input coordinate is already canonical;
+# polynomial intermediates within one addition fit in 2048 signed bits.
 block ADD_POINTS
-  5 OP_PICK 3 OP_PICK @M                                      # xx
-  5 OP_PICK 3 OP_PICK @M                                      # yy
-  5 OP_PICK 3 OP_PICK @M                                      # zz
-  8 OP_PICK 8 OP_PICK OP_ADD 6 OP_PICK 6 OP_PICK OP_ADD @M
-  3 OP_PICK OP_SUB 2 OP_PICK OP_SUB @F                        # xy
-  9 OP_PICK 8 OP_PICK OP_ADD 7 OP_PICK 6 OP_PICK OP_ADD @M
-  4 OP_PICK OP_SUB 2 OP_PICK OP_SUB @F                        # xz
-  9 OP_PICK 9 OP_PICK OP_ADD 7 OP_PICK 7 OP_PICK OP_ADD @M
-  4 OP_PICK OP_SUB 3 OP_PICK OP_SUB @F                        # yz
-  1 OP_PICK 3 OP_MUL OP_NEGATE 4 OP_PICK @B3 @M OP_ADD @F     # h = -3xz + 3b*zz
-  5 OP_PICK 1 OP_PICK OP_SUB @F                               # minus = yy-h
-  6 OP_PICK 2 OP_PICK OP_ADD @F                               # plus  = yy+h
-  6 OP_PICK 3 OP_MUL OP_NEGATE @F                             # azz
-  9 OP_PICK 3 OP_MUL 1 OP_PICK OP_ADD @F                      # t
-  6 OP_PICK @B3 @M 11 OP_PICK 3 OP_PICK OP_SUB
-  3 OP_MUL OP_SUB @F                                          # k
-  8 OP_PICK 5 OP_PICK @M 7 OP_PICK 2 OP_PICK @M OP_SUB @POS   # X3
-  5 OP_PICK 5 OP_PICK @M 3 OP_PICK 3 OP_PICK @M OP_ADD @POS   # Y3
-  8 OP_PICK 6 OP_PICK @M 11 OP_PICK 5 OP_PICK @M OP_ADD @POS  # Z3
+  5 OP_PICK 3 OP_PICK OP_MUL                                      # xx
+  5 OP_PICK 3 OP_PICK OP_MUL                                      # yy
+  5 OP_PICK 3 OP_PICK OP_MUL                                      # zz
+  8 OP_PICK 8 OP_PICK OP_ADD 6 OP_PICK 6 OP_PICK OP_ADD OP_MUL
+  3 OP_PICK OP_SUB 2 OP_PICK OP_SUB                        # xy
+  9 OP_PICK 8 OP_PICK OP_ADD 7 OP_PICK 6 OP_PICK OP_ADD OP_MUL
+  4 OP_PICK OP_SUB 2 OP_PICK OP_SUB                        # xz
+  9 OP_PICK 9 OP_PICK OP_ADD 7 OP_PICK 7 OP_PICK OP_ADD OP_MUL
+  4 OP_PICK OP_SUB 3 OP_PICK OP_SUB                        # yz
+  1 OP_PICK 3 OP_MUL OP_NEGATE 4 OP_PICK @CACHED_B3 OP_MUL OP_ADD     # h = -3xz + 3b*zz
+  5 OP_PICK 1 OP_PICK OP_SUB                               # minus = yy-h
+  6 OP_PICK 2 OP_PICK OP_ADD                               # plus  = yy+h
+  6 OP_PICK 3 OP_MUL OP_NEGATE                             # azz
+  9 OP_PICK 3 OP_MUL 1 OP_PICK OP_ADD                      # t
+  6 OP_PICK @CACHED_B3 OP_MUL 11 OP_PICK 3 OP_PICK OP_SUB
+  3 OP_MUL OP_SUB                                          # k
+  8 OP_PICK 5 OP_PICK OP_MUL 7 OP_PICK 2 OP_PICK OP_MUL OP_SUB @POS   # X3
+  5 OP_PICK 5 OP_PICK OP_MUL 3 OP_PICK 3 OP_PICK OP_MUL OP_ADD @POS   # Y3
+  8 OP_PICK 6 OP_PICK OP_MUL 11 OP_PICK 5 OP_PICK OP_MUL OP_ADD @POS  # Z3
   OP_TOALTSTACK OP_TOALTSTACK OP_TOALTSTACK
   repeat 9 DROP_TWO
   OP_FROMALTSTACK OP_FROMALTSTACK OP_FROMALTSTACK
 end
+# The point arithmetic stack starts with p, 3b, r. Copy 3b from the second slot.
+block CACHED_B3
+  OP_DEPTH OP_2 OP_SUB OP_PICK
+end
 block DROP_TWO
   OP_2DROP
 end
-# base exponent accumulator -> base^2 exponent/2 newAccumulator, mod n.
-block INVERSE_STEP
-  OP_OVER OP_2 OP_MOD OP_IF 2 OP_PICK OP_MUL @N OP_MOD OP_ENDIF
-  OP_TOALTSTACK OP_2 OP_DIV OP_SWAP OP_DUP OP_MUL @N OP_MOD
-  OP_SWAP OP_FROMALTSTACK
+# Fixed binary exponentiation by the group order minus two. Stack: n base acc.
+block SQUARE
+  OP_DUP OP_MUL 2 OP_PICK OP_MOD
+end
+block SQUARE_TIMES_BASE
+  @SQUARE OP_OVER OP_MUL 2 OP_PICK OP_MOD
+end
+# Start acc=base (leading one); read the remaining 255 exponent bits MSB first.
+block INVERT_SCALAR
+  repeat 31 SQUARE_TIMES_BASE
+  repeat 32 SQUARE
+  repeat 65 SQUARE_TIMES_BASE
+  @SQUARE
+  repeat 4 SQUARE_TIMES_BASE
+  repeat 2 SQUARE
+  repeat 3 SQUARE_TIMES_BASE
+  repeat 2 SQUARE
+  repeat 2 SQUARE_TIMES_BASE
+  @SQUARE
+  repeat 5 SQUARE_TIMES_BASE
+  @SQUARE
+  @SQUARE_TIMES_BASE
+  @SQUARE
+  @SQUARE_TIMES_BASE
+  @SQUARE
+  @SQUARE_TIMES_BASE
+  @SQUARE
+  repeat 2 SQUARE_TIMES_BASE
+  @SQUARE
+  repeat 2 SQUARE_TIMES_BASE
+  @SQUARE
+  @SQUARE_TIMES_BASE
+  repeat 2 SQUARE
+  repeat 3 SQUARE_TIMES_BASE
+  repeat 3 SQUARE
+  @SQUARE_TIMES_BASE
+  @SQUARE
+  repeat 4 SQUARE_TIMES_BASE
+  repeat 2 SQUARE
+  repeat 4 SQUARE_TIMES_BASE
+  @SQUARE
+  @SQUARE_TIMES_BASE
+  repeat 4 SQUARE
+  @SQUARE_TIMES_BASE
+  repeat 2 SQUARE
+  repeat 4 SQUARE_TIMES_BASE
+  repeat 2 SQUARE
+  repeat 3 SQUARE_TIMES_BASE
+  @SQUARE
+  repeat 3 SQUARE_TIMES_BASE
+  repeat 2 SQUARE
+  repeat 3 SQUARE_TIMES_BASE
+  repeat 2 SQUARE
+  @SQUARE_TIMES_BASE
+  @SQUARE
+  @SQUARE_TIMES_BASE
+  @SQUARE
+  repeat 2 SQUARE_TIMES_BASE
+  repeat 4 SQUARE
+  @SQUARE_TIMES_BASE
+  @SQUARE
+  repeat 6 SQUARE_TIMES_BASE
+  repeat 3 SQUARE
+  repeat 2 SQUARE_TIMES_BASE
+  repeat 3 SQUARE
+  repeat 2 SQUARE_TIMES_BASE
+  repeat 2 SQUARE
+  @SQUARE_TIMES_BASE
+  repeat 2 SQUARE
+  @SQUARE_TIMES_BASE
+  @SQUARE
+  @SQUARE_TIMES_BASE
+  @SQUARE
+  @SQUARE_TIMES_BASE
+  repeat 2 SQUARE
+  repeat 4 SQUARE_TIMES_BASE
 end
 # u v -> floor(u/2) floor(v/2); save low-bit(u) + 2*low-bit(v).
 block DIGIT
@@ -87,8 +160,26 @@ block DIGIT
   OP_2 OP_DIV OP_SWAP OP_2 OP_DIV OP_SWAP
 end
 # ... table accumulator -> ... table (2*accumulator + table[digit])
+# Bernstein-Lange dbl-2007-bl-2, projective coordinates, a = -3.
+# Keep the existing projective infinity when Z is zero.
+block DOUBLE_POINT
+  OP_DUP OP_0NOTEQUAL OP_IF
+    2 OP_PICK OP_OVER OP_SUB 3 OP_PICK 2 OP_PICK OP_ADD OP_MUL 3 OP_MUL  # w
+    2 OP_PICK 2 OP_PICK OP_MUL OP_DUP OP_ADD                              # s
+    3 OP_PICK OP_OVER OP_MUL                                              # R
+    5 OP_PICK OP_OVER OP_MUL OP_DUP OP_ADD                                # B
+    3 OP_PICK OP_DUP OP_MUL OP_OVER OP_DUP OP_ADD OP_SUB                  # h
+    OP_DUP 4 OP_PICK OP_MUL @POS                                          # X3
+    2 OP_PICK 2 OP_PICK OP_SUB 6 OP_PICK OP_MUL
+    4 OP_PICK OP_DUP OP_MUL OP_DUP OP_ADD OP_SUB @POS                     # Y3
+    5 OP_PICK OP_DUP OP_MUL 6 OP_PICK OP_MUL @POS                         # Z3
+    OP_TOALTSTACK OP_TOALTSTACK OP_TOALTSTACK
+    repeat 4 DROP_TWO
+    OP_FROMALTSTACK OP_FROMALTSTACK OP_FROMALTSTACK
+  OP_ENDIF
+end
 block SCALAR_STEP
-  2 OP_PICK 2 OP_PICK 2 OP_PICK @ADD_POINTS
+  @DOUBLE_POINT
   OP_FROMALTSTACK 3 OP_MUL 14 OP_SWAP OP_SUB
   OP_DUP OP_TOALTSTACK OP_PICK OP_FROMALTSTACK
   OP_DUP OP_TOALTSTACK OP_PICK OP_FROMALTSTACK OP_PICK @ADD_POINTS
@@ -96,11 +187,11 @@ end
 
 block LOCK
   # parent P Q signature
+  OP_OVER OP_HASH160 @OWNER OP_EQUALVERIFY
   OP_DEPTH 4 OP_NUMEQUALVERIFY
   2 OP_PICK OP_SIZE 158 OP_NUMEQUALVERIFY OP_DROP
   OP_OVER OP_SIZE 65 OP_NUMEQUALVERIFY OP_DROP
   OP_SIZE 64 OP_NUMEQUALVERIFY
-  OP_OVER OP_HASH160 @OWNER OP_EQUALVERIFY
   3 OP_PICK OP_HASH256 3 OP_PICK 68 OP_SPLIT OP_NIP 32 OP_SPLIT OP_DROP OP_EQUALVERIFY
   2 OP_PICK 104 OP_SPLIT OP_NIP 2 OP_SPLIT OP_DROP 0x01ac OP_EQUALVERIFY
 
@@ -128,16 +219,16 @@ block LOCK
   2 OP_PICK OP_0 @FIELD OP_WITHIN OP_VERIFY 1 OP_PICK OP_0 @FIELD OP_WITHIN OP_VERIFY
   OP_OVER OP_DUP @M 3 OP_PICK OP_DUP OP_DUP @M 3 OP_SUB @M @B OP_ADD @POS OP_NUMEQUALVERIFY
 
-  3 OP_PICK @N_MINUS_2 OP_1
-  repeat 256 INVERSE_STEP
+  @N 4 OP_PICK OP_DUP @INVERT_SCALAR
   OP_TOALTSTACK OP_2DROP OP_FROMALTSTACK
   # p r s x y z invS. Store u=z/s then v=r/s above saved P.
   OP_DUP 2 OP_PICK OP_MUL @N OP_MOD OP_TOALTSTACK
   5 OP_PICK OP_MUL @N OP_MOD OP_TOALTSTACK
   OP_DROP OP_ROT OP_DROP OP_TOALTSTACK OP_TOALTSTACK
+  @B3 OP_SWAP
   OP_0 OP_1 OP_0 @GX @GY OP_1 OP_FROMALTSTACK OP_FROMALTSTACK OP_1
   5 OP_PICK 5 OP_PICK 5 OP_PICK 5 OP_PICK 5 OP_PICK 5 OP_PICK @ADD_POINTS
-  # p r O G Q (G+Q), then build a fixed 256-entry digit stack, MSB on top.
+  # p 3b r O G Q (G+Q), then build a fixed 256-entry digit stack, MSB on top.
   OP_FROMALTSTACK OP_FROMALTSTACK OP_SWAP
   repeat 256 DIGIT
   OP_2DROP OP_0 OP_1 OP_0
@@ -148,8 +239,8 @@ block LOCK
   15 OP_PICK @N OP_ADD OP_DUP @FIELD OP_LESSTHAN OP_TOALTSTACK
   1 OP_PICK @M 3 OP_PICK OP_NUMEQUAL OP_FROMALTSTACK OP_BOOLAND
   OP_FROMALTSTACK OP_BOOLOR OP_VERIFY
-  repeat 8 DROP_TWO
-  OP_DROP OP_FROMALTSTACK
+  repeat 9 DROP_TWO
+  OP_FROMALTSTACK
 
   # P -> native public-parameter signature. WP1605 section 1.1, k=a=1.
   OP_DUP 154 OP_SPLIT OP_NIP 1 OP_SPLIT OP_DROP OP_TOALTSTACK

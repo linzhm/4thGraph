@@ -2,7 +2,28 @@
 
 这个研究模板实现普通持有人付款。付款人把收款人的 P-256 公钥哈希写入锁定脚本。收款人可签署带多个输入、多个收款输出及找零的交易；新输出可使用其他锁定脚本。默认签名类型是 `ALL|FORKID`（0x41）。[手写 Bitcoin Script](./payment.asm) · [Python 装配入口](./handwritten.py) · [交易测试](./test_handwritten.py)
 
-**实测大小是主要取舍。** 默认锁定脚本为 **214,973 字节**。BSV 节点的原生 `CHECKSIG` 使用 secp256k1，Secure Enclave 使用 NIST P-256（secp256r1）。本模板把 P-256 验签展开为 BSV 整数运算，用原生 `CHECKSIG` 绑定当前交易。标准 P2PKH 的所有者模型得以保留，但不能沿用其 25 字节脚本或标准地址编码。此大小是本参考实现的测量值，并非 P-256 验签的理论下限。[BSV 节点 CPubKey::Verify](https://github.com/bitcoin-sv/bitcoin-sv/blob/6504a3aff65ba97c0f6c80962b033e35ecbfed4b/src/pubkey.cpp#L183-L214) · [Apple SecureEnclave.P256.Signing.PrivateKey](https://developer.apple.com/documentation/cryptokit/secureenclave/p256/signing/privatekey)
+**实测大小是主要取舍。** 默认 v2 锁定脚本为 **88,188 字节**，v1 为 214,973 字节。BSV 节点的原生 `CHECKSIG` 使用 secp256k1，Secure Enclave 使用 NIST P-256（secp256r1）。本模板把 P-256 验签展开为 BSV 整数运算，用原生 `CHECKSIG` 绑定当前交易。标准 P2PKH 的所有者模型得以保留，但不能沿用其 25 字节脚本或标准地址编码。此大小是本参考实现的测量值，并非 P-256 验签的理论下限。[BSV 节点 CPubKey::Verify](https://github.com/bitcoin-sv/bitcoin-sv/blob/6504a3aff65ba97c0f6c80962b033e35ecbfed4b/src/pubkey.cpp#L183-L214) · [Apple SecureEnclave.P256.Signing.PrivateKey](https://developer.apple.com/documentation/cryptokit/secureenclave/p256/signing/privatekey)
+
+## 钱包识别与替换 P2P256H
+
+本仓库用 `P2P256H` 指“支付给 P-256 公钥哈希”的手写模板。该名称是钱包的本地分类。输入识别器的字节是单个输出的完整 `scriptPubKey`，已去掉输出金额和脚本长度。返回值给出模板版本、所有者的 20 字节哈希、允许的全部签名类型。完整公钥由花费者在解锁栈中提供。
+
+v2 的前 24 字节为 `78 a9 14 <ownerHash160 的 20 字节> 88`，对应 `OP_OVER OP_HASH160 PUSH20 <hash> OP_EQUALVERIFY`。无论哈希中是否出现换行、空字节或操作码字节，原始脚本的半开区间 `[3,23)` 都是同一个字段。钱包用短前缀筛选候选，用固定长度二进制正则完整匹配模板头部，要求六个许可位分别为 `OP_0` 或 `OP_1` 且至少一位开启，并逐字节比较其余固定程序。更改末尾的验签指令、追加操作码或采用其他推送编码都会使识别失败。v1 使用原有字节布局和单独的匹配模板。[识别与装配](./handwritten.py) · [v1 固定汇编](./payment-v1.asm)
+
+```python
+from handwritten import match_locking_script, replace_owner_hash160
+
+lock = match_locking_script(script_pubkey_bytes)
+if lock is not None:
+    print(lock.version, lock.owner_hash160.hex(), lock.allowed_types)
+    new_output_script = replace_owner_hash160(script_pubkey_bytes, next_owner_hash160)
+```
+
+替换函数返回一份可用于**新输出**的原始锁定脚本，版本和签名权限沿用原值。已有 UTXO 的控制权仍由它创建时的那份脚本决定。若用十六进制文本建立索引，可先检查 v2 的长度和开头 `78a914`，解码后再调用完整识别器。
+
+## 压缩如何取得
+
+v2 在 256 轮双标量乘法里单独计算点倍加，使用适用于 P-256 的射影坐标公式，并显式处理无穷远点。通用点加把模约简推迟到三个结果坐标，单次运算的中间整数控制在 2,048 位以内。群阶和曲线常数在栈上复用，标量求逆按固定指数展开。以上改动都在锁定脚本内部；一次解锁仍只推入父交易、原像、公钥和签名。本文报告本仓库两个已知布局的长度，全局最小长度尚未得到证明。[倍点公式 dbl-2007-bl-2](https://hyperelliptic.org/EFD/g1p/auto-shortw-projective-3.html#doubling-dbl-2007-bl-2) · [手写汇编](./payment.asm)
 
 ## 锁定参数与解锁栈
 

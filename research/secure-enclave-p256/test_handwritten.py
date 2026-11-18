@@ -6,7 +6,7 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec, utils
 from tx_engine import SIGHASH, Script, Tx, TxIn, TxOut, sig_hash_preimage
 
-from handwritten import FLAGS, locking_script, unlocking_script
+from handwritten import FLAGS, PaymentLock, locking_script, match_locking_script, replace_owner_hash160, unlocking_script
 
 
 def parent(lock, amount, label):
@@ -142,6 +142,58 @@ class PaymentTests(unittest.TestCase):
                     # Strip B and its signature. Keep the original A scriptSig, replace all outputs.
                     # 900 sat is affordable by A alone, so failure cannot be due to overspending.
                     self.expect(a_flag == 0xc2, [self.funding], [900], a_sig)
+
+    def test_template_round_trip(self):
+        owner = bytes(range(20))  # Includes a newline, NUL and other binary bytes.
+        other = bytes(reversed(owner))
+        for ver, size in ((1, 214973), (2, 88188)):
+            for mask in range(1, 64):
+                flags = tuple(flag for bit, flag in enumerate(FLAGS) if mask & (1 << bit))
+                raw = locking_script(owner, flags, version=ver).raw_serialize()
+                self.assertEqual(len(raw), size)
+                self.assertEqual(match_locking_script(raw), PaymentLock(ver, owner, flags))
+                replaced = replace_owner_hash160(raw, other)
+                self.assertEqual(replaced, locking_script(other, flags, version=ver).raw_serialize())
+            if ver == 2:
+                self.assertEqual(raw[:24], bytes.fromhex("78a914") + owner + b"\x88")
+
+    def test_reject_other_scripts(self):
+        owner = bytes(range(20))
+        p2pkh = b"\x76\xa9\x14" + owner + b"\x88\xac"
+        for ver in (1, 2):
+            a = locking_script(owner, (0x41,), version=ver).raw_serialize()
+            b = locking_script(owner, (0x42,), version=ver).raw_serialize()
+            slot = next(i for i, (x, y) in enumerate(zip(a, b)) if x == 0x51 and y == 0)
+            invalid = [a[:-1], a + b"\x61", a[:-1] + b"\x51", p2pkh,
+                       a[:slot] + b"\x52" + a[slot+1:], a[:slot] + b"\x00" + a[slot+1:]]
+            for raw in invalid:
+                self.assertIsNone(match_locking_script(raw))
+                with self.assertRaises(ValueError):
+                    replace_owner_hash160(raw, owner)
+            with self.assertRaises(ValueError):
+                replace_owner_hash160(a, owner[:-1])
+
+    def test_replaced_lock_enforces_new_owner(self):
+        next_key = ec.derive_private_key(11, ec.SECP256R1())
+        raw_pub = next_key.public_key().public_bytes(serialization.Encoding.X962, serialization.PublicFormat.UncompressedPoint)
+        next_owner = hashlib.new("ripemd160", hashlib.sha256(raw_pub).digest()).digest()
+        raw = self.default.tx_outs[0].script_pubkey.raw_serialize()
+        lock = Script()
+        lock.append_data(replace_owner_hash160(raw, next_owner))
+        parents = [parent(lock, 1000, "33")]
+        self.expect(True, parents, [900], self.witness(0x41, parents, [900], key=next_key))
+        self.expect(False, parents, [900], self.witness(0x41, parents, [900]))
+
+    def test_special_public_points(self):
+        # Q=G and Q=-G exercise coincident points and G+Q at infinity.
+        n = int("ffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc632551", 16)
+        for secret in (1, n-1):
+            key = ec.derive_private_key(secret, ec.SECP256R1())
+            pub = key.public_key().public_bytes(serialization.Encoding.X962, serialization.PublicFormat.UncompressedPoint)
+            owner = hashlib.new("ripemd160", hashlib.sha256(pub).digest()).digest()
+            for ver in (1, 2):
+                parents = [parent(locking_script(owner, version=ver), 1000, "66")]
+                self.expect(True, parents, [900], self.witness(0x41, parents, [900], key=key))
 
     def test_prior_secure_enclave_format_vector(self):
         p = bytes.fromhex("010000006906346983736310bedde3e7d86af3999a4eb87295f429e8e58189cfa7f25875752adad0a7b9ceca853768aebb6965eca126a62965f698a0c1bc43d83db632ad09dc2a9f5ac84e9f40a7b8113b958fef4bbf8cc9c00d03d0f4f7b728e8aa88270000000001ace803000000000000ffffffff10a6bf93b4eca215f9f7201a9e2fb6c4a6b53e094c6c1750c43c97ed86bbbdd00000000041000000")
