@@ -10,12 +10,17 @@ from tx_engine import Script, Tx, TxIn, TxOut
 
 from checked_wallet import sign_payment
 from p2pkh_r1 import locking_script_from_public_key
+from replay_payment import replay
 from test_native import signer
 from test_universal import check
 from universal import authorization
 
 
 class OrdinaryPaymentTest(unittest.TestCase):
+    def test_public_vector(self):
+        parent, signed = replay()
+        check(signed, [parent], 0)
+
     def test_complete_payment(self):
         key, pubkey, _ = signer(1)  # Public P-256 generator point, for this fixture only.
         parent_lock = Script()

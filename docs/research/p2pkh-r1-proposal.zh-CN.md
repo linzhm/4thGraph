@@ -11,6 +11,33 @@ P2PKH-R1 定义一种 BSV 锁定脚本模板。付款人把收款人的 P-256 �
 
 常规 P2PKH 让付款人只凭收款人的公钥哈希创建输出。BSV 原生签名检查使用 secp256k1，而 Apple Secure Enclave 等签名器提供 NIST P-256（secp256r1）。P2PKH-R1 保留按公钥哈希收款的方式，在 Script 中验证 P-256 签名，并用 Push TX 将授权绑定到节点实际验证的交易。收款方可以使用任何满足本文接口的 P-256 签名器，链上无需识别设备品牌。本草案定义输出模板和解锁约定；地址编码、收款请求传输、硬件证明以及后继输出延续规则均在范围之外。[BRC-16](https://github.com/bsv-blockchain/BRCs/blob/master/scripts/0016.md) · [BRC-21](https://github.com/bsv-blockchain/BRCs/blob/master/scripts/0021.md) · [Apple 签名接口](https://developer.apple.com/documentation/cryptokit/secureenclave/p256/signing/privatekey)
 
+## 快速上手：花费一笔普通付款
+
+假设钱包收到一笔 100,000 聪的 P2PKH-R1 输出，位于父交易的 `vout=0`。现在向一个普通 P2PKH 收款脚本付 99,000 聪，剩余 1,000 聪作为本例手续费，找零为零。这笔花费只有一个输入和一个输出。
+
+1. 钱包取回**完整父交易**，准备收款输出并显示金额、找零和手续费。用户确认后，调用下面的接口。
+2. 接口从父交易核对 outpoint、前序输出金额及所有者。它构造 BIP143 ALL（`0x41`）原像，将双 SHA-256 后的 32 字节摘要交给签名器。签名器只签一次，返回 64 字节大端 `r || s`。
+3. 接口填入解锁栈的全部七项，验证子交易，返回完整签后交易。调用方可用 `signed.serialize()` 取得 wire 字节。有找零时应在签名前把找零输出一并放进 `outputs`；输入金额必须等于输出总额加已确认的费用。
+
+```python
+from checked_wallet import sign_payment
+from tx_engine import TxOut
+
+outputs = [TxOut(99_000, recipient_script)]
+signed = sign_payment(parent, 0, outputs, 1_000, owner_public_key,
+                      hardware_sign_digest, wallet_history_path)
+```
+
+`recipient_script` 来自收款请求，`owner_public_key` 是所花费旧输出对应的 65 字节 R1 公钥。`hardware_sign_digest` 是钱包与设备之间的摘要签名回调。`wallet_history_path` 指向钱包共用的持久化签名历史。本入口用于单输入普通付款；多输入或其他签名类型使用下文的逐输入接口。[钱包实现](../../research/secure-enclave-p256/checked_wallet.py)
+
+**离线复现。** 从仓库根目录，在已安装 Python 3.12 和 `tx-engine==0.13.1` 的环境中运行：
+
+```sh
+python research/secure-enclave-p256/replay_payment.py
+```
+
+程序读取公开向量，只对该向量的固定摘要返回已记录的测试签名。它本地验证交易，并与发布的签后字节逐字节比对。预期输出为 `62b466ac14c69de5fb2ea8b743f4b7dfba63ac9af12588f844db2217ca03efa7  (60189 bytes)`。该交易引用合成的前序输出，金额和费用只作演示。BSV Node 1.2.3 的无对等连接 regtest 使用同一份前序数据验证输入 0。[完整父交易](./p2pkh-r1/spend-all/parent.hex) · [待签子交易、原像、摘要及签名](./p2pkh-r1/spend-all/vector.json) · [完整签后交易](./p2pkh-r1/spend-all/signed.hex) · [回放程序](../../research/secure-enclave-p256/replay_payment.py)
+
 ## 规范
 
 本节的“必须”表示字节级互操作要求，“应”表示钱包的推荐行为。所有偏移均从原始脚本的第一个字节起算，起点为 0。十六进制字段按写出的字节顺序解释。
@@ -125,11 +152,11 @@ sha256sum scriptPubKey.bin
 
 ## 开发顺序与验收条件
 
-当前已有公钥到锁的确定性接口、模板识别接口、收款向量 A/B/C，以及在原生节点上执行的花费测试。建议先让另一个钱包只凭规范完成一次离线花费。下列事项按依赖排列，均为尚待交付的工作。
+当前已有公钥到锁的确定性接口、模板识别接口、收款向量 A/B/C，普通 BIP143 ALL 完整花费向量，以及在原生节点上执行的花费测试。建议先让另一个钱包只凭规范完成一次离线花费。下列事项按依赖排列，均为尚待交付的工作。
 
 | 阶段 | 交付物 | 完成条件 |
 | --- | --- | --- |
-| 1. 固定花费向量 | 提供可直接读取的父交易、待签子交易、输入索引、真实前序金额、请求类型、实际原像类型、`scriptCode`、原像、32 字节摘要、公开测试签名、完整解锁和节点预期结果。大段交易字节可放在按哈希引用的文件中。 | 至少覆盖普通 BIP143 ALL、普通 OTDA ALL、有配对 SINGLE、两种无配对 SINGLE 和两输入混用 NONE/ALL。逐项比对序列化字节，给出节点版本和脚本标志；区分整笔交易有效性与指定输入的脚本验证。 |
+| 1. 扩充固定花费向量 | 以已发布的普通 BIP143 ALL 向量为基准，为其他路径提供可直接读取的父交易、待签子交易、输入索引、真实前序金额、请求类型、实际原像类型、`scriptCode`、原像、32 字节摘要、公开测试签名、完整解锁和节点预期结果。大段交易字节可放在按哈希引用的文件中。 | 至少覆盖普通 BIP143 ALL、普通 OTDA ALL、有配对 SINGLE、两种无配对 SINGLE 和两输入混用 NONE/ALL。逐项比对序列化字节，给出节点版本和脚本标志；区分整笔交易有效性与指定输入的脚本验证。 |
 | 2. 独立钱包复现 | 另一套 SDK 只使用本文、规范模板和固定向量，独立构造原像、识别收款人哈希并组装解锁栈。 | 复现 A/B/C 及阶段 1 的摘要；使用向量内签名时应复现解锁字节。让离线节点验证普通和伴随路径，记录任何需要查阅参考源码才能解决的歧义并回补规范。 |
 | 3. 真实签名器 | 接入 Secure Enclave 的公钥导出、摘要签名和签名格式转换，记录设备、系统版本及所选 API。可与阶段 2 并行。 | 普通及伴随路径分别只调用一次签名，验证设备实际返回的签名并通过离线节点检查。单独检查用户取消时不返回解锁脚本。真机验收比较签名的有效性，ECDSA 不要求重签得到相同字节。 |
 | 4. 成本与可用性 | 测量一次收款、一次花费、连续两次花费时的锁、父交易、解锁和整笔交易字节数，分别记录本地脚本验证与目标服务接收策略的证据。 | 记录费率和适用条件，按实际交易大小估费；说明钱包怎样保留或重新获取完整父交易，并在资料缺失时给出可恢复的错误。 |

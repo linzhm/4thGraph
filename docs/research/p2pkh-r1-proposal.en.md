@@ -11,6 +11,33 @@ P2PKH-R1 defines a BSV locking script template. A payer commits an output to a r
 
 Conventional P2PKH lets a payer create an output knowing only the recipient’s public-key hash. BSV’s native signature check uses secp256k1. Signers such as Apple’s Secure Enclave offer NIST P-256 (secp256r1). P2PKH-R1 retains the public-key-hash payment model, verifies the P-256 signature in Script, and uses Push TX to bind the authorization to the transaction verified by the node. Any signer providing the specified P-256 interface can be used. On-chain verification requires no device identification. Address encoding, payment-request transport, hardware attestation and successor-output covenants are outside the scope of this template. [BRC-16](https://github.com/bsv-blockchain/BRCs/blob/master/scripts/0016.md) · [BRC-21](https://github.com/bsv-blockchain/BRCs/blob/master/scripts/0021.md) · [Apple signing API](https://developer.apple.com/documentation/cryptokit/secureenclave/p256/signing/privatekey)
 
+## Quick start: spend an ordinary payment
+
+Suppose the wallet owns output 0 of a parent transaction. It holds 100,000 satoshis under P2PKH-R1. The wallet pays 99,000 satoshis to a conventional P2PKH recipient and approves a fixture fee of 1,000 satoshis. There is no change. The payment has one input and one output.
+
+1. Fetch the **complete parent**, prepare the recipient output and display the payment amount, change and fee. Call the entry below after approval.
+2. The wallet checks the outpoint, spent amount and owner against the parent. It builds a BIP143 ALL (`0x41`) preimage and passes its 32-byte double-SHA-256 digest to the signer. One signer call returns the 64-byte big-endian `r || s`.
+3. The wallet assembles all seven unlocking items, validates the child and returns the signed transaction. Call `signed.serialize()` to obtain its wire bytes. Include any change output in `outputs` before signing. The sum of outputs plus the approved fee must equal the spent amount.
+
+```python
+from checked_wallet import sign_payment
+from tx_engine import TxOut
+
+outputs = [TxOut(99_000, recipient_script)]
+signed = sign_payment(parent, 0, outputs, 1_000, owner_public_key,
+                      hardware_sign_digest, wallet_history_path)
+```
+
+The payment request provides `recipient_script`. The 65-byte R1 `owner_public_key` belongs to the output being spent. The wallet supplies a device digest-signing callback and a persistent signing history path. This entry covers ordinary single-input payments. Use the per-input signing interface for mixed inputs or other signature types. [Wallet implementation](../../research/secure-enclave-p256/checked_wallet.py)
+
+**Offline replay.** From the repository root, with Python 3.12 and `tx-engine==0.13.1` installed, run:
+
+```sh
+python research/secure-enclave-p256/replay_payment.py
+```
+
+The program returns a recorded public signature only for the fixture digest, validates the transaction locally and compares it byte-for-byte to the published signed transaction. Expected output is `62b466ac14c69de5fb2ea8b743f4b7dfba63ac9af12588f844db2217ca03efa7  (60189 bytes)`. The previous output is synthetic. Amounts and fees are illustrative. An isolated BSV Node 1.2.3 regtest verifies input 0 against the same supplied previous output. [Complete parent](./p2pkh-r1/spend-all/parent.hex) · [Unsigned child, preimage, digest and signature](./p2pkh-r1/spend-all/vector.json) · [Signed transaction](./p2pkh-r1/spend-all/signed.hex) · [Replay program](../../research/secure-enclave-p256/replay_payment.py)
+
 ## Specification
 
 In this section, MUST states a byte-level interoperability requirement. SHOULD states recommended wallet behavior. Offsets are zero-based from the first byte of the raw script. Hexadecimal byte strings are shown in serialization order.
@@ -125,11 +152,11 @@ Each output carries about 60 KB of program. A spend also carries the complete pa
 
 ## Implementation milestones and acceptance criteria
 
-The draft supplies a public-key-to-script function, a recognizer, three output vectors and native node spend tests. The next interoperability milestone is a wallet that can complete an offline spend from the specification alone. The following deliverables remain open.
+The draft supplies a public-key-to-script function, a recognizer, three output vectors, a complete ordinary BIP143 ALL spend vector and native node spend tests. The next interoperability milestone is a wallet that can complete an offline spend from the specification alone. The following deliverables remain open.
 
 | Stage | Deliverable | Acceptance criterion |
 | --- | --- | --- |
-| 1. Portable spend vectors | Publish the parent, unsigned child, input index, spent amount, requested and actual preimage types, `scriptCode`, preimage, 32-byte digest, public test signature, completed unlock and expected node result. Large transactions can be files referenced by hash. | Cover ordinary BIP143 ALL, ordinary OTDA ALL, paired SINGLE, both unpaired SINGLE paths and mixed NONE/ALL inputs. Compare serialized bytes at each stage. Record the node version and verification flags, distinguishing input script validation from transaction acceptance. |
+| 1. Extend the portable spend vectors | Following the published ordinary BIP143 ALL vector, provide the parent, unsigned child, input index, spent amount, requested and actual preimage types, `scriptCode`, preimage, 32-byte digest, public test signature, completed unlock and expected node result. Large transactions can be files referenced by hash. | Cover ordinary BIP143 ALL, ordinary OTDA ALL, paired SINGLE, both unpaired SINGLE paths and mixed NONE/ALL inputs. Compare serialized bytes at each stage. Record the node version and verification flags, distinguishing input script validation from transaction acceptance. |
 | 2. Independent wallet | A second SDK uses the specification, canonical bytes and fixtures to recover the owner hash, construct preimages and assemble the unlocking stack. | Reproduce A/B/C and the stage 1 digests. With the supplied signatures, reproduce the unlock bytes. Validate ordinary and companion spends offline and document any ambiguity that required reading reference code. |
 | 3. Physical signer | Integrate Secure Enclave public-key export, digest signing and signature conversion. Record the device, OS version and API. This can proceed alongside stage 2. | Make one signer call per ordinary or companion spend, check the returned signature and pass offline node validation. Cancellation returns no unlocking script. Check signature validity on hardware since ECDSA does not require two signatures on one digest to be byte-identical. |
 | 4. Cost and availability | Measure receipt, a single spend and two successive spends. Record the sizes of the lock, parent, unlock and whole transaction. Record local validation and target service policy separately. | Estimate fees using actual sizes and documented rates. Demonstrate how a wallet retains or reacquires its full parent and reports a recoverable error when the parent is unavailable. |
