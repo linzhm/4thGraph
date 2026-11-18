@@ -33,6 +33,10 @@ python generate_lock.py --owner-hash160 4ceab2c8be16c1d4c6b4147d39aa449c2d63f184
 | 4 | push(invS) | 32 字节小端的 s⁻¹ mod n，n 为 R1 曲线阶。锁验证 s × invS ≡ 1 mod n |
 | 5 | OP_0 或 OP_1 | 普通路径或下述无配对 OTDA SINGLE 伴随路径 |
 
+钱包必须根据已构造的交易及本输入请求的签名类型计算第 5 项。仅当类型为 0x63 或 0xe3，且从零起算的输入索引大于或等于输出数量时，写入 OP_1。其余受支持的情况一律写入 OP_0。普通付款接口固定使用 0x41，不提供分支位或签名类型参数。多输入协议如需显式使用其他签名类型，仍按同一规则计算分支位。[钱包实现](../../research/secure-enclave-p256/checked_wallet.py) · [分支位计算](../../research/secure-enclave-p256/universal.py)
+
+钱包识别收款时，应同时核对完整模板指纹和预期的收款公钥哈希。付款方可以构造任意输出脚本。如果额外要求收款人只能用 NONE，固定程序的字节就发生改变，模板检查会失败。付款方自己的签名类型只控制它所签的输入。收款人以后花费这个输出时，可以自行选择模板支持的签名类型。
+
 锁核对 HASH160(Q)，验证 R1 签名，再通过 PUSHTX 的公开构造与原生 `OP_CHECKSIG` 将该授权绑定到节点正在验证的交易上下文。栈内既不含父交易原文，也不含前序签名。普通 ForkID ALL 的 P 为 159 字节，其中序列化的 scriptCode 为 `02 68 ac`。五项编码合计 **326 字节**（161 + 66 + 65 + 33 + 1）。[锁定脚本汇编](../../research/secure-enclave-p256/current-input.asm) · [绑定检查](../../research/secure-enclave-p256/universal-core.asm) · [nChain WP1605](https://nchain.com/wp-content/uploads/2022/03/WP1605_PUSHTX-and-its-Building-Blocks.pdf) · [BRC-21](https://github.com/bsv-blockchain/BRCs/blob/master/scripts/0021.md)
 
 ## 签名覆盖范围
@@ -46,7 +50,7 @@ python generate_lock.py --owner-hash160 4ceab2c8be16c1d4c6b4147d39aa449c2d63f184
 | 其他输入的 outpoint | BIP143 未设 ANYONECANPAY 时，hashPrevouts 承诺所有输入的有序 outpoint；设置后该字段为零。OTDA 在变换的交易中选取输入集合 |
 | 输入金额 | BIP143 原像直接包含当前输入金额。两种算法都不直接证明其他输入的金额；OTDA 原像也不序列化当前输入金额 |
 
-BIP143 SINGLE 在当前输入没有同索引输出时，其 hashOutputs 为零，原像仍含当前 outpoint。OTDA SINGLE 在相同条件下使用节点规定的常量摘要 1。此时选 OP_1，设备签一次绑定当前输入的伴随 BIP143 SINGLE 原像，保留 ANYONECANPAY 选择。脚本内部另用公开构造验证原生 OTDA 常量摘要。此路径的 P 为 163 字节。普通 OTDA 路径的 P 可因本次输入输出而变长，例如 OTDA ALL 会包含本次创建的 R1 输出脚本。[原生节点规则](https://github.com/bitcoin-sv/bitcoin-sv/blob/6504a3aff65ba97c0f6c80962b033e35ecbfed4b/src/script/interpreter.cpp#L1894-L2124) · [路径构造](../../research/secure-enclave-p256/universal.py)
+BIP143 SINGLE 在当前输入没有同索引输出时，其 hashOutputs 为零，原像仍含当前 outpoint。OTDA SINGLE 在相同条件下使用节点规定的常量摘要 1。此时钱包自动写入 OP_1，设备签一次绑定当前输入的伴随 BIP143 SINGLE 原像，保留 ANYONECANPAY 选择。脚本内部另用公开构造验证原生 OTDA 常量摘要。此路径的 P 为 163 字节。普通 OTDA 路径的 P 可因本次输入输出而变长，例如 OTDA ALL 会包含本次创建的 R1 输出脚本。[原生节点规则](https://github.com/bitcoin-sv/bitcoin-sv/blob/6504a3aff65ba97c0f6c80962b033e35ecbfed4b/src/script/interpreter.cpp#L1894-L2124) · [路径构造](../../research/secure-enclave-p256/universal.py)
 
 ## 验收与待完成工作
 
