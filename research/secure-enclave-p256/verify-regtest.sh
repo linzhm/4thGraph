@@ -23,7 +23,7 @@ export REGTEST_COOKIE="$data/regtest/.cookie"
 for attempt in {1..60}; do
   if ! kill -0 "$node_pid" 2>/dev/null; then tail -60 "$node_dir/node.log"; exit 1; fi
   if [[ -s "$REGTEST_COOKIE" ]] && "$cli" -regtest -rpcport=18443 -datadir="$data" getblockcount >/dev/null 2>&1; then
-    python -m unittest -v test_universal test_spend_example
+    python -m unittest -v test_universal test_spend_example test_current_input
     exit 0
   fi
   sleep 1

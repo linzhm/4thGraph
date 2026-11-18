@@ -47,12 +47,28 @@ def authorization(tx, index, amount, requested_type):
 def universal_unlocking_script(parent, auth, pubkey, signature):
     if not parent or len(pubkey) != 65 or pubkey[0] != 4 or len(signature) != 64:
         raise ValueError("expected parent, X9.63 public key and raw R1 signature")
+    return _build_unlock(auth, pubkey, signature, parent)
+
+
+def current_input_unlock(auth, pubkey, signature):
+    """No parent, parent signatures, or ordinal appear in the new witness."""
+    if len(pubkey) != 65 or pubkey[0] != 4 or len(signature) != 64:
+        raise ValueError("expected X9.63 public key and raw R1 signature")
+    return _build_unlock(auth, pubkey, signature, None)
+
+
+def _build_unlock(auth, pubkey, signature, parent):
     s = int.from_bytes(signature[32:], "big")
     if not 0 < s < GROUP_ORDER_R1:
         raise ValueError("invalid P-256 signature scalar")
     inverse = pow(s, -1, GROUP_ORDER_R1).to_bytes(32, "little")
     out = Script()
-    for data in (parent, auth.preimage, pubkey, signature, auth.ordinal.to_bytes(4, "little"), inverse):
+    if parent is not None:
+        out.append_pushdata(parent)
+    for data in (auth.preimage, pubkey, signature):
         out.append_pushdata(data)
+    if parent is not None:
+        out.append_pushdata(auth.ordinal.to_bytes(4, "little"))
+    out.append_pushdata(inverse)
     out.append_data(bytes([0x51 if auth.companion else 0x00]))
     return out

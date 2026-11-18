@@ -9,7 +9,7 @@ from cryptography.hazmat.primitives.asymmetric import ec, utils
 from tx_engine import Script, Tx, TxIn
 
 from handwritten import GROUP_ORDER_R1, match_locking_script
-from universal import authorization, universal_unlocking_script
+from universal import authorization, current_input_unlock, universal_unlocking_script
 
 
 class SigningKeyBlocked(RuntimeError):
@@ -34,7 +34,7 @@ def sign_spend(tx, index, parent, requested_type, pubkey, sign_digest, history_p
         raise ValueError("parent outpoint mismatch")
     output = parent.tx_outs[txin.prev_index]
     lock = match_locking_script(output.script_pubkey.raw_serialize())
-    if lock is None or lock.version not in (7, 8) or requested_type not in lock.allowed_types:
+    if lock is None or lock.version not in (7, 8, 9) or requested_type not in lock.allowed_types:
         raise ValueError("unrecognized template or disallowed sighash")
     if len(pubkey) != 65 or pubkey[0] != 4:
         raise ValueError("expected uncompressed X9.63 P-256 key")
@@ -43,7 +43,6 @@ def sign_spend(tx, index, parent, requested_type, pubkey, sign_digest, history_p
         raise ValueError("owner key mismatch")
     auth = authorization(tx, index, output.amount, requested_type)
     digest = auth.digest()
-    parent_bytes = parent.serialize()
 
     with closing(sqlite3.connect(history_path, timeout=30)) as db:
         db.execute("CREATE TABLE IF NOT EXISTS seen_r "
@@ -70,7 +69,9 @@ def sign_spend(tx, index, parent, requested_type, pubkey, sign_digest, history_p
                 db.execute("INSERT INTO seen_r VALUES (?,?,?)", (pubkey, signature[:32], digest))
         if conflict:
             raise SigningKeyBlocked("same P-256 r observed on different digests; signature withheld")
-    return universal_unlocking_script(parent_bytes, auth, pubkey, signature)
+    if lock.version == 9:
+        return current_input_unlock(auth, pubkey, signature)
+    return universal_unlocking_script(parent.serialize(), auth, pubkey, signature)
 
 
 def sign_payment(parent, vout, outputs, fee_sats, pubkey, sign_digest, history_path):

@@ -13,8 +13,9 @@ SOURCES = {
     4: ("payment.asm", "tagged-lock.asm", "window-4.asm"),
     5: ("payment.asm", "native-lock.asm", "bip143.asm", "window-4.asm"),
     6: ("payment.asm", "native-lock.asm", "otda.asm", "window-4.asm"),
-    7: ("payment.asm", "universal.asm", "policy-legacy.asm", "window-4.asm"),
-    8: ("payment.asm", "universal.asm", "signature-type.asm", "window-4.asm"),
+    7: ("payment.asm", "universal.asm", "universal-core.asm", "policy-legacy.asm", "window-4.asm"),
+    8: ("payment.asm", "universal.asm", "universal-core.asm", "signature-type.asm", "window-4.asm"),
+    9: ("payment.asm", "current-input.asm", "universal-core.asm", "signature-type.asm", "window-4.asm"),
 }
 FLAGS = {0x41: "ALL", 0xC1: "ALL_ACP", 0x42: "NONE", 0xC2: "NONE_ACP", 0x43: "SINGLE", 0xC3: "SINGLE_ACP"}
 
@@ -25,7 +26,7 @@ GROUP_ORDER_R1 = 0xffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc632
 
 
 def flags_for(version):
-    if version in (7, 8):
+    if version in (7, 8, 9):
         return UNIVERSAL_FLAGS
     return OTDA_FLAGS if version == 6 else FLAGS
 
@@ -136,7 +137,7 @@ def _template(version):
                 skeleton.append(0)
             else:
                 skeleton.extend(emit(token))
-    expected_slots = set() if version == 8 else flags_for(version).keys()
+    expected_slots = set() if version in (8, 9) else flags_for(version).keys()
     if owner_offset is None or flag_offsets.keys() != expected_slots:
         raise ValueError("incomplete payment template")
     return bytes(skeleton), owner_offset, flag_offsets
@@ -154,12 +155,12 @@ def _locking_bytes(owner_hash160, allowed, version):
 
 def locking_script(owner_hash160: bytes, allowed_types=None, *, version=2) -> Script:
     default = {0x41, 0x61} if version == 7 else {0x61 if version == 6 else 0x41}
-    if version == 8:
+    if version in (8, 9):
         default = set(UNIVERSAL_FLAGS)
     allowed = default if allowed_types is None else set(allowed_types)
     if len(owner_hash160) != 20 or not allowed or not allowed.issubset(flags_for(version)):
         raise ValueError("expected a 20-byte owner hash and supported ForkID types")
-    if version == 8 and allowed != set(UNIVERSAL_FLAGS):
+    if version in (8, 9) and allowed != set(UNIVERSAL_FLAGS):
         raise ValueError("ordinary P2PKH-R1 has no configurable sighash policy")
     out = Script()
     out.append_data(_locking_bytes(owner_hash160, allowed, version))
@@ -182,14 +183,14 @@ def _matcher(version):
 
 def match_locking_script(raw: bytes) -> PaymentLock | None:
     """Match a raw scriptPubKey (no CompactSize prefix) against a known version."""
-    for version in (8, 7, 2, 3, 4, 5, 6, 1):
+    for version in (9, 8, 7, 2, 3, 4, 5, 6, 1):
         size, header, end, suffix = _matcher(version)
         if len(raw) != size:
             continue
         match = header.fullmatch(raw, 0, end)
         if match is None or not raw.endswith(suffix):
             continue
-        if version == 8:
+        if version in (8, 9):
             return PaymentLock(version, match["owner"], tuple(UNIVERSAL_FLAGS))
         allowed = tuple(flag for flag in flags_for(version) if match[f"f{flag:02x}"] == bytes([0x51]))
         if allowed:
