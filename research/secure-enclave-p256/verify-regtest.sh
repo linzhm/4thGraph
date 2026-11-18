@@ -13,12 +13,11 @@ node_bin=$(find "$node_dir" -type f -name bitcoind -print -quit)
 cli="$(dirname "$node_bin")/bitcoin-cli"
 data="$node_dir/regtest-data"
 mkdir "$data"
-"$node_bin" -version | head -2
-"$node_bin" -regtest -server -datadir="$data" -listen=0 -connect=0 -dnsseed=0 -discover=0 \
+"$node_bin" -regtest -server -rpcport=18443 -minminingtxfee=0.000005 -datadir="$data" -listen=0 -connect=0 -dnsseed=0 -discover=0 \
   -genesisactivationheight=1 -chronicleactivationheight=2 -excessiveblocksize=1000000000 \
   -maxstackmemoryusageconsensus=100000000 -maxtxsizepolicy=100000000 -maxstdtxvalidationduration=1000 \
   -maxnonstdtxvalidationduration=2000 -daemon
-trap '"$cli" -regtest -datadir="$data" stop >/dev/null || true' EXIT
-"$cli" -regtest -datadir="$data" -rpcwait getblockcount
+trap '"$cli" -regtest -rpcport=18443 -datadir="$data" stop >/dev/null || true' EXIT
+"$cli" -regtest -rpcport=18443 -datadir="$data" -rpcwait getblockcount
 export REGTEST_COOKIE="$data/regtest/.cookie"
 python -m unittest -v test_universal
