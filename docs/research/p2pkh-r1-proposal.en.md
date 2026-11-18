@@ -30,9 +30,10 @@ signed = sign_payment(parent, 0, outputs, 1_000, owner_public_key,
 
 The payment request provides `recipient_script`. The 65-byte R1 `owner_public_key` belongs to the output being spent. The wallet supplies a device digest-signing callback and a persistent signing history path. This entry covers ordinary single-input payments. Use the per-input signing interface for mixed inputs or other signature types. [Wallet implementation](../../research/secure-enclave-p256/checked_wallet.py)
 
-**Offline replay.** From the repository root, with Python 3.12 and `tx-engine==0.13.1` installed, run:
+**Offline replay.** The verification environment uses Python 3.12 and the pinned fork. Installation requires Git, a Rust build environment and network access. Subsequent replay is offline. From the repository root run
 
 ```sh
+python -m pip install "tx-engine @ git+https://github.com/linzhm/chain-gang.git@ffa7f0cc0797d8905655ca9dd0e5270d41daee50"
 python research/secure-enclave-p256/replay_payment.py
 ```
 
@@ -135,14 +136,38 @@ An implementation should reproduce all three scripts and recover the correspondi
 
 ## Reference implementation and verification status
 
-The reference program is defined directly in Bitcoin Script assembly. Its assembler expands named blocks and fixed repetitions. The reference P-256 verifier uses four-bit windows. Wallets can instantiate the canonical bytes directly using section 1. Run the following commands in the repository’s `research/secure-enclave-p256` directory with Python 3.12 and `tx-engine==0.13.1`. [Generator](../../research/secure-enclave-p256/generate_lock.py) · [Window arithmetic](../../research/secure-enclave-p256/window-4.asm)
+The reference program is defined directly in Bitcoin Script assembly. Its assembler expands named blocks and fixed repetitions. The reference P-256 verifier uses four-bit windows. Wallets can instantiate the canonical bytes directly using section 1. Run the following commands in the repository’s `research/secure-enclave-p256` directory using the verification environment above. [Generator](../../research/secure-enclave-p256/generate_lock.py) · [Window arithmetic](../../research/secure-enclave-p256/window-4.asm)
 
 ```sh
 python generate_lock.py --owner-hash160 000102030405060708090a0b0c0d0e0f10111213 --format raw > scriptPubKey.bin
 sha256sum scriptPubKey.bin
 ```
 
-Offline testing has exercised all twelve types, mixed inputs in the same transaction and the unpaired paths. The assembler and the byte-oriented wallet API reproduced all three vectors. The run passed 53 Python/chain-gang tests, eight isolated BSV Node 1.2.3 tests and two nChain comparisons. [Verification record](https://github.com/linzhm/bsv-script-lab/actions/runs/44364686046/job/135015159182) · [nChain PUSHTX reference](https://github.com/nchain-innovation/zkscript_package/blob/fc20fb743edbc5bc5aba9d16625d50d1f50a3ef4/src/zkscript/transaction_introspection/transaction_introspection.py)
+Offline testing has exercised all twelve types, mixed inputs in the same transaction and the unpaired paths. The assembler and the byte-oriented wallet API reproduced all three vectors. The earlier node run is linked below. The next section reports per-path results for the fork. [Verification record](https://github.com/linzhm/bsv-script-lab/actions/runs/44364686046/job/135015159182) · [nChain PUSHTX reference](https://github.com/nchain-innovation/zkscript_package/blob/fc20fb743edbc5bc5aba9d16625d50d1f50a3ef4/src/zkscript/transaction_introspection/transaction_introspection.py)
+
+## Chronicle implications for P2PKH-R1
+
+**Digest selection at spend time.** Both `0x41` and `0x61` commit to all outputs. Bit `0x20` in the latter selects OTDA. We signed the published one-input payment both ways using the same parent, recipient output, amounts and fee. All sizes are bytes. Both transactions passed the pinned chain-gang fork and BSV Node 1.2.3. [Release specification](https://docs.bsvblockchain.org/network-topology/nodes/sv-node/chronicle-release) · [Two-engine run](https://github.com/linzhm/bsv-script-lab/actions/runs/44369934431/job/135033638206)
+
+| Signature type | Preimage | Unlocking script | Complete child |
+| --- | ---: | ---: | ---: |
+| BIP143 ALL | 159 | 60,102 | 60,189 |
+| OTDA ALL | 91 | 60,034 | 60,121 |
+
+OTDA saved **68 bytes** in this case. OTDA serialization depends on transaction shape. BIP143 ALL uses fixed-size hashes of the input and output sets. Estimate the two preimage sizes on the intended transaction. The ordinary example continues to use BIP143 ALL. Carrying the complete parent dominates its unlocking size.
+
+**Functional unlocking scripts merit the first experiment.** Chronicle permits computations in the unlocking phase. The **59,768-byte** public parent occupies **59,771 bytes** as a data push. It contains 64 consecutive copies of an 830-byte four-bit window routine. Reconstructing that repetition and joining the surrounding bytes takes **7,501 bytes** of unlocking code, saving **52,270 bytes** on this one item. Both engines verified the reconstructed parent against its hash in an isolated data-transport test. The published payment vector uses a direct push. Adopting the computed form requires a full R1 spend test, measurement of execution costs, confirmation of activation and acceptance policy, and wallet recognition of both unlocking encodings. The saving depends on the parent’s contents. [Data-transport test](../../research/secure-enclave-p256/test_spend_example.py) · [Release specification §3](https://docs.bsvblockchain.org/network-topology/nodes/sv-node/chronicle-release)
+
+**Lock-side opportunities are smaller.** For a preimage already checked to be long enough, a 32-byte slice at offset 68 could use `OP_SUBSTR` in place of two splits and stack cleanup. The static encoding at that site would shrink from eight bytes to five. This needs the relevant UTXO-era rules and changes the template fingerprint. Numeric shifts merit timing in the four-bit window, although `OP_16 OP_DIV` and `OP_4 OP_RSHIFTNUM` each occupy two bytes. Increasing the ScriptNum ceiling offers no direct size benefit for the current P-256 arithmetic. Relaxing low-S for native signatures does not replace R1 verification or reduce the number of hardware signatures. [Node opcode implementation](https://github.com/bitcoin-sv/bitcoin-sv/blob/6504a3aff65ba97c0f6c80962b033e35ecbfed4b/src/script/interpreter.cpp#L609-L637) · [Window assembly](../../research/secure-enclave-p256/window-4.asm)
+
+### Patched engine coverage
+
+CI builds `linzhm/chain-gang@ffa7f0cc0797d8905655ca9dd0e5270d41daee50` from source and checks the installed revision. Both engines verified paired transactions across all twelve types at two input positions, mixed NONE/OTDA ALL, and unpaired BIP143 SINGLE. Unpaired OTDA SINGLE (`63/e3`) has two separate results.
+
+- **Digest API.** The fork returns the native consensus sentinel, raw byte `01` followed by 31 zero bytes. The preimage API reports an error because this case has no serialized preimage. The owner makes one signature on the input-specific companion BIP143 digest. [Patch notes](https://github.com/linzhm/chain-gang/blob/ffa7f0cc0797d8905655ca9dd0e5270d41daee50/docs/otda-constant-digest.md)
+- **Complete input.** The native node accepts the valid companion spend. The pinned fork’s `Tx.validate` reports a false top stack item. Its two-phase source strips separators from the remaining script code. The node retains a later unexecuted separator in the companion BIP143 script code. This source difference is consistent with the observed result. CI records the disagreement explicitly. The next engine acceptance criterion is success on the same complete `63/e3` inputs in both engines. [Initial comparison](https://github.com/linzhm/bsv-script-lab/actions/runs/44369295614/job/135031389747) · [Fork script handling](https://github.com/linzhm/chain-gang/blob/ffa7f0cc0797d8905655ca9dd0e5270d41daee50/src/script/interpreter/script_code.rs#L32-L47) · [Node script suffix selection](https://github.com/bitcoin-sv/bitcoin-sv/blob/6504a3aff65ba97c0f6c80962b033e35ecbfed4b/src/script/interpreter.cpp#L1441-L1482) · [Node BIP143 serialization](https://github.com/bitcoin-sv/bitcoin-sv/blob/6504a3aff65ba97c0f6c80962b033e35ecbfed4b/src/script/interpreter.cpp#L2065-L2084)
+
+**Activation heights.** Node 1.2.3 and the release document specify mainnet 943,816 and testnet 1,713,168. The fork’s constants are 943,835 and 1,713,022 respectively. The comparison uses explicit Genesis/Chronicle flags on isolated regtest and the fork’s `Tx.validate`. For height-aware validation, resolve the target node’s chain parameters, UTXO era and transaction version. Signature bit `0x20` selects the digest algorithm. [Node parameters](https://github.com/bitcoin-sv/bitcoin-sv/blob/6504a3aff65ba97c0f6c80962b033e35ecbfed4b/src/chainparams.cpp#L23-L26) · [Fork parameters](https://github.com/linzhm/chain-gang/blob/ffa7f0cc0797d8905655ca9dd0e5270d41daee50/src/chronicle.rs)
 
 ## Security and deployment considerations
 

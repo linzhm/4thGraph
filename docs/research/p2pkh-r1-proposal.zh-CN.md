@@ -30,9 +30,10 @@ signed = sign_payment(parent, 0, outputs, 1_000, owner_public_key,
 
 `recipient_script` 来自收款请求，`owner_public_key` 是所花费旧输出对应的 65 字节 R1 公钥。`hardware_sign_digest` 是钱包与设备之间的摘要签名回调。`wallet_history_path` 指向钱包共用的持久化签名历史。本入口用于单输入普通付款；多输入或其他签名类型使用下文的逐输入接口。[钱包实现](../../research/secure-enclave-p256/checked_wallet.py)
 
-**离线复现。** 从仓库根目录，在已安装 Python 3.12 和 `tx-engine==0.13.1` 的环境中运行：
+**离线复现。** 验证使用 Python 3.12 和固定提交的补丁引擎。安装时需要 Git、Rust 构建环境和网络，随后可离线回放。从仓库根目录运行
 
 ```sh
+python -m pip install "tx-engine @ git+https://github.com/linzhm/chain-gang.git@ffa7f0cc0797d8905655ca9dd0e5270d41daee50"
 python research/secure-enclave-p256/replay_payment.py
 ```
 
@@ -135,14 +136,38 @@ rb"\x76\x00\x52\xa5\x69\x6b\x82\x01\x20\x9d.{322}(?P<owner_hash160>.{20}).{59354
 
 ## 参考实现与验证状态
 
-参考程序直接以 Bitcoin Script 汇编定义，装配器展开命名块及固定次数的重复。四位窗口是参考实现进行 P-256 验签的方式。钱包可直接按第 1 节实例化规范模板。以下命令在仓库的 `research/secure-enclave-p256` 目录下运行，使用 Python 3.12 和 `tx-engine==0.13.1`。[生成器](../../research/secure-enclave-p256/generate_lock.py) · [四位窗口汇编](../../research/secure-enclave-p256/window-4.asm)
+参考程序直接以 Bitcoin Script 汇编定义，装配器展开命名块及固定次数的重复。四位窗口是参考实现进行 P-256 验签的方式。钱包可直接按第 1 节实例化规范模板。以下命令在仓库的 `research/secure-enclave-p256` 目录下运行，使用上文的验证环境。[生成器](../../research/secure-enclave-p256/generate_lock.py) · [四位窗口汇编](../../research/secure-enclave-p256/window-4.asm)
 
 ```sh
 python generate_lock.py --owner-hash160 000102030405060708090a0b0c0d0e0f10111213 --format raw > scriptPubKey.bin
 sha256sum scriptPubKey.bin
 ```
 
-已有离线验收覆盖全部十二种类型、同笔交易混用及无配对路径。参考装配器与钱包字节接口复现了上述三个向量。本次通过 53 项 Python/chain-gang 测试、8 项离线 BSV Node 1.2.3 测试和 2 项 nChain 对照。[验收记录](https://github.com/linzhm/bsv-script-lab/actions/runs/44364686046/job/135015159182) · [nChain PUSHTX 参考实现](https://github.com/nchain-innovation/zkscript_package/blob/fc20fb743edbc5bc5aba9d16625d50d1f50a3ef4/src/zkscript/transaction_introspection/transaction_introspection.py)
+已有离线验收覆盖全部十二种类型、同笔交易混用及无配对路径。参考装配器与钱包字节接口复现了上述三个向量。早期节点运行见记录，补丁引擎的逐路径结果见下节。[验收记录](https://github.com/linzhm/bsv-script-lab/actions/runs/44364686046/job/135015159182) · [nChain PUSHTX 参考实现](https://github.com/nchain-innovation/zkscript_package/blob/fc20fb743edbc5bc5aba9d16625d50d1f50a3ef4/src/zkscript/transaction_introspection/transaction_introspection.py)
+
+## Chronicle 对本模板的影响
+
+**同一把锁可以在花费时选摘要算法。** `0x41` 和 `0x61` 都承诺全部输出。后者的 `0x20` 位选择 OTDA。把已发布的单输入付款按相同父交易、收款输出、金额与费用分别签署，得到下表。三项长度均为字节；每条路径都在固定补丁版 chain-gang 和 BSV Node 1.2.3 上通过。[升级说明](https://docs.bsvblockchain.org/network-topology/nodes/sv-node/chronicle-release) · [双引擎实测](https://github.com/linzhm/bsv-script-lab/actions/runs/44369934431/job/135033638206)
+
+| 签名类型 | 原像 | 解锁脚本 | 完整子交易 |
+| --- | ---: | ---: | ---: |
+| BIP143 ALL | 159 | 60,102 | 60,189 |
+| OTDA ALL | 91 | 60,034 | 60,121 |
+
+这次选择 OTDA 节省 **68 字节**。OTDA 序列化的长度随交易结构变化；BIP143 ALL 对输入和输出集合使用定长哈希。钱包应分别计算目标交易的原像长度。普通单输入示例继续用 BIP143 ALL，完整父交易仍是其主要开销。
+
+**功能性解锁脚本值得优先试验。** Chronicle 放宽了解锁脚本只推数据的限制。对同一份 **59,768 字节**的公开父交易，直接推入需 **59,771 字节**。它包含 64 份连续相同的 830 字节四位窗口程序。试验在解锁侧重建这段重复数据，再与其前后字节拼接，构造程序只需 **7,501 字节**，该数据项少 **52,270 字节**。双引擎在独立的哈希相等测试锁上核对了完整重建结果。公布的付款向量仍采用直接推入；采用新编码前，需要在完整 R1 花费上验证所有者授权、执行成本、适用的激活与接收策略，以及钱包对两种解锁格式的识别。压缩比例取决于父交易内容。[数据项试验](../../research/secure-enclave-p256/test_spend_example.py) · [升级说明 §3](https://docs.bsvblockchain.org/network-topology/nodes/sv-node/chronicle-release)
+
+**锁内指令的机会较小。** 例如，在已验证长度足够的原像上，取偏移 68 起的 32 字节，可以把两次 `OP_SPLIT` 加栈清理换成 `OP_SUBSTR`，单处静态编码由 8 字节降到 5 字节。它需要相应的 UTXO 规则，并会改变模板指纹。数值移位也值得针对四位窗口计时，但 `OP_16 OP_DIV` 和 `OP_4 OP_RSHIFTNUM` 都是两字节。更大的 ScriptNum 上限对当前 P-256 运算没有直接体积收益。原生签名的 low-S 放宽也不会替代 R1 验签或让硬件少签一次。[节点操作码实现](https://github.com/bitcoin-sv/bitcoin-sv/blob/6504a3aff65ba97c0f6c80962b033e35ecbfed4b/src/script/interpreter.cpp#L609-L637) · [四位窗口汇编](../../research/secure-enclave-p256/window-4.asm)
+
+### 补丁引擎的验证边界
+
+CI 从源码构建 `linzhm/chain-gang@ffa7f0cc0797d8905655ca9dd0e5270d41daee50`，校验安装来源的提交。对有配对输出的十二种类型（两个输入位置）、混用 NONE/OTDA ALL，以及无配对 BIP143 SINGLE，完整花费已通过补丁引擎与原生节点的对照。对无配对 OTDA SINGLE 的 `63/e3`，需分两层看：
+
+- **摘要 API。** 补丁返回节点使用的常量摘要，原始字节是 `01` 后跟 31 个零；请求原像返回错误，因为没有这样的序列化原像。持有人仍只签一次当前输入专属的伴随 BIP143 摘要。[补丁说明](https://github.com/linzhm/chain-gang/blob/ffa7f0cc0797d8905655ca9dd0e5270d41daee50/docs/otda-constant-digest.md)
+- **完整输入验证。** 同一合法伴随花费在 BSV Node 上通过，而此补丁版的 `Tx.validate` 返回栈顶为假。源码显示两阶段处理会从剩余 `scriptCode` 移除分隔符；节点的伴随 BIP143 检查保留尚未执行的分隔符。这与观察结果相符。CI 单列记录该差异。下一个引擎验收条件，是固定的两个引擎对 `63/e3` 完整输入都返回成功。[首次对照日志](https://github.com/linzhm/bsv-script-lab/actions/runs/44369295614/job/135031389747) · [补丁引擎](https://github.com/linzhm/chain-gang/blob/ffa7f0cc0797d8905655ca9dd0e5270d41daee50/src/script/interpreter/script_code.rs#L32-L47) · [节点选择脚本后缀](https://github.com/bitcoin-sv/bitcoin-sv/blob/6504a3aff65ba97c0f6c80962b033e35ecbfed4b/src/script/interpreter.cpp#L1441-L1482) · [节点 BIP143 序列化](https://github.com/bitcoin-sv/bitcoin-sv/blob/6504a3aff65ba97c0f6c80962b033e35ecbfed4b/src/script/interpreter.cpp#L2065-L2084)
+
+**高度边界。** Node 1.2.3 与发布说明的主网、测试网激活高度分别为 943,816、1,713,168；补丁分支相应常量为 943,835、1,713,022。本次比较使用显式 Genesis/Chronicle 标志的隔离 regtest 及补丁引擎的 `Tx.validate`。按真实链高度判定适用规则时，应核对目标节点的链参数、UTXO 所属时期与交易版本。签名类型中的 `0x20` 只负责选择摘要算法。[节点链参数](https://github.com/bitcoin-sv/bitcoin-sv/blob/6504a3aff65ba97c0f6c80962b033e35ecbfed4b/src/chainparams.cpp#L23-L26) · [补丁引擎链参数](https://github.com/linzhm/chain-gang/blob/ffa7f0cc0797d8905655ca9dd0e5270d41daee50/src/chronicle.rs)
 
 ## 安全与部署考虑
 
