@@ -1,0 +1,3 @@
+cryptography>=43
+requests>=2.32
+tx-engine @ git+https://github.com/linzhm/chain-gang.git@ffa7f0cc0797d8905655ca9dd0e5270d41daee50
