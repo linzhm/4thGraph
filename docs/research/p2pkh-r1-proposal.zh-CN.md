@@ -1,79 +1,101 @@
-# P2PKH-R1 v7 初步方案：如何生成、识别和花费一把锁
+# P2PKH-R1：支付给 P-256 公钥哈希
 
-[English edition](./p2pkh-r1-proposal.en.md)
+**状态**　首次征求意见草案　·　**类别**　Bitcoin Script 模板　·　**维护仓库**　linzhm/bsv-script-lab  
+[English text](./p2pkh-r1-proposal.en.md) · [规范模板字节](./p2pkh-r1/template.hex)
 
-付款人需要两项公开参数：收款人的 **P-256 公钥哈希**和**允许的签名类型集合**。用这两项实例化已验收的 v7 手写模板，就得到可以放进 BSV 交易输出的 59,811 字节 `scriptPubKey`。收款人在花费时才调用 Secure Enclave。v7 是本仓库的模板版本，与 BSV 交易的 `nVersion` 分开。[生成入口](../../research/secure-enclave-p256/generate_lock.py) · [手写入口块](../../research/secure-enclave-p256/universal.asm)
+## 摘要
 
-## 一、收款人与付款人的约定
+P2PKH-R1 定义一种 BSV 锁定脚本模板。付款人把收款人的 P-256 公钥哈希和允许的交易签名类型写入输出。花费者揭示公钥，并用对应私钥对当前输入的交易摘要签署一次。本文规定如何生成和识别输出、如何构造解锁栈，以及如何验证不同钱包产生的字节是否兼容。
 
-1. 收款钱包导出 P-256（secp256r1）签名公钥的 65 字节 X9.63 表示 `04 || x_BE32 || y_BE32`。收款请求应标明 `P2PKH-R1`、模板版本 7、签名许可，以及这个公钥或其 `RIPEMD160(SHA256(Q))`。这是双方的钱包接口约定，本方案没有分配 BSV 地址前缀。仅凭公钥哈希无法确认收款人持有密钥或密钥的硬件来源。[Apple Secure Enclave 签名接口](https://developer.apple.com/documentation/cryptokit/secureenclave/p256/signing/privatekey)
-2. 付款钱包从可信的收款请求取得字段。收到公钥时验证编码和曲线点，再哈希完整 65 字节；收到已约定的哈希时验证长度为 20 字节。普通付款默认只允许两个 ALL 类型 `41,61`。业务需要 NONE、SINGLE 或 ANYONECANPAY 时，在创建这笔输出前显式加入相应的类型。
-3. 生成器装配脚本，再用完整模板识别器读回类型、版本、所有者哈希及全部许可。付款钱包核对金额，以原始字节设置新输出的 `scriptPubKey`。输出在交易中的序列化为 `amount_LE64 || CompactSize(59811) || scriptPubKey`；长度前缀是 `fd a3 e9`。整个脚本直接作为输出程序，不能再包一层 PUSHDATA。[识别器](../../research/secure-enclave-p256/lock_identity.py)
+## 动机与适用范围
 
-## 二、生成一份可以逐字节比较的样例
+常规 P2PKH 让付款人只凭收款人的公钥哈希创建输出。BSV 原生签名检查使用 secp256k1，而 Apple Secure Enclave 等签名器提供 NIST P-256（secp256r1）。P2PKH-R1 保留按公钥哈希收款的方式，在 Script 中验证 P-256 签名，并用 Push TX 将授权绑定到节点实际验证的交易。收款方可以使用任何满足本文接口的 P-256 签名器，链上无需识别设备品牌。本草案定义输出模板和解锁约定；地址编码、收款请求传输、硬件证明以及后继输出延续规则均在范围之外。[BRC-16](https://github.com/bsv-blockchain/BRCs/blob/master/scripts/0016.md) · [BRC-21](https://github.com/bsv-blockchain/BRCs/blob/master/scripts/0021.md) · [Apple 签名接口](https://developer.apple.com/documentation/cryptokit/secureenclave/p256/signing/privatekey)
 
-以下命令适用于有私库读取权限、Python 3.12 和对应 tx-engine wheel 的 Linux 环境。下载依赖后，生成阶段可离线运行。示例哈希仅用于重现字节，不对应本方案提供的收款钱包。
+## 规范
+
+本节的“必须”表示字节级互操作要求，“应”表示钱包的推荐行为。所有偏移均从原始脚本的第一个字节起算，起点为 0。十六进制字段按写出的字节顺序解释。
+
+### 1. 创建和识别输出
+
+收款参数为 `ownerHash160`（20 字节）及 `allowedTypes`（下表类型的非空子集）。若收款人提供公钥 Q，钱包必须验证它是 P-256 上的有效非无穷远点，并对恰好 65 字节的 `04 || x_BE32 || y_BE32` 计算 `RIPEMD160(SHA256(Q))`。若直接接受哈希，付款人应通过可信收款请求确认模板名、哈希和许可集合。普通付款推荐 `{41,61}`，使持有人可在两种算法下对全部输出签名。
+
+1. 读取[规范模板字节](./p2pkh-r1/template.hex)，去掉 ASCII 空白并按十六进制解码。所得 59,811 字节为下文向量 A 的完整程序。
+2. 将 `[437,457)` 的 20 字节换为 `ownerHash160`。对下表中每一种类型，允许时在其偏移写 `51`（`OP_1`），否则写 `00`（`OP_0`）。十二个偏移各占一字节。
+3. 结果即原始 `scriptPubKey`，其余字节必须与规范模板逐字节相同。序列化交易输出时依次写聪数的 8 字节小端整数、脚本长度 `fd a3 e9`、原始程序。
+4. 识别器必须检查完整长度、全部固定字节、十二个许可值及集合非空，再返回模板名、所有者哈希及许可集合。字节正则可以实现这项检查。输入是已解析出的单个输出脚本。辅助验签公钥是固定程序的一部分；此模板的所有者公钥在解锁时提供。
+
+| 类型 | ForkID / 偏移 | ForkID + ANYONECANPAY / 偏移 | OTDA / 偏移 | OTDA + ANYONECANPAY / 偏移 |
+| --- | --- | --- | --- | --- |
+| ALL | `41` / 307 | `c1` / 316 | `61` / 366 | `e1` / 376 |
+| NONE | `42` / 326 | `c2` / 336 | `62` / 386 | `e2` / 396 |
+| SINGLE | `43` / 346 | `c3` / 356 | `63` / 406 | `e3` / 416 |
+
+### 2. 构造交易授权
+
+签名类型按输入选择，必须属于该输出的许可集合。表中各值都含 ForkID 位 `40`。在启用 Chronicle 规则的节点上，额外的 `20` 位选择 OTDA。以下将不含该位的类型称为 BIP143 路径。混用发生在各输入的签名中，交易自身的 `nVersion` 另行序列化。[Chronicle 规范](https://docs.bsvblockchain.org/network-topology/nodes/sv-node/chronicle-release) · [节点摘要算法](https://github.com/bitcoin-sv/bitcoin-sv/blob/6504a3aff65ba97c0f6c80962b033e35ecbfed4b/src/script/interpreter.cpp#L1894-L2124)
+
+| 当前输入的情形 | 钱包必须构造的原像 P | 分支值 |
+| --- | --- | --- |
+| BIP143，含无配对 SINGLE | 按请求类型作 ForkID 序列化，`scriptCode = 68 ac`。原像 159 字节 | 0 |
+| OTDA ALL、NONE 或有配对 SINGLE | 按请求类型作 OTDA 序列化，当前输入的 `scriptCode = 68 ac`。原像随交易变化 | 0 |
+| OTDA SINGLE 且当前输入索引 ≥ 输出数 | 保留请求类型 `63/e3` 的原生检查。构造伴随 BIP143 原像，类型分别为 `43/c3`，`scriptCode = 63 ad 67 ab 68 ac`，`hashOutputs` 为 32 个零字节。原像 163 字节 | 1 |
+
+这里列出的 `scriptCode` 是实际执行相应 `OP_CODESEPARATOR` 后的原始脚本后缀，序列化时须按算法编码长度。原像末尾包含该原像实际使用的四字节小端签名类型。钱包必须用真实父交易取得当前 outpoint 指向的输出，核对所有者与权限，BIP143 路径必须使用该输出的金额。手机对 `SHA256(SHA256(P))` 签一次 ECDSA P-256。摘要签名接口的输入为 32 字节；使用会再次哈希输入的消息签名接口将得到不同结果。[原像与路径参考](../../research/secure-enclave-p256/universal.py)
+
+**输出覆盖范围。** ALL 承诺全部序列化输出的顺序、金额及脚本。NONE 允许更换全部输出。有配对 SINGLE 承诺当前输入同索引的输出。BIP143 无配对 SINGLE 将 `hashOutputs` 置零，仍有当前输入专属的摘要。OTDA 无配对 SINGLE 由节点直接返回 `uint256(1)`；本模板的分支 1 用伴随摘要取得持有人对当前输入的授权。请求类型的许可独立于伴随类型。两条路径都只需一次持有人签名。
+
+**输入覆盖范围。** BIP143 的 `hashPrevouts` 承诺顺序排列的全部 outpoint，ANYONECANPAY 将其置零。当前 outpoint、金额和 sequence 仍直接写入原像。完整 `hashSequence` 仅用于不带 ANYONECANPAY 的 ALL。OTDA 使用按签名类型变换后的交易序列化，没有这些独立的哈希字段或前序输出金额字段。钱包核算费用时应取得所有相关前序输出。例如，输入 A 用 NONE 并依赖 B 的 ALL 来决定收款输出，A 应核对 B 的 outpoint 并关闭 ANYONECANPAY；否则 A 的授权允许省略 B。[节点序列化规则](https://github.com/bitcoin-sv/bitcoin-sv/blob/6504a3aff65ba97c0f6c80962b033e35ecbfed4b/src/script/interpreter.cpp#L1894-L2124)
+
+### 3. 构造与验证解锁脚本
+
+花费者必须按下表顺序推入六个字节串，再推入分支操作码。父交易为当前 outpoint 引用的完整直接父交易。P-256 群阶记为 n。[P-256 参数](https://doi.org/10.6028/NIST.SP.800-186)
+
+| 顺序（栈底至栈顶） | 编码 |
+| --- | --- |
+| 1 | 父交易的完整 wire 序列化 |
+| 2 | 上节所选原像 P |
+| 3 | 65 字节公钥 Q，包含 `04` 前缀 |
+| 4 | 64 字节 `r_BE32 || s_BE32`，满足 `1 ≤ r,s < n`。不附加类型字节，DER 签名须先转换 |
+| 5 | 4 字节小端无符号整数。普通 OTDA 且不带 ANYONECANPAY 时为实际输入索引，其余为零 |
+| 6 | 32 字节小端无符号整数 `w = s⁻¹ mod n` |
+| 7 | 普通路径 `OP_0`，伴随路径 `OP_1` |
+
+锁验证 Q 的哈希、曲线点和签名标量，验证 `1 ≤ w < n` 及 `s·w mod n = 1`，并检查标准 ECDSA 验签等式。它还检查父交易哈希与原像中当前 outpoint 的 txid 一致，用原生 `OP_CHECKSIG` 把所提供的材料绑定到实际交易。普通 OTDA 路径按输入数量和位置提示定位当前输入，并核对脚本标记。没有按输入输出数量执行的 Script 循环。钱包应从原始交易独立推导上述材料，并在签名前向用户展示金额、费用和签名允许改变的字段。[验签汇编](../../research/secure-enclave-p256/payment.asm) · [交易绑定汇编](../../research/secure-enclave-p256/universal.asm)
+
+## 互操作向量
+
+以下 SHA-256 对原始锁定脚本只哈希一次。两个输出长度均为 59,811 字节，哈希输入不含金额、CompactSize 长度或十六进制文本中的换行。测试用所有者哈希仅用于比对字节。
+
+| 向量 | ownerHash160（十六进制） | allowedTypes | 原始脚本 SHA-256 |
+| --- | --- | --- | --- |
+| A | `000102030405060708090a0b0c0d0e0f10111213` | `41,61` | `6ac6c4dbbf77bb0a73cf2136338c5d81a3c2674f71929f9c2dd196064be6b952` |
+| B | 字节 `11` 重复 20 次 | `42,e3` | `92599b5ff408dbbeb92241bc89e7ce932bdddfd318907c8099db5ba348ef8d52` |
+
+实现应对两个向量均能先生成、再识别并读回精确参数。识别器应拒绝全部许可关闭、固定指令改变、截短或追加字节的脚本。花费验收应覆盖同一个 UTXO 上两种摘要算法、NONE、有配对与无配对 SINGLE、错误父交易和错误求逆值。[识别用例](../../research/secure-enclave-p256/test_lock_identity.py) · [原生节点用例](../../research/secure-enclave-p256/test_universal.py)
+
+## 参考实现与验证状态
+
+参考程序直接以 Bitcoin Script 汇编定义，装配器展开命名块及固定次数的重复。四位窗口是参考实现进行 P-256 验签的方式。钱包可直接按第 1 节实例化规范模板。以下命令在仓库的 `research/secure-enclave-p256` 目录下运行，使用 Python 3.12 和 `tx-engine==0.13.1`。[生成器](../../research/secure-enclave-p256/generate_lock.py) · [四位窗口汇编](../../research/secure-enclave-p256/window-4.asm)
 
 ```sh
-git clone --branch research/pels-transaction-bounds https://github.com/linzhm/bsv-script-lab.git
-cd bsv-script-lab
-git checkout --detach f2c1503d4cb2d4843a4b13f6b8be187816376eea
-python3.12 -m venv .venv
-. .venv/bin/activate
-python -m pip install --only-binary=tx-engine tx-engine==0.13.1
-cd research/secure-enclave-p256
-OWNER=000102030405060708090a0b0c0d0e0f10111213
-python generate_lock.py --owner-hash160 "$OWNER" --allow 41,61
-python generate_lock.py --owner-hash160 "$OWNER" --allow 41,61 --format raw > scriptPubKey.bin
+python generate_lock.py --owner-hash160 000102030405060708090a0b0c0d0e0f10111213 --allow 41,61 --format raw > scriptPubKey.bin
 sha256sum scriptPubKey.bin
 ```
 
-清单应显示模板 `P2PKH-R1`、版本 `7`、许可 `["41","61"]` 和长度 `59811`。样例原始脚本的单次 SHA-256 为 **`6ac6c4dbbf77bb0a73cf2136338c5d81a3c2674f71929f9c2dd196064be6b952`**。这是文件指纹。花费交易的签名摘要另行计算。实际收款时可将 `--owner-hash160 "$OWNER"` 换成 `--public-key "$PUBLIC_KEY_HEX"`，对应同一公钥哈希的两个入口生成完全相同的字节。改变所有者或权限会改变文件指纹。[样例二进制与 JSON 清单](https://github.com/linzhm/bsv-script-lab/actions/runs/44356580922/artifacts/14454081010) · [生成及验收日志](https://github.com/linzhm/bsv-script-lab/actions/runs/44356580922/job/134986197432)
+已有离线验收覆盖全部十二种类型、同笔交易混用及无配对路径。参考实现的既有运行通过 52 项 Python/chain-gang 测试、8 项 BSV Node 1.2.3 测试和 2 项 nChain 对照。该运行的输出字节与向量 A 的指纹一致。[验收记录](https://github.com/linzhm/bsv-script-lab/actions/runs/44356580922/job/134986197432) · [nChain PUSHTX 参考实现](https://github.com/nchain-innovation/zkscript_package/blob/fc20fb743edbc5bc5aba9d16625d50d1f50a3ef4/src/zkscript/transaction_introspection/transaction_introspection.py)
 
-## 三、锁定程序如何装配
+## 安全与部署考虑
 
-| 源码 | 工作 |
+收款锁只公开所有者哈希，花费公开公钥、签名及可由 s 计算的逆元。私钥和 ECDSA nonce k 必须留在签名器内。同钥在不同摘要上复用 k 可能泄露私钥。参考钱包在释放签名之前观察同一公钥的 r 与摘要，检测到冲突时阻断。该机制只覆盖共享完整历史的签名调用。设备来源证明属于钱包与签名器之间的信任问题。[ECDSA 规范](https://doi.org/10.6028/NIST.FIPS.186-5) · [钱包实现](../../research/secure-enclave-p256/checked_wallet.py)
+
+每笔此类输出携带约 60 KB 程序，花费还必须携带完整父交易，连续花费会把更早的解锁数据带入下一笔父交易。钱包应按实际序列化长度评估费用，并确认目标节点或服务的接收限制。
+
+## 尚待完成
+
+| 工作 | 可验收结果 |
 | --- | --- |
-| [universal.asm](../../research/secure-enclave-p256/universal.asm) | 提供 `LOCK` 入口、所有者与十二个权限槽位、普通及无配对 SINGLE 分支，以及原生检查的代码分隔符。 |
-| [payment.asm](../../research/secure-enclave-p256/payment.asm) | 检查 R1 曲线点、签名和公共运算提示，用 WP1605 的 PUSHTX 构件把所提供的摘要与当前 BSV 原生签名检查相连。 |
-| [window-4.asm](../../research/secure-enclave-p256/window-4.asm) | 分别处理固定基点 G 和本次公钥 Q 的四位表。装配时把 256 位标量的 64 轮展开为固定操作码。 |
-| [handwritten.py](../../research/secure-enclave-p256/handwritten.py) | 读取命名汇编块和固定重复，用 nChain chain-gang 的 tx-engine 编码操作码，填入 20 字节所有者哈希及十二个 `OP_0/OP_1`。API 调用为 `locking_script(owner_hash, allowed_types, version=7).raw_serialize()`；省略版本会选择旧模板。 |
+| 独立实现与可移植的花费向量 | 发布包含父交易、子交易、原像、摘要、签名和预期结果的固定数据；由第二个钱包实现复现普通及伴随路径 |
+| 设备联调 | 在真实 Secure Enclave 上完成摘要签名，将设备输出转换为规定的 64 字节格式，离线节点验证完整花费 |
+| 部署评估与独立审查 | 记录代表性交易大小、费用和接收策略；完成对原像绑定、分支隔离、曲线运算及钱包签名前展示的独立审查 |
 
-收款时只需确定这十三个槽位。花费时，锁计算提供的原像的双 SHA-256，验证所有者的 R1 ECDSA 签名；原生 secp256k1 `OP_CHECKSIG` 提供交易绑定。PUSHTX 的辅助参数是公开的。签名材料还绑定所推父交易的哈希与当前 outpoint 中的 txid。普通支付允许收款人选新的输出脚本；如果业务要求同索引延续原锁，需要另行定义 PELS 的后继输出约束。构造 v7 无需 sCrypt、JS/TS 或上游 zkscript 编译器。[WP1605 原文章节和出处](./pels-transaction-bounds.md) · [nChain PUSHTX 对照实现](https://github.com/nchain-innovation/zkscript_package/blob/fc20fb743edbc5bc5aba9d16625d50d1f50a3ef4/src/zkscript/transaction_introspection/transaction_introspection.py) · [chain-gang 固定版本](https://github.com/nchain-innovation/chain-gang/tree/v0.13.1)
-
-## 四、一个 UTXO 怎样支持两种签名算法
-
-付款时固定许可集合；花费时，钱包为每个输入选择一个被允许的类型。下表各值均为十六进制，括号内为加 ANYONECANPAY 的值。Chronicle 生效时，这些类型具有 ForkID 位 `40`，额外的 `20` 位选择 OTDA。同笔交易的输入可以选择不同类型。[Chronicle 规范](https://docs.bsvblockchain.org/network-topology/nodes/sv-node/chronicle-release) · [节点签名序列化与分派](https://github.com/bitcoin-sv/bitcoin-sv/blob/6504a3aff65ba97c0f6c80962b033e35ecbfed4b/src/script/interpreter.cpp#L1894-L2124)
-
-| 授权 | BIP143 风格 ForkID | OTDA | 输出范围 |
-| --- | --- | --- | --- |
-| ALL | 41 (c1) | 61 (e1) | 所有输出的顺序、金额、脚本 |
-| NONE | 42 (c2) | 62 (e2) | 本签名允许变更全部输出 |
-| SINGLE | 43 (c3) | 63 (e3) | 有配对时约束与当前输入同索引的输出；缺配对时按下述规则 |
-
-BIP143 路径中，未选 ANYONECANPAY 时 `hashPrevouts` 承诺有序的所有输入 outpoint，选中时为 32 个零字节。当前输入的 outpoint、前序输出金额和 sequence 仍直接进入原像。仅非 ANYONECANPAY 的 ALL 提交完整 `hashSequence`。ALL 的 `hashOutputs` 承诺全部序列化输出；有配对 SINGLE 仅承诺对应输出；NONE 和无配对 SINGLE 取零。OTDA 序列化按类型变换后的交易，没有独立的上述三个哈希字段，也没有独立的前序输出金额字段。两种算法均不会凭其他输入的 outpoint 直接证明其金额。需要总费用时，钱包应取得每个输入对应的真实前序输出。约束变长输出时须验证真实输出的序列化及边界；任意字节切片没有这样的语义。[节点源码](https://github.com/bitcoin-sv/bitcoin-sv/blob/6504a3aff65ba97c0f6c80962b033e35ecbfed4b/src/script/interpreter.cpp#L1894-L2124) · [各类约束的边界](./pels-transaction-bounds.md)
-
-例如有输入 0、1，只有输出 0。输入 1 选 BIP143 SINGLE 仍有交易专属摘要，只将 `hashOutputs` 置零。选 OTDA SINGLE 时，节点在序列化前返回常量 `uint256(1)`。v7 保留这项原生检查，并要求手机对绑定当前输入的伴随 BIP143 SINGLE 摘要签**一次**；保留原 ANYONECANPAY 选择，使用单独的 `scriptCode`。这样缺配对时也能授权，手机绝不单独签一个可在不同交易间重复使用的常量。若业务希望 A 用 NONE 把输出的决定权交给 B，应由 A 核对并承诺 B 的 outpoint，再由 B 用 ALL 或有配对的 SINGLE。A 若打开 ANYONECANPAY，A 的签名就不要求 B 一起花费。[分支与混用实测](./p2pkh-r1-universal.md)
-
-## 五、钱包花费时实际推什么
-
-钱包取得直接父交易、待签子交易、当前输入序号和请求类型。先核对真实 outpoint 和前序输出、模板、许可及所有者，再把收款输出、找零、费用与本次许可的可变字段展示给用户。按选中路径构造原像 P，对 `SHA256(SHA256(P))` 用硬件摘要签名接口签一次。签名回调输入是已算好的 32 字节摘要；若交给会先哈希消息的接口，则会多哈希一轮。签名以定宽大端 `r || s` 交给钱包。仓库提供 `checked_wallet.sign_spend(tx, index, parent, requested_type, pubkey, sign_digest, history_path)`，返回解锁脚本。[已检查的钱包入口](../../research/secure-enclave-p256/checked_wallet.py) · [原像构造](../../research/secure-enclave-p256/universal.py)
-
-| 推入顺序（从栈底到栈顶） | 内容 |
-| --- | --- |
-| 1 | 直接父交易的完整序列化字节 |
-| 2 | 当前授权路径的原像 P |
-| 3 | 收款人的 65 字节 X9.63 公钥 Q |
-| 4 | 单个 64 字节 R1 签名，无 DER 外壳或附加类型字节 |
-| 5 | 4 字节小端位置提示。普通非 ANYONECANPAY 的 OTDA 为真实输入序号，其他情况为零 |
-| 6 | 32 字节小端 `w = s⁻¹ mod n`。锁检查范围和 `s·w mod n = 1` |
-| 7 | 普通路径 `OP_0`，无配对 OTDA 伴随路径 `OP_1` |
-
-OTDA 普通路径读取输入数量、检查位置范围和当前位置的脚本标记。R1 共用固定轮数的验证主体，锁无需按交易输入输出数量动态循环。完整父交易必须可获得，且其大小全部计入解锁。连续花费同类输出时，父交易还会包含更早一次花费所推的数据；测算费用应使用实际父交易长度。[通用汇编](../../research/secure-enclave-p256/universal.asm) · [解锁构造](../../research/secure-enclave-p256/universal.py)
-
-## 六、识别、安全与验收
-
-- **识别。** 对一个已解析输出的完整原始程序调用 `identify_locking_script(raw)`。v7 所有者哈希位于零起算的 `[437,457)`。识别器用字节正则捕获参数并逐字节比对固定程序，要求全部许可合法且至少开启一项。短前缀和偏移只供筛选。需要验证候选公钥时使用 `matches_owner_key`。需要为新收款人生成锁时用生成器重新装配。[识别器与正则](../../research/secure-enclave-p256/lock_identity.py) · [装配与匹配](../../research/secure-enclave-p256/handwritten.py)
-- **密钥与 nonce。** 收款锁只公开所有者哈希，花费时才公开 Q。钱包不接收临时私钥作为模板参数；辅助公钥也不作为所有者返回。`w` 可从公开的 s 算出。真正需要保密的是签名私钥和 ECDSA nonce k。同钥对不同摘要重复 k 可能泄露私钥；钱包在返回解锁脚本前核验签名，用持久化历史检测同钥、不同摘要、相同 r 的冲突。它只覆盖经过该入口且历史完整的签名。真机签名器的 nonce 实现仍需按其平台保证评估。[钱包实现](../../research/secure-enclave-p256/checked_wallet.py) · [RFC 6979](https://www.rfc-editor.org/rfc/rfc6979)
-- **已验收。** 公钥与哈希两种输入生成相同字节；非曲线点、32 字节标量和未知权限被拒绝。合成交易覆盖 12 种模式、同笔混用、两种无配对 SINGLE，以及错误所有者、父交易和求逆提示。生成版 CI 通过 52 项 Python/chain-gang 测试、8 项无对等连接的 BSV Node 1.2.3 测试和 2 项 nChain 对照。无配对 OTDA 的节点行为以原生节点为准。[本次 CI](https://github.com/linzhm/bsv-script-lab/actions/runs/44356580922/job/134986197432)
-- **选型与上线缺口。** 旧签名格式的两位联合表和四位分表分别为 62,051 和 61,717 字节，百万次的每次均值为 6.7190、6.5925 ms。v7 复用摘要并验证外部提供的逆元，最终为 59,811 字节。v7 的小样本是每条路径 32 次本机 RPC，均值约 22 ms，包含 RPC 开销。下一项设备验收是由真机 Secure Enclave 对固定交易摘要签名、读出 64 字节签名，再用同一离线节点验证。矿工接收策略、实际费用及部署安全审查仍待验证。[旧版百万次记录](https://github.com/linzhm/bsv-script-lab/actions/runs/44342695412/job/134946778724) · [v7 小样本](https://github.com/linzhm/bsv-script-lab/actions/runs/44350574355/job/134964757191)
+本草案借鉴 BRC 的脚本模板提案结构，尚未分配 BRC 编号。[BRC 提案格式](https://github.com/bsv-blockchain/BRCs/blob/master/EXAMPLE.md) · [Wei Zhang，WP1605《PUSHTX and its Building Blocks》（出版方原址）](https://nchain.com/wp-content/uploads/2022/03/WP1605_PUSHTX-and-its-Building-Blocks.pdf)

@@ -1,79 +1,101 @@
-# P2PKH-R1 v7 payment proposal
+# P2PKH-R1 — Pay to P-256 Public Key Hash
 
-[中文版](./p2pkh-r1-proposal.zh-CN.md)
+**Status**  Initial draft for review · **Category**  Bitcoin Script template · **Maintainer repository**  linzhm/bsv-script-lab  
+[中文文本](./p2pkh-r1-proposal.zh-CN.md) · [Canonical template bytes](./p2pkh-r1/template.hex)
 
-A payer needs two public parameters to create this lock, **the recipient’s P-256 public-key hash** and **the set of permitted signature types**. Instantiating the tested v7 assembly template with those parameters produces a 59,811-byte BSV output script. The recipient needs the Secure Enclave only when spending. The template version and the BSV transaction’s `nVersion` are independent. [Generator](../../research/secure-enclave-p256/generate_lock.py) · [Assembly entry point](../../research/secure-enclave-p256/universal.asm)
+## Abstract
 
-## 1. Agree on the payment parameters
+P2PKH-R1 defines a BSV locking script template. A payer commits an output to a recipient’s P-256 public-key hash and a set of permitted transaction signature types. To spend it, the owner reveals the public key and signs a transaction digest for the current input once. This proposal specifies output generation and recognition, the unlocking stack, and byte-level interoperability checks for wallets and SDKs.
 
-1. The receiving wallet exports its P-256 (secp256r1) signing public key in the 65-byte X9.63 encoding `04 || x_BE32 || y_BE32`. The payment request should identify the template as `P2PKH-R1`, specify version 7 and the permitted signature types, and convey either the key or `RIPEMD160(SHA256(Q))`. This is a wallet interface proposal with no assigned BSV address prefix. A hash alone establishes neither possession of the private key nor hardware provenance. [Apple Secure Enclave signing API](https://developer.apple.com/documentation/cryptokit/secureenclave/p256/signing/privatekey)
-2. The payer obtains the parameters from an authenticated payment request. For a public key, the generator validates the encoding and curve point before hashing all 65 bytes. For a supplied hash, it checks the 20-byte length. Ordinary payments default to the two ALL types, `41,61`. A payment that needs NONE, SINGLE or ANYONECANPAY must include the relevant type when creating the output.
-3. After assembly, the generator reads back the template, version, owner and all permissions through the full-script matcher. The payer checks the amount and assigns the raw result to the new output’s `scriptPubKey`. The wire output is `amount_LE64 || CompactSize(59811) || scriptPubKey`. The length prefix is `fd a3 e9`. Insert the program bytes directly into the script field. An extra PUSHDATA wrapper would change the program. [Template recognition](../../research/secure-enclave-p256/lock_identity.py)
+## Motivation and scope
 
-## 2. Reproduce a payment script
+Conventional P2PKH lets a payer create an output knowing only the recipient’s public-key hash. BSV’s native signature check uses secp256k1. Signers such as Apple’s Secure Enclave offer NIST P-256 (secp256r1). P2PKH-R1 retains the public-key-hash payment model, verifies the P-256 signature in Script, and uses Push TX to bind the authorization to the transaction verified by the node. Any signer providing the specified P-256 interface can be used. On-chain verification requires no device identification. Address encoding, payment-request transport, hardware attestation and successor-output covenants are outside the scope of this template. [BRC-16](https://github.com/bsv-blockchain/BRCs/blob/master/scripts/0016.md) · [BRC-21](https://github.com/bsv-blockchain/BRCs/blob/master/scripts/0021.md) · [Apple signing API](https://developer.apple.com/documentation/cryptokit/secureenclave/p256/signing/privatekey)
 
-These commands target Linux with private repository access, Python 3.12 and an available tx-engine wheel. After dependencies are installed, generation works offline. The example hash is a byte fixture with no receiving wallet supplied.
+## Specification
+
+In this section, MUST states a byte-level interoperability requirement. SHOULD states recommended wallet behavior. Offsets are zero-based from the first byte of the raw script. Hexadecimal byte strings are shown in serialization order.
+
+### 1. Create and recognize an output
+
+The payment parameters are `ownerHash160` (20 bytes) and `allowedTypes` (a nonempty subset of the table below). If the recipient supplies a public key Q, the wallet MUST validate that Q is a finite P-256 curve point and compute `RIPEMD160(SHA256(Q))` over exactly the 65 bytes `04 || x_BE32 || y_BE32`. When accepting a hash directly, the payer SHOULD confirm the template name, hash and permission set through an authenticated payment request. The recommended ordinary payment policy is `{41,61}`, allowing the owner to commit to all outputs using either digest algorithm.
+
+1. Read the [canonical template bytes](./p2pkh-r1/template.hex), remove ASCII whitespace and decode the hex. The result is the complete 59,811-byte program for vector A below.
+2. Replace the 20 bytes at `[437,457)` with `ownerHash160`. For each signature type in the table, write `51` (`OP_1`) at its offset if permitted, otherwise `00` (`OP_0`). Each of the twelve offsets occupies one byte.
+3. The result is the raw `scriptPubKey`. Every other byte MUST match the canonical template. To serialize a transaction output, write the amount in satoshis as an eight-byte little-endian integer, followed by the script length `fd a3 e9` and the raw program.
+4. A recognizer MUST check the full length, every fixed byte, all twelve permission values and a nonempty permission set before returning the template name, owner hash and permitted types. A byte-pattern matcher can perform this check. Its input is the script field of one parsed output. The internal binding public key belongs to the fixed program. The owner supplies the payment public key at spend time.
+
+| Type | ForkID / offset | ForkID + ANYONECANPAY / offset | OTDA / offset | OTDA + ANYONECANPAY / offset |
+| --- | --- | --- | --- | --- |
+| ALL | `41` / 307 | `c1` / 316 | `61` / 366 | `e1` / 376 |
+| NONE | `42` / 326 | `c2` / 336 | `62` / 386 | `e2` / 396 |
+| SINGLE | `43` / 346 | `c3` / 356 | `63` / 406 | `e3` / 416 |
+
+### 2. Construct the transaction authorization
+
+The spending wallet selects a permitted signature type for each input. All types in the table include the ForkID bit `40`. Under the Chronicle rules the additional `20` bit selects OTDA. Here, BIP143 denotes the ForkID path with that bit clear. Inputs of one transaction can select different types. The transaction’s `nVersion` is serialized separately. [Chronicle specification](https://docs.bsvblockchain.org/network-topology/nodes/sv-node/chronicle-release) · [Node digest algorithms](https://github.com/bitcoin-sv/bitcoin-sv/blob/6504a3aff65ba97c0f6c80962b033e35ecbfed4b/src/script/interpreter.cpp#L1894-L2124)
+
+| Current input | Preimage P the wallet MUST construct | Selector |
+| --- | --- | --- |
+| BIP143, including unpaired SINGLE | Use ForkID serialization for the requested type with `scriptCode = 68 ac`. The preimage is 159 bytes | 0 |
+| OTDA ALL, NONE or paired SINGLE | Use OTDA serialization for the requested type with `scriptCode = 68 ac` for the current input. Length varies with the transaction | 0 |
+| OTDA SINGLE with input index ≥ output count | Retain the native check for the requested `63/e3`. Construct a companion BIP143 preimage for `43/c3` respectively, with `scriptCode = 63 ad 67 ab 68 ac` and 32 zero bytes for `hashOutputs`. The preimage is 163 bytes | 1 |
+
+Each `scriptCode` above is the raw script suffix following the applicable executed `OP_CODESEPARATOR`. Encode its length as required by the selected serialization. The preimage ends with the actual preimage signature type as a four-byte little-endian integer. The wallet MUST obtain the output at the current outpoint from the actual parent and check its owner and permissions. The BIP143 path MUST use that output’s amount. The signer makes one P-256 ECDSA signature over `SHA256(SHA256(P))`. A digest-signing API takes those 32 bytes. Passing them through a message-signing API that hashes its input would change the digest. [Reference preimage construction](../../research/secure-enclave-p256/universal.py)
+
+**Output coverage.** ALL commits to all serialized outputs in order, including their amounts and scripts. NONE permits all outputs to change. Paired SINGLE commits to the output at the current input’s index. Unpaired BIP143 SINGLE uses zero `hashOutputs` and retains an input-specific digest. For unpaired OTDA SINGLE the node returns `uint256(1)` directly. Selector 1 obtains the owner’s authorization for this input through the companion digest. Permission for the requested type is independent of permission for the companion type. Both paths require one owner signature.
+
+**Input coverage.** BIP143 `hashPrevouts` commits to all outpoints in order. ANYONECANPAY sets it to zero. The current outpoint, amount and sequence still enter the preimage directly. Only ALL without ANYONECANPAY includes the full `hashSequence`. OTDA serializes a transformed transaction and has no separate aggregate-hash fields or previous-output amount field. To calculate fees, the wallet should obtain the actual spent outputs. For example, if input A uses NONE and relies on B’s ALL signature to select the outputs, A should check B’s outpoint and omit ANYONECANPAY. Otherwise A’s authorization permits B to be omitted. [Node serialization rules](https://github.com/bitcoin-sv/bitcoin-sv/blob/6504a3aff65ba97c0f6c80962b033e35ecbfed4b/src/script/interpreter.cpp#L1894-L2124)
+
+### 3. Construct and verify the unlocking script
+
+The spender MUST push six byte strings in the following order, followed by the selector opcode. The direct parent is the full transaction referenced by the current outpoint. Let n be the order of the P-256 group. [P-256 parameters](https://doi.org/10.6028/NIST.SP.800-186)
+
+| Order, bottom to top | Encoding |
+| --- | --- |
+| 1 | Complete wire serialization of the direct parent transaction |
+| 2 | Preimage P selected in section 2 |
+| 3 | 65-byte public key Q including the `04` prefix |
+| 4 | 64 bytes `r_BE32 || s_BE32`, with `1 ≤ r,s < n`. Convert a DER signature to this representation and omit any signature-type suffix |
+| 5 | Four-byte little-endian unsigned integer. Use the actual input index for ordinary OTDA without ANYONECANPAY and zero otherwise |
+| 6 | 32-byte little-endian unsigned integer `w = s⁻¹ mod n` |
+| 7 | `OP_0` for the ordinary path or `OP_1` for the companion path |
+
+The lock checks the owner hash, curve point and signature scalars, verifies `1 ≤ w < n` and `s·w mod n = 1`, and checks the ECDSA verification equation. It checks the parent transaction hash against the current outpoint’s txid in the preimage. Native `OP_CHECKSIG` binds the supplied material to the transaction. The ordinary OTDA path uses the input count and ordinal to locate the current input and check its script marker. No Script loop scales with the number of transaction inputs or outputs. A wallet SHOULD derive these values from transaction data and show amounts, fees and fields that the signature permits to change before obtaining consent. [Signature verification assembly](../../research/secure-enclave-p256/payment.asm) · [Transaction binding assembly](../../research/secure-enclave-p256/universal.asm)
+
+## Interoperability vectors
+
+These fingerprints use one SHA-256 over the raw locking script. Both scripts are 59,811 bytes. The hash excludes the amount, CompactSize length and line breaks in the hex file. The owner hashes below are byte fixtures.
+
+| Vector | ownerHash160 (hexadecimal) | allowedTypes | Raw script SHA-256 |
+| --- | --- | --- | --- |
+| A | `000102030405060708090a0b0c0d0e0f10111213` | `41,61` | `6ac6c4dbbf77bb0a73cf2136338c5d81a3c2674f71929f9c2dd196064be6b952` |
+| B | Byte `11` repeated 20 times | `42,e3` | `92599b5ff408dbbeb92241bc89e7ce932bdddfd318907c8099db5ba348ef8d52` |
+
+An implementation should generate both vectors, recognize them and return the exact payment parameters. A recognizer should reject an empty permission set, a changed fixed opcode, truncation or appended bytes. Spend tests should cover both digest algorithms on the same UTXO, NONE, paired and unpaired SINGLE, an incorrect parent, and an incorrect inverse. [Recognition tests](../../research/secure-enclave-p256/test_lock_identity.py) · [Native node tests](../../research/secure-enclave-p256/test_universal.py)
+
+## Reference implementation and verification status
+
+The reference program is defined directly in Bitcoin Script assembly. Its assembler expands named blocks and fixed repetitions. The reference P-256 verifier uses four-bit windows. Wallets can instantiate the canonical bytes directly using section 1. Run the following commands in the repository’s `research/secure-enclave-p256` directory with Python 3.12 and `tx-engine==0.13.1`. [Generator](../../research/secure-enclave-p256/generate_lock.py) · [Window arithmetic](../../research/secure-enclave-p256/window-4.asm)
 
 ```sh
-git clone --branch research/pels-transaction-bounds https://github.com/linzhm/bsv-script-lab.git
-cd bsv-script-lab
-git checkout --detach f2c1503d4cb2d4843a4b13f6b8be187816376eea
-python3.12 -m venv .venv
-. .venv/bin/activate
-python -m pip install --only-binary=tx-engine tx-engine==0.13.1
-cd research/secure-enclave-p256
-OWNER=000102030405060708090a0b0c0d0e0f10111213
-python generate_lock.py --owner-hash160 "$OWNER" --allow 41,61
-python generate_lock.py --owner-hash160 "$OWNER" --allow 41,61 --format raw > scriptPubKey.bin
+python generate_lock.py --owner-hash160 000102030405060708090a0b0c0d0e0f10111213 --allow 41,61 --format raw > scriptPubKey.bin
 sha256sum scriptPubKey.bin
 ```
 
-The manifest should report `P2PKH-R1`, version `7`, permissions `["41","61"]` and `59811` bytes. The single SHA-256 fingerprint of the raw fixture is **`6ac6c4dbbf77bb0a73cf2136338c5d81a3c2674f71929f9c2dd196064be6b952`**. Spending uses a separately computed transaction signing digest. For an actual recipient public key, substitute `--public-key "$PUBLIC_KEY_HEX"` for `--owner-hash160 "$OWNER"`. Both inputs produce identical bytes when they represent the same owner and policy. Changing either parameter changes the fingerprint. [Binary fixture and JSON manifest](https://github.com/linzhm/bsv-script-lab/actions/runs/44356580922/artifacts/14454081010) · [Generation and verification log](https://github.com/linzhm/bsv-script-lab/actions/runs/44356580922/job/134986197432)
+Offline testing has exercised all twelve types, mixed inputs in the same transaction and the unpaired paths. The recorded reference run passed 52 Python/chain-gang tests, eight BSV Node 1.2.3 tests and two nChain comparisons. Its output script fingerprint matches vector A. [Verification record](https://github.com/linzhm/bsv-script-lab/actions/runs/44356580922/job/134986197432) · [nChain PUSHTX reference](https://github.com/nchain-innovation/zkscript_package/blob/fc20fb743edbc5bc5aba9d16625d50d1f50a3ef4/src/zkscript/transaction_introspection/transaction_introspection.py)
 
-## 3. Assemble the lock
+## Security and deployment considerations
 
-| Source | Role |
+The output exposes the owner hash. Spending reveals the public key, signature and an inverse computable from public s. The signing private key and ECDSA nonce k must remain inside the signer. Reusing k under one key for distinct digests can disclose the private key. The reference wallet checks r and the digest for each public key before releasing the signature and blocks on conflict. Its observation covers only calls sharing an intact signing history. Trust in a particular device’s provenance is a separate wallet decision. [ECDSA specification](https://doi.org/10.6028/NIST.FIPS.186-5) · [Wallet implementation](../../research/secure-enclave-p256/checked_wallet.py)
+
+Each output carries about 60 KB of program. A spend also carries the complete parent, which can include earlier unlocking data after successive spends. Wallets should estimate fees from the actual serialized lengths and establish the target service’s transaction acceptance limits.
+
+## Outstanding work
+
+| Work item | Acceptance criterion |
 | --- | --- |
-| [universal.asm](../../research/secure-enclave-p256/universal.asm) | Defines the LOCK entry, owner and twelve permission slots, ordinary and unpaired SINGLE paths, and the code separators for native verification. |
-| [payment.asm](../../research/secure-enclave-p256/payment.asm) | Checks R1 curve points, the signature and public arithmetic hints. Implements the WP1605 PUSHTX building block used to bind the supplied digest to BSV’s native signature check. |
-| [window-4.asm](../../research/secure-enclave-p256/window-4.asm) | Uses separate four-bit tables for the fixed base point G and the revealed public key Q. The assembler expands 64 rounds for the 256-bit scalars. |
-| [handwritten.py](../../research/secure-enclave-p256/handwritten.py) | Expands named assembly blocks and fixed repetitions, encodes opcodes with nChain chain-gang’s tx-engine, and fills the 20-byte owner slot and twelve single-opcode permissions. The direct API is `locking_script(owner_hash, allowed_types, version=7).raw_serialize()`. Omitting the version selects an earlier template. |
+| Independent implementation and portable spend vectors | Publish fixed parents, spending transactions, preimages, digests, signatures and expected results. Reproduce the ordinary and companion paths in a second wallet implementation |
+| Device integration | Sign a fixture digest on a physical Secure Enclave device, convert its signature to the specified 64 bytes and validate the complete spend on an offline node |
+| Deployment and independent review | Record representative sizes, fees and acceptance policies. Obtain independent review of preimage binding, branch separation, curve arithmetic and wallet consent displays |
 
-The payer sets only those thirteen slots. At spend time, the lock hashes the supplied preimage twice with SHA-256 and verifies the owner’s R1 ECDSA signature. Native secp256k1 `OP_CHECKSIG` supplies the transaction binding using public PUSHTX parameters. The lock also ties the supplied parent transaction hash to the txid in the current outpoint. An ordinary payment allows the owner to choose new output scripts. A business requirement to continue the lock at the same output index would require a separate PELS successor rule. This assembly uses no sCrypt, JavaScript/TypeScript compiler or upstream zkscript compiler. [WP1605 source notes](./pels-transaction-bounds.md) · [nChain PUSHTX reference](https://github.com/nchain-innovation/zkscript_package/blob/fc20fb743edbc5bc5aba9d16625d50d1f50a3ef4/src/zkscript/transaction_introspection/transaction_introspection.py) · [Pinned chain-gang](https://github.com/nchain-innovation/chain-gang/tree/v0.13.1)
-
-## 4. Choose the signature coverage
-
-The payer fixes the allowed set at receipt. The spending wallet selects one allowed type for each input. All table entries are hexadecimal, with ANYONECANPAY variants in parentheses. Under Chronicle, these types have the ForkID bit `40` set. The additional `20` bit selects OTDA. Inputs of a single transaction can choose different types. [Chronicle specification](https://docs.bsvblockchain.org/network-topology/nodes/sv-node/chronicle-release) · [Node serialization and dispatch](https://github.com/bitcoin-sv/bitcoin-sv/blob/6504a3aff65ba97c0f6c80962b033e35ecbfed4b/src/script/interpreter.cpp#L1894-L2124)
-
-| Authorization | BIP143-style ForkID | OTDA | Output coverage |
-| --- | --- | --- | --- |
-| ALL | 41 (c1) | 61 (e1) | Commits to all outputs in order, including amounts and scripts |
-| NONE | 42 (c2) | 62 (e2) | Allows all outputs to change under this signature |
-| SINGLE | 43 (c3) | 63 (e3) | Commits to the output at the input’s index when present. See below when absent |
-
-For BIP143, `hashPrevouts` commits to all input outpoints in order unless ANYONECANPAY sets it to 32 zero bytes. The current outpoint, previous output amount and current sequence appear directly in the preimage. Only ALL without ANYONECANPAY commits to the complete `hashSequence`. The `hashOutputs` field commits to all serialized outputs for ALL and the paired output for paired SINGLE. NONE and unpaired SINGLE use zero. OTDA serializes a transaction transformed for the chosen signature type. It has no separate aggregate-hash fields or current previous-output amount field. Other inputs’ outpoints alone do not establish their amounts. A wallet calculating fees must obtain the actual spent outputs. A rule about variable-length outputs must authenticate their serialization and boundaries before interpreting a slice as an output. [Node source](https://github.com/bitcoin-sv/bitcoin-sv/blob/6504a3aff65ba97c0f6c80962b033e35ecbfed4b/src/script/interpreter.cpp#L1894-L2124) · [Transaction bounds study](./pels-transaction-bounds.md)
-
-Take a transaction with inputs 0 and 1 and only output 0. Input 1 using BIP143 SINGLE has a transaction-specific digest with zero `hashOutputs`. For OTDA SINGLE the node returns `uint256(1)` before serialization. v7 retains the requested native check and has the phone sign a companion BIP143 SINGLE digest bound to the current input, using a separate `scriptCode` and preserving ANYONECANPAY. The phone makes **one** signature, covering the input-specific authorization. To delegate output choice to input B, A can use NONE after checking and committing to B’s outpoint. B can then use ALL or paired SINGLE. If A chooses ANYONECANPAY, its signature permits B’s input to be omitted. [Branch and mixed-input tests](./p2pkh-r1-universal.md)
-
-## 5. Supply the unlocking data
-
-The wallet obtains the direct parent transaction, unsigned child transaction, input index and requested type. It verifies the outpoint, spent output, template, permissions and owner. It should show the recipient outputs, change, fees and the fields that may change under the requested signature. Construct the applicable preimage P and invoke a hardware digest-signing API once on `SHA256(SHA256(P))`. The callback receives that 32-byte result. Passing it to a message API that hashes its input would add another hash. Return a fixed-width big-endian `r || s`. The repository entry `checked_wallet.sign_spend(tx, index, parent, requested_type, pubkey, sign_digest, history_path)` produces the unlocking script. [Checked wallet entry](../../research/secure-enclave-p256/checked_wallet.py) · [Preimage construction](../../research/secure-enclave-p256/universal.py)
-
-| Push order, bottom to top | Value |
-| --- | --- |
-| 1 | Complete serialized direct parent transaction |
-| 2 | Preimage P for the selected authorization path |
-| 3 | Recipient’s 65-byte X9.63 public key Q |
-| 4 | One 64-byte raw R1 signature with no DER wrapper or trailing signature-type byte |
-| 5 | Four-byte little-endian ordinal. Use the actual input index for ordinary OTDA without ANYONECANPAY, zero otherwise |
-| 6 | 32-byte little-endian `w = s⁻¹ mod n`. The lock checks range and `s·w mod n = 1` |
-| 7 | `OP_0` on the ordinary path, `OP_1` on the unpaired OTDA companion path |
-
-The ordinary OTDA path decodes the input count, checks the ordinal and verifies the current-input script marker. The shared R1 verifier has a fixed round count. No Script loop scans a variable number of transaction inputs or outputs. The wallet must retain or fetch the complete parent and budget its full size in the unlocking script. In successive spends of this template, that parent can itself contain earlier unlocking data. Use the actual parent size when estimating fees. [Universal assembly](../../research/secure-enclave-p256/universal.asm) · [Unlocking script builder](../../research/secure-enclave-p256/universal.py)
-
-## 6. Recognize and validate the result
-
-- **Identification.** Call `identify_locking_script(raw)` on the complete raw program of a parsed output. The zero-based v7 owner-hash range is `[437,457)`. The byte-pattern matcher captures the parameters and compares the entire fixed program. All permission opcodes must be valid, with at least one enabled. Use offsets or prefixes only to select candidates. Verify a candidate key with `matches_owner_key`. To change the payee for a new output, assemble a new instance. [Recognition](../../research/secure-enclave-p256/lock_identity.py) · [Assembly and byte patterns](../../research/secure-enclave-p256/handwritten.py)
-- **Keys and nonces.** The output reveals the owner hash. Spending reveals Q. A temporary private key has no place among the template parameters. Recognition returns only the owner field and excludes the internal public binding key. Anyone can derive w from public s. The signing private key and ECDSA nonce k must remain secret. Reusing k across different digests under one key can expose the private key. The checked wallet validates the signature and records each observed r and digest before releasing the unlock. Its duplicate-r protection covers signatures that pass through this entry and share an intact history. The hardware nonce implementation remains a platform assurance question. [Wallet implementation](../../research/secure-enclave-p256/checked_wallet.py) · [RFC 6979](https://www.rfc-editor.org/rfc/rfc6979)
-- **Verification evidence.** Public-key and hash inputs produce identical scripts. Invalid curve points, 32-byte scalars and unsupported permissions are rejected. Synthetic transactions cover all twelve modes, mixed inputs, both unpaired SINGLE paths and rejection of a wrong owner, parent or inverse hint. The generator revision passed 52 Python/chain-gang tests, eight isolated BSV Node 1.2.3 tests and two nChain comparisons. The native node supplies the reference result for unpaired OTDA. [CI results](https://github.com/linzhm/bsv-script-lab/actions/runs/44356580922/job/134986197432)
-- **Size, performance and outstanding work.** For the earlier signature format the two-bit joint table and four-bit split tables produced 62,051 and 61,717 bytes, with million-run means of 6.7190 and 6.5925 ms respectively. v7 shares the computed digest and checks a supplied inverse, yielding 59,811 bytes. The v7 sample measured 32 local RPC calls per path at about 22 ms including RPC overhead. The next device acceptance test is to sign a fixture’s digest inside a real Secure Enclave, export the raw signature and verify the completed spend on the same offline node. Miner acceptance policy, actual fees and a deployment security review remain open. [Earlier million-run experiment](https://github.com/linzhm/bsv-script-lab/actions/runs/44342695412/job/134946778724) · [v7 measurements](https://github.com/linzhm/bsv-script-lab/actions/runs/44350574355/job/134964757191)
+This draft follows the BRC script proposal format. A BRC number has not been assigned. [BRC proposal format](https://github.com/bsv-blockchain/BRCs/blob/master/EXAMPLE.md) · [Wei Zhang, WP1605, *PUSHTX and its Building Blocks* (original publisher URL)](https://nchain.com/wp-content/uploads/2022/03/WP1605_PUSHTX-and-its-Building-Blocks.pdf)
