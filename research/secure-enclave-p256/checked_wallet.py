@@ -6,6 +6,8 @@ import sqlite3
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import ec, utils
 
+from tx_engine import Script, Tx, TxIn
+
 from handwritten import GROUP_ORDER_R1, match_locking_script
 from universal import authorization, universal_unlocking_script
 
@@ -69,3 +71,25 @@ def sign_spend(tx, index, parent, requested_type, pubkey, sign_digest, history_p
         if conflict:
             raise SigningKeyBlocked("same P-256 r observed on different digests; signature withheld")
     return universal_unlocking_script(parent_bytes, auth, pubkey, signature)
+
+
+def sign_payment(parent, vout, outputs, fee_sats, pubkey, sign_digest, history_path):
+    """Finish an ordinary single-input payment using BIP143 ALL (0x41).
+
+    Supply the intended TxOut list, including any change, and the approved fee.
+    For mixed inputs or another sighash use sign_spend on the prepared transaction.
+    """
+    if not 0 <= vout < len(parent.tx_outs):
+        raise ValueError("parent output index out of range")
+    outputs = list(outputs)
+    if not outputs or any(output.amount < 0 for output in outputs):
+        raise ValueError("expected payment outputs with nonnegative amounts")
+    if fee_sats < 0 or parent.tx_outs[vout].amount != sum(output.amount for output in outputs) + fee_sats:
+        raise ValueError("payment outputs and approved fee do not balance")
+    unsigned = Tx(2, [TxIn(parent.id(), vout, Script())], outputs, 0)
+    unlock = sign_spend(unsigned, 0, parent, 0x41, pubkey, sign_digest, history_path)
+    prev = unsigned.tx_ins[0]
+    signed = Tx(unsigned.version, [TxIn(prev.prev_tx, prev.prev_index, unlock, prev.sequence)],
+                unsigned.tx_outs, unsigned.locktime)
+    signed.validate([parent])
+    return signed
