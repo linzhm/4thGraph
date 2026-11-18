@@ -53,7 +53,7 @@ class PaymentTests(unittest.TestCase):
         if valid:
             tx.validate(parents)
         else:
-            with self.assertRaises(RuntimeError):
+            with self.assertRaisesRegex(ValueError, "Error evaluating the script"):
                 tx.validate(parents)
 
     def test_all_six_modes_on_one_lock(self):
@@ -64,6 +64,7 @@ class PaymentTests(unittest.TestCase):
                 self.expect(True, parents, [800, 300], sig)
                 # Preserve the exact scriptSig for every mutation.
                 self.expect((flag & 31) == 2, parents, [799, 300], sig)
+                self.expect((flag & 31) == 2, parents, [1100], sig)
                 self.expect((flag & 31) != 1, parents, [800, 299], sig)
                 self.expect(bool(flag & 128), parents + [self.extra], [800, 300], sig)
                 self.expect(False, parents, [800, 300], sig, sequences=[0xfffffffe, 0xffffffff])
