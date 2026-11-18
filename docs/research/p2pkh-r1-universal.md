@@ -1,5 +1,7 @@
 # P2PKH-R1 通用摘要与 `SINGLE` 边界
 
+生成完整付款脚本、读取权限及构造解锁栈，见 [中文初步方案](./p2pkh-r1-proposal.zh-CN.md) · [English proposal](./p2pkh-r1-proposal.en.md)。
+
 同一 v7 输出可以在花费时按签名类型选 BIP143 或 OTDA。创建输出时将允许的类型写入模板。默认许可 `0x41`、`0x61` 两种 ALL；可以显式选取 12 种类型的任一非空子集。每笔交易有一个 `nVersion`，每个原生签名有自己的类型字节。Chronicle 激活后，`0x20` 选择 OTDA，`0x40` 是 ForkID，`0x80` 是 ANYONECANPAY。[节点分派](https://github.com/bitcoin-sv/bitcoin-sv/blob/6504a3aff65ba97c0f6c80962b033e35ecbfed4b/src/script/interpreter.cpp#L2112-L2124) · [Chronicle 规范](https://docs.bsvblockchain.org/network-topology/nodes/sv-node/chronicle-release)
 
 ## 选型决定
