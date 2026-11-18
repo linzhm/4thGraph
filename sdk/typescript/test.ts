@@ -35,3 +35,21 @@ test("reject altered code, framing, malformed public keys and owner width", () =
   offCurve[0] = 4;
   assert.throws(() => lockForKey(base, offCurve));
 });
+
+test("ordinary payment reproduces the native-verified signed transaction", async () => {
+  const { signPayment } = await import("./payment.ts");
+  const v = JSON.parse(fixture("spend-all.json"));
+  const q = Buffer.from(v.public_key_x963, "hex");
+  const p = { txid: Buffer.from(v.parent_txid, "hex"), vout: 0,
+    inputSatoshis: 1000n, inputScript: lockForKey(base, q),
+    outputs: [{satoshis: 900n, script: Buffer.from([0x51])}], fee: 100n };
+  const signed = await signPayment(p, q, digest => {
+    assert.equal(digest.toString("hex"), v.digest_hex);
+    return Buffer.from(v.signature_hex, "hex");
+  });
+  assert.ok(signed.includes(Buffer.from(v.script_sig_hex, "hex")));
+  const first = createHash("sha256").update(signed).digest();
+  assert.equal(createHash("sha256").update(first).digest().reverse().toString("hex"), v.signed_txid);
+  await assert.rejects(signPayment(p, q, () => Buffer.alloc(64)), /invalid R1/);
+  await assert.rejects(signPayment({...p, fee: 99n}, q, () => { throw Error("unexpected signer"); }), /balance/);
+});

@@ -31,3 +31,29 @@ fn public_vectors() {
     off_curve[0] = 4;
     assert!(lock_for_key(&base, &off_curve).is_err());
 }
+
+#[test]
+fn ordinary_payment() {
+    use p2pkh_r1::payment::{sign_payment, Output, Payment};
+    let v: Value = serde_json::from_str(include_str!("../../../template/spend-all.json")).unwrap();
+    let dec = |name: &str| hex::decode(v[name].as_str().unwrap()).unwrap();
+    let base = hex::decode(include_str!("../../../template/template.hex").split_whitespace().collect::<String>()).unwrap();
+    let key = dec("public_key_x963");
+    let mut payment = Payment {
+        txid: dec("parent_txid").try_into().unwrap(), vout: 0, input_satoshis: 1000,
+        input_script: lock_for_key(&base, &key).unwrap(),
+        outputs: vec![Output { satoshis: 900, script: vec![0x51] }], fee: 100,
+    };
+    let tx = sign_payment(&payment, &key, |digest| {
+        assert_eq!(digest.as_slice(), dec("digest_hex"));
+        Ok(dec("signature_hex").try_into().unwrap())
+    }).unwrap();
+    let mut txid = Sha256::digest(Sha256::digest(&tx));
+    txid.reverse();
+    assert_eq!(hex::encode(txid), v["signed_txid"].as_str().unwrap());
+    let witness = dec("script_sig_hex");
+    assert!(tx.windows(witness.len()).any(|w| w == witness));
+    assert!(sign_payment(&payment, &key, |_| Ok([0; 64])).is_err());
+    payment.fee -= 1;
+    assert!(sign_payment(&payment, &key, |_| panic!("unexpected signer")).is_err());
+}

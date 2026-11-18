@@ -46,3 +46,5 @@ pub fn lock_for_key(template: &[u8], key: &[u8]) -> Result<Vec<u8>, &'static str
     let owner: [u8; 20] = Ripemd160::digest(Sha256::digest(key)).into();
     lock_for_owner(template, &owner)
 }
+
+pub mod payment;
