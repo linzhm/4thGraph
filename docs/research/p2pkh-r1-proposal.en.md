@@ -45,6 +45,20 @@ python research/secure-enclave-p256/replay_payment.py
 
 The program returns a recorded public signature only for the fixture digest, validates the transaction locally and compares it byte-for-byte to the published signed transaction. Expected output is `62b466ac14c69de5fb2ea8b743f4b7dfba63ac9af12588f844db2217ca03efa7  (60189 bytes)`. The previous output is synthetic. Amounts and fees are illustrative. An isolated BSV Node 1.2.3 regtest verifies input 0 against the same supplied previous output. [Complete parent](./p2pkh-r1/spend-all/parent.hex) · [Unsigned child, preimage, digest and signature](./p2pkh-r1/spend-all/vector.json) · [Signed transaction](./p2pkh-r1/spend-all/signed.hex) · [Replay program](../../research/secure-enclave-p256/replay_payment.py)
 
+**Unlocking bytes in the example.** Each line starts with hex bytes. Angle brackets denote the literal data. The first push length varies with the actual parent. This example uses ordinary BIP143 ALL (`0x41`).
+
+```text
+4d 78 e9  <full parent transaction, 59,768 bytes>
+4c 9f     <current input's BIP143 preimage, 159 bytes>
+41        <owner R1 public key, 65 bytes>
+40        <r_BE32 || s_BE32, 64 bytes>
+04        00 00 00 00
+20        <inverse of s modulo n, 32 bytes little-endian>
+00
+```
+
+The first prefix is `OP_PUSHDATA2` plus a two-byte little-endian length. The second is `OP_PUSHDATA1` plus a one-byte length. Item 5 pushes four zero bytes for the ordinal. Item 7 is the ordinary-path selector `OP_0`. The 60,102-byte unlock and the spent 59,706-byte lock total 119,808 bytes (117 KiB). A new recipient output contributes its own size. The separate chain test covers a P2PKH payment to R1, an R1 payment to a second R1 owner, and that new owner's subsequent spend. [Offline node results](https://github.com/linzhm/bsv-script-lab/actions/runs/44374644256/job/135050400960)
+
 ## Specification
 
 In this section, MUST states a byte-level interoperability requirement. SHOULD states recommended wallet behavior. Offsets are zero-based from the first byte of the raw script. Hexadecimal byte strings are shown in serialization order.
