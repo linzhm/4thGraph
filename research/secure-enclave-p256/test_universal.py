@@ -136,3 +136,62 @@ class UniversalTests(unittest.TestCase):
                 stats["elapsed_ns"] += perf_counter_ns() - start
                 stats["count"] += 1
         print("UNIVERSAL_RPC_SAMPLE", json.dumps({k: v[1] for k, v in cases.items()}, sort_keys=True), flush=True)
+
+    def test_public_witness_boundaries(self):
+        # Malformed public fields must fail under the real node, independently
+        # of how strictly a wallet checks its own output.
+        from handwritten import GROUP_ORDER_R1
+        ps = [self.p]
+        a, good = self.data(ps, 0, [900], 0x41)
+        order = GROUP_ORDER_R1
+        r, s = int.from_bytes(good[:32], "big"), int.from_bytes(good[32:], "big")
+        inverse = pow(s, -1, order)
+
+        def run(rr, ss, inv, valid=False):
+            w = Script()
+            for field in (ps[0].serialize(), a.preimage, self.pub,
+                          rr.to_bytes(32, "big") + ss.to_bytes(32, "big"),
+                          bytes(4), inv.to_bytes(32, "little")):
+                w.append_pushdata(field)
+            w.append_data(bytes([0]))
+            check(child(ps, [900], {0: w}), ps, 0, valid)
+
+        run(r, s, inverse, True)
+        for rr, ss in ((0, s), (order, s), (r, 0), (r, order)):
+            with self.subTest(r_valid=(0 < rr < order), s_valid=(0 < ss < order)):
+                run(rr, ss, inverse)
+        for bad_inverse in (0, order, (inverse + 1) % order):
+            run(r, s, bad_inverse)
+        # ECDSA has two valid s representatives. A corresponding inverse is required.
+        run(r, order - s, inverse)
+        run(r, order - s, order - inverse, True)
+
+    def test_point_validation_independent_of_owner_hash(self):
+        from hashlib import new, sha256
+        key, _, _ = signer()
+        prime = 0xffffffff00000001000000000000000000000000ffffffffffffffffffffffff
+        for x, y in ((0, 0), (prime, 1), (1, prime)):
+            invalid = bytes([4]) + x.to_bytes(32, "big") + y.to_bytes(32, "big")
+            owner = new("ripemd160", sha256(invalid).digest()).digest()
+            ps = [parent(locking_script(owner, version=7), 1000, "22")]
+            a = authorization(child(ps, [900]), 0, 1000, 0x41)
+            w = universal_unlocking_script(ps[0].serialize(), a, invalid, sign(a, key))
+            check(child(ps, [900], {0: w}), ps, 0, False)
+
+    def test_checked_wallet_output(self):
+        from tempfile import TemporaryDirectory
+        from pathlib import Path
+        from checked_wallet import sign_spend
+
+        def device_callback(digest):
+            der = self.key.sign(digest, ec.ECDSA(utils.Prehashed(hashes.SHA256()), deterministic_signing=True))
+            r, s = utils.decode_dss_signature(der)
+            return r.to_bytes(32, "big") + s.to_bytes(32, "big")
+
+        ps = [self.fee, self.p]
+        with TemporaryDirectory() as directory:
+            ledger = Path(directory) / "history.sqlite"
+            for flag, amounts in ((0x41, [900]), (0x61, [900]), (0x63, [900])):
+                tx = child(ps, amounts)
+                w = sign_spend(tx, 1, self.p, flag, self.pub, device_callback, ledger)
+                check(child(ps, amounts, {1: w}), ps, 1)

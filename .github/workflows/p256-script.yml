@@ -23,7 +23,7 @@ jobs:
       - run: python -m pip install --only-binary=tx-engine tx-engine==0.13.1
       - name: Validate handwritten Script locally in the Rust engine
         working-directory: research/secure-enclave-p256
-        run: python -m unittest -v test_handwritten test_windows test_native
+        run: python -m unittest -v test_handwritten test_windows test_native test_checked_wallet
       - name: Time native digest profiles on the same runner
         working-directory: research/secure-enclave-p256
         run: python test_native.py
