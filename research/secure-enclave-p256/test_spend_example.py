@@ -1,6 +1,7 @@
 """Reproducible synthetic single-input payment. The test signer is software-only."""
 import json
 from pathlib import Path
+from hashlib import sha256
 import tempfile
 import unittest
 
@@ -9,6 +10,7 @@ from cryptography.hazmat.primitives.asymmetric import ec, utils
 from tx_engine import Script, Tx, TxIn, TxOut
 
 from checked_wallet import sign_payment
+from handwritten import _assembly
 from p2pkh_r1 import locking_script_from_public_key
 from replay_payment import replay
 from test_native import signer
@@ -38,6 +40,37 @@ class OrdinaryPaymentTest(unittest.TestCase):
         for name, auth, tx in (("BIP143_ALL", bip143, ordinary), ("OTDA_ALL", otda, chronicle)):
             print("CHRONICLE_VECTOR_SIZE", name, "preimage", len(auth.preimage),
                   "unlock", len(tx.tx_ins[0].script_sig.raw_serialize()), "transaction", len(tx.serialize()))
+
+    def test_chronicle_parent_bytes(self):
+        # Isolated data-transport experiment: the fixture checks the full
+        # reconstructed parent. It does not change the payment template.
+        parent, _ = replay()
+        data = parent.serialize()
+        _, emit = _assembly(8)
+        unit = emit("@STEP_SPLIT4")
+        run = unit * 64
+        self.assertEqual(data.count(run), 1)
+        before, after = data.split(run)
+        program = Script()
+        program.append_pushdata(before)
+        program.append_pushdata(unit)
+        doubling = Script.parse_string("OP_DUP OP_CAT").raw_serialize()
+        program.append_data(doubling * 6)
+        program.append_data(Script.parse_string("OP_CAT").raw_serialize())
+        program.append_pushdata(after)
+        program.append_data(Script.parse_string("OP_CAT").raw_serialize())
+
+        digest = sha256(sha256(data).digest()).digest()
+        lock = Script.parse_string(f"OP_HASH256 0x{digest.hex()} OP_EQUAL")
+        prev = Tx(2, [TxIn("44" * 32, 0, Script())], [TxOut(1000, lock)], 0)
+        raw = Script()
+        raw.append_pushdata(data)
+        for script in (raw, program):
+            spend = Tx(2, [TxIn(prev.id(), 0, script)], [TxOut(900, Script.parse_string("OP_1"))], 0)
+            spend.validate([prev])
+            check(spend, [prev], 0)
+        print("CHRONICLE_PARENT_BYTES", len(data), "direct_push", len(raw.raw_serialize()),
+              "reconstruction", len(program.raw_serialize()), "round", len(unit), flush=True)
 
     def test_complete_payment(self):
         key, pubkey, _ = signer(1)  # Public P-256 generator point, for this fixture only.

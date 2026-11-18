@@ -77,13 +77,18 @@ class UniversalTests(unittest.TestCase):
                 self.assertEqual(a.companion, bool(flag & 0x20))
                 w = self.unlock(parents, 1, a, sig)
                 tx = child(parents, [900], {1: w})
-                tx.validate(parents)
                 check(tx, parents, 1)
                 if a.companion:
+                    # Pinned fork: the sentinel is fixed, but two-phase scriptCode
+                    # stripping still disagrees on the companion BIP143 signature.
+                    with self.assertRaisesRegex(ValueError, "Top of stack is false"):
+                        tx.validate(parents)
                     script = Script.parse_string("OP_CHECKSIG")
                     self.assertEqual(bytes(sig_hash(tx, 1, script, 1000, flag)), b"\x01" + bytes(31))
                     with self.assertRaises(ValueError):
                         sig_hash_preimage(tx, 1, script, 1000, flag)
+                else:
+                    tx.validate(parents)
                 check(child(parents, [899], {1: w}), parents, 1)
                 check(child(parents, [898, 1], {1: w}), parents, 1, False)
                 if a.companion:
