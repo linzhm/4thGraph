@@ -74,3 +74,35 @@ v7 实测为 **59,811 B**。在无 P2P 连接的 BSV Node 1.2.3 regtest 上，�
 | OTDA SINGLE，无配对 | 163 | 60,211 | 22.14 |
 
 最后一行的 163 字节属于伴随 BIP143 授权；原生 OTDA 检查取常量摘要。测试代码提交为 [265c698297f56c5116f853b9be9092e93d8a43b7](https://github.com/linzhm/bsv-script-lab/commit/265c698297f56c5116f853b9be9092e93d8a43b7)。
+
+## 签名私钥与 nonce 的安全边界
+
+付款人锁定的是 R1 公钥哈希。解锁公开父交易、原像、公钥、ECDSA 签名 `(r,s)`、位置、分支位和 `w=s⁻¹ mod n`。任意观察者都可以由公开的 `s` 算出 `w`。这些字段不需要手机私钥或签名 nonce。v7 的 secp256k1 PUSHTX 检查采用公开参数，作用是交易绑定；授权依赖独立的 secp256r1 签名。
+
+**同一把 R1 钥匙对两个不同消息摘要复用秘密 nonce，可能导致私钥被恢复。** 即使硬件不提供导出私钥的接口，已发布的错误签名仍有这个风险。相同公钥在不同摘要上出现相同 `r` 是需要阻断的信号；同一摘要的确定性重签可以产生相同签名。软件测试使用确定性签名，Apple 的公开 API 只保证了所提供的建钥、签名等接口，本研究未核实 Secure Enclave 内部生成 nonce 的具体算法或侧信道特性。[RFC 6979](https://www.rfc-editor.org/rfc/rfc6979#section-3.2) · [FIPS 186-5](https://csrc.nist.gov/pubs/fips/186-5/final) · [Apple Secure Enclave 签名 API](https://developer.apple.com/documentation/cryptokit/secureenclave/p256/signing/privatekey)
+
+钱包可以通过已检查的入口构造 v7 解锁脚本。调用方负责展示并核对收款输出、找零、金额、费用和本次 sighash 授权范围，向回调传入摘要。回调须返回 64 字节签名，且在检查完成前不记录或发送签名。对已经签署并泄露的两个冲突签名，本地阻断无法追回它们；应停止使用该钥匙新增授权，按钱包的密钥泄露流程处理。[钱包入口](../../research/secure-enclave-p256/checked_wallet.py)
+
+```python
+from checked_wallet import sign_spend
+
+unlock = sign_spend(unsigned_tx, input_index, parent_tx, requested_type,
+                    public_key_x963, hardware_sign_digest, wallet_history_path)
+```
+
+入口检查真实 outpoint 对应的脚本、金额、模板许可及所有者，重建摘要，调用签名器一次，并用独立的 P-256 实现验证结果。发布前在同一个 SQLite 写事务内检查并记录 `(Q,r,digest)`。同摘要可重试；若发现同钥同 `r` 配不同摘要，先持久化该钥匙的阻断状态，再抛出错误。数据库只记录观察所需的公钥、公开签名分量和摘要。应使用受保护的固定路径并保持历史完整；多个调用进程共用同一历史，独立数据库、历史回滚或绕过该入口的签名无法相互检测。这是事后观察，不能发现所有低熵或带偏差的 nonce。锁定脚本只能看到当前输入的验证材料。原始装配接口留给试验和已在其他位置完成验证的调用方。
+
+| 检查层 | 通过与拒绝用例 |
+| --- | --- |
+| 签名器前的策略检查 | 错父交易、错误所有者、禁用的 sighash 均在调用回调前拒绝，由 outpoint 指向的实际前序输出可以位于索引 1 |
+| 发布前签名与 nonce 检查 | 错误摘要的签名和越界标量不写历史；并发重试只写一行；模拟已有冲突记录时阻断且重开后仍然有效，另一把钥匙可独立使用 |
+| BSV 节点输入验证 | 检查 `r,s` 为 0 或群阶、错误或越界逆元、已与所有者哈希匹配的无效公钥点；合法的另一个 ECDSA `s` 表示须配上对应逆元 |
+| 跨交易与分支 | 复用既有的 outpoint、类型许可、无配对伴随授权与错误位置测试。NONE、ANYONECANPAY 放开的字段由签名类型决定 |
+
+nonce 告警测试在临时数据库里模拟先前观察，没有生成使用重复秘密 nonce 的签名对。上述链上用例均为合成输入，在无对等连接的 regtest 上调用只读验证 RPC。新增防护不改变 v7 脚本字节。[钱包回归](../../research/secure-enclave-p256/test_checked_wallet.py) · [原生节点回归](../../research/secure-enclave-p256/test_universal.py)
+
+## 下一项可验证提示的体积预算
+
+v7 的四位分表中，固定 G 表的文字操作码与常量占 1,023 B，15 个非零仿射点的原始坐标本身占 960 B。把这些坐标移至解锁脚本并核对固定哈希还要增加解包代码。更值得试验的是动态 Q 表：当前窗口从 `2Q` 到 `15Q` 的建表指令共 2,172 B。可以考虑由钱包额外提供 14 个仿射斜率，按顺序从已核验的 Q 得出这 14 个点。每一步都要验证分母非零、域内的斜率等式，并由脚本计算下一点。14 个定长域元素合计 448 B，如合并为一个栈项则总推入开销为 451 B。这些量只依赖公开 Q，钱包不需要接触签名 nonce。2,172 B 是当前可替换代码的总预算，净节省量取决于新检查、解包和栈管理的实际装配大小。这里仅做静态核算，尚未改变通用锁或得出新版体积。完整花费还携带父交易，其中含上一次的锁与解锁数据，也应纳入比较。[四位窗口](../../research/secure-enclave-p256/window-4.asm)
+
+本轮验收通过 46 项 Python/chain-gang 测试、8 项 BSV Node 1.2.3 离线测试和 2 项 nChain 对照测试。v7 锁仍为 59,811 B。[具体运行与日志](https://github.com/linzhm/bsv-script-lab/actions/runs/44353247588/job/134974347874)
