@@ -36,8 +36,12 @@ def test_signer(secret):
     return key.verifying_key.to_string("compressed"), sign
 
 
-def run(node, *, compact_holder=False, compact_outputs=False, ticket_mode=None):
+def run(node, *, compact_holder=False, compact_outputs=False, ticket_mode=None, recipient_respend=False):
     ticket_profiles = {"metadata": "G", "derive": "H", "template": "I"}
+    if recipient_respend:
+        if ticket_mode not in (None, "template"):
+            raise ValueError("the recipient-respend comparison uses template tickets")
+        ticket_mode = "template"
     if ticket_mode is not None and ticket_mode not in ticket_profiles:
         raise ValueError("unknown inventory ticket mode")
     if node.node.call("getblockchaininfo")["chain"] != "regtest" or node.node.call("getconnectioncount"):
@@ -48,6 +52,10 @@ def run(node, *, compact_holder=False, compact_outputs=False, ticket_mode=None):
     ticket_key, ticket_sign = test_signer(2020)
     wallets = dict(test_signer(i) for i in range(1000, 1128))
     owners = tuple(wallets)
+    received_vout = 31
+    origin_owners = owners
+    if recipient_respend:
+        origin_owners = (owners[-1], owners[received_vout]) * 64
     coinbase = node.node.fund(node.address)
     issue_lock = push(issuer) + asm("OP_CHECKSIG")
     setup_outputs = (Output(2_000, issue_lock),) * 128 + (Output(50_000, issue_lock),) * 2 + (
@@ -80,7 +88,7 @@ def run(node, *, compact_holder=False, compact_outputs=False, ticket_mode=None):
 
     # Submit all independent origins before mining a single block.
     parents, leaves = [], []
-    for i, owner in enumerate(owners):
+    for i, owner in enumerate(origin_owners):
         state = InventoryState(200 + i, 1000, owner)
         parent = from_setup(i, payment.token_output(state, parts))
         validate_at_heights(parent, (setup,), spend_height=200, activation_height=2, utxo_heights=(3,))
@@ -98,6 +106,10 @@ def run(node, *, compact_holder=False, compact_outputs=False, ticket_mode=None):
     positions = tuple(range(0, 128, 2))
     records = []
     for generation in range(2):
+        if recipient_respend and generation == 1:
+            # Spend one received output and 63 existing coins. Selecting one
+            # leaf of each pair keeps the membership proof width identical.
+            positions = tuple(2 * i if i == received_vout else 2 * i + 1 for i in range(64))
         label = f"payment-{generation + 1}"
         root = inventory_root(leaves)
         started = perf_counter()
@@ -111,7 +123,9 @@ def run(node, *, compact_holder=False, compact_outputs=False, ticket_mode=None):
         previous = tuple(parents[i] for i in positions)
         selected_inputs = tuple(Input(leaf.outpoint[:32], int.from_bytes(leaf.outpoint[32:], "little"))
                                 for leaf in selected)
-        out_states = tuple(replace(leaf.state, owner=owners[(i + 1 + generation) % len(owners)],
+        recipients = (owners[generation * 64:(generation + 1) * 64] if recipient_respend
+                      else owners[generation + 1:generation + 65])
+        out_states = tuple(replace(leaf.state, owner=recipients[i],
                                    quantity=leaf.state.quantity + (1 if i % 2 else -1))
                            for i, leaf in enumerate(selected))
         tx = Transaction((Input(verifier.txid_wire(), 0), Input(companion.txid_wire(), 0), *selected_inputs),
@@ -184,19 +198,23 @@ def run(node, *, compact_holder=False, compact_outputs=False, ticket_mode=None):
         for i, pos in enumerate(positions):
             leaves[pos] = InventoryLeaf(scope, Input(final.txid_wire(), i).outpoint(), out_states[i])
             parents[pos] = final
-    if records[0]["distinct_token_parents"] != 64 or records[1]["distinct_token_parents"] != 1:
+    if records[0]["distinct_token_parents"] != 64 or records[1]["distinct_token_parents"] != (64 if recipient_respend else 1):
         raise AssertionError("unexpected direct-parent topology")
     if records[0]["payment_bytes"] != records[1]["payment_bytes"] or any(r["full_token_parent_raw_occurrences"] for r in records):
         raise AssertionError("unexpected depth-dependent wire data under the fixed-DER test profile")
     if records[0]["total_including_dedicated_funding"] != records[1]["total_including_dedicated_funding"]:
         raise AssertionError("unexpected change in the size including verifier and companion funding")
     return {
-        "profile": ticket_profiles.get(ticket_mode, "F" if compact_outputs else ("E-compact" if compact_holder else "E")),
+        "profile": "I-distinct" if recipient_respend else ticket_profiles.get(
+            ticket_mode, "F" if compact_outputs else ("E-compact" if compact_holder else "E")),
         **({"ticket_wallet_key": ticket_key.hex()} if ticket_mode else {}),
         "trust": "Test issuer approves each inventory root through one of two real issuance coupons. "
                  "This does not supply a permissionless recursive root update.",
-        "statistics": "Two disjoint fixed-width coupons, fixed 70-byte DER test signer, alternating 64 of 128. "
-                      "Second payment spends all 64 authorized outputs of the first.",
+        "statistics": ("Two one-wallet payments to 64 distinct external recipients, 64 different token parents each. "
+                       "The second payer spends the received vout 31 and 63 existing single-origin UTXOs. "
+                       "Fixed 70-byte DER test signatures." if recipient_respend else
+                       "Two disjoint fixed-width coupons, fixed 70-byte DER test signer, alternating 64 of 128. "
+                       "Second payment spends all 64 authorized outputs of the first."),
         "scope": scope.hex(), "origin_transaction_bytes": sum(rec["bytes"] for name, rec in node.evidence["transactions"].items()
                                                                 if name.startswith("origin-")),
         "payments": records, **node.evidence,
@@ -214,10 +232,12 @@ if __name__ == "__main__":
                         help="encode only output states and authenticate exact reconstructed TxOuts with ForkID ALL")
     parser.add_argument("--ticket-mode", choices=("metadata", "derive", "template"),
                         help="use compact holders/outputs and a wallet ticket naming the required verifier outpoint")
+    parser.add_argument("--recipient-respend", action="store_true",
+                        help="template tickets; spend one received output alongside 63 independent existing coins")
     args = parser.parse_args()
-    if args.compact_outputs and not args.compact_holder and not args.ticket_mode:
+    if args.compact_outputs and not args.compact_holder and not (args.ticket_mode or args.recipient_respend):
         parser.error("select --compact-holder as the comparison baseline for --compact-outputs")
     args.out.mkdir()
     result = run(Regtest(args.node_url, args.cookie), compact_holder=args.compact_holder,
-                 compact_outputs=args.compact_outputs, ticket_mode=args.ticket_mode)
+                 compact_outputs=args.compact_outputs, ticket_mode=args.ticket_mode, recipient_respend=args.recipient_respend)
     (args.out / "summary.json").write_text(json.dumps(result, indent=2) + "\n")

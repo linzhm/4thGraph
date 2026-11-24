@@ -1,12 +1,12 @@
 # CCTP 与 BSV 储备桥开发计划
 
-草案 · 2026-11-24
+草案 · 2026-11-25
 
 以 [协议规格](bsv-usdc-bridge-spec.md) 和 [实现清单](bsv-usdc-token-checklist.md) 为准。第一条交付路径是独立测试储备到 BSV regtest，再接入跨链测试网。CCTP 用于受支持网络间的原生 USDC 调拨。Circle 合作接口、域注册及生产运营责任以 X01–X04 的确认结果为准。
 
 现有 [Groth16 回归](../../groth16/docs/regtest.md) 可作为出证和交易构造基线。[v3 双链记录](../fixtures/v3-certified-cross-chain-regtest-summary.json) 已覆盖 BSV 上的同密钥前序验证和 Anvil 最终释放。验收时区分宿主参考模型、真实电路、BSV Node 和跨链适配器各自验证的关系。
 
-[BSV 指令执行与验证构件验收](dual-route-validation.md) 记录当前冻结优先顺序、Groth16 复用接口和保留的实验分支。
+下一项普通付款交付以[收款人独立验真](bsv-usdc-bridge-spec.md#p0--收款人独立验真)为准。收款方独立配置策略并核验 B2G，铸造完成后停用发行签名器，由两个钱包分别发起连续付款。普通花费路径须能持续供给验证器，且不消耗发行方为普通付款预签的许可。即使发行方签署了错误的库存清单，钱包也须拒绝无合法铸造来源的指定输出。采用有限库存票据的字节对照归入阶段 5 的实验记录。[BSV 指令执行与验证构件验收](dual-route-validation.md) 保留已完成的冻结路径与通用验证构件记录。
 
 ## 里程碑
 

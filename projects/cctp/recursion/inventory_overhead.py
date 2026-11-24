@@ -268,13 +268,11 @@ def support_scripts(tx, ledger, compact_holder=False, ticket_mode=None, coupons=
     return scripts
 
 
-def verify_ticket_signature(tx, vin, spent, key):
-    raw = tx.inputs[vin].script
-    fields = signature(raw)
-    partition(raw, fields)
+def verify_forkid_signature(tx, vin, spent, key, raw):
+    partition(raw, signature(raw))
     signer = VerifyingKey.from_string(key, curve=SECP256k1, valid_encodings={"compressed"})
     digest = hash256(preimage_all(tx, vin, spent.value, spent.script))
-    require(signer.verify_digest(raw[1:-1], digest, sigdecode=sigdecode_der), "invalid ticket signature")
+    require(signer.verify_digest(raw[1:-1], digest, sigdecode=sigdecode_der), "invalid ForkID ALL signature")
 
 
 def check_signed_ticket(tx, ticket, setup, coupons):
@@ -288,7 +286,7 @@ def check_signed_ticket(tx, ticket, setup, coupons):
         len(issuer_key) == 33 and source.script == push(issuer_key) + asm("OP_CHECKSIG"),
         "wrong issuer lock",
     )
-    verify_ticket_signature(ticket, 0, source, issuer_key)
+    verify_forkid_signature(ticket, 0, source, issuer_key, issuer_input.script)
     require(tx.inputs[1].outpoint() == Input(ticket.txid_wire(), 0).outpoint(), "wrong spent ticket")
     spent = ticket.outputs[0]
     key = spent.script[39:-1]
@@ -297,7 +295,7 @@ def check_signed_ticket(tx, ticket, setup, coupons):
         len(key) == 33 and spent.script == expected_lock,
         "ticket does not authorize the actual verifier outpoint or the signing key",
     )
-    verify_ticket_signature(tx, 1, spent, key)
+    verify_forkid_signature(tx, 1, spent, key, tx.inputs[1].script)
     return {
         "issuer_coupon_wire": issuer_input.outpoint().hex(),
         "signed_verifier_outpoint_wire": tx.inputs[0].outpoint().hex(),
@@ -394,22 +392,69 @@ def compact_output_context(tx, funding, scope, parts):
     )
 
 
+def audit_distinct_payer(tx, preceding, origin_points, ledger, scope, parts):
+    """Verify one sender, independent receipts, and the exact repeated disclosure from wire."""
+    inputs = tx.inputs[2:]
+    points = {inp.outpoint() for inp in inputs}
+    parent_count = len({inp.txid for inp in inputs})
+    require(parent_count == len(inputs) == 64, "expected 64 distinct token parent txids")
+    remaining = origin_points
+    previous_vouts = []
+    if preceding is not None:
+        preceding_txid = preceding.txid_wire()
+        previous_vouts = [inp.vout for inp in inputs if inp.txid == preceding_txid]
+        require(previous_vouts == [31], "expected only output 31 of the first payment")
+        remaining = origin_points - {inp.outpoint() for inp in preceding.inputs[2:]}
+    fresh_origins = points & remaining
+    require(len(fresh_origins) + len(previous_vouts) == 64, "unexpected or already spent origin")
+
+    vector = b"".join(inp.outpoint() for inp in inputs)
+    encoded_vector = push(vector)
+    owners = set()
+    for vin, inp in enumerate(inputs, 2):
+        source = parent(inp, ledger)
+        owner = wide_leaf(scope, source, inp.vout, parts).state.owner
+        sig_push = inp.script[:1 + inp.script[0]]
+        verify_forkid_signature(tx, vin, source.outputs[inp.vout], owner, sig_push)
+        owners.add(owner)
+        require(inp.script.count(encoded_vector) == 1, "holder lacks an exact copy of the ordered token outpoints")
+    require(len(owners) == 1, "token inputs belong to multiple sending keys")
+    payer = owners.pop()
+    recipients = {wide_leaf(scope, tx, vout, parts).state.owner for vout in range(len(tx.outputs))}
+    require(len(recipients) == 64 and payer not in recipients, "expected 64 external recipient keys")
+    return {
+        "payer_pubkey": payer.hex(),
+        "distinct_recipient_keys": len(recipients),
+        "self_payment_outputs": 0,
+        "verified_holder_signatures": len(inputs),
+        "distinct_token_parent_txids": parent_count,
+        "inputs_from_unspent_initial_origins": len(fresh_origins),
+        "vouts_from_preceding_payment": previous_vouts,
+        "token_outpoint_vector_sha256": sha256(vector).hexdigest(),
+        "token_outpoint_vector_bytes": len(vector),
+        "holder_witness_copies": len(inputs),
+        "vector_payload_in_holders_bytes": len(inputs) * len(vector),
+        "vector_payload_after_first_holder_copy_bytes": (len(inputs) - 1) * len(vector),
+    }
+
+
 def audit_wide(ledger, summary):
     scope = bytes.fromhex(summary["scope"])
     labels = summary["transactions"]
     setup = ledger[labels["issuance-anchor"]["txid"]]
     coupons = tuple(Input(setup.txid_wire(), i).outpoint() for i in (128, 129))
     profile = summary["profile"]
-    ticket_mode = profile if profile in ("G", "H", "I") else None
+    ticket_mode = {"G": "G", "H": "H", "I": "I", "I-distinct": "I"}.get(profile)
     compact_outputs = profile == "F" or bool(ticket_mode)
     compact_holder = compact_outputs or profile == "E-compact"
-    if profile == "I":
+    if ticket_mode == "I":
         parts = template_ticket_token_parts(scope, coupons, input_count=66)
     elif ticket_mode:
         parts = ticket_token_parts(scope, coupons, input_count=66, derive_prevouts=profile == "H")
     else:
         parts = token_parts(scope, coupons, input_count=66, compact_holder=compact_holder)
-    leaves = [wide_leaf(scope, ledger[labels[f"origin-{n:03}"]["txid"]], 0, parts) for n in range(128)]
+    origins = tuple(ledger[labels[f"origin-{n:03}"]["txid"]] for n in range(128))
+    leaves = [wide_leaf(scope, origin, 0, parts) for origin in origins]
     rows = {}
     for n, row in enumerate(summary["payments"], 1):
         tx = ledger[row["txid"]]
@@ -483,14 +528,27 @@ def audit_wide(ledger, summary):
         }
         if ticket_mode:
             rows[f"payment-{n}"]["ticket_binding"] = ticket_binding
-    first_id = rows["payment-1"]["txid"]
+    first = ledger[rows["payment-1"]["txid"]]
     second = ledger[rows["payment-2"]["txid"]]
-    require(
-        all(inp.txid[::-1].hex() == first_id and inp.vout == i for i, inp in enumerate(second.inputs[2:])),
-        "wide payment did not consume all 64 preceding outputs in order",
-    )
+    if profile == "I-distinct":
+        require(
+            all(len(tx.inputs) == len(tx.outputs) == 1 and tx.inputs[0].outpoint() == Input(setup.txid_wire(), i).outpoint()
+                for i, tx in enumerate(origins)),
+            "unexpected initial token funding",
+        )
+        origin_points = {Input(origin.txid_wire(), 0).outpoint() for origin in origins}
+        alice = audit_distinct_payer(first, None, origin_points, ledger, scope, parts)
+        bob = audit_distinct_payer(second, first, origin_points, ledger, scope, parts)
+        require(alice["payer_pubkey"] != bob["payer_pubkey"], "second payment must have a different sending key")
+        rows["payment-1"]["source_topology"] = alice
+        rows["payment-2"]["source_topology"] = bob
+    else:
+        first_txid = first.txid_wire()
+        require(
+            all(inp.txid == first_txid and inp.vout == i for i, inp in enumerate(second.inputs[2:])),
+            "wide payment did not consume all 64 preceding outputs in order",
+        )
     # The initial holder locks are paid once at issuance. Successor locks are already counted in payment.
-    origins = tuple(ledger[labels[f"origin-{n:03}"]["txid"]] for n in range(128))
     preparation = {
         "issuance_anchor_bytes": len(setup.serialize()),
         "initial_128_origin_transactions_bytes": sum(len(origin.serialize()) for origin in origins),
@@ -534,7 +592,7 @@ def audit(directory, profile):
         for k, raw in {**archive["funding"], **archive["transactions"]}.items()
     }
     require(all(tx.txid() == k for k, tx in ledger.items()), "txid differs from serialized transaction")
-    if profile in ("E", "E-compact", "F", "G", "H", "I"):
+    if profile in ("E", "E-compact", "F", "G", "H", "I", "I-distinct"):
         return audit_wide(ledger, summary)
     labels = summary["transactions"]
     setup = ledger[labels["issuance-anchor-and-coupons"]["txid"]]
@@ -563,7 +621,7 @@ def audit(directory, profile):
     }
 
 
-PROFILES = ("B", "C", "D", "E", "E-compact", "F", "G", "H", "I")
+PROFILES = ("B", "C", "D", "E", "E-compact", "F", "G", "H", "I", "I-distinct")
 
 
 def main():

@@ -2440,5 +2440,277 @@
       "total_with_dedicated_funding": -6504
     },
     "issuance_and_two_payments_bytes_minus_H": -18128
+  },
+  "I-distinct": {
+    "scope": "f3c36efeed8eeae44b3d1d551b301afa0e1e0035c26acded1fd7084dfa3e3033",
+    "one_time_preparation": {
+      "issuance_anchor_bytes": 5918,
+      "initial_128_origin_transactions_bytes": 134656,
+      "initial_128_token_lock_bytes_within_origins": 117504
+    },
+    "two_payments_with_funding_and_issuance_bytes": 682556,
+    "rows": {
+      "payment-1": {
+        "txid": "fe31d59e2600a33d266b602b327225e57d73a68c3fb4fd2a530c3140c40cddca",
+        "total_with_dedicated_funding": 270991,
+        "payment": {
+          "version_locktime_counts": 10,
+          "outpoints_sequences": 2640,
+          "input_script_lengths": 196,
+          "output_satoshis_and_script_lengths": 704,
+          "verifier_scriptSig": 11155,
+          "companion_scriptSig": 72,
+          "holders_64_scriptSig": 174016,
+          "token_output_locks": 58752
+        },
+        "scriptSigs": {
+          "verifier": {
+            "membership_sibling_push": 64,
+            "membership_sibling": 2048,
+            "packed_records_push": 3,
+            "membership_indices": 64,
+            "source_state": 3200,
+            "packed_successor_states_push": 3,
+            "packed_successor_states": 3200,
+            "ordered_prevouts_push": 3,
+            "ordered_prevouts": 2376,
+            "preimage_push": 2,
+            "before_scriptCode": 104,
+            "scriptCode_length": 1,
+            "scriptCode_compact_suffix": 35,
+            "after_scriptCode": 52
+          },
+          "companion": {
+            "signature_push": 1,
+            "signature_der": 70,
+            "sighash_byte": 1
+          },
+          "holders_64": {
+            "signature_push": 64,
+            "signature_der": 4480,
+            "sighash_byte": 64,
+            "ticket_wallet_pubkey_push": 64,
+            "ticket_wallet_pubkey": 2112,
+            "ticket_verifier_outpoint_push": 64,
+            "ticket_verifier_outpoint": 2304,
+            "ticket_satoshis_number": 192,
+            "ticket_issuer_der_push": 64,
+            "ticket_issuer_der": 4480,
+            "ticket_coupon_slot_number": 64,
+            "token_prevouts_push": 192,
+            "token_prevouts": 147456,
+            "preimage_push": 128,
+            "before_scriptCode": 6656,
+            "scriptCode_length": 64,
+            "scriptCode_compact_suffix": 2240,
+            "after_scriptCode": 3328
+          }
+        },
+        "representative_holder": {
+          "signature_push": 1,
+          "signature_der": 70,
+          "sighash_byte": 1,
+          "ticket_wallet_pubkey_push": 1,
+          "ticket_wallet_pubkey": 33,
+          "ticket_verifier_outpoint_push": 1,
+          "ticket_verifier_outpoint": 36,
+          "ticket_satoshis_number": 3,
+          "ticket_issuer_der_push": 1,
+          "ticket_issuer_der": 70,
+          "ticket_coupon_slot_number": 1,
+          "token_prevouts_push": 3,
+          "token_prevouts": 2304,
+          "preimage_push": 2,
+          "before_scriptCode": 104,
+          "scriptCode_length": 1,
+          "scriptCode_compact_suffix": 35,
+          "after_scriptCode": 52
+        },
+        "actual_token_locks_64": {
+          "tag_and_scope_push": 3904,
+          "state_push": 64,
+          "state": 3200,
+          "holder_and_verifier_guard": 51584
+        },
+        "verifier_funding": {
+          "version_locktime_counts": 10,
+          "outpoints_sequences": 40,
+          "input_script_lengths": 1,
+          "output_satoshis_and_script_lengths": 11,
+          "verifier_native_lock": 23179
+        },
+        "companion_funding": {
+          "version_locktime_counts": 10,
+          "outpoints_sequences": 40,
+          "input_script_lengths": 1,
+          "output_satoshis_and_script_lengths": 9,
+          "signature_push": 1,
+          "signature_der": 70,
+          "sighash_byte": 1,
+          "companion_native_lock": 73
+        },
+        "history": {
+          "known_token_creation_and_ancestor_txs": 66,
+          "literal_token_history_bytes_in_scriptSigs": 0
+        },
+        "ticket_binding": {
+          "issuer_coupon_wire": "c14ad354e9af991934c485a33098589d39c40dd9adbe3c7874aaeeed4818fb1f80000000",
+          "signed_verifier_outpoint_wire": "14597194207c81e7f34150f98183b5ece4f15d1a43944b3db3867451bdc2f11d00000000",
+          "ticket_outpoint_wire": "0966d94ea9d1507611aa447a361eccfda9205abe17bdc53478a9976d947cc44000000000",
+          "ticket_pubkey": "0237bb22d3f7afe8668e9b28561332d9e3734a8139bfe139d2c094741456403609"
+        },
+        "source_topology": {
+          "payer_pubkey": "025af94ac07f8d6492a472ad406709720678086856b01528bf8248ac8edafe6584",
+          "distinct_recipient_keys": 64,
+          "self_payment_outputs": 0,
+          "verified_holder_signatures": 64,
+          "distinct_token_parent_txids": 64,
+          "inputs_from_unspent_initial_origins": 64,
+          "vouts_from_preceding_payment": [],
+          "token_outpoint_vector_sha256": "5a6353eb9f71e7a0ff3c994af2dafe5c3bcc6e968ef00550c465dd50302507c9",
+          "token_outpoint_vector_bytes": 2304,
+          "holder_witness_copies": 64,
+          "vector_payload_in_holders_bytes": 147456,
+          "vector_payload_after_first_holder_copy_bytes": 145152
+        }
+      },
+      "payment-2": {
+        "txid": "60a2e96f5208e7abea0defb28ba98c944b5eb7576587dcfb5259d74f12dd2444",
+        "total_with_dedicated_funding": 270991,
+        "payment": {
+          "version_locktime_counts": 10,
+          "outpoints_sequences": 2640,
+          "input_script_lengths": 196,
+          "output_satoshis_and_script_lengths": 704,
+          "verifier_scriptSig": 11155,
+          "companion_scriptSig": 72,
+          "holders_64_scriptSig": 174016,
+          "token_output_locks": 58752
+        },
+        "scriptSigs": {
+          "verifier": {
+            "membership_sibling_push": 64,
+            "membership_sibling": 2048,
+            "packed_records_push": 3,
+            "membership_indices": 64,
+            "source_state": 3200,
+            "packed_successor_states_push": 3,
+            "packed_successor_states": 3200,
+            "ordered_prevouts_push": 3,
+            "ordered_prevouts": 2376,
+            "preimage_push": 2,
+            "before_scriptCode": 104,
+            "scriptCode_length": 1,
+            "scriptCode_compact_suffix": 35,
+            "after_scriptCode": 52
+          },
+          "companion": {
+            "signature_push": 1,
+            "signature_der": 70,
+            "sighash_byte": 1
+          },
+          "holders_64": {
+            "signature_push": 64,
+            "signature_der": 4480,
+            "sighash_byte": 64,
+            "ticket_wallet_pubkey_push": 64,
+            "ticket_wallet_pubkey": 2112,
+            "ticket_verifier_outpoint_push": 64,
+            "ticket_verifier_outpoint": 2304,
+            "ticket_satoshis_number": 192,
+            "ticket_issuer_der_push": 64,
+            "ticket_issuer_der": 4480,
+            "ticket_coupon_slot_number": 64,
+            "token_prevouts_push": 192,
+            "token_prevouts": 147456,
+            "preimage_push": 128,
+            "before_scriptCode": 6656,
+            "scriptCode_length": 64,
+            "scriptCode_compact_suffix": 2240,
+            "after_scriptCode": 3328
+          }
+        },
+        "representative_holder": {
+          "signature_push": 1,
+          "signature_der": 70,
+          "sighash_byte": 1,
+          "ticket_wallet_pubkey_push": 1,
+          "ticket_wallet_pubkey": 33,
+          "ticket_verifier_outpoint_push": 1,
+          "ticket_verifier_outpoint": 36,
+          "ticket_satoshis_number": 3,
+          "ticket_issuer_der_push": 1,
+          "ticket_issuer_der": 70,
+          "ticket_coupon_slot_number": 1,
+          "token_prevouts_push": 3,
+          "token_prevouts": 2304,
+          "preimage_push": 2,
+          "before_scriptCode": 104,
+          "scriptCode_length": 1,
+          "scriptCode_compact_suffix": 35,
+          "after_scriptCode": 52
+        },
+        "actual_token_locks_64": {
+          "tag_and_scope_push": 3904,
+          "state_push": 64,
+          "state": 3200,
+          "holder_and_verifier_guard": 51584
+        },
+        "verifier_funding": {
+          "version_locktime_counts": 10,
+          "outpoints_sequences": 40,
+          "input_script_lengths": 1,
+          "output_satoshis_and_script_lengths": 11,
+          "verifier_native_lock": 23179
+        },
+        "companion_funding": {
+          "version_locktime_counts": 10,
+          "outpoints_sequences": 40,
+          "input_script_lengths": 1,
+          "output_satoshis_and_script_lengths": 9,
+          "signature_push": 1,
+          "signature_der": 70,
+          "sighash_byte": 1,
+          "companion_native_lock": 73
+        },
+        "history": {
+          "known_token_creation_and_ancestor_txs": 132,
+          "literal_token_history_bytes_in_scriptSigs": 0
+        },
+        "ticket_binding": {
+          "issuer_coupon_wire": "c14ad354e9af991934c485a33098589d39c40dd9adbe3c7874aaeeed4818fb1f81000000",
+          "signed_verifier_outpoint_wire": "8c1dd48d0fed81841915b7f8729331879b974a3dbd5f22ac27999a79302d70ce00000000",
+          "ticket_outpoint_wire": "549069dacb874a21115f5d575d383350513ce8a8113250eed3e846b51c45079300000000",
+          "ticket_pubkey": "0237bb22d3f7afe8668e9b28561332d9e3734a8139bfe139d2c094741456403609"
+        },
+        "source_topology": {
+          "payer_pubkey": "029b6518ea99ff1b4222a93f2662e05551d60969ecebe378c1477b5c36427e0641",
+          "distinct_recipient_keys": 64,
+          "self_payment_outputs": 0,
+          "verified_holder_signatures": 64,
+          "distinct_token_parent_txids": 64,
+          "inputs_from_unspent_initial_origins": 63,
+          "vouts_from_preceding_payment": [
+            31
+          ],
+          "token_outpoint_vector_sha256": "9908e4d0f2f9db55fa99cebd043c274f59afc6d9a8d7df057ecfa06ee804644e",
+          "token_outpoint_vector_bytes": 2304,
+          "holder_witness_copies": 64,
+          "vector_payload_in_holders_bytes": 147456,
+          "vector_payload_after_first_holder_copy_bytes": 145152
+        }
+      }
+    },
+    "previous_to_next": {
+      "payment": {},
+      "scriptSigs": {
+        "verifier": {},
+        "companion": {},
+        "holders_64": {}
+      },
+      "verifier_funding": {},
+      "companion_funding": {},
+      "total_with_dedicated_funding": 0
+    }
   }
 }
