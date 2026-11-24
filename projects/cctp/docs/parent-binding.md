@@ -47,3 +47,5 @@ SHA-256 前缀检查点可以减少需要披露的字节。证明必须从初始
 ## Chronicle 独立节点边界记录
 
 BSV Node 1.2.3 在激活高度 105 的隔离 regtest 运行 60 组原始交易。50 组通过 RPC 准入和原始候选区块验证，10 组在两层均被拒绝。用例覆盖旧与新 UTXO、激活当块创建后花费、交易版本 1 和 2、同笔混用 `0x41/0x61` 和 `0x43/0x63`，以及多个 `OP_CODESEPARATOR` 和错选分隔符。此边界矩阵使用独立的 PUSHTX 夹具锁。完整 CCTP 共享锁用 `run_certified_lifecycle.py --chronicle-all` 在启用 Chronicle 的隔离节点跑原生证明和双链生命周期。[节点验收摘要](../fixtures/chronicle-activation-regtest-summary.json) · [复现脚本](../recursion/run_chronicle_regtest.py)
+
+该 CCTP 共享锁已完成独立 BSV regtest 与 Anvil 双链闭环。实际验证器签名类型为 3 笔 `0x41`、7 笔 `0x61`，两个签名类型共用原连续性密钥。两笔释放后，源链实际储备和 BSV 流通均为 384 个最小单位。撤销已释放对应的 BSV 销毁块后，账本重开仍保持挂起。此记录覆盖激活后的完整锁，激活边界仍由上面的专用夹具提供，公开测试网需要单独验收。[实测双链闭环](../fixtures/v3-dual-all-cross-chain-regtest-summary.json)

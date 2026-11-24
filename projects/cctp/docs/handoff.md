@@ -95,3 +95,4 @@ PYTHONPATH=.:projects/groth16/reference ../cctp-test-tools/venv/bin/python -m un
 
 - [2→2 守恒小样](../recursion/conservation/README.md) 使用一份普通 BLS12-381 Groth16，分别消费两笔独立测试父交易以及付款的两个共父后继。两笔均在独立 regtest 入块。同一验证器锁、协同锁和声明框架用于两步。共享验证器从实际父交易核对两个受认可的锁，代币输入各核对持有人、对应实际槽位和同一回执。
 - [大小记录](../fixtures/conservation-2x2-regtest-summary.json) 区分 1,078 字节证明见证、验证器资金原文和直接父交易原文。第二笔付款沿用同一证明尺寸，直接父原文增加到 482,360 字节。3,744 字节的中间态披露仅用于链下复算这笔父交易 txid。
+- [双预像完整锁的双链记录](../fixtures/v3-dual-all-cross-chain-regtest-summary.json) 另行完成。独立 BSV 节点确认十笔共享验证器交易，Anvil 完成两笔释放，最终储备与 BSV 流通各 384。钱包验收及释放后重组挂起通过。
