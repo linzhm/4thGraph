@@ -53,20 +53,32 @@ def public_input_check(ic):
 
 def require_public_input_point(field, ic, high, low, claimed_x, claimed_y):
     ic0, high_base, low_base = ic
-    for point in ic:
+    return require_affine_msm(
+        field, ic0, ((high, high_base, LIMB_BITS), (low, low_base, LIMB_BITS)), claimed_x, claimed_y,
+    )
+
+
+def require_affine_msm(field, constant, terms, claimed_x, claimed_y, *, checked_offset=None):
+    """Check a bounded fixed-base sum with an optional already authenticated G1 offset."""
+    for point in (constant, *(base for _, base, _ in terms)):
         if point is not None:
             check_point_host(point)
-    field.require(field.less_than(high, 2**LIMB_BITS))
-    field.require(field.less_than(low, 2**LIMB_BITS))
+    for scalar, _, width in terms:
+        field.require(field.less_than(scalar, 2**width))
     curve = Curve(field)
     jacobian = Jacobian(curve)
     host = Curve(Host())
-    accumulator = INFINITY if ic0 is None else jacobian.lift(ic0)
-    for scalar, base in ((high, high_base), (low, low_base)):
+    if checked_offset is None:
+        accumulator = INFINITY if constant is None else jacobian.lift(constant)
+    else:
+        accumulator = jacobian.lift(checked_offset)
+        if constant is not None:
+            accumulator = _add_fixed(curve, jacobian, accumulator, constant)
+    for scalar, base, width in terms:
         if base is None:
             continue
-        for bit_index in range(LIMB_BITS):
-            if bit_index == LIMB_BITS - 1:
+        for bit_index in range(width):
+            if bit_index == width - 1:
                 bit = scalar
             else:
                 quotient = field.divide(scalar, 2)
@@ -74,7 +86,7 @@ def require_public_input_point(field, ic, high, low, claimed_x, claimed_y):
                 scalar = quotient
             added = _add_fixed(curve, jacobian, accumulator, base)
             accumulator = _choose(field, bit, added, accumulator)
-            if bit_index < LIMB_BITS - 1:
+            if bit_index < width - 1:
                 base = host.add_host(base, base)
 
     x, y, z = accumulator

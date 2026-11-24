@@ -1,0 +1,166 @@
+{
+  "scope": "Local EVM and BSV regtest lifecycle with mock USDC and test proof parameters. BSV token ancestry is checked by the release host against confirmed transactions.",
+  "transactions": {
+    "mint-genesis": {
+      "txid": "0c551ae0fde151d728bdefb2b329b1dcc52c224441f8297362467a6aa924a522",
+      "blockhash": "29fc3ae47f03af2a0747d020c0622b2dfe74933d6e98254376596934d5a201eb",
+      "bytes": 42047
+    },
+    "mint-1024": {
+      "txid": "979c0c866c2601946c3e0941f7abccb3932441e97fd74bf1aebf394abd74c26a",
+      "blockhash": "273c0fb5377a4b2daa95ac32394a1ad3ea1d2795fa9b7b612cb797c741f7bd52",
+      "bytes": 94688
+    },
+    "split": {
+      "txid": "9e88b34a7e85954b3f5998e008dac5d38908a86d63644f669df769c9cf5de015",
+      "blockhash": "0f81b5e9df24a5a6c9387c9452332ddd2dbf61f9aebfde0cb274b4b7c5a056ee",
+      "bytes": 561302
+    },
+    "freeze": {
+      "txid": "3295be885455764b03b482f123f4388b9559c0508eedb76e5f67b8b2cd684624",
+      "blockhash": "4d56246bbdd649b85ea50e1138907f07d4dfb035df6b5db32b7baf729196fffc",
+      "bytes": 3727
+    },
+    "unfreeze": {
+      "txid": "2ece619bcfc4beb7cbde623e14010a9524212442be1a2fe6b40235cd7999bca9",
+      "blockhash": "7c720b123ff7a07e5662518500e695c707a8e40ff17114627fe455bcaa7da90d",
+      "bytes": 3726
+    },
+    "distinct-mimo": {
+      "txid": "5bf1cad7a1c1472bdfb47a343f13cd1af45057c2c68ac1f4ddaa28bc459e59b9",
+      "blockhash": "2dc02c93b9bfc7b4fbe90b2ea53254fc564fe5426721a6b5f9b1aaaa5bd0b7a9",
+      "bytes": 1494698
+    },
+    "merge": {
+      "txid": "726bb85176c2f31903515fadfc65ba86c0e44307a56de43ec60f1359b4eb09e7",
+      "blockhash": "6cc7ccebb834a5287c357a83f2d5fff6818c249d710defd615e44d2b9931a88a",
+      "bytes": 3912369
+    },
+    "partial-burn": {
+      "txid": "b0ead5234e1061d6e784f02369b5aabbe8ba8a977c45077639c8d62bd24be3b4",
+      "blockhash": "03661c162aaf8227e44459dc24c2d73300722f6acf704d820ed53dfb62bf6bbd",
+      "bytes": 4374324
+    },
+    "mint-128": {
+      "txid": "594e11556a18ad90786c03c1d5613b200dcbdff53365a720d91090f8f98c28b8",
+      "blockhash": "090d6d052d7f8a13b905c92be59560e5226220ad195072f217beb6500a87e5ff",
+      "bytes": 94688
+    },
+    "full-burn": {
+      "txid": "58b3a52bd7bdaf42ccc2befa2fa259bc63e3eedc3422962c5457501d29249548",
+      "blockhash": "3173296ce9707eac79d75eb2c330964c9d0a768326b39e3e0fd310bcdbf4f63a",
+      "bytes": 551596
+    }
+  },
+  "node": "/Bitcoin SV:1.2.3/",
+  "source_chain": {
+    "chain_id": 31337,
+    "vault": "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512",
+    "mock_usdc": "0x5FbDB2315678afecb367f032d93F642f64180aa3"
+  },
+  "evm_deposits": {
+    "1024": {
+      "txid": "0xd7a832d88ea7ff43f92f5883aea8a41f3fde6789b75710b25facfde2ed6953cf",
+      "blockhash": "0x87fa3d176e2d93c597eb4af2bb7c9f87d18e96dfaa5c9f7156b811eb6340ff76",
+      "event_id": "c8ff72bc8af584279f588dfa39a0d86f3d9d355619121de88c10658f887aee7f",
+      "receipt_log_ordinal": 1,
+      "quantity": 1024
+    },
+    "128": {
+      "txid": "0x88c080ee32cf9c9129f7c34a419ba7c79210871759806eb5dd1f2b0d440133d5",
+      "blockhash": "0x8a9f273ec761454374c02210814bc801094767447e7ac904fe3e2aad3d0fba47",
+      "event_id": "9b58c053806c4c71f65041d48835254328451363ea9f2f2bca7df0051fd2e627",
+      "receipt_log_ordinal": 1,
+      "quantity": 128
+    }
+  },
+  "evm_releases": {
+    "640": {
+      "txid": "0x0635f1091ac954166450128594315a82dc5de0ba50db5382924a6cd0ddb50cf3",
+      "blockhash": "0x9946456ace726777c3f227c6d4291341e072b7772147bea9a658503f340b3c8b",
+      "burn_txid": "b0ead5234e1061d6e784f02369b5aabbe8ba8a977c45077639c8d62bd24be3b4",
+      "burn_vout": 1,
+      "burn_blockhash": "03661c162aaf8227e44459dc24c2d73300722f6acf704d820ed53dfb62bf6bbd",
+      "burn_event_id": "f20333bdfa523ea2cbdaa8ab5e988401132de9ab773811c4f69dbf682d2f723d",
+      "attestation_digest": "69b85ff7eb5b6d2ff1ceec4a7d50ee6fb934d286521e3bbde438905de6a9c102",
+      "confirmation_depth_policy": 2,
+      "quantity": 640,
+      "actual_recipient_credit": 640,
+      "finalized": true,
+      "recovered_without_resigning": true
+    },
+    "128": {
+      "txid": "0x07ba51b34d967323943eed41fa6f6ae3e6724e07b1b930695dc38110f642bc12",
+      "blockhash": "0x43313f7cb6a63280f98812c476b40fe76d0ca8f21a0e900914778c890db69224",
+      "burn_txid": "58b3a52bd7bdaf42ccc2befa2fa259bc63e3eedc3422962c5457501d29249548",
+      "burn_vout": 0,
+      "burn_blockhash": "3173296ce9707eac79d75eb2c330964c9d0a768326b39e3e0fd310bcdbf4f63a",
+      "burn_event_id": "24ca038c8d1a9e6e619b2dbecc2a5ca8dc20a7f949494365d983d5cc582d8879",
+      "attestation_digest": "27c5ffa2ff11794d04a1a89d471f616ccd39f29bf69a65deaedb0d7a292c57ea",
+      "confirmation_depth_policy": 2,
+      "quantity": 128,
+      "actual_recipient_credit": 128,
+      "finalized": true,
+      "recovered_without_resigning": true
+    }
+  },
+  "wrong_parent_rejection": "sendrawtransaction: {'code': -26, 'message': '16: mandatory-script-verify-flag-failed (Script failed an OP_EQUALVERIFY operation)'}",
+  "partial-burn-wrong-recipient": "sendrawtransaction: {'code': -26, 'message': '16: mandatory-script-verify-flag-failed (Script evaluated without error but finished with a false/empty top stack element)'}",
+  "wallet_change": {
+    "txid": "b0ead5234e1061d6e784f02369b5aabbe8ba8a977c45077639c8d62bd24be3b4",
+    "vout": 0,
+    "outpoint_wire": "b4e34bd22bd6c8397607457c978abae8bbaab56923f084e7d661104e23d5eab000000000",
+    "quantity": 384,
+    "confirmations": 2,
+    "known_spend_status": "unspent",
+    "frozen": false,
+    "blockhash": "03661c162aaf8227e44459dc24c2d73300722f6acf704d820ed53dfb62bf6bbd",
+    "block_header": "000000208aa831992b4de415d6ef0d719d248c81f6ffd5f2837a357c28a534b8ebccc76c509f41afba2a64785153600968936091438c4e095ff94c572be6e4eb8b786ae98954056bffff7f2000000000",
+    "block_height": 676,
+    "block_leaf_count": 2,
+    "merkle_index": 1,
+    "merkle_siblings_wire": [
+      "d6d514b478f34dc4d249e275a21140c92361691434fa0e4894168cb0a343ac5c"
+    ]
+  },
+  "wallet_spent": {
+    "txid": "9e88b34a7e85954b3f5998e008dac5d38908a86d63644f669df769c9cf5de015",
+    "vout": 1,
+    "outpoint_wire": "15e05dcfc969f79d664f64636da80889d3c5da08e098593f4b95857e4ab3889e01000000",
+    "quantity": 384,
+    "confirmations": 7,
+    "known_spend_status": "spent",
+    "frozen": false,
+    "blockhash": "0f81b5e9df24a5a6c9387c9452332ddd2dbf61f9aebfde0cb274b4b7c5a056ee",
+    "block_header": "0000002052bdf741c797b72c617b9bfa95271dead31a4a3932ac95aa2d4b7a37b50f3c273e5c64a2825098533ad6c900bc6a28a127c1ae450111ba511521a33b38f7de387b54056bffff7f2002000000",
+    "block_height": 671,
+    "block_leaf_count": 2,
+    "merkle_index": 1,
+    "merkle_siblings_wire": [
+      "023b65d4a7f787b3bbddb2f4445456da0b0107d61afc5ebf6d42ac0f2f29ffb5"
+    ]
+  },
+  "main_path_accounting": {
+    "deposited": 1024,
+    "minted": 1024,
+    "burned": 640,
+    "released": 640,
+    "net_reserve": 384,
+    "actual_vault_balance": 384,
+    "bsv_circulating": 384,
+    "pending_mint": 0,
+    "pending_release": 0
+  },
+  "full-burn-wrong-recipient": "sendrawtransaction: {'code': -26, 'message': '16: mandatory-script-verify-flag-failed (Script evaluated without error but finished with a false/empty top stack element)'}",
+  "final_accounting": {
+    "deposited": 1152,
+    "minted": 1152,
+    "burned": 768,
+    "released": 768,
+    "net_reserve": 384,
+    "actual_vault_balance": 384,
+    "bsv_circulating": 384,
+    "pending_mint": 0,
+    "pending_release": 0
+  }
+}

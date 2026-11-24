@@ -52,20 +52,23 @@ class TransferStatement:
         return int.from_bytes(digest[:16], "big"), int.from_bytes(digest[16:], "big")
 
 
-def _forkid_all_digest() -> bytes:
+def _forkid_digest(sighash: int = 0x41) -> bytes:
     return (
         asm("OP_DUP OP_SIZE OP_4 OP_SUB OP_SPLIT OP_NIP")
-        + push(b"\x41\x00\x00\x00") + asm("OP_EQUALVERIFY OP_HASH256")
+        + push(sighash.to_bytes(4, "little")) + asm("OP_EQUALVERIFY OP_HASH256")
     )
 
 
-def _bind_digest_signature() -> bytes:
-    return binding_der() + push(b"\x41") + asm("OP_CAT")
+def _bind_digest_signature(sighash: int = 0x41) -> bytes:
+    return binding_der() + push(bytes([sighash])) + asm("OP_CAT")
 
 
-def _authenticate_forkid_all() -> bytes:
+def authenticate_forkid_preimage(sighash: int = 0x41) -> bytes:
+    """Check a witnessed ForkID preimage against this input and leave its digest."""
+    if sighash not in (0x41, 0x43):
+        raise ValueError("expected ForkID ALL or SINGLE")
     return (
-        _forkid_all_digest() + asm("OP_DUP") + _bind_digest_signature()
+        _forkid_digest(sighash) + asm("OP_DUP") + _bind_digest_signature(sighash)
         + push(PUBLIC) + asm("OP_CHECKSIGVERIFY")
     )
 
@@ -86,7 +89,7 @@ def compact_preimage_digest_script() -> bytes:
     """Hash a compact ForkID ALL preimage and save a copy for CHECKSIG."""
     return (
         asm("OP_SIZE") + number(157 + len(COMPACT_SCRIPTCODE)) + asm("OP_NUMEQUALVERIFY")
-        + _forkid_all_digest() + asm("OP_DUP OP_TOALTSTACK")
+        + _forkid_digest() + asm("OP_DUP OP_TOALTSTACK")
     )
 
 
@@ -98,7 +101,7 @@ def statement_script(issuance_outpoint: bytes, *, compact_preimage=False) -> byt
         prefix = compact_preimage_digest_script()
         domain = COMPACT_DOMAIN
     else:
-        prefix = _authenticate_forkid_all()
+        prefix = authenticate_forkid_preimage()
         domain = DOMAIN
     return (
         prefix + push(domain + issuance_outpoint)
@@ -106,19 +109,18 @@ def statement_script(issuance_outpoint: bytes, *, compact_preimage=False) -> byt
     )
 
 
-def verifier_input_guard(verifier_lock: bytes, *, input_index: int = 0) -> bytes:
-    """Consume verifier parent bytes, serialized prevouts and a ForkID ALL preimage.
+def verifier_input_script_hash(*, input_index: int = 0) -> bytes:
+    """Consume parent bytes, serialized prevouts and preimage; leave the verifier hash.
 
     The selected output is vout zero and its parent has one input with a one-byte
     script length and one output. The guard commits to the full serialized
-    script field with SHA-256. This fragment leaves the owner's checks to
-    the enclosing token covenant.
+    script field with SHA-256.
     """
     if type(input_index) is not int or not 0 <= input_index <= 1:
         raise ValueError("expected verifier at input zero or shared guard at input one")
     skip = number(input_index * 36) + asm("OP_SPLIT OP_NIP") if input_index else b""
     return (
-        asm("OP_DUP OP_TOALTSTACK") + _authenticate_forkid_all()
+        asm("OP_DUP OP_TOALTSTACK") + authenticate_forkid_preimage()
         + asm("OP_DROP OP_FROMALTSTACK OP_4 OP_SPLIT OP_NIP 32 OP_SPLIT OP_DROP "
               "OP_OVER OP_HASH256 OP_EQUALVERIFY")
         + skip + asm("36 OP_SPLIT OP_DROP OP_OVER OP_HASH256")
@@ -131,9 +133,17 @@ def verifier_input_guard(verifier_lock: bytes, *, input_index: int = 0) -> bytes
                               "OP_1 OP_SPLIT OP_SWAP")
         + push(b"\x01") + asm("OP_EQUALVERIFY 8 OP_SPLIT OP_NIP "
                               "OP_SIZE OP_4 OP_SUB OP_SPLIT OP_DROP")
-        + asm("OP_SHA256") + push(sha256(blob(verifier_lock)).digest()) + asm("OP_EQUALVERIFY")
+        + asm("OP_SHA256")
     )
 
+
+
+def verifier_input_guard(verifier_lock: bytes, *, input_index: int = 0) -> bytes:
+    """Require the full serialized locking script of the designated input."""
+    return (
+        verifier_input_script_hash(input_index=input_index)
+        + push(sha256(blob(verifier_lock)).digest()) + asm("OP_EQUALVERIFY")
+    )
 
 
 def shared_guard_lock(verifier_lock: bytes) -> bytes:

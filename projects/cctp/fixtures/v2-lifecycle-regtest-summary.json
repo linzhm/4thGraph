@@ -1,0 +1,59 @@
+{
+  "scope": "Anchored BSV mint and v2 transaction relations using a test deposit attestation",
+  "transactions": {
+    "mint-genesis": {
+      "txid": "f1ec7ecaaf9498c60c41a490cc55a252e8c71f7b15e623b0bc8f63ed4691a790",
+      "blockhash": "04c7ce808119e44d69bc86559269afc0c96a4b62a4421fdc514520c58c2c5e65",
+      "bytes": 42047
+    },
+    "mint-1024": {
+      "txid": "26e1cfb788ba676524ce7baede37d411ed7c52eabc3ec67f9d62fc1e92539408",
+      "blockhash": "4ac2b5e385c585d092901d5d235d05333f8a581ac9ce99da7a09d29390be7a4f",
+      "bytes": 94689
+    },
+    "split": {
+      "txid": "7a9201d1d5ed8f76b507606e9d258b391e458297f53d6d81e1bfdaf0c05269bb",
+      "blockhash": "4054354ea8e456d2a77c02bda148ff5ea511e82639f138f9964aa1e84b16cf0f",
+      "bytes": 561302
+    },
+    "freeze": {
+      "txid": "55688eba467ca14638d73ebdab1ca3bf2d8698ffc1b772aeca4f3cad44edea90",
+      "blockhash": "47a9e13d4f8986d254568133d2ede4d53694ea71371b4fe254ba56cadb892a3d",
+      "bytes": 3726
+    },
+    "unfreeze": {
+      "txid": "cb0606d2c6f7122bc2bb9ad06d77165483593f9422f3eecff88f68c4199f2431",
+      "blockhash": "3d98308cadb014108219ebc62994a39e38c88526efbd45d3c9a424b520ca954f",
+      "bytes": 3726
+    },
+    "distinct-mimo": {
+      "txid": "019971c5ec6bd4566a8e43ff923e0f68dc0556a9992bfbb9689b1e9ed10ee2f9",
+      "blockhash": "424a0adeeb2e28e49abf35d66c7a6e85b47dbc9558d377e6426121277ef1569c",
+      "bytes": 1494697
+    },
+    "merge": {
+      "txid": "a735fe33a4be5862e3e79f11822850a967179a9670be1f414aee51f683a4562b",
+      "blockhash": "3dcf441d53d4d8dea5fe2cfdaac6583b609974bbd9f9f4a6224a2cc4bb76f008",
+      "bytes": 3912367
+    },
+    "partial-burn": {
+      "txid": "b96f6ff03b99c0d0c16b124f6c6b440cc62eec624fee37b8b8643209c5e4b009",
+      "blockhash": "376e3052366b41e409c3b2a7aae24eaad20f3ac58ee0c608353c9a64894ccaed",
+      "bytes": 4374321
+    },
+    "mint-128": {
+      "txid": "f3c68bd717f336ed1ed0600cd926320597659769e17cba2ff63897fae9e59259",
+      "blockhash": "02bdae12a141494b18daef5e1298d720fc3d65525a38a3f0d0db251ac33044c9",
+      "bytes": 94688
+    },
+    "full-burn": {
+      "txid": "bc4ec0c9c9988a5b5f8cfe45c0f076f37af3677782e80028929dadce1a52c7e9",
+      "blockhash": "487e7c06d36bc74913974dcddfc3f67a142fb45782f51462e3789fbd7f073aa2",
+      "bytes": 551596
+    }
+  },
+  "node": "/Bitcoin SV:1.2.3/",
+  "wrong_parent_rejection": "sendrawtransaction: {'code': -26, 'message': '16: mandatory-script-verify-flag-failed (Script failed an OP_EQUALVERIFY operation)'}",
+  "partial-burn-wrong-recipient": "sendrawtransaction: {'code': -26, 'message': '16: mandatory-script-verify-flag-failed (Script evaluated without error but finished with a false/empty top stack element)'}",
+  "full-burn-wrong-recipient": "sendrawtransaction: {'code': -26, 'message': '16: mandatory-script-verify-flag-failed (Script evaluated without error but finished with a false/empty top stack element)'}"
+}

@@ -271,11 +271,19 @@ def check_g2(curve, original, seed_multiple, *, projective=False):
 @lru_cache(maxsize=32)
 def locking_script(
     key, public_inputs, *, fused=True, join_lines=True, projective_g1=False, projective_g2=False,
-    reuse_constants=False,
+    reuse_constants=False, input_relation=None,
 ):
-    """Return script bytes, named offsets and a generated stack-depth estimate."""
+    """Return script bytes, named offsets and a generated stack-depth estimate.
+
+    ``input_relation`` can extend dynamic verification. It checks the claimed
+    verification-key point and returns whether it is finite. Its witness fields
+    come after A/B/C and the residue, before the main proof's slope hints.
+    """
     dynamic = public_inputs is None
-    delta_lines, constant = prepare_key(key, (0, 0) if dynamic else public_inputs)
+    if input_relation is not None and not dynamic:
+        raise ValueError("a custom input relation requires dynamic public inputs")
+    values = (0,) * (len(key.ic) - 1) if dynamic and input_relation is not None else (0, 0)
+    delta_lines, constant = prepare_key(key, values if dynamic else public_inputs)
     program = Program()
     tower = Tower(program)
     g1, g2 = Curve(program), Curve(program, twist=True)
@@ -290,7 +298,8 @@ def locking_script(
         from public_inputs import require_public_input_point
 
         program.mark("public_inputs")
-        finite = require_public_input_point(program, key.ic, high, low, claimed_x, claimed_y)
+        relation = require_public_input_point if input_relation is None else input_relation
+        finite = relation(program, key.ic, high, low, claimed_x, claimed_y)
         gamma_term = (prepared_lines(key.gamma), g1.negate((claimed_x, claimed_y)), finite)
         host = Host()
         constant = fixed_miller(

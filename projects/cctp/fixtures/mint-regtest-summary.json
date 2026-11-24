@@ -1,0 +1,21 @@
+{
+  "node": "/Bitcoin SV:1.2.3/",
+  "genesis_txid": "0c48893040d304705f1d14e699b8c01617963774dd99879d366bd4de6ffe8c3d",
+  "first": {
+    "txid": "91d4c9628a2c70f136cdaff8737920b85de5e52be6924b85921e5ac7daf43b82",
+    "block": "680a497cbbbceccd0b16ae64e8f2d81c875b62e004df11fae8c5048054e1f12d",
+    "quantity": 1024
+  },
+  "second": {
+    "txid": "ba5bd429c9b03036ce267a00fa4aa96ffeddc67cebfeda2c68fab7350bd0b476",
+    "block": "7582b395a025e3ec2dba9edf37733e7e91244ba7951913497c6b625a9eb7e701",
+    "quantity": 384
+  },
+  "pause_txid": "ec161e00eebe4702316bc5fb0b5205797f69547104d4d9b7112ec1554b98b2e7",
+  "resume_txid": "0f3eee95336f4c8626d03cbc016a8f1b3ad597363d3abaf509f7f9bc2b634e00",
+  "mint_while_paused": "sendrawtransaction: {'code': -26, 'message': '16: mandatory-script-verify-flag-failed (Script failed an OP_VERIFY operation)'}",
+  "competing_mint": "sendrawtransaction: {'code': -26, 'message': '258: txn-mempool-conflict'}",
+  "resigned_replay": "sendrawtransaction: {'code': -26, 'message': '16: mandatory-script-verify-flag-failed (Script failed an OP_EQUALVERIFY operation)'}",
+  "first_mint_bytes": 93771,
+  "state_lock_bytes": 41948
+}

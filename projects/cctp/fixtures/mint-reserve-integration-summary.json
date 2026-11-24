@@ -1,0 +1,22 @@
+{
+  "source": {
+    "node": "Anvil",
+    "chain_id": 31337,
+    "reserve_contract": "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512",
+    "tx_hash": "0xd7a832d88ea7ff43f92f5883aea8a41f3fde6789b75710b25facfde2ed6953cf",
+    "block": "0x9b7fd3ca165c27e77fc487c8868ecad7625c17b7ff55810c56b43f252536c5c5",
+    "receipt_log_ordinal": 1,
+    "net_reserve": 1024
+  },
+  "bsv": {
+    "node": "/Bitcoin SV:1.2.3/",
+    "genesis_txid": "581dda802fff1bc6fae02bdf63d32ac5075116f3b2b13e0a18662409aead3ae3",
+    "mint_txid": "080694a7ad921a4f68103ede6d68510e25c55ca5005abe6c0b842ec9919d1e39",
+    "block": "18801bf14f1070ab6ab63c5dbf40633ee1e9fb96d17e2eb7a8aae3b560f54f77",
+    "vout": 1,
+    "minted_quantity": 1024
+  },
+  "deposit_event_id": "c8ff72bc8af584279f588dfa39a0d86f3d9d355619121de88c10658f887aee7f",
+  "bridge_asset_id": "9e35610ec6a85ea8af5ed3bf60be817a3e41388a0d906dc8054d32acdd9dd6ac",
+  "signer_calls_before_source_finality": 0
+}
