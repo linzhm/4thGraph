@@ -27,7 +27,7 @@ type fixedParentTestCircuit struct {
 }
 
 func (c *fixedParentTestCircuit) Define(api frontend.API) error {
-	output, err := BindFixedParentOutput(api, c.Raw, c.ActualOutpoint[:], testFixedParentLayout, []int{0, 2}, 2)
+	output, err := BindFixedParentOutput(api, c.Raw, c.ActualOutpoint[:], testFixedParentLayout, []int{0, 2})
 	if err != nil {
 		return err
 	}
@@ -37,7 +37,7 @@ func (c *fixedParentTestCircuit) Define(api frontend.API) error {
 	for i, value := range output.Script {
 		api.AssertIsEqual(value, c.Selected[9+i])
 	}
-	api.AssertIsEqual(output.Quantity, c.Quantity)
+	api.AssertIsEqual(parentUint64(api, output.Script[2:10]), c.Quantity)
 	api.AssertIsEqual(output.Satoshis, c.Satoshis)
 	var context []frontend.Variable
 	context = append(context, output.Parent.Version...)
@@ -187,4 +187,110 @@ func TestInvalidFixedParentLayouts(t *testing.T) {
 			t.Fatalf("accepted invalid fixed legacy parent layout %+v", layout)
 		}
 	}
+}
+
+const mintFixturePrefix = "\x17BSV/CCTP/mint-state/v2\x00\x20"
+const mintFixtureBody = "\x77\x51\x10" // Fixture covenant followed by a 16-byte counter push.
+const mintFixtureLockSize = len(mintFixturePrefix) + 32 + len(mintFixtureBody) + 16 + 1
+const mintFixtureParentSize = 4 + 1 + 41 + 1 + (8 + 1 + mintFixtureLockSize) + (8 + 1 + 1) + 4
+
+type mintStateOpeningCircuit struct {
+	Outpoint [36]frontend.Variable `gnark:",public"`
+	Root     [32]frontend.Variable `gnark:",public"`
+	Total    [16]frontend.Variable `gnark:",public"`
+	Raw      [mintFixtureParentSize]frontend.Variable
+}
+
+func (c *mintStateOpeningCircuit) Define(api frontend.API) error {
+	layout := FixedParentLayout{InputScriptLengths: []int{0}, OutputScriptLengths: []int{mintFixtureLockSize, 1}}
+	output, err := BindFixedParentOutput(api, c.Raw[:], c.Outpoint[:], layout, []int{0})
+	if err != nil {
+		return err
+	}
+	for i, value := range []byte(mintFixturePrefix) {
+		api.AssertIsEqual(output.Script[i], value)
+	}
+	for i, value := range c.Root {
+		api.AssertIsEqual(output.Script[len(mintFixturePrefix)+i], value)
+	}
+	for i, value := range []byte(mintFixtureBody) {
+		api.AssertIsEqual(output.Script[len(mintFixturePrefix)+len(c.Root)+i], value)
+	}
+	for i, value := range c.Total {
+		api.AssertIsEqual(output.Script[mintFixtureLockSize-1-len(c.Total)+i], value)
+	}
+	api.AssertIsEqual(output.Script[mintFixtureLockSize-1], 0x75)
+	api.AssertIsEqual(output.Satoshis, 1500)
+	return nil
+}
+
+func TestMintStateReusesTheActualParentOutputBinding(t *testing.T) {
+	root := bytes.Repeat([]byte{0xaf}, 32)
+	total := make([]byte, 16)
+	binary.LittleEndian.PutUint64(total, 1408)
+	total[15] = 0x80
+
+	raw := append([]byte{2, 0, 0, 0, 1}, bytes.Repeat([]byte{0x42}, 36)...)
+	raw = append(raw, 0, 0xff, 0xff, 0xff, 0xff, 2)
+	raw = binary.LittleEndian.AppendUint64(raw, 1500)
+	raw = append(raw, byte(mintFixtureLockSize))
+	raw = append(raw, mintFixturePrefix...)
+	raw = append(raw, root...)
+	raw = append(raw, mintFixtureBody...)
+	raw = append(raw, total...)
+	raw = append(raw, 0x75)
+	raw = binary.LittleEndian.AppendUint64(raw, 1000)
+	raw = append(raw, 1, 0x51)
+	raw = binary.LittleEndian.AppendUint32(raw, 0)
+	if len(raw) != mintFixtureParentSize {
+		t.Fatalf("unexpected fixture transaction length %d", len(raw))
+	}
+	var valid mintStateOpeningCircuit
+	for i, value := range raw {
+		valid.Raw[i] = value
+	}
+	for i := 32; i < len(valid.Outpoint); i++ {
+		valid.Outpoint[i] = 0
+	}
+	for i, value := range hash256(raw) {
+		valid.Outpoint[i] = value
+	}
+	for i, value := range root {
+		valid.Root[i] = value
+	}
+	for i, value := range total {
+		valid.Total[i] = value
+	}
+
+	field := ecc.BLS12_381.ScalarField()
+	ccs, err := frontend.Compile(field, r1cs.NewBuilder, &mintStateOpeningCircuit{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	solve := func(t *testing.T, assignment mintStateOpeningCircuit, accepted bool) {
+		t.Helper()
+		witness, err := frontend.NewWitness(&assignment, field)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := ccs.Solve(witness); (err == nil) != accepted {
+			t.Fatalf("unexpected solver result, wanted valid=%t: %v", accepted, err)
+		}
+	}
+	solve(t, valid, true)
+	t.Run("wrong-state-slot", func(t *testing.T) {
+		wrongSlot := valid
+		wrongSlot.Outpoint[32] = 1
+		solve(t, wrongSlot, false)
+	})
+	t.Run("substituted-event-root", func(t *testing.T) {
+		wrongRoot := valid
+		wrongRoot.Root[0] = 0x7f
+		solve(t, wrongRoot, false)
+	})
+	t.Run("truncated-cumulative-minting", func(t *testing.T) {
+		wrongTotal := valid
+		wrongTotal.Total[15] = 0
+		solve(t, wrongTotal, false)
+	})
 }

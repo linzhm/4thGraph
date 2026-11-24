@@ -1,0 +1,79 @@
+{
+  "scope": "Three consecutive native v2 mints with locally attested test deposits and fixed-width test DER",
+  "node": "/Bitcoin SV:1.2.3/",
+  "genesis_txid": "e6db289e8dbd2a41d9e7144768cfb4f75d30882dc6da4d4e4d25707be0b37ecb",
+  "mints": [
+    {
+      "txid": "06d7a800ebd8b7e8761b14495f615975c20d9eba63945cc1614fa8f010a7406a",
+      "blockhash": "1befbc81904fbfce3ff3405fae757b1a530812d72e4874f7ff6ec91d63bf4bdb",
+      "height": 331,
+      "spent_state": {
+        "txid": "e6db289e8dbd2a41d9e7144768cfb4f75d30882dc6da4d4e4d25707be0b37ecb",
+        "vout": 0
+      },
+      "bytes": 93865,
+      "script_sig_bytes": [
+        50686,
+        0
+      ],
+      "txout_bytes": [
+        42006,
+        860,
+        219
+      ],
+      "attestation_der_bytes": 70,
+      "event_path_bytes": 8192,
+      "event_root": "7afdf29ac6ae5d0b5e5f69fb853a372fcf8ddbe2f2a05ff815a3784658e16eac",
+      "net_quantity": 1017,
+      "cumulative_minted": 1017
+    },
+    {
+      "txid": "61dba346f7b936cfe4e30f0924bdf6afb257d858085a106641b619ea7e9847e3",
+      "blockhash": "0dadfd5a832fd87d093bf27d4ea78fed9f1b2a3cb4708d0f4bbcedf97959f835",
+      "height": 332,
+      "spent_state": {
+        "txid": "06d7a800ebd8b7e8761b14495f615975c20d9eba63945cc1614fa8f010a7406a",
+        "vout": 0
+      },
+      "bytes": 93865,
+      "script_sig_bytes": [
+        50686,
+        0
+      ],
+      "txout_bytes": [
+        42006,
+        860,
+        219
+      ],
+      "attestation_der_bytes": 70,
+      "event_path_bytes": 8192,
+      "event_root": "acca072ef9bb409d15412c7865003c8dbf24dfe194ad9bcb2f0a69fedab3fab9",
+      "net_quantity": 383,
+      "cumulative_minted": 1400
+    },
+    {
+      "txid": "8955db37b0a962ec327a84e9f6a7a56a42dcef43e638c0af8ab74281f4497403",
+      "blockhash": "7b2d2a4ed839ac561f3330b5bbe17f209497979098de3052614ffc2e9a249f32",
+      "height": 333,
+      "spent_state": {
+        "txid": "61dba346f7b936cfe4e30f0924bdf6afb257d858085a106641b619ea7e9847e3",
+        "vout": 0
+      },
+      "bytes": 93865,
+      "script_sig_bytes": [
+        50686,
+        0
+      ],
+      "txout_bytes": [
+        42006,
+        860,
+        219
+      ],
+      "attestation_der_bytes": 70,
+      "event_path_bytes": 8192,
+      "event_root": "503e335f4197ce744fcb2b82b4f1d97720a217345288493ada20ef04a1abab4a",
+      "net_quantity": 254,
+      "cumulative_minted": 1654
+    }
+  ]
+}

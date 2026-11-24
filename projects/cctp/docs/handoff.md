@@ -112,3 +112,4 @@ PYTHONPATH=.:projects/groth16/reference ../cctp-test-tools/venv/bin/python -m un
 
 - [当前联合证明目标](recursive-provenance.md) 是按实际 vin 逐槽认证 `txid:vout` 及前序 B2G。守恒只计已认证的代币输出，费用输入贡献零。已编译的固定布局构件核对父 SHA256d、规范边界与选定输出，并从同一原文提取前序上下文。组合约束对输入顺序、错 vout、重复 outpoint、替换数量和遗漏输出均有回归覆盖。
 - [计数状态连续性基线](../fixtures/v3-counted-continuity-regtest-summary.json) 在独立 BSV Node 1.2.3 高度 224–227 确认同锚两笔认证铸造、2→2 和后继 1→2。累计净量从 1,024 到 1,408。基线仍携带父原文。下一验收点是同一新版参数认证不同动作的父布局，并在节点确认两笔同形状转账。
+- 父输出绑定构件已共用给铸造状态和 Token，分别解析获授权的状态 `vout 0` 与代币 vout。三笔[原生 v2 铸造](../fixtures/v2-counted-mint-fixed-width-regtest-summary.json)连续入块，固定测试 DER 后各 93,865 字节。归档的 v3 认证铸造从 2,124,903 到 5,176,762 字节，状态 vin 同宽。验证器 vin 的差额由父状态原文替换增加 2,082,179 字节、前序资金增加 969,679 字节及证明编码增加 1 字节组成。新版联合证明需按[同形状验收](recursive-provenance.md#首轮验收)让铸造和转账的历史字节都归零。

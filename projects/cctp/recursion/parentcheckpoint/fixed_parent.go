@@ -18,13 +18,12 @@ type FixedParentLayout struct {
 }
 
 // BoundParentOutput is the selected actual output of the hashed parent. Bytes
-// in TxOut and Script are in wire order. Satoshis and Quantity are decoded LE.
+// in TxOut and Script are in wire order. The caller interprets its state.
 type BoundParentOutput struct {
 	Vout     frontend.Variable
 	TxOut    []frontend.Variable
 	Script   []frontend.Variable
 	Satoshis frontend.Variable
-	Quantity frontend.Variable
 	Parent   BoundParentContext
 }
 
@@ -68,11 +67,11 @@ func (layout FixedParentLayout) SerializedSize() (int, error) {
 // BindFixedParentOutput hashes the exact serialized parent provided to the
 // parser and checks its SHA256d against actualOutpoint's 32 wire-order txid
 // bytes. The next four little-endian bytes select one of eligibleVouts.
-// Eligible outputs have an equal serialized width and carry an eight-byte LE
-// quantity at quantityOffsetInScript. The caller supplies the outpoint from
-// authenticated child context and enforces the selected token lock policy.
+// Eligible outputs have an equal serialized width. The caller supplies the
+// outpoint from authenticated child context and checks the selected state or
+// token lock and the predecessor's authorization for that output position.
 func BindFixedParentOutput(api frontend.API, raw, actualOutpoint []frontend.Variable,
-	layout FixedParentLayout, eligibleVouts []int, quantityOffsetInScript int) (BoundParentOutput, error) {
+	layout FixedParentLayout, eligibleVouts []int) (BoundParentOutput, error) {
 	var selected BoundParentOutput
 	fields, err := layout.fields()
 	if err != nil {
@@ -81,8 +80,8 @@ func BindFixedParentOutput(api frontend.API, raw, actualOutpoint []frontend.Vari
 	if len(raw) != fields.width || len(actualOutpoint) != 36 {
 		return selected, fmt.Errorf("expected %d raw parent bytes and a 36-byte outpoint", fields.width)
 	}
-	if len(eligibleVouts) == 0 || quantityOffsetInScript < 0 {
-		return selected, fmt.Errorf("expected at least one eligible vout and a valid token quantity offset")
+	if len(eligibleVouts) == 0 {
+		return selected, fmt.Errorf("expected at least one eligible vout")
 	}
 	previous := -1
 	var selectedShape txOutField
@@ -95,10 +94,9 @@ func BindFixedParentOutput(api frontend.API, raw, actualOutpoint []frontend.Vari
 		if i == 0 {
 			selectedShape = field
 		}
-		if field.end-field.script < 8 || quantityOffsetInScript > field.end-field.script-8 ||
-			field.script-field.start != selectedShape.script-selectedShape.start ||
+		if field.script-field.start != selectedShape.script-selectedShape.start ||
 			field.end-field.start != selectedShape.end-selectedShape.start {
-			return selected, fmt.Errorf("eligible vouts must contain the quantity and share one TxOut shape")
+			return selected, fmt.Errorf("eligible vouts must share one TxOut shape")
 		}
 	}
 
@@ -141,7 +139,6 @@ func BindFixedParentOutput(api frontend.API, raw, actualOutpoint []frontend.Vari
 	}
 	selected.Script = selected.TxOut[selectedShape.script-selectedShape.start:]
 	selected.Satoshis = parentUint64(api, selected.TxOut[:8])
-	selected.Quantity = parentUint64(api, selected.Script[quantityOffsetInScript:quantityOffsetInScript+8])
 	selected.Parent = BoundParentContext{
 		Version:  raw[:4],
 		Outputs:  raw[fields.outputs[0].start : fields.width-4],

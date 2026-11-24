@@ -66,7 +66,7 @@ func (c *boundConservationFixture) Define(api frontend.API) error {
 	}
 	for i := range c.Parents {
 		output, err := parentcheckpoint.BindFixedParentOutput(api, c.Parents[i][:], c.Outpoints[i+1][:],
-			fixtureLayout, []int{0}, len(fixtureTokenPrefix)+freeze.QuantityOffset-8)
+			fixtureLayout, []int{0})
 		if err != nil {
 			return err
 		}

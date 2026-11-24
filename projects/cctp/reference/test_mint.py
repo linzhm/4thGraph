@@ -258,19 +258,87 @@ class MintTests(unittest.TestCase):
     def test_independent_node_enforces_cumulative_minting(self):
         self._independent_node_mints(state_version=2)
 
-    def _independent_node_mints(self, *, state_version):
+    @unittest.skipUnless(os.environ.get("CCTP_MINT_REGTEST_COOKIE"), "requires independent BSV regtest")
+    def test_independent_node_counted_mints_keep_the_same_shape(self):
+        node, address, funded, policy, genesis = self._regtest_state(state_version=2, funding_outputs=4)
+
+        def fixed_width_test_signer(digest):
+            # Control unrelated DER length variation in this wire-size comparison.
+            for attempt in range(256):
+                signature = ATTESTOR.sign_digest_deterministic(
+                    digest, hashfunc=sha256, sigencode=sigencode_der_canonize,
+                    extra_entropy=attempt.to_bytes(2, "little"),
+                )
+                if len(signature) == 70:
+                    return signature
+            raise AssertionError("could not produce a 70-byte test DER signature")
+
+        prior, events = genesis, MintEvents()
+        mints, records = [], []
+        expected_total = 0
+        for i, (gross, fee, owner) in enumerate(((1024, 7, OWNER), (384, 1, OTHER), (257, 3, OWNER)), 1):
+            deposit = replace(event(policy, i, gross, owner), fee_quantity=fee)
+            plan = prepare_mint(policy, prior, events, deposit, Input(funded.txid_wire(), i))
+            signed = authorize_mint(plan, lambda _: deposit, fixed_width_test_signer)
+            self.assertEqual(signed.inputs[0].outpoint(), Input(prior.txid_wire(), 0).outpoint())
+            self.assertEqual(signed.inputs[0].script[0], 71)
+            node.confirm(signed, address)
+            block_hash = node.call("getrawtransaction", signed.txid(), True)["blockhash"]
+            expected_total += deposit.net_quantity
+            state = policy.parse_state_lock(signed.outputs[0].script)
+            self.assertEqual(state.root, plan.successor.root)
+            self.assertEqual(state.cumulative_minted, expected_total)
+            self.assertEqual(read_token(signed.outputs[1].script, VERIFIER).quantity, deposit.net_quantity)
+            records.append({
+                "txid": signed.txid(),
+                "blockhash": block_hash,
+                "height": node.call("getblockheader", block_hash, True)["height"],
+                "spent_state": {"txid": prior.txid(), "vout": 0},
+                "bytes": len(signed.serialize()),
+                "script_sig_bytes": [len(txin.script) for txin in signed.inputs],
+                "txout_bytes": [len(txout.serialize()) for txout in signed.outputs],
+                "attestation_der_bytes": 70,
+                "event_path_bytes": sum(map(len, plan.path)),
+                "event_root": state.root.hex(),
+                "net_quantity": deposit.net_quantity,
+                "cumulative_minted": state.cumulative_minted,
+            })
+            mints.append(signed)
+            prior, events = signed, plan.successor
+
+        for field in ("bytes", "script_sig_bytes", "txout_bytes", "event_path_bytes"):
+            self.assertEqual([record[field] for record in records], [records[0][field]] * 3)
+        self.assertEqual(recover_mint_state(policy, genesis, tuple(mints)).cumulative_minted, expected_total)
+
+        if os.environ.get("CCTP_MINT_REPORT"):
+            import json
+
+            report = {
+                "scope": "Three consecutive native v2 mints with locally attested test deposits and fixed-width test DER",
+                "node": node.call("getnetworkinfo")["subversion"],
+                "genesis_txid": genesis.txid(),
+                "mints": records,
+            }
+            Path(os.environ["CCTP_MINT_REPORT"]).write_text(json.dumps(report, indent=2) + "\n")
+
+    def _regtest_state(self, *, state_version, funding_outputs):
         node = Node(os.environ.get("CCTP_MINT_REGTEST_URL", "http://127.0.0.1:19444"),
                     Path(os.environ["CCTP_MINT_REGTEST_COOKIE"]))
         owner_hash = new("ripemd160", sha256(public(OWNER)).digest()).digest()
         address = base58check(b"\x6f" + owner_hash)
         coinbase = node.fund(address)
-        funded = Transaction((Input(coinbase.txid_wire(), 0),), (Output(200_000, asm("OP_1")),) * 6)
+        funded = Transaction((Input(coinbase.txid_wire(), 0),), (Output(200_000, asm("OP_1")),) * funding_outputs)
         funded = sign_p2pkh(funded, coinbase, 0, OWNER)
         node.confirm(funded, address)
         anchor = Input(funded.txid_wire(), 0)
         policy = replace(setup_policy(anchor), pause_authority=public(OTHER), state_version=state_version)
         genesis = Transaction((anchor,), (Output(100_000, policy.state_lock(EMPTY_ROOT)),))
         node.confirm(genesis, address)
+        policy.check_genesis(genesis)
+        return node, address, funded, policy, genesis
+
+    def _independent_node_mints(self, *, state_version):
+        node, address, funded, policy, genesis = self._regtest_state(state_version=state_version, funding_outputs=6)
         first_event, second_event = event(policy, 1, 1024), event(policy, 2, 384, OTHER)
         if state_version == 2:
             first_event = replace(first_event, fee_quantity=7)
