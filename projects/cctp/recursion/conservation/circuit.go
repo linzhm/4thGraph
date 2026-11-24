@@ -1,6 +1,8 @@
 package conservation
 
 import (
+	"fmt"
+
 	"github.com/consensys/gnark/frontend"
 	"github.com/linzhm/BSV-Script-Lab/projects/cctp/recursion/freeze"
 )
@@ -21,8 +23,38 @@ func littleEndian(api frontend.API, values []frontend.Variable) frontend.Variabl
 	return result
 }
 
+// AssertDistinctOutpoints rejects repeated authenticated vin outpoints. Each
+// byte must be constrained by the caller's transaction context or its parser.
+func AssertDistinctOutpoints(api frontend.API, outpoints [][freeze.OutpointSize]frontend.Variable) {
+	const half = freeze.OutpointSize / 2
+	packed := make([][2]frontend.Variable, len(outpoints))
+	for i, outpoint := range outpoints {
+		packed[i] = [2]frontend.Variable{littleEndian(api, outpoint[:half]), littleEndian(api, outpoint[half:])}
+	}
+	for i, left := range packed {
+		for _, right := range packed[i+1:] {
+			sameLow := api.IsZero(api.Sub(left[0], right[0]))
+			sameHigh := api.IsZero(api.Sub(left[1], right[1]))
+			api.AssertIsEqual(api.Mul(sameLow, sameHigh), 0)
+		}
+	}
+}
+
 func (c *Circuit) Define(api frontend.API) error {
-	records := c.Payload[ContextSize:]
+	if err := Assert2x2(api, c.Payload[ContextSize:]); err != nil {
+		return err
+	}
+	freeze.AssertSHA256dStatement(api, Domain, c.Payload[:], c.Public)
+	return nil
+}
+
+// Assert2x2 enforces the regular transfer rules over two prior and two
+// successor state records in transaction order. The caller must constrain
+// each record byte and authenticate it against the corresponding actual TxOut.
+func Assert2x2(api frontend.API, records []frontend.Variable) error {
+	if len(records) != 4*freeze.StateSize {
+		return fmt.Errorf("expected four ordered CCTP state records")
+	}
 	reference := records[:freeze.StateSize]
 	var quantities, satoshis [4]frontend.Variable
 	for i := range quantities {
@@ -51,6 +83,5 @@ func (c *Circuit) Define(api frontend.API) error {
 	// This decomposition rules out overflow in the conserved total.
 	api.ToBinary(inputQuantity, 64)
 	api.AssertIsEqual(api.Add(satoshis[0], satoshis[1]), api.Add(satoshis[2], satoshis[3]))
-	freeze.AssertSHA256dStatement(api, Domain, c.Payload[:], c.Public)
 	return nil
 }

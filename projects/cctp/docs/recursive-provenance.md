@@ -12,6 +12,10 @@ CCTP 的代币依赖图允许拆分和合并。按照证明携带数据（PCD）
 
 当前连续性电路已经验证前序证明，父交易原文由 Script 用于确立前序证明对应的实际 `txid:vout`。首选目标是让新的递归电路把直接父认证和前序验证纳入同一份本笔证明。保留现有连续性密钥的过渡方案使用额外的独立父证明，先验证定长接口和成本。改变现有递归关系需要新电路、参数和策略版本。 [现有连续性关系](../recursion/continuity/circuit.go) · [父绑定构件](parent-binding.md)
 
+新的一份证明同时验证父绑定、守恒和 B2G。以本笔已认证的完整 vin 向量分配输入槽，每个实际输入恰好分类一次，拒绝重复的 outpoint。每个代币槽从同一份父交易取得前序声明和精确 `txid:vout` 的状态。前序声明必须认证同一发行锚、资产和策略，并明确授权这个 vout 为可转账代币。守恒直接取该 TxOut 的数量。经策略识别的普通 BSV 费用输入贡献零代币。脚本中的代币标识只用于解析，确认余额还需有效来源证明。 [2→2 守恒约束](../recursion/conservation/circuit.go)
+
+本笔证明也覆盖完整的有序 TxOut 向量，按动作规定的角色和精确锁区分代币、找零、回执等输出。全部获授权代币后继参与求和，后续证明从本笔已认证的上下文和规则恢复获授权的 vout。求和使用 uint64 代币最小单位，并独立核对聪数。当前 R1CS 测试组合了父交易 SHA256d、vout、完整输入与输出向量承诺及守恒。测试中的费用 outpoint 和锁后缀固定，正式电路仍需接入对父声明、发行锚、动作和策略的验证。 [父输出绑定](../recursion/parentcheckpoint/fixed_parent.go) · [组合约束测试](../recursion/conservation/bound_conservation_test.go)
+
 本笔证明的公开声明包含资产、发行锚、策略版本、获准的验证密钥身份、动作及本笔交易上下文承诺。上下文承诺固定序列化的实际输入 outpoint、序列、输出、版本和锁定时间。若回执只记录前序摘要，它可纳入完整输出承诺。若设计让本笔回执携带本笔证明的声明摘要，摘要范围须排除该回执，并由 Script 对完整已认证输出验证回执的确定性构造。当前证明生成后才填完 `scriptSig` 并计算本笔 txid。后继证明可使用已定稿的直接父 txid。 [BSV 签名预像](https://github.com/bitcoin-sv/bitcoin-sv/blob/v1.2.3/src/script/interpreter.cpp#L1725-L1786) · [BSV txid 计算](https://github.com/bitcoin-sv/bitcoin-sv/blob/v1.2.3/src/primitives/transaction.cpp#L61-L74)
 
 对本笔每个实际代币槽，递归关系从父原文重算 txid，解析真实 vout 和金额、锁及代币状态，再从同一父原文重建其前序声明。如果前序规则由 BSV Script 执行，还要认证父实际 verifier vin 花费了策略认可的资金输出，或以等价机制从策略认证该 outpoint。单独重验一份零前序递归证明无法认定铸造基例。策略身份必须绑定允许的验证密钥和状态模板，生成顺序须避免把随后才确定的锁哈希放回该锁的构造输入。 [铸造状态的 Script 基例](../recursion/issuance_base.py) · [现有密钥承诺](../recursion/keycommit)
@@ -40,4 +44,6 @@ Genesis   = (asset, policyVersion, EMPTY_ROOT, 0, false)
 
 同一测试发行锚确认两笔认证铸造，验证第二笔实际消费第一笔的状态。两个 minted vout 用于第一笔 `2→2`，其两个 Token 后继用于第二笔 `2→2`。每槽独立认证实际 vout，链上见证不引入共父分组。两笔普通转账须各自入块，取真实序列化及全部专用资金记录。固定形状历史增量为零，同时记录定长槽位、签名编码、证明次数、出证耗时和峰值内存。另测重复使用入金、伪造累计量、错误发行锚和策略、错父 vout、复制回执、替换实际验证器及现有冻结规则。
 
-现有 v3 已验证过串行认证铸造。原生 v2 计数锁也已在独立节点走完两笔铸造与中间的暂停和恢复，节点拒绝篡改累计量。SHA-256 字段叶已完成原生出证并拒绝把真实哈希状态和另一笔交易的输出字段拼接。完整父绑定和两笔定长转账的入块仍需实测。 [v3 节点记录](../fixtures/v3-continuity-regtest-summary.json) · [v2 计数节点记录](../fixtures/v2-counted-mint-regtest-summary.json) · [字段叶实测](../recursion/parentbinding/README.md#从分段打开固定位置的字段)
+共用验证密钥的首轮电路须同时识别铸造和转账的父布局。铸造状态链消费父 `vout 0`，铸造产生的代币位于 `vout 1`。转账按实际动作确定可花费的 Token 输出位置。若用定长父布局降低 SHA-256 出证成本，先验证实际序列化。签名、证明字段和任何填充必须进入最终交易字节。较短的父交易按其真实长度执行 SHA-256 填充。固定形状的链上大小比较还须固定或单列签名编码的变动。
+
+现有 v3 连续性密钥已配合 v2 计数状态在独立节点通过同锚的两笔认证铸造和后继 2→2、1→2。原生 v2 计数锁也已在独立节点走完两笔铸造与中间的暂停和恢复，节点拒绝篡改累计量。SHA-256 字段叶已完成原生出证并拒绝把真实哈希状态和另一笔交易的输出字段拼接。联合证明和两笔定长转账的入块仍需实测。 [v3 计数连续性节点记录](../fixtures/v3-counted-continuity-regtest-summary.json) · [v2 计数节点记录](../fixtures/v2-counted-mint-regtest-summary.json) · [字段叶实测](../recursion/parentbinding/README.md#从分段打开固定位置的字段)
