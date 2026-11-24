@@ -12,6 +12,7 @@ from bridge_ledger import BridgeLedger
 from burn_receipt import BurnReceipt
 from certified_burn_provenance import CertifiedBurnProvenance
 from certified_wallet_provenance import CertifiedWalletProvenance
+from chronicle_preimage import CHRONICLE_ALL, LEGACY_ALL
 from committed_verifier import load_verifying_key
 from continuity_statement import ParentReceipt
 from continuity_verifier import ContinuityVerifier, SINGLE_OUTPUT_MARKER
@@ -26,7 +27,7 @@ from run_continuity_regtest import NativeProver, _checkpoint, _prove, _save, _si
 from run_recursive_mimo import Regtest
 from shared.transaction import Input, Output, Transaction
 from test_operational_token import fixture_signer
-from usdc_amount import parse_usdc
+from usdc_amount import USDC_DECIMALS
 from wallet_receipt import SpendStatus
 
 
@@ -42,7 +43,7 @@ class CertifiedOutput:
 
 
 class Lifecycle:
-    def __init__(self, node, prover, key_artifact, evm):
+    def __init__(self, node, prover, key_artifact, evm, *, chronicle_all=False):
         self.node, self.prover = node, prover
         freeze_key, self.freeze_sign = fixture_signer(12)
         pause_key, self.pause_sign = fixture_signer(14)
@@ -55,7 +56,7 @@ class Lifecycle:
         self.verifier = ContinuityVerifier(
             template, freeze_key, key, commitment, bytes.fromhex(key_artifact["continuity_key_digest"]),
             certified_mints=True, certified_admin=True, certified_burns=True,
-            certified_single_output=True, certified_pause=True,
+            certified_single_output=True, certified_pause=True, chronicle_all=chronicle_all,
         )
         self.mint_policy = self.verifier.mint_policy
         self.genesis = node.include("mint-genesis", Transaction(
@@ -97,6 +98,10 @@ class Lifecycle:
     def _receipt(self, origins):
         return ParentReceipt(tuple(self.verifier.proof_digest(item.transaction, item.funding) for item in origins))
 
+    def _verifier_input(self, funding, *, chronicle=True):
+        sighash = CHRONICLE_ALL if chronicle and self.verifier.chronicle_all else LEGACY_ALL
+        return self.verifier.verifier_input(funding, sighash)
+
     def _submit(self, label, funding, origins, verified, witness, *, position, quantities, coin_parents=None):
         receipt, context = verified
         artifact, public, proof = _prove(self.verifier, self.prover, label, receipt, context,
@@ -108,6 +113,8 @@ class Lifecycle:
         spent = tuple((item.transaction, item.position) for item in origins)
         _, _, details = _checkpoint(self.node, self.prover, label, signed, funding, artifact, public, receipt,
                                     quantities, spent, {})
+        index = self.verifier.verifier_input_index(signed)
+        details["shared_verifier_sighash"] = f"0x{self.verifier.verifier_sighash(signed, index):02x}"
         self.proof_checks[label] = details
         record = self.node.evidence["transactions"][label]
         print(f"{label} confirmed at {record['height']} ({record['bytes']} bytes)", flush=True)
@@ -125,7 +132,8 @@ class Lifecycle:
         previous = load_state()
         origins = () if self.state is None else (self.state,)
         support = None if self.state is None else self.state.funding
-        plan = prepare_mint(self.mint_policy, prior, self.events, deposit, Input(funding.txid_wire(), 0),
+        sponsor = self._verifier_input(funding, chronicle=self.state is not None)
+        plan = prepare_mint(self.mint_policy, prior, self.events, deposit, sponsor,
                             receipt=self._receipt(origins), verifier_parent=funding)
 
         def resolve_funding(txid):
@@ -151,7 +159,8 @@ class Lifecycle:
         prior, funding = self.state_prior(), self.fund(label)
         origins = () if self.state is None else (self.state,)
         support = None if self.state is None else self.state.funding
-        signed = authorize_pause(self.mint_policy, prior, self.events, Input(funding.txid_wire(), 0),
+        sponsor = self._verifier_input(funding, chronicle=not paused)
+        signed = authorize_pause(self.mint_policy, prior, self.events, sponsor,
                                   self.pause_sign, paused=paused, receipt=self._receipt(origins), verifier_parent=funding)
         verified = self.verifier.validate_pause(signed, funding, prior, support)
         self.state = self._submit(label, funding, origins, verified,
@@ -169,7 +178,8 @@ class Lifecycle:
         output = prior.outputs[item.position]
         state = self.verifier.policy.parse(output.script)
         successor = replace(output, script=self.verifier.policy.lock(replace(state, frozen=not state.frozen)))
-        tx = Transaction((item.input(), Input(funding.txid_wire(), 0)), (successor, self._receipt((item,)).output()))
+        sponsor = self._verifier_input(funding, chronicle=state.frozen)
+        tx = Transaction((item.input(), sponsor), (successor, self._receipt((item,)).output()))
         signed = tx.with_script(0, freeze_witness(tx, 0, prior, self.verifier.policy, self.freeze_sign,
                                                  verifier_parent=funding))
         verified = self.verifier.validate_admin(signed, funding, prior, item.funding)
@@ -187,7 +197,7 @@ class Lifecycle:
             successors = (burn.output(), *successors)
         elif len(successors) == 1:
             successors += (SINGLE_OUTPUT_MARKER,)
-        tx = Transaction((Input(funding.txid_wire(), 0), *(item.input() for item in origins)),
+        tx = Transaction((self._verifier_input(funding), *(item.input() for item in origins)),
                          (*successors, self._receipt(origins).output()))
         if burn is None:
             verified = self.verifier.validate(tx, funding, parents, supports)
@@ -215,15 +225,15 @@ class Lifecycle:
             raise AssertionError("unexpected frozen supply at release checkpoint")
         return self.bridge.release(chain, item.transaction, 0, provenance, circulating=circulating, interrupt=interrupt)
 
-    def wallet_acceptance(self, minted, frozen, change):
+    def wallet_acceptance(self, minted, frozen, change, *, total, frozen_amount, remainder):
         chain = self.adopted()
         policy = chain.confirmation_policy(self.verifier.asset)
         provenance = CertifiedWalletProvenance(self.verifier, chain.call, policy, self.locations().get)
         evidence = []
         for item, quantity, flag, status in (
-            (minted, 1024, False, SpendStatus.SPENT),
-            (frozen, 640, True, SpendStatus.SPENT),
-            (change, 384, False, SpendStatus.UNSPENT),
+            (minted, total, False, SpendStatus.SPENT),
+            (frozen, frozen_amount, True, SpendStatus.SPENT),
+            (change, remainder, False, SpendStatus.UNSPENT),
         ):
             receipt, fields = chain.payment(item.transaction, item.position, self.verifier.asset,
                                              self.verifier.policy, provenance, self.node.owner_key)
@@ -307,36 +317,51 @@ def exercise_release_reorg(node, service, policy, reference, verifier, accountin
                 "source_rpc_or_signer_called": False}
 
 
-def run(node, prover, key_artifact, evm, *, reorg_probe=False):
-    lab = Lifecycle(node, prover, key_artifact, evm)
-    minted, first = lab.mint("mint-1024", parse_usdc("0.001024"), interrupt=True)
-    split = lab.transfer("split", (minted,), (640, 384))
-    retained = replace(split, position=1)
-    frozen = lab.toggle("freeze-640", split)
+def run(node, prover, key_artifact, evm, *, reorg_probe=False, chronicle_all=False):
+    path = Path(__file__).parent.parent / "fixtures" / "dual-route-scenario.json"
+    scenario = json.loads(path.read_text())
+    if scenario["usdc_decimals"] != USDC_DECIMALS:
+        raise ValueError("shared fixture amount precision does not match USDC")
+    split_case, lifecycle = scenario["one_to_two"], scenario["lifecycle"]
+    total = split_case["input_quantity"]
+    split_quantities = tuple(split_case["output_quantities"])
+    freeze_vout = lifecycle["freeze_split_vout"]
+    freeze_quantity = split_quantities[freeze_vout]
+    burn_quantity, remaining = lifecycle["partial_burn"], lifecycle["retained_quantity"]
+    supplemental = lifecycle["supplemental_mint_and_full_burn"]
+    lab = Lifecycle(node, prover, key_artifact, evm, chronicle_all=chronicle_all)
+    minted, first = lab.mint("mint-1024", total, interrupt=True)
+    split = lab.transfer("split", (minted,), split_quantities)
+    retained = replace(split, position=1 - freeze_vout)
+    frozen = lab.toggle("freeze-640", replace(split, position=freeze_vout))
     freeze_accounting = lab.bridge.reconcile(*lab.supply(frozen, retained))
     resumed = lab.toggle("unfreeze-640", frozen)
-    merged = lab.transfer("merge-1024", (resumed, retained), (1024,))
-    burn = BurnReceipt(lab.verifier.asset.asset_id(), lab.verifier.asset.reserve_domain, lab.reserve.recipient, 640)
-    change = lab.transfer("partial-burn-640", (merged,), (384,), burn=burn)
+    merged = lab.transfer("merge-1024", (resumed, retained), (total,))
+    burn = BurnReceipt(lab.verifier.asset.asset_id(), lab.verifier.asset.reserve_domain, lab.reserve.recipient, burn_quantity)
+    change = lab.transfer("partial-burn-640", (merged,), (remaining,), burn=burn)
     primary_release = lab.release(change, (change,), interrupt=True)
     primary = lab.bridge.reconcile(*lab.supply(change))
-    if (primary["net_reserve"], primary["bsv_circulating"], primary["pending_mint"], primary["pending_release"]) != (384, 384, 0, 0):
-        raise AssertionError("primary lifecycle must settle to 384 base units on both chains")
+    if (primary["net_reserve"], primary["bsv_circulating"], primary["pending_mint"], primary["pending_release"]) != (
+        remaining, remaining, 0, 0,
+    ):
+        raise AssertionError("primary lifecycle reserve and circulation must match the fixture remainder")
 
     lab.pause_mint("pause-minting", True)
     lab.pause_mint("resume-minting", False)
-    second_mint, second = lab.mint("mint-64-after-resume", parse_usdc("0.000064"))
-    full = lab.transfer("full-burn-64", (second_mint,), (), burn=replace(burn, quantity=64))
+    second_mint, second = lab.mint("mint-64-after-resume", supplemental)
+    full = lab.transfer("full-burn-64", (second_mint,), (), burn=replace(burn, quantity=supplemental))
     full_release = lab.release(full, (change,))
     final = lab.bridge.reconcile(*lab.supply(change))
     report = {
         "scope": "Same-key continuity on independent BSV regtest with a local Anvil mock USDC reserve",
         "asset_id": lab.verifier.asset.asset_id().hex(),
         "continuity_key_digest": lab.verifier.key_digest.hex(),
+        "dual_all_profile": lab.verifier.chronicle_all,
         "evm": {"chain_id": lab.reserve.scope.chain_id, "reserve": lab.reserve.vault, "token": lab.reserve.usdc},
         "mints": [first, second], "proof_checks": lab.proof_checks, "freeze_accounting": freeze_accounting,
         "releases": [primary_release, full_release], "after_primary_scenario": primary,
-        "wallet": lab.wallet_acceptance(minted, frozen, change),
+        "wallet": lab.wallet_acceptance(minted, frozen, change, total=total, frozen_amount=freeze_quantity,
+                                        remainder=remaining),
         "final_accounting": final, "journal": lab.bridge.audit(), **node.evidence,
     }
     if reorg_probe:
@@ -357,6 +382,7 @@ def main():
     parser.add_argument("--setup-dir", type=Path, required=True)
     parser.add_argument("--out", type=Path, required=True)
     parser.add_argument("--reorg-probe", action="store_true", help="temporarily revert the final burn on a dedicated regtest")
+    parser.add_argument("--chronicle-all", action="store_true", help="use a new dual verifier lock on an active regtest")
     args = parser.parse_args()
     if not (args.node_url and args.cookie):
         parser.error("independent BSV regtest RPC and cookie are required")
@@ -364,7 +390,8 @@ def main():
     args.out.mkdir()
     node = Regtest(args.node_url, args.cookie)
     with NativeProver(args.prover, args.setup_dir, args.out, key_artifact["continuity_key_digest"]) as prover, start_anvil() as evm:
-        _save(args.out / "summary.json", run(node, prover, key_artifact, evm, reorg_probe=args.reorg_probe))
+        _save(args.out / "summary.json", run(node, prover, key_artifact, evm, reorg_probe=args.reorg_probe,
+                                            chronicle_all=args.chronicle_all))
 
 
 if __name__ == "__main__":

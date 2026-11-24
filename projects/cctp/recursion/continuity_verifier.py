@@ -3,6 +3,8 @@ from dataclasses import dataclass, replace
 from functools import cached_property
 
 from burn_receipt import BURN_MARKER, read_burn
+from chronicle_context_script import all_relation_material, bind_all_context, use_actual_context_digest
+from chronicle_preimage import CHRONICLE_ALL, LEGACY_ALL, VERIFIER_SEQUENCES, shared_verifier_sighash
 from committed_verifier import CommitmentRelation, verifier_fields
 from committed_verifier import verifier_lock as committed_lock
 from continuity_preimage import current_funding_hash, prior_digest, statement_limbs, vin_one_transaction_material_check
@@ -13,7 +15,7 @@ from mint import ROOT_OFFSET, STATE_MARKER, MintPolicy, read_deposit
 from operational_token import TokenPolicy
 from recursive_mimo import _add_quantities, _assert_u64, _slots
 from shared.script import asm, number, push
-from shared.transaction import Output, Transaction, hash256, preimage_all
+from shared.transaction import Input, Output, Transaction, hash256, preimage_all, preimage_otda
 from statement import fixed
 from transfer import COMPACT_SCRIPTCODE, compact_preimage_digest_script, compact_verifier_binding
 from verifier import VerificationKey, unlocking_script
@@ -44,6 +46,7 @@ class ContinuityVerifier:
     certified_single_output: bool = False
     certified_pause: bool = False
     shared_ordinary_guard: bool = False
+    chronicle_all: bool = False
 
     def __post_init__(self):
         fixed(self.key_digest, 32)
@@ -60,6 +63,8 @@ class ContinuityVerifier:
             raise ValueError("certified pause requires certified minting and a pause authority")
         if type(self.shared_ordinary_guard) is not bool or self.shared_ordinary_guard and not self.certified_admin:
             raise ValueError("shared ordinary guard requires certified token administration")
+        if type(self.chronicle_all) is not bool:
+            raise ValueError("select an explicit shared verifier sighash profile")
 
     @property
     def asset(self):
@@ -67,7 +72,8 @@ class ContinuityVerifier:
 
     @cached_property
     def lock(self):
-        return self.statement_script() + committed_lock(self.key, self.commitment) + compact_verifier_binding()
+        binding = bind_all_context() if self.chronicle_all else compact_verifier_binding()
+        return self.statement_script() + committed_lock(self.key, self.commitment) + binding
 
     @cached_property
     def policy(self):
@@ -109,12 +115,13 @@ class ContinuityVerifier:
             parent_output=self._parent_output(),
         )
         return (
-            relation + asm("OP_3 OP_ROLL") + _conserve(incoming, profile.flow_outputs)
+            self._current_material(incoming + 1, profile.flow_outputs + 1 + int(single), 0, 2 * incoming)
+            + relation + asm("OP_3 OP_ROLL") + _conserve(incoming, profile.flow_outputs)
             # Identify the executing verifier, without embedding its own hash.
             + asm("OP_DUP") + number(2*incoming + 4) + asm("OP_ROLL OP_SWAP")
             + current_funding_hash()
             + asm("OP_DUP OP_4 OP_PICK OP_EQUALVERIFY OP_3 OP_ROLL OP_DROP OP_SWAP")
-            + compact_preimage_digest_script()
+            + self._current_digest()
             + asm("OP_TOALTSTACK OP_SWAP OP_TOALTSTACK")
             + self._collect_prior_digests(count)
             # Compare the actual final OP_RETURN output field to the ordered
@@ -125,7 +132,13 @@ class ContinuityVerifier:
 
     def _prior_digest(self):
         return prior_digest(self.asset.asset_id(), self.key_digest, certified_admin=self.certified_admin,
-                            certified_pause=self.certified_pause)
+                            certified_pause=self.certified_pause, chronicle_all=self.chronicle_all)
+
+    def _current_material(self, inputs, outputs, index, ancestors):
+        return all_relation_material(inputs, outputs, index, ancestors) if self.chronicle_all else b""
+
+    def _current_digest(self):
+        return use_actual_context_digest() if self.chronicle_all else compact_preimage_digest_script()
 
     def _parent_output(self):
         return None
@@ -134,9 +147,10 @@ class ContinuityVerifier:
         from issuance_base import runtime_mint_state_script
 
         current = (
-            vin_one_transaction_material_check(preceding_outputs=1 if pause else 3)
+            self._current_material(2, 2 if pause else 4, 1, 1 if genesis else 2)
+            + vin_one_transaction_material_check(preceding_outputs=1 if pause else 3)
             + asm("OP_DUP") + number(4 if genesis else 5) + asm("OP_ROLL OP_SWAP")
-            + current_funding_hash() + asm("OP_SWAP") + compact_preimage_digest_script()
+            + current_funding_hash() + asm("OP_SWAP") + self._current_digest()
             + asm("OP_TOALTSTACK OP_SWAP OP_TOALTSTACK")
         )
         state = runtime_mint_state_script(self.mint_template, self.freeze_key, genesis_only=genesis,
@@ -147,7 +161,9 @@ class ContinuityVerifier:
         else:
             payload = (
                 asm("OP_2DUP") + state + asm("OP_ROT OP_SWAP")
-                + (self._prior_digest() if self.certified_pause else prior_digest(self.asset.asset_id(), self.key_digest))
+                + (self._prior_digest() if self.certified_pause else prior_digest(
+                    self.asset.asset_id(), self.key_digest, chronicle_all=self.chronicle_all,
+                ))
                 + push(b"\x01") + asm("OP_SWAP OP_CAT") + push(ZERO) + asm("OP_CAT")
             )
         return (
@@ -162,10 +178,11 @@ class ContinuityVerifier:
                                           certified_admin=True, allow_frozen=True,
                                           shared_ordinary_guard=self.shared_ordinary_guard)
         return (
-            vin_one_transaction_material_check(preceding_outputs=1, select_parent_script=True,
-                                               parent_output=self._parent_output())
+            self._current_material(2, 2, 1, 2)
+            + vin_one_transaction_material_check(preceding_outputs=1, select_parent_script=True,
+                                                 parent_output=self._parent_output())
             + asm("OP_DUP 6 OP_ROLL OP_SWAP") + current_funding_hash()
-            + asm("OP_SWAP") + compact_preimage_digest_script()
+            + asm("OP_SWAP") + self._current_digest()
             + asm("OP_TOALTSTACK OP_SWAP OP_TOALTSTACK OP_SWAP") + parse_token
             + asm("OP_2 OP_PICK OP_EQUALVERIFY OP_DROP OP_ROT OP_SWAP")
             + self._prior_digest()
@@ -233,8 +250,28 @@ class ContinuityVerifier:
         """Select the verifier vin used by the canonical continuity layout."""
         return self._layout(tx)[1]
 
+    def verifier_sighash(self, tx, index):
+        """Get the actual verifier's type from the spend's committed sequence."""
+        return shared_verifier_sighash(tx.inputs[index].sequence) if self.chronicle_all else LEGACY_ALL
+
+    def verifier_input(self, funding, sighash_type=LEGACY_ALL):
+        """Place a verifier input in the transaction draft before authorizations."""
+        if not self.chronicle_all:
+            if sighash_type != LEGACY_ALL:
+                raise ValueError("dual verifier profile required for Chronicle ALL")
+            return Input(funding.txid_wire(), 0)
+        if type(sighash_type) is not int or sighash_type not in VERIFIER_SEQUENCES:
+            raise ValueError("expected a supported shared verifier ALL signature type")
+        return Input(funding.txid_wire(), 0, sequence=VERIFIER_SEQUENCES[sighash_type])
+
+    def context_preimage(self, tx, funding, index):
+        """Rebuild the actual signature preimage from transaction and funding bytes."""
+        if self.verifier_sighash(tx, index) == CHRONICLE_ALL:
+            return preimage_otda(tx, index, COMPACT_SCRIPTCODE, CHRONICLE_ALL)
+        return preimage_all(tx, index, funding.outputs[0].value, COMPACT_SCRIPTCODE)
+
     def context(self, tx, funding):
-        """Read the typed receipt and hash the actual compact verifier preimage."""
+        """Read the typed receipt and hash the actual shared verifier preimage."""
         layout, index = self._layout(tx)
         self.policy.selected_verifier(tx, funding.serialize(), index=index)
         receipt = ParentReceipt.parse(tx.outputs[-1])
@@ -248,8 +285,7 @@ class ContinuityVerifier:
             raise ValueError("certified single-output transfer requires prior proofs")
         if len(tx.inputs) != (2 if index else 1 + max(1, len(receipt.parents))):
             raise ValueError("wrong verifier and protocol input shape")
-        preimage = preimage_all(tx, index, funding.outputs[0].value, COMPACT_SCRIPTCODE)
-        return receipt, hash256(preimage)
+        return receipt, hash256(self.context_preimage(tx, funding, index))
 
     def proof_digest(self, tx, funding):
         receipt, context = self.context(tx, funding)
@@ -323,15 +359,15 @@ class ContinuityVerifier:
         return (unlocking_script(verifier_fields(self.key, self.commitment, signals, proof))
                 + self.burn_material(tx, funding, parents, supporting))
 
-    @staticmethod
-    def transaction_material(tx: Transaction, funding: Transaction, parents, supporting, *, count, verifier_index=0):
+    def transaction_material(self, tx: Transaction, funding: Transaction, parents, supporting, *, count, verifier_index=0):
         """Serialize proof-independent wire witnesses in input order."""
-        return b"".join(push(part) for part in (
-            funding.serialize(), *(support.serialize() for support in supporting),
-            *(parent.serialize() for parent in parents),
+        vectors = () if self.verifier_sighash(tx, verifier_index) == CHRONICLE_ALL else (
             b"".join(output.serialize() for output in tx.outputs),
             b"".join(txin.outpoint() for txin in tx.inputs),
-            preimage_all(tx, verifier_index, funding.outputs[0].value, COMPACT_SCRIPTCODE),
+        )
+        return b"".join(push(part) for part in (
+            funding.serialize(), *(support.serialize() for support in supporting),
+            *(parent.serialize() for parent in parents), *vectors, self.context_preimage(tx, funding, verifier_index),
         )) + number(count)
 
     def witness(self, proof, tx, funding, parents, supporting):

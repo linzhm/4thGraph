@@ -33,6 +33,8 @@ class CapacityVerifier(ContinuityVerifier):
             raise ValueError("capacity requires certified minting and the shared guard at width 64 or 256")
         if type(self.compressed_ancestry) is not bool:
             raise ValueError("expected an explicit capacity witness encoding")
+        if self.chronicle_all:
+            raise ValueError("capacity receipts currently require the legacy ALL context")
 
     @cached_property
     def capacity_modes(self):

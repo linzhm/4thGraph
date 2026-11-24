@@ -16,13 +16,15 @@ from mint_events import Deposit, DepositPosition, EMPTY_ROOT, MintEvents
 from operational_token import FORKID_ALL, FORKID_SINGLE, freeze_witness, ordinary_witness
 from shared.evaluate import ScriptError, evaluate
 from shared.script import encode_num
-from shared.transaction import Input, Output, Transaction, hash256, preimage_all, preimage_forkid
+from shared.transaction import Input, Output, Transaction, hash256, preimage_all, preimage_forkid, preimage_otda
 from statement import AssetDescriptor
 from test_operational_token import fixture_signer
 from transfer import COMPACT_SCRIPTCODE
 
 
 class ContinuityAdminIntegration(unittest.TestCase):
+    chronicle_all = False
+
     @classmethod
     def setUpClass(cls):
         key, commitment = load_verifying_key(json.loads(
@@ -38,14 +40,14 @@ class ContinuityAdminIntegration(unittest.TestCase):
         asset = AssetDescriptor(1, anchor.outpoint(), 6, 7, b"r" * 32, b"p" * 32)
         template = MintPolicy(asset, 84532, b"v" * 20, issuer_key, lambda _: b"")
         cls.verifier = ContinuityVerifier(template, freeze_key, key, commitment, b"k" * 32,
-                                         certified_mints=True, certified_admin=True)
+                                         certified_mints=True, certified_admin=True, chronicle_all=cls.chronicle_all)
         cls.policy = cls.verifier.policy
         cls.mint_policy = cls.verifier.mint_policy
         cls.genesis = Transaction((anchor,), (Output(50_000, cls.mint_policy.state_lock(EMPTY_ROOT)),))
         cls.mint_funding = cls.funding_at(1)
         event = Deposit(DepositPosition(84532, asset.reserve_domain, template.reserve_contract, b"d" * 32, 0),
                         asset.reserve_asset, asset.network, asset.asset_id(), 1024, 0, cls.owner_key)
-        plan = prepare_mint(cls.mint_policy, cls.genesis, MintEvents(), event, cls.outpoint(cls.mint_funding),
+        plan = prepare_mint(cls.mint_policy, cls.genesis, MintEvents(), event, cls.verifier_input(cls.mint_funding, 0x61),
                             receipt=ParentReceipt(()), verifier_parent=cls.mint_funding)
         cls.mint = authorize_mint(plan, lambda _: event, issuer_sign)
         cls.statement = cls.verifier.statement_script()
@@ -62,19 +64,29 @@ class ContinuityAdminIntegration(unittest.TestCase):
         return Input(tx.txid_wire(), vout)
 
     @classmethod
+    def verifier_input(cls, funding, sighash):
+        return cls.verifier.verifier_input(funding, sighash if cls.chronicle_all else 0x41)
+
+    @classmethod
+    def expected_preimage(cls, tx, funding, index):
+        if cls.verifier.verifier_sighash(tx, index) == 0x61:
+            return preimage_otda(tx, index, COMPACT_SCRIPTCODE, 0x61)
+        return preimage_all(tx, index, funding.outputs[0].value, COMPACT_SCRIPTCODE)
+
+    @classmethod
     def toggle(cls, parent, vout, parent_funding, funding):
         previous = parent.outputs[vout]
         state = cls.policy.parse(previous.script)
         successor = replace(previous, script=cls.policy.lock(replace(state, frozen=not state.frozen)))
         # Both mint and administration use the universal verifier at vin1.
-        prior_preimage = preimage_all(parent, 1, parent_funding.outputs[0].value, COMPACT_SCRIPTCODE)
+        prior_preimage = cls.expected_preimage(parent, parent_funding, 1)
         prior_digest = ParentReceipt.parse(parent.outputs[-1]).digest(
             cls.verifier.asset.asset_id(), cls.verifier.key_digest, hash256(prior_preimage),
         )
         receipt = ParentReceipt((prior_digest,))
-        tx = Transaction((cls.outpoint(parent, vout), cls.outpoint(funding)), (successor, receipt.output()))
-        return tx.with_script(0, freeze_witness(tx, 0, parent, cls.policy, cls.admin_sign,
-                                                verifier_parent=funding))
+        sponsor = cls.verifier_input(funding, 0x61 if state.frozen else 0x41)
+        tx = Transaction((cls.outpoint(parent, vout), sponsor), (successor, receipt.output()))
+        return tx.with_script(0, freeze_witness(tx, 0, parent, cls.policy, cls.admin_sign, verifier_parent=funding))
 
     def check_token_input(self, tx, vin, previous):
         """Evaluate the actual specialized covenant with native signature digests."""
@@ -93,13 +105,14 @@ class ContinuityAdminIntegration(unittest.TestCase):
         self.assertEqual(result, ([b"\x01"], []))
 
     def assert_statement(self, tx, funding, parents, supporting, *, mode, index):
-        expected_preimage = preimage_all(tx, index, funding.outputs[0].value, COMPACT_SCRIPTCODE)
+        expected_preimage = self.expected_preimage(tx, funding, index)
         expected_context = hash256(expected_preimage)
         expected_receipt = ParentReceipt.parse(tx.outputs[-1])
         signals = expected_receipt.signals(self.verifier.asset.asset_id(), self.verifier.key_digest, expected_context)
         raw = self.verifier.transaction_material(tx, funding, parents, supporting,
                                                  count=mode, verifier_index=index)
-        self.assertEqual(evaluate(raw + self.statement), (list(map(encode_num, signals)), [expected_context]))
+        alt = [bytes([self.verifier.verifier_sighash(tx, index)])] if self.chronicle_all else []
+        self.assertEqual(evaluate(raw + self.statement), (list(map(encode_num, signals)), [*alt, expected_context]))
         return expected_receipt, expected_context
 
     def test_signed_mint_freeze_unfreeze_then_ordinary_transfer(self):
@@ -121,7 +134,7 @@ class ContinuityAdminIntegration(unittest.TestCase):
         receipt = ParentReceipt((self.verifier.proof_digest(self.resume, self.resume_funding),))
         outputs = tuple(self.mint_policy.token_output(quantity, self.owner_key) for quantity in (640, 384))
         tx = Transaction(
-            (self.outpoint(self.transfer_funding), self.outpoint(self.resume)), (*outputs, receipt.output()),
+            (self.verifier_input(self.transfer_funding, 0x61), self.outpoint(self.resume)), (*outputs, receipt.output()),
         )
         tx = tx.with_script(1, ordinary_witness(tx, 1, self.resume, self.policy, self.transfer_funding,
                                                self.owner_sign))
@@ -147,3 +160,20 @@ class ContinuityAdminIntegration(unittest.TestCase):
                 )
                 with self.assertRaises(ScriptError):
                     evaluate(material + self.statement)
+
+
+class ChronicleContinuityAdminIntegration(ContinuityAdminIntegration):
+    chronicle_all = True
+
+    def test_rejects_both_preimage_types_when_the_actual_sequence_declares_the_other(self):
+        from chronicle_context_script import all_relation_material
+
+        tx, funding = self.freeze, self.freeze_funding
+        wrong_otda = preimage_otda(tx, 1, COMPACT_SCRIPTCODE, 0x61)
+        with self.assertRaises(ScriptError):
+            evaluate(all_relation_material(2, 2, 1, 0), [funding.serialize(), wrong_otda])
+
+        tx, funding = self.resume, self.resume_funding
+        wrong_forkid = preimage_all(tx, 1, funding.outputs[0].value, COMPACT_SCRIPTCODE)
+        with self.assertRaises(ScriptError):
+            evaluate(all_relation_material(2, 2, 1, 0), [funding.serialize(), wrong_forkid])

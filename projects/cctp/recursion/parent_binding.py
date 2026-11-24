@@ -8,9 +8,10 @@ from dataclasses import dataclass
 from hashlib import sha256
 from typing import TYPE_CHECKING
 
+from chronicle_preimage import normalize_shared_verifier_preimage
 from operational_token import TokenPolicy
 from shared.transaction import (
-    CHRONICLE, FORKID, SIGHASH_ALL, Input, Output, Transaction, blob, compact, hash256, preimage_all,
+    CHRONICLE, FORKID, SIGHASH_ALL, Input, Output, Transaction, blob, compact, hash256,
 )
 from statement import fixed, uint
 from transaction_relation import TokenState
@@ -97,10 +98,8 @@ class ParentBinding:
 def derive_parent_binding(verifier: "ContinuityVerifier", parent_raw: bytes, funding_raw: bytes) -> ParentBinding:
     """Build the statement from actual serialized parent and verifier funding bytes.
 
-    The selected verifier input must carry witness bytes. This reference
-    derives the fixed v3 0x41 context from the actual prevout and funded amount.
-    A dual-mode relation must recover the exact verifier branch from the actual
-    canonical witness or authenticated receipt and reconstruct that sighash.
+    The selected verifier input must carry witness bytes. The legacy lock fixes
+    the type to 0x41 and the dual lock binds it to the verifier input sequence.
     Script execution or confirmation requires separate evidence.
     """
     if type(parent_raw) is not bytes or type(funding_raw) is not bytes:
@@ -112,16 +111,18 @@ def derive_parent_binding(verifier: "ContinuityVerifier", parent_raw: bytes, fun
         raise ValueError("missing witness for the parent verifier input")
     receipt, context = verifier.context(parent, funding)
     funded = funding.outputs[parent.inputs[index].vout]
-    preimage = preimage_all(parent, index, funded.value, COMPACT_SCRIPTCODE)
-    if context != hash256(preimage):
-        raise ValueError("parent context does not use the fixed 0x41 verifier path")
+    sighash_type = verifier.verifier_sighash(parent, index)
+    preimage = verifier.context_preimage(parent, funding, index)
+    normalized = normalize_shared_verifier_preimage(
+        parent, index, funding, preimage, sighash_type=sighash_type, script_code=COMPACT_SCRIPTCODE,
+    )
+    if context != normalized.digest:
+        raise ValueError("parent context does not match its actual verifier sighash")
     asset_id = verifier.asset.asset_id()
     continuity = receipt.digest(asset_id, verifier.key_digest, context)
-    # The last 40 bytes of this compact ALL preimage are hashOutputs, locktime and sighash type.
-    hash_outputs = preimage[-40:-8]
     return ParentBinding(
-        asset_id, sha256(blob(funded.script)).digest(), LEGACY_ALL, hash256(parent_raw),
-        hash_outputs, len(parent.outputs), continuity,
+        asset_id, sha256(blob(funded.script)).digest(), sighash_type, hash256(parent_raw),
+        normalized.hash_outputs, len(parent.outputs), continuity,
     )
 
 

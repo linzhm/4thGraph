@@ -1,4 +1,5 @@
 """Rebuild ForkID commitments at the BSV continuity verifier boundary."""
+from chronicle_preimage import CHRONICLE_ALL, LEGACY_ALL, VERIFIER_SEQUENCES
 from continuity_statement import CONTINUITY_DOMAIN, OUTPUT_PREFIX, PARENT_SIZE
 from mimo_verifier import _match_prefix, _pick, _select_parent_output, _split, _unsigned
 from parent_preimage import _compact_size, _count, _read_input, _skip_output
@@ -48,21 +49,27 @@ def _hash_input_column(input_count, offset):
     return code + asm("OP_HASH256 OP_TOALTSTACK")
 
 
-def _prior_preimage(input_count, *, output_count=3, verifier_index=0, initial_pause=False):
-    """Consume [parent raw, its funding raw, current lock hash]; leave [receipt, preimage]."""
+def _check_prior_receipt(input_count, output_count, initial_pause):
     if output_count == 2 and not initial_pause:
         count = asm("OP_1 OP_NUMEQUALVERIFY")
     else:
         count = asm("0 2 OP_WITHIN OP_VERIFY") if input_count == 2 else asm("OP_2 OP_NUMEQUALVERIFY")
+    return (
+        asm("OP_SIZE OP_4 OP_SUB OP_SPLIT OP_OVER") + _skip_output() * (output_count - 1)
+        + _match_prefix(OUTPUT_PREFIX)
+        + asm("OP_SIZE") + number(PARENT_SIZE) + asm("OP_NUMEQUALVERIFY")
+        + asm("OP_DUP OP_1 OP_SPLIT OP_DROP") + _unsigned() + count
+    )
+
+
+def _prior_forkid_preimage(input_count, output_count, verifier_index, initial_pause):
+    """Consume [parent raw, its funding raw, current lock hash]; leave [receipt, preimage]."""
     selected = asm("OP_2SWAP OP_2DROP") if verifier_index else asm("OP_2DROP") * (input_count - 1)
     return (
         # Put the expected lock hash under funding; parse the parent itself.
         asm("OP_ROT OP_ROT OP_SWAP OP_4 OP_SPLIT OP_SWAP OP_TOALTSTACK")
         + _count(input_count) + _read_input() * input_count + _count(output_count)
-        + asm("OP_SIZE OP_4 OP_SUB OP_SPLIT OP_OVER") + _skip_output() * (output_count - 1)
-        + _match_prefix(OUTPUT_PREFIX)
-        + asm("OP_SIZE") + number(PARENT_SIZE) + asm("OP_NUMEQUALVERIFY")
-        + asm("OP_DUP OP_1 OP_SPLIT OP_DROP") + _unsigned() + count
+        + _check_prior_receipt(input_count, output_count, initial_pause)
         + asm("OP_TOALTSTACK OP_SWAP OP_HASH256 OP_SWAP OP_TOALTSTACK OP_TOALTSTACK")
         + _hash_input_column(input_count, 1) + _hash_input_column(input_count, 0)
         + selected + asm("OP_TOALTSTACK OP_DUP OP_TOALTSTACK") + _funding_output()
@@ -72,6 +79,43 @@ def _prior_preimage(input_count, *, output_count=3, verifier_index=0, initial_pa
               "OP_FROMALTSTACK OP_CAT OP_FROMALTSTACK OP_CAT "
               "OP_FROMALTSTACK OP_FROMALTSTACK OP_ROT OP_CAT")
         + push(b"\x41\x00\x00\x00") + asm("OP_CAT")
+    )
+
+
+def _prior_otda_preimage(input_count, output_count, verifier_index, initial_pause):
+    inputs = push(bytes([input_count]))
+    for i in range(input_count):
+        depth = 2 * (input_count - i)
+        field = blob(COMPACT_SCRIPTCODE) if i == verifier_index else bytes(1)
+        inputs += _pick(depth) + push(field) + asm("OP_CAT") + _pick(depth) + asm("OP_CAT OP_CAT")
+    return (
+        asm("OP_ROT OP_ROT OP_SWAP OP_4 OP_SPLIT OP_SWAP OP_TOALTSTACK")
+        + _count(input_count) + _read_input() * input_count + _count(output_count)
+        + _check_prior_receipt(input_count, output_count, initial_pause)
+        + asm("OP_TOALTSTACK OP_TOALTSTACK OP_TOALTSTACK")
+        # Authenticate the actual verifier funding even though OTDA omits its amount.
+        + _pick(2 * input_count) + _pick(2 * (input_count - verifier_index)) + _funding_output()
+        + _pick(2 * input_count + 3) + asm("OP_EQUALVERIFY OP_DROP")
+        + inputs + asm("OP_TOALTSTACK") + asm("OP_2DROP") * (input_count + 1)
+        + asm("OP_FROMALTSTACK") + push(bytes([output_count]))
+        + asm("OP_CAT OP_FROMALTSTACK OP_CAT OP_FROMALTSTACK OP_CAT")
+        + push(b"\x61\x00\x00\x00") + asm("OP_CAT OP_FROMALTSTACK OP_FROMALTSTACK OP_ROT OP_CAT")
+    )
+
+
+def _prior_preimage(input_count, *, output_count=3, verifier_index=0, initial_pause=False, chronicle_all=False):
+    """Consume [parent raw, its funding raw, approved lock hash]; leave [receipt, preimage]."""
+    legacy = _prior_forkid_preimage(input_count, output_count, verifier_index, initial_pause)
+    if not chronicle_all:
+        return legacy
+    skip_input = _read_input() + asm("OP_ROT OP_DROP OP_SWAP OP_DROP")
+    return (
+        asm("OP_2 OP_PICK OP_4 OP_SPLIT OP_NIP") + _count(input_count) + skip_input * verifier_index
+        + _split(36) + asm("OP_NIP") + _compact_size() + asm("OP_SPLIT OP_NIP OP_4 OP_SPLIT OP_DROP OP_DUP")
+        + push(VERIFIER_SEQUENCES[CHRONICLE_ALL].to_bytes(4, "little")) + asm("OP_EQUAL OP_IF OP_DROP")
+        + _prior_otda_preimage(input_count, output_count, verifier_index, initial_pause)
+        + asm("OP_ELSE") + push(VERIFIER_SEQUENCES[LEGACY_ALL].to_bytes(4, "little"))
+        + asm("OP_EQUALVERIFY") + legacy + asm("OP_ENDIF")
     )
 
 
@@ -85,17 +129,18 @@ def _count_outputs_in_two_input_parent():
     )
 
 
-def prior_preimage(*, certified_admin=False, certified_pause=False):
-    """Parse the actual parent context, including the verifier at vin1 in state transitions."""
-    ordinary = _prior_preimage(2)
+def prior_preimage(*, certified_admin=False, certified_pause=False, chronicle_all=False):
+    """Parse the actual parent context and, in the dual profile, its signed verifier type."""
+    ordinary = _prior_preimage(2, chronicle_all=chronicle_all)
     state_transition = certified_admin or certified_pause
     if state_transition:
         ordinary = (
             asm("OP_2 OP_NUMEQUAL OP_IF")
-            + _prior_preimage(2, output_count=2, verifier_index=1, initial_pause=certified_pause)
+            + _prior_preimage(2, output_count=2, verifier_index=1, initial_pause=certified_pause,
+                              chronicle_all=chronicle_all)
             + asm("OP_ELSE") + ordinary + asm("OP_ENDIF")
         )
-    vin_one = _prior_preimage(2, output_count=4, verifier_index=1)
+    vin_one = _prior_preimage(2, output_count=4, verifier_index=1, chronicle_all=chronicle_all)
     cases = (
         asm("OP_DUP OP_4 OP_NUMEQUAL OP_IF OP_DROP") + vin_one + asm("OP_ELSE") + ordinary + asm("OP_ENDIF")
         if state_transition else push(b"\x04") + asm("OP_EQUAL OP_IF") + vin_one + asm("OP_ELSE") + ordinary + asm("OP_ENDIF")
@@ -104,7 +149,7 @@ def prior_preimage(*, certified_admin=False, certified_pause=False):
         asm("OP_2 OP_PICK OP_4 OP_SPLIT OP_NIP OP_1 OP_SPLIT OP_DROP")
         + push(b"\x02") + asm("OP_EQUAL OP_IF")
         + _count_outputs_in_two_input_parent() + cases
-        + asm("OP_ELSE") + _prior_preimage(3) + asm("OP_ENDIF")
+        + asm("OP_ELSE") + _prior_preimage(3, chronicle_all=chronicle_all) + asm("OP_ENDIF")
     )
 
 
@@ -114,9 +159,9 @@ def continuity_digest(asset_id, key_digest):
     return asm("OP_SWAP OP_CAT") + push(prefix) + asm("OP_SWAP OP_CAT OP_HASH256")
 
 
-def prior_digest(asset_id, key_digest, *, certified_admin=False, certified_pause=False):
+def prior_digest(asset_id, key_digest, *, certified_admin=False, certified_pause=False, chronicle_all=False):
     return (
-        prior_preimage(certified_admin=certified_admin, certified_pause=certified_pause)
+        prior_preimage(certified_admin=certified_admin, certified_pause=certified_pause, chronicle_all=chronicle_all)
         + asm("OP_HASH256") + continuity_digest(asset_id, key_digest)
     )
 

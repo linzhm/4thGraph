@@ -96,7 +96,7 @@ class ParentBindingTests(unittest.TestCase):
                 return receipt, b"x" * 32
 
         other = WrongContext(*self.common, **self.profile)
-        with self.assertRaisesRegex(ValueError, "fixed 0x41"):
+        with self.assertRaisesRegex(ValueError, "actual verifier sighash"):
             derive_parent_binding(other, self.parent.serialize(), self.funding_raw)
 
     def test_signed_txid_cannot_be_substituted_for_the_same_continuity_digest(self):

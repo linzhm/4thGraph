@@ -15,9 +15,8 @@ from projects.cctp.evm.bsv_burn_evidence import (
     BsvConfirmationPolicy, BsvNodeSnapshot, BsvTransactionLocation, read_bsv_raw_transaction,
 )
 from projects.cctp.evm.reserve_rpc import Rpc
-from shared.transaction import Input, Transaction, blob, hash256, preimage_all
+from shared.transaction import Input, Transaction, blob, hash256
 from transaction_relation import TokenState
-from transfer import COMPACT_SCRIPTCODE
 
 if TYPE_CHECKING:
     from continuity_verifier import ContinuityVerifier
@@ -163,7 +162,7 @@ class CertifiedWalletProvenance:
                 receipt, context = verifier.validate(tx, funding, parents, supporting)
                 mode = verifier.transfer_mode(tx)
 
-        expected_context = hash256(preimage_all(tx, verifier_index, funding.outputs[0].value, COMPACT_SCRIPTCODE))
+        expected_context = hash256(verifier.context_preimage(tx, funding, verifier_index))
         if suffix is None:
             suffix = verifier.transaction_material(tx, funding, parents, supporting, count=mode,
                                                    verifier_index=verifier_index)

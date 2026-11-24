@@ -78,3 +78,9 @@ PYTHONPATH=.:projects/groth16/reference ../cctp-test-tools/venv/bin/python -m un
 
 - [主方案](development-plan.md#父交易绑定与-chronicle-验收门槛) 保留现有连续性声明及密钥，加入定稿父交易的独立绑定证明。共享验证器计划按实际签名类型走 `0x41` BIP143 或 `0x61` Chronicle OTDA。节点确定可用高度，持币输入首轮继续用 `0x41`。
 - [绑定设计](parent-binding.md) 的 Python 提取器、公开输入及指定输出 Script 构件已通过本地回归。[SHA-256 小样](../recursion/parentbinding/README.md) 完成单块出证和验证。整段推算成本要求先验证可组合方案。完整父交易绑定证明、共享锁双分支及独立节点激活矩阵仍待实现和验收。首轮从新发行锚测试。
+
+## 同日续接：两条路线与双预像
+
+- [共同验收](dual-route-validation.md) 和共用交易向量已同步到两个分支。单证明探索使用 `/Users/linzheming/Codex/BSV-Script-Lab/cctp-groth16-rules-worktree` 的 `cctp/groth16-rules-exploration`，基点为 `4e3b02294501afabf6d5b03490a8ce9bd4e452d1`。其首项是使用独立电路和密钥验证实际 `1→2`，记录原生出证、独立入块和对应负例。
+- Script 主线增加窄形状双预像。钱包在签名前设置实际 verifier vin 的序列值，Script 通过验签确认相同的类型，父摘要从该 vin 的序列重建。完整共享锁使用 `run_certified_lifecycle.py --chronicle-all` 验收。容量回执仍使用现有 `0x41`。
+- [Chronicle 独立节点边界矩阵](../fixtures/chronicle-activation-regtest-summary.json) 已确认 50 个有效案例入块、10 个无效案例被拒绝。边界试验使用专用夹具锁，覆盖激活前后、版本 1/2、实际新旧 UTXO、混签和管理配对。完整 CCTP 锁和独立父绑定证明分别留存证据。

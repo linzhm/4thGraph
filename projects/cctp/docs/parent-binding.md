@@ -13,6 +13,8 @@
 
 两条分支向同一代币关系提供有序 outpoints、规范 outputs 和实际 preimage 的认证摘要。连续性电路仍接收原有两个公开整数。版本、执行到的 `OP_CODESEPARATOR` 和对应的 `scriptCode` 清理规则都按节点编码处理。共享验证器的分支选择必须与构造并验签的 sighash 一致。持有人、铸造方及冻结方的权限签名分开处理。冻结和解冻的 `SINGLE` 继续使用现有 `0x43` 路径，`0x63` 另做验收。[仓库签名预像编码](../../../shared/transaction.py)
 
+新版窄形状锁将验证器实际 vin 的 `nSequence` 固定为 `0x80000041` 或 `0x80000061`。钱包在角色签名和出证前写入。锁从预像读签名类型并核对实际序列值，父交易认证从原文的实际 verifier vin 重算类型。这样在 Chronicle 可执行的版本 2 `scriptSig` 中，见证字节重排不会改写父声明的类型。两个序列值都禁用相对锁定时间。使用非零绝对 `nLockTime` 时仍适用节点的绝对终结条件。[节点版本分派](https://github.com/bitcoin-sv/bitcoin-sv/blob/v1.2.3/src/script/interpreter.cpp#L31-L39) · [节点 scriptSig 规则](https://github.com/bitcoin-sv/bitcoin-sv/blob/v1.2.3/src/script/interpreter.cpp#L2120-L2132)
+
 用户的离线布置测量只计算共享验证器输入的数据及 push 开销。`0x61` 在已入块的部分销毁样例少 136 字节，在 64→64 和 256→256 的模拟布局多 182 和 1,146 字节。持币输入若也解析 OTDA，则需另测各输入重复携带有序输出的成本。
 
 ## 独立父交易绑定声明
@@ -28,7 +30,7 @@ BSV/CCTP/parent-binding/v1\0
   || continuity_digest[32]
 ```
 
-`verifier_script_field_hash` 是实际验证器锁的 CompactSize 加脚本的 SHA-256。后继验证器从已认证的资产策略取得父锁身份，避免在新共享锁中硬编码它自身的哈希。输出向量采用 ALL 的逐输出规范序列化拼接。后继 Script 以真实当前 vin 的 `txid`、实际披露向量的摘要和计数、经过认证的父连续性摘要重建绑定声明。每个被消费 vout 仍需解析和核对资产、金额、锁及状态。当前 v3 只有 `0x41`，参考提取器会独立重算该分支的真实紧凑预像。双支持实现须从实际绑定验签所用的规范见证布局或认证回执提取类型，再走对应的证明关系。
+`verifier_script_field_hash` 是实际验证器锁的 CompactSize 加脚本的 SHA-256。后继验证器从已认证的资产策略取得父锁身份，避免在新共享锁中硬编码它自身的哈希。输出向量采用 ALL 的逐输出规范序列化拼接。后继 Script 以真实当前 vin 的 `txid`、实际披露向量的摘要和计数、经过认证的父连续性摘要重建绑定声明。每个被消费 vout 仍需解析和核对资产、金额、锁及状态。参考提取器对 v3 旧锁重算固定 `0x41`，对双预像锁从实际 verifier vin 的 `nSequence` 重建签名类型及对应预像。
 
 ## 前缀状态与实现顺序
 
@@ -39,3 +41,7 @@ SHA-256 前缀检查点可以减少需要披露的字节。证明必须从初始
 1. 使用独立绑定证明和 `0x41` 重跑单父铸造、拆分、冻结、解冻、合并及销毁。记录每笔字节、父证据、出证和节点验收耗时，核对直接父数量固定时见证对历史深度保持稳定。
 2. 将 `0x61` 接入同一共享验证器，并让父交易绑定证明重建实际分支摘要。在独立 BSV Node 的真实激活配置下，验收激活前一块、激活块、激活后一块。对链上可构造的样例交叉覆盖旧与新 UTXO、花费交易版本 1 和 2。新 UTXO 从其真实创建高度开始参与花费测试。同笔交易混用、错配预像解析器、不同执行 `OP_CODESEPARATOR` 的路径均需实测。分别记录实际花费高度的签名可用性、UTXO 创建高度的脚本规则及花费版本相关的延展性规则。`0x43` 与 `0x63` 配对资金与后继输出另验。已有差分记录经节点 `verifyscript` 取得，本项目仍需记录实际付款的内存池及区块结果。[已有 Chronicle 差分证据](../../../shared/chronicle-regression.md)
 3. 对父 `txid`、vout、复制代币锁、错序输出、改量、换验证器、错误 padding 或 midstate 和旧证明复用逐项记录拒绝层。然后同一绑定接口覆盖 64→64、256→256 的共父与多父原生证明、钱包和费用。原文见证基线记录在 [容量验收](capacity.md)。
+
+## Chronicle 独立节点边界记录
+
+BSV Node 1.2.3 在激活高度 105 的隔离 regtest 运行 60 组原始交易。50 组通过 RPC 准入和原始候选区块验证，10 组在两层均被拒绝。用例覆盖旧与新 UTXO、激活当块创建后花费、交易版本 1 和 2、同笔混用 `0x41/0x61` 和 `0x43/0x63`，以及多个 `OP_CODESEPARATOR` 和错选分隔符。此边界矩阵使用独立的 PUSHTX 夹具锁。完整 CCTP 共享锁用 `run_certified_lifecycle.py --chronicle-all` 在启用 Chronicle 的隔离节点跑原生证明和双链生命周期。[节点验收摘要](../fixtures/chronicle-activation-regtest-summary.json) · [复现脚本](../recursion/run_chronicle_regtest.py)

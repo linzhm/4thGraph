@@ -18,8 +18,7 @@ from projects.cctp.evm.bsv_burn_evidence import (
     BurnReference, CanonicalBurn, read_bsv_raw_transaction,
 )
 from projects.cctp.evm.reserve_rpc import Rpc
-from shared.transaction import Input, blob, hash256, preimage_all
-from transfer import COMPACT_SCRIPTCODE
+from shared.transaction import Input, blob, hash256
 
 if TYPE_CHECKING:
     from continuity_verifier import ContinuityVerifier
@@ -105,7 +104,7 @@ class CertifiedBurnProvenance:
             supporting.append(prior_funding)
         parents, supporting = tuple(parents), tuple(supporting)
         receipt, context, actual_burn = verifier.validate_burn(tx, funding, parents, supporting)
-        expected_context = hash256(preimage_all(tx, 0, funding.outputs[0].value, COMPACT_SCRIPTCODE))
+        expected_context = hash256(verifier.context_preimage(tx, funding, 0))
         material = verifier.burn_material(tx, funding, parents, supporting)
         witness = tx.inputs[0].script
         if (actual_burn != burn.receipt or context != expected_context or len(witness) <= len(material)
