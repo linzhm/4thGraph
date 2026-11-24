@@ -128,19 +128,22 @@ class ActualMimoTests(unittest.TestCase):
         anchor = Input(setup.txid_wire(), 5)
         reserve = None
         if evm:
-            from cross_chain_fixture import LocalReserve
+            from cross_chain_fixture import AdoptedBsvChain, DurableBridge, LocalReserve
 
             reserve = LocalReserve(evm, anchor.outpoint())
             asset = reserve.asset
             evidence["scope"] = (
                 "Local EVM and BSV regtest lifecycle with mock USDC and test proof parameters. "
-                "BSV token ancestry is checked by the release host against confirmed transactions."
+                "BSV token ancestry is checked by the release host against confirmed transactions. "
+                "Journal evidence uses SQLite across signer interruption, restart and reconciliation."
             )
             evidence["source_chain"] = {
                 "chain_id": reserve.scope.chain_id, "vault": reserve.vault, "mock_usdc": reserve.usdc,
             }
             evidence["evm_deposits"] = {}
             evidence["evm_releases"] = {}
+            evidence["mint_journal"] = {}
+            evidence["reconciliation"] = {}
         else:
             asset = AssetDescriptor(1, anchor.outpoint(), 6, 7, b"r" * 32, b"p" * 32)
 
@@ -176,19 +179,42 @@ class ActualMimoTests(unittest.TestCase):
                     include(parent)
             confirm(genesis, (setup,), "mint-genesis")
             if reserve:
+                bridge = DurableBridge(reserve, mint_policy, Path(temp) / "bridge.sqlite3")
                 first_deposit, evidence["evm_deposits"]["1024"] = reserve.deposit(1024, owner_key)
-                observe_first = reserve.observe
             else:
                 first_deposit = Deposit(
                     DepositPosition(chain_id, asset.reserve_domain, reserve_contract, b"t" * 32, 0),
                     asset.reserve_asset, asset.network, asset.asset_id(), 1024, 0, owner_key,
                 )
-                def observe_first(_):
-                    return first_deposit
+
+            def run_mint(plan, transitions, label, *, interrupt=False):
+                if not reserve:
+                    signed = authorize_mint(plan, lambda _: plan.deposit, mint_signer)
+                    confirm(signed, (plan.prior, setup), label)
+                    return signed
+
+                if not transitions:
+                    node.call("generatetoaddress", 1, address)
+                predecessor_chain = AdoptedBsvChain(node, confirmed_blocks)
+
+                def current_mint_state():
+                    return predecessor_chain.mint_state(mint_policy, genesis, transitions)
+
+                predecessor = current_mint_state()
+                signed, journal = bridge.authorize_mint(plan, current_mint_state, mint_signer, interrupt=interrupt)
+                if not transitions:
+                    pending = bridge.reconcile(0, 0)
+                    self.assertEqual(pending["pending_mint"], plan.deposit.net_quantity)
+                    evidence["reconciliation"]["before_first_mint_broadcast"] = pending
+                confirm(signed, (plan.prior, setup), label)
+                node.call("generatetoaddress", 1, address)
+                confirmed_chain = AdoptedBsvChain(node, confirmed_blocks)
+                confirmed = bridge.record_mint(confirmed_chain, signed, predecessor, plan.deposit.position.event_id())
+                evidence["mint_journal"][label] = journal | confirmed
+                return signed
 
             plan = prepare_mint(mint_policy, genesis, MintEvents(), first_deposit, Input(setup.txid_wire(), 6))
-            origin = authorize_mint(plan, observe_first, mint_signer)
-            confirm(origin, (genesis, setup), "mint-1024")
+            origin = run_mint(plan, (), "mint-1024", interrupt=True)
 
             def transfer(label, prover, verifier, sources, output_amounts, receipt=None):
                 parents, vouts, input_amounts = zip(*sources, strict=True)
@@ -248,6 +274,12 @@ class ActualMimoTests(unittest.TestCase):
                 return signed
 
             frozen = toggle("freeze", split, 7, True)
+            if reserve:
+                freeze_chain = AdoptedBsvChain(node, confirmed_blocks)
+                freeze_lineage = freeze_chain.lineage(mint_policy, policy, provers)
+                circulating, frozen_units = freeze_chain.supply(freeze_lineage, (frozen, 0), (split, 1))
+                self.assertEqual((circulating, frozen_units), (1024, 640))
+                evidence["reconciliation"]["frozen_split"] = bridge.reconcile(circulating, frozen_units)
             active = toggle("unfreeze", frozen, 8, False)
             mimo = transfer("distinct-mimo", provers[1], verifiers[1],
                             ((active, 0, 640), (split, 1, 384)), (640, 384))
@@ -258,8 +290,6 @@ class ActualMimoTests(unittest.TestCase):
             self.assertEqual(policy.parse(change.outputs[0].script).quantity, 384)
 
             if reserve:
-                from cross_chain_fixture import AdoptedBsvChain
-
                 node.call("generatetoaddress", 1, address)
                 chain = AdoptedBsvChain(node, confirmed_blocks)
                 lineage = chain.lineage(mint_policy, policy, provers)
@@ -270,23 +300,20 @@ class ActualMimoTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, "wrong asset or token lock"):
                     chain.payment(change, 1, asset, policy, lineage, owner_key)
 
-                evidence["evm_releases"]["640"] = reserve.release(chain, change, 1, lineage)
-                evidence["main_path_accounting"] = reserve.accounting(1024, 640, change_wallet.quantity)
+                evidence["evm_releases"]["640"] = bridge.release(
+                    chain, change, 1, lineage, circulating=change_wallet.quantity, interrupt=True,
+                )
+                evidence["main_path_accounting"] = bridge.reconcile(change_wallet.quantity, 0)
                 second_deposit, evidence["evm_deposits"]["128"] = reserve.deposit(128, owner_key)
-                observe_second = reserve.observe
             else:
                 second_deposit = replace(
                     first_deposit, position=replace(first_deposit.position, transaction_hash=b"s" * 32),
                     gross_quantity=128,
                 )
 
-                def observe_second(_):
-                    return second_deposit
-
             second_plan = prepare_mint(mint_policy, origin, plan.successor, second_deposit,
                                        Input(setup.txid_wire(), 9))
-            second = authorize_mint(second_plan, observe_second, mint_signer)
-            confirm(second, (origin, setup), "mint-128")
+            second = run_mint(second_plan, (origin,), "mint-128")
             full = replace(partial, quantity=128)
             destroyed = transfer("full-burn", provers[4], verifiers[4], ((second, 1, 128),), (), full)
             self.assertEqual(destroyed.outputs, (full.output(),))
@@ -294,7 +321,14 @@ class ActualMimoTests(unittest.TestCase):
                 node.call("generatetoaddress", 1, address)
                 chain = AdoptedBsvChain(node, confirmed_blocks)
                 lineage = chain.lineage(mint_policy, policy, provers)
-                evidence["evm_releases"]["128"] = reserve.release(chain, destroyed, 0, lineage)
-                evidence["final_accounting"] = reserve.accounting(1152, 768, change_wallet.quantity)
+                final_supply, final_frozen = chain.supply(lineage, (change, 0))
+                self.assertEqual((final_supply, final_frozen), (384, 0))
+                evidence["evm_releases"]["128"] = bridge.release(
+                    chain, destroyed, 0, lineage, circulating=final_supply,
+                )
+                evidence["final_accounting"] = bridge.reconcile(final_supply, final_frozen)
+                self.assertEqual((evidence["final_accounting"]["pending_mint"],
+                                  evidence["final_accounting"]["pending_release"]), (0, 0))
+                evidence["journal_audit"] = bridge.audit()
         if node and "CCTP_MIMO_REPORT" in os.environ:
             Path(os.environ["CCTP_MIMO_REPORT"]).write_text(json.dumps(evidence, indent=2) + "\n")

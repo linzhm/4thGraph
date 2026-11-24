@@ -1,0 +1,454 @@
+{
+  "scope": "Local EVM and BSV regtest lifecycle with mock USDC and test proof parameters. BSV token ancestry is checked by the release host against confirmed transactions. Journal evidence uses SQLite across signer interruption, restart and reconciliation.",
+  "transactions": {
+    "mint-genesis": {
+      "txid": "fa217d84b10ccbeed986dd927826f8bef5bf648c231304d369402d4b49c7f804",
+      "blockhash": "79f4be5f22368eea72d8fd2c25ee63e49b91439a79436d5aff96cf0a6ef0e180",
+      "bytes": 42047
+    },
+    "mint-1024": {
+      "txid": "e4f21bafd455d245d69e04f141d70b4a858a74afa05c758c5e9ea3c7f09d7d4c",
+      "blockhash": "6f1d93c4eeee7669252dbc40b9d6cc5eeb698fa8af075cd8b5da24a4122cf6fc",
+      "bytes": 94689
+    },
+    "split": {
+      "txid": "ae1da7ab2e38325e9e788aa5b6546e10124ec52a3a0c9b1016027fb1b3741ed1",
+      "blockhash": "4c3d2f5b943bafdab04c016a2508b7c4d11facbaae3e1d053ee583e1a0d8ed5d",
+      "bytes": 561302
+    },
+    "freeze": {
+      "txid": "65660117783cc15d9717c901e0c248f2acab1348ae4112ba84624cae6bae870b",
+      "blockhash": "51ae4661c79953112e76a756f793d1bc5a3c57fc5a448c8c76b3512ec27403ea",
+      "bytes": 3726
+    },
+    "unfreeze": {
+      "txid": "7ac206122ebd28bf5d3ab8a933db1358af93e1d7aa8e0f0d6a1e6b4f62d88ab6",
+      "blockhash": "4cd451ac9dce76dcdeafe52d31a55ce7bbbec4ff8aead848a1636ff4f87eafdc",
+      "bytes": 3726
+    },
+    "distinct-mimo": {
+      "txid": "fb2da37257df632245960767b35b207358e6b9bbead053c651fbe40c0ae63b5e",
+      "blockhash": "3cb23058f346a123b3eed8857db1026ff8c87cbe264529069733fa5aef19a189",
+      "bytes": 1494695
+    },
+    "merge": {
+      "txid": "ed63150f4c35f5d5c9b8478a2453f6b4f4963bf8d9122881b147d911a866b387",
+      "blockhash": "58af56d500577457713ab4bd0c3e03444f79d4698a3899618eefb543c94da4fd",
+      "bytes": 3912362
+    },
+    "partial-burn": {
+      "txid": "14175bea95fd15c0b02e35e306525be151f21b8c38c1980caf89ea9338e1226b",
+      "blockhash": "4d972ecfb3e55961b723795f6f370b016ee61af4a75c5248c71f718d94d74c25",
+      "bytes": 4374317
+    },
+    "mint-128": {
+      "txid": "f9449b20d4471c0fa629833766f5b7d13c0fa55483905ad35650ae15f4157fb9",
+      "blockhash": "7b25a240658c118f5b6ef5c7db7c70283cc24b25bf73f6fbfdc79634b23a7936",
+      "bytes": 94688
+    },
+    "full-burn": {
+      "txid": "c2fbee495dfc83cf8bc4196a305f87f09f1284ba88333ffefaf5404427747bec",
+      "blockhash": "74c1a5c0f93a94156b680e8e00df0baeedae3097c90bbc723191114c37f74e50",
+      "bytes": 551596
+    }
+  },
+  "node": "/Bitcoin SV:1.2.3/",
+  "source_chain": {
+    "chain_id": 31337,
+    "vault": "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512",
+    "mock_usdc": "0x5FbDB2315678afecb367f032d93F642f64180aa3"
+  },
+  "evm_deposits": {
+    "1024": {
+      "txid": "0xd7a832d88ea7ff43f92f5883aea8a41f3fde6789b75710b25facfde2ed6953cf",
+      "blockhash": "0x3cb6bae279f5b07eae5c2d3979f8b74409952d6f5ca8dd7da3b78c21c8b85471",
+      "event_id": "c8ff72bc8af584279f588dfa39a0d86f3d9d355619121de88c10658f887aee7f",
+      "receipt_log_ordinal": 1,
+      "quantity": 1024
+    },
+    "128": {
+      "txid": "0x88c080ee32cf9c9129f7c34a419ba7c79210871759806eb5dd1f2b0d440133d5",
+      "blockhash": "0x124e91d5301914ab236027c4eb537967c8e88a1987662c29d337601e24a016fd",
+      "event_id": "9b58c053806c4c71f65041d48835254328451363ea9f2f2bca7df0051fd2e627",
+      "receipt_log_ordinal": 1,
+      "quantity": 128
+    }
+  },
+  "evm_releases": {
+    "640": {
+      "txid": "0x5479a93739455d04c6c789c4cdeae3dca2ddf100b17695b0463355baa2e1864b",
+      "blockhash": "0xac8b99250acfda2ad4263affc75ae5054ae50328da57991ee3aeb9c37559f3a1",
+      "receipt_log_ordinal": 1,
+      "burn_txid": "14175bea95fd15c0b02e35e306525be151f21b8c38c1980caf89ea9338e1226b",
+      "burn_vout": 1,
+      "burn_blockhash": "4d972ecfb3e55961b723795f6f370b016ee61af4a75c5248c71f718d94d74c25",
+      "burn_event_id": "fc580944d8135df1c057ccb7ed0760b8d4fb3948df54607ed84737709c981b85",
+      "attestation_digest": "03b862ed859cf8d5259d7987e7c542eadf834ba23d3ca4cfc8ca304183a5541e",
+      "confirmation_depth_policy": 2,
+      "quantity": 640,
+      "actual_recipient_credit": 640,
+      "finalized": true,
+      "recovered_without_resigning": true,
+      "journal": {
+        "event_id": "fc580944d8135df1c057ccb7ed0760b8d4fb3948df54607ed84737709c981b85",
+        "authorization_digest": "03b862ed859cf8d5259d7987e7c542eadf834ba23d3ca4cfc8ca304183a5541e",
+        "phase_before_broadcast": "authorized",
+        "signer_interrupted": true,
+        "pre_sign_intent_persisted": true,
+        "recovered_signature_without_resigning": true,
+        "observed_effect_phase": "submitted",
+        "final_effect_phase": "settled"
+      },
+      "before_broadcast_accounting": {
+        "deposited": 1024,
+        "minted": 1024,
+        "burned": 640,
+        "released": 0,
+        "net_reserve": 1024,
+        "actual_vault_balance": 1024,
+        "bsv_circulating": 384,
+        "bsv_frozen": 0,
+        "pending_mint": 0,
+        "pending_release": 640,
+        "balanced": true,
+        "holds": 0
+      }
+    },
+    "128": {
+      "txid": "0x61f168aff1200dcb147919817bb08789f6704febb87d55e081e968f4df2e1119",
+      "blockhash": "0xdbed01d80d92792e016fc7c5592908a62c7475661eb4867357824f7d5fd3fdbe",
+      "receipt_log_ordinal": 1,
+      "burn_txid": "c2fbee495dfc83cf8bc4196a305f87f09f1284ba88333ffefaf5404427747bec",
+      "burn_vout": 0,
+      "burn_blockhash": "74c1a5c0f93a94156b680e8e00df0baeedae3097c90bbc723191114c37f74e50",
+      "burn_event_id": "bf6d3217952b54778ace71e6a449390664b7fd770c1745417aead08f04e15b6e",
+      "attestation_digest": "06b3dbc458dc1e274e3fc573b43e9bd70fbbd9b8d879aaba84ea952b97aa7e32",
+      "confirmation_depth_policy": 2,
+      "quantity": 128,
+      "actual_recipient_credit": 128,
+      "finalized": true,
+      "recovered_without_resigning": true,
+      "journal": {
+        "event_id": "bf6d3217952b54778ace71e6a449390664b7fd770c1745417aead08f04e15b6e",
+        "authorization_digest": "06b3dbc458dc1e274e3fc573b43e9bd70fbbd9b8d879aaba84ea952b97aa7e32",
+        "phase_before_broadcast": "authorized",
+        "signer_interrupted": false,
+        "pre_sign_intent_persisted": true,
+        "recovered_signature_without_resigning": true,
+        "observed_effect_phase": "submitted",
+        "final_effect_phase": "settled"
+      },
+      "before_broadcast_accounting": {
+        "deposited": 1152,
+        "minted": 1152,
+        "burned": 768,
+        "released": 640,
+        "net_reserve": 512,
+        "actual_vault_balance": 512,
+        "bsv_circulating": 384,
+        "bsv_frozen": 0,
+        "pending_mint": 0,
+        "pending_release": 128,
+        "balanced": true,
+        "holds": 0
+      }
+    }
+  },
+  "mint_journal": {
+    "mint-1024": {
+      "event_id": "c8ff72bc8af584279f588dfa39a0d86f3d9d355619121de88c10658f887aee7f",
+      "authorization_digest": "b9cc5e0a20c7013d5d4023bf8c41a6c7604aca07fb0c14abe5f8441763f61128",
+      "phase_before_broadcast": "authorized",
+      "signer_interrupted": true,
+      "pre_sign_intent_persisted": true,
+      "recovered_signature_without_resigning": true,
+      "reconstructed_from_persisted_draft": true,
+      "bsv_txid": "e4f21bafd455d245d69e04f141d70b4a858a74afa05c758c5e9ea3c7f09d7d4c",
+      "bsv_blockhash": "6f1d93c4eeee7669252dbc40b9d6cc5eeb698fa8af075cd8b5da24a4122cf6fc",
+      "bsv_vout": 1,
+      "bsv_height": 224,
+      "phase_after_confirmation": "settled"
+    },
+    "mint-128": {
+      "event_id": "9b58c053806c4c71f65041d48835254328451363ea9f2f2bca7df0051fd2e627",
+      "authorization_digest": "a22d396dd7c947c036509e6cab4abf8337a0c25a3173963df95e420d0b9a9232",
+      "phase_before_broadcast": "authorized",
+      "signer_interrupted": false,
+      "pre_sign_intent_persisted": true,
+      "recovered_signature_without_resigning": true,
+      "reconstructed_from_persisted_draft": true,
+      "bsv_txid": "f9449b20d4471c0fa629833766f5b7d13c0fa55483905ad35650ae15f4157fb9",
+      "bsv_blockhash": "7b25a240658c118f5b6ef5c7db7c70283cc24b25bf73f6fbfdc79634b23a7936",
+      "bsv_vout": 1,
+      "bsv_height": 233,
+      "phase_after_confirmation": "settled"
+    }
+  },
+  "reconciliation": {
+    "before_first_mint_broadcast": {
+      "deposited": 1024,
+      "minted": 0,
+      "burned": 0,
+      "released": 0,
+      "net_reserve": 1024,
+      "actual_vault_balance": 1024,
+      "bsv_circulating": 0,
+      "bsv_frozen": 0,
+      "pending_mint": 1024,
+      "pending_release": 0,
+      "balanced": true,
+      "holds": 0
+    },
+    "frozen_split": {
+      "deposited": 1024,
+      "minted": 1024,
+      "burned": 0,
+      "released": 0,
+      "net_reserve": 1024,
+      "actual_vault_balance": 1024,
+      "bsv_circulating": 1024,
+      "bsv_frozen": 640,
+      "pending_mint": 0,
+      "pending_release": 0,
+      "balanced": true,
+      "holds": 0
+    }
+  },
+  "wrong_parent_rejection": "sendrawtransaction: {'code': -26, 'message': '16: mandatory-script-verify-flag-failed (Script failed an OP_EQUALVERIFY operation)'}",
+  "partial-burn-wrong-recipient": "sendrawtransaction: {'code': -26, 'message': '16: mandatory-script-verify-flag-failed (Script evaluated without error but finished with a false/empty top stack element)'}",
+  "wallet_change": {
+    "txid": "14175bea95fd15c0b02e35e306525be151f21b8c38c1980caf89ea9338e1226b",
+    "vout": 0,
+    "outpoint_wire": "6b22e13893ea89af0c98c1388c1bf251e15b5206e3352eb0c015fd95ea5b171400000000",
+    "quantity": 384,
+    "confirmations": 2,
+    "known_spend_status": "unspent",
+    "frozen": false,
+    "blockhash": "4d972ecfb3e55961b723795f6f370b016ee61af4a75c5248c71f718d94d74c25",
+    "block_header": "00000020fda44dc943b5ef8e6199388a69d4794f44033e0cbdb43a7157745700d556af5842d3559999671099e56a3509a494010dcd283d7d61306b2c6c9887e8ef16102f875b056bffff7f2002000000",
+    "block_height": 231,
+    "block_leaf_count": 2,
+    "merkle_index": 1,
+    "merkle_siblings_wire": [
+      "c1a7377a24510d31ea364612edd7d2a0c04e3a6e505624f4d4fbb8f59283ed97"
+    ]
+  },
+  "wallet_spent": {
+    "txid": "ae1da7ab2e38325e9e788aa5b6546e10124ec52a3a0c9b1016027fb1b3741ed1",
+    "vout": 1,
+    "outpoint_wire": "d11e74b3b17f0216109b0c3a2ac54e12106e54b6a58a789e5e32382eaba71dae01000000",
+    "quantity": 384,
+    "confirmations": 7,
+    "known_spend_status": "spent",
+    "frozen": false,
+    "blockhash": "4c3d2f5b943bafdab04c016a2508b7c4d11facbaae3e1d053ee583e1a0d8ed5d",
+    "block_header": "00000020ee97431f0b3bbadd504a3d50171e5d9a2932c30cb074182cf2dd2f791ffb040c9e9318b038ca816a953d01df230020348dea905414b75e8a726f710f3ca2d294785b056bffff7f2000000000",
+    "block_height": 226,
+    "block_leaf_count": 2,
+    "merkle_index": 1,
+    "merkle_siblings_wire": [
+      "2ef43832b341f181cf419fe9b0610896f72b5a327c196e05341b44885e50c8fc"
+    ]
+  },
+  "main_path_accounting": {
+    "deposited": 1024,
+    "minted": 1024,
+    "burned": 640,
+    "released": 640,
+    "net_reserve": 384,
+    "actual_vault_balance": 384,
+    "bsv_circulating": 384,
+    "bsv_frozen": 0,
+    "pending_mint": 0,
+    "pending_release": 0,
+    "balanced": true,
+    "holds": 0
+  },
+  "full-burn-wrong-recipient": "sendrawtransaction: {'code': -26, 'message': '16: mandatory-script-verify-flag-failed (Script evaluated without error but finished with a false/empty top stack element)'}",
+  "final_accounting": {
+    "deposited": 1152,
+    "minted": 1152,
+    "burned": 768,
+    "released": 768,
+    "net_reserve": 384,
+    "actual_vault_balance": 384,
+    "bsv_circulating": 384,
+    "bsv_frozen": 0,
+    "pending_mint": 0,
+    "pending_release": 0,
+    "balanced": true,
+    "holds": 0
+  },
+  "journal_audit": [
+    {
+      "sequence": 1,
+      "event_id": "c8ff72bc8af584279f588dfa39a0d86f3d9d355619121de88c10658f887aee7f",
+      "operation": "origin_finalized"
+    },
+    {
+      "sequence": 2,
+      "event_id": "c8ff72bc8af584279f588dfa39a0d86f3d9d355619121de88c10658f887aee7f",
+      "operation": "mint_state_reserved"
+    },
+    {
+      "sequence": 3,
+      "event_id": "c8ff72bc8af584279f588dfa39a0d86f3d9d355619121de88c10658f887aee7f",
+      "operation": "authorization_recorded"
+    },
+    {
+      "sequence": 4,
+      "event_id": "c8ff72bc8af584279f588dfa39a0d86f3d9d355619121de88c10658f887aee7f",
+      "operation": "origin_replay"
+    },
+    {
+      "sequence": 5,
+      "event_id": "c8ff72bc8af584279f588dfa39a0d86f3d9d355619121de88c10658f887aee7f",
+      "operation": "authorization_replay"
+    },
+    {
+      "sequence": 6,
+      "event_id": "c8ff72bc8af584279f588dfa39a0d86f3d9d355619121de88c10658f887aee7f",
+      "operation": "signature_recorded"
+    },
+    {
+      "sequence": 7,
+      "event_id": "c8ff72bc8af584279f588dfa39a0d86f3d9d355619121de88c10658f887aee7f",
+      "operation": "origin_replay"
+    },
+    {
+      "sequence": 8,
+      "event_id": "c8ff72bc8af584279f588dfa39a0d86f3d9d355619121de88c10658f887aee7f",
+      "operation": "authorization_replay"
+    },
+    {
+      "sequence": 9,
+      "event_id": "c8ff72bc8af584279f588dfa39a0d86f3d9d355619121de88c10658f887aee7f",
+      "operation": "effect_finalized"
+    },
+    {
+      "sequence": 10,
+      "event_id": "fc580944d8135df1c057ccb7ed0760b8d4fb3948df54607ed84737709c981b85",
+      "operation": "origin_finalized"
+    },
+    {
+      "sequence": 11,
+      "event_id": "fc580944d8135df1c057ccb7ed0760b8d4fb3948df54607ed84737709c981b85",
+      "operation": "authorization_recorded"
+    },
+    {
+      "sequence": 12,
+      "event_id": "fc580944d8135df1c057ccb7ed0760b8d4fb3948df54607ed84737709c981b85",
+      "operation": "origin_replay"
+    },
+    {
+      "sequence": 13,
+      "event_id": "fc580944d8135df1c057ccb7ed0760b8d4fb3948df54607ed84737709c981b85",
+      "operation": "authorization_replay"
+    },
+    {
+      "sequence": 14,
+      "event_id": "fc580944d8135df1c057ccb7ed0760b8d4fb3948df54607ed84737709c981b85",
+      "operation": "signature_recorded"
+    },
+    {
+      "sequence": 15,
+      "event_id": "fc580944d8135df1c057ccb7ed0760b8d4fb3948df54607ed84737709c981b85",
+      "operation": "origin_replay"
+    },
+    {
+      "sequence": 16,
+      "event_id": "fc580944d8135df1c057ccb7ed0760b8d4fb3948df54607ed84737709c981b85",
+      "operation": "authorization_replay"
+    },
+    {
+      "sequence": 17,
+      "event_id": "fc580944d8135df1c057ccb7ed0760b8d4fb3948df54607ed84737709c981b85",
+      "operation": "effect_observed"
+    },
+    {
+      "sequence": 18,
+      "event_id": "fc580944d8135df1c057ccb7ed0760b8d4fb3948df54607ed84737709c981b85",
+      "operation": "effect_finalized"
+    },
+    {
+      "sequence": 19,
+      "event_id": "fc580944d8135df1c057ccb7ed0760b8d4fb3948df54607ed84737709c981b85",
+      "operation": "origin_replay"
+    },
+    {
+      "sequence": 20,
+      "event_id": "9b58c053806c4c71f65041d48835254328451363ea9f2f2bca7df0051fd2e627",
+      "operation": "origin_finalized"
+    },
+    {
+      "sequence": 21,
+      "event_id": "9b58c053806c4c71f65041d48835254328451363ea9f2f2bca7df0051fd2e627",
+      "operation": "mint_state_reserved"
+    },
+    {
+      "sequence": 22,
+      "event_id": "9b58c053806c4c71f65041d48835254328451363ea9f2f2bca7df0051fd2e627",
+      "operation": "authorization_recorded"
+    },
+    {
+      "sequence": 23,
+      "event_id": "9b58c053806c4c71f65041d48835254328451363ea9f2f2bca7df0051fd2e627",
+      "operation": "signature_recorded"
+    },
+    {
+      "sequence": 24,
+      "event_id": "9b58c053806c4c71f65041d48835254328451363ea9f2f2bca7df0051fd2e627",
+      "operation": "origin_replay"
+    },
+    {
+      "sequence": 25,
+      "event_id": "9b58c053806c4c71f65041d48835254328451363ea9f2f2bca7df0051fd2e627",
+      "operation": "authorization_replay"
+    },
+    {
+      "sequence": 26,
+      "event_id": "9b58c053806c4c71f65041d48835254328451363ea9f2f2bca7df0051fd2e627",
+      "operation": "effect_finalized"
+    },
+    {
+      "sequence": 27,
+      "event_id": "bf6d3217952b54778ace71e6a449390664b7fd770c1745417aead08f04e15b6e",
+      "operation": "origin_finalized"
+    },
+    {
+      "sequence": 28,
+      "event_id": "bf6d3217952b54778ace71e6a449390664b7fd770c1745417aead08f04e15b6e",
+      "operation": "authorization_recorded"
+    },
+    {
+      "sequence": 29,
+      "event_id": "bf6d3217952b54778ace71e6a449390664b7fd770c1745417aead08f04e15b6e",
+      "operation": "signature_recorded"
+    },
+    {
+      "sequence": 30,
+      "event_id": "bf6d3217952b54778ace71e6a449390664b7fd770c1745417aead08f04e15b6e",
+      "operation": "origin_replay"
+    },
+    {
+      "sequence": 31,
+      "event_id": "bf6d3217952b54778ace71e6a449390664b7fd770c1745417aead08f04e15b6e",
+      "operation": "authorization_replay"
+    },
+    {
+      "sequence": 32,
+      "event_id": "bf6d3217952b54778ace71e6a449390664b7fd770c1745417aead08f04e15b6e",
+      "operation": "effect_observed"
+    },
+    {
+      "sequence": 33,
+      "event_id": "bf6d3217952b54778ace71e6a449390664b7fd770c1745417aead08f04e15b6e",
+      "operation": "effect_finalized"
+    },
+    {
+      "sequence": 34,
+      "event_id": "bf6d3217952b54778ace71e6a449390664b7fd770c1745417aead08f04e15b6e",
+      "operation": "origin_replay"
+    }
+  ]
+}
