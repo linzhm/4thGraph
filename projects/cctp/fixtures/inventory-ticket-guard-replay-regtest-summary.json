@@ -1,0 +1,405 @@
+{
+  "scope": "Read-only verifyscript of vin 0 (shared verifier), 1 (ticket), 2 (first holder) over mined regtest inputs. Variants only replace the named outpoint or ticket signature. Outpoint variants refresh the shared verifier, ticket and every holder witness. Profile I supplies the approved ticket fields for both outpoint variants.",
+  "node": "/Bitcoin SV:1.2.3/",
+  "profiles": {
+    "g": {
+      "mined": {
+        "payment-1": {
+          "txid": "88d725917b40ace27b96e8c6e2d040496e9c6d34011dde0156e3aa0a5dd0f674",
+          "blockhash": "5fee5f73943a71c9c7299c69e4c76ec2c8bdf16877c9e53e6dcc164735aca2b6",
+          "height": 889,
+          "bytes": 259001
+        },
+        "payment-1-verifier": {
+          "txid": "7a43b5d767cf63c1895abc6dfa99f08981addd33e023988f5155ed30250831ae",
+          "blockhash": "2409f232f24a35cf97ea189db198dd9fba4bc15c683b0938d4c1e9ea1e3cc20f",
+          "height": 885,
+          "bytes": 23287
+        },
+        "payment-1-companion": {
+          "txid": "3e5107beddf10fb5d50cc417f5c515ccef7be8e4726944508599e15dd3028e2f",
+          "blockhash": "4b3acfe44c50279cfea35ed049b071f8f241e51067432da03c9afffc95873820",
+          "height": 886,
+          "bytes": 205
+        },
+        "negative-same-verifier-lock": {
+          "txid": "9173c33d7c1f0d88c829a58e6a5d50fcd9114fdaccac13975ea0ebe173e5d40a",
+          "blockhash": "060d29b3becc2a4c7e6290e8af0800c9e35a1f62416c5a682c89e442cc3da46f",
+          "height": 887,
+          "bytes": 23287
+        },
+        "negative-same-ticket-lock": {
+          "txid": "e1ae421b833442a127f38b68900cda028142ffa7ffb164b95da1cb48dc916479",
+          "blockhash": "48c89339bdbc0a29346ac8f6eb878efc1a9358a54488aa3a662f489fb0f6c2ec",
+          "height": 888,
+          "bytes": 133
+        },
+        "issuance-anchor": {
+          "txid": "4f1a4b3597e277a01b922d48dc5392fe74c647c7a1cb869271a48012b71fbb8c",
+          "blockhash": "14345187470943be28d3911de2c50fbcd6c2988777e012badf87e677a4dd019e",
+          "height": 883,
+          "bytes": 5918
+        },
+        "origin-000": {
+          "txid": "5bbface55255bd4bac8cf1b21214e5bafbe2771c3dad3f9db7a3edc84aba5317",
+          "blockhash": "27e1aab80fc7f58df862839459552248137be2e8ab04df842a07eeb6d66f6ede",
+          "height": 884,
+          "bytes": 1098
+        }
+      },
+      "holder_vin": 2,
+      "holder_origin_vout": 0,
+      "results": {
+        "mined_original": {
+          "candidate_txid": "88d725917b40ace27b96e8c6e2d040496e9c6d34011dde0156e3aa0a5dd0f674",
+          "vin_results": [
+            {
+              "vin": 0,
+              "result": "ok",
+              "flags": 4015147
+            },
+            {
+              "vin": 1,
+              "result": "ok",
+              "flags": 4015147
+            },
+            {
+              "vin": 2,
+              "result": "ok",
+              "flags": 4015147
+            }
+          ]
+        },
+        "same_verifier_lock_other_txid": {
+          "candidate_txid": "cd315def4059c323c2f89fd02e32588f6932fc7ad03f388ef5b4d60d78ac6dc6",
+          "vin_results": [
+            {
+              "vin": 0,
+              "result": "ok",
+              "flags": 4015147
+            },
+            {
+              "vin": 1,
+              "result": "ok",
+              "flags": 4015147
+            },
+            {
+              "vin": 2,
+              "result": "error",
+              "description": "Script failed an OP_EQUALVERIFY operation",
+              "flags": 4015147
+            }
+          ]
+        },
+        "ticket_from_unapproved_coupon": {
+          "candidate_txid": "2c107b11ebf9e2a19f97de4478557a891f3c59b8523f36cbbd0d5e2fdbe23d34",
+          "vin_results": [
+            {
+              "vin": 0,
+              "result": "ok",
+              "flags": 4015147
+            },
+            {
+              "vin": 1,
+              "result": "ok",
+              "flags": 4015147
+            },
+            {
+              "vin": 2,
+              "result": "error",
+              "description": "Script failed an OP_VERIFY operation",
+              "flags": 4015147
+            }
+          ]
+        },
+        "wrong_ticket_signature": {
+          "candidate_txid": "e62213eda4fbdf0e35fe738258157c1820a443753c409663e623c1a00f046a79",
+          "vin_results": [
+            {
+              "vin": 0,
+              "result": "ok",
+              "flags": 4015147
+            },
+            {
+              "vin": 1,
+              "result": "error",
+              "description": "Script evaluated without error but finished with a false/empty top stack element",
+              "flags": 4015147
+            },
+            {
+              "vin": 2,
+              "result": "ok",
+              "flags": 4015147
+            }
+          ]
+        }
+      }
+    },
+    "h": {
+      "mined": {
+        "payment-1": {
+          "txid": "9a70bc49aa7cf66179947f617545e0ae7f42385582ac52a1dbaa757974b83943",
+          "blockhash": "33e963723ade5ec78bd22b357e4bf9fd489b0de1a963e69b6dc36bd1f8afb8c3",
+          "height": 1000,
+          "bytes": 254009
+        },
+        "payment-1-verifier": {
+          "txid": "99e35cc88795900669dd00204e4ba64c02ab925119a0de15a5f4f2642d5780c0",
+          "blockhash": "03bd9615880775e2b3b90c855838afd62964aaafdb01798c0e6f941d3389a135",
+          "height": 996,
+          "bytes": 23281
+        },
+        "payment-1-companion": {
+          "txid": "b399440a9021f282e511ed5a931d6a73f5d56e1c25073e22d9fed41d4f8b80db",
+          "blockhash": "7c1e6bf2cff216014a4066cfb0e4cc23c1c0257f65678865a0fb29bee2fc53c0",
+          "height": 997,
+          "bytes": 205
+        },
+        "negative-same-verifier-lock": {
+          "txid": "7a6e41415541d1dfb9df027596ceba154efa298868af29613c9307b5153c8e5a",
+          "blockhash": "253bcc14cf62b7e490235548b17d6b0a4b20b0f15976c8450cbf20a8fe93799e",
+          "height": 998,
+          "bytes": 23281
+        },
+        "negative-same-ticket-lock": {
+          "txid": "d0edeb8ea49b198b9ec228db370fc2424f7a5ca9ae6bde6641253fe5c8cbf969",
+          "blockhash": "7309f585b193fb7dc9f2c7bbd3c331c9d8ede3c8de770a25747674efefc59ef7",
+          "height": 999,
+          "bytes": 133
+        },
+        "issuance-anchor": {
+          "txid": "5395889cab43a149fe614071cfe79c85710670a41f259d1c278bc63e704caaf7",
+          "blockhash": "6010e1c123eeb2d45ace795e2b4f292e749bb1703c7d1aabe2b530552de1ba1e",
+          "height": 994,
+          "bytes": 5917
+        },
+        "origin-000": {
+          "txid": "495282c565e4bb1202d91f1db94dd5f3c5a828a8873622bd82fc89985bcd8119",
+          "blockhash": "362f40bfa32b390aa7e0f94645ad2de53f697cb51779373b102daff00b72ab29",
+          "height": 995,
+          "bytes": 1092
+        }
+      },
+      "holder_vin": 2,
+      "holder_origin_vout": 0,
+      "results": {
+        "mined_original": {
+          "candidate_txid": "9a70bc49aa7cf66179947f617545e0ae7f42385582ac52a1dbaa757974b83943",
+          "vin_results": [
+            {
+              "vin": 0,
+              "result": "ok",
+              "flags": 4015147
+            },
+            {
+              "vin": 1,
+              "result": "ok",
+              "flags": 4015147
+            },
+            {
+              "vin": 2,
+              "result": "ok",
+              "flags": 4015147
+            }
+          ]
+        },
+        "same_verifier_lock_other_txid": {
+          "candidate_txid": "8c4a12bfd760165745193ec87d84c52b00e240093e8d380f1cd88c1dd409a7e2",
+          "vin_results": [
+            {
+              "vin": 0,
+              "result": "ok",
+              "flags": 4015147
+            },
+            {
+              "vin": 1,
+              "result": "ok",
+              "flags": 4015147
+            },
+            {
+              "vin": 2,
+              "result": "error",
+              "description": "Script failed an OP_EQUALVERIFY operation",
+              "flags": 4015147
+            }
+          ]
+        },
+        "ticket_from_unapproved_coupon": {
+          "candidate_txid": "da4754854e81309c0e6b441572500d58e2773e1b879786a09c7e207f24dd4f9b",
+          "vin_results": [
+            {
+              "vin": 0,
+              "result": "ok",
+              "flags": 4015147
+            },
+            {
+              "vin": 1,
+              "result": "ok",
+              "flags": 4015147
+            },
+            {
+              "vin": 2,
+              "result": "error",
+              "description": "Script failed an OP_VERIFY operation",
+              "flags": 4015147
+            }
+          ]
+        },
+        "wrong_ticket_signature": {
+          "candidate_txid": "2a1106f02cee76d6586c1eace00946f7ee0f3fb6cf16c484697ea511d5738b39",
+          "vin_results": [
+            {
+              "vin": 0,
+              "result": "ok",
+              "flags": 4015147
+            },
+            {
+              "vin": 1,
+              "result": "error",
+              "description": "Script evaluated without error but finished with a false/empty top stack element",
+              "flags": 4015147
+            },
+            {
+              "vin": 2,
+              "result": "ok",
+              "flags": 4015147
+            }
+          ]
+        }
+      }
+    },
+    "i": {
+      "mined": {
+        "payment-1": {
+          "txid": "bc130dac2152498878405c4374581515184e65a6d5e330f99619639870406b4a",
+          "blockhash": "0655a29c90e618ad32545e9159bffb30ebdfaa553be316b5ce19286433dc29e3",
+          "height": 1111,
+          "bytes": 247545
+        },
+        "payment-1-verifier": {
+          "txid": "c175eb6234530451ed1e1927737f98aa761b69204d2f42c5aee736efd7e1219c",
+          "blockhash": "6f1ef4510075ea7701d99a45a3d506716339863641b34a8dbba62f270fe64b25",
+          "height": 1107,
+          "bytes": 23241
+        },
+        "payment-1-companion": {
+          "txid": "63bf0f908f363ab7f176bb942c2897b83f940766acba67057ec8ad0f13249c77",
+          "blockhash": "297ec398248839528de8e820e19d9114abd898c0b930ade4bf2f72806db37710",
+          "height": 1108,
+          "bytes": 205
+        },
+        "negative-same-verifier-lock": {
+          "txid": "9431d2c096c066c2aa9f9336dcdfcb38ea51c0698991d925e0a381082a20a455",
+          "blockhash": "2d79704cae40b855ce218915761ea56388703549cf20a929587ae95ac4437e39",
+          "height": 1109,
+          "bytes": 23241
+        },
+        "negative-same-ticket-lock": {
+          "txid": "2a873dcc2d3c219828597e1a5cf276a9fdbeb247db9456c78b4f03648f1b964b",
+          "blockhash": "6e09500da872728a2dc512464273e697df190ca38d14baa0df382bf9a51b0cb4",
+          "height": 1110,
+          "bytes": 133
+        },
+        "issuance-anchor": {
+          "txid": "fafb3086f3360c736d7916735d262546b6521f54db533437a49dddab7d3b46d6",
+          "blockhash": "2d91d418bafbf5b7f7e7431062170c48a7bf1aabed8333849ef6bce81305fc7c",
+          "height": 1105,
+          "bytes": 5917
+        },
+        "origin-000": {
+          "txid": "e4e27c4d530abd5715167d4822863825b468e2aaf11aa110e0830e9cf8406fbc",
+          "blockhash": "57d17bd5aa42f45c8e905c59a98ca1e0cd095eca5d831c105ff0f67adaec8229",
+          "height": 1106,
+          "bytes": 1052
+        }
+      },
+      "holder_vin": 2,
+      "holder_origin_vout": 0,
+      "results": {
+        "mined_original": {
+          "candidate_txid": "bc130dac2152498878405c4374581515184e65a6d5e330f99619639870406b4a",
+          "vin_results": [
+            {
+              "vin": 0,
+              "result": "ok",
+              "flags": 4015147
+            },
+            {
+              "vin": 1,
+              "result": "ok",
+              "flags": 4015147
+            },
+            {
+              "vin": 2,
+              "result": "ok",
+              "flags": 4015147
+            }
+          ]
+        },
+        "same_verifier_lock_other_txid": {
+          "candidate_txid": "e18f6f9204e27a1a270dea3e212cc7f15f74fe0cfac026ac71b2077c7d877182",
+          "vin_results": [
+            {
+              "vin": 0,
+              "result": "ok",
+              "flags": 4015147
+            },
+            {
+              "vin": 1,
+              "result": "ok",
+              "flags": 4015147
+            },
+            {
+              "vin": 2,
+              "result": "error",
+              "description": "Script failed an OP_EQUALVERIFY operation",
+              "flags": 4015147
+            }
+          ]
+        },
+        "ticket_from_unapproved_coupon": {
+          "candidate_txid": "87817e0f429b65bbe3fe2647ffdf93f6ef80404f73c18cf55293fbf6241eee79",
+          "vin_results": [
+            {
+              "vin": 0,
+              "result": "ok",
+              "flags": 4015147
+            },
+            {
+              "vin": 1,
+              "result": "ok",
+              "flags": 4015147
+            },
+            {
+              "vin": 2,
+              "result": "error",
+              "description": "Script failed an OP_EQUALVERIFY operation",
+              "flags": 4015147
+            }
+          ]
+        },
+        "wrong_ticket_signature": {
+          "candidate_txid": "1ae793c1c4530720cd0887ccd369a39e5d0b9ee5ea27aaafc78ed445abc24e0c",
+          "vin_results": [
+            {
+              "vin": 0,
+              "result": "ok",
+              "flags": 4015147
+            },
+            {
+              "vin": 1,
+              "result": "error",
+              "description": "Script evaluated without error but finished with a false/empty top stack element",
+              "flags": 4015147
+            },
+            {
+              "vin": 2,
+              "result": "ok",
+              "flags": 4015147
+            }
+          ]
+        }
+      }
+    }
+  }
+}

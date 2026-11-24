@@ -7,7 +7,10 @@ from hashlib import sha256
 from pathlib import Path
 
 from chronicle_preimage import CHRONICLE_ALL
+from ecdsa import SECP256k1, VerifyingKey
+from ecdsa.util import sigdecode_der
 from inventory_payment import TOKEN_TAG, companion_lock, proof_lock, token_parts
+from inventory_ticket import template_ticket_token_parts, ticket_token_parts
 from inventory_tree import (
     InventoryLeaf,
     InventoryState,
@@ -19,9 +22,10 @@ from inventory_wide import wide_verifier_lock
 from run_freeze_probe_regtest import read_key
 from transfer import COMPACT_SCRIPTCODE
 
-from shared.script import number, push
+from shared.script import asm, number, push
 from shared.transaction import (
     Input,
+    Output,
     Transaction,
     blob,
     compact,
@@ -200,17 +204,61 @@ def check_history(tx, ledger):
     }
 
 
-def support_scripts(tx, ledger, compact_holder=False):
+def template_ticket_fields(ticket, coupons):
+    """Partition the pieces the holder carries and reconstruct the exact signed funding bytes."""
+    source = ticket.inputs[0]
+    spent = ticket.outputs[0]
+    der = dict(signature(source.script))["signature_der"]
+    slot = coupons.index(source.outpoint())
+    coupon = coupons[slot]
+    verifier = spent.script[1:37]
+    key = spent.script[39:-1]
+    rebuilt = Transaction(
+        (Input(coupon[:32], int.from_bytes(coupon[32:], "little"), push(der + b"\x41")),),
+        (Output(spent.value, push(verifier) + asm("OP_DROP") + push(key) + asm("OP_CHECKSIG")),),
+        version=2,
+        locktime=0,
+    )
+    require(rebuilt.serialize() == ticket.serialize(), "template fields cannot reproduce the signed ticket")
+    return (
+        pushed("ticket_wallet_pubkey", key)
+        + pushed("ticket_verifier_outpoint", verifier)
+        + [("ticket_satoshis_number", number(spent.value))]
+        + pushed("ticket_issuer_der", der)
+        + [("ticket_coupon_slot_number", number(slot))]
+    )
+
+
+def support_scripts(tx, ledger, compact_holder=False, ticket_mode=None, coupons=()):
     parents = [parent(inp, ledger) for inp in tx.inputs]
     prevouts = b"".join(i.outpoint() for i in tx.inputs)
     scripts = {}
+    if ticket_mode == "I":
+        companion_evidence = template_ticket_fields(parents[1], coupons)
+    else:
+        companion_evidence = pushed("companion_funding_raw", parents[1].serialize())
+    if ticket_mode in ("H", "I"):
+        ticket = parents[1]
+        verifier = ticket.outputs[0].script[1:37]
+        ticket_outpoint = Input(hash256(ticket.serialize()), 0).outpoint()
+        tail = b"".join(i.outpoint() for i in tx.inputs[2:])
+        require(
+            verifier + ticket_outpoint + tail == prevouts,
+            "ticket and token outpoints differ from actual input order",
+        )
+        outpoints = pushed("token_prevouts", tail)
+    else:
+        outpoints = pushed("ordered_prevouts", prevouts)
     for n, inp in enumerate(tx.inputs[1:], 1):
         prev = parents[n].outputs[inp.vout]
+        if ticket_mode and n == 1:
+            scripts["companion"] = partition(inp.script, signature(inp.script))
+            continue
         entries = []
         if n >= 2:
             entries += signature(inp.script)
-            entries += pushed("companion_funding_raw", parents[1].serialize())
-        entries += pushed("ordered_prevouts", prevouts)
+            entries += companion_evidence
+        entries += outpoints
         has_suffix = compact_holder and n >= 2
         script_code = COMPACT_SCRIPTCODE if has_suffix else prev.script
         entries += forkid(
@@ -218,6 +266,44 @@ def support_scripts(tx, ledger, compact_holder=False):
         )
         scripts["companion" if n == 1 else f"holder{n - 2}"] = partition(inp.script, entries)
     return scripts
+
+
+def verify_ticket_signature(tx, vin, spent, key):
+    raw = tx.inputs[vin].script
+    fields = signature(raw)
+    partition(raw, fields)
+    signer = VerifyingKey.from_string(key, curve=SECP256k1, valid_encodings={"compressed"})
+    digest = hash256(preimage_all(tx, vin, spent.value, spent.script))
+    require(signer.verify_digest(raw[1:-1], digest, sigdecode=sigdecode_der), "invalid ticket signature")
+
+
+def check_signed_ticket(tx, ticket, setup, coupons):
+    """Read the two authority links from wire bytes independently of the wallet template."""
+    require(len(ticket.inputs) == len(ticket.outputs) == 1, "expected one funding input and one output")
+    issuer_input = ticket.inputs[0]
+    require(issuer_input.outpoint() in coupons and issuer_input.txid == setup.txid_wire(), "wrong coupon")
+    source = setup.outputs[issuer_input.vout]
+    issuer_key = source.script[1:-1]
+    require(
+        len(issuer_key) == 33 and source.script == push(issuer_key) + asm("OP_CHECKSIG"),
+        "wrong issuer lock",
+    )
+    verify_ticket_signature(ticket, 0, source, issuer_key)
+    require(tx.inputs[1].outpoint() == Input(ticket.txid_wire(), 0).outpoint(), "wrong spent ticket")
+    spent = ticket.outputs[0]
+    key = spent.script[39:-1]
+    expected_lock = push(tx.inputs[0].outpoint()) + asm("OP_DROP") + push(key) + asm("OP_CHECKSIG")
+    require(
+        len(key) == 33 and spent.script == expected_lock,
+        "ticket does not authorize the actual verifier outpoint or the signing key",
+    )
+    verify_ticket_signature(tx, 1, spent, key)
+    return {
+        "issuer_coupon_wire": issuer_input.outpoint().hex(),
+        "signed_verifier_outpoint_wire": tx.inputs[0].outpoint().hex(),
+        "ticket_outpoint_wire": tx.inputs[1].outpoint().hex(),
+        "ticket_pubkey": key.hex(),
+    }
 
 
 def audit_row(tx, ledger, summary, row, parts, groth_locks):
@@ -313,16 +399,27 @@ def audit_wide(ledger, summary):
     labels = summary["transactions"]
     setup = ledger[labels["issuance-anchor"]["txid"]]
     coupons = tuple(Input(setup.txid_wire(), i).outpoint() for i in (128, 129))
-    compact_outputs = summary["profile"] == "F"
-    compact_holder = summary["profile"] in ("E-compact", "F")
-    parts = token_parts(scope, coupons, input_count=66, compact_holder=compact_holder)
+    profile = summary["profile"]
+    ticket_mode = profile if profile in ("G", "H", "I") else None
+    compact_outputs = profile == "F" or bool(ticket_mode)
+    compact_holder = compact_outputs or profile == "E-compact"
+    if profile == "I":
+        parts = template_ticket_token_parts(scope, coupons, input_count=66)
+    elif ticket_mode:
+        parts = ticket_token_parts(scope, coupons, input_count=66, derive_prevouts=profile == "H")
+    else:
+        parts = token_parts(scope, coupons, input_count=66, compact_holder=compact_holder)
     leaves = [wide_leaf(scope, ledger[labels[f"origin-{n:03}"]["txid"]], 0, parts) for n in range(128)]
     rows = {}
     for n, row in enumerate(summary["payments"], 1):
         tx = ledger[row["txid"]]
         require(len(tx.inputs) == 66 and len(tx.outputs) == 64, "unexpected wide shape")
         vf, cf = (parent(inp, ledger) for inp in tx.inputs[:2])
-        require(cf.outputs[0].script == companion_lock(vf, input_count=66), "incorrect wide companion")
+        if ticket_mode:
+            ticket_binding = check_signed_ticket(tx, cf, setup, coupons)
+            require(ticket_binding["ticket_pubkey"] == summary["ticket_wallet_key"], "recorded ticket signer differs")
+        else:
+            require(cf.outputs[0].script == companion_lock(vf, input_count=66), "incorrect wide companion")
         positions_by_point = {leaf.outpoint: i for i, leaf in enumerate(leaves)}
         positions = [positions_by_point[inp.outpoint()] for inp in tx.inputs[2:]]
         root = inventory_root(leaves)
@@ -348,7 +445,7 @@ def audit_wide(ledger, summary):
         entries += [pushed("packed_records", encoded)[0]] + records
         entries += compact_output_context(tx, vf, scope, parts) if compact_outputs else otda(tx)
         vf_script = partition(tx.inputs[0].script, entries)
-        support = support_scripts(tx, ledger, compact_holder)
+        support = support_scripts(tx, ledger, compact_holder, ticket_mode, coupons)
         companion = support.pop("companion")
         holder = sum_fields(support.values())
         holders = list(support.values())
@@ -384,14 +481,40 @@ def audit_wide(ledger, summary):
             "companion_funding": companion_funds,
             "history": check_history(tx, ledger),
         }
+        if ticket_mode:
+            rows[f"payment-{n}"]["ticket_binding"] = ticket_binding
     first_id = rows["payment-1"]["txid"]
     second = ledger[rows["payment-2"]["txid"]]
     require(
         all(inp.txid[::-1].hex() == first_id and inp.vout == i for i, inp in enumerate(second.inputs[2:])),
         "wide payment did not consume all 64 preceding outputs in order",
     )
+    # The initial holder locks are paid once at issuance. Successor locks are already counted in payment.
+    origins = tuple(ledger[labels[f"origin-{n:03}"]["txid"]] for n in range(128))
+    preparation = {
+        "issuance_anchor_bytes": len(setup.serialize()),
+        "initial_128_origin_transactions_bytes": sum(len(origin.serialize()) for origin in origins),
+        "initial_128_token_lock_bytes_within_origins": sum(len(origin.outputs[0].script) for origin in origins),
+    }
+    require(
+        preparation["initial_128_origin_transactions_bytes"] == summary["origin_transaction_bytes"],
+        "incorrect recorded origin transaction bytes",
+    )
+    experiment_bytes = (
+        preparation["issuance_anchor_bytes"]
+        + preparation["initial_128_origin_transactions_bytes"]
+        + sum(row["total_with_dedicated_funding"] for row in rows.values())
+    )
+    protocol_records = [info for name, info in labels.items() if not name.startswith("negative-")]
+    require(
+        len(protocol_records) == 135
+        and experiment_bytes == sum(len(ledger[info["txid"]].serialize()) for info in protocol_records),
+        "setup, origins, payment funding and two payments must account for the entire positive path",
+    )
     return {
         "scope": summary["scope"],
+        "one_time_preparation": preparation,
+        "two_payments_with_funding_and_issuance_bytes": experiment_bytes,
         "rows": rows,
         "previous_to_next": compare(rows["payment-1"], rows["payment-2"]),
     }
@@ -411,7 +534,7 @@ def audit(directory, profile):
         for k, raw in {**archive["funding"], **archive["transactions"]}.items()
     }
     require(all(tx.txid() == k for k, tx in ledger.items()), "txid differs from serialized transaction")
-    if profile in ("E", "E-compact", "F"):
+    if profile in ("E", "E-compact", "F", "G", "H", "I"):
         return audit_wide(ledger, summary)
     labels = summary["transactions"]
     setup = ledger[labels["issuance-anchor-and-coupons"]["txid"]]
@@ -440,7 +563,7 @@ def audit(directory, profile):
     }
 
 
-PROFILES = ("B", "C", "D", "E", "E-compact", "F")
+PROFILES = ("B", "C", "D", "E", "E-compact", "F", "G", "H", "I")
 
 
 def main():
@@ -450,10 +573,14 @@ def main():
     parser.add_argument("--out", type=Path, required=True)
     args = parser.parse_args()
     report = {p: audit(args.directory, p) for p in args.profiles}
-    if "F" in report and "E-compact" in report:
-        report["F"]["bytes_minus_E_compact_first_payment"] = compare(
-            report["E-compact"]["rows"]["payment-1"], report["F"]["rows"]["payment-1"]
-        )
+    for profile, baseline in (("F", "E-compact"), ("G", "F"), ("H", "G"), ("I", "H")):
+        if profile in report and baseline in report:
+            name = "bytes_minus_" + baseline.replace("-", "_") + "_first_payment"
+            report[profile][name] = compare(report[baseline]["rows"]["payment-1"], report[profile]["rows"]["payment-1"])
+            report[profile]["issuance_and_two_payments_bytes_minus_" + baseline.replace("-", "_")] = (
+                report[profile]["two_payments_with_funding_and_issuance_bytes"]
+                - report[baseline]["two_payments_with_funding_and_issuance_bytes"]
+            )
     args.out.write_text(json.dumps(report, indent=2) + "\n")
 
 

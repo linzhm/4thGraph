@@ -30,8 +30,27 @@ def _one_of(values):
 
 def token_parts(scope, coupons, *, input_count=4, compact_holder=False):
     """Coupons authorize the test issuer to create a one-use verifier companion."""
-    if len(scope) != 32 or not coupons or any(len(item) != 36 for item in coupons):
-        raise ValueError("invalid scope or issuer coupons")
+    if not coupons or any(len(item) != 36 for item in coupons):
+        raise ValueError("invalid issuer coupons")
+    guard = (
+        _slice(36, 36)
+        + asm("OP_OVER OP_HASH256") + push(bytes(4)) + asm("OP_CAT OP_EQUALVERIFY")
+        + _split(4) + asm("OP_NIP OP_1 OP_SPLIT OP_SWAP") + push(b"\x01")
+        + asm("OP_EQUALVERIFY 36 OP_SPLIT OP_DROP") + _one_of(coupons)
+    )
+    return bound_token_parts(scope, input_count, guard, compact_holder=compact_holder)
+
+
+def bound_token_parts(scope, input_count, guard, *, compact_holder, restore_prevouts=b""):
+    """Authenticate the ordered outpoints and check the holder signature.
+
+    By default the witness provides the full ordered outpoints. A profile may
+    supply a decoder that consumes its own disclosures and leaves the restored
+    vector on top. After the common width and hash checks, its guard consumes
+    the vector and any remaining disclosures, leaving just the owner signature.
+    """
+    if len(scope) != 32:
+        raise ValueError("invalid token scope")
     if type(input_count) is not int or input_count < 3:
         raise ValueError("expected a verifier, companion and token inputs")
     prefix = push(TOKEN_TAG + scope) + bytes([50])
@@ -43,13 +62,12 @@ def token_parts(scope, coupons, *, input_count=4, compact_holder=False):
     else:
         context = asm("OP_TOALTSTACK OP_DUP") + authenticate_forkid_preimage() + asm("OP_DROP")
     body = (
-        # sig, companion raw, prevouts, candidate preimage, tag, state
+        # Owner signature, profile disclosures, candidate preimage, tag, state.
         asm("OP_NIP OP_DUP") + _slice(49, 1) + push(b"\x00") + asm("OP_EQUALVERIFY")
-        + _slice(16, 33) + context + _slice(4, 32) + asm("OP_OVER") + _check_width(36 * input_count)
-        + asm("OP_HASH256 OP_EQUALVERIFY") + _slice(36, 36)
-        + asm("OP_OVER OP_HASH256") + push(bytes(4)) + asm("OP_CAT OP_EQUALVERIFY")
-        + _split(4) + asm("OP_NIP OP_1 OP_SPLIT OP_SWAP") + push(b"\x01")
-        + asm("OP_EQUALVERIFY 36 OP_SPLIT OP_DROP") + _one_of(coupons)
+        + _slice(16, 33) + context + _slice(4, 32)
+        + (asm("OP_TOALTSTACK") + restore_prevouts + asm("OP_FROMALTSTACK") if restore_prevouts else b"")
+        + asm("OP_OVER") + _check_width(36 * input_count)
+        + asm("OP_HASH256 OP_EQUALVERIFY") + guard
         + asm("OP_DEPTH OP_1 OP_NUMEQUALVERIFY OP_DUP OP_SIZE OP_1SUB OP_SPLIT OP_NIP")
         + push(b"\x41") + asm("OP_EQUALVERIFY OP_FROMALTSTACK OP_CHECKSIG")
     )
@@ -63,14 +81,19 @@ def token_output(state, parts):
     return Output(state.sats, prefix + state.encode() + body)
 
 
-def token_witness(tx, vin, previous, companion, signer, *, compact_holder=False):
-    """Request the original full-lock owner signature; select only the PUSHTX material."""
+def holder_authorization(tx, vin, previous, signer, *, compact_holder):
+    """Get the owner's full-lock signature and the corresponding PUSHTX material."""
     raw = preimage_all(tx, vin, previous.value, previous.script)
     if compact_holder and not previous.script.endswith(COMPACT_SUFFIX):
         raise ValueError("expected a token lock with a compact verifier suffix")
     binding = preimage_all(tx, vin, previous.value, COMPACT_SCRIPTCODE) if compact_holder else raw
-    return b"".join(map(push, (signer(hash256(raw)) + b"\x41", companion.serialize(),
-                               b"".join(i.outpoint() for i in tx.inputs), binding)))
+    return signer(hash256(raw)) + b"\x41", binding
+
+
+def token_witness(tx, vin, previous, companion, signer, *, compact_holder=False, prevout_start=0):
+    signature, binding = holder_authorization(tx, vin, previous, signer, compact_holder=compact_holder)
+    return b"".join(map(push, (signature, companion.serialize(),
+                               b"".join(i.outpoint() for i in tx.inputs[prevout_start:]), binding)))
 
 
 def companion_lock(funding, *, input_count=4):

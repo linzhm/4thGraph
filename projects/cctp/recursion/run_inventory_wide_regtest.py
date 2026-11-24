@@ -11,6 +11,7 @@ from ecdsa import SECP256k1, SigningKey
 from ecdsa.util import sigencode_der_canonize
 
 import inventory_payment as payment
+import inventory_ticket as ticket
 from inventory_tree import InventoryLeaf, InventoryState, inventory_root, multi_path
 from inventory_wide import wide_verifier_lock, wide_witness
 from regtest_mint import sign_p2pkh
@@ -35,16 +36,24 @@ def test_signer(secret):
     return key.verifying_key.to_string("compressed"), sign
 
 
-def run(node, *, compact_holder=False, compact_outputs=False):
+def run(node, *, compact_holder=False, compact_outputs=False, ticket_mode=None):
+    ticket_profiles = {"metadata": "G", "derive": "H", "template": "I"}
+    if ticket_mode is not None and ticket_mode not in ticket_profiles:
+        raise ValueError("unknown inventory ticket mode")
     if node.node.call("getblockchaininfo")["chain"] != "regtest" or node.node.call("getconnectioncount"):
         raise ValueError("an isolated BSV regtest is required")
     issuer, issuer_sign = test_signer(13)
+    if ticket_mode:
+        compact_holder = compact_outputs = True
+    ticket_key, ticket_sign = test_signer(2020)
     wallets = dict(test_signer(i) for i in range(1000, 1128))
     owners = tuple(wallets)
     coinbase = node.node.fund(node.address)
     issue_lock = push(issuer) + asm("OP_CHECKSIG")
     setup_outputs = (Output(2_000, issue_lock),) * 128 + (Output(50_000, issue_lock),) * 2 + (
         Output(2_000_000, asm("OP_1")),) * 2
+    if ticket_mode:
+        setup_outputs += (Output(2_000_000, asm("OP_1")),) * 2
     if coinbase.outputs[0].value <= sum(output.value for output in setup_outputs):
         raise ValueError("insufficient isolated test subsidy")
     setup = node.include("issuance-anchor", sign_p2pkh(
@@ -52,7 +61,14 @@ def run(node, *, compact_holder=False, compact_outputs=False):
         SigningKey.from_secret_exponent(11, curve=SECP256k1)), (coinbase,))
     scope = hash256(b"BSV/CCTP/wide-inventory/regtest/v1\0" + Input(setup.txid_wire(), 0).outpoint())
     coupons = tuple(Input(setup.txid_wire(), i).outpoint() for i in (128, 129))
-    parts = payment.token_parts(scope, coupons, input_count=66, compact_holder=compact_holder)
+    if ticket_mode == "template":
+        parts = ticket.template_ticket_token_parts(scope, coupons, input_count=66)
+    elif ticket_mode == "derive":
+        parts = ticket.ticket_token_parts(scope, coupons, input_count=66, derive_prevouts=True)
+    elif ticket_mode:
+        parts = ticket.ticket_token_parts(scope, coupons, input_count=66)
+    else:
+        parts = payment.token_parts(scope, coupons, input_count=66, compact_holder=compact_holder)
 
     def from_setup(index, output):
         tx = Transaction((Input(setup.txid_wire(), index),), (output,))
@@ -87,8 +103,9 @@ def run(node, *, compact_holder=False, compact_outputs=False):
         started = perf_counter()
         lock = wide_verifier_lock(scope, parts, root, compact_outputs=compact_outputs)
         verifier = node.include(label + "-verifier", from_setup(130 + generation, Output(1_500_000, lock)), (setup,))
-        companion = node.include(label + "-companion", from_setup(128 + generation,
-            Output(10_000, payment.companion_lock(verifier, input_count=66))), (setup,))
+        companion_lock = (ticket.ticket_lock(verifier, ticket_key) if ticket_mode
+                          else payment.companion_lock(verifier, input_count=66))
+        companion = node.include(label + "-companion", from_setup(128 + generation, Output(10_000, companion_lock)), (setup,))
         funded = perf_counter()
         selected = [leaves[i] for i in positions]
         previous = tuple(parents[i] for i in positions)
@@ -100,15 +117,26 @@ def run(node, *, compact_holder=False, compact_outputs=False):
         tx = Transaction((Input(verifier.txid_wire(), 0), Input(companion.txid_wire(), 0), *selected_inputs),
                          tuple(payment.token_output(state, parts) for state in out_states))
 
-        def signed(candidate, outputs):
+        def signed(candidate, outputs, ticket_parent=companion, origin_material=None):
+            disclosed_ticket = ticket_parent if origin_material is None else origin_material
             final = candidate.with_script(0, wide_witness(candidate, scope, leaves, positions, outputs,
                                                          compact_outputs=compact_outputs,
                                                          verifier_sats=verifier.outputs[0].value))
-            final = final.with_script(1, payment.companion_witness(candidate, companion))
+            companion_witness = (ticket.ticket_witness(candidate, ticket_parent, ticket_sign) if ticket_mode
+                                 else payment.companion_witness(candidate, ticket_parent))
+            final = final.with_script(1, companion_witness)
             for j, (leaf, parent) in enumerate(zip(selected, previous, strict=True)):
                 vin = j + 2
-                witness = payment.token_witness(candidate, vin, parent.outputs[candidate.inputs[vin].vout],
-                                                companion, wallets[leaf.state.owner], compact_holder=compact_holder)
+                prior = parent.outputs[candidate.inputs[vin].vout]
+                if ticket_mode == "template":
+                    witness = ticket.template_ticket_token_witness(candidate, vin, prior, disclosed_ticket,
+                                                                   wallets[leaf.state.owner], coupons)
+                elif ticket_mode == "derive":
+                    witness = ticket.ticket_token_witness(candidate, vin, prior, ticket_parent,
+                                                          wallets[leaf.state.owner], derive_prevouts=True)
+                else:
+                    witness = payment.token_witness(candidate, vin, prior, ticket_parent,
+                                                    wallets[leaf.state.owner], compact_holder=compact_holder)
                 final = final.with_script(vin, witness)
             return final
 
@@ -124,6 +152,14 @@ def run(node, *, compact_holder=False, compact_outputs=False):
                 changed_script = replace(tx.outputs[0], script=tx.outputs[0].script + asm("OP_NOP"))
                 changed = replace(tx, outputs=(changed_script, *tx.outputs[1:]))
                 negatives["changed_output_lock_with_fresh_signatures"] = node.reject(signed(changed, out_states))
+            if ticket_mode:
+                # Both lookalike funding outputs are real; all wallet and ticket signatures are refreshed.
+                other = node.include("negative-same-verifier-lock", from_setup(132, verifier.outputs[0]), (setup,))
+                altered = replace(tx, inputs=(Input(other.txid_wire(), 0), *tx.inputs[1:]))
+                negatives["same_verifier_lock_other_txid"] = node.reject(signed(altered, out_states))
+                copied = node.include("negative-same-ticket-lock", from_setup(133, companion.outputs[0]), (setup,))
+                altered = replace(tx, inputs=(tx.inputs[0], Input(copied.txid_wire(), 0), *tx.inputs[2:]))
+                negatives["ticket_from_unapproved_coupon"] = node.reject(signed(altered, out_states, copied, companion))
         node.include(label, final, (verifier, companion, *previous))
         witnesses = [len(item.script) for item in final.inputs]
         body = final.serialize()
@@ -139,7 +175,8 @@ def run(node, *, compact_holder=False, compact_outputs=False):
             "verifier_witness_bytes": witnesses[0], "companion_witness_bytes": witnesses[1],
             "holder_witnesses_bytes": sum(witnesses[2:]), "holder_witness_each_bytes": sorted(set(witnesses[2:])),
             "companion_raw_copies_in_holders": sum(i.script.count(companion.serialize()) for i in final.inputs[2:]),
-            "prevout_vector_bytes_per_holder": 36 * len(tx.inputs), "sibling_hash_bytes": len(multi_path(leaves, positions)) * 32,
+            "prevout_vector_bytes_per_holder": 36 * (len(tx.inputs) - (2 if ticket_mode in ("derive", "template") else 0)),
+            "sibling_hash_bytes": len(multi_path(leaves, positions)) * 32,
             "successor_lock_bytes_per_output": len(final.outputs[0].script),
             "full_token_parent_raw_occurrences": sum(i.script.count(raw) for i in final.inputs for raw in parent_raws.values()),
             "actual_input_outpoints": [txi.outpoint().hex() for txi in final.inputs[2:]], "negatives": negatives,
@@ -151,8 +188,11 @@ def run(node, *, compact_holder=False, compact_outputs=False):
         raise AssertionError("unexpected direct-parent topology")
     if records[0]["payment_bytes"] != records[1]["payment_bytes"] or any(r["full_token_parent_raw_occurrences"] for r in records):
         raise AssertionError("unexpected depth-dependent wire data under the fixed-DER test profile")
+    if records[0]["total_including_dedicated_funding"] != records[1]["total_including_dedicated_funding"]:
+        raise AssertionError("unexpected change in the size including verifier and companion funding")
     return {
-        "profile": "F" if compact_outputs else ("E-compact" if compact_holder else "E"),
+        "profile": ticket_profiles.get(ticket_mode, "F" if compact_outputs else ("E-compact" if compact_holder else "E")),
+        **({"ticket_wallet_key": ticket_key.hex()} if ticket_mode else {}),
         "trust": "Test issuer approves each inventory root through one of two real issuance coupons. "
                  "This does not supply a permissionless recursive root update.",
         "statistics": "Two disjoint fixed-width coupons, fixed 70-byte DER test signer, alternating 64 of 128. "
@@ -172,10 +212,12 @@ if __name__ == "__main__":
                         help="bind the holder preimage using the compact Script after OP_CODESEPARATOR")
     parser.add_argument("--compact-outputs", action="store_true",
                         help="encode only output states and authenticate exact reconstructed TxOuts with ForkID ALL")
+    parser.add_argument("--ticket-mode", choices=("metadata", "derive", "template"),
+                        help="use compact holders/outputs and a wallet ticket naming the required verifier outpoint")
     args = parser.parse_args()
-    if args.compact_outputs and not args.compact_holder:
+    if args.compact_outputs and not args.compact_holder and not args.ticket_mode:
         parser.error("select --compact-holder as the comparison baseline for --compact-outputs")
     args.out.mkdir()
     result = run(Regtest(args.node_url, args.cookie), compact_holder=args.compact_holder,
-                 compact_outputs=args.compact_outputs)
+                 compact_outputs=args.compact_outputs, ticket_mode=args.ticket_mode)
     (args.out / "summary.json").write_text(json.dumps(result, indent=2) + "\n")
