@@ -107,3 +107,8 @@ PYTHONPATH=.:projects/groth16/reference ../cctp-test-tools/venv/bin/python -m un
 - 主验收改为历史增量零字节，允许新增父绑定证明。新试验锚可使用 [Chronicle 专用路径](parent-binding.md#chronicle-新锁的预像和父哈希)。每个实际 Token 输入槽验证所选父输出和前序 B2G 声明。首轮从真实铸造接两笔同形状普通转账。 [铸造基例](mint.md#铸造如何进入连续性证明)
 - [私有 SHA-256 分段](../recursion/parentbinding/README.md#隐藏段数据) 已对两个相邻测试分段完成原生出证。先在新交易形状验证同一个递归电路直接重算父 txid，并绑定字段位置与真实 TxOut。仅在出证超预算时考虑分段聚合。完整关系需在独立 BSV Node 通过两次连续普通转账。
 - 新增 [v2 累计铸造状态](../fixtures/v2-counted-mint-regtest-summary.json)。独立节点确认 genesis、铸造、暂停、恢复和第二次铸造，累计为 `0 → 1,017 → 1,017 → 1,017 → 1,400`。状态锁固定增加 47 字节，旧版保持原编码。
+
+## 同日续接 · 按实际代币 UTXO 验守恒
+
+- [当前联合证明目标](recursive-provenance.md) 是按实际 vin 逐槽认证 `txid:vout` 及前序 B2G。守恒只计已认证的代币输出，费用输入贡献零。已编译的固定布局构件核对父 SHA256d、规范边界与选定输出，并从同一原文提取前序上下文。组合约束对输入顺序、错 vout、重复 outpoint、替换数量和遗漏输出均有回归覆盖。
+- [计数状态连续性基线](../fixtures/v3-counted-continuity-regtest-summary.json) 在独立 BSV Node 1.2.3 高度 224–227 确认同锚两笔认证铸造、2→2 和后继 1→2。累计净量从 1,024 到 1,408。基线仍携带父原文。下一验收点是同一新版参数认证不同动作的父布局，并在节点确认两笔同形状转账。
