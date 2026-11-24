@@ -25,7 +25,7 @@ class DepositEvidenceError(ValueError):
 class EvmJsonRpc:
     """Read-only JSON-RPC transport. The endpoint may contain a provider token."""
 
-    _METHODS = frozenset(("eth_chainId", "eth_getTransactionReceipt", "eth_getBlockByNumber", "eth_call"))
+    _METHODS = frozenset(("eth_chainId", "eth_getTransactionReceipt", "eth_getBlockByNumber", "eth_call", "eth_getLogs"))
 
     def __init__(self, url: str, *, timeout: float = 15):
         endpoint = urlsplit(url)
