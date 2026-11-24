@@ -51,6 +51,8 @@ PYTHONPATH=.:projects/groth16/reference:projects/cctp/reference:projects/cctp/re
 
 [实际交易节点记录](../../fixtures/v3-continuity-regtest-summary.json) 覆盖高度 211–214 的两笔认证铸造、2→2 和后继 1→2。最后一笔交易为 15,081,190 字节，最大输入脚本为 14,106,366 字节。归档包含真实交易及全量证明，入金采用隔离测试签发。该配置测试了认证铸造和转账，带认证回执的冻结与解冻另有本地 Script 验证。
 
+追加 `--mint-state-version 2` 可用累计净铸造量状态重跑。同一连续性密钥在独立 BSV Node 1.2.3 的高度 224–227 确认了两笔认证铸造及后继的 2→2、1→2。第二笔铸造消费第一笔的状态，累计净铸造量从 1,024 增至 1,408。两笔转账分别为 12,162,612 和 15,082,186 字节。这组基线仍携带完整父交易，转账形状也不同，固定形状的历史增量由新版联合证明单独验收。 [计数状态节点记录](../../fixtures/v3-counted-continuity-regtest-summary.json)
+
 ## 本地双链闭环
 
 安装 Foundry 并把 `forge`、`cast`、`anvil` 放入 `PATH`。下列程序启动隔离 Anvil 测试储备，连接已有的独立 BSV regtest，使用同一份连续性参数为十笔状态及代币交易出证。签发恢复、源链确认及余额对账使用持久 BridgeService。

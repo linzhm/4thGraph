@@ -1,0 +1,165 @@
+{
+  "scope": "Two certified mints using test attestations and two MIMO hops under the same BSB22 key on BSV regtest.",
+  "mint_state_version": 2,
+  "asset_id": "ad9216a7e3a154c8b9cdab7cbfba251a03a3cfc3f2b69fa090b2615b3d1ef584",
+  "continuity_key_digest": "677731270de75ec11f65c92f2ac8b0c428df79e28a532a035b8402166eb04a9b",
+  "proof_checks": {
+    "certified-first-mint": {
+      "predecessors": [
+        {
+          "txid": "f89fa983757353acc2aabd05754c5805a322eb3b6307522abbedccb3dcb05b5f",
+          "vout": 0
+        }
+      ],
+      "public_signals": [
+        "14720547461288446459915252033730415608",
+        "304733753691975475572841328775062380847"
+      ],
+      "previous_proof_digests": [],
+      "proof_sha256": "c7745dec21d5f9b8bdca2f54c86d51d1de89fddb29ff36497e32f0e0fdcd81c7",
+      "largest_input_script_bytes": 1059100,
+      "quantities": [
+        1024
+      ],
+      "rejections": {},
+      "cumulative_minted": 1024
+    },
+    "certified-next-mint": {
+      "predecessors": [
+        {
+          "txid": "3ed2f99eed2af71ec6930d84736c8dbc0406d38b709fa78d2910af53b5208eb2",
+          "vout": 0
+        }
+      ],
+      "public_signals": [
+        "133961351957972821509825897951930427276",
+        "336371334930388610203527035869504033642"
+      ],
+      "previous_proof_digests": [
+        "0b13130654a07e5bb0e08740c1808bf8e541960c9f1fbb8dccc1a5b4f638612f"
+      ],
+      "proof_sha256": "a0573da7189751dbbcc100be7b3c398714ded2f2e588a9ccfdcc2a59598d4a6b",
+      "largest_input_script_bytes": 4110959,
+      "quantities": [
+        384
+      ],
+      "rejections": {},
+      "cumulative_minted": 1408
+    },
+    "two-continuity-parents": {
+      "predecessors": [
+        {
+          "txid": "3ed2f99eed2af71ec6930d84736c8dbc0406d38b709fa78d2910af53b5208eb2",
+          "vout": 1
+        },
+        {
+          "txid": "7f7c9d75108921c73f3d3e0aedfaa536bbb94fbb740df72c6de7b96bdc279a3d",
+          "vout": 1
+        }
+      ],
+      "public_signals": [
+        "17054721455818724917249412856811861328",
+        "248879702186044137806702852557886569695"
+      ],
+      "previous_proof_digests": [
+        "0b13130654a07e5bb0e08740c1808bf8e541960c9f1fbb8dccc1a5b4f638612f",
+        "64c80495ec53b117f51fce8cda7d278cfd0ec33c37a67c386bf7ebcf4339536a"
+      ],
+      "proof_sha256": "4e059aaac7245465d66ef6880b45956253ff89f9b9e39d9421d8310415213882",
+      "largest_input_script_bytes": 10216102,
+      "quantities": [
+        640,
+        768
+      ],
+      "rejections": {
+        "substituted_predecessor_funding": "sendrawtransaction: {'code': -26, 'message': '16: mandatory-script-verify-flag-failed (Script failed an OP_EQUALVERIFY operation)'}",
+        "resigned_payout_with_old_proof": "sendrawtransaction: {'code': -26, 'message': '16: mandatory-script-verify-flag-failed (Script failed an OP_NUMEQUALVERIFY operation)'}"
+      }
+    },
+    "continuity-descendant": {
+      "predecessors": [
+        {
+          "txid": "cc54e1bcbeb44571428d77826d6923e87b1869e471f037f6c89114ad4625d964",
+          "vout": 1
+        }
+      ],
+      "public_signals": [
+        "104309421162904393669331007438893347702",
+        "39046088254428440895171673489647329104"
+      ],
+      "previous_proof_digests": [
+        "0cd49eb0184965940e438d433c63b550bb3c7cb2859b173e2f04bd7c56c5bcdf"
+      ],
+      "proof_sha256": "7a197074b7a6b78a1f0ffa28fa2f16e97f15a142ba1630f437566d670357666b",
+      "largest_input_script_bytes": 14107329,
+      "quantities": [
+        384,
+        384
+      ],
+      "rejections": {}
+    }
+  },
+  "node": "/Bitcoin SV:1.2.3/",
+  "transactions": {
+    "setup": {
+      "txid": "718745d038cc41a3409c684f46666fa45810122f59ffd954234789ec7bd58d1a",
+      "blockhash": "1c00c3be82f929d86d4a1435152d93c475c960b8a0b23ccbb2da6166e1465446",
+      "height": 218,
+      "bytes": 218
+    },
+    "funding-0": {
+      "txid": "ce157b9f7b29cb95aaf3eb221bfa33886c96017e44b7e350ce369ea26d595cea",
+      "blockhash": "4484d4ff81a579094213d353a8dbb16952b25aff514fb8158bd8d2489e4059e5",
+      "height": 219,
+      "bytes": 969674
+    },
+    "funding-1": {
+      "txid": "41ff6815accac0560cf212852085b544e166aa7a099688609926671d12dfc4db",
+      "blockhash": "2c30073f982d9358ca4fb6865193b957e0c40dbaeb0a00395679275175a7dcf0",
+      "height": 220,
+      "bytes": 969674
+    },
+    "funding-2": {
+      "txid": "43d209fdb6ed4e39c96064bb23828fb811314fd61a15adfcf97d5c121860278c",
+      "blockhash": "381246c2ef8e092a4188b2b615820fe4819d915fa26119bf24f9b16b59384300",
+      "height": 221,
+      "bytes": 969674
+    },
+    "funding-4": {
+      "txid": "89245e994fdae4c283d6e6e3cb08ac32d7d6178fa940d389639f8a2229c6f230",
+      "blockhash": "02555afaed11d7e7e01d27593324fd70d23c683ad9c6b1156c35972a6ca72a26",
+      "height": 222,
+      "bytes": 969674
+    },
+    "mint-genesis": {
+      "txid": "f89fa983757353acc2aabd05754c5805a322eb3b6307522abbedccb3dcb05b5f",
+      "blockhash": "462e2fe72290089c7b7e766a1fc57529bc6734cb2082eba71cd84e0f01377d4d",
+      "height": 223,
+      "bytes": 42726
+    },
+    "certified-first-mint": {
+      "txid": "3ed2f99eed2af71ec6930d84736c8dbc0406d38b709fa78d2910af53b5208eb2",
+      "blockhash": "108b711e418872906d855a8f106d3baeed696faab1f3d6dd6bfd41029194a395",
+      "height": 224,
+      "bytes": 2124903
+    },
+    "certified-next-mint": {
+      "txid": "7f7c9d75108921c73f3d3e0aedfaa536bbb94fbb740df72c6de7b96bdc279a3d",
+      "blockhash": "2ded1579e10365b10a59ac1826994b3e3f4d2c53645eae873a7175a074ae4da3",
+      "height": 225,
+      "bytes": 5176762
+    },
+    "two-continuity-parents": {
+      "txid": "cc54e1bcbeb44571428d77826d6923e87b1869e471f037f6c89114ad4625d964",
+      "blockhash": "5838d43f2240940191d622b03f647f55464ce95b8a52b21b361ec740acea042f",
+      "height": 226,
+      "bytes": 12162612
+    },
+    "continuity-descendant": {
+      "txid": "05684cf70d554d349428c9a1c683c035fe65f40fa93ff0ac626f9ab519cba91d",
+      "blockhash": "5dba0b36349e60882a8f12caf3f0bc7cd33b94d9be14553948b49740f292d3c4",
+      "height": 227,
+      "bytes": 15082186
+    }
+  }
+}
