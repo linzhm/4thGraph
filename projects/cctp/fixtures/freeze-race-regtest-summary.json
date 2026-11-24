@@ -1,0 +1,62 @@
+{
+  "scope": "Independent BSV regtest, two anchored mint origins, synthetic finalized deposits and test Groth16 setup",
+  "node": "/Bitcoin SV:1.2.3/",
+  "cases": {
+    "freeze_first": {
+      "token_outpoint": "fc5fdc0193660307ac063ec2ffb88ce9e206aa0edbc45f174a0411d5a3b6ff7a:1",
+      "candidates": {
+        "freeze": {
+          "txid": "209697041d872269bbfa702511eac1394884dc02426128faba4e3e879dadc647",
+          "node_validated_inputs": [
+            "ok",
+            "ok"
+          ]
+        },
+        "payment": {
+          "txid": "dbcff39c3358bf5bb35405c13cd62408e8c1245f681a68456974e377cd4c2272",
+          "node_validated_inputs": [
+            "ok",
+            "ok"
+          ]
+        }
+      },
+      "winner": "209697041d872269bbfa702511eac1394884dc02426128faba4e3e879dadc647",
+      "blockhash": "433375b2a0878b7c39fc94e1ced182f309e498db313593ac5976e2c98617d422",
+      "loser_rejection": "sendrawtransaction: {'code': -26, 'message': '258: txn-mempool-conflict'}",
+      "winner_frozen": true,
+      "quantity": 640
+    },
+    "payment_first": {
+      "token_outpoint": "e3591c2fbf054d52d9ec7bbd5166c9436382f9ab6bc796d3658e668dbc1f56e7:1",
+      "candidates": {
+        "freeze": {
+          "txid": "fd63649d2a35152f742bf16d46a1fd13f39aa8d52b9d71d49ceb63a4725a4925",
+          "node_validated_inputs": [
+            "ok",
+            "ok"
+          ]
+        },
+        "payment": {
+          "txid": "79c60e2253cae12147fe7a7981631facdd5c05dd4e4fb171cf8b88c8335ba50b",
+          "node_validated_inputs": [
+            "ok",
+            "ok"
+          ]
+        }
+      },
+      "winner": "79c60e2253cae12147fe7a7981631facdd5c05dd4e4fb171cf8b88c8335ba50b",
+      "blockhash": "7aee42670af062e8d9cc16ef93152f60df5e2a1b455eb62e3db1860c55e9c314",
+      "loser_rejection": "sendrawtransaction: {'code': -26, 'message': '258: txn-mempool-conflict'}",
+      "winner_frozen": false,
+      "quantity": 384
+    }
+  },
+  "wrong_administrator_rejection": "sendrawtransaction: {'code': -26, 'message': '16: mandatory-script-verify-flag-failed (Script evaluated without error but finished with a false/empty top stack element)'}",
+  "frozen_owner_rejection": {
+    "node_input_results": [
+      "error",
+      "error"
+    ],
+    "submit_rejection": "sendrawtransaction: {'code': -26, 'message': '16: mandatory-script-verify-flag-failed (Script failed an OP_EQUALVERIFY operation)'}"
+  }
+}
