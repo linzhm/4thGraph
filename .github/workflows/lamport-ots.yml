@@ -1,0 +1,38 @@
+name: Lamport OTS conformance
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pinned engine and verify its provenance
+        run: |
+          python -m pip install -r projects/lamport-ots/reference/requirements.txt
+          python - <<'PY'
+          import json
+          from importlib.metadata import distribution
+          source = json.loads(distribution('tx-engine').read_text('direct_url.json'))
+          assert source['vcs_info']['commit_id'] == '5cb8c6e410dbfad1c619cec3ca54d1bcaacd4eb7'
+          PY
+      - name: Cryptography, generated Script, adversarial payments and vectors
+        run: python -m unittest discover -s projects/lamport-ots/reference -p test_lamport.py -v
+      - name: Complete transactions in BSV Node and chain-gang
+        run: bash projects/lamport-ots/reference/verify.sh
+      - name: Reproducible vectors and measured performance
+        run: |
+          python projects/lamport-ots/reference/measure.py --write-vector
+          git diff --exit-code -- projects/lamport-ots/template/
+          python projects/lamport-ots/reference/measure.py --benchmark > /tmp/lamport-measurement.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: lamport-measurement
+          path: /tmp/lamport-measurement.json

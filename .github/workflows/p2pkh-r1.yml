@@ -1,0 +1,59 @@
+name: P2PKH-R1 conformance
+# Development tests run in a cloud Linux environment or Apple Container.
+# Keep Actions manual to avoid duplicate push/PR runs.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: TypeScript vectors
+        working-directory: projects/p2pkh-r1/sdk/typescript
+        run: |
+          npm install --ignore-scripts --no-audit --no-fund
+          npm run check
+          npm test
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+          cache: false
+      - name: Go vectors
+        working-directory: projects/p2pkh-r1/sdk/go
+        run: |
+          go mod download golang.org/x/crypto
+          go test ./...
+      - name: Rust vectors
+        working-directory: projects/p2pkh-r1/sdk/rust
+        run: cargo test
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify payments with the pinned chain-gang build and BSV Node
+        working-directory: projects/p2pkh-r1/reference
+        run: |
+          python -m pip install -r requirements.txt
+          python - <<'PY'
+          import json
+          import re
+          from importlib.metadata import distribution
+          from pathlib import Path
+
+          requirements = Path("requirements.txt").read_text().splitlines()
+          pin, = [line.rsplit("@", 1)[-1] for line in requirements if line.startswith("tx-engine @ ")]
+          source = json.loads(distribution("tx-engine").read_text("direct_url.json"))
+          if not re.fullmatch(r"[0-9a-f]{40}", pin) or source["vcs_info"]["commit_id"] != pin:
+              raise SystemExit("installed tx-engine differs from the pinned commit")
+          print("Verified chain-gang commit", pin)
+          PY
+          bash verify.sh

@@ -1,0 +1,58 @@
+{
+  "template": "P2PKH-R1-Deferred",
+  "base_script_hex_file": "template.hex",
+  "script_bytes": 1435,
+  "fields": {
+    "owner_hash160": {
+      "offset": 1,
+      "length": 20
+    },
+    "target_script_sha256": {
+      "offset": 22,
+      "length": 32
+    },
+    "input_value_le64": {
+      "offset": 109,
+      "length": 8
+    },
+    "target_txout_hash256": {
+      "offset": 134,
+      "length": 32
+    }
+  },
+  "fixed_bytes_sha256": "c81b70f59e00402fb3cd936d174e7c8a45eb8205a18b3ad43fac29e93f58ccb4",
+  "base_vector_id": 1,
+  "base_script_sha256": "35d0d5ff948baea702fc5a3df13f3c4c2706953136d45606d55971b421283824",
+  "vectors": [
+    {
+      "id": 1,
+      "value_sats": 100000,
+      "public_key_x963": "046b17d1f2e12c4247f8bce6e563a440f277037d812deb33a0f4a13945d898c2964fe342e2fe1a7f9b8ee7eb4a7c0f9e162bce33576b315ececbb6406837bf51f5",
+      "owner_hash160": "4ceab2c8be16c1d4c6b4147d39aa449c2d63f184",
+      "target_script_sha256": "b3acd6b92a23120bd24432ada2b1cac013fe06381d7ea96ac6c5a73c493f4287",
+      "target_txout_hash256": "4aa2ecf5279d2bf8b8e31a9530f8fe803eab6debfdff446602cecd10b4cf257b",
+      "legacy_locking_script_sha256": "e606096dc6008a9b0c4bbe082aebeaf480aa4c6277c78400469c7acce9dbfbe7",
+      "locking_script_sha256": "35d0d5ff948baea702fc5a3df13f3c4c2706953136d45606d55971b421283824"
+    },
+    {
+      "id": 2,
+      "value_sats": 120000,
+      "public_key_x963": "047cf27b188d034f7e8a52380304b51ac3c08969e277f21b35a60b48fc4766997807775510db8ed040293d9ac69f7430dbba7dade63ce982299e04b79d227873d1",
+      "owner_hash160": "63006f147d3bafc234f8ad6edc2b1fa934512dbc",
+      "target_script_sha256": "784e04964fb74a47ce963a3ed4ab31ba5163ba285491e0c7dc5520c31a1198e1",
+      "target_txout_hash256": "9362f6f8f597503382f5414379326ec10916f94d20638b2352efea577d33984a",
+      "legacy_locking_script_sha256": "505839522f3d83943c92b9935ed6bb9cbf5472199f2996bb77676d2d543d24df",
+      "locking_script_sha256": "c4937913e505ccc5aec04921854c4a5ce6605dc61436d0af88d502f243c2b616"
+    },
+    {
+      "id": 3,
+      "value_sats": 1,
+      "public_key_x963": "045ecbe4d1a6330a44c8f7ef951d4bf165e6c6b721efada985fb41661bc6e7fd6c8734640c4998ff7e374b06ce1a64a2ecd82ab036384fb83d9a79b127a27d5032",
+      "owner_hash160": "4bef3ea90055ae6aea6b3608e6230982736c250f",
+      "target_script_sha256": "2b2c06dd465395926886682cd94187a2af006422be846bb92b625f2daaf98bc1",
+      "target_txout_hash256": "62ec317c82b384e56bf29e7b26791951eb2ea75fd0cf38280d28f02b65b7f957",
+      "legacy_locking_script_sha256": "011dcbb7ad3cfd3d326448d08338e30696e3c0d374b69f47a3df937215c16052",
+      "locking_script_sha256": "a5763dc977d6447f56b637169d80d5fb58ae27674f5b0e39ab617fb5d2c5121f"
+    }
+  ]
+}

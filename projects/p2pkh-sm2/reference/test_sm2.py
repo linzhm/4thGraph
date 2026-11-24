@@ -1,0 +1,205 @@
+"""Standard vectors, OpenSSL interoperability, generator and payment negatives."""
+import base64
+from dataclasses import replace
+from hashlib import sha256
+import json
+from pathlib import Path
+import random
+import shutil
+import subprocess
+import tempfile
+import unittest
+from assemble import assemble
+from p2pkh_sm2 import *
+from sm2 import *
+from sm3_script import hash_script,compress,IV
+from shared.evaluate import evaluate,ScriptError
+from shared.script import push,number,assemble as assemble_blocks
+from shared.transaction import *
+
+ROOT=Path(__file__).resolve().parents[1]
+
+
+def der(tag,raw):
+    n=len(raw); length=bytes([n]) if n<128 else bytes([0x81,n])
+    return bytes([tag])+length+raw
+
+
+def der_signature(sig):
+    def scalar(b):
+        b=b.lstrip(b'\0') or b'\0'
+        return der(2,(b'\0' if b[0]&128 else b'')+b)
+    return der(48,scalar(sig[:32])+scalar(sig[32:]))
+
+
+def raw_signature(sig):
+    from ecdsa.util import sigdecode_der
+    r,s=sigdecode_der(sig,N)
+    return be32(r)+be32(s)
+
+
+def public_pem(key):
+    algorithm=der(48,der(6,bytes.fromhex('2a8648ce3d0201'))+der(6,bytes.fromhex('2a811ccf5501822d')))
+    raw=der(48,algorithm+der(3,b'\0'+key))
+    return b'-----BEGIN PUBLIC KEY-----\n'+base64.encodebytes(raw)+b'-----END PUBLIC KEY-----\n'
+
+
+def native_checker(tx,index,value):
+    from ecdsa import VerifyingKey,SECP256k1,BadSignatureError
+    from ecdsa.util import sigdecode_der
+    digest=hash256(preimage_all(tx,index,value))
+    def check(signature,key):
+        if signature[-1:]!=b'\x41': return False
+        try: return VerifyingKey.from_string(key,curve=SECP256k1).verify_digest(signature[:-1],digest,sigdecode=sigdecode_der)
+        except (BadSignatureError,ValueError): return False
+    return check
+
+
+def fixture(d=1,k=2):
+    key=encode_public(mul(d)); lock=locking_script_from_public_key(key)
+    funding=Transaction((Input(b'\x22'*32,0),),(Output(1000,lock),))
+    tx=Transaction((Input(funding.txid_wire(),0),),(Output(900,b'\x51'),))
+    pre=preimage_all(tx,0,1000); sig=fixture_sign(d,hash256(pre),k)
+    return key,lock,funding,tx,pre,sig
+
+
+def valid_script(lock,witness,tx,value=1000,index=0):
+    try:
+        stack,alt=evaluate(lock,witness,native_checker(tx,index,value))
+        return stack==[b'\x01'] and alt==[]
+    except ScriptError: return False
+
+
+class SM2Tests(unittest.TestCase):
+    def test_standard_vector(self):
+        v=json.loads((ROOT/'template/sm2-standard.json').read_text())
+        q=bytes.fromhex(v['public_key']); m=bytes.fromhex(v['message']); sig=bytes.fromhex(v['signature'])
+        self.assertEqual(za(q).hex(),v['za'])
+        self.assertEqual(message_digest(q,m).hex(),v['digest'])
+        self.assertEqual(fixture_sign(int(v['private_key_test_only'],16),m,int(v['nonce_test_only'],16)),sig)
+        self.assertTrue(verify(q,m,sig))
+        self.assertFalse(verify(q,m,sig,b'other identity'))
+        self.assertFalse(verify(q,m+b'!',sig))
+        self.assertFalse(verify(q,m,sig[:32]+be32(N-int.from_bytes(sig[32:],'big'))))
+        with self.assertRaises(ValueError): za(q,b'x'*8192)
+
+    def test_sm3_generated_boundary_lengths(self):
+        rng=random.Random(4818)
+        for n in (0,3,55,56,63,64,65,82,119,120,127,128,210):
+            message=rng.randbytes(n)
+            with self.subTest(length=n):
+                stack,alt=evaluate(hash_script(n),[b'lower',message])
+                self.assertEqual(stack,[b'lower',sm3(message)]); self.assertEqual(alt,[])
+        self.assertEqual(sm3(b'abc').hex(),'66c7f0f462eeedd9d1f2d46bdc10e4e24167c4875cf2f7a2297da02b8f4ba8e0')
+
+    def test_sm3_fixed_prefix_midstate(self):
+        for d in (1,2,19,N-2):
+            key=encode_public(mul(d)); prefix=b'\0\x80'+USER_ID+be32(A)+be32(B)+be32(G[0])+be32(G[1])
+            state=compress(compress(IV,prefix[:64]),prefix[64:128])
+            stack,alt=evaluate(hash_script(82,state,128),[prefix[128:]+key[1:]])
+            self.assertEqual(stack,[za(key)]); self.assertEqual(alt,[])
+
+    def test_openssl_standard_and_round_trip(self):
+        self.assertIsNotNone(shutil.which('openssl'),'OpenSSL with SM2 is required')
+        v=json.loads((ROOT/'template/sm2-standard.json').read_text())
+        with tempfile.TemporaryDirectory() as directory:
+            d=Path(directory)
+            (d/'pub.pem').write_bytes(public_pem(bytes.fromhex(v['public_key'])))
+            (d/'message').write_bytes(bytes.fromhex(v['message']))
+            (d/'signature').write_bytes(der_signature(bytes.fromhex(v['signature'])))
+            def run(*args): return subprocess.run(['openssl',*args],cwd=d,check=True,capture_output=True).stdout
+            run('pkeyutl','-verify','-pubin','-inkey','pub.pem','-rawin','-digest','sm3','-pkeyopt','distid:'+USER_ID.decode(),'-in','message','-sigfile','signature')
+            run('genpkey','-algorithm','SM2','-out','private.pem')
+            key=run('pkey','-in','private.pem','-pubout','-outform','DER')[-65:]
+            def signer(message,user_id):
+                (d/'message').write_bytes(message)
+                return raw_signature(run('pkeyutl','-sign','-inkey','private.pem','-rawin','-digest','sm3','-pkeyopt','distid:'+user_id.decode(),'-in','message'))
+            lock=locking_script_from_public_key(key)
+            parent=Transaction((Input(b'\x55'*32,0),),(Output(1000,lock),))
+            signed=sign_payment(parent.serialize(),0,[Output(900,b'\x51')],100,key,signer)
+            items,_=evaluate(signed.inputs[0].script)
+            self.assertTrue(valid_script(lock,items,signed))
+
+    def test_canonical_recognition(self):
+        key,lock,*_=fixture()
+        manifest=json.loads((ROOT/'template/layout.json').read_text())
+        self.assertEqual(len(lock),manifest['script_bytes'])
+        self.assertEqual(recognize(lock),public_key_hash160(key))
+        for at in (0,49,70,1000,len(lock)-1):
+            mutated=bytearray(lock); mutated[at]^=1
+            self.assertIsNone(recognize(bytes(mutated)))
+        self.assertIsNone(recognize(lock[:-1])); self.assertIsNone(recognize(lock+b'\0'))
+        with self.assertRaises(ValueError): locking_script_from_owner_hash(bytes(19))
+        r1=bytes.fromhex('046b17d1f2e12c4247f8bce6e563a440f277037d812deb33a0f4a13945d898c2964fe342e2fe1a7f9b8ee7eb4a7c0f9e162bce33576b315ececbb6406837bf51f5')
+        with self.assertRaises(ValueError): public_key_hash160(r1)
+
+    def test_full_script_random_keys(self):
+        for d,k in ((1,2),(7,19),(19,7),(N-2,N-1),(12345,67890)):
+            key,lock,parent,tx,pre,sig=fixture(d,k)
+            with self.subTest(d=d): self.assertTrue(valid_script(lock,[pre,key,sig],tx))
+
+    def test_script_rejects_invalid_signature_and_key(self):
+        key,lock,parent,tx,pre,sig=fixture()
+        bad_signatures=[be32(0)+sig[32:],be32(N)+sig[32:],sig[:32]+be32(0),sig[:32]+be32(N),be32(1)+be32(N-1),sig[:-1],sig+b'\0',sig[:32]+be32(N-int.from_bytes(sig[32:],'big')),fixture_sign(1,hash256(pre),3,b'wrong ID')]
+        for value in bad_signatures:
+            with self.subTest(signature=value.hex()): self.assertFalse(valid_script(lock,[pre,key,value],tx))
+        # Malformed key gets its own matching owner hash, so the point check is exercised.
+        for q in (b'\x04'+bytes(64),b'\x04'+be32(P)+key[33:],b'\x03'+key[1:]):
+            owner=new('ripemd160',sha256(q).digest()).digest()
+            self.assertFalse(valid_script(locking_script_from_owner_hash(owner),[pre,q,sig],tx))
+        self.assertFalse(valid_script(lock,[pre,encode_public(mul(2)),sig],tx))
+        self.assertFalse(valid_script(lock,[b'extra',pre,key,sig],tx))
+
+    def test_transaction_and_preimage_tampering(self):
+        key,lock,parent,tx,pre,sig=fixture()
+        variants=[replace(tx,outputs=(Output(899,b'\x51'),)),replace(tx,locktime=1),replace(tx,version=1),replace(tx,inputs=(replace(tx.inputs[0],sequence=1),)),replace(tx,inputs=(replace(tx.inputs[0],vout=1),)),replace(tx,inputs=(replace(tx.inputs[0],txid=b'\x33'*32),)),replace(tx,outputs=(Output(900,b'\x00'),))]
+        for changed in variants:
+            self.assertFalse(valid_script(lock,[pre,key,sig],changed))
+            p=preimage_all(changed,0,1000)
+            s=fixture_sign(1,hash256(p),3)
+            self.assertFalse(valid_script(lock,[p,key,s],tx))
+        self.assertFalse(valid_script(lock,[pre,key,sig],tx,value=1001))
+        for changed in (pre[:-1],pre+b'\0',pre[:-4]+b'\x42\0\0\0',pre[:105]+b'\xad'+pre[106:]):
+            self.assertFalse(valid_script(lock,[changed,key,fixture_sign(1,hash256(changed),3)],tx))
+
+    def test_infinity_rejected(self):
+        # s=1, t=2, Q=-(1/2)G => sG+tQ=infinity.
+        key=encode_public(mul(N-pow(2,-1,N)))
+        self.assertFalse(verify_digest(key,bytes(32),be32(1)+be32(1)))
+        point_code=assemble_blocks(ROOT/'reference/asm',bytes(20),entry='VERIFY_SM2_POINT')
+        with self.assertRaises(ScriptError):
+            evaluate(b''.join(number(x) for x in (P,1,1,*parse_public(key),0))+point_code)
+
+    def test_high_x_candidate(self):
+        # Construct a valid verification relation with x >= n (negligible random probability).
+        x=N
+        while True:
+            y=pow((x*x*x+A*x+B)%P,(P+1)//4,P)
+            if (y*y-x*x*x-A*x-B)%P==0: break
+            x+=1
+        e=123; r=(e+x)%N; s=456; t=(r+s)%N
+        q=mul(pow(t,-1,N),add((x,y),mul(N-s)))
+        self.assertTrue(verify_digest(encode_public(q),be32(e),be32(r)+be32(s)))
+        point_code=assemble_blocks(ROOT/'reference/asm',bytes(20),entry='VERIFY_SM2_POINT')
+        self.assertEqual(evaluate(b''.join(number(v) for v in (P,r,s,*q,e))+point_code),([],[]))
+
+    def test_payment_vector_and_consecutive_payments(self):
+        v=json.loads((ROOT/'template/spend-all.json').read_text())
+        key,lock,parent,tx,pre,sig=fixture()
+        self.assertEqual(pre.hex(),v['preimage_hex']); self.assertEqual(sig.hex(),v['signature_hex'])
+        signed=tx.with_script(0,current_input_unlock(tx,0,1000,key,sig))
+        self.assertEqual(signed.inputs[0].script.hex(),v['script_sig_hex']); self.assertEqual(signed.txid(),v['signed_txid'])
+        parent=Transaction((Input(b'\x33'*32,0),),(Output(10000,lock),))
+        lengths=[]
+        for hop in range(3):
+            signed=sign_payment(parent.serialize(),0,[Output(parent.outputs[0].value-100,lock)],100,key,lambda m,uid: fixture_sign(1,m,hop+2,uid))
+            witness,_=evaluate(signed.inputs[0].script)
+            self.assertTrue(valid_script(lock,witness,signed,value=parent.outputs[0].value))
+            lengths.append(len(signed.inputs[0].script)); parent=signed
+        self.assertEqual(lengths,[291]*3)
+        with self.assertRaises(ValueError): sign_payment(parent.serialize(),0,[Output(1,b'\x51')],0,key,lambda *_: sig)
+        with self.assertRaises(ValueError): sign_payment(parent.serialize(),0,[Output(parent.outputs[0].value-100,b'\x51')],100,key,lambda *_: bytes(64))
+        with self.assertRaises(ValueError): Transaction.parse(parent.serialize()+b'\0')
+
+
+if __name__=='__main__': unittest.main()

@@ -1,0 +1,83 @@
+{
+  "scope": "Local wall-clock, warmup=3; includes Python adapter overhead; not miner throughput or network fee",
+  "platform": "macOS-27.2.1-arm64-arm-64bit",
+  "machine": "arm64",
+  "python": "3.12.16",
+  "iterations": 30,
+  "legacy_sizes": {
+    "secret_key_bytes": 16384,
+    "public_key_bytes": 16384,
+    "signature_bytes": 8192,
+    "digest_verifier_bytes_including_key": 21876,
+    "locking_script_bytes_including_key": 22491,
+    "locking_non_key_bytes_including_push_headers": 6107,
+    "binding_tail_bytes": 587,
+    "unlocking_script_bytes": 8355,
+    "total_lock_and_unlock_bytes": 30846,
+    "signed_one_input_one_OP_TRUE_output_tx_bytes": 8418,
+    "locking_instructions_including_pushes_and_both_branches": 5634,
+    "locking_non_push_opcodes_including_both_branches": 4207,
+    "sha256_opcodes": 256,
+    "hash256_opcodes": 1,
+    "checksig_opcodes": 1
+  },
+  "universal_sizes": {
+    "locking_script_bytes_including_key": 22780,
+    "locking_non_key_bytes_including_push_headers": 6396,
+    "forkid_ordinary_unlocking_script_bytes": 8357,
+    "forkid_ordinary_total_lock_and_unlock_bytes": 31137,
+    "unpaired_otda_single_unlocking_script_bytes": 8361,
+    "locking_instructions_including_pushes_and_both_branches": 5762,
+    "sha256_opcodes": 256,
+    "hash256_opcodes": 1,
+    "native_signature_opcodes": 2
+  },
+  "development_stack_peaks_for_legacy_fixture": {
+    "main_items": 5,
+    "alt_items": 32,
+    "combined_items": 33,
+    "combined_payload_bytes": 8512
+  },
+  "timings": {
+    "keygen_including_public_hashes": {
+      "median_ms": 0.269271,
+      "min_ms": 0.265666,
+      "max_ms": 0.3305
+    },
+    "sign_digest_stateless": {
+      "median_ms": 0.04427,
+      "min_ms": 0.043875,
+      "max_ms": 0.045875
+    },
+    "verify_digest": {
+      "median_ms": 0.149855,
+      "min_ms": 0.149333,
+      "max_ms": 0.150541
+    },
+    "generate_locking_script": {
+      "median_ms": 1.594542,
+      "min_ms": 1.516666,
+      "max_ms": 1.761458
+    },
+    "development_full_script_with_python_ecdsa": {
+      "median_ms": 4.370605,
+      "min_ms": 4.161125,
+      "max_ms": 5.153333
+    },
+    "chain_gang_legacy_all_transaction": {
+      "median_ms": 0.298729,
+      "min_ms": 0.283875,
+      "max_ms": 0.400208
+    },
+    "chain_gang_universal_all_transaction": {
+      "median_ms": 0.319333,
+      "min_ms": 0.2965,
+      "max_ms": 0.365375
+    },
+    "chain_gang_universal_companion_transaction": {
+      "median_ms": 0.362521,
+      "min_ms": 0.349541,
+      "max_ms": 0.443375
+    }
+  }
+}

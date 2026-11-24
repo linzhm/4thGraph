@@ -1,0 +1,60 @@
+"""Current-input P2PKH-R1 signing messages and unlocking scripts."""
+from dataclasses import dataclass
+from hashlib import sha256
+
+from tx_engine import Script, sig_hash_preimage
+
+GROUP_ORDER_R1 = 0xffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc632551
+UNIVERSAL_FLAGS = frozenset({base | mode for base in (0x41, 0x42, 0x43)
+                             for mode in (0, 0x20, 0x80, 0xa0)})
+
+# The last executed separator differs between ordinary and companion authorization.
+ORDINARY_CODE = bytes.fromhex("68ac")
+COMPANION_CODE = bytes.fromhex("63ad67ab68ac")
+
+
+@dataclass(frozen=True)
+class SpendAuthorization:
+    requested_type: int
+    preimage: bytes
+    companion: bool
+
+    def digest(self):
+        return sha256(sha256(self.preimage).digest()).digest()
+
+
+def authorization(tx, index, amount, requested_type):
+    if requested_type not in UNIVERSAL_FLAGS or not 0 <= index < len(tx.tx_ins):
+        raise ValueError("unsupported sighash or input index")
+    companion = (requested_type & 0x7f) == 0x63 and index >= len(tx.tx_outs)
+    actual = requested_type & ~0x20 if companion else requested_type
+    otda = bool(actual & 0x20)
+    code = COMPANION_CODE if companion else ORDINARY_CODE
+    if otda:
+        suffix = Script()
+        suffix.append_data(code)
+        pre = bytes(sig_hash_preimage(tx, index, suffix, amount, actual))
+    else:
+        # Supply the actual executed branch's scriptCode verbatim, including its
+        # unexecuted separator. A lexical last-separator search cannot infer this path.
+        pre = bytes(sig_hash_preimage(tx, index, Script.parse_string("OP_CHECKSIG"), amount, actual))
+        if len(pre) != 158 or pre[104:106] != bytes.fromhex("01ac"):
+            raise ValueError("unexpected engine BIP143 layout")
+        pre = pre[:104] + bytes([len(code)]) + code + pre[106:]
+    return SpendAuthorization(requested_type, pre, companion)
+
+
+def current_input_unlock(auth, pubkey, signature):
+    """Serialize the four pushes and the derived branch opcode."""
+    if len(pubkey) != 65 or pubkey[0] != 4 or len(signature) != 64:
+        raise ValueError("expected X9.63 public key and raw R1 signature")
+    s = int.from_bytes(signature[32:], "big")
+    if not 0 < s < GROUP_ORDER_R1:
+        raise ValueError("invalid P-256 signature scalar")
+    inverse = pow(s, -1, GROUP_ORDER_R1).to_bytes(32, "little")
+    out = Script()
+    for data in (auth.preimage, pubkey, signature):
+        out.append_pushdata(data)
+    out.append_pushdata(inverse)
+    out.append_data(bytes([0x51 if auth.companion else 0x00]))
+    return out
