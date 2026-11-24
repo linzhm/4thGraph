@@ -1,6 +1,7 @@
 """Complete-input and canonical framing tests without CCTP dependencies."""
 
 from dataclasses import replace
+from hashlib import sha256
 from importlib.util import find_spec
 import unittest
 
@@ -33,6 +34,12 @@ def as_digest(signals):
 
 
 class StatementReceiptTests(unittest.TestCase):
+    def test_existing_two_input_statement_script_bytes(self):
+        self.assertEqual(
+            sha256(statement_script()).hexdigest(),
+            "0c47fef6fdbe7e0fb7806f53cd14eea6d1c10821561888b4e72a020cd6c01664",
+        )
+
     def test_script_extracts_exact_two_big_endian_limbs(self):
         parents = funding_pair(COMPACT_SUFFIX)
         signals = (2**128 - 1, 2**127 + 5)
@@ -80,6 +87,26 @@ class StatementReceiptTests(unittest.TestCase):
         reject(prevouts=prevouts + prevouts[:36])
         reject(preimage=base[:105] + b"\x51" + base[106:])
         reject(preimage=base[:-4] + b"\x43" + bytes(3))
+
+    @unittest.skipUnless(find_spec("tx_engine"), "requires the independent chain-gang evaluator")
+    def test_one_proof_at_vin_zero_with_four_inputs_and_two_preceding_outputs(self):
+        from shared.chain_gang import validate_at_heights
+
+        shape = dict(input_count=4, verifier_index=0, preceding_outputs=2)
+        key, signals, proof = fixture()
+        parents = tuple(
+            Transaction((Input(bytes([1 + i]) * 32, 0),), (Output(10_000, lock),))
+            for i, lock in enumerate((verifier_lock(key, **shape), *(asm("OP_1"),) * 3))
+        )
+        inputs = tuple(Input(parent.txid_wire(), 0) for parent in parents)
+        outs = (Output(900, asm("OP_1")), Output(1000, b"x" * 253), receipt_output(as_digest(signals)))
+        tx = Transaction(inputs, outs)
+        witness = verifier_witness(key, proof, tx, parents[0], **shape)
+        heights = dict(spend_height=100, activation_height=2, utxo_heights=(3,) * 4)
+        validate_at_heights(tx.with_script(0, witness), parents, **heights)
+        swapped = replace(tx, inputs=(inputs[1], inputs[0], *inputs[2:])).with_script(1, witness)
+        with self.assertRaises(ValueError):
+            validate_at_heights(swapped, parents, **heights)
 
     @unittest.skipUnless(find_spec("tx_engine"), "requires the independent chain-gang evaluator")
     def test_plain_and_independent_bsb22_proof_spends(self):

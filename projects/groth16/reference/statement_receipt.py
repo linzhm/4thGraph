@@ -1,8 +1,8 @@
-"""Verify Groth16 limbs from the actual statement receipt of a two-vin spend.
+"""Verify Groth16 limbs from the actual statement receipt of a fixed-shape spend.
 
-The application binds the digest to its own rules, for example by deriving and
-checking the same receipt in vin0. This validator checks the proof and actual
-transaction framing of the receipt at vout1.
+The application binds the digest to its own rules, for example by deriving
+and checking the same receipt in each token input. This validator checks
+the proof and actual transaction framing of the final receipt.
 """
 
 from bsb22 import verifier_fields as committed_fields
@@ -59,27 +59,40 @@ def _skip_output():
     )
 
 
-def statement_script():
-    """Consume [outputs, prevouts, compact vin1 preimage] and leave two limbs."""
+def _check_shape(input_count, verifier_index, preceding_outputs):
+    if (type(input_count) is not int or not 1 <= input_count <= 258
+            or type(verifier_index) is not int or not 0 <= verifier_index < input_count
+            or type(preceding_outputs) is not int or not 1 <= preceding_outputs <= 256):
+        raise ValueError("expected a bounded statement receipt layout")
+
+
+def statement_script(*, input_count=2, verifier_index=1, preceding_outputs=1):
+    """Consume [outputs, prevouts, compact verifier preimage] and leave two limbs."""
+    _check_shape(input_count, verifier_index, preceding_outputs)
     script_field = blob(COMPACT_SCRIPTCODE)
+    offset = 36 * verifier_index
+    if verifier_index + 1 == input_count:
+        selected = _split(offset) + asm("OP_NIP") if offset else b""
+    else:
+        selected = _slice(offset, 36)
     return (
         # Preserve the digest of this very preimage for the final CHECKSIG.
         asm("OP_DUP") + compact_preimage_digest_script() + asm("OP_DROP OP_DUP")
         + _slice(104, len(script_field)) + push(script_field) + asm("OP_EQUALVERIFY")
-        # Require two actual outpoints and bind the executing input to vin1.
-        + asm("OP_OVER OP_SIZE 72 OP_NUMEQUALVERIFY OP_HASH256 OP_OVER")
-        + _slice(4, 32) + asm("OP_EQUALVERIFY OP_OVER 36 OP_SPLIT OP_NIP OP_OVER")
+        # Require the exact number of actual outpoints and the executing vin.
+        + asm("OP_OVER OP_SIZE") + number(36 * input_count) + asm("OP_NUMEQUALVERIFY OP_HASH256 OP_OVER")
+        + _slice(4, 32) + asm("OP_EQUALVERIFY OP_OVER") + selected + asm("OP_OVER")
         + _slice(68, 36) + asm("OP_EQUALVERIFY OP_NIP")
         # Authenticate all output fields and require the receipt to be last.
         + asm("OP_OVER OP_HASH256 OP_OVER") + _slice(152, 32) + asm("OP_EQUALVERIFY OP_DROP")
-        + _skip_output() + _split(len(RECEIPT_PREFIX)) + asm("OP_SWAP")
+        + _skip_output() * preceding_outputs + _split(len(RECEIPT_PREFIX)) + asm("OP_SWAP")
         + push(RECEIPT_PREFIX) + asm("OP_EQUALVERIFY OP_SIZE 32 OP_NUMEQUALVERIFY")
         + digest_limbs_script()
     )
 
 
-def verifier_lock(key, commitment=None):
-    """Build the vin1 lock, with either a plain or a single-commitment Groth16 key."""
+def verifier_lock(key, commitment=None, *, input_count=2, verifier_index=1, preceding_outputs=1):
+    """Build the actual verifier lock from a plain or single-commitment key."""
     if commitment is None:
         if len(key.ic) != 3:
             raise ValueError("a plain statement verifier requires two public limbs")
@@ -88,21 +101,25 @@ def verifier_lock(key, commitment=None):
         if len(key.ic) != 4:
             raise ValueError("a committed statement verifier requires two public limbs and a commitment")
         proof_lock = committed_lock(key, commitment)
-    return statement_script() + proof_lock + compact_verifier_binding()
+    return (
+        statement_script(input_count=input_count, verifier_index=verifier_index, preceding_outputs=preceding_outputs)
+        + proof_lock + compact_verifier_binding()
+    )
 
 
-def verifier_material(tx, funding):
-    """Serialize the transaction material after the proof fields in vin1."""
-    if len(tx.inputs) != 2 or len(tx.outputs) != 2:
-        raise ValueError("statement verifier requires exactly two inputs and two outputs")
-    receipt_digest(tx.outputs[1])
-    current = tx.inputs[1]
+def verifier_material(tx, funding, *, input_count=2, verifier_index=1, preceding_outputs=1):
+    """Serialize the transaction material after the proof fields."""
+    _check_shape(input_count, verifier_index, preceding_outputs)
+    if len(tx.inputs) != input_count or len(tx.outputs) != preceding_outputs + 1:
+        raise ValueError("transaction does not match the statement receipt layout")
+    receipt_digest(tx.outputs[preceding_outputs])
+    current = tx.inputs[verifier_index]
     if current.txid != funding.txid_wire() or not 0 <= current.vout < len(funding.outputs):
         raise ValueError("funding does not match the actual statement verifier outpoint")
     previous = funding.outputs[current.vout]
     if not previous.script.endswith(COMPACT_SUFFIX):
         raise ValueError("expected a compact binding suffix in the verifier funding lock")
-    preimage = preimage_all(tx, 1, previous.value, COMPACT_SCRIPTCODE)
+    preimage = preimage_all(tx, verifier_index, previous.value, COMPACT_SCRIPTCODE)
     return b"".join(map(push, (
         b"".join(output.serialize() for output in tx.outputs),
         b"".join(item.outpoint() for item in tx.inputs),
@@ -110,10 +127,11 @@ def verifier_material(tx, funding):
     )))
 
 
-def verifier_witness(key, proof, tx, funding, commitment=None):
+def verifier_witness(key, proof, tx, funding, commitment=None, *, input_count=2, verifier_index=1, preceding_outputs=1):
     """Encode proof fields using the two digest limbs declared by the receipt."""
-    material = verifier_material(tx, funding)
-    digest = receipt_digest(tx.outputs[1])
+    material = verifier_material(tx, funding, input_count=input_count, verifier_index=verifier_index,
+                                 preceding_outputs=preceding_outputs)
+    digest = receipt_digest(tx.outputs[preceding_outputs])
     signals = int.from_bytes(digest[:16], "big"), int.from_bytes(digest[16:], "big")
     if commitment is None:
         point = verification_key_point(key.ic, signals) or (0, 0)
