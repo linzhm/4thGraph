@@ -13,7 +13,7 @@ MARKER = push(b"BSV/Groth16/1") + asm("OP_DROP")
 ID_SUFFIX = asm("OP_DROP")
 PROFILES = ("separate", "fused", "alpha", "beta", "gamma")
 EXPERIMENTS = ("alpha", "beta", "gamma")
-DEFAULT_EXPERIMENT = "alpha"
+DEFAULT_EXPERIMENT = "beta"
 PROJECTIVE_G1_PROFILES = ("beta", "gamma")
 
 

@@ -23,7 +23,7 @@ From the repository root with Python 3.12 or later:
 ```sh
 export PYTHONPATH=".:projects/groth16/reference"
 python3 -m unittest -v test_groth16.ReferenceTests
-python3 projects/groth16/reference/vector.py --experiment alpha --scripts-out /tmp/groth16-vector
+python3 projects/groth16/reference/vector.py --experiment beta --scripts-out /tmp/groth16-vector
 ```
 
 For the complete-input regression matrix and a median timing per profile, install the chain-gang build in [shared requirements](../../shared/requirements-chronicle.txt).
