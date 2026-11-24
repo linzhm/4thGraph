@@ -1,0 +1,64 @@
+{
+  "scope": "Chronicle-only native Script checks of current committed receipt and script-bound public limbs. Fixture limbs substitute for outer Groth16.",
+  "node": "/Bitcoin SV:1.2.3/",
+  "transactions": {
+    "setup": {
+      "txid": "d92e2925a535d2f0403b13f8b063d514ef31d6d89ced5d7f4b33763a46062c99",
+      "blockhash": "611094e14a66dd31c8e3b8ce2303cd2a17ee0ee241388aa1c7d4bdd94a9594e9",
+      "height": 972,
+      "bytes": 228
+    },
+    "transfer-context-1-to-4-verifier": {
+      "txid": "64a81529d238970d95c8dfb70cf5034bb1101275a7baf159215ba4c166f8adf1",
+      "blockhash": "5a778cc0f983f396e7414cd065a8909cecb656d6afd48d32258bc75d2243b92d",
+      "height": 973,
+      "bytes": 1681
+    },
+    "transfer-context-1-to-4": {
+      "txid": "7f5931199c08e4469d8f4f589a8ca0e2b3555d8a4508b75292365651091c6c47",
+      "blockhash": "2012fafe5276bf68045daca9f73bb7d0e315438e55523bbde80b019edaae343b",
+      "height": 974,
+      "bytes": 497
+    },
+    "transfer-context-4-to-4-verifier": {
+      "txid": "088b6e4bb4907f93ad285708613d73ce0fc4d0387a6df5485a5f804b175d0050",
+      "blockhash": "4dbcaef85fa67faecebd64ba4757039fb99dcda433db77ddc085686db145c07b",
+      "height": 975,
+      "bytes": 1739
+    },
+    "transfer-context-4-to-4": {
+      "txid": "6af8cf1119a7e43760951d55e43de018d129f764fdd278ebacc850a49d890dd2",
+      "blockhash": "0d2a33b6d5cad2052f6ed115f22dd2ac3f6fc2dd15c25daa0059f18bb762c14c",
+      "height": 976,
+      "bytes": 743
+    }
+  },
+  "checks": {
+    "transfer-context-1-to-4": {
+      "shape": [
+        1,
+        4
+      ],
+      "receipt_bytes": 77,
+      "statement_digest": "c2c147eaaefc131b60fabc0fb94e2e5efd443635f982f79afde5c1619215e0d5",
+      "verifier_lock_bytes": 1619,
+      "receipt_witness_and_signature_checks": {
+        "wrong_receipt_count": "sendrawtransaction: {'code': -26, 'message': '16: mandatory-script-verify-flag-failed (Script failed an OP_EQUALVERIFY operation)'}",
+        "stale_current_outputs": "sendrawtransaction: {'code': -26, 'message': '16: mandatory-script-verify-flag-failed (Script evaluated without error but finished with a false/empty top stack element)'}"
+      }
+    },
+    "transfer-context-4-to-4": {
+      "shape": [
+        4,
+        4
+      ],
+      "receipt_bytes": 77,
+      "statement_digest": "7482b9adf36b7ea336fed9ca1745859ae59a26bd940207c5731106d8cb7d2058",
+      "verifier_lock_bytes": 1677,
+      "receipt_witness_and_signature_checks": {
+        "wrong_receipt_count": "sendrawtransaction: {'code': -26, 'message': '16: mandatory-script-verify-flag-failed (Script failed an OP_EQUALVERIFY operation)'}",
+        "stale_current_outputs": "sendrawtransaction: {'code': -26, 'message': '16: mandatory-script-verify-flag-failed (Script evaluated without error but finished with a false/empty top stack element)'}"
+      }
+    }
+  }
+}

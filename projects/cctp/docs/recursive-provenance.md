@@ -74,4 +74,6 @@ Genesis   = (asset, policyVersion, EMPTY_ROOT, 0, false)
 
 用小型父交易与真实 BSB22 测试证明组合求解后，专用 1→4 为 5,790,214 条约束，专用 4→4 为 17,092,424 条。两者把实际父 vout 的代币数量交给同一守恒函数，重建前序证明摘要，并承诺实际全部四个输出。改量后重算本笔公开声明也会被拒绝。组合测试的前序证明属于测试电路，发行基例、外层新参数、签名验收及连续入块仍待完成。 [组合测试](../recursion/continuity/wire_transfer_test.go)
 
+独立 BSV Node 已确认 1→4 和 4→4 的 Chronicle 声明边界测试，Script 从本笔实际预像和 77 字节回执重建两个公开量，再用节点验签绑定该预像。错误回执数量和改后的实际输出配旧预像均被拒绝。节点夹具直接核对公开量，完整交易验收仍需外层 Groth16 和持币锁。 [声明边界节点记录](../fixtures/v2-committed-transfer-context-regtest-summary.json)
+
 守恒按 Token 最小单位与 satoshi 分别核对。1→4 的四个 Token 输出必须各有正数最小单位。保留本试验的聪数守恒时，一个 4,000 satoshi 的代币输入可分给四个各 1,000 satoshi 的输出。若策略要求四个输出各 1,000 satoshi，且原代币输入只有 1,000 satoshi，补足载体聪数需要明确的独立资金规则。
