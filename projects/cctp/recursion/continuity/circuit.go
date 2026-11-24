@@ -8,13 +8,10 @@ import (
 	"github.com/linzhm/BSV-Script-Lab/projects/cctp/recursion/keycommit"
 
 	"github.com/consensys/gnark/frontend"
-	"github.com/consensys/gnark/std/algebra"
 	"github.com/consensys/gnark/std/algebra/emulated/sw_bls12381"
 	"github.com/consensys/gnark/std/commitments/pedersen"
 	"github.com/consensys/gnark/std/hash/sha2"
-	"github.com/consensys/gnark/std/math/emulated"
 	"github.com/consensys/gnark/std/math/uints"
-	recursive "github.com/consensys/gnark/std/recursion/groth16"
 )
 
 const domain = "BSV/CCTP/continuity/v1\x00"
@@ -126,56 +123,11 @@ func (c *Circuit) Define(api frontend.API) error {
 	message = append(message, context...)
 	message = append(message, byteAPI.ValueOf(c.Count))
 
-	verifier, err := recursive.NewVerifier[Fr, G1, G2, GT](api)
+	priorBytes, err := assertPredecessorProofs(api, byteAPI, &c.Key, c.pad, active[:], c.Prior[:], c.Proofs[:])
 	if err != nil {
 		return err
 	}
-	curve, err := algebra.GetCurve[Fr, G1](api)
-	if err != nil {
-		return err
-	}
-	pairing, err := algebra.GetPairing[G1, G2, GT](api)
-	if err != nil {
-		return err
-	}
-	scalar, err := emulated.NewField[Fr](api)
-	if err != nil {
-		return err
-	}
-	for i := range c.Prior {
-		prior := make([]uints.U8, 32)
-		for j, value := range c.Prior[i] {
-			api.AssertIsEqual(api.Mul(api.Sub(1, active[i]), value), 0)
-			prior[j] = byteAPI.ValueOf(value)
-		}
-		message = append(message, prior...)
-		inputs := uint128Pair(api, prior)
-		witness := recursive.Witness[Fr]{Public: make([]emulated.Element[Fr], 2)}
-		for j, value := range inputs {
-			selected := api.Select(active[i], value, c.pad.Limbs[j])
-			witness.Public[j] = *scalar.FromBits(api.ToBinary(selected, 128)...)
-		}
-		key, err := verifier.SwitchVerificationKey(active[i], []keycommit.Key{c.pad.Key, c.Key})
-		if err != nil {
-			return fmt.Errorf("select predecessor %d key: %w", i, err)
-		}
-		given, filler := &c.Proofs[i], &c.pad.Proof
-		proof := Proof{
-			Ar:  *curve.Mux(active[i], &filler.Ar, &given.Ar),
-			Bs:  *pairing.MuxG2(active[i], &filler.Bs, &given.Bs),
-			Krs: *curve.Mux(active[i], &filler.Krs, &given.Krs),
-			Commitments: []pedersen.Commitment[G1]{{
-				G1El: *curve.Mux(active[i], &filler.Commitments[0].G1El, &given.Commitments[0].G1El),
-			}},
-			CommitmentPok: pedersen.KnowledgeProof[G1]{
-				G1El: *curve.Mux(active[i], &filler.CommitmentPok.G1El, &given.CommitmentPok.G1El),
-			},
-		}
-		if err := verifier.AssertProof(key, proof, witness,
-			recursive.WithSubgroupCheck(), recursive.WithCompleteArithmetic()); err != nil {
-			return fmt.Errorf("verify predecessor %d: %w", i, err)
-		}
-	}
+	message = append(message, priorBytes...)
 	digest, err := hash256(api, message)
 	if err != nil {
 		return err

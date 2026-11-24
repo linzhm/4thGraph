@@ -13,6 +13,16 @@ RECEIPT_PREFIX = asm("OP_0 OP_RETURN") + push(RECEIPT_TAG) + bytes([PARENT_SIZE]
 OUTPUT_PREFIX = bytes(8) + compact(len(RECEIPT_PREFIX) + PARENT_SIZE) + RECEIPT_PREFIX
 OUTPUT_SIZE = len(OUTPUT_PREFIX) + PARENT_SIZE
 
+COMMITTED_CONTINUITY_DOMAIN = b"BSV/CCTP/continuity/v2\x00"
+PREDECESSOR_COMMITMENT_DOMAIN = b"BSV/CCTP/predecessors/v2\x00"
+COMMITTED_RECEIPT_TAG = b"BSV/CCTP/continuity-parents/v2\x00"
+COMMITTED_PARENT_SLOTS = 4
+COMMITTED_PAYLOAD_SIZE = 1 + 32
+COMMITTED_RECEIPT_PREFIX = asm("OP_0 OP_RETURN") + push(COMMITTED_RECEIPT_TAG) + bytes([COMMITTED_PAYLOAD_SIZE])
+COMMITTED_OUTPUT_PREFIX = (bytes(8) + compact(len(COMMITTED_RECEIPT_PREFIX) + COMMITTED_PAYLOAD_SIZE)
+                           + COMMITTED_RECEIPT_PREFIX)
+COMMITTED_OUTPUT_SIZE = len(COMMITTED_OUTPUT_PREFIX) + COMMITTED_PAYLOAD_SIZE
+
 
 @dataclass(frozen=True)
 class ParentReceipt:
@@ -52,3 +62,47 @@ class ParentReceipt:
 
     def signals(self, asset_id, key_digest, transaction_context):
         return public_inputs(self.statement(asset_id, key_digest, transaction_context))
+
+
+@dataclass(frozen=True)
+class CommittedParentReceipt:
+    """Commit up to four ordered predecessor slots in a fixed-width receipt."""
+    count: int
+    commitment: bytes
+
+    @classmethod
+    def from_parents(cls, parents: tuple[bytes, ...]):
+        if len(parents) > COMMITTED_PARENT_SLOTS:
+            raise ValueError("at most four committed predecessor slots")
+        fields = b"".join(fixed(digest, 32) for digest in parents)
+        fields += ZERO * (COMMITTED_PARENT_SLOTS - len(parents))
+        return cls(len(parents), hash256(PREDECESSOR_COMMITMENT_DOMAIN + bytes([len(parents)]) + fields))
+
+    def payload(self):
+        if type(self.count) is not int or not 0 <= self.count <= COMMITTED_PARENT_SLOTS:
+            raise ValueError("invalid committed predecessor count")
+        commitment = fixed(self.commitment, 32)
+        if self.count == 0 and commitment != self.from_parents(()).commitment:
+            raise ValueError("invalid empty predecessor commitment")
+        return bytes([self.count]) + commitment
+
+    def output(self):
+        return Output(0, COMMITTED_RECEIPT_PREFIX + self.payload())
+
+    @classmethod
+    def parse(cls, output):
+        if output.value != 0 or not output.script.startswith(COMMITTED_RECEIPT_PREFIX):
+            raise ValueError("missing canonical committed predecessor receipt")
+        raw = fixed(output.script[len(COMMITTED_RECEIPT_PREFIX):], COMMITTED_PAYLOAD_SIZE)
+        result = cls(raw[0], raw[1:])
+        result.payload()
+        return result
+
+    def statement(self, asset_id, key_digest, transaction_context):
+        return (
+            COMMITTED_CONTINUITY_DOMAIN + fixed(asset_id, 32) + fixed(key_digest, 32)
+            + fixed(transaction_context, 32) + self.payload()
+        )
+
+    def digest(self, asset_id, key_digest, transaction_context):
+        return hash256(self.statement(asset_id, key_digest, transaction_context))

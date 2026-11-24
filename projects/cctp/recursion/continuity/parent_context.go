@@ -17,20 +17,15 @@ type chronicleParentProfile struct {
 	MinParents, MaxParents int
 }
 
-// chronicleParentMaterial derives an OTDA preimage and the actual final receipt
-// from one case. Framing and verifier checks apply only to the selected case.
-func chronicleParentMaterial(api frontend.API, branch parentcheckpoint.BoundParentCase,
-	profile chronicleParentProfile, approvedVerifier [36]frontend.Variable,
-) (preimage, payload []frontend.Variable, err error) {
-	active, tx := branch.Selector, branch.Context
+func chronicleContextPreimage(api frontend.API, active frontend.Variable, tx parentcheckpoint.BoundParentContext,
+	verifierVin int, scriptCode []byte, approvedVerifier [36]frontend.Variable,
+) ([]frontend.Variable, error) {
 	if len(tx.Inputs) == 0 || len(tx.Inputs) >= 253 || len(tx.TxOuts) == 0 || len(tx.TxOuts) >= 253 ||
-		profile.VerifierVin < 0 || profile.VerifierVin >= len(tx.Inputs) ||
-		len(profile.ScriptCode) == 0 || len(profile.ScriptCode) >= 253 ||
-		profile.MinParents < 0 || profile.MaxParents > 2 || profile.MinParents > profile.MaxParents {
-		return nil, nil, fmt.Errorf("invalid bounded Chronicle predecessor profile")
+		verifierVin < 0 || verifierVin >= len(tx.Inputs) || len(scriptCode) == 0 || len(scriptCode) >= 253 {
+		return nil, fmt.Errorf("invalid bounded Chronicle transaction profile")
 	}
 	if len(tx.Version) != 4 || len(tx.Locktime) != 4 {
-		return nil, nil, fmt.Errorf("invalid authenticated predecessor header")
+		return nil, fmt.Errorf("invalid authenticated transaction header")
 	}
 	api.AssertIsBoolean(active)
 	equalIfActive := func(a, b frontend.Variable) {
@@ -39,22 +34,22 @@ func chronicleParentMaterial(api frontend.API, branch parentcheckpoint.BoundPare
 
 	// OTDA ALL keeps ordered outpoints and sequences, empties each other
 	// script field, and binds the canonical full output vector.
-	preimage = append([]frontend.Variable{}, tx.Version...)
+	preimage := append([]frontend.Variable{}, tx.Version...)
 	preimage = append(preimage, len(tx.Inputs))
 	for i, input := range tx.Inputs {
 		if len(input.Outpoint) != 36 || len(input.Sequence) != 4 {
-			return nil, nil, fmt.Errorf("invalid authenticated predecessor vin %d", i)
+			return nil, fmt.Errorf("invalid authenticated vin %d", i)
 		}
 		preimage = append(preimage, input.Outpoint...)
-		if i == profile.VerifierVin {
+		if i == verifierVin {
 			for j, value := range approvedVerifier {
 				equalIfActive(input.Outpoint[j], value)
 			}
 			for j, value := range []byte{0x61, 0, 0, 0x80} {
 				equalIfActive(input.Sequence[j], value)
 			}
-			preimage = append(preimage, len(profile.ScriptCode))
-			for _, value := range profile.ScriptCode {
+			preimage = append(preimage, len(scriptCode))
+			for _, value := range scriptCode {
 				preimage = append(preimage, value)
 			}
 		} else {
@@ -63,10 +58,30 @@ func chronicleParentMaterial(api frontend.API, branch parentcheckpoint.BoundPare
 		preimage = append(preimage, input.Sequence...)
 	}
 	preimage = append(preimage, len(tx.TxOuts))
-	preimage = append(preimage, tx.Outputs...)
+	for _, output := range tx.TxOuts {
+		preimage = append(preimage, output...)
+	}
 	preimage = append(preimage, tx.Locktime...)
 	preimage = append(preimage, 0x61, 0, 0, 0)
+	return preimage, nil
+}
 
+// chronicleParentMaterial derives an OTDA preimage and the actual final receipt
+// from one case. Framing and verifier checks apply only to the selected case.
+func chronicleParentMaterial(api frontend.API, branch parentcheckpoint.BoundParentCase,
+	profile chronicleParentProfile, approvedVerifier [36]frontend.Variable,
+) ([]frontend.Variable, []frontend.Variable, error) {
+	if profile.MinParents < 0 || profile.MaxParents > 2 || profile.MinParents > profile.MaxParents {
+		return nil, nil, fmt.Errorf("invalid bounded Chronicle predecessor count")
+	}
+	active, tx := branch.Selector, branch.Context
+	preimage, err := chronicleContextPreimage(api, active, tx, profile.VerifierVin, profile.ScriptCode, approvedVerifier)
+	if err != nil {
+		return nil, nil, err
+	}
+	equalIfActive := func(a, b frontend.Variable) {
+		api.AssertIsEqual(api.Mul(active, api.Sub(a, b)), 0)
+	}
 	// Parse the actual final TxOut. A receipt-shaped suffix inside any other
 	// locking script has no authority.
 	receiptScriptSize := 2 + 1 + len(parentReceiptTag) + 1 + parentReceiptPayloadSize
@@ -80,7 +95,7 @@ func chronicleParentMaterial(api frontend.API, branch parentcheckpoint.BoundPare
 	for i, value := range prefix {
 		equalIfActive(receipt[i], value)
 	}
-	payload = receipt[len(prefix):]
+	payload := receipt[len(prefix):]
 	count := payload[0]
 	matches := [3]frontend.Variable{
 		api.IsZero(count), api.IsZero(api.Sub(count, 1)), api.IsZero(api.Sub(count, 2)),

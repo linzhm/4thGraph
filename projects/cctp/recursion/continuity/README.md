@@ -64,6 +64,15 @@ CCTP_CONTINUITY_SOLVER_TEST=1 go test -count=1 \
 
 单槽测试用 266 字节铸造形状和 295 字节转账形状，与 Python 原有 OTDA 和回执编码得到的摘要逐字节核对。覆盖实际 verifier outpoint、错 vout、替换摘要、回执前缀、非零填充和错误签名类型的序列。先选择预像及回执，再共用一次预像哈希和一次声明哈希，单槽测试由 912,161 条降到 583,954 条约束。双槽测试将重建的摘要接到现有同密钥递归验签。两份前序测试证明由同一个小型 BSB22 电路原生证明，替换成相同密钥下另一笔的证明失败。该组合求解有 9,301,078 条约束。测试使用合成交易和前序关系，完整铸造、守恒规则、对当前交易的链上绑定及连续入块由新版验收覆盖。
 
+四输出测试使用 77 字节新版回执，复用按实际 `txid:vout` 打开父输出的逻辑。对每个实际代币输入重建并验证前序摘要，核对全部四个后继的同一资产、策略、Token 数量及 satoshi。固定专用电路的 1→4 和 4→4 分别为 5,790,214 和 17,092,424 条约束。测试使用真实的同密钥前序测试证明，并对改量后重算公开输入的交易求解。 [字节模型和适用范围](../../docs/recursive-provenance.md#四输出的转账形状)
+
+```sh
+CCTP_CONTINUITY_SOLVER_TEST=1 go test -count=1 \
+  -run '^TestWireTransfersBindBalanceAndProofForOneOrFourParents$' -v ./continuity
+CCTP_CONTINUITY_SLOT_TEST=1 go test -count=1 \
+  -run '^Test(PredecessorProofSlots|ContinuityV1ConstraintFingerprint)$' -v ./continuity
+```
+
 ## 本地双链闭环
 
 安装 Foundry 并把 `forge`、`cast`、`anvil` 放入 `PATH`。下列程序启动隔离 Anvil 测试储备，连接已有的独立 BSV regtest，使用同一份连续性参数为十笔状态及代币交易出证。签发恢复、源链确认及余额对账使用持久 BridgeService。

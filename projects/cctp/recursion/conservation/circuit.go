@@ -55,8 +55,21 @@ func Assert2x2(api frontend.API, records []frontend.Variable) error {
 	if len(records) != 4*freeze.StateSize {
 		return fmt.Errorf("expected four ordered CCTP state records")
 	}
+	return AssertTransfer(api, records, 2)
+}
+
+// AssertTransfer checks positive active states with a shared asset and policy.
+// Input records precede output records. The caller authenticates every record
+// and its position against the corresponding actual TxOut and constrains all
+// bytes. Token quantities and satoshis are conserved independently.
+func AssertTransfer(api frontend.API, records []frontend.Variable, inputCount int) error {
+	count := len(records) / freeze.StateSize
+	if len(records)%freeze.StateSize != 0 || inputCount < 1 || inputCount >= count {
+		return fmt.Errorf("expected nonempty ordered transfer input and output state records")
+	}
 	reference := records[:freeze.StateSize]
-	var quantities, satoshis [4]frontend.Variable
+	quantities := make([]frontend.Variable, count)
+	satoshis := make([]frontend.Variable, count)
 	for i := range quantities {
 		state := records[i*freeze.StateSize : (i+1)*freeze.StateSize]
 		quantity := littleEndian(api, state[freeze.QuantityOffset:freeze.OwnerOffset])
@@ -77,11 +90,18 @@ func Assert2x2(api frontend.API, records []frontend.Variable) error {
 		quantities[i], satoshis[i] = quantity, sats
 	}
 
-	inputQuantity := api.Add(quantities[0], quantities[1])
-	api.AssertIsEqual(inputQuantity, api.Add(quantities[2], quantities[3]))
-	// Each operand is a uint64 and the BLS scalar field exceeds uint65.
-	// This decomposition rules out overflow in the conserved total.
+	sum := func(values []frontend.Variable) frontend.Variable {
+		total := values[0]
+		for _, value := range values[1:] {
+			total = api.Add(total, value)
+		}
+		return total
+	}
+	inputQuantity := sum(quantities[:inputCount])
+	api.AssertIsEqual(inputQuantity, sum(quantities[inputCount:]))
+	// The byte-constrained uint64 operands cannot wrap the proving field.
+	// Restrict the conserved quantity to the protocol's uint64 range.
 	api.ToBinary(inputQuantity, 64)
-	api.AssertIsEqual(api.Add(satoshis[0], satoshis[1]), api.Add(satoshis[2], satoshis[3]))
+	api.AssertIsEqual(sum(satoshis[:inputCount]), sum(satoshis[inputCount:]))
 	return nil
 }
