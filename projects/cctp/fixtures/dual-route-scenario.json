@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "usdc_decimals": 6,
+  "one_to_two": {
+    "input_quantity": 1024,
+    "output_quantities": [640, 384],
+    "token_input_vin": 1,
+    "verifier_vin": 0,
+    "token_output_vouts": [0, 1]
+  },
+  "lifecycle": {
+    "freeze_split_vout": 0,
+    "partial_burn": 640,
+    "retained_quantity": 384,
+    "supplemental_mint_and_full_burn": 64
+  },
+  "negative_cases": [
+    "copied-token-lock-with-false-origin",
+    "wrong-parent-vout",
+    "missing-actual-token-input",
+    "wrong-owner-or-role",
+    "replaced-verifier-utxo",
+    "changed-output-value-or-recipient",
+    "reused-old-proof",
+    "ordinary-spend-of-frozen-token",
+    "repeated-release"
+  ],
+  "capacity_widths": [64, 256]
+}
