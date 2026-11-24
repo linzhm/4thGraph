@@ -1,0 +1,100 @@
+{
+  "scope": "isolated regtest sendrawtransaction and explicit proof-of-work submitblock; no P2P peers",
+  "node": "/Bitcoin SV:1.2.3/",
+  "activation_height": 105,
+  "mined_blocks": [
+    {
+      "accepted": true,
+      "hash": "7c9038a0f024a24fa6e0011240f1e12bdab3a62c9218678fe7cf25b8c4bab921",
+      "height": 104,
+      "previous": "47b2ad3e6a97398ec904bdfb4338bbadc2c40fdaceee980d67c830f2b0d4c72f",
+      "header": "000000202fc7d4b0f230c8670d98eeceda0fc4c2adbb3843fbbd04c98e39976a3eadb247a6258ee124287ec86ace0fa01a480d630c153310660c728728a0efadb141f0edb477056bffff7f2001000000"
+    },
+    {
+      "accepted": true,
+      "hash": "22f58c70e2ff600f2bd144752115f0dac1a83eeaff1be7d99a9d726d984d3d96",
+      "height": 105,
+      "previous": "7c9038a0f024a24fa6e0011240f1e12bdab3a62c9218678fe7cf25b8c4bab921",
+      "header": "0000002021b9bac4b825cfe78f6718922ca6b3da2be1f1401201e0a64fa224f0a038907cd7a3ab7c2c3276fc5d0c81e53af37f708c2b4d15530e85b733af14797a6656e7b577056bffff7f2000000000"
+    },
+    {
+      "accepted": true,
+      "hash": "02333ac499818483d96866bbadd46a7202d32402fdd25f6060092d81fd0b4e87",
+      "height": 106,
+      "previous": "22f58c70e2ff600f2bd144752115f0dac1a83eeaff1be7d99a9d726d984d3d96",
+      "header": "00000020963d4d986d729d9ad9e71bffea3ea8c1daf015217544d12b0f60ffe2708cf522472867b2f4a53fb33288e45fa945f85a7a271991c30765d5c61c5143b4593f81b677056bffff7f2001000000"
+    }
+  ],
+  "node_image": "docker.io/bitcoinsv/bitcoin-sv@sha256:d96fe4786a00e5fc10bc9e0e76a6006376f9472d4eb74d07e4c1e0d019493d33",
+  "genesis_activation_height": 1,
+  "network": "regtest",
+  "height_cases": {
+    "104": {
+      "rpc_admitted": 2,
+      "rpc_rejected": 6,
+      "blocks_accepted_cases": 2,
+      "blocks_rejected_cases": 6,
+      "proof_of_work_block": "7c9038a0f024a24fa6e0011240f1e12bdab3a62c9218678fe7cf25b8c4bab921",
+      "rpc_rejections": {
+        "sendrawtransaction: {'code': -26, 'message': '64: flexible-mandatory-script-verify-flag-failed (Illegal use of SIGHASH_CHRONICLE)'}": 4,
+        "sendrawtransaction: {'code': -26, 'message': '16: mandatory-script-verify-flag-failed (Signature must be zero for failed CHECK(MULTI)SIG operation)'}": 2
+      }
+    },
+    "105": {
+      "rpc_admitted": 24,
+      "rpc_rejected": 2,
+      "blocks_accepted_cases": 24,
+      "blocks_rejected_cases": 2,
+      "proof_of_work_block": "22f58c70e2ff600f2bd144752115f0dac1a83eeaff1be7d99a9d726d984d3d96",
+      "rpc_rejections": {
+        "sendrawtransaction: {'code': -26, 'message': '16: mandatory-script-verify-flag-failed (Signature must be zero for failed CHECK(MULTI)SIG operation)'}": 1,
+        "sendrawtransaction: {'code': -26, 'message': '16: mandatory-script-verify-flag-failed (Script failed an OP_CHECKSIGVERIFY operation)'}": 1
+      }
+    },
+    "106": {
+      "rpc_admitted": 24,
+      "rpc_rejected": 2,
+      "blocks_accepted_cases": 24,
+      "blocks_rejected_cases": 2,
+      "proof_of_work_block": "02333ac499818483d96866bbadd46a7202d32402fdd25f6060092d81fd0b4e87",
+      "rpc_rejections": {
+        "sendrawtransaction: {'code': -26, 'message': '16: mandatory-script-verify-flag-failed (Signature must be zero for failed CHECK(MULTI)SIG operation)'}": 1,
+        "sendrawtransaction: {'code': -26, 'message': '16: mandatory-script-verify-flag-failed (Script failed an OP_CHECKSIGVERIFY operation)'}": 1
+      }
+    }
+  },
+  "funding": {
+    "old": {
+      "height": 103,
+      "txid": "0dfdf5782b9af430fe091d582d1ecd614545de6abc28aa7b3b25f2d04f8f9920",
+      "admission": {
+        "accepted": true,
+        "mempool": true
+      },
+      "block": {
+        "accepted": true,
+        "hash": "47b2ad3e6a97398ec904bdfb4338bbadc2c40fdaceee980d67c830f2b0d4c72f",
+        "height": 103,
+        "previous": "5f93f71ba09b8db75357ec23966f2ff9b5505a9568e9ebd75e14a5cd696d3c48",
+        "header": "00000020483c6d69cda5145ed7ebe968955a50b5f92f6f9623ec5753b78d9ba01bf7935f1db9ef71afc1fdc8981a0bfd127b175b4627c4bde278fe0d03271d03deaf04b4b377056bffff7f2001000000"
+      }
+    },
+    "new": {
+      "height": 105,
+      "txid": "6e76e4717f122276fa772e4c031d72bda052cd810a1066f45246ea486896fc6e",
+      "admission": {
+        "accepted": true,
+        "mempool": true
+      },
+      "block": {
+        "accepted": true,
+        "hash": "22f58c70e2ff600f2bd144752115f0dac1a83eeaff1be7d99a9d726d984d3d96",
+        "height": 105,
+        "previous": "7c9038a0f024a24fa6e0011240f1e12bdab3a62c9218678fe7cf25b8c4bab921",
+        "header": "0000002021b9bac4b825cfe78f6718922ca6b3da2be1f1401201e0a64fa224f0a038907cd7a3ab7c2c3276fc5d0c81e53af37f708c2b4d15530e85b733af14797a6656e7b577056bffff7f2000000000"
+      }
+    }
+  },
+  "tested_case_count": 60,
+  "raw_evidence": "chronicle-activation-regtest.json.gz"
+}
