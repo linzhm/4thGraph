@@ -8,6 +8,8 @@ This project specifies a BSV token backed by source-chain USDC. The initial test
 - [Development handoff](docs/handoff.md)
 - [Transfer commitment reference profile](docs/transfer-commitment.md)
 - [Actual transaction relation and acceptance boundary](docs/actual-transaction-relation.md)
+- [Independent parent binding and dual verifier sighashes](docs/parent-binding.md)
+- [Capacity acceptance](docs/capacity.md)
 - [v2 token lifecycle and node results](docs/v2-lifecycle.md)
 - [Mint covenant and cross-chain adapter](docs/mint.md)
 - [Base Sepolia source-chain candidate](docs/base-sepolia-plan.md)
