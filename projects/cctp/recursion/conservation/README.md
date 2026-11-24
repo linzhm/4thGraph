@@ -29,6 +29,24 @@ The token lock was 1,791 bytes. Each payment used a fixed 1,010,000-satoshi test
 
 The successor transaction discloses its one direct parent once. That disclosure contains the earlier witnesses serialized in the parent. An offline SHA-256 checkpoint recomputed this parent's actual txid from a 32-byte state, 8-byte processed length, and 3,704-byte suffix. An authenticated parent proof is required before substituting those 3,744 bytes in the covenant. [Parent binding](../../docs/parent-binding.md)
 
+## Repeated transfers with lossless parent records
+
+The `--compressed-parents` profile moves direct-parent binding into the existing companion at vin1. It already reads the actual vin0 funding transaction. The companion extracts that verifier's script field and its own script field from the authenticated `0x41` preimage, then uses those two byte strings to decode the parent records. Script checks each reconstructed transaction's full SHA256d against the actual input outpoint, selects its vout and checks the exact token lock body. Both owners still authorize their own inputs, and the existing conservation circuit verifies the current receipt independently of any earlier proof.
+
+`--transfers 4` runs a payment from separate origins and three subsequent payments that consume both outputs of the previous payment. Run both modes with the same Groth16 parameters, separate output paths and the same node policy. Add `--compressed-parents` only to the second run. The receipts count the two dedicated funding transactions per payment and check each mined outpoint. The compressed fixture bounds each parent record and reconstructed transaction to eight million bytes. Unique historical bytes still grow between transfers.
+
+Both four-payment sequences were mined on separate Bitcoin SV 1.2.3 regtest nodes. The table includes the verifier and companion funding transaction for each payment.
+
+| Transfer | Raw parent total | Lossless parent total | Bytes saved |
+|---|---:|---:|---:|
+| 1 | 937,317 | 956,279 | −18,962 |
+| 2 | 1,415,972 | 977,908 | 438,064 |
+| 3 | 1,894,629 | 999,537 | 895,092 |
+| 4 | 2,373,286 | 1,021,168 | 1,352,118 |
+| Four payments | 6,621,204 | 3,954,892 | 2,666,312 |
+
+The fourth payment alone drops from 1,918,330 to 562,940 bytes. Lossless parent records save 40.3% over four payments and dedicated funding. Each payment still carries one independent conservation proof and requires zero parent-binding proofs. Both sequences used the same fixed regtest sponsor amounts. [Node results and byte accounting](../../fixtures/conservation-repeat-regtest-summary.json)
+
 ## Reproduce
 
 From `projects/cctp/recursion`, compile and generate an independent test setup.
