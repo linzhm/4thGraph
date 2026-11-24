@@ -121,12 +121,14 @@ class DurableBridge:
     def _unexpected_sign(_digest):
         raise AssertionError("durably authorized action reached the signer again")
 
-    def authorize_mint(self, plan, load_state, signer, *, interrupt=False):
+    def authorize_mint(self, plan, load_state, signer, *, interrupt=False, resolve_verifier_funding=None):
         event_id = plan.deposit.position.event_id()
         result, journal = self._authorize_with_restart(
             event_id, lambda service, callback: service.authorize_mint(plan, load_state, callback),
             signer, interrupt=interrupt,
-            resume=lambda service, callback: service.recover_mint(event_id, load_state, callback),
+            resume=lambda service, callback: service.recover_mint(
+                event_id, load_state, callback, resolve_verifier_funding=resolve_verifier_funding,
+            ),
         )
         return result, journal | {"reconstructed_from_persisted_draft": True}
 

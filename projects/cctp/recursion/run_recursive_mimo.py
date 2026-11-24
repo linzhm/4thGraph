@@ -68,12 +68,12 @@ class Regtest:
             raise
         raise AssertionError("regtest accepted an invalid recursive spend")
 
-    def setup(self):
+    def setup(self, outputs=6):
         coinbase = self.node.fund(self.address)
-        value = min(100_000_000, coinbase.outputs[0].value // 7)
+        value = min(100_000_000, coinbase.outputs[0].value // (outputs + 1))
         if value < 5_000_000:
             raise ValueError("test node subsidy too small for this fixture; use a fresh regtest")
-        unsigned = Transaction((Input(coinbase.txid_wire(), 0),), (Output(value, asm("OP_1")),) * 6)
+        unsigned = Transaction((Input(coinbase.txid_wire(), 0),), (Output(value, asm("OP_1")),) * outputs)
         signer = SigningKey.from_secret_exponent(11, curve=SECP256k1)
         return self.include("setup", sign_p2pkh(unsigned, coinbase, 0, signer), (coinbase,))
 

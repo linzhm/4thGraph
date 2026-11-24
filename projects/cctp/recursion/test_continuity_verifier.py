@@ -6,7 +6,7 @@ import unittest
 from committed_verifier import load_verifying_key
 from continuity_statement import ParentReceipt
 from continuity_verifier import ContinuityVerifier
-from mint import MintPolicy, authorize_mint, prepare_mint
+from mint import MintPolicy, authorize_mint, authorize_pause, prepare_mint
 from mint_events import Deposit, DepositPosition, EMPTY_ROOT, MintEvents
 from shared.evaluate import ScriptError, evaluate
 from shared.script import encode_num
@@ -134,3 +134,46 @@ class ContinuityVerifierTests(unittest.TestCase):
             material = verifier.transaction_material(tx, funding, *args, count=mode, verifier_index=1)
             with self.assertRaises(ScriptError):
                 evaluate(material + statement)
+
+    def test_certified_pause_and_resume_can_precede_the_first_mint(self):
+        pause_key, pause_sign = fixture_signer(14)
+        template = replace(self.verifier.mint_template, pause_authority=pause_key)
+        verifier = replace(self.verifier, mint_template=template, certified_mints=True, certified_pause=True)
+        policy = verifier.mint_policy
+        genesis = replace(self.genesis, outputs=(Output(50_000, policy.state_lock(EMPTY_ROOT)),))
+        events = MintEvents()
+        statement = verifier.statement_script()
+
+        def fund(index):
+            return Transaction((Input(bytes([index]) * 32, 0),), (Output(100_000, verifier.lock),))
+
+        def check(tx, funding, parent, support, receipt, context, mode):
+            raw = verifier.transaction_material(tx, funding, (parent,), support, count=mode, verifier_index=1)
+            signals = receipt.signals(verifier.asset.asset_id(), verifier.key_digest, context)
+            actual = hash256(preimage_all(tx, 1, funding.outputs[0].value, COMPACT_SCRIPTCODE))
+            self.assertEqual(evaluate(raw + statement), (list(map(encode_num, signals)), [actual]))
+
+        first, second, third = (fund(i) for i in (1, 2, 3))
+        paused = authorize_pause(policy, genesis, events, Input(first.txid_wire(), 0), pause_sign,
+                                 paused=True, receipt=ParentReceipt(()), verifier_parent=first)
+        receipt, context = verifier.validate_pause(paused, first, genesis)
+        check(paused, first, genesis, (), receipt, context, 10)
+
+        resumed = authorize_pause(policy, paused, events, Input(second.txid_wire(), 0), pause_sign, paused=False,
+                                  receipt=ParentReceipt((verifier.proof_digest(paused, first),)), verifier_parent=second)
+        receipt, context = verifier.validate_pause(resumed, second, paused, first)
+        check(resumed, second, paused, (first,), receipt, context, 11)
+
+        _, issuer_signer = fixture_signer(13)
+        deposit = Deposit(DepositPosition(84532, 7, policy.reserve_contract, b"d" * 32, 0),
+                          verifier.asset.reserve_asset, 1, verifier.asset.asset_id(), 1024, 0, self.owner)
+        plan = prepare_mint(policy, resumed, events, deposit, Input(third.txid_wire(), 0),
+                            receipt=ParentReceipt((verifier.proof_digest(resumed, second),)), verifier_parent=third)
+        minted = authorize_mint(plan, lambda _: deposit, issuer_signer)
+        receipt, context = verifier.validate_mint(minted, third, resumed, second)
+        check(minted, third, resumed, (second,), receipt, context, 4)
+
+        reset = replace(resumed, outputs=(resumed.outputs[0], ParentReceipt(()).output()))
+        with self.assertRaises(ScriptError):
+            raw = verifier.transaction_material(reset, second, (paused,), (), count=10, verifier_index=1)
+            evaluate(raw + statement)

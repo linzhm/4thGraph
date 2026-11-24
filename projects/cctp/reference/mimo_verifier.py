@@ -6,7 +6,7 @@ provenance must separately establish that each parent issued the selected vout.
 """
 from dataclasses import dataclass
 
-from burn_receipt import burn_prefix, read_burn
+from burn_receipt import SCRIPT_SIZE as BURN_SCRIPT_SIZE, burn_prefix, read_burn
 from public_inputs import verification_key_point
 from shared.script import asm, number, push
 from shared.transaction import preimage_all
@@ -125,6 +125,20 @@ def _append_slot(index, *, first=False):
             + asm("OP_SWAP OP_CAT OP_CAT OP_FROMALTSTACK"))
 
 
+def _append_burn(asset_id, reserve_domain, index, *, strict_size=False):
+    """Append the gross burn amount to the conserved output slots."""
+    size_check = (asm("OP_SIZE") + number(BURN_SCRIPT_SIZE) + asm("OP_NUMEQUALVERIFY")
+                  if strict_size else b"")
+    return (
+        asm("OP_FROMALTSTACK") + _match_prefix(bytes(8))
+        + _compact_size() + asm("OP_SPLIT OP_TOALTSTACK") + size_check
+        + _match_prefix(burn_prefix(asset_id, reserve_domain))
+        + _split(20) + asm("OP_SWAP") + push(bytes(20)) + asm("OP_EQUAL OP_NOT OP_VERIFY")
+        + _split(8) + asm("OP_OVER") + _unsigned() + asm("OP_SWAP") + _unsigned()
+        + asm("OP_GREATERTHAN OP_VERIFY OP_OVER") + _append_slot(index)
+    )
+
+
 @dataclass(frozen=True)
 class MimoProfile:
     incoming: int
@@ -149,7 +163,7 @@ class MimoProfile:
         fixed(self.freeze_key, 33)
 
     def relation(self, asset_id, reserve_domain=None, *, keep_parents=False, output_tail=0, parent_vout=None,
-                 certified_admin=False):
+                 certified_admin=False, burn_first=False, distinct_token_inputs=False):
         """Derive [slots, preimage] above the proof stack.
 
         Witness order above proof: parent raws in vin order (excluding vin 0),
@@ -158,8 +172,13 @@ class MimoProfile:
         With output_tail, require exactly that many trailing serialized output
         bytes and return both the inherited guard vector and those bytes
         between slots and preimage for the caller to check.
+        With burn_first, parse the exact burn at vout zero before any change.
         """
+        if burn_first and not self.burn:
+            raise ValueError("burn-first layout requires a burn profile")
         parse = _parse_active_token(asset_id, self.freeze_key, self.guards, certified_admin=certified_admin)
+        distinct_tokens = (asm("OP_DUP 36 OP_SPLIT OP_NIP 36 OP_SPLIT OP_EQUAL OP_NOT OP_VERIFY")
+                           if (burn_first or distinct_token_inputs) and self.incoming == 2 else b"")
         code = (
             asm("OP_SIZE 192 OP_NUMEQUALVERIFY OP_DUP OP_TOALTSTACK")
             + asm("OP_DUP OP_4 OP_SPLIT OP_NIP 32 OP_SPLIT OP_DROP")
@@ -167,6 +186,7 @@ class MimoProfile:
             + _split(152) + asm("OP_NIP 32 OP_SPLIT OP_DROP")
             + _pick(2) + asm("OP_HASH256 OP_EQUALVERIFY")
             + asm("OP_SIZE") + number(36 * (self.incoming + 1)) + asm("OP_NUMEQUALVERIFY")
+            + distinct_tokens
             + asm("OP_FROMALTSTACK OP_DUP OP_TOALTSTACK")
             + _split(68) + asm("OP_NIP 36 OP_SPLIT OP_DROP OP_OVER 36 OP_SPLIT OP_DROP OP_EQUALVERIFY")
             + push(uint(self.incoming, 2)) + asm("OP_0")
@@ -183,18 +203,14 @@ class MimoProfile:
             )
         code += (asm("OP_SWAP") + push(uint(self.flow_outputs, 2)) + asm("OP_CAT OP_SWAP")
                  + _pick(3) + asm("OP_TOALTSTACK"))
-        for i in range(self.outgoing):
+        if burn_first:
+            code += _append_burn(asset_id, reserve_domain, 0, strict_size=True)
+        change_start = int(burn_first)
+        for i in range(change_start, change_start + self.outgoing):
             code += (asm("OP_FROMALTSTACK") + _take_output_script() + asm("OP_TOALTSTACK")
                      + parse + _append_slot(i))
-        if self.burn:
-            code += (
-                asm("OP_FROMALTSTACK") + _match_prefix(bytes(8))
-                + _compact_size() + asm("OP_SPLIT OP_TOALTSTACK")
-                + _match_prefix(burn_prefix(asset_id, reserve_domain))
-                + _split(20) + asm("OP_SWAP") + push(bytes(20)) + asm("OP_EQUAL OP_NOT OP_VERIFY")
-                + _split(8) + asm("OP_OVER") + _unsigned() + asm("OP_SWAP") + _unsigned()
-                + asm("OP_GREATERTHAN OP_VERIFY OP_OVER") + _append_slot(self.outgoing)
-            )
+        if self.burn and not burn_first:
+            code += _append_burn(asset_id, reserve_domain, self.outgoing)
         if output_tail:
             return (
                 code + asm("OP_FROMALTSTACK OP_SIZE") + number(output_tail) + asm("OP_NUMEQUALVERIFY")

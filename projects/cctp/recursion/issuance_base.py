@@ -138,11 +138,14 @@ def runtime_first_mint_base_script(mint_policy: MintPolicy, freeze_key: bytes) -
     )
 
 
-def _certified_state_template(mint_template: MintPolicy, freeze_key: bytes, *, certified_admin=False) -> tuple[bytes, bytes]:
+def _certified_state_template(
+    mint_template: MintPolicy, freeze_key: bytes, *, certified_admin=False, certified_pause=False,
+) -> tuple[bytes, bytes]:
     def instantiate(placeholder_lock):
         policy = TokenPolicy((placeholder_lock,), freeze_key, certified_admin=certified_admin)
         digest, = policy.verifier_hashes()
-        covenant = replace(mint_template, lock_token=policy.lock, certified_verifier_hash=digest)
+        covenant = replace(mint_template, lock_token=policy.lock, certified_verifier_hash=digest,
+                           certified_pause=certified_pause)
         return digest, covenant.state_lock(EMPTY_ROOT)
 
     placeholder, template = instantiate(_GUARD_PLACEHOLDER)
@@ -153,7 +156,7 @@ def _certified_state_template(mint_template: MintPolicy, freeze_key: bytes, *, c
 
 
 def runtime_mint_state_script(mint_template: MintPolicy, freeze_key: bytes, *, genesis_only: bool,
-                              certified_admin=False) -> bytes:
+                              certified_admin=False, certified_pause=False) -> bytes:
     """Consume [authenticated state tx raw, authenticated verifier hash].
 
     The caller authenticates the txid and selected vout zero. Genesis mode
@@ -164,7 +167,9 @@ def runtime_mint_state_script(mint_template: MintPolicy, freeze_key: bytes, *, g
     """
     if type(genesis_only) is not bool:
         raise ValueError("genesis_only must be boolean")
-    template, placeholder = _certified_state_template(mint_template, freeze_key, certified_admin=certified_admin)
+    template, placeholder = _certified_state_template(
+        mint_template, freeze_key, certified_admin=certified_admin, certified_pause=certified_pause,
+    )
     # Compare the two configured guard occurrences to the same authenticated
     # verifier hash, then normalize to the template's fixed digest bytes.
     first = template.index(placeholder)

@@ -41,9 +41,9 @@ def _hash_input_column(input_count, offset):
     return code + asm("OP_HASH256 OP_TOALTSTACK")
 
 
-def _prior_preimage(input_count, *, output_count=3, verifier_index=0):
+def _prior_preimage(input_count, *, output_count=3, verifier_index=0, initial_pause=False):
     """Consume [parent raw, its funding raw, current lock hash]; leave [receipt, preimage]."""
-    if output_count == 2:
+    if output_count == 2 and not initial_pause:
         count = asm("OP_1 OP_NUMEQUALVERIFY")
     else:
         count = asm("0 2 OP_WITHIN OP_VERIFY") if input_count == 2 else asm("OP_2 OP_NUMEQUALVERIFY")
@@ -78,18 +78,20 @@ def _count_outputs_in_two_input_parent():
     )
 
 
-def prior_preimage(*, certified_admin=False):
-    """Parse the actual parent context, including verifiers at mint or toggle vin1."""
+def prior_preimage(*, certified_admin=False, certified_pause=False):
+    """Parse the actual parent context, including the verifier at vin1 in state transitions."""
     ordinary = _prior_preimage(2)
-    if certified_admin:
+    state_transition = certified_admin or certified_pause
+    if state_transition:
         ordinary = (
-            asm("OP_2 OP_NUMEQUAL OP_IF") + _prior_preimage(2, output_count=2, verifier_index=1)
+            asm("OP_2 OP_NUMEQUAL OP_IF")
+            + _prior_preimage(2, output_count=2, verifier_index=1, initial_pause=certified_pause)
             + asm("OP_ELSE") + ordinary + asm("OP_ENDIF")
         )
     vin_one = _prior_preimage(2, output_count=4, verifier_index=1)
     cases = (
         asm("OP_DUP OP_4 OP_NUMEQUAL OP_IF OP_DROP") + vin_one + asm("OP_ELSE") + ordinary + asm("OP_ENDIF")
-        if certified_admin else push(b"\x04") + asm("OP_EQUAL OP_IF") + vin_one + asm("OP_ELSE") + ordinary + asm("OP_ENDIF")
+        if state_transition else push(b"\x04") + asm("OP_EQUAL OP_IF") + vin_one + asm("OP_ELSE") + ordinary + asm("OP_ENDIF")
     )
     return (
         asm("OP_2 OP_PICK OP_4 OP_SPLIT OP_NIP OP_1 OP_SPLIT OP_DROP")
@@ -105,8 +107,11 @@ def continuity_digest(asset_id, key_digest):
     return asm("OP_SWAP OP_CAT") + push(prefix) + asm("OP_SWAP OP_CAT OP_HASH256")
 
 
-def prior_digest(asset_id, key_digest, *, certified_admin=False):
-    return prior_preimage(certified_admin=certified_admin) + asm("OP_HASH256") + continuity_digest(asset_id, key_digest)
+def prior_digest(asset_id, key_digest, *, certified_admin=False, certified_pause=False):
+    return (
+        prior_preimage(certified_admin=certified_admin, certified_pause=certified_pause)
+        + asm("OP_HASH256") + continuity_digest(asset_id, key_digest)
+    )
 
 
 def statement_limbs(asset_id, key_digest):

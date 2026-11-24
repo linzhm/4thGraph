@@ -162,3 +162,36 @@ class CertifiedMintTests(unittest.TestCase):
         self.check_inputs(paused, (genesis, self.coin_parent))
         self.check_inputs(resumed, (paused, self.coin_parent))
         self.check_inputs(mint, (resumed, self.verifier_parent))
+
+    def test_certified_pause_preserves_root_and_rebuilds_mint_history(self):
+        lock = asm("OP_DEPTH OP_IF OP_DROP OP_ENDIF OP_1")
+        tokens = TokenPolicy((lock,), self.freeze)
+        policy = replace(self.policy, lock_token=tokens.lock, certified_verifier_hash=tokens.verifier_hashes()[0],
+                         pause_authority=self.freeze, certified_pause=True)
+        genesis = self.genesis_for(policy)
+        events = MintEvents()
+        admin = lambda digest: legacy_fixture.sign(digest, legacy_fixture.OTHER)
+        first_funding, second_funding, mint_funding = (self.fund_verifier(i, lock) for i in (1, 2, 3))
+        paused = authorize_pause(policy, genesis, events, self.input_at(first_funding), admin, paused=True,
+                                 receipt=ParentReceipt(()), verifier_parent=first_funding)
+        self.check_inputs(paused, (genesis, first_funding))
+        frozen = recover_mint_state(policy, genesis, (paused,))
+        self.assertEqual((frozen.events, frozen.paused), (events, True))
+        with self.assertRaisesRegex(ValueError, "paused"):
+            self.plan_for(policy, paused, events, mint_funding, self.deposit, ParentReceipt((b"p" * 32,)))
+        resumed = authorize_pause(policy, paused, events, self.input_at(second_funding), admin, paused=False,
+                                  receipt=ParentReceipt((b"p" * 32,)), verifier_parent=second_funding)
+        self.check_inputs(resumed, (paused, second_funding))
+        self.assertEqual(resumed.outputs[0], genesis.outputs[0])
+        plan = self.plan_for(policy, resumed, events, mint_funding, self.deposit, ParentReceipt((b"q" * 32,)))
+        minted = self.authorize(plan)
+        self.check_inputs(minted, (resumed, mint_funding))
+
+        # Confirmed verifier witnesses participate in txids but not in replay of unsigned state transitions.
+        minted = minted.with_script(1, asm("OP_1"))
+        self.check_inputs(minted, (resumed, mint_funding))
+        restored = recover_mint_state(policy, genesis, (paused, resumed, minted))
+        self.assertEqual((restored.transaction, restored.events, restored.paused), (minted, plan.successor, False))
+        with self.assertRaisesRegex(ValueError, "actual verifier"):
+            authorize_pause(policy, genesis, events, self.input_at(first_funding), admin, paused=True,
+                            receipt=ParentReceipt(()))

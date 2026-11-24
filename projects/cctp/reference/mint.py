@@ -1,7 +1,7 @@
 """Consensus mint covenant and host transaction builder for the CCTP bridge."""
 
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from functools import cached_property
 from hashlib import sha256
 from typing import TYPE_CHECKING
@@ -122,6 +122,15 @@ def _finish_certified_outputs() -> bytes:
     )
 
 
+def _certified_guard(verifier_hash: bytes) -> bytes:
+    from transfer import verifier_input_script_hash
+
+    return (
+        asm("OP_DEPTH OP_8 OP_NUMEQUALVERIFY OP_7 OP_ROLL OP_4 OP_PICK OP_3 OP_PICK")
+        + verifier_input_script_hash(input_index=1) + push(verifier_hash) + asm("OP_EQUALVERIFY")
+    )
+
+
 @dataclass(frozen=True)
 class MintPolicy:
     asset: AssetDescriptor
@@ -132,6 +141,7 @@ class MintPolicy:
     carrier: int = 1000
     pause_authority: bytes | None = None
     certified_verifier_hash: bytes | None = None
+    certified_pause: bool = False
 
     def __post_init__(self):
         self.asset.encode()
@@ -146,6 +156,9 @@ class MintPolicy:
                 raise ValueError("mint and pause authorities must be distinct")
         if self.certified_verifier_hash is not None and not any(fixed(self.certified_verifier_hash, 32)):
             raise ValueError("certified mint requires a concrete verifier script hash")
+        if (type(self.certified_pause) is not bool or self.certified_pause
+                and (self.certified_verifier_hash is None or self.pause_authority is None)):
+            raise ValueError("certified pause requires a verifier and a pause authority")
         amount(self.carrier)
         if not self.source_chain_id or not any(self.reserve_contract) or not self.carrier:
             raise ValueError("expected a concrete source chain, reserve contract and token carrier")
@@ -206,8 +219,15 @@ class MintPolicy:
             return self._mint_branch()
         # Pause-enabled witnesses append an operation selector. The lock itself
         # adds the committed pause flag above the root before selecting the branch.
+        select = asm("OP_2 OP_ROLL OP_DUP OP_0 OP_EQUAL OP_OVER OP_1 OP_EQUAL OP_BOOLOR OP_VERIFY")
+        if self.certified_pause:
+            # Keep one verifier commitment shared by both operations.
+            select += (
+                asm("OP_TOALTSTACK OP_TOALTSTACK") + _certified_guard(self.certified_verifier_hash)
+                + asm("OP_FROMALTSTACK OP_FROMALTSTACK")
+            )
         return (
-            asm("OP_2 OP_ROLL OP_DUP OP_0 OP_EQUAL OP_OVER OP_1 OP_EQUAL OP_BOOLOR OP_VERIFY OP_IF")
+            select + asm("OP_IF")
             + self._pause_branch()
             + asm("OP_ELSE OP_NOT OP_VERIFY")
             + self._mint_branch()
@@ -218,17 +238,8 @@ class MintPolicy:
         # Unlocking stack (top at right): sig, Merkle path, deposit, prevouts,
         # optional change, preimage. The locking prefix adds the old root.
         script = b""
-        if self.certified_verifier_hash is not None:
-            from transfer import verifier_input_script_hash
-
-            # Certified mint adds the raw vin-one funding transaction below
-            # the normal mint fields. Authenticate it using this state's
-            # ForkID ALL preimage, then restore the legacy main stack shape.
-            script += (
-                asm("OP_DEPTH OP_8 OP_NUMEQUALVERIFY OP_7 OP_ROLL OP_4 OP_PICK OP_3 OP_PICK")
-                + verifier_input_script_hash(input_index=1)
-                + push(self.certified_verifier_hash) + asm("OP_EQUALVERIFY")
-            )
+        if self.certified_verifier_hash is not None and not self.certified_pause:
+            script += _certified_guard(self.certified_verifier_hash)
         script += _authenticate(self.attestor)
         # Validate mint scope and use just the source position as the replay key.
         script += (
@@ -285,7 +296,7 @@ class MintPolicy:
             + asm("OP_FROMALTSTACK OP_FROMALTSTACK OP_IF") + push(asm("OP_1"))
             + asm("OP_ELSE") + push(asm("OP_0")) + asm("OP_ENDIF")
             + asm("OP_2SWAP OP_2 OP_ROLL OP_SWAP OP_CAT OP_CAT OP_CAT OP_NIP")
-            + _finish_outputs()
+            + (_finish_certified_outputs() if self.certified_pause else _finish_outputs())
         )
 
     def state_lock(self, root: bytes, *, paused: bool = False) -> bytes:
@@ -450,7 +461,8 @@ def authorize_mint(
 
 def prepare_pause(
     policy: MintPolicy, prior: Transaction, events: MintEvents, sponsor: Input,
-    *, paused: bool, change: Output | None = None,
+    *, paused: bool, change: Output | None = None, receipt: "ParentReceipt | None" = None,
+    verifier_parent: Transaction | None = None,
 ) -> Transaction:
     if policy.pause_authority is None or type(paused) is not bool:
         raise ValueError("mint pause requires a configured authority and explicit status")
@@ -460,6 +472,19 @@ def prepare_pause(
     if sponsor.outpoint() == state_input.outpoint():
         raise ValueError("duplicate mint input")
     outputs = (Output(prior.outputs[0].value, policy.state_lock(events.root, paused=paused)),)
+    if policy.certified_pause:
+        from projects.cctp.recursion.continuity_statement import ParentReceipt
+
+        if change is not None or receipt is None or sponsor.vout != 0:
+            raise ValueError("certified pause requires vin-one verifier vout zero and a continuity receipt")
+        if verifier_parent is not None:
+            _check_verifier_parent(policy, sponsor, verifier_parent)
+        receipt_output = receipt.output()
+        if len(ParentReceipt.parse(receipt_output).parents) > 1:
+            raise ValueError("certified pause has at most one predecessor proof")
+        return Transaction((state_input, sponsor), (*outputs, receipt_output))
+    if receipt is not None or verifier_parent is not None:
+        raise ValueError("legacy pause does not accept a continuity verifier or receipt")
     if change is not None:
         _change_bytes(change)
         outputs += (change,)
@@ -469,15 +494,22 @@ def prepare_pause(
 def authorize_pause(
     policy: MintPolicy, prior: Transaction, events: MintEvents, sponsor: Input,
     sign_digest: Callable[[bytes], bytes], *, paused: bool, change: Output | None = None,
+    receipt: "ParentReceipt | None" = None, verifier_parent: Transaction | None = None,
 ) -> Transaction:
-    transaction = prepare_pause(policy, prior, events, sponsor, paused=paused, change=change)
+    transaction = prepare_pause(policy, prior, events, sponsor, paused=paused, change=change,
+                                receipt=receipt, verifier_parent=verifier_parent)
+    funding, tail = b"", _change_bytes(change) if change is not None else b""
+    if policy.certified_pause:
+        _check_verifier_parent(policy, sponsor, verifier_parent)
+        assert verifier_parent is not None
+        funding = push(verifier_parent.serialize())
+        tail = transaction.outputs[1].serialize()
     outpoint_bytes = b"".join(item.outpoint() for item in transaction.inputs)
     state = prior.outputs[0]
     preimage = preimage_all(transaction, 0, state.value, state.script)
     signature = sign_digest(hash256(preimage)) + b"\x41"
-    serialized_change = _change_bytes(change) if change is not None else b""
-    witness = b"".join(push(field) for field in (signature, b"", b"", outpoint_bytes, serialized_change, preimage))
-    return transaction.with_script(0, witness + asm("OP_1"))
+    witness = b"".join(push(field) for field in (signature, b"", b"", outpoint_bytes, tail, preimage))
+    return transaction.with_script(0, funding + witness + asm("OP_1"))
 
 
 @dataclass(frozen=True)
@@ -497,16 +529,27 @@ def recover_mint_state(
         size = len(transaction.outputs)
         if len(transaction.inputs) != 2 or not 1 <= size <= 4:
             raise ValueError("invalid mint history layout")
+        replay = transaction.with_script(0, b"")
         if size <= 2:
-            change = transaction.outputs[1] if size == 2 else None
+            change, receipt = (transaction.outputs[1] if size == 2 else None), None
+            if policy.certified_pause:
+                from projects.cctp.recursion.continuity_statement import ParentReceipt
+
+                if size != 2:
+                    raise ValueError("missing certified pause continuity receipt")
+                change, receipt = None, ParentReceipt.parse(transaction.outputs[1])
+                replay = replay.with_script(1, b"")
             paused = not paused
-            expected = prepare_pause(policy, prior, events, transaction.inputs[1], paused=paused, change=change)
+            expected = prepare_pause(policy, prior, events, replay.inputs[1], paused=paused, change=change,
+                                     receipt=receipt)
         else:
             change, receipt = _mint_tail(policy, transaction)
-            plan = prepare_mint(policy, prior, events, read_deposit(transaction), transaction.inputs[1],
+            if receipt is not None:
+                replay = replay.with_script(1, b"")
+            plan = prepare_mint(policy, prior, events, read_deposit(transaction), replay.inputs[1],
                                 change=change, receipt=receipt)
             expected, events = plan.transaction, plan.successor
-        if transaction.with_script(0, b"").serialize() != expected.serialize():
+        if replay != expected:
             raise ValueError("mint history does not extend the anchored state")
         prior = transaction
     return RecoveredMintState(prior, events, paused)

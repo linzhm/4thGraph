@@ -10,8 +10,9 @@ from ecdsa import BadSignatureError, SECP256k1, VerifyingKey
 from ecdsa.util import sigdecode_der
 
 from bridge_ledger import BridgeLedger, ChainReference, EventState
+from certified_burn_provenance import CertifiedBurnProvenance
 from confirmed_lineage import ConfirmedLineage
-from mint import MintPlan, MintPolicy, RecoveredMintState, authorize_mint, prepare_mint, read_deposit
+from mint import MintPlan, MintPolicy, RecoveredMintState, _mint_tail, authorize_mint, prepare_mint, read_deposit
 from mint_events import Deposit, DepositPosition
 from projects.cctp.evm.bsv_burn_evidence import (
     BsvConfirmationPolicy, BurnReference, CanonicalBurn, require_canonical_burn_block,
@@ -171,6 +172,7 @@ class BridgeService:
 
     def recover_mint(
         self, event_id: bytes, load_mint_state: Callable[[], RecoveredMintState], sign_digest: DigestSigner,
+        *, resolve_verifier_funding: Callable[[bytes], Transaction] | None = None,
     ) -> Transaction:
         """Rebuild the identical signed mint from its persisted draft and confirmed state."""
         self._check_evm_origin(event_id)
@@ -180,9 +182,14 @@ class BridgeService:
         if (current.paused or tx.inputs[0].txid != current.transaction.txid_wire()
                 or tx.inputs[0].outpoint() != saved.state_outpoint):
             raise ValueError("current confirmed mint state does not match the saved authorization")
-        change = tx.outputs[3] if len(tx.outputs) == 4 else None
+        change, receipt = _mint_tail(self.mint_policy, tx)
+        funding = None
+        if receipt is not None:
+            if resolve_verifier_funding is None:
+                raise ValueError("certified mint recovery requires the actual verifier funding transaction")
+            funding = resolve_verifier_funding(tx.inputs[1].txid)
         plan = prepare_mint(self.mint_policy, current.transaction, current.events, saved.deposit, tx.inputs[1],
-                            change=change)
+                            change=change, receipt=receipt, verifier_parent=funding)
         prior = current.transaction.outputs[0]
         if plan.transaction != tx or hash256(preimage_all(tx, 0, prior.value, prior.script)) != saved.digest:
             raise ValueError("saved mint draft disagrees with its authorization digest")
@@ -212,10 +219,18 @@ class BridgeService:
         if predecessor.paused or len(tx.inputs) != 2 or len(tx.outputs) not in (3, 4):
             raise ValueError("mint effect does not extend a valid mint state")
         deposit = read_deposit(tx)
-        change = tx.outputs[3] if len(tx.outputs) == 4 else None
+        change, receipt = _mint_tail(self.mint_policy, tx)
+        funding = None
+        candidate = tx.with_script(0, b"")
+        if receipt is not None:
+            raw_funding = bsv_rpc("getrawtransaction", tx.inputs[1].txid[::-1].hex(), False)
+            if not isinstance(raw_funding, str):
+                raise ValueError("missing actual certified mint verifier funding transaction")
+            funding = Transaction.parse(bytes.fromhex(raw_funding))
+            candidate = candidate.with_script(1, b"")
         plan = prepare_mint(self.mint_policy, predecessor.transaction, predecessor.events,
-                            deposit, tx.inputs[1], change=change)
-        if tx.with_script(0, b"") != plan.transaction:
+                            deposit, candidate.inputs[1], change=change, receipt=receipt, verifier_parent=funding)
+        if candidate != plan.transaction:
             raise ValueError("confirmed BSV transaction does not reproduce the expected mint")
         event_id = deposit.position.event_id()
         self._check_bsv_origin(bsv_rpc, bsv_policy, event_id, effect=True)
@@ -228,8 +243,12 @@ class BridgeService:
 
     def authorize_release(
         self, bsv_rpc: Rpc, bsv_policy: BsvConfirmationPolicy, reference: BurnReference,
-        lineage: ConfirmedLineage, sign_digest: DigestSigner,
+        lineage: ConfirmedLineage | CertifiedBurnProvenance, sign_digest: DigestSigner,
     ) -> ReleaseAuthorization | Settlement:
+        certified_policy = self.mint_policy.certified_verifier_hash is not None
+        certified_lineage = isinstance(lineage, CertifiedBurnProvenance)
+        if certified_policy != certified_lineage:
+            raise ValueError("release provenance must match the configured certified or legacy policy")
         if lineage.mint_policy != self.mint_policy:
             raise ValueError("burn lineage does not belong to this bridge")
         asset = self.mint_policy.asset
@@ -238,7 +257,11 @@ class BridgeService:
         self._check_evm_origin(event_id, effect=True)
 
         def provenance(burn: CanonicalBurn, burn_asset) -> bool:
-            if burn_asset != asset or lineage.burn(reference.txid, reference.vout) != burn.receipt:
+            if burn_asset != asset:
+                return False
+            receipt = (lineage.verify(burn, bsv_rpc, bsv_policy).receipt if certified_lineage
+                       else lineage.burn(reference.txid, reference.vout))
+            if receipt != burn.receipt:
                 return False
             actual = burn.reference
             self.ledger.observe_burn(burn.receipt, ChainReference(
