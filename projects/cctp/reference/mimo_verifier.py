@@ -15,7 +15,7 @@ from transaction_relation import TokenState
 from transaction_verifier import verifier_key_id, verifier_lock
 from transfer import COMPACT_SCRIPTCODE
 from verifier import unlocking_fields, unlocking_script
-from operational_token import TokenPolicy, TOKEN_MARKER
+from operational_token import FLAG_OFFSET, TokenPolicy, TOKEN_MARKER
 
 MAX_PARENT_INPUTS = 4
 MAX_PARENT_OUTPUTS = 4
@@ -76,10 +76,10 @@ def _match_prefix(prefix):
     return _split(len(prefix)) + asm("OP_SWAP") + push(prefix) + asm("OP_EQUALVERIFY")
 
 
-def _parse_active_token(asset_id, freeze_key, guards):
+def _parse_active_token(asset_id, freeze_key, guards, *, certified_admin=False, allow_frozen=False):
     """Check the exact v2 script with local owner/amount and inherited guard set."""
     locks = tuple(b"CCTP template placeholder " + bytes([i]) for i in range(guards))
-    policy = TokenPolicy(locks, freeze_key)
+    policy = TokenPolicy(locks, freeze_key, certified_admin=certified_admin)
     owner = b"\x02" + bytes(range(32))
     template = policy.lock(TokenState(asset_id, 1, owner))
     guard_offsets = [template.index(digest) for digest in policy.verifier_hashes()]
@@ -89,13 +89,19 @@ def _parse_active_token(asset_id, freeze_key, guards):
     assert template[owner_tail:owner_tail + 33] == owner
     assert sorted(guard_offsets) == guard_offsets
 
+    end_owner = owner_offset + 33
+    if allow_frozen:
+        flag = (asm("OP_1 OP_SPLIT OP_SWAP") + _unsigned() + asm("0 2 OP_WITHIN OP_VERIFY")
+                + _match_prefix(template[FLAG_OFFSET + 1:guard_offsets[0]]))
+    else:
+        flag = _match_prefix(template[end_owner:guard_offsets[0]])
     check = (
         asm("OP_SIZE") + number(len(template)) + asm("OP_NUMEQUALVERIFY")
         + _match_prefix(template[:QUANTITY_OFFSET])
         + _split(8) + asm("OP_SWAP OP_TOALTSTACK")
         + _split(33) + asm("OP_SWAP OP_DUP OP_1 OP_SPLIT OP_DROP") + _unsigned()
         + asm("2 4 OP_WITHIN OP_VERIFY OP_SWAP")
-        + _match_prefix(template[owner_offset + 33:guard_offsets[0]])
+        + flag
         + asm("OP_0 OP_SWAP")
     )
     cursor = guard_offsets[0]
@@ -142,7 +148,8 @@ class MimoProfile:
             raise ValueError("expected one to eight approved verifier locks")
         fixed(self.freeze_key, 33)
 
-    def relation(self, asset_id, reserve_domain=None, *, keep_parents=False, output_tail=0, parent_vout=None):
+    def relation(self, asset_id, reserve_domain=None, *, keep_parents=False, output_tail=0, parent_vout=None,
+                 certified_admin=False):
         """Derive [slots, preimage] above the proof stack.
 
         Witness order above proof: parent raws in vin order (excluding vin 0),
@@ -152,7 +159,7 @@ class MimoProfile:
         bytes and return both the inherited guard vector and those bytes
         between slots and preimage for the caller to check.
         """
-        parse = _parse_active_token(asset_id, self.freeze_key, self.guards)
+        parse = _parse_active_token(asset_id, self.freeze_key, self.guards, certified_admin=certified_admin)
         code = (
             asm("OP_SIZE 192 OP_NUMEQUALVERIFY OP_DUP OP_TOALTSTACK")
             + asm("OP_DUP OP_4 OP_SPLIT OP_NIP 32 OP_SPLIT OP_DROP")

@@ -9,10 +9,10 @@ from functools import cached_property
 
 from committed_verifier import CommitmentRelation, verifier_fields
 from committed_verifier import verifier_lock as committed_lock
-from continuity_preimage import current_funding_hash, mint_transaction_material_check, prior_digest, statement_limbs
+from continuity_preimage import current_funding_hash, prior_digest, statement_limbs, vin_one_transaction_material_check
 from continuity_statement import OUTPUT_PREFIX, OUTPUT_SIZE, ParentReceipt, ZERO
 from issuance_base import MINTED_VOUT, check_first_mint, runtime_first_mint_base_script
-from mimo_verifier import MimoProfile, _match_prefix
+from mimo_verifier import MimoProfile, _match_prefix, _parse_active_token
 from mint import MintPolicy, read_deposit
 from operational_token import TokenPolicy
 from recursive_mimo import _add_quantities, _assert_u64, _slots
@@ -40,11 +40,14 @@ class ContinuityVerifier:
     commitment: CommitmentRelation
     key_digest: bytes
     certified_mints: bool = False
+    certified_admin: bool = False
 
     def __post_init__(self):
         fixed(self.key_digest, 32)
         if type(self.certified_mints) is not bool or self.mint_template.certified_verifier_hash is not None:
             raise ValueError("provide an unbound mint template and select its proof profile explicitly")
+        if type(self.certified_admin) is not bool or (self.certified_admin and not self.certified_mints):
+            raise ValueError("certified token administration requires certified minting")
 
     @property
     def asset(self):
@@ -56,7 +59,7 @@ class ContinuityVerifier:
 
     @cached_property
     def policy(self):
-        return TokenPolicy((self.lock,), self.freeze_key)
+        return TokenPolicy((self.lock,), self.freeze_key, certified_admin=self.certified_admin)
 
     @cached_property
     def mint_policy(self):
@@ -69,7 +72,7 @@ class ContinuityVerifier:
         if count == 0:
             return (asm("OP_ROT OP_SWAP") + runtime_first_mint_base_script(self.mint_template, self.freeze_key)
                     + push(ParentReceipt(()).payload()))
-        prior = prior_digest(self.asset.asset_id(), self.key_digest)
+        prior = prior_digest(self.asset.asset_id(), self.key_digest, certified_admin=self.certified_admin)
         if count == 1:
             return asm("OP_ROT OP_SWAP") + prior + push(b"\x01") + asm("OP_SWAP OP_CAT") + push(ZERO) + asm("OP_CAT")
         return (
@@ -83,7 +86,7 @@ class ContinuityVerifier:
         incoming = max(1, count)
         relation = MimoProfile(incoming, 2, 1, self.freeze_key).relation(
             self.asset.asset_id(), keep_parents=True, output_tail=OUTPUT_SIZE,
-            parent_vout=MINTED_VOUT if count == 0 else None,
+            parent_vout=MINTED_VOUT if count == 0 else None, certified_admin=self.certified_admin,
         )
         return (
             relation + asm("OP_3 OP_ROLL") + _conserve(incoming)
@@ -104,12 +107,13 @@ class ContinuityVerifier:
         from issuance_base import runtime_mint_state_script
 
         current = (
-            mint_transaction_material_check()
+            vin_one_transaction_material_check()
             + asm("OP_DUP") + number(4 if genesis else 5) + asm("OP_ROLL OP_SWAP")
             + current_funding_hash() + asm("OP_SWAP") + compact_preimage_digest_script()
             + asm("OP_TOALTSTACK OP_SWAP OP_TOALTSTACK")
         )
-        state = runtime_mint_state_script(self.mint_template, self.freeze_key, genesis_only=genesis)
+        state = runtime_mint_state_script(self.mint_template, self.freeze_key, genesis_only=genesis,
+                                          certified_admin=self.certified_admin)
         if genesis:
             payload = state + push(ParentReceipt(()).payload())
         else:
@@ -123,6 +127,23 @@ class ContinuityVerifier:
             + asm("OP_EQUALVERIFY OP_FROMALTSTACK")
         )
 
+    def _admin_path(self):
+        # The exact token lock at vin0 enforces the issuer signature and the
+        # paired flag toggle. This path authenticates that token and its proof.
+        parse_token = _parse_active_token(self.asset.asset_id(), self.freeze_key, 1,
+                                          certified_admin=True, allow_frozen=True)
+        return (
+            vin_one_transaction_material_check(preceding_outputs=1, select_parent_script=True)
+            + asm("OP_DUP 6 OP_ROLL OP_SWAP") + current_funding_hash()
+            + asm("OP_SWAP") + compact_preimage_digest_script()
+            + asm("OP_TOALTSTACK OP_SWAP OP_TOALTSTACK OP_SWAP") + parse_token
+            + asm("OP_2 OP_PICK OP_EQUALVERIFY OP_DROP OP_ROT OP_SWAP")
+            + prior_digest(self.asset.asset_id(), self.key_digest, certified_admin=True)
+            + push(b"\x01") + asm("OP_SWAP OP_CAT") + push(ZERO) + asm("OP_CAT")
+            + asm("OP_DUP OP_FROMALTSTACK") + _match_prefix(OUTPUT_PREFIX)
+            + asm("OP_EQUALVERIFY OP_FROMALTSTACK")
+        )
+
     def statement_script(self):
         if self.certified_mints:
             variants = (
@@ -131,6 +152,8 @@ class ContinuityVerifier:
             )
         else:
             variants = tuple((count, self._path(count)) for count in (0, 1, 2))
+        if self.certified_admin:
+            variants += ((5, self._admin_path()),)
         code = b""
         for mode, branch in variants[:-1]:
             code += asm("OP_DUP") + number(mode) + asm("OP_NUMEQUAL OP_IF OP_DROP") + branch + asm("OP_ELSE")
@@ -143,14 +166,17 @@ class ContinuityVerifier:
     def context(self, tx, funding):
         """Read the typed receipt and hash the actual compact verifier preimage."""
         minted = self.certified_mints and len(tx.outputs) == 4
-        index = int(minted)
+        administrative = self.certified_admin and len(tx.outputs) == 2
+        index = int(minted or administrative)
         self.policy.selected_verifier(tx, funding.serialize(), index=index)
-        if len(tx.outputs) != (4 if minted else 3):
+        if not (minted or administrative or len(tx.outputs) == 3):
             raise ValueError("incorrect continuity output layout")
         receipt = ParentReceipt.parse(tx.outputs[-1])
         if minted and (len(receipt.parents) > 1 or tx.inputs[0].vout != 0):
             raise ValueError("incorrect mint state vout or receipt")
-        if len(tx.inputs) != (2 if minted else 1 + max(1, len(receipt.parents))):
+        if administrative and len(receipt.parents) != 1:
+            raise ValueError("token administration requires one predecessor proof")
+        if len(tx.inputs) != (2 if index else 1 + max(1, len(receipt.parents))):
             raise ValueError("wrong verifier and protocol input shape")
         preimage = preimage_all(tx, index, funding.outputs[0].value, COMPACT_SCRIPTCODE)
         return receipt, hash256(preimage)
@@ -232,4 +258,28 @@ class ContinuityVerifier:
             unlocking_script(verifier_fields(self.key, self.commitment, signals, proof))
             + self.transaction_material(tx, funding, (state_parent,), support,
                                         count=3 + len(receipt.parents), verifier_index=1)
+        )
+
+    def validate_admin(self, tx, funding, parent, previous_verifier):
+        if not self.certified_admin or len(tx.outputs) != 2:
+            raise ValueError("not a certified token administration transaction")
+        receipt, context = self.context(tx, funding)
+        txin = tx.inputs[0]
+        if txin.txid != parent.txid_wire() or not 0 <= txin.vout < len(parent.outputs):
+            raise ValueError("wrong actual token parent")
+        prior = parent.outputs[txin.vout]
+        state = self.policy.parse(prior.script)
+        if state is None or state.asset_id != self.asset.asset_id():
+            raise ValueError("wrong prior token asset or lock")
+        expected = replace(prior, script=self.policy.lock(replace(state, frozen=not state.frozen)))
+        if tx.outputs[0] != expected or receipt.parents != (self.proof_digest(parent, previous_verifier),):
+            raise ValueError("the admin spend must preserve the token and bind its actual predecessor proof")
+        return receipt, context
+
+    def admin_witness(self, proof, tx, funding, parent, previous_verifier):
+        receipt, context = self.validate_admin(tx, funding, parent, previous_verifier)
+        signals = receipt.signals(self.asset.asset_id(), self.key_digest, context)
+        return (
+            unlocking_script(verifier_fields(self.key, self.commitment, signals, proof))
+            + self.transaction_material(tx, funding, (parent,), (previous_verifier,), count=5, verifier_index=1)
         )

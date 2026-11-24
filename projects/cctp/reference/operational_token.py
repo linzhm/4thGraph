@@ -1,9 +1,9 @@
 """Operational token locks for a fixed asset verifier set and a freeze role."""
-from dataclasses import dataclass
+from dataclasses import dataclass, field, replace
 from hashlib import sha256
 
 from shared.script import asm, number, push
-from shared.transaction import Transaction, blob, hash256, preimage_forkid
+from shared.transaction import Output, Transaction, blob, hash256, preimage_forkid
 from statement import fixed
 from transaction_relation import TokenState
 from transfer import authenticate_forkid_preimage, verifier_input_script_hash
@@ -24,11 +24,42 @@ def _verify_signature(key: bytes) -> bytes:
     )
 
 
-def _freeze_branch(key: bytes) -> bytes:
+def _certified_admin_guard() -> bytes:
+    """Consume the actual vin-one verifier material, preserving both preimages."""
+    return (
+        # [issuer signature, verifier funding, prevouts, ALL preimage,
+        # receipt output, SINGLE preimage, prior flag].
+        asm("OP_DEPTH OP_7 OP_NUMEQUALVERIFY OP_4 OP_PICK OP_SIZE 72 OP_NUMEQUALVERIFY "
+            "36 OP_SPLIT OP_DROP OP_4 OP_PICK 68 OP_SPLIT OP_NIP 36 OP_SPLIT OP_DROP OP_EQUALVERIFY "
+            "OP_5 OP_ROLL OP_5 OP_ROLL OP_5 OP_PICK")
+        + verifier_input_script_hash(input_index=1)
+        + asm("OP_FROMALTSTACK OP_EQUALVERIFY")
+    )
+
+
+def _certified_admin_outputs() -> bytes:
+    from projects.cctp.recursion.continuity_statement import OUTPUT_PREFIX, OUTPUT_SIZE, ZERO
+
+    # Verify the SAME paired successor against the SINGLE and the ALL
+    # commitments. ALL ensures the receipt is the only other actual vout.
+    first_bytes = OUTPUT_PREFIX + b"\x01"
+    return (
+        asm("OP_DUP OP_HASH256 OP_ROT OP_EQUALVERIFY OP_OVER OP_SIZE")
+        + number(OUTPUT_SIZE) + asm("OP_NUMEQUALVERIFY OP_DUP")
+        + number(len(first_bytes)) + asm("OP_SPLIT OP_DROP")
+        + push(first_bytes) + asm("OP_EQUALVERIFY")
+        + number(OUTPUT_SIZE - len(ZERO)) + asm("OP_SPLIT OP_NIP")
+        + push(ZERO) + asm("OP_EQUALVERIFY OP_SWAP OP_CAT OP_HASH256 OP_SWAP "
+                           "OP_SIZE 40 OP_SUB OP_SPLIT OP_NIP 32 OP_SPLIT OP_DROP OP_EQUALVERIFY")
+    )
+
+
+def _freeze_branch(key: bytes, *, certified_admin: bool = False) -> bytes:
     # The SINGLE preimage authentically exposes the output at this input's
     # index. The issuer's independent ALL signature covers the whole spend.
     return (
-        push(b"\x01") + asm("OP_XOR OP_TOALTSTACK OP_DUP")
+        (_certified_admin_guard() if certified_admin else b"")
+        + push(b"\x01") + asm("OP_XOR OP_TOALTSTACK OP_DUP")
         + authenticate_forkid_preimage(FORKID_SINGLE) + asm("OP_DROP")
         + asm("104 OP_SPLIT OP_NIP OP_SIZE 44 OP_SUB OP_SPLIT")
         + asm("OP_4 OP_SPLIT OP_NIP 32 OP_SPLIT OP_DROP OP_SWAP")
@@ -36,7 +67,8 @@ def _freeze_branch(key: bytes) -> bytes:
         # The v2 script length is always encoded by 3-byte CompactSize.
         + number(3 + FLAG_OFFSET)
         + asm("OP_SPLIT OP_1 OP_SPLIT OP_NIP OP_FROMALTSTACK OP_SWAP")
-        + asm("OP_CAT OP_CAT OP_CAT OP_HASH256 OP_EQUALVERIFY")
+        + asm("OP_CAT OP_CAT OP_CAT")
+        + (_certified_admin_outputs() if certified_admin else asm("OP_HASH256 OP_EQUALVERIFY"))
         + _verify_signature(key)
     )
 
@@ -50,6 +82,7 @@ class TokenPolicy:
     """
     verifier_locks: tuple[bytes, ...]
     freeze_key: bytes
+    certified_admin: bool = field(default=False, kw_only=True)
 
     def __post_init__(self):
         fixed(self.freeze_key, 33)
@@ -60,6 +93,8 @@ class TokenPolicy:
             raise ValueError("expected complete verifier locks")
         if len(set(locks)) != len(locks):
             raise ValueError("duplicate verifier lock")
+        if type(self.certified_admin) is not bool or (self.certified_admin and len(locks) != 1):
+            raise ValueError("certified administration requires one exact verifier lock")
 
     def verifier_hashes(self) -> tuple[bytes, ...]:
         return tuple(sorted(sha256(blob(lock)).digest() for lock in self.verifier_locks))
@@ -74,6 +109,8 @@ class TokenPolicy:
         return parent
 
     def _ordinary_guard(self) -> bytes:
+        if self.certified_admin:
+            return verifier_input_script_hash() + asm("OP_FROMALTSTACK OP_EQUALVERIFY")
         first, *remaining = self.verifier_hashes()
         if not remaining:
             return verifier_input_script_hash() + push(first) + asm("OP_EQUALVERIFY")
@@ -83,10 +120,12 @@ class TokenPolicy:
         return verifier_input_script_hash() + compare + asm("OP_NIP OP_VERIFY")
 
     def lock(self, state: TokenState) -> bytes:
+        shared_digest = (push(self.verifier_hashes()[0]) + asm("OP_TOALTSTACK")
+                         if self.certified_admin else b"")
         script = (
             TOKEN_MARKER + push(state.encode())
-            + asm("OP_NIP OP_SIZE OP_1SUB OP_SPLIT OP_NIP OP_SWAP OP_IF")
-            + _freeze_branch(self.freeze_key)
+            + asm("OP_NIP") + shared_digest + asm("OP_SIZE OP_1SUB OP_SPLIT OP_NIP OP_SWAP OP_IF")
+            + _freeze_branch(self.freeze_key, certified_admin=self.certified_admin)
             + asm("OP_ELSE OP_NOT OP_VERIFY")
             + self._ordinary_guard()
             + _verify_signature(state.owner)
@@ -125,7 +164,7 @@ def ordinary_witness(tx, index, parent, policy, verifier_parent, signer):
             + push(verifier_parent.serialize()) + push(prevouts) + push(preimage) + asm("OP_0"))
 
 
-def freeze_witness(tx, index, parent, policy, signer):
+def freeze_witness(tx, index, parent, policy, signer, *, verifier_parent=None):
     """Authorize the actual spend with an external freeze-role signer."""
     txin = tx.inputs[index]
     if txin.txid != parent.txid_wire() or not 0 <= txin.vout < len(parent.outputs):
@@ -135,5 +174,22 @@ def freeze_witness(tx, index, parent, policy, signer):
     if state is None:
         raise ValueError("expected token")
     preimage = preimage_forkid(tx, index, output.value, output.script, FORKID_SINGLE)
-    signature_digest = hash256(preimage_forkid(tx, index, output.value, output.script, FORKID_ALL))
-    return push(signer(signature_digest) + bytes([FORKID_ALL])) + push(preimage) + asm("OP_1")
+    full_preimage = preimage_forkid(tx, index, output.value, output.script, FORKID_ALL)
+    transition = b""
+    if policy.certified_admin:
+        from projects.cctp.recursion.continuity_statement import ParentReceipt
+
+        if index != 0 or len(tx.inputs) != 2 or len(tx.outputs) != 2 or verifier_parent is None:
+            raise ValueError("certified administration needs token vin0, verifier vin1 and two outputs")
+        policy.selected_verifier(tx, verifier_parent.serialize(), index=1)
+        successor = Output(output.value, policy.lock(replace(state, frozen=not state.frozen)))
+        if tx.outputs[0] != successor or len(ParentReceipt.parse(tx.outputs[1]).parents) != 1:
+            raise ValueError("certified administration needs the paired toggle and one predecessor digest")
+        prevouts = b"".join(item.outpoint() for item in tx.inputs)
+        transition = b"".join(push(item) for item in (
+            verifier_parent.serialize(), prevouts, full_preimage, tx.outputs[1].serialize(),
+        ))
+    elif verifier_parent is not None:
+        raise ValueError("legacy administration has no verifier parent")
+    signature = signer(hash256(full_preimage)) + bytes([FORKID_ALL])
+    return push(signature) + transition + push(preimage) + asm("OP_1")
