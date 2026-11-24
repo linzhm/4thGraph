@@ -6,7 +6,7 @@
 
 现有 [Groth16 回归](../../groth16/docs/regtest.md) 可作为出证和交易构造基线。[v3 双链记录](../fixtures/v3-certified-cross-chain-regtest-summary.json) 已覆盖 BSV 上的同密钥前序验证和 Anvil 最终释放。验收时区分宿主参考模型、真实电路、BSV Node 和跨链适配器各自验证的关系。
 
-[两条实现路线的共同验收](dual-route-validation.md) 记录 Script 主线、单证明探索分支和共用向量。
+[BSV 指令执行与验证构件验收](dual-route-validation.md) 记录当前冻结优先顺序、Groth16 复用接口和保留的实验分支。
 
 ## 里程碑
 
