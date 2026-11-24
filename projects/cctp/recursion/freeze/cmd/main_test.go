@@ -11,6 +11,7 @@ import (
 	bls "github.com/consensys/gnark-crypto/ecc/bls12-381"
 	"github.com/consensys/gnark-crypto/ecc/bls12-381/fr/pedersen"
 	native "github.com/consensys/gnark/backend/groth16/bls12-381"
+	"github.com/linzhm/BSV-Script-Lab/projects/cctp/recursion/conservation"
 )
 
 func TestStatementsAndProofArtifacts(t *testing.T) {
@@ -89,22 +90,53 @@ func TestNativeFileFingerprintAndNoOverwrite(t *testing.T) {
 }
 
 func TestProfileConstraintFingerprints(t *testing.T) {
-	profiles := []string{plainProfile, bsb22Profile}
-	fingerprints := make([]string, len(profiles))
-	for i, profile := range profiles {
+	fingerprints := make(map[string]string)
+	for _, profile := range []string{plainProfile, bsb22Profile, conservationProfile} {
+		var fingerprint string
 		for repeat := 0; repeat < 2; repeat++ {
 			_, m, err := compileFreeze(profile)
 			if err != nil {
 				t.Fatal(err)
 			}
-			if repeat > 0 && fingerprints[i] != m.CircuitSHA256 {
+			if repeat > 0 && fingerprint != m.CircuitSHA256 {
 				t.Fatalf("%s has unstable circuit serialization", profile)
 			}
-			fingerprints[i] = m.CircuitSHA256
+			fingerprint = m.CircuitSHA256
 			t.Logf("%s: %d constraints, %d commitments, %s", profile, m.Constraints, m.Commitments, m.CircuitSHA256)
 		}
+		if other, exists := fingerprints[fingerprint]; exists {
+			t.Fatalf("%s and %s share a circuit fingerprint", profile, other)
+		}
+		fingerprints[fingerprint] = profile
 	}
-	if fingerprints[0] == fingerprints[1] {
-		t.Fatal("plain and BSB22 parameter profiles have the same constraint fingerprint")
+}
+
+func TestConservationProfileStatementAndArtifact(t *testing.T) {
+	wire := hex.EncodeToString((conservation.Statement{}).Encode())
+	statement, assignment, err := assignmentFor(conservationProfile, wire)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := assignment.(*conservation.Circuit); !ok {
+		t.Fatal("wrong circuit assignment for conservation profile")
+	}
+	if _, _, err := assignmentFor(plainProfile, wire); err == nil {
+		t.Fatal("freeze profile accepted a conservation statement")
+	}
+
+	_, _, g1, g2 := bls.Generators()
+	vk, proof := new(native.VerifyingKey), new(native.Proof)
+	vk.G1.Alpha, vk.G1.K = g1, []bls.G1Affine{g1, g1, g1}
+	vk.G2.Beta, vk.G2.Gamma, vk.G2.Delta = g2, g2, g2
+	proof.Ar, proof.Bs, proof.Krs = g1, g2, g1
+	key, err := keyArtifact(manifest{Profile: conservationProfile, TestOnly: true}, vk)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := addProof(key, conservationProfile, proof, statement); err != nil {
+		t.Fatal(err)
+	}
+	if key["format"] != "CCTP conservation Groth16 artifact v1" || key["statement"] != wire || key["freeze_profile"] != nil {
+		t.Fatal("incorrect conservation artifact profile")
 	}
 }

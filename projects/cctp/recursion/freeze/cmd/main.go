@@ -1,4 +1,4 @@
-// Command freeze creates test-only Groth16 parameters or proves an exact freeze statement.
+// Command freeze creates test-only Groth16 parameters and proves CCTP statements.
 package main
 
 import (
@@ -22,16 +22,19 @@ import (
 	"github.com/consensys/gnark/frontend"
 	"github.com/consensys/gnark/frontend/cs/r1cs"
 	recursive "github.com/consensys/gnark/std/recursion/groth16"
+	"github.com/linzhm/BSV-Script-Lab/projects/cctp/recursion/conservation"
 	"github.com/linzhm/BSV-Script-Lab/projects/cctp/recursion/freeze"
 )
 
 const (
-	plainProfile     = "plain"
-	bsb22Profile     = "bsb22"
-	parameterFormat  = "CCTP freeze test parameters v1"
-	manifestName     = "manifest.json"
-	verifyingKeyName = "verifying.key"
-	provingKeyName   = "proving.key"
+	plainProfile                = "plain"
+	bsb22Profile                = "bsb22"
+	conservationProfile         = "conservation"
+	parameterFormat             = "CCTP freeze test parameters v1"
+	conservationParameterFormat = "CCTP conservation test parameters v1"
+	manifestName                = "manifest.json"
+	verifyingKeyName            = "verifying.key"
+	provingKeyName              = "proving.key"
 )
 
 type manifest struct {
@@ -48,6 +51,7 @@ type manifest struct {
 
 func compileFreeze(profile string) (constraint.ConstraintSystem, manifest, error) {
 	m := manifest{Format: parameterFormat, Profile: profile, TestOnly: true, StatementBytes: freeze.EncodedSize}
+	privateBytes := freeze.PayloadSize
 	var circuit frontend.Circuit
 	switch profile {
 	case plainProfile:
@@ -55,8 +59,12 @@ func compileFreeze(profile string) (constraint.ConstraintSystem, manifest, error
 	case bsb22Profile:
 		circuit = &freeze.Circuit{}
 		m.Commitments = 1
+	case conservationProfile:
+		circuit = &conservation.Circuit{}
+		m.Format, m.StatementBytes = conservationParameterFormat, conservation.EncodedSize
+		privateBytes = conservation.PayloadSize
 	default:
-		return nil, m, fmt.Errorf("expected freeze profile plain or bsb22")
+		return nil, m, fmt.Errorf("expected profile plain, bsb22 or conservation")
 	}
 	ccs, err := frontend.Compile(ecc.BLS12_381.ScalarField(), r1cs.NewBuilder, circuit)
 	if err != nil {
@@ -64,7 +72,7 @@ func compileFreeze(profile string) (constraint.ConstraintSystem, manifest, error
 	}
 	commitments, ok := ccs.GetCommitments().(constraint.Groth16Commitments)
 	if !ok || len(commitments) != m.Commitments || ccs.GetNbPublicVariables() != 3 ||
-		ccs.GetNbSecretVariables() != freeze.PayloadSize {
+		ccs.GetNbSecretVariables() != privateBytes {
 		return nil, m, fmt.Errorf("unexpected public, private or commitment dimensions for %s", profile)
 	}
 	if profile == bsb22Profile && len(commitments[0].GetPublicCommitted()) != 0 {
@@ -140,8 +148,8 @@ func setup(directory, profile string) error {
 	if profile == "" {
 		profile = plainProfile
 	}
-	if profile != plainProfile && profile != bsb22Profile {
-		return fmt.Errorf("expected freeze profile plain or bsb22")
+	if profile != plainProfile && profile != bsb22Profile && profile != conservationProfile {
+		return fmt.Errorf("expected profile plain, bsb22 or conservation")
 	}
 	if err := os.Mkdir(directory, 0700); err != nil {
 		return err
@@ -150,6 +158,8 @@ func setup(directory, profile string) error {
 	if err != nil {
 		return err
 	}
+	fmt.Printf("compiled %s: %d constraints, %d commitments, fingerprint %s\n",
+		profile, m.Constraints, m.Commitments, m.CircuitSHA256)
 	started := time.Now()
 	pk, vk, err := groth16.Setup(ccs)
 	if err != nil {
@@ -173,7 +183,7 @@ func setup(directory, profile string) error {
 	if err := writeJSON(filepath.Join(directory, manifestName), m); err != nil {
 		return err
 	}
-	fmt.Printf("freeze %s: %d constraints, test setup %s, verifying key %s\n",
+	fmt.Printf("%s: %d constraints, test setup %s, verifying key %s\n",
 		profile, m.Constraints, time.Since(started), m.VerifyingSHA256)
 	return nil
 }
@@ -187,8 +197,12 @@ func loadManifest(directory string) (manifest, error) {
 	if err := json.Unmarshal(file, &m); err != nil {
 		return m, err
 	}
-	if m.Format != parameterFormat || !m.TestOnly || m.StatementBytes != freeze.EncodedSize {
-		return m, fmt.Errorf("expected completed test-only freeze parameters")
+	expectedFormat, expectedBytes := parameterFormat, freeze.EncodedSize
+	if m.Profile == conservationProfile {
+		expectedFormat, expectedBytes = conservationParameterFormat, conservation.EncodedSize
+	}
+	if m.Format != expectedFormat || !m.TestOnly || m.StatementBytes != expectedBytes {
+		return m, fmt.Errorf("expected completed test-only CCTP parameters")
 	}
 	return m, nil
 }
@@ -204,11 +218,32 @@ func parseStatement(wire string) (freeze.Statement, error) {
 	return freeze.ParseStatement(raw)
 }
 
-func prove(directory, profile, wire, output string) error {
+func assignmentFor(profile, wire string) (proofStatement, frontend.Circuit, error) {
+	if profile == conservationProfile {
+		if len(wire) != 2*conservation.EncodedSize {
+			return nil, nil, fmt.Errorf("expected %d conservation statement bytes encoded as hex", conservation.EncodedSize)
+		}
+		raw, err := hex.DecodeString(wire)
+		if err != nil {
+			return nil, nil, fmt.Errorf("invalid conservation statement hex: %w", err)
+		}
+		statement, err := conservation.ParseStatement(raw)
+		if err != nil {
+			return nil, nil, err
+		}
+		return statement, statement.Assignment(), nil
+	}
 	statement, err := parseStatement(wire)
 	if err != nil {
-		return err
+		return nil, nil, err
 	}
+	if profile == bsb22Profile {
+		return statement, statement.Assignment(), nil
+	}
+	return statement, statement.PlainAssignment(), nil
+}
+
+func prove(directory, profile, wire, output string) error {
 	if _, err := os.Lstat(output); err == nil || !os.IsNotExist(err) {
 		return fmt.Errorf("choose a new proof output path: %s", output)
 	}
@@ -219,13 +254,17 @@ func prove(directory, profile, wire, output string) error {
 	if profile != "" && profile != saved.Profile {
 		return fmt.Errorf("requested profile does not match the completed setup")
 	}
+	statement, assignment, err := assignmentFor(saved.Profile, wire)
+	if err != nil {
+		return err
+	}
 	ccs, expected, err := compileFreeze(saved.Profile)
 	if err != nil {
 		return err
 	}
 	expected.ProvingSHA256, expected.VerifyingSHA256 = saved.ProvingSHA256, saved.VerifyingSHA256
 	if expected != saved {
-		return fmt.Errorf("setup manifest belongs to a different freeze constraint system")
+		return fmt.Errorf("setup manifest belongs to a different CCTP constraint system")
 	}
 	pk := groth16.NewProvingKey(ecc.BLS12_381)
 	vk := new(native.VerifyingKey)
@@ -240,11 +279,9 @@ func prove(directory, profile, wire, output string) error {
 		return err
 	}
 	field := ecc.BLS12_381.ScalarField()
-	var assignment frontend.Circuit = statement.PlainAssignment()
 	var provingOptions []backend.ProverOption
 	var verificationOptions []backend.VerifierOption
 	if saved.Profile == bsb22Profile {
-		assignment = statement.Assignment()
 		provingOptions = append(provingOptions, recursive.GetNativeProverOptions(field, field))
 		verificationOptions = append(verificationOptions, recursive.GetNativeVerifierOptions(field, field))
 	}
@@ -256,7 +293,7 @@ func prove(directory, profile, wire, output string) error {
 	proof, err := groth16.Prove(ccs, pk, witness, provingOptions...)
 	provedAt := time.Now()
 	if err != nil {
-		return fmt.Errorf("freeze witness does not prove: %w", err)
+		return fmt.Errorf("%s witness does not prove: %w", saved.Profile, err)
 	}
 	public, err := witness.Public()
 	if err != nil {
@@ -275,15 +312,15 @@ func prove(directory, profile, wire, output string) error {
 	if err := writeJSON(output, key); err != nil {
 		return err
 	}
-	fmt.Printf("freeze %s: proved and verified in %s, statement %x\n", saved.Profile, time.Since(started), statement.Digest())
+	fmt.Printf("%s: proved and verified in %s, statement %x\n", saved.Profile, time.Since(started), statement.Digest())
 	return nil
 }
 
 func main() {
 	mode := flag.String("mode", "", "setup or prove")
-	profile := flag.String("profile", "", "plain (setup default) or bsb22; prove reads the setup profile")
+	profile := flag.String("profile", "", "plain (setup default), bsb22, or conservation; prove reads the setup profile")
 	directory := flag.String("dir", "", "fresh setup directory or completed setup to reuse")
-	wire := flag.String("statement", "", "exact versioned freeze statement encoded as hex")
+	wire := flag.String("statement", "", "exact versioned statement encoded as hex")
 	output := flag.String("out", "", "new proof JSON path")
 	flag.Parse()
 	var err error

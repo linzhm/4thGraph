@@ -90,3 +90,8 @@ PYTHONPATH=.:projects/groth16/reference ../cctp-test-tools/venv/bin/python -m un
 - [当前范围](dual-route-validation.md) 先验收 BSV 冻结和解冻。已有 `1→2` 单证明探索留在独立分支，暂停扩展。源链按受信 RPC、最终性及授权签发接续。跨曲线递归和源链区块压缩暂停。
 - [普通 Groth16 与可选 BSB22](../../groth16/docs/bsb22.md) 共用验证器。分离后 CCTP 的 16 项锁、见证和声明字节一致，独立算术证明已由 BSV Node 入块并拒绝错误公开值。
 - [冻结规则小样](../recursion/freeze/README.md) 保留原生冻结授权，按真实交易构造公开输入。普通及 BSB22 电路对同一声明各自编译和求解，普通版没有 BSB22 承诺。实验锁独立于储备桥。原 Script 正例已在第二个隔离节点[重放入块](../fixtures/v3-certified-freeze-replay-summary.json)。
+
+## 同日续接：守恒规则和共享验证输入
+
+- [2→2 守恒小样](../recursion/conservation/README.md) 使用一份普通 BLS12-381 Groth16，分别消费两笔独立测试父交易以及付款的两个共父后继。两笔均在独立 regtest 入块。同一验证器锁、协同锁和声明框架用于两步。共享验证器从实际父交易核对两个受认可的锁，代币输入各核对持有人、对应实际槽位和同一回执。
+- [大小记录](../fixtures/conservation-2x2-regtest-summary.json) 区分 1,078 字节证明见证、验证器资金原文和直接父交易原文。第二笔付款沿用同一证明尺寸，直接父原文增加到 482,360 字节。3,744 字节的中间态披露仅用于链下复算这笔父交易 txid。

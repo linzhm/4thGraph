@@ -3,11 +3,17 @@ package main
 import (
 	"encoding/hex"
 	"fmt"
+	"math/big"
 
 	bls "github.com/consensys/gnark-crypto/ecc/bls12-381"
 	native "github.com/consensys/gnark/backend/groth16/bls12-381"
-	"github.com/linzhm/BSV-Script-Lab/projects/cctp/recursion/freeze"
 )
+
+type proofStatement interface {
+	Encode() []byte
+	Digest() [32]byte
+	Limbs() [2]*big.Int
+}
 
 func encodeG1(p bls.G1Affine) [3]string {
 	if p.IsInfinity() {
@@ -23,24 +29,32 @@ func encodeG2(p bls.G2Affine) [3][2]string {
 func keyArtifact(m manifest, vk *native.VerifyingKey) (map[string]any, error) {
 	if len(vk.G1.K) != 3+m.Commitments || len(vk.CommitmentKeys) != m.Commitments ||
 		len(vk.PublicAndCommitmentCommitted) != m.Commitments {
-		return nil, fmt.Errorf("verifying key has the wrong shape for the %s freeze circuit", m.Profile)
+		return nil, fmt.Errorf("verifying key has the wrong shape for the %s circuit", m.Profile)
 	}
 	points := make([][3]string, len(vk.G1.K))
 	for i, point := range vk.G1.K {
 		points[i] = encodeG1(point)
 	}
 	data := map[string]any{
-		"freeze_profile":       m.Profile,
 		"test_only":            m.TestOnly,
 		"constraints":          m.Constraints,
 		"circuit_sha256":       m.CircuitSHA256,
 		"verifying_key_sha256": m.VerifyingSHA256,
 		"curve":                "bls12-381",
 	}
+	if m.Profile == conservationProfile {
+		data["conservation_profile"] = m.Profile
+	} else {
+		data["freeze_profile"] = m.Profile
+	}
 	switch m.Profile {
-	case plainProfile:
+	case plainProfile, conservationProfile:
 		// Export the affine shape used by snarkjs_adapter, with Fp2 real first.
-		data["format"], data["protocol"], data["nPublic"] = "CCTP freeze Groth16 artifact v1", "groth16", 2
+		format := "CCTP freeze Groth16 artifact v1"
+		if m.Profile == conservationProfile {
+			format = "CCTP conservation Groth16 artifact v1"
+		}
+		data["format"], data["protocol"], data["nPublic"] = format, "groth16", 2
 		data["vk_alpha_1"], data["vk_beta_2"] = encodeG1(vk.G1.Alpha), encodeG2(vk.G2.Beta)
 		data["vk_gamma_2"], data["vk_delta_2"], data["IC"] = encodeG2(vk.G2.Gamma), encodeG2(vk.G2.Delta), points
 	case bsb22Profile:
@@ -60,14 +74,14 @@ func keyArtifact(m manifest, vk *native.VerifyingKey) (map[string]any, error) {
 	return data, nil
 }
 
-func addProof(data map[string]any, profile string, proof *native.Proof, statement freeze.Statement) error {
+func addProof(data map[string]any, profile string, proof *native.Proof, statement proofStatement) error {
 	limbs := statement.Limbs()
 	digest := statement.Digest()
 	data["public_signals"] = [2]string{limbs[0].String(), limbs[1].String()}
 	data["statement"] = hex.EncodeToString(statement.Encode())
 	data["statement_digest"] = hex.EncodeToString(digest[:])
 	switch profile {
-	case plainProfile:
+	case plainProfile, conservationProfile:
 		if len(proof.Commitments) != 0 {
 			return fmt.Errorf("plain proof must have no commitment")
 		}

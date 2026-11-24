@@ -15,7 +15,7 @@ from run_recursive_mimo import Regtest
 from shared.transaction import Input, Output, Transaction
 from shared.script import asm
 from snarkjs_adapter import load_artifacts, point
-from statement import AssetDescriptor
+from statement import AssetDescriptor, public_inputs
 from transaction_relation import TokenState
 from usdc_amount import USDC_DECIMALS
 from verifier import VerificationKey, unlocking_fields, unlocking_script
@@ -34,7 +34,11 @@ def read_key(data, profile):
 
 
 def prove_candidate(binary, directory, output, tx, previous, manifest, key):
-    statement = freeze_probe.statement(tx, previous)
+    return prove_statement(binary, directory, output, freeze_probe.statement(tx, previous), manifest, key)
+
+
+def prove_statement(binary, directory, output, statement, manifest, key):
+    """Generate and encode one plain or committed BLS12-381 statement proof."""
     start = perf_counter()
     subprocess.run([str(binary.resolve()), "-mode", "prove", "-dir", str(directory),
                     "-statement", statement.hex(), "-out", str(output)], check=True)
@@ -42,7 +46,7 @@ def prove_candidate(binary, directory, output, tx, previous, manifest, key):
     data = json.loads(output.read_text())
     if (data["statement"] != statement.hex() or
             data["verifying_key_sha256"] != manifest["verifying_key_sha256"]):
-        raise ValueError("the native proof does not match the frozen transaction or parameters")
+        raise ValueError("the native proof does not match the prepared statement or parameters")
     if manifest["profile"] == "bsb22":
         vk, relation, signals, proof = load_artifact(data)
         fields = verifier_fields(vk, relation, signals, proof)
@@ -50,8 +54,8 @@ def prove_candidate(binary, directory, output, tx, previous, manifest, key):
         vk, signals, proof = load_artifacts(data, data, data["public_signals"])
         point_coordinates = verification_key_point(vk.ic, signals) or (0, 0)
         fields = (*point_coordinates, *unlocking_fields(vk, signals, proof, projective_g1=True, projective_g2=True))
-    if vk != key or signals != freeze_probe.signals(tx, previous):
-        raise ValueError("the native proof does not verify the expected freeze public inputs")
+    if vk != key or signals != public_inputs(statement):
+        raise ValueError("the native proof does not verify the expected public inputs")
     return unlocking_script(fields), {
         "prove_process_seconds": elapsed, "proof_artifact_sha256": sha256(output.read_bytes()).hexdigest(),
         "public_inputs": list(map(str, signals)), "statement_digest": data["statement_digest"],
