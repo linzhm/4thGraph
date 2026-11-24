@@ -20,7 +20,7 @@ from operational_token import TokenPolicy, ordinary_witness
 from recursive_mimo import RecursiveMimo, SplitLeaf
 from regtest_mint import Node, RpcFailure, base58check, sign_p2pkh
 from shared.chain_gang import validate_at_heights
-from shared.script import asm
+from shared.script import asm, push
 from shared.transaction import Input, Output, Transaction, hash256
 from snarkjs_adapter import load_artifacts as load_leaf_artifacts
 from statement import AssetDescriptor, Slot
@@ -85,12 +85,15 @@ class Regtest:
             raise
         raise AssertionError("regtest accepted an invalid recursive spend")
 
-    def setup(self, outputs=6):
+    def setup(self, outputs=6, *, anchor_tag=b""):
         coinbase = self.node.fund(self.address)
         value = min(100_000_000, coinbase.outputs[0].value // (outputs + 1))
         if value < 5_000_000:
             raise ValueError("test node subsidy too small for this fixture; use a fresh regtest")
-        unsigned = Transaction((Input(coinbase.txid_wire(), 0),), (Output(value, asm("OP_1")),) * outputs)
+        funding = (Output(value, asm("OP_1")),) * outputs
+        if anchor_tag:
+            funding += (Output(0, asm("OP_0 OP_RETURN") + push(anchor_tag)),)
+        unsigned = Transaction((Input(coinbase.txid_wire(), 0),), funding)
         signer = SigningKey.from_secret_exponent(11, curve=SECP256k1)
         return self.include("setup", sign_p2pkh(unsigned, coinbase, 0, signer), (coinbase,))
 

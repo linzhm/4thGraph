@@ -13,7 +13,7 @@ from mint import MintPolicy, authorize_mint, prepare_mint
 from mint_events import Deposit, DepositPosition, EMPTY_ROOT, MintEvents
 from operational_token import freeze_witness, ordinary_witness
 from projects.cctp.evm.bsv_burn_evidence import BsvConfirmationPolicy, BsvTransactionLocation, BurnEvidenceError
-from shared.script import asm
+from shared.script import asm, push
 from shared.transaction import Input, Output, Transaction, hash256
 from statement import AssetDescriptor
 from test_certified_burn_provenance import FixtureNode
@@ -22,7 +22,9 @@ from wallet_receipt import BlockInclusion, SpendStatus, verify_payment
 
 
 @unittest.skipUnless(find_spec("continuity_verifier"), "requires the CCTP recursion reference path")
-class CertifiedWalletTests(unittest.TestCase):
+class CertifiedWalletFixture(unittest.TestCase):
+    align_output_count = False
+
     @classmethod
     def setUpClass(cls):
         from committed_verifier import load_artifact
@@ -38,7 +40,8 @@ class CertifiedWalletTests(unittest.TestCase):
         cls.asset = asset = AssetDescriptor(1, anchor.outpoint(), 6, 7, b"u" * 32, b"p" * 32)
         template = MintPolicy(asset, 31337, b"v" * 20, issuer, lambda _: b"")
         verifier = ContinuityVerifier(template, freeze, key, commitment, b"k" * 32, certified_mints=True,
-                                      certified_admin=True, certified_burns=True, certified_single_output=True)
+                                      certified_admin=True, certified_burns=True, certified_single_output=True,
+                                      align_output_count=cls.align_output_count)
         cls.verifier = verifier
         policy = verifier.policy
         mint_policy = verifier.mint_policy
@@ -104,6 +107,8 @@ class CertifiedWalletTests(unittest.TestCase):
         self.policy = BsvConfirmationPolicy(self.asset.network, "regtest", self.node.hashes[0], 2)
         self.wallet = CertifiedWalletProvenance(self.verifier, self.node, self.policy, self.node.locations.get)
 
+
+class CertifiedWalletTests(CertifiedWalletFixture):
     def test_exact_vout_for_all_certified_creation_operations(self):
         cases = (
             (self.mint, 1, "mint", 1024, False, 1),
@@ -230,3 +235,42 @@ class CertifiedWalletTests(unittest.TestCase):
         self.assertEqual(wallet.check_creation(tx, vout), payment.creation)
         with self.assertRaisesRegex(CertifiedWalletError, "spent, conflicted or unavailable"):
             wallet.check_spendable(tx, vout, **order)
+
+
+class AlignedWalletTests(CertifiedWalletFixture):
+    align_output_count = True
+
+    def test_confirmed_payment_padding_is_independent_of_eligibility_and_repayment(self):
+        from continuity_statement import ParentReceipt
+        from parent_prefix import align_output_count
+
+        tx = self.split
+        aligned = align_output_count(tx, 0)
+        shortest = aligned.inputs[0].script[len(tx.inputs[0].script):]
+        other = push(bytes(75)) if shortest != push(bytes(75)) else push(bytes(76))
+        for pad in (b"", shortest, other, push(bytes(255)), b"\x4c\x00", b"\x4c\x01\x00",
+                    b"\x4d\x02\x00" + bytes(2), b"\x4e\xff\x00\x00\x00" + bytes(255)):
+            parent = tx.with_script(0, tx.inputs[0].script + pad)
+            node = FixtureNode((*self.transactions[:9], (10, parent)))
+            wallet = replace(self.wallet, bsv_rpc=node, locate=node.locations.get)
+            creation = wallet.check_creation(parent, 0)
+            self.assertEqual((creation.txid_wire, creation.state.quantity), (parent.txid_wire(), 640))
+            next_receipt = ParentReceipt((creation.proof_digest,))
+            funder = self.funders[2]
+            spend = Transaction((Input(funder.txid_wire(), 0), Input(parent.txid_wire(), 0)),
+                                (self.verifier.mint_policy.token_output(200, self.owner),
+                                 self.verifier.mint_policy.token_output(440, self.owner), next_receipt.output()))
+            self.assertEqual(self.verifier.validate(spend, funder, (parent,), (self.funders[1],))[0], next_receipt)
+
+        for invalid in (push(b"\x01"), push(bytes(256)), push(b"") * 2, asm("OP_NOP"),
+                        b"\x4c", b"\x4d\x00", b"\x4e\x01\x00\x00", b"\x4c\x02\x00",
+                        b"\x4d\x01\x00\x01", b"\x4e\x00\x00\x00\x00\x00"):
+            parent = tx.with_script(0, tx.inputs[0].script + invalid)
+            self.node.include(16, parent)
+            with self.assertRaisesRegex(CertifiedWalletError, "does not attest"):
+                self.wallet.check_creation(parent, 0)
+        # Even a legal pad cannot conceal a change to the actual transaction material.
+        changed = tx.with_script(0, tx.inputs[0].script[:-2] + b"\xfa\x51" + shortest)
+        self.node.include(16, changed)
+        with self.assertRaisesRegex(CertifiedWalletError, "does not attest"):
+            self.wallet.check_creation(changed, 0)

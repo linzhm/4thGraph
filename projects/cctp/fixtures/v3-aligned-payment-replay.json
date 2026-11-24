@@ -1,0 +1,138 @@
+{
+  "node": "/Bitcoin SV:1.2.3/",
+  "asset_id": "059f681de9ba9093813028170c9c84ee4b656c8b9848ab277788d6bc7484b8e4",
+  "verifier_lock_hash": "ffa5d15ff1dd1929bbde2f84cdb29deb33dff4841e28e441de3341973072f815",
+  "continuity_key_digest": "677731270de75ec11f65c92f2ac8b0c428df79e28a532a035b8402166eb04a9b",
+  "minimum_confirmations": 2,
+  "bob_output": {
+    "txid": "46cbea8c7f8cb75b122e99b2d6731f290ca56b43631c46f472163431b9d20fce",
+    "vout": 0
+  },
+  "carol_output": {
+    "txid": "19f76c07ba370558f235b13bb97d0caa70b97861dec22f432100873fac391601",
+    "vout": 0
+  },
+  "prior_to_bob_spend": {
+    "observation": {
+      "height": 224,
+      "tip": "6b847f094a5974d1431098f81c856fc2577710c2065c8cf816fb6438936ff59d",
+      "present_in_chain_utxos": true,
+      "present_in_utxos_with_mempool": true
+    },
+    "bob_receipt": {
+      "txid": "46cbea8c7f8cb75b122e99b2d6731f290ca56b43631c46f472163431b9d20fce",
+      "vout": 0,
+      "owner": "03421f5fc9a21065445c96fdb91c0c1e2f2431741c72713b4b99ddcb316f31e9fc",
+      "quantity": 275,
+      "frozen": false,
+      "spend_status": "unspent",
+      "confirmations": 2,
+      "tip": "6b847f094a5974d1431098f81c856fc2577710c2065c8cf816fb6438936ff59d",
+      "tip_height": 224,
+      "block_header": "0000002034d0111f6c7daf3b91958b3b45b83c7c3007deb2943bb29b123edfc2751c725e6ea94e9dc241231247bb6d2895959149c3168cca4d45eb89987f755c1cde3aa9f1cc056bffff7f2001000000",
+      "height": 223,
+      "leaf_count": 2,
+      "index": 1,
+      "merkle_siblings_wire": [
+        "cd1f96618bf1a7fabcfc350efa94eb8499422c8535342045f4369c6453bf200e"
+      ],
+      "verifier_outpoint_wire": "b4d544272d577a440bc406f9463c797478aa96511bd5e3fde0eb04755f4f38c700000000",
+      "proof_digest": "ebc89ef1076d440590ce11552ca84724f701c1ecca6bc82b33160fc019214ce5"
+    }
+  },
+  "pending_bob_spend": {
+    "observation": {
+      "height": 224,
+      "tip": "6b847f094a5974d1431098f81c856fc2577710c2065c8cf816fb6438936ff59d",
+      "present_in_chain_utxos": true,
+      "present_in_utxos_with_mempool": false
+    },
+    "spending_txid_in_mempool": "19f76c07ba370558f235b13bb97d0caa70b97861dec22f432100873fac391601",
+    "bob_wallet": {
+      "accepted": false,
+      "reason": "output is spent, conflicted or unavailable at the wallet node"
+    }
+  },
+  "one_confirmation": {
+    "observation": {
+      "height": 225,
+      "tip": "04b97130ae8e1be774b2da1af097f5cf67e73784f1d402b4c165468d58216690",
+      "present_in_chain_utxos": true,
+      "present_in_utxos_with_mempool": true
+    },
+    "carol_wallet": {
+      "accepted": false,
+      "reason": "BSV occurrence does not meet the confirmation policy"
+    }
+  },
+  "confirmed": {
+    "observation": {
+      "height": 226,
+      "tip": "6b3895d99ad5d4dc3c000be4b12b3349ad4d7825b29c2c88a1671d2971a57c85",
+      "present_in_chain_utxos": true,
+      "present_in_utxos_with_mempool": true
+    },
+    "carol_receipt": {
+      "txid": "19f76c07ba370558f235b13bb97d0caa70b97861dec22f432100873fac391601",
+      "vout": 0,
+      "owner": "032fa2104d6b38d11b0230010559879124e42ab8dfeff5ff29dc9cdadd4ecacc3f",
+      "quantity": 350,
+      "frozen": false,
+      "spend_status": "unspent",
+      "confirmations": 2,
+      "tip": "6b3895d99ad5d4dc3c000be4b12b3349ad4d7825b29c2c88a1671d2971a57c85",
+      "tip_height": 226,
+      "block_header": "000000209df56f933864fb16f88c5c06c2107757c26f851cf8981043d174594a097f846ba9d34f2f9f34c3e0a381576bfa019860b5689604805712b19b6338d70be190d723cd056bffff7f2001000000",
+      "height": 225,
+      "leaf_count": 2,
+      "index": 1,
+      "merkle_siblings_wire": [
+        "473e1bb69910509801f4a6e3193d232b5cd43843092736e563c97b1e8506864b"
+      ],
+      "verifier_outpoint_wire": "4339bc2916ec6359fc335d7336aa440caf2b33f2a56773aa81213063716aced200000000",
+      "proof_digest": "e843a8248231b04441903b2a75ed4b248a2563c71c06d2101a7dcb0d7ff12ba6"
+    }
+  },
+  "withdrawn": {
+    "observation": {
+      "height": 224,
+      "tip": "6b847f094a5974d1431098f81c856fc2577710c2065c8cf816fb6438936ff59d",
+      "present_in_chain_utxos": false,
+      "present_in_utxos_with_mempool": true
+    },
+    "carol_wallet": {
+      "accepted": false,
+      "reason": "BSV occurrence does not meet the confirmation policy"
+    },
+    "invalidated_block": "04b97130ae8e1be774b2da1af097f5cf67e73784f1d402b4c165468d58216690",
+    "payment_reentered_mempool": true
+  },
+  "restored": {
+    "observation": {
+      "height": 226,
+      "tip": "6b3895d99ad5d4dc3c000be4b12b3349ad4d7825b29c2c88a1671d2971a57c85",
+      "present_in_chain_utxos": true,
+      "present_in_utxos_with_mempool": true
+    },
+    "carol_receipt": {
+      "txid": "19f76c07ba370558f235b13bb97d0caa70b97861dec22f432100873fac391601",
+      "vout": 0,
+      "owner": "032fa2104d6b38d11b0230010559879124e42ab8dfeff5ff29dc9cdadd4ecacc3f",
+      "quantity": 350,
+      "frozen": false,
+      "spend_status": "unspent",
+      "confirmations": 2,
+      "tip": "6b3895d99ad5d4dc3c000be4b12b3349ad4d7825b29c2c88a1671d2971a57c85",
+      "tip_height": 226,
+      "block_header": "000000209df56f933864fb16f88c5c06c2107757c26f851cf8981043d174594a097f846ba9d34f2f9f34c3e0a381576bfa019860b5689604805712b19b6338d70be190d723cd056bffff7f2001000000",
+      "height": 225,
+      "leaf_count": 2,
+      "index": 1,
+      "merkle_siblings_wire": [
+        "473e1bb69910509801f4a6e3193d232b5cd43843092736e563c97b1e8506864b"
+      ],
+      "verifier_outpoint_wire": "4339bc2916ec6359fc335d7336aa440caf2b33f2a56773aa81213063716aced200000000",
+      "proof_digest": "e843a8248231b04441903b2a75ed4b248a2563c71c06d2101a7dcb0d7ff12ba6"
+    }
+  }
+}

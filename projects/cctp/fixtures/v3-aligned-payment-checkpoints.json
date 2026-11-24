@@ -1,0 +1,45 @@
+{
+  "scope": "Off-chain SHA-256 continuation from final, mined payments. Payload counts 32 state bytes, 8 length bytes and the actual suffix. Excludes authentication proofs and Script push encoding.",
+  "payments": {
+    "alice-to-bob": {
+      "txid": "46cbea8c7f8cb75b122e99b2d6731f290ca56b43631c46f472163431b9d20fce",
+      "raw_bytes": 12343308,
+      "output_count": 3,
+      "processed_bytes": 12338432,
+      "midstate": "7d88b05ec1289badcfe0534c94fc7a0ed4713642d5cf9bd9d8433d5e5f31efdb",
+      "suffix_bytes": 4876,
+      "suffix_sha256d": "0c7c8c9532fb88f38e6fe788026abcf5eccb324a43ecbf2ebb90af839289161b",
+      "hash_outputs": "241a06242de4d7870e791a3cf6a637c1b834c1e4dee4d6abd28de9190e6774a4",
+      "height": 223,
+      "blockhash": "25bfb5e1ac3a73cd216892149728f138d5f6c497f6aabc3965c695bb7d309bd2",
+      "spent_token_outpoints": [
+        "acfa57bf1dfa8e6b9413061a50ed6afdb0bfd3edcd7a0d8ff761ece3cf2148b2:1",
+        "edf72361d7df50294a8ff1f1e582d6ee7487b828089a85da2bb2489f3ec0174a:1"
+      ],
+      "alignment_push_bytes": 38,
+      "embedded_token_parent_bytes": 7409873,
+      "payment_and_verifier_funding_bytes": 13326512,
+      "checkpoint_payload_bytes": 4916
+    },
+    "bob-to-carol": {
+      "txid": "19f76c07ba370558f235b13bb97d0caa70b97861dec22f432100873fac391601",
+      "raw_bytes": 25626252,
+      "output_count": 3,
+      "processed_bytes": 25621376,
+      "midstate": "a34311c5666fe19accfadd1ad4f58619298ec2904aa8abd04ce429f5713a10c9",
+      "suffix_bytes": 4876,
+      "suffix_sha256d": "a51cbe92a55159e40f366b903121aafe4a3d12bde3e8a7c358e118acd8de53db",
+      "hash_outputs": "dba255fc49537b236efdce1a1d43ebbf40fa1fbcaeccb518b26f2a88c0345a00",
+      "height": 225,
+      "blockhash": "04b97130ae8e1be774b2da1af097f5cf67e73784f1d402b4c165468d58216690",
+      "spent_token_outpoints": [
+        "46cbea8c7f8cb75b122e99b2d6731f290ca56b43631c46f472163431b9d20fce:0",
+        "6110d2d3965b4be0076fce63e0c47098e59a5f253431ae09b2633a269c8e02a1:1"
+      ],
+      "alignment_push_bytes": 15,
+      "embedded_token_parent_bytes": 20692768,
+      "payment_and_verifier_funding_bytes": 26609456,
+      "checkpoint_payload_bytes": 4916
+    }
+  }
+}

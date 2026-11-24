@@ -1,5 +1,6 @@
 import json
 from dataclasses import replace
+from importlib.util import find_spec
 from pathlib import Path
 import unittest
 
@@ -9,7 +10,7 @@ from continuity_verifier import ContinuityVerifier
 from mint import MintPolicy, authorize_mint, authorize_pause, prepare_mint
 from mint_events import Deposit, DepositPosition, EMPTY_ROOT, MintEvents
 from shared.evaluate import ScriptError, evaluate
-from shared.script import encode_num
+from shared.script import asm, encode_num, number, push
 from shared.transaction import Input, Output, Transaction, hash256, preimage_all
 from statement import AssetDescriptor
 from test_operational_token import fixture_signer
@@ -49,6 +50,36 @@ class ContinuityVerifierTests(unittest.TestCase):
 
     def run_statement(self, args, count):
         return evaluate(self.verifier.transaction_material(*args, count=count) + self.statement)
+
+    @unittest.skipUnless(find_spec("tx_engine"), "requires pinned chain-gang")
+    def test_optional_zero_padding_only_precedes_ordinary_transfer_branches(self):
+        from shared.chain_gang import validate_at_heights
+
+        with self.assertRaisesRegex(ValueError, "certified mint"):
+            replace(self.verifier, align_output_count=True)
+        base = replace(self.verifier, certified_mints=True)
+        aligned = replace(base, align_output_count=True)
+        statement = base.statement_script()
+        self.assertTrue(aligned.statement_script().endswith(statement))
+        prefix = aligned.statement_script()[:-len(statement)]
+        # Check the added lock prefix in consensus mode, including its remaining stack.
+        for mode, field, valid in (
+            (1, b"", True), (2, push(b""), True), (1, push(bytes(255)), True),
+            (2, b"\x4c\x01\x00", True), (2, b"\x4d\x01\x00\x00", True),
+            (2, b"\x4e\x01\x00\x00\x00\x00", True), (3, b"", True),
+            (3, push(bytes(10)), False), (1, push(bytes(256)), False), (2, push(b"\x81"), False),
+        ):
+            with self.subTest(mode=mode, field_bytes=len(field)):
+                lock = prefix + asm("OP_DEPTH OP_1 OP_NUMEQUALVERIFY") + number(mode) + asm("OP_EQUAL")
+                funding = Transaction((Input(b"f" * 32, 0),), (Output(2, lock),))
+                witness = number(mode) + field
+                tx = Transaction((Input(funding.txid_wire(), 0, witness),), (Output(1, asm("OP_1")),))
+                context = dict(spend_height=10, activation_height=2, utxo_heights=(3,))
+                if valid:
+                    validate_at_heights(tx, (funding,), **context)
+                else:
+                    with self.assertRaises((ValueError, RuntimeError)):
+                        validate_at_heights(tx, (funding,), **context)
 
     def test_root_one_recursive_parent_and_independent_or_shared_two(self):
         first = self.create(1, (self.minted,), (self.genesis,), (1,), (640, 384), base=True)

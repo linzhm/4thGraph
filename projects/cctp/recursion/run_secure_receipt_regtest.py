@@ -14,6 +14,7 @@ from cross_chain_fixture import AdoptedBsvChain
 from mint import MintPolicy
 from mint_events import EMPTY_ROOT, MintEvents
 from operational_token import ordinary_witness
+from parent_prefix import align_output_count, output_offsets
 from projects.cctp.evm.bsv_burn_evidence import BsvTransactionLocation
 from run_capacity_regtest import _fund, _measure_transaction, _save_durable
 from run_continuity_regtest import NativeProver, _mint, _prove
@@ -25,13 +26,13 @@ from test_operational_token import fixture_signer
 from usdc_amount import USDC_DECIMALS
 
 
-def verifier_for(node, setup, artifact):
+def verifier_for(node, setup, artifact, *, aligned=False):
     asset = AssetDescriptor(1, Input(setup.txid_wire(), 0).outpoint(), USDC_DECIMALS, 7, b"r" * 32, b"p" * 32)
     template = MintPolicy(asset, 84532, b"r" * 20, node.minter_key, lambda _: b"", state_version=2)
     key, commitment = load_verifying_key(artifact)
     return ContinuityVerifier(template, node.freeze_key, key, commitment,
                               bytes.fromhex(artifact["continuity_key_digest"]), certified_mints=True,
-                              certified_admin=True)
+                              certified_admin=True, align_output_count=aligned)
 
 
 def read_tx(node, txid):
@@ -41,9 +42,9 @@ def read_tx(node, txid):
     return tx
 
 
-def bootstrap(node, prover, key_artifact):
-    setup = node.setup(outputs=5)
-    verifier = verifier_for(node, setup, key_artifact)
+def bootstrap(node, prover, key_artifact, *, aligned=False):
+    setup = node.setup(outputs=5, anchor_tag=b"BSV/CCTP/regtest/aligned-payments/v1" if aligned else b"")
+    verifier = verifier_for(node, setup, key_artifact, aligned=aligned)
     policy = verifier.mint_policy
     state = node.include("mint-genesis", Transaction((Input(setup.txid_wire(), 0),), (
         Output(setup.outputs[0].value - 50_000, policy.state_lock(EMPTY_ROOT)),
@@ -75,7 +76,7 @@ def bootstrap(node, prover, key_artifact):
         "scope": "Three BSV test mints backed by test deposit attestations. Minting process exits before ordinary payments.",
         "mint_public_key": node.minter_key.hex(), "freeze_public_key": node.freeze_key.hex(),
         "asset_id": verifier.asset.asset_id().hex(), "issuance_anchor": verifier.asset.issuance_outpoint.hex(),
-        "continuity_key_digest": verifier.key_digest.hex(),
+        "continuity_key_digest": verifier.key_digest.hex(), "align_output_count": aligned,
         "verifier_lock_hash": sha256(blob(verifier.lock)).hexdigest(), "minted": total,
         "satoshi_funding_txid": sponsor.txid(), "proof_checks": checks,
         "confirmation_timings": node.confirmation_timings, **node.evidence,
@@ -161,21 +162,37 @@ def pay(node, verifier, prover, key, label, funding, payer, sign, coins, payouts
     if label == "alice-to-bob":
         # Same quantities and newly signed transaction, but a different recipient.
         altered = replace(tx, outputs=(verifier.mint_policy.token_output(payouts[0][1], payer), *tx.outputs[1:]))
-        negative["new_holder_signatures_with_original_proof_on_changed_recipient"] = node.reject(signed(altered))
-    final = node.include(label, signed(tx), (funding, *parents))
+        changed = signed(altered)
+        if verifier.align_output_count:
+            changed = align_output_count(changed, 0)
+        negative["new_holder_signatures_with_original_proof_on_changed_recipient"] = node.reject(changed)
+    final = signed(tx)
+    if verifier.align_output_count:
+        if label == "alice-to-bob":
+            oversized = final.with_script(0, final.inputs[0].script + push(bytes(256)))
+            negative["oversized_zero_padding_256_bytes"] = node.reject(oversized)
+        final = align_output_count(final, 0)
+    final = node.include(label, final, (funding, *parents))
     input_positions = tuple((parent, vout) for parent, (_, vout, _) in zip(parents, coins, strict=True))
     measurement = _measure_transaction(final, ((funding, 0), *input_positions))
     material = verifier.transaction_material(tx, funding, parents, supports, count=verifier.transfer_mode(tx))
-    if not final.inputs[0].script.endswith(material):
-        raise AssertionError("confirmed verifier witness differs from its parent disclosures")
+    padding = verifier.confirmed_witness_padding(final, 0, material)
+    count_offset, _ = output_offsets(final.serialize())
+    if verifier.align_output_count:
+        if not padding or count_offset % 64:
+            raise AssertionError("confirmed payment lacks its aligned output count")
+        base = final.with_script(0, final.inputs[0].script[:-len(padding)])
+        if align_output_count(base, 0) != final:
+            raise AssertionError("confirmed payment differs from the shortest wallet padding")
     return final, {
         "txid": final.txid(), "payer": payer.hex(), "parent_receipts": accepted,
         "funding_txid": funding.txid(), "funding_bytes": len(funding.serialize()),
         "payment_and_verifier_funding_bytes": len(funding.serialize()) + len(final.serialize()),
         "proof_sha256": sha256(artifact.read_bytes()).hexdigest(), "proof_file": artifact.name,
         "prior_proofs_from_node": [p.name for p in proof_paths], "prove_seconds": proof_seconds,
-        "proof_witness_bytes": len(final.inputs[0].script) - len(material),
-        "verifier_material_bytes": len(material),
+        "proof_witness_bytes": len(final.inputs[0].script) - len(material) - len(padding),
+        "verifier_material_bytes": len(material), "alignment_push_bytes": len(padding),
+        "alignment_push_hex": padding.hex(), "output_count_offset": count_offset,
         "public_signals": list(map(str, public)), "parent_proof_digests": [p.hex() for p in receipt.parents],
         "direct_token_parent_bytes": [len(p.serialize()) for p in parents],
         "funding_of_direct_parents_bytes": [len(p.serialize()) for p in supports],
@@ -183,13 +200,13 @@ def pay(node, verifier, prover, key, label, funding, payer, sign, coins, payouts
     }
 
 
-def payments(node, prover, key, manifest, expected_asset, expected_verifier_hash):
+def payments(node, prover, key, manifest, expected_asset, expected_verifier_hash, *, aligned=False):
     if node.minter is not None:
         raise AssertionError("ordinary payment process has a mint signer")
     node.evidence["transactions"].update(manifest["transactions"])
     records = node.evidence["transactions"]
     setup = read_tx(node, records["setup"]["txid"])
-    verifier = verifier_for(node, setup, key)
+    verifier = verifier_for(node, setup, key, aligned=aligned)
     lock_hash = sha256(blob(verifier.lock)).digest()
     if verifier.asset.asset_id() != expected_asset or lock_hash != expected_verifier_hash:
         raise ValueError("deployment differs from the recipient's independently pinned asset or verifier")
@@ -234,6 +251,7 @@ def payments(node, prover, key, manifest, expected_asset, expected_verifier_hash
         "recipient_expected_asset": expected_asset.hex(), "recipient_expected_verifier_hash": expected_verifier_hash.hex(),
         "minted": manifest["minted"], "mint_signer_loaded_in_payment_process": False,
         "ordinary_companion_inputs": 0, "mint_proof_checks": manifest["proof_checks"],
+        "align_output_count": aligned,
         "payments": [alice_check, bob_check], "carol_receipt": carol_check, "wallet_negatives": negatives,
         "payment_byte_delta": bob_check["transaction_bytes"] - alice_check["transaction_bytes"],
         "funded_byte_delta": bob_check["payment_and_verifier_funding_bytes"]
@@ -250,6 +268,8 @@ def main():
     parser.add_argument("--prover", type=Path, required=True)
     parser.add_argument("--setup-dir", type=Path, required=True)
     parser.add_argument("--out", type=Path, required=True)
+    parser.add_argument("--align-output-count", action="store_true",
+                        help="use a fresh policy with zero-padding support and align each ordinary payment")
     parser.add_argument("--expected-asset", help="32-byte asset ID configured independently by the recipient")
     parser.add_argument("--expected-verifier-hash", help="recipient's SHA256 of the compact-length-prefixed verifier lock")
     args = parser.parse_args()
@@ -276,10 +296,11 @@ def main():
         raise ValueError("this test requires an isolated BSV regtest")
     with NativeProver(args.prover, args.setup_dir, args.out, key["continuity_key_digest"]) as prover:
         if manifest is None:
-            _save_durable(manifest_path, bootstrap(node, prover, key))
+            _save_durable(manifest_path, bootstrap(node, prover, key, aligned=args.align_output_count))
         else:
             _save_durable(args.out / "summary.json",
-                          payments(node, prover, key, manifest, expected_asset, expected_verifier_hash))
+                          payments(node, prover, key, manifest, expected_asset, expected_verifier_hash,
+                                   aligned=args.align_output_count))
 
 
 if __name__ == "__main__":

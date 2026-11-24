@@ -8,12 +8,68 @@ import sys
 from tempfile import TemporaryDirectory
 import unittest
 
-from parent_prefix import BLOCK_BYTES, checkpoint_record, output_offsets, parent_prefix, sha256_checkpoint, sha256_continue
+from parent_prefix import (
+    BLOCK_BYTES, align_output_count, checkpoint_record, output_offsets, parent_prefix,
+    sha256_checkpoint, sha256_continue,
+)
+from projects.groth16.reference.transfer import COMPACT_SCRIPTCODE
 from shared.script import asm, push
-from shared.transaction import Input, Output, Transaction, compact, hash256
+from shared.transaction import Input, Output, Transaction, compact, hash256, preimage_all, preimage_otda
 
 
 class ParentPrefixTests(unittest.TestCase):
+    def test_align_output_count_uses_the_shortest_zero_push_at_the_selected_vin(self):
+        # (script sizes, vin, shortest payload, CompactSize width before/after).
+        cases = (
+            ((175, 57), 0, 0, (1, 1)),     # OP_0 is sufficient.
+            ((175, 58), 0, 63, (1, 1)),    # Aligned already, but still add one item.
+            ((252, 12), 0, 30, (1, 3)),
+            ((12, 65_535), 1, 25, (3, 5)),
+            ((238, 44), 0, 139, (1, 3)),   # Both CompactSize and PUSHDATA1 skip a candidate alignment.
+        )
+        for sizes, vin, payload_size, widths in cases:
+            with self.subTest(sizes=sizes, vin=vin):
+                tx = Transaction(tuple(Input(bytes([i]) * 32, i, bytes([0x51]) * size, sequence=5 + i)
+                                       for i, size in enumerate(sizes)), (Output(1_000, b"\x51"),), locktime=42)
+                old = tx.inputs[vin].script
+                aligned = align_output_count(tx, vin)
+                expected = tx.with_script(vin, old + push(bytes(payload_size)))
+                self.assertEqual(aligned, expected)
+                self.assertEqual((len(compact(len(old))), len(compact(len(aligned.inputs[vin].script)))), widths)
+                new_count, _ = output_offsets(aligned.serialize())
+                self.assertEqual(new_count % BLOCK_BYTES, 0)
+                for n in range(payload_size):
+                    shorter = tx.with_script(vin, old + push(bytes(n)))
+                    self.assertNotEqual(output_offsets(shorter.serialize())[0] % BLOCK_BYTES, 0)
+
+    def test_aligned_archived_payments_keep_sighash_preimages_and_equal_suffix_lengths(self):
+        path = Path(__file__).resolve().parents[1] / "fixtures/v3-secure-receipt-regtest.json.xz"
+        with lzma.open(path, "rt") as stream:
+            archive = json.load(stream)
+        for label, payload_size in (("alice-to-bob", 21), ("bob-to-carol", 41)):
+            with self.subTest(label=label):
+                txid = archive["summary"]["transactions"][label]["txid"]
+                ledger = archive["transactions"]
+                raw = bytes.fromhex(ledger[txid])
+                tx = Transaction.parse(raw)
+                self.assertEqual(tx.txid(), txid)
+                vin = len(tx.inputs) - 1
+                aligned = align_output_count(tx, vin)
+                self.assertNotEqual(aligned.txid(), txid)
+                self.assertEqual(aligned, tx.with_script(vin, tx.inputs[vin].script + push(bytes(payload_size))))
+                count, _ = output_offsets(raw)
+                padded = aligned.serialize()
+                padded_count, _ = output_offsets(padded)
+                self.assertEqual(padded_count % BLOCK_BYTES, 0)
+                self.assertEqual(padded[padded_count:], raw[count:])
+                self.assertEqual(len(padded) - padded_count, 4_876)
+                for i, item in enumerate(tx.inputs):
+                    previous = Transaction.parse(bytes.fromhex(ledger[item.txid[::-1].hex()]))
+                    spent = previous.outputs[item.vout]
+                    code = COMPACT_SCRIPTCODE if i == 0 else spent.script
+                    self.assertEqual(preimage_all(tx, i, spent.value, code), preimage_all(aligned, i, spent.value, code))
+                    self.assertEqual(preimage_otda(tx, i, code, 0x61), preimage_otda(aligned, i, code, 0x61))
+
     def test_cli_generates_the_same_verified_record_from_hex_and_binary(self):
         tx = Transaction(
             (Input(b"p" * 32, 0, push(bytes(range(256))), sequence=9),),

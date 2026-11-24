@@ -35,6 +35,8 @@ class CapacityVerifier(ContinuityVerifier):
             raise ValueError("expected an explicit capacity witness encoding")
         if self.chronicle_all:
             raise ValueError("capacity receipts currently require the legacy ALL context")
+        if self.align_output_count:
+            raise ValueError("output alignment is only configured for ordinary two-output transfers")
 
     @cached_property
     def capacity_modes(self):

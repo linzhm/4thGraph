@@ -42,3 +42,22 @@ python "$driver" --phase payments --node-url "$REGTEST_URL" --cookie "$REGTEST_C
 原始链上交易、区块信息、五份原生证明及验证密钥另有[压缩归档](../fixtures/v3-secure-receipt-regtest.json.xz)。本次协议验证密钥标识为 `677731270de75ec11f65c92f2ac8b0c428df79e28a532a035b8402166eb04a9b`。R1CS 指纹为 `70a485af0ccc64cffb4275515fabc57d9344b5104960a7ae22e2819cbd681704`，原始 VK 的 SHA-256 为 `2820918c22c2fe11750547dfce9b6bdfed66c51b0e6e7a01903650c6c27615bf`。本地 PK 为 2,712,016,823 字节，其 SHA-256 为 `d3f3aed0255ec2c34dfd8f2605fb710cea1bbd11e8718f8b07a2ac066ff30b71`。本次使用单机测试 setup，未提供生产参数仪式、独立的协议安全审计、公开转发策略或公网费用证据。
 
 离线核算可执行 `python projects/cctp/recursion/archive_secure_receipt.py replay --archive projects/cctp/fixtures/v3-secure-receipt-regtest.json.xz --audit /tmp/secure-receipt-audit.json`，再与仓内核算文件逐字节比较。使用[链状态重放驱动](../recursion/run_secure_receipt_replay.py)时指定包含源区块的原节点、一个全新的隔离 regtest 节点、运行摘要、验证密钥和收款人预配置。源节点只提供区块和交易原文，mempool、撤块和恢复均在新节点执行。
+
+## 父交易的输出边界对齐
+
+两阶段的运行命令均加上 `--align-output-count`。发行锚交易追加带有 `BSV/CCTP/regtest/aligned-payments/v1` 标记的零值输出，使这套配置具有独立的发行 outpoint 和资产标识。收款方在高度 215 固定实际批准的验证器锁摘要。铸造建立该策略，普通付款由共享验证器输入消费零填充。两笔付款继续携带完整父原文，节点和收款钱包沿原来的 B2G 路径校验所花的真实代币。[收款方预配置](../fixtures/v3-aligned-payment-recipient-policy.json) · [父交易绑定关系](parent-binding.md#前缀状态与实现顺序)
+
+| 入块实测 | Alice 付给 Bob | Bob 付给 Carol |
+|---|---:|---:|
+| 确认高度 | 223 | 225 |
+| 付款字节 | 12,343,308 | 25,626,252 |
+| 含本次验证器资金的字节 | 13,326,512 | 26,609,456 |
+| 零填充 push，含编码 | 38 B | 15 B |
+| 第一个输出计数字节的偏移 | 12,338,432 | 25,621,376 |
+| 从该偏移到交易结尾 | 4,876 B | 4,876 B |
+| 后缀、中间态和已处理长度的合计 | 4,916 B | 4,916 B |
+| 链上递归证明字段，含编码 | 1,862 B | 1,861 B |
+
+每笔均用 `0x41`。Bob 花费 Alice 已确认付款的 `vout 0` 和独立铸造的 `vout 1`。节点拒绝了 256 字节零填充，也拒绝了变更收款人、重新取得持有人签名却沿用原证明的交易。第二台节点从创世块重放，Carol 在高度 226 达到两个确认后验收 350 个最小单位，撤销付款块后收据失效，重新采用后得到相同收据。两笔全包仍相差 13,282,944 字节。这部分历史增长需要在后继验证器中用独立认证的父证据替换原文。[第二台节点重放](../fixtures/v3-aligned-payment-replay.json)
+
+离线核算从[新节点的原始交易与区块归档](../fixtures/v3-aligned-payment-regtest.json.xz)重建交易标识、区块包含、所花的两个代币 outpoint、最短填充、SHA-256 中间态和完整输出后缀。分别使用原付款核算命令的 `replay` 和新增的 `aligned-checkpoints` 模式，后者的输出可与[两笔付款的检查点](../fixtures/v3-aligned-payment-checkpoints.json)逐字节比较。

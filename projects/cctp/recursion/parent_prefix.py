@@ -10,7 +10,8 @@ from dataclasses import dataclass
 from hashlib import sha256
 from struct import Struct
 
-from shared.transaction import amount, compact
+from shared.script import push
+from shared.transaction import Transaction, amount, compact
 
 
 BLOCK_BYTES = 64
@@ -121,6 +122,27 @@ def output_offsets(raw: bytes) -> tuple[int, tuple[int, ...]]:
     if cursor != end:
         raise ValueError("trailing bytes after output region")
     return count_offset, tuple(positions)
+
+
+def align_output_count(tx: Transaction, vin: int) -> Transaction:
+    """Append one minimal zero-filled push to a witness whose lock consumes it.
+
+    Call after all other unlocking fields are final, before publishing the txid.
+    This changes the parent transaction itself and leaves its outputs untouched.
+    """
+    if type(vin) is not int or not 0 <= vin < len(tx.inputs):
+        raise ValueError("missing padding input")
+    offset, _ = output_offsets(tx.serialize())
+    script = tx.inputs[vin].script
+    before = len(compact(len(script)))
+    # Past PUSHDATA1's threshold only one CompactSize width change is possible
+    # within payload lengths 76..255. At least one interval covers all 64 residues.
+    for size in range(256):
+        field = push(bytes(size))
+        width_change = len(compact(len(script) + len(field))) - before
+        if (offset + len(field) + width_change) % BLOCK_BYTES == 0:
+            return tx.with_script(vin, script + field)
+    raise AssertionError("no SHA-256 alignment within the supported padding range")
 
 
 @dataclass(frozen=True)

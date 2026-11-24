@@ -7,10 +7,11 @@ from pathlib import Path
 from types import SimpleNamespace
 
 from continuity_chain_proof import _proof_coordinates, chain_prior_artifact
+from parent_prefix import align_output_count, checkpoint_record
 from regtest_mint import Node
 from run_secure_receipt_regtest import verifier_for
 from shared.script import number, push
-from shared.transaction import Transaction, blob, hash256, preimage_all
+from shared.transaction import Transaction, blob, compact, hash256, preimage_all
 from wallet_receipt import BlockInclusion
 
 MINTS = ("alice-first-mint", "alice-second-mint", "bob-existing-mint")
@@ -77,7 +78,8 @@ def audit(archive):
     key = json.loads(archive["key_json"])
     deployment_keys = SimpleNamespace(minter_key=bytes.fromhex(summary["mint_public_key"]),
                                       freeze_key=bytes.fromhex(summary["freeze_public_key"]))
-    verifier = verifier_for(deployment_keys, ledger[records["setup"]["txid"]], key)
+    verifier = verifier_for(deployment_keys, ledger[records["setup"]["txid"]], key,
+                            aligned=summary.get("align_output_count", False))
     require(verifier.key_digest.hex() == summary["continuity_key_digest"]
             and sha256(blob(verifier.lock)).hexdigest() == summary["verifier_lock_hash"]
             and verifier.asset.asset_id().hex() == summary["asset_id"]
@@ -129,6 +131,12 @@ def audit(archive):
         verifier_fields.extend((f"direct_parent_{i}", push(p.serialize())) for i, p in enumerate(parents))
         verifier_fields.extend([("ordered_outputs", push(outs)), ("ordered_outpoints", push(prevouts)),
                                 ("preimage", push(verifier.context_preimage(tx, funding, vi))), ("mode", number(mode))])
+        if verifier.align_output_count and not creating_mint:
+            material = verifier.transaction_material(tx, funding, parents, supports, count=mode, verifier_index=vi)
+            padding = verifier.confirmed_witness_padding(tx, vi, material)
+            require(padding and padding.hex() == details["alignment_push_hex"]
+                    and len(padding) == details["alignment_push_bytes"], "payment padding differs")
+            verifier_fields.append(("alignment_push", padding))
         parts = witness_partition(script, verifier_fields)
         direct = [len(p.serialize()) for p in parents]
         nested = sum(embedded.get(p.txid(), 0) for p in parents)
@@ -188,6 +196,53 @@ def audit(archive):
                                                                            "direct_token_parent_raw_bytes_total")}}
 
 
+def audit_aligned_payments(archive):
+    """Recompute the two confirmed payment checkpoints from their signed wire bytes."""
+    summary = archive["summary"]
+    require(summary.get("align_output_count") is True, "use an archive created with --align-output-count")
+    records = summary["transactions"]
+    payment_checks = dict(zip(PAYMENTS, summary["payments"], strict=True))
+    evidence = {}
+    expected_parents = {PAYMENTS[0]: ((MINTS[0], 1), (MINTS[1], 1)),
+                        PAYMENTS[1]: ((PAYMENTS[0], 0), (MINTS[2], 1))}
+    for label, spent in expected_parents.items():
+        block_record = records[label]
+        txid = block_record["txid"]
+        raw = bytes.fromhex(archive["transactions"][txid])
+        tx = Transaction.parse(raw)
+        block = archive["blocks"][block_record["blockhash"]]
+        ids = [bytes.fromhex(item)[::-1] for item in block["tx"]]
+        inclusion = BlockInclusion.from_block(bytes.fromhex(block["header"]), block["height"], ids, ids.index(tx.txid_wire()))
+        require(inclusion.block_hash()[::-1].hex() == block_record["blockhash"]
+                and inclusion.height == block_record["height"], "archived payment block differs")
+        actual = [(i.txid[::-1].hex(), i.vout) for i in tx.inputs[1:]]
+        require(actual == [(records[name]["txid"], vout) for name, vout in spent], "wrong token parents")
+        padding = bytes.fromhex(payment_checks[label]["alignment_push_hex"])
+        witness = tx.inputs[0].script
+        require(padding and witness.endswith(padding)
+                and align_output_count(tx.with_script(0, witness[:-len(padding)]), 0) == tx,
+                "payment did not use the shortest supported alignment field")
+        record = checkpoint_record(raw)
+        require(record["txid"] == txid and record["raw_bytes"] == block_record["bytes"], "payment txid or size differs")
+        require(record["processed_bytes"] == record["output_count_offset"], "payment output count is unaligned")
+        tail = compact(len(tx.outputs)) + b"".join(o.serialize() for o in tx.outputs) + tx.locktime.to_bytes(4, "little")
+        require(bytes.fromhex(record["suffix"]) == tail, "checkpoint suffix differs from canonical outputs and locktime")
+        evidence[label] = {k: record[k] for k in ("txid", "raw_bytes", "output_count", "processed_bytes", "midstate",
+                                                   "suffix_bytes", "suffix_sha256d", "hash_outputs")}
+        funding_raw_hex = archive["transactions"][tx.inputs[0].txid[::-1].hex()]
+        evidence[label].update({
+            "height": inclusion.height, "blockhash": block_record["blockhash"],
+            "spent_token_outpoints": [f"{parent}:{vout}" for parent, vout in actual],
+            "alignment_push_bytes": len(padding),
+            "embedded_token_parent_bytes": sum(len(archive["transactions"][parent]) // 2 for parent, _ in actual),
+            "payment_and_verifier_funding_bytes": len(raw) + len(funding_raw_hex) // 2,
+            "checkpoint_payload_bytes": 32 + 8 + len(tail),
+        })
+    return {"scope": "Off-chain SHA-256 continuation from final, mined payments. Payload counts 32 state bytes, "
+                     "8 length bytes and the actual suffix. Excludes authentication proofs and Script push encoding.",
+            "payments": evidence}
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="mode", required=True)
@@ -196,7 +251,7 @@ def main():
     create.add_argument("--cookie", type=Path, required=True)
     create.add_argument("--run-dir", type=Path, required=True)
     create.add_argument("--key", type=Path, required=True)
-    for p in (create, commands.add_parser("replay")):
+    for p in (create, commands.add_parser("replay"), commands.add_parser("aligned-checkpoints")):
         p.add_argument("--archive", type=Path, required=True)
         p.add_argument("--audit", type=Path, required=True)
     args = parser.parse_args()
@@ -205,7 +260,7 @@ def main():
     else:
         with lzma.open(args.archive, "rt") as source:
             data = json.load(source)
-    report = audit(data)
+    report = audit_aligned_payments(data) if args.mode == "aligned-checkpoints" else audit(data)
     if args.mode == "capture":
         with lzma.open(args.archive, "xt", preset=3) as output:
             json.dump(data, output, separators=(",", ":"))

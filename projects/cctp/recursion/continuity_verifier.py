@@ -47,6 +47,7 @@ class ContinuityVerifier:
     certified_pause: bool = False
     shared_ordinary_guard: bool = False
     chronicle_all: bool = False
+    align_output_count: bool = False
 
     def __post_init__(self):
         fixed(self.key_digest, 32)
@@ -65,6 +66,8 @@ class ContinuityVerifier:
             raise ValueError("shared ordinary guard requires certified token administration")
         if type(self.chronicle_all) is not bool:
             raise ValueError("select an explicit shared verifier sighash profile")
+        if type(self.align_output_count) is not bool or self.align_output_count and not self.certified_mints:
+            raise ValueError("witness alignment requires a certified mint policy")
 
     @property
     def asset(self):
@@ -214,6 +217,12 @@ class ContinuityVerifier:
     def statement_script(self):
         variants = self._statement_variants()
         code = b""
+        if self.align_output_count:
+            # Certified modes are positive. An optional all-zero field sits above
+            # the mode of an ordinary transfer; all other witness fields stay put.
+            code = asm("OP_DUP OP_SIZE OP_DUP 255 OP_LESSTHANOREQUAL OP_VERIFY "
+                       "OP_0 OP_SWAP OP_NUM2BIN OP_EQUAL OP_IF OP_DROP "
+                       "OP_DUP OP_1 OP_3 OP_WITHIN OP_VERIFY OP_ENDIF")
         for mode, branch in variants[:-1]:
             code += asm("OP_DUP") + number(mode) + asm("OP_NUMEQUAL OP_IF OP_DROP") + branch + asm("OP_ELSE")
         mode, branch = variants[-1]
@@ -370,6 +379,29 @@ class ContinuityVerifier:
             funding.serialize(), *(support.serialize() for support in supporting),
             *(parent.serialize() for parent in parents), *vectors, self.context_preimage(tx, funding, verifier_index),
         )) + number(count)
+
+    def confirmed_witness_padding(self, tx, index, material):
+        """Match all reconstructed material and an optional single zero-filled push.
+
+        A confirmed transfer may use a different length or push encoding than
+        our wallet would choose. Its full parent remains available to v3.
+        """
+        witness = tx.inputs[index].script
+        if len(witness) > len(material) and witness.endswith(material):
+            return b""
+        if self.align_output_count and index == 0 and self._layout(tx)[0] == "transfer":
+            # PUSHDATA4 adds the longest possible header for this single field.
+            start = witness.rfind(material, max(1, len(witness) - len(material) - 260))
+            if start >= 1:
+                field = witness[start + len(material):]
+                if field and field[0] <= 0x4e:
+                    opcode = field[0]
+                    length_bytes = 0 if opcode < 0x4c else 1 << (opcode - 0x4c)
+                    header = 1 + length_bytes
+                    size = opcode if not length_bytes else int.from_bytes(field[1:header], "little")
+                    if size <= 255 and len(field) == header + size and not any(field[header:]):
+                        return field
+        raise ValueError("certified witness differs from the transaction material or allowed padding")
 
     def witness(self, proof, tx, funding, parents, supporting):
         receipt, context = self.validate(tx, funding, parents, supporting)

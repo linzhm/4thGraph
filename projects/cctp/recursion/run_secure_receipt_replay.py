@@ -74,7 +74,8 @@ def replay(source, clone, summary, key, pins):
     node = SimpleNamespace(node=clone, evidence={"transactions": records},
                            minter_key=bytes.fromhex(summary["mint_public_key"]),
                            freeze_key=bytes.fromhex(summary["freeze_public_key"]))
-    verifier = verifier_for(node, read_tx(node, records["setup"]["txid"]), key)
+    verifier = verifier_for(node, read_tx(node, records["setup"]["txid"]), key,
+                            aligned=summary.get("align_output_count", False))
     require(verifier.asset.asset_id().hex() == pins["asset"]
             and verifier.asset.issuance_outpoint.hex() == pins["anchor"]
             and sha256(blob(verifier.lock)).hexdigest() == pins["verifier_hash"],

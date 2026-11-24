@@ -183,9 +183,12 @@ class CertifiedWalletProvenance:
         if suffix is None:
             suffix = verifier.transaction_material(tx, funding, parents, supporting, count=mode,
                                                    verifier_index=verifier_index)
-        witness = tx.inputs[verifier_index].script
-        if context != expected_context or len(witness) <= len(suffix) or not witness.endswith(suffix):
+        if context != expected_context:
             raise CertifiedWalletError("certified witness does not attest the adopted wallet transaction context")
+        try:
+            verifier.confirmed_witness_padding(tx, verifier_index, suffix)
+        except ValueError as error:
+            raise CertifiedWalletError("certified witness does not attest the adopted wallet transaction context") from error
         snapshot.check_active()
         verifier_hash = sha256(blob(funding.outputs[0].script)).digest()
         return CertifiedCreation(
