@@ -32,6 +32,17 @@ GOMAXPROCS=4 go test -count=1 -v ./parentbinding -run '^TestPrivateSHA256Leaf$'
 GOMAXPROCS=4 CCTP_SHA256_LEAF_NATIVE_TEST=1 go test -count=1 -v ./parentbinding -run '^TestPrivateSHA256Leaf$'
 ```
 
+## 从分段打开固定位置的字段
+
+`SHA256ProjectionLeaf` 按编译固定的有序、无重叠字节区间，从参与 SHA-256 压缩的同一份私有分段提取字段。公开值先保留 `SHA256Leaf` 的五个标量，再附上选中字节依序拼接后分成的大端 uint128。最后一段按实际剩余字节编码。区间起点相对分段，绝对字节位置为公开块序号乘以 64 再加区间起点。聚合器需固定所接受的验证密钥、区间配置和预期块序号，并完成规范交易解析及填充验证。 [字段电路](sha_projection.go)
+
+两块样例跨块绑定 `nSequence`，同时提取输入 outpoint、输出数量及首个输出金额。59 个披露字节占四个公开标量，电路共 202,823 条约束。将另一笔原文的字段与此分段的真实哈希状态拼接会被拒绝。原生测试参数生成 49.51 秒，出证 1.43 秒，验证 2.47 毫秒。验证器拒绝保留原证明并替换字段公开值。
+
+```sh
+GOMAXPROCS=4 go test -count=1 -v ./parentbinding -run 'TestSHA256ProjectionLeaf|TestInvalidSHA256ProjectionLayout'
+GOMAXPROCS=4 CCTP_SHA256_PROJECTION_NATIVE_TEST=1 go test -count=1 -v ./parentbinding -run '^TestSHA256ProjectionLeaf$'
+```
+
 ## 生成父交易中间态
 
 在仓库根目录运行。输入是已序列化的 BSV 父交易原文，钱包应在父交易定稿后生成。
