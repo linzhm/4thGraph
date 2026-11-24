@@ -28,6 +28,7 @@
 | [ML-DSA-44](projects/ml-dsa/README.md) | FIPS 204 纯模式消息验签，以及交易绑定的付款模板 | [实现与测量](projects/ml-dsa/README.md) |
 | [XMSS-SHA2_10_256](projects/xmss/README.md) | 有状态哈希签名，每个根公钥最多使用 1,024 个独立签名索引 | [协议规范](projects/xmss/docs/spec.md) · [复现验证](projects/xmss/README.md#check-the-implementation) |
 | [Groth16](projects/groth16/README.md) | BLS12-381 证明验证，固定公开输入的脚本优化与钱包识别 | [验证器设计](projects/groth16/docs/verifier.md) · [钱包描述符](projects/groth16/docs/wallet.md) |
+| [CCTP](projects/cctp/README.md) | 由源链 USDC 储备支持的 BSV 代币发行、冻结与赎回 | [协议规格](projects/cctp/docs/bsv-usdc-bridge-spec.md) · [实现清单](projects/cctp/docs/bsv-usdc-token-checklist.md) |
 
 <details>
 <summary><strong>对照脚本尺寸</strong></summary>

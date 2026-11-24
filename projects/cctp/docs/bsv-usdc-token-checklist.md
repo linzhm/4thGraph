@@ -28,4 +28,4 @@
 3. **补齐业务出口（R05、R07、R08）。** 执行冻结、解冻、销毁和一次性释放。暂停与地址政策按照 R06 和合作条件确定。
 4. **验收而后主网准备（R09–R14）。** 接入运营和钱包，跑通 1,024 枚闭环及攻击性负例，并测 64 与 256 输入的成本。X01–X04 等待双方确认，独立测试桥可先进行。
 
-证据入口：[交易与大小测试](transfer.md) · [出证工具链](toolchain.md) · [1,024 枚回归](regtest.md) · [冻结设计](issuer-freeze.md)。
+证据入口：[交易与大小测试](../../groth16/docs/transfer.md) · [出证工具链](../../groth16/docs/toolchain.md) · [1,024 枚回归](../../groth16/docs/regtest.md) · [冻结设计](issuer-freeze.md) · [销毁与赎回设计](burn-redemption.md)。

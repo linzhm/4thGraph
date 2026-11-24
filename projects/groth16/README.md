@@ -7,9 +7,7 @@ This experiment generates BLS12-381 Groth16 verification scripts and a wallet de
 - [Transaction binding and shared verifier](docs/transfer.md)
 - [Circom and snarkjs integration](docs/toolchain.md)
 - [1,024-unit issuance and regtest replay](docs/regtest.md)
-- [Issuer-controlled token freezing](docs/issuer-freeze.md)
-- [BSV USDC-backed bridge specification](docs/bsv-usdc-bridge-spec.md)
-- [Token protocol implementation checklist](docs/bsv-usdc-token-checklist.md)
+- [CCTP and BSV bridge project](../cctp/README.md)
 - [Reproducible two-input vector](template/vector.json)
 
 | Experiment | Locking script | Unlocking script | Combined | chain-gang median |

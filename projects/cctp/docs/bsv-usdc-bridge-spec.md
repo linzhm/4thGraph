@@ -56,3 +56,5 @@
 | X04 | 审计范围、限额费率、储备报告、故障处置、品牌和兑付责任。若考虑迁移至 Circle 原生发行，另行约定存量处理。 |
 
 对应工作见 [BSV 代币协议实现清单](bsv-usdc-token-checklist.md)。
+
+实施补充见 [冻结设计](issuer-freeze.md) 和 [销毁与赎回设计](burn-redemption.md)。
