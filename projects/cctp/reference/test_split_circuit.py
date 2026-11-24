@@ -1,4 +1,5 @@
 from dataclasses import replace
+from importlib.util import find_spec
 import json
 from pathlib import Path
 import shutil
@@ -12,7 +13,7 @@ from ecdsa.util import sigdecode_der
 
 from shared.evaluate import ScriptError, evaluate
 from shared.pushtx import PUBLIC
-from shared.transaction import Output, hash256, preimage_all
+from shared.transaction import Input, Output, Transaction, hash256, preimage_all
 from statement import TRANSFER_DOMAIN, public_inputs, transfer_bytes
 from transaction_verifier import verifier_key_id, verifier_lock, verifier_witness
 from transfer import COMPACT_SCRIPTCODE
@@ -36,9 +37,8 @@ class SplitCircuitTests(unittest.TestCase):
             prover = CompiledProver.load(build / "split_commitment.r1cs")
             lock = verifier_lock(fixture.asset, prover.key)
             parent = replace(fixture.parent, outputs=(Output(1, lock),))
-            tx = replace(fixture.tx, inputs=(
-                replace(fixture.tx.inputs[0], txid=parent.txid_wire()), fixture.tx.inputs[1],
-            ))
+            token_parent = Transaction((Input(b"t" * 32, 0),), (Output(2, b"\x51"),))
+            tx = replace(fixture.tx, inputs=(Input(parent.txid_wire(), 0), Input(token_parent.txid_wire(), 0)))
             statement = transfer_bytes(
                 fixture.asset, verifier_key_id(prover.key), tx, parent, lock,
                 fixture.inputs, fixture.outputs, script_code=COMPACT_SCRIPTCODE,
@@ -104,3 +104,9 @@ class SplitCircuitTests(unittest.TestCase):
             )
             with self.assertRaises(ScriptError):
                 evaluate(changed_witness + lock, checksig=native_signature(changed_tx))
+
+            if find_spec("tx_engine") is not None:
+                from shared.chain_gang import validate_at_heights
+
+                validate_at_heights(tx.with_script(0, script_sig), (parent, token_parent),
+                                    spend_height=100, activation_height=2, utxo_heights=(3, 3))

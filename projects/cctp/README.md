@@ -5,6 +5,7 @@ This project specifies a BSV token backed by source-chain USDC. The initial test
 ## Specification and implementation
 
 - [Development plan and acceptance milestones](docs/development-plan.md)
+- [Development handoff](docs/handoff.md)
 - [Transfer commitment reference profile](docs/transfer-commitment.md)
 
 - [Bridge and token protocol specification](docs/bsv-usdc-bridge-spec.md)
