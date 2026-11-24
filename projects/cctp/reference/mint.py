@@ -257,6 +257,20 @@ class MintPolicy:
             + asm("OP_ENDIF")
         )
 
+    def _event_transition(self, events: MintEvents, event_id: bytes) -> tuple[MintEvents, tuple[bytes, ...]]:
+        return events.add(event_id)
+
+    def _event_path_bytes(self, path: tuple[bytes, ...]) -> bytes:
+        return b"".join(path)
+
+    def _event_transition_script(self) -> bytes:
+        """Replace the old root and event ID on top of the authenticated mint stack."""
+        return (
+            _unsigned() + asm("OP_6 OP_PICK") + _size(TREE_DEPTH * 32)
+            + push(EMPTY_LEAF) + push(SPENT_LEAF) + _sparse_fold()
+            + asm("OP_TOALTSTACK OP_3 OP_ROLL OP_EQUALVERIFY OP_2DROP OP_FROMALTSTACK")
+        )
+
     def _mint_branch(self) -> bytes:
         # Unlocking stack (top at right): sig, Merkle path, deposit, prevouts,
         # optional change, preimage. The locking prefix adds the old root.
@@ -270,9 +284,7 @@ class MintPolicy:
             + _slice(0, len(self.source)) + push(self.source) + asm("OP_EQUALVERIFY OP_DUP")
             + _slice(POSITION_SIZE, len(self.destination)) + push(self.destination) + asm("OP_EQUALVERIFY")
             + _slice(0, POSITION_SIZE) + push(EVENT_ID_DOMAIN) + asm("OP_SWAP OP_CAT OP_HASH256")
-            + _unsigned() + asm("OP_6 OP_PICK") + _size(TREE_DEPTH * 32)
-            + push(EMPTY_LEAF) + push(SPENT_LEAF) + _sparse_fold()
-            + asm("OP_TOALTSTACK OP_3 OP_ROLL OP_EQUALVERIFY OP_2DROP OP_FROMALTSTACK")
+            + self._event_transition_script()
         )
         # Copy the authenticated scriptCode from the preimage and replace its root.
         # The covenant uses a three-byte CompactSize prefix (checked by state_lock).
@@ -424,7 +436,7 @@ def prepare_mint(
             raise ValueError("certified mint requires vin-one verifier vout zero and a continuity receipt")
         if verifier_parent is not None:
             _check_verifier_parent(policy, sponsor, verifier_parent)
-    successor, path = events.add(deposit.position.event_id())
+    successor, path = policy._event_transition(events, deposit.position.event_id())
     total = state.cumulative_minted + deposit.net_quantity if policy.state_version == 2 else 0
     outputs = (
         Output(prior.outputs[0].value, policy.state_lock(successor.root, cumulative_minted=total)),
@@ -489,7 +501,7 @@ def mint_unlock(plan: MintPlan, der_signature: bytes) -> bytes:
         verifier = push(plan.verifier_parent.serialize())
         tail = receipt.output().serialize()
     witness = b"".join(push(field) for field in (
-        der_signature + b"\x41", b"".join(plan.path), plan.deposit.encode(), prevouts, tail, preimage,
+        der_signature + b"\x41", plan.policy._event_path_bytes(plan.path), plan.deposit.encode(), prevouts, tail, preimage,
     ))
     return verifier + witness + (asm("OP_0") if plan.policy.pause_authority is not None else b"")
 

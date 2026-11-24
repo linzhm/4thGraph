@@ -27,6 +27,8 @@ R02、R03 与 R06 的铸造一侧。
 
 固定 70 字节测试 DER 后，同一锚的三笔原生 v2 铸造分三块连续确认，每笔均为 93,865 字节。状态输入见证均为 50,686 字节，稀疏路径均为 8,192 字节，累计量依次为 1,017、1,400、1,654。现有 v3 认证铸造的前两笔在 verifier vin 仍推入完整父状态交易，第二笔另外推入前序验证器资金原文。新版联合证明的零历史增长需按 [递归验收](recursive-provenance.md#首轮验收) 独立验证。 [三笔同宽铸造记录](../fixtures/v2-counted-mint-fixed-width-regtest-summary.json) · [v3 节点基线](../fixtures/v3-counted-continuity-regtest-summary.json)
 
+供递归小样使用的有界原生铸造固定三个完整测试事件 ID。状态转移表预计算这些事件集合的原稀疏树根，签发摘要、串行状态、累计净量和代币输出继续由原生铸造锁检查。它使用独立状态标识，状态输入的路径推入为空。三笔原生铸造各为 8,068 字节，节点拒绝正确重签的入金重放及未登记事件。此夹具的签发数据与事件清单均限于隔离测试。 [有界铸造节点记录](../fixtures/v2-bounded-native-mint-regtest-summary.json)
+
 ## 入金记录
 
 `OP_FALSE OP_RETURN` 后是独立 push 的 `BSV/CCTP/deposit/v1\0` 域及 185 字节记录。所有整数使用小端。EVM 地址和交易哈希按 JSON-RPC 十六进制字节顺序。
@@ -61,3 +63,5 @@ PYTHONPATH=.:projects/groth16/reference:projects/cctp/reference \
 可用 `CCTP_MINT_REPORT` 与 `CCTP_RESERVE_MINT_REPORT` 输出本次区块引用及拒绝结果。Cookie 仅读取自节点文件。
 
 单独复跑三笔同宽铸造时，运行 `test_mint.MintTests.test_independent_node_counted_mints_keep_the_same_shape`，并用 `CCTP_MINT_REPORT` 记录每笔交易和各字段字节数。
+
+有界夹具使用 `test_bounded_mint.BoundedMintTests.test_three_mints_on_independent_node`。用 `CCTP_BOUNDED_MINT_URL` 和 `CCTP_BOUNDED_MINT_COOKIE` 指向隔离节点，用 `CCTP_BOUNDED_MINT_REPORT` 写入新的报告路径。

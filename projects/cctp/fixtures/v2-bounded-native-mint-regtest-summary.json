@@ -1,0 +1,99 @@
+{
+  "scope": "Native bounded lab mint using three locally attested deposits and actual sparse roots",
+  "node": "/Bitcoin SV:1.2.3/",
+  "genesis_txid": "1f06e3c99d13346f22fe4f72c96986a830085f5bb8435fbc2570998f99619162",
+  "genesis_bytes": 3256,
+  "state_lock_bytes": 3194,
+  "attestation_der_bytes": 70,
+  "event_path_bytes_on_wire": 0,
+  "mints": [
+    {
+      "txid": "554f5fc1bcced765f6f6d68212f2fdddcbee0b169b098f29a21cd5c529217037",
+      "blockhash": "7952525a9e5fdbfebe60b099aede088400ea7159a9e4a4b783e71a988adf93a5",
+      "height": 868,
+      "bytes": 8068,
+      "script_sig_bytes": [
+        3690,
+        0
+      ],
+      "txout_bytes": [
+        3205,
+        860,
+        219
+      ],
+      "net_quantity": 1017,
+      "cumulative_minted": 1017,
+      "event_root": "7afdf29ac6ae5d0b5e5f69fb853a372fcf8ddbe2f2a05ff815a3784658e16eac",
+      "previous_state_txid": "1f06e3c99d13346f22fe4f72c96986a830085f5bb8435fbc2570998f99619162"
+    },
+    {
+      "txid": "4def85adb3b4eb77dfcad19caaab043e7413ebbccfdaf38897611d731cd9aa30",
+      "blockhash": "640270cce4fdfc24e1842a749b688fdeeddc955152b6c6c79ec8e4b5de3333e5",
+      "height": 869,
+      "bytes": 8068,
+      "script_sig_bytes": [
+        3690,
+        0
+      ],
+      "txout_bytes": [
+        3205,
+        860,
+        219
+      ],
+      "net_quantity": 383,
+      "cumulative_minted": 1400,
+      "event_root": "acca072ef9bb409d15412c7865003c8dbf24dfe194ad9bcb2f0a69fedab3fab9",
+      "previous_state_txid": "554f5fc1bcced765f6f6d68212f2fdddcbee0b169b098f29a21cd5c529217037"
+    },
+    {
+      "txid": "8face50bc2270929f3e7397617452eb5bc6f02818f2e52b2f2df211a6e9f3f66",
+      "blockhash": "7ef4e5d3ba960a9367dbeaf3ab538171d60932585d9e174e77cb0ffdde7516e3",
+      "height": 870,
+      "bytes": 8068,
+      "script_sig_bytes": [
+        3690,
+        0
+      ],
+      "txout_bytes": [
+        3205,
+        860,
+        219
+      ],
+      "net_quantity": 254,
+      "cumulative_minted": 1654,
+      "event_root": "503e335f4197ce744fcb2b82b4f1d97720a217345288493ada20ef04a1abab4a",
+      "previous_state_txid": "4def85adb3b4eb77dfcad19caaab043e7413ebbccfdaf38897611d731cd9aa30"
+    }
+  ],
+  "rejections": {
+    "replay": {
+      "txid": "9e19796c10b0be662269e15645d699ef29783d7b9de735121b93ced9aa6efdc5",
+      "rejection": "sendrawtransaction: {'code': -26, 'message': '16: mandatory-script-verify-flag-failed (Script failed an OP_VERIFY operation)'}"
+    },
+    "unapproved": {
+      "txid": "a7035db6101bb4754260ce3d7514537758a9df7955d601ecb8151a5806d3d26d",
+      "rejection": "sendrawtransaction: {'code': -26, 'message': '16: mandatory-script-verify-flag-failed (Script failed an OP_VERIFY operation)'}"
+    }
+  },
+  "parent_binding_solver": {
+    "txid": "554f5fc1bcced765f6f6d68212f2fdddcbee0b169b098f29a21cd5c529217037",
+    "input_script_lengths": [
+      3690,
+      0
+    ],
+    "output_script_lengths": [
+      3194,
+      849,
+      210
+    ],
+    "constraints": 4528991,
+    "accepted_vouts": [
+      0,
+      1
+    ],
+    "rejected": [
+      "vout 1 opened as the state TxOut at vout 0",
+      "deposit receipt vout 2"
+    ]
+  }
+}
