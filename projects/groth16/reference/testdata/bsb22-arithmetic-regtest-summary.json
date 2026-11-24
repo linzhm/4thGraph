@@ -1,0 +1,27 @@
+{
+  "scope": "isolated Bitcoin SV regtest, independent arithmetic BSB22 proof",
+  "node": "/Bitcoin SV:1.2.3/",
+  "public_inputs": [
+    16,
+    55
+  ],
+  "lock_bytes": 943511,
+  "witness_bytes": 1864,
+  "lock_sha256": "da742904c41c7ebccaa0812031fa786ce0a9e8046420082cc13696d1c140a0d7",
+  "witness_sha256": "81e31e931ba37b0d74fbc599384fd58981ff0aa2ed74c85758d6c8ee0d7fe9ae",
+  "funding": {
+    "txid": "c7dd87d482ad3d3a888d7385d4aa6b0ce6be28df8f9e7baef643d9de53541f8a",
+    "blockhash": "2caab70fce3f694b613699ce1b1385f0bf125c562cb78bcc729d8bf78847e1bb"
+  },
+  "spend": {
+    "txid": "9d357135cd2dd48fb14585ebcc0952c6983911ea5c1ffa1f57a585b2a6a6fbb3",
+    "blockhash": "3450eb8aa8b83976682a186301682cfcca6f2681ab4af575dd902f1a87902d3e",
+    "height": 103,
+    "bytes": 1927,
+    "rpc_submission_seconds": 0.7970954169286415
+  },
+  "changed_public_input": {
+    "txid": "9b217e612a8dea68b969df5a83abd8db01f0900dff3e8dc4e596680a51ff4ee3",
+    "rejection": "sendrawtransaction: {'code': -26, 'message': '16: mandatory-script-verify-flag-failed (Script failed an OP_NUMEQUALVERIFY operation)'}"
+  }
+}

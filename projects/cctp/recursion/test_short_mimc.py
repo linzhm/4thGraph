@@ -6,11 +6,12 @@ from shared.evaluate import evaluate, ScriptError
 from shared.transaction import Input, Output, Transaction, hash256
 from verifier import unlocking_script
 
-from short_mimc import commitment_challenge, VECTOR
+from short_mimc import ROUNDS, VECTOR, commitment_challenge
 
 
 class ShortMiMCTests(unittest.TestCase):
     def test_script_matches_gnark_commitment_challenge(self):
+        self.assertEqual(ROUNDS, tuple(int(value, 16) for value in VECTOR["round_constants"]))
         program = Program()
         commitment = tuple(program.wire_field() for _ in range(2))
         claimed = program.wire_field()

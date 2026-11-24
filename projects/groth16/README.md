@@ -5,6 +5,7 @@ This experiment generates BLS12-381 Groth16 verification scripts and a wallet de
 - [Verifier design and optimization](docs/verifier.md)
 - [Wallet recognition and acceptance](docs/wallet.md)
 - [Transaction binding and shared verifier](docs/transfer.md)
+- [Optional gnark BSB22 adapter](docs/bsb22.md)
 - [Circom and snarkjs integration](docs/toolchain.md)
 - [1,024-unit issuance and regtest replay](docs/regtest.md)
 - [CCTP and BSV bridge project](../cctp/README.md)
