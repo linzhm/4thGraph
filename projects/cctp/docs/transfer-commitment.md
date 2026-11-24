@@ -4,9 +4,9 @@
 
 转账承诺从独立的版本域开始，依次包含资产身份、验证密钥标识、输入 0 的 ForkID SIGHASH_ALL preimage 双 SHA-256、代币输入槽列表和代币输出槽列表。每组列表包含 2 字节计数，每槽编码 4 字节位置和 8 字节代币数量。槽位严格递增，输入 0 保留给共享验证器。数量非零，转账两侧总量相等且不超过 uint64。摘要按字节顺序拆成两个大端 128 位公开输入。
 
-Python 编码器根据交易和验证器父交易构造 preimage。Circom 模板按编译时的输入数、输出数和 preimage 长度实例化，复用 Groth16 项目的 SHA-256 构件。首个实例化覆盖 1→2，并使用公开的测试专用证明参数。
+Python 编码器根据交易和验证器父交易构造 preimage。Circom 模板按编译时的输入数、输出数和 preimage 长度实例化，复用 Groth16 项目的 SHA-256 构件。首个实例化覆盖 1→2，采用共享验证器的 192 字节紧凑 preimage 和公开的测试专用证明参数。验证器脚本从资产与验证密钥身份、该 preimage 和见证中的槽位编码推导公开输入。脚本在 Groth16 验证后执行 CHECKSIG，以当前支出认证 preimage。
 
-下一层需将 Script 认证的 preimage、资产及验证密钥身份绑定到同一份证明，约束真实父交易、输入输出槽及后继锁，并验证合法发行或真实前序证明。当前电路约束 preimage 字节、槽位的内部规则和公开摘要。BSV 节点与钱包的完整验收跟随完整关系接入。
+脚本联测使用本地解释器和真实 secp256k1 签名检查。原交易通过。调换输出后，原见证在 CHECKSIG 失败，按新交易重建见证也无法通过原 Groth16 证明。下一层需认证代币父交易及合法发行或真实前序证明，并将声明槽位与实际输入、输出锁及金额绑定。独立 BSV Node 入块和钱包验收另行记录。
 
 ```sh
 PYTHONPATH=.:projects/groth16/reference python3 -m unittest discover -s projects/cctp/reference -v

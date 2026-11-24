@@ -75,25 +75,34 @@ def compact_verifier_binding() -> bytes:
     return asm("OP_VERIFY OP_FROMALTSTACK") + _bind_digest_signature() + COMPACT_SUFFIX
 
 
+def digest_limbs_script() -> bytes:
+    """Consume a 32-byte digest and leave two unsigned 128-bit scalars."""
+    reverse16 = asm("OP_1 OP_SPLIT OP_SWAP OP_TOALTSTACK") * 15 + asm("OP_FROMALTSTACK OP_CAT") * 15
+    unsigned_limb = reverse16 + push(b"\x00") + asm("OP_CAT OP_BIN2NUM")
+    return asm("16 OP_SPLIT OP_SWAP") + unsigned_limb + asm("OP_SWAP") + unsigned_limb
+
+
+def compact_preimage_digest_script() -> bytes:
+    """Hash a compact ForkID ALL preimage and save a copy for CHECKSIG."""
+    return (
+        asm("OP_SIZE") + number(157 + len(COMPACT_SCRIPTCODE)) + asm("OP_NUMEQUALVERIFY")
+        + _forkid_all_digest() + asm("OP_DUP OP_TOALTSTACK")
+    )
+
+
 def statement_script(issuance_outpoint: bytes, *, compact_preimage=False) -> bytes:
     """Leave both public scalars. Compact mode saves the digest for the final CHECKSIG."""
     if len(issuance_outpoint) != 36:
         raise ValueError("expected a 36-byte issuance outpoint")
-    reverse16 = asm("OP_1 OP_SPLIT OP_SWAP OP_TOALTSTACK") * 15 + asm("OP_FROMALTSTACK OP_CAT") * 15
-    unsigned_limb = reverse16 + push(b"\x00") + asm("OP_CAT OP_BIN2NUM")
     if compact_preimage:
-        prefix = (
-            asm("OP_SIZE") + number(157 + len(COMPACT_SCRIPTCODE)) + asm("OP_NUMEQUALVERIFY")
-            + _forkid_all_digest() + asm("OP_DUP OP_TOALTSTACK")
-        )
+        prefix = compact_preimage_digest_script()
         domain = COMPACT_DOMAIN
     else:
         prefix = _authenticate_forkid_all()
         domain = DOMAIN
     return (
         prefix + push(domain + issuance_outpoint)
-        + asm("OP_SWAP OP_CAT OP_HASH256 16 OP_SPLIT OP_SWAP")
-        + unsigned_limb + asm("OP_SWAP") + unsigned_limb
+        + asm("OP_SWAP OP_CAT OP_HASH256") + digest_limbs_script()
     )
 
 

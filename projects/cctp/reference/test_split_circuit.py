@@ -1,3 +1,4 @@
+from dataclasses import replace
 import json
 from pathlib import Path
 import shutil
@@ -6,8 +7,15 @@ from tempfile import TemporaryDirectory
 import unittest
 
 from circom_fixture_prover import CompiledProver
-from shared.transaction import preimage_all
-from statement import TRANSFER_DOMAIN, public_inputs
+from ecdsa import BadSignatureError, SECP256k1, VerifyingKey
+from ecdsa.util import sigdecode_der
+
+from shared.evaluate import ScriptError, evaluate
+from shared.pushtx import PUBLIC
+from shared.transaction import Output, hash256, preimage_all
+from statement import TRANSFER_DOMAIN, public_inputs, transfer_bytes
+from transaction_verifier import verifier_key_id, verifier_lock, verifier_witness
+from transfer import COMPACT_SCRIPTCODE
 from verifier import verify_host
 import test_statement
 
@@ -18,9 +26,6 @@ class SplitCircuitTests(unittest.TestCase):
         project = Path(__file__).resolve().parents[1]
         fixture = test_statement.StatementTests()
         fixture.setUp()
-        statement = fixture.statement()
-        spent = fixture.parent.outputs[0]
-        preimage = preimage_all(fixture.tx, 0, spent.value, spent.script)
         with TemporaryDirectory(prefix=".split-circuit-", dir=project) as directory:
             build = Path(directory)
             subprocess.run(
@@ -28,6 +33,17 @@ class SplitCircuitTests(unittest.TestCase):
                  "--prime", "bls12381", "--r1cs", "--wasm", "-o", str(build)],
                 check=True, capture_output=True, text=True,
             )
+            prover = CompiledProver.load(build / "split_commitment.r1cs")
+            lock = verifier_lock(fixture.asset, prover.key)
+            parent = replace(fixture.parent, outputs=(Output(1, lock),))
+            tx = replace(fixture.tx, inputs=(
+                replace(fixture.tx.inputs[0], txid=parent.txid_wire()), fixture.tx.inputs[1],
+            ))
+            statement = transfer_bytes(
+                fixture.asset, verifier_key_id(prover.key), tx, parent, lock,
+                fixture.inputs, fixture.outputs, script_code=COMPACT_SCRIPTCODE,
+            )
+            preimage = preimage_all(tx, 0, 1, COMPACT_SCRIPTCODE)
             generated = build / "split_commitment_js"
             witness_input = build / "input.json"
             command = ["node", str(generated / "generate_witness.js"),
@@ -49,7 +65,6 @@ class SplitCircuitTests(unittest.TestCase):
             expected = public_inputs(statement)
             valid = witness(statement, expected)
             self.assertEqual(valid.returncode, 0, valid.stderr)
-            prover = CompiledProver.load(build / "split_commitment.r1cs")
             signals, proof = prover.prove(build / "witness.wtns")
             self.assertEqual(signals, expected)
             self.assertTrue(verify_host(prover.key, signals, proof))
@@ -62,3 +77,30 @@ class SplitCircuitTests(unittest.TestCase):
             self.assertIn("Assert Failed", witness(statement, expected, changed_preimage).stderr)
             inflation = statement[:-8] + (385).to_bytes(8, "little")
             self.assertIn("Assert Failed", witness(inflation, public_inputs(inflation)).stderr)
+
+            script_sig = verifier_witness(
+                fixture.asset, prover.key, proof, tx, parent, fixture.inputs, fixture.outputs,
+            )
+
+            def native_signature(actual_tx):
+                digest = hash256(preimage_all(actual_tx, 0, 1, COMPACT_SCRIPTCODE))
+
+                def verify(signature, key):
+                    self.assertEqual(key, PUBLIC)
+                    self.assertEqual(signature[-1], 0x41)
+                    signer = VerifyingKey.from_string(key, curve=SECP256k1)
+                    try:
+                        return signer.verify_digest(signature[:-1], digest, sigdecode=sigdecode_der)
+                    except BadSignatureError:
+                        return False
+
+                return verify
+
+            self.assertEqual(evaluate(script_sig + lock, checksig=native_signature(tx)), ([b"\x01"], []))
+            changed_tx = replace(tx, outputs=tx.outputs[::-1])
+            self.assertEqual(evaluate(script_sig + lock, checksig=native_signature(changed_tx)), ([b""], []))
+            changed_witness = verifier_witness(
+                fixture.asset, prover.key, proof, changed_tx, parent, fixture.inputs, fixture.outputs,
+            )
+            with self.assertRaises(ScriptError):
+                evaluate(changed_witness + lock, checksig=native_signature(changed_tx))

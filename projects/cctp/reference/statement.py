@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass
 
+from shared.script import asm
 from shared.transaction import Transaction, hash256, preimage_all
 
 ASSET_DOMAIN = b"BSV/CCTP/asset/v1\x00"
@@ -72,6 +73,8 @@ def transfer_bytes(
     verifier_lock: bytes,
     inputs: tuple[Slot, ...],
     outputs: tuple[Slot, ...],
+    *,
+    script_code: bytes | None = None,
 ) -> bytes:
     """Build the reference statement with the shared verifier at input zero."""
     if not tx.inputs or len({item.outpoint() for item in tx.inputs}) != len(tx.inputs):
@@ -88,7 +91,11 @@ def transfer_bytes(
     uint(input_total, 8)
     if input_total != sum(item.quantity for item in outputs):
         raise ValueError("quantity is not conserved")
-    preimage = preimage_all(tx, 0, previous_output.value, verifier_lock)
+    if script_code is None:
+        script_code = verifier_lock
+    elif not script_code or not verifier_lock.endswith(asm("OP_CODESEPARATOR") + script_code):
+        raise ValueError("incorrect compact verifier suffix")
+    preimage = preimage_all(tx, 0, previous_output.value, script_code)
     return (
         TRANSFER_DOMAIN
         + asset.asset_id()
