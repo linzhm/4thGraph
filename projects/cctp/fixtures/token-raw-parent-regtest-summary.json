@@ -1,0 +1,98 @@
+{
+  "scope": "Anchored test mint, native freeze and unfreeze, and holder-authorized exact token rollover",
+  "source": "test deposit attestation",
+  "parent_profile": "legacy v2 native unfreeze",
+  "mode": "raw-parent",
+  "token_quantity": 640,
+  "carrier_satoshis": 1000,
+  "checkpoint": {
+    "format": "BSV parent SHA256 checkpoint v1",
+    "txid": "707c56935bc7e7fa9a9b4840b1dabb3c1d6ca1742fccc8279c5df4aa49894fb4",
+    "txid_wire": "b44f8949aaf45d9c27c8cc2f74a16c1d3cbbdab140489b9afae7c75b93567c70",
+    "raw_bytes": 3433,
+    "processed_bytes": 1856,
+    "midstate": "6793949c584ab6f56ee45e026be469746a69847bad617ff3f3b59f13c6ad3a1d",
+    "suffix": "fb91578f2e610300000000ffffffff01e803000000000000fd0a06124253562f434354502f746f6b656e2f7632004a0090b871d2b18e75114b526ac8de7c16dc5532f4fa0a36765571cba682a93832800200000000000003774ae7f858a9411e5ef4246b70c65aac5649980be5c17891bbec17895da008cb0077828c7f777c630101866b76768254947f77044300000088aa76517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e01007e81209817f8165b81f259d928ce2ddbfc9b02070b87ce9562a055acbbdcf97e66be799321414136d08c5ed2bf3ba048afe6dcaebafeffffffffffffffffffffffffffffff009776697621414136d08c5ed2bf3ba048afe6dcaebafeffffffffffffffffffffffffffffff007c94a3826b012080517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e01206c947f77827d6b7e23022079be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798027c7e6c01249301307c7e7c7e01437e210279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798ad7501687f7782012c947f547f7701207f757c8258947f7c01607f517f776c7c7e7e7eaa8874519d76828c7f770141882103d01115d548e7561b15c38f004d734633687cf4419620095bc5b0f47070afe85aac679169766b768254947f77044100000088aa76517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e01007e81209817f8165b81f259d928ce2ddbfc9b02070b87ce9562a055acbbdcf97e66be799321414136d08c5ed2bf3ba048afe6dcaebafeffffffffffffffffffffffffffffff009776697621414136d08c5ed2bf3ba048afe6dcaebafeffffffffffffffffffffffffffffff007c94a3826b012080517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e01206c947f77827d6b7e23022079be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798027c7e6c01249301307c7e7c7e01417e210279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798ad756c547f7701207f7578aa8801247f7578aa04000000007e8801297f7c547f77517f75010188517f7c01007e81760002fd00a5697f77547f77517f7c010188587f778254947f75a8208604898e21c040b2549c8ca314b98f6c7839c63921a2f5ed81ea16bd9bbeda868874519d76828c7f770141882103774ae7f858a9411e5ef4246b70c65aac5649980be5c17891bbec17895da008cbac6802000000",
+    "suffix_bytes": 1577,
+    "output_count_offset": 1871,
+    "output_count": 1,
+    "output_offsets": [
+      1872
+    ],
+    "suffix_sha256d": "036ed8e137ffed2e6006bb8b2408d8ed43a97ca541587e617aedbfa47d487b6b",
+    "hash_outputs": "f7a2bb936d2d1efd5fa0383a62a6809a48f3171e43893db841eaaad5008a3bff"
+  },
+  "parameters": null,
+  "proof": null,
+  "rejections": {
+    "changed-token-quantity": {
+      "txid": "d40146d8933c5c1858d9a2b936a4dca1345f6076d13894dba6ccaab6db5a872f",
+      "rejection": "sendrawtransaction: {'code': -26, 'message': '16: mandatory-script-verify-flag-failed (Script failed an OP_EQUALVERIFY operation)'}"
+    },
+    "wrong-holder": {
+      "txid": "eac4f9b3fb9788c4a41d9aceaca3f298d3b3fd6c49ab1d5e4e009732199f90d0",
+      "rejection": "sendrawtransaction: {'code': -26, 'message': '16: mandatory-script-verify-flag-failed (Script evaluated without error but finished with a false/empty top stack element)'}"
+    }
+  },
+  "parent_disclosure_with_encoding_bytes": 3436,
+  "proof_witness_bytes": 0,
+  "child_witness_bytes_by_vin": [
+    3703,
+    2768
+  ],
+  "child_bytes": 8124,
+  "verifier_lock_bytes": 849,
+  "verifier_funding_transaction_bytes": 911,
+  "child_and_verifier_funding_bytes": 9035,
+  "child_fee_satoshis": 1000000,
+  "node_timings": {
+    "chain_gang_seconds": 0.0003309580497443676,
+    "node_submission_seconds": 0.00504437496419996,
+    "node_mining_and_confirmation_seconds": 0.018385124974884093
+  },
+  "node": "/Bitcoin SV:1.2.3/",
+  "transactions": {
+    "setup": {
+      "txid": "612e8f5791fb9aa551fc9a1a157973c8d4b80b1c7c5177a8f3c79700815310b5",
+      "blockhash": "40f865e23d348d6988f2779991ad13538ce0bc9362a7132ef3df2e5ad5dc850b",
+      "height": 740,
+      "bytes": 207
+    },
+    "mint-genesis": {
+      "txid": "127c2a5a4816fee0173e80c705ed8dfc7e9eb7a31dd62702366d72c6776eaf6f",
+      "blockhash": "724999843f8908d67b80e9331903a519d062b28727cb0c4a76a8a5290174ab4c",
+      "height": 741,
+      "bytes": 41900
+    },
+    "mint": {
+      "txid": "efbe7b70f82a5da6b997830b736a14386b5f80cc9b1ef1f097f864eb1a430fd8",
+      "blockhash": "453da39fb3f9fab9a5a498455f7f65552d2b223f2d3eb3d6237e1720361a7ce5",
+      "height": 742,
+      "bytes": 94247
+    },
+    "freeze": {
+      "txid": "12e302225c13ae2d009af0676a4329d7b4a2fa88d19c2636c04ada22f8dd1ed9",
+      "blockhash": "4ba1be77bb64a4326bb83fc9ecf2d626d476015716c5966112d406d4c689c4c2",
+      "height": 743,
+      "bytes": 3433
+    },
+    "unfreeze-parent": {
+      "txid": "707c56935bc7e7fa9a9b4840b1dabb3c1d6ca1742fccc8279c5df4aa49894fb4",
+      "blockhash": "38ac26d6ebdf64e560a130d21699c4d8239b8cdc4454d5ae8246fca00527f155",
+      "height": 744,
+      "bytes": 3433
+    },
+    "verifier-funding": {
+      "txid": "40f33ab7fd93f44c0a78f1366d253be9b84b9756ce005dece18b84b92c37a980",
+      "blockhash": "476bed398dab84c59ab58b9c8948aee00cd57d34191bf5e87a2535384c3787ce",
+      "height": 745,
+      "bytes": 911
+    },
+    "token-rollover": {
+      "txid": "a7b9d059b40a964591ea055d29aac209f08e9f27faf871cafcd8adb41a427537",
+      "blockhash": "612311e7e3ba6a14ef5dd91db9aa90f5c31b82a31bf30713f0b17d151719c9a9",
+      "height": 746,
+      "bytes": 8124
+    }
+  }
+}

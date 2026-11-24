@@ -3,13 +3,42 @@ from hashlib import sha256
 import json
 import lzma
 from pathlib import Path
+import subprocess
+import sys
+from tempfile import TemporaryDirectory
 import unittest
 
-from parent_prefix import BLOCK_BYTES, output_offsets, parent_prefix, sha256_checkpoint, sha256_continue
+from parent_prefix import BLOCK_BYTES, checkpoint_record, output_offsets, parent_prefix, sha256_checkpoint, sha256_continue
+from shared.script import asm, push
 from shared.transaction import Input, Output, Transaction, compact, hash256
 
 
 class ParentPrefixTests(unittest.TestCase):
+    def test_cli_generates_the_same_verified_record_from_hex_and_binary(self):
+        tx = Transaction(
+            (Input(b"p" * 32, 0, push(bytes(range(256))), sequence=9),),
+            (Output(1000, asm("OP_1")), Output(2000, asm("OP_1"))),
+        )
+        raw = tx.serialize()
+        record = checkpoint_record(raw)
+        self.assertEqual(record["txid"], tx.txid())
+        self.assertEqual(record["processed_bytes"], 256)
+        self.assertEqual(record["output_count_offset"], 307)
+        self.assertEqual(record["output_offsets"], [308, 318])
+        self.assertEqual(bytes.fromhex(record["suffix"]), raw[256:])
+        self.assertEqual(record["hash_outputs"], hash256(b"".join(x.serialize() for x in tx.outputs)).hex())
+        command = [sys.executable, "-m", "projects.cctp.recursion.parent_prefix"]
+        root = Path(__file__).resolve().parents[3]
+        with TemporaryDirectory() as directory:
+            src = Path(directory) / "parent.hex"
+            dest = Path(directory) / "checkpoint.json"
+            src.write_text(raw.hex() + "\n")
+            subprocess.run([*command, str(src), "--out", str(dest)], cwd=root, check=True)
+            self.assertEqual(json.loads(dest.read_text()), record)
+        result = subprocess.run([*command, "-", "--input-format", "raw"], input=raw,
+                                capture_output=True, cwd=root, check=True)
+        self.assertEqual(json.loads(result.stdout), record)
+
     def test_checkpoint_and_continuation_match_hashlib_at_padding_edges(self):
         raw = bytes(range(256)) + b"\xa5" * 80
         for length in (0, 55, 56, 63, 64, 65, 119, 120, 127, 128, 129, 335, 336):

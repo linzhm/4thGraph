@@ -24,14 +24,19 @@ import (
 	recursive "github.com/consensys/gnark/std/recursion/groth16"
 	"github.com/linzhm/BSV-Script-Lab/projects/cctp/recursion/conservation"
 	"github.com/linzhm/BSV-Script-Lab/projects/cctp/recursion/freeze"
+	"github.com/linzhm/BSV-Script-Lab/projects/cctp/recursion/parentcheckpoint"
 )
 
 const (
 	plainProfile                = "plain"
 	bsb22Profile                = "bsb22"
 	conservationProfile         = "conservation"
+	parentCheckpointProfile     = "parent-checkpoint"
+	tokenCheckpointProfile      = "parent-checkpoint-token"
 	parameterFormat             = "CCTP freeze test parameters v1"
 	conservationParameterFormat = "CCTP conservation test parameters v1"
+	parentCheckpointFormat      = "CCTP parent checkpoint test parameters v1"
+	tokenCheckpointFormat       = "CCTP token parent checkpoint test parameters v1"
 	manifestName                = "manifest.json"
 	verifyingKeyName            = "verifying.key"
 	provingKeyName              = "proving.key"
@@ -63,8 +68,16 @@ func compileFreeze(profile string) (constraint.ConstraintSystem, manifest, error
 		circuit = &conservation.Circuit{}
 		m.Format, m.StatementBytes = conservationParameterFormat, conservation.EncodedSize
 		privateBytes = conservation.PayloadSize
+	case parentCheckpointProfile:
+		circuit = &parentcheckpoint.Circuit{}
+		m.Format, m.StatementBytes = parentCheckpointFormat, parentcheckpoint.EncodedSize
+		privateBytes = parentcheckpoint.ParentSize
+	case tokenCheckpointProfile:
+		circuit = &parentcheckpoint.TokenCircuit{}
+		m.Format, m.StatementBytes = tokenCheckpointFormat, parentcheckpoint.EncodedSize
+		privateBytes = parentcheckpoint.TokenParentSize
 	default:
-		return nil, m, fmt.Errorf("expected profile plain, bsb22 or conservation")
+		return nil, m, fmt.Errorf("unknown circuit profile %q", profile)
 	}
 	ccs, err := frontend.Compile(ecc.BLS12_381.ScalarField(), r1cs.NewBuilder, circuit)
 	if err != nil {
@@ -148,8 +161,10 @@ func setup(directory, profile string) error {
 	if profile == "" {
 		profile = plainProfile
 	}
-	if profile != plainProfile && profile != bsb22Profile && profile != conservationProfile {
-		return fmt.Errorf("expected profile plain, bsb22 or conservation")
+	switch profile {
+	case plainProfile, bsb22Profile, conservationProfile, parentCheckpointProfile, tokenCheckpointProfile:
+	default:
+		return fmt.Errorf("unknown circuit profile %q", profile)
 	}
 	if err := os.Mkdir(directory, 0700); err != nil {
 		return err
@@ -198,8 +213,13 @@ func loadManifest(directory string) (manifest, error) {
 		return m, err
 	}
 	expectedFormat, expectedBytes := parameterFormat, freeze.EncodedSize
-	if m.Profile == conservationProfile {
+	switch m.Profile {
+	case conservationProfile:
 		expectedFormat, expectedBytes = conservationParameterFormat, conservation.EncodedSize
+	case parentCheckpointProfile:
+		expectedFormat, expectedBytes = parentCheckpointFormat, parentcheckpoint.EncodedSize
+	case tokenCheckpointProfile:
+		expectedFormat, expectedBytes = tokenCheckpointFormat, parentcheckpoint.EncodedSize
 	}
 	if m.Format != expectedFormat || !m.TestOnly || m.StatementBytes != expectedBytes {
 		return m, fmt.Errorf("expected completed test-only CCTP parameters")
@@ -218,7 +238,13 @@ func parseStatement(wire string) (freeze.Statement, error) {
 	return freeze.ParseStatement(raw)
 }
 
-func assignmentFor(profile, wire string) (proofStatement, frontend.Circuit, error) {
+func assignmentFor(profile, wire, parent string) (proofStatement, frontend.Circuit, error) {
+	if profile == parentCheckpointProfile || profile == tokenCheckpointProfile {
+		return checkpointAssignment(profile, wire, parent)
+	}
+	if parent != "" {
+		return nil, nil, fmt.Errorf("-parent is only valid for parent checkpoint profiles")
+	}
 	if profile == conservationProfile {
 		if len(wire) != 2*conservation.EncodedSize {
 			return nil, nil, fmt.Errorf("expected %d conservation statement bytes encoded as hex", conservation.EncodedSize)
@@ -243,7 +269,38 @@ func assignmentFor(profile, wire string) (proofStatement, frontend.Circuit, erro
 	return statement, statement.PlainAssignment(), nil
 }
 
-func prove(directory, profile, wire, output string) error {
+func checkpointAssignment(profile, wire, parent string) (proofStatement, frontend.Circuit, error) {
+	if len(wire) != 2*parentcheckpoint.EncodedSize {
+		return nil, nil, fmt.Errorf("expected %d parent checkpoint statement bytes encoded as hex", parentcheckpoint.EncodedSize)
+	}
+	raw, err := hex.DecodeString(wire)
+	if err != nil {
+		return nil, nil, fmt.Errorf("invalid parent checkpoint statement hex: %w", err)
+	}
+	statement, err := parentcheckpoint.ParseStatement(raw)
+	if err != nil {
+		return nil, nil, err
+	}
+	parentSize := parentcheckpoint.ParentSize
+	if profile == tokenCheckpointProfile {
+		parentSize = parentcheckpoint.TokenParentSize
+	}
+	if len(parent) != 2*parentSize {
+		return nil, nil, fmt.Errorf("expected %d parent transaction bytes encoded as hex in -parent", parentSize)
+	}
+	parentRaw, err := hex.DecodeString(parent)
+	if err != nil {
+		return nil, nil, fmt.Errorf("invalid parent transaction hex: %w", err)
+	}
+	if profile == tokenCheckpointProfile {
+		assignment, err := statement.TokenAssignment(parentRaw)
+		return statement, assignment, err
+	}
+	assignment, err := statement.Assignment(parentRaw)
+	return statement, assignment, err
+}
+
+func prove(directory, profile, wire, parent, output string) error {
 	if _, err := os.Lstat(output); err == nil || !os.IsNotExist(err) {
 		return fmt.Errorf("choose a new proof output path: %s", output)
 	}
@@ -254,7 +311,7 @@ func prove(directory, profile, wire, output string) error {
 	if profile != "" && profile != saved.Profile {
 		return fmt.Errorf("requested profile does not match the completed setup")
 	}
-	statement, assignment, err := assignmentFor(saved.Profile, wire)
+	statement, assignment, err := assignmentFor(saved.Profile, wire, parent)
 	if err != nil {
 		return err
 	}
@@ -318,19 +375,20 @@ func prove(directory, profile, wire, output string) error {
 
 func main() {
 	mode := flag.String("mode", "", "setup or prove")
-	profile := flag.String("profile", "", "plain (setup default), bsb22, or conservation; prove reads the setup profile")
+	profile := flag.String("profile", "", "plain (setup default), bsb22, conservation, parent-checkpoint, or parent-checkpoint-token; prove reads the setup profile")
 	directory := flag.String("dir", "", "fresh setup directory or completed setup to reuse")
 	wire := flag.String("statement", "", "exact versioned statement encoded as hex")
+	parent := flag.String("parent", "", "actual parent transaction hex for a parent checkpoint proof")
 	output := flag.String("out", "", "new proof JSON path")
 	flag.Parse()
 	var err error
 	switch {
 	case flag.NArg() != 0 || *directory == "":
 		err = fmt.Errorf("provide -mode and -dir; positional arguments are unsupported")
-	case *mode == "setup" && *wire == "" && *output == "":
+	case *mode == "setup" && *wire == "" && *parent == "" && *output == "":
 		err = setup(*directory, *profile)
 	case *mode == "prove" && *wire != "" && *output != "":
-		err = prove(*directory, *profile, *wire, *output)
+		err = prove(*directory, *profile, *wire, *parent, *output)
 	default:
 		err = fmt.Errorf("use setup with -dir or prove with -dir, -statement and -out")
 	}

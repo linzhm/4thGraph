@@ -1,0 +1,118 @@
+{
+  "scope": "Two-output test parent authenticated by a separate plain Groth16 checkpoint input",
+  "checkpoint": {
+    "format": "BSV parent SHA256 checkpoint v1",
+    "txid": "a60b1978c7c3ad093ffd5701309fa940ca94db1408831ca85e47c0214fe38f38",
+    "txid_wire": "388fe34f21c0475ea81c830814db94ca40a99f300157fd3f09adc3c778190ba6",
+    "raw_bytes": 332,
+    "processed_bytes": 256,
+    "midstate": "d951dd0d64e9ddcb48a3fe57df0f91636a384a953e5f14e013980c51cbe1c8f7",
+    "suffix": "d1d2d3d4d5d6d7d8d9dadbdcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeffffffffff02e8030000000000000151d007000000000000015100000000",
+    "suffix_bytes": 76,
+    "output_count_offset": 307,
+    "output_count": 2,
+    "output_offsets": [
+      308,
+      318
+    ],
+    "suffix_sha256d": "7d47853f49746ccfce1d178357cb71e547c861c184b0b07248272f8b891d420c",
+    "hash_outputs": "746265682690dd2b1a282c12b4acf174a009ca1019fdcb6b49022849d63756ca"
+  },
+  "parameters": {
+    "format": "CCTP parent checkpoint test parameters v1",
+    "profile": "parent-checkpoint",
+    "test_only": true,
+    "constraints": 548575,
+    "commitments": 0,
+    "statement_bytes": 174,
+    "circuit_sha256": "0825467bfd4b6641de9d07c32c089d5ad452bfdb7c2ff927c02e1a7881614bdb",
+    "verifying_key_sha256": "d28b16132f1e58481e45772d5371add494ae61dfc52a2063eca40dee06cfb7c0",
+    "proving_key_sha256": "6a2d472487c4340f9d89aabc12364373287e7fa1ee2ddd7a4bb297550d1c5259"
+  },
+  "proof": {
+    "prove_process_seconds": 105.57729391707107,
+    "proof_artifact_sha256": "6660979dd01e414846a42005059aa4e7ee14626df4ea37f18f7b144f34b32889",
+    "public_inputs": [
+      "23338208875241698731899356501382678126",
+      "5248733451003595046445971531087741025"
+    ],
+    "statement_digest": "118ec68945e0ef760a74b0529b26466e03f2de89f158b87aa0a5f6b9ff440061",
+    "native_prove_seconds": 6.430359875,
+    "native_verify_seconds": 0.0174405
+  },
+  "rejections": {
+    "wrong-midstate": {
+      "txid": "8604b4fe3426e4e12fcc2c1a5197c69fdb42661668dc2d4d08eaf969c5535e2f",
+      "rejection": "sendrawtransaction: {'code': -26, 'message': '16: mandatory-script-verify-flag-failed (Script failed an OP_NUMEQUALVERIFY operation)'}"
+    },
+    "wrong-suffix": {
+      "txid": "3af07da10b5743f9986041be8ec7ecc4e70f425859fc39dd19dea67a2dcdb27b",
+      "rejection": "sendrawtransaction: {'code': -26, 'message': '16: mandatory-script-verify-flag-failed (Script failed an OP_NUMEQUALVERIFY operation)'}"
+    },
+    "other-parent-outpoint": {
+      "txid": "d112c041e78496cbe9039da9f717a211515fe20f7fdc9eaf7be176b1f67e7239",
+      "rejection": "sendrawtransaction: {'code': -26, 'message': '16: mandatory-script-verify-flag-failed (Script failed an OP_NUMEQUALVERIFY operation)'}"
+    },
+    "other-output-slot": {
+      "txid": "ac14a93b6ed4f1ae8e31894c8f9f301433cd982726469a00c80be0dacf1ab7b2",
+      "rejection": "sendrawtransaction: {'code': -26, 'message': '16: mandatory-script-verify-flag-failed (Script failed an OP_EQUALVERIFY operation)'}"
+    }
+  },
+  "parent_disclosure_bytes": 108,
+  "parent_disclosure_with_encoding_bytes": 111,
+  "raw_parent_with_encoding_bytes": 335,
+  "proof_witness_bytes": 1078,
+  "verifier_lock_bytes": 450783,
+  "verifier_funding_transaction_bytes": 450847,
+  "checkpoint_spend_witness_bytes": 1456,
+  "node_timings": {
+    "chain_gang_seconds": 0.04826783295720816,
+    "node_submission_seconds": 0.5764917079359293,
+    "node_mining_and_confirmation_seconds": 0.014203417114913464
+  },
+  "node": "/Bitcoin SV:1.2.3/",
+  "transactions": {
+    "setup": {
+      "txid": "629313b43db8a199172ecaaf341c6f076432677dd37c3f8a4ea18f72acff0c9f",
+      "blockhash": "27c54eeb44a4ba203cb7a8fa4c6e18f4ff620be489f6d4e7fa6017181082a7e5",
+      "height": 632,
+      "bytes": 187
+    },
+    "parent-funding": {
+      "txid": "f125a07074dd34200b3f6c3529dd27c2af8ff7e824f605ae4d47a4492ace91e2",
+      "blockhash": "4304633c7393fd4a2693b846f01b0ae8324c1c4df7ee91869191c886992eab35",
+      "height": 633,
+      "bytes": 62
+    },
+    "parent": {
+      "txid": "a60b1978c7c3ad093ffd5701309fa940ca94db1408831ca85e47c0214fe38f38",
+      "blockhash": "3245f8bb99a0b2967cc5b40bb811b48d0360dce8551be1d30d7fcfc04d01cad8",
+      "height": 634,
+      "bytes": 332
+    },
+    "alternate-parent-funding": {
+      "txid": "2faf5b8f2eac3ce4dbdf8076ba0d68111ff145ae844ed9a09848756f2a221ef6",
+      "blockhash": "7eb4ad7f87ff1570ab2ef132f658e4da4eed89947ab720e450e65536312defa5",
+      "height": 635,
+      "bytes": 62
+    },
+    "alternate-parent": {
+      "txid": "2f20073ad47de9a4c2d7935866ee881baa36d2e694c39599f37d61098069f924",
+      "blockhash": "2e1d093ea8b5ba08414caf7fa3ba138a31de6254db2ec780b9be0eb61914aa6d",
+      "height": 636,
+      "bytes": 332
+    },
+    "verifier-funding": {
+      "txid": "8dc28bc31d6d83d9b04bc48bf0659f7b3133af4eb8b0fce62fdfa6b50aae6417",
+      "blockhash": "770d6e2c81912e69ab12b8b5d24336cc8a999681713631dd6f7e97eafaa056cf",
+      "height": 637,
+      "bytes": 450847
+    },
+    "checkpoint-spend": {
+      "txid": "3cf7a7309fd96e78792ac007864ee93583ec7720275744aed31863c5870dac9a",
+      "blockhash": "04e8b7ab150b43bf3d761f60ddfc43c5158fc82d1b0a445f24e6a32c0898b0d5",
+      "height": 638,
+      "bytes": 1560
+    }
+  }
+}

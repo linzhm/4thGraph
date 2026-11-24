@@ -12,6 +12,7 @@ import (
 	"github.com/consensys/gnark-crypto/ecc/bls12-381/fr/pedersen"
 	native "github.com/consensys/gnark/backend/groth16/bls12-381"
 	"github.com/linzhm/BSV-Script-Lab/projects/cctp/recursion/conservation"
+	"github.com/linzhm/BSV-Script-Lab/projects/cctp/recursion/parentcheckpoint"
 )
 
 func TestStatementsAndProofArtifacts(t *testing.T) {
@@ -91,7 +92,7 @@ func TestNativeFileFingerprintAndNoOverwrite(t *testing.T) {
 
 func TestProfileConstraintFingerprints(t *testing.T) {
 	fingerprints := make(map[string]string)
-	for _, profile := range []string{plainProfile, bsb22Profile, conservationProfile} {
+	for _, profile := range []string{plainProfile, bsb22Profile, conservationProfile, parentCheckpointProfile} {
 		var fingerprint string
 		for repeat := 0; repeat < 2; repeat++ {
 			_, m, err := compileFreeze(profile)
@@ -113,14 +114,14 @@ func TestProfileConstraintFingerprints(t *testing.T) {
 
 func TestConservationProfileStatementAndArtifact(t *testing.T) {
 	wire := hex.EncodeToString((conservation.Statement{}).Encode())
-	statement, assignment, err := assignmentFor(conservationProfile, wire)
+	statement, assignment, err := assignmentFor(conservationProfile, wire, "")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if _, ok := assignment.(*conservation.Circuit); !ok {
 		t.Fatal("wrong circuit assignment for conservation profile")
 	}
-	if _, _, err := assignmentFor(plainProfile, wire); err == nil {
+	if _, _, err := assignmentFor(plainProfile, wire, ""); err == nil {
 		t.Fatal("freeze profile accepted a conservation statement")
 	}
 
@@ -138,5 +139,39 @@ func TestConservationProfileStatementAndArtifact(t *testing.T) {
 	}
 	if key["format"] != "CCTP conservation Groth16 artifact v1" || key["statement"] != wire || key["freeze_profile"] != nil {
 		t.Fatal("incorrect conservation artifact profile")
+	}
+}
+
+func TestParentCheckpointProfileAssignment(t *testing.T) {
+	wire := hex.EncodeToString((parentcheckpoint.Statement{}).Encode())
+	raw := hex.EncodeToString(make([]byte, parentcheckpoint.ParentSize))
+	statement, assignment, err := assignmentFor(parentCheckpointProfile, wire, raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := assignment.(*parentcheckpoint.Circuit); !ok || hex.EncodeToString(statement.Encode()) != wire {
+		t.Fatal("wrong circuit assignment for parent checkpoint profile")
+	}
+	for _, malformed := range []string{"", raw[2:], raw + "00", "xx" + raw[2:]} {
+		if _, _, err := assignmentFor(parentCheckpointProfile, wire, malformed); err == nil {
+			t.Fatal("accepted a malformed parent transaction input")
+		}
+	}
+	if _, _, err := assignmentFor(conservationProfile, wire, raw); err == nil {
+		t.Fatal("conservation profile accepted parent checkpoint input")
+	}
+	tokenRaw := hex.EncodeToString(make([]byte, parentcheckpoint.TokenParentSize))
+	statement, assignment, err = assignmentFor(tokenCheckpointProfile, wire, tokenRaw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := assignment.(*parentcheckpoint.TokenCircuit); !ok || hex.EncodeToString(statement.Encode()) != wire {
+		t.Fatal("wrong circuit assignment for token parent checkpoint profile")
+	}
+	if _, _, err := assignmentFor(tokenCheckpointProfile, wire, raw); err == nil {
+		t.Fatal("token parent checkpoint accepted the shorter profile's input")
+	}
+	if _, _, err := assignmentFor(parentCheckpointProfile, wire, tokenRaw); err == nil {
+		t.Fatal("short parent checkpoint accepted the token profile's input")
 	}
 }

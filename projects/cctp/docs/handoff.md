@@ -96,3 +96,9 @@ PYTHONPATH=.:projects/groth16/reference ../cctp-test-tools/venv/bin/python -m un
 - [2→2 守恒小样](../recursion/conservation/README.md) 使用一份普通 BLS12-381 Groth16，分别消费两笔独立测试父交易以及付款的两个共父后继。两笔均在独立 regtest 入块。同一验证器锁、协同锁和声明框架用于两步。共享验证器从实际父交易核对两个受认可的锁，代币输入各核对持有人、对应实际槽位和同一回执。
 - [大小记录](../fixtures/conservation-2x2-regtest-summary.json) 区分 1,078 字节证明见证、验证器资金原文和直接父交易原文。第二笔付款沿用同一证明尺寸，直接父原文增加到 482,360 字节。3,744 字节的中间态披露仅用于链下复算这笔父交易 txid。
 - [双预像完整锁的双链记录](../fixtures/v3-dual-all-cross-chain-regtest-summary.json) 另行完成。独立 BSV 节点确认十笔共享验证器交易，Anvil 完成两笔释放，最终储备与 BSV 流通各 384。钱包验收及释放后重组挂起通过。
+
+## 同日续接 · SHA-256 中间态与真实 Token 父交易
+
+- [Python 工具和复现命令](../recursion/parentbinding/README.md#生成父交易中间态) 从定稿父原文生成中间态披露，并与标准库直接计算的 txid 核对。已复算 482,360 字节的入块守恒父交易。
+- [有界中间态证明](../fixtures/parent-checkpoint-regtest-summary.json) 已由独立节点确认。同一口径下，332 字节父交易的披露减掉 224 字节，证明增加 1,078 字节。当前小样的独立出资锁为一次性试验构件。
+- [真实 Token 原文对照](../fixtures/token-raw-parent-regtest-summary.json) 从锚定测试铸造经原生冻结和解冻，实际消费 3,433 字节的解冻父交易。新旧组以相同规则保持完整后继输出，并由 Token 锁要求本笔实际验证器。单列持币输入重复的验证器资金原文。v3 连续性父绑定、长父交易证明和跨链公开测试仍需独立完成。

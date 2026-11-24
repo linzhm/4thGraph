@@ -42,17 +42,25 @@ func keyArtifact(m manifest, vk *native.VerifyingKey) (map[string]any, error) {
 		"verifying_key_sha256": m.VerifyingSHA256,
 		"curve":                "bls12-381",
 	}
-	if m.Profile == conservationProfile {
+	switch m.Profile {
+	case conservationProfile:
 		data["conservation_profile"] = m.Profile
-	} else {
+	case parentCheckpointProfile, tokenCheckpointProfile:
+		data["parent_checkpoint_profile"] = m.Profile
+	default:
 		data["freeze_profile"] = m.Profile
 	}
 	switch m.Profile {
-	case plainProfile, conservationProfile:
+	case plainProfile, conservationProfile, parentCheckpointProfile, tokenCheckpointProfile:
 		// Export the affine shape used by snarkjs_adapter, with Fp2 real first.
 		format := "CCTP freeze Groth16 artifact v1"
-		if m.Profile == conservationProfile {
+		switch m.Profile {
+		case conservationProfile:
 			format = "CCTP conservation Groth16 artifact v1"
+		case parentCheckpointProfile:
+			format = "CCTP parent checkpoint Groth16 artifact v1"
+		case tokenCheckpointProfile:
+			format = "CCTP token parent checkpoint Groth16 artifact v1"
 		}
 		data["format"], data["protocol"], data["nPublic"] = format, "groth16", 2
 		data["vk_alpha_1"], data["vk_beta_2"] = encodeG1(vk.G1.Alpha), encodeG2(vk.G2.Beta)
@@ -81,7 +89,7 @@ func addProof(data map[string]any, profile string, proof *native.Proof, statemen
 	data["statement"] = hex.EncodeToString(statement.Encode())
 	data["statement_digest"] = hex.EncodeToString(digest[:])
 	switch profile {
-	case plainProfile, conservationProfile:
+	case plainProfile, conservationProfile, parentCheckpointProfile, tokenCheckpointProfile:
 		if len(proof.Commitments) != 0 {
 			return fmt.Errorf("plain proof must have no commitment")
 		}

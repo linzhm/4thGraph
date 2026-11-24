@@ -138,5 +138,63 @@ class ParentPrefix:
 def parent_prefix(raw: bytes) -> ParentPrefix:
     """Generate a checkpoint at the last block boundary before the output count."""
     count_offset, _ = output_offsets(raw)
+    return _prefix_at(raw, count_offset)
+
+
+def _prefix_at(raw: bytes, count_offset: int) -> ParentPrefix:
     processed = count_offset - count_offset % BLOCK_BYTES
     return ParentPrefix(count_offset, processed, sha256_checkpoint(raw[:processed]), raw[processed:])
+
+
+def checkpoint_record(raw: bytes) -> dict:
+    """Return the checkpoint disclosure and check it against the raw txid."""
+    count_offset, positions = output_offsets(raw)
+    checkpoint = _prefix_at(raw, count_offset)
+    txid_wire = sha256(sha256(raw).digest()).digest()
+    if checkpoint.continued_txid_wire() != txid_wire:
+        raise ValueError("SHA-256 continuation disagrees with the full transaction")
+    outputs = raw[positions[0]:-4]
+    return {
+        "format": "BSV parent SHA256 checkpoint v1",
+        "txid": txid_wire[::-1].hex(),
+        "txid_wire": txid_wire.hex(),
+        "raw_bytes": len(raw),
+        "processed_bytes": checkpoint.processed_bytes,
+        "midstate": checkpoint.state.hex(),
+        "suffix": checkpoint.suffix.hex(),
+        "suffix_bytes": len(checkpoint.suffix),
+        "output_count_offset": count_offset,
+        "output_count": len(positions),
+        "output_offsets": list(positions),
+        "suffix_sha256d": sha256(sha256(checkpoint.suffix).digest()).hexdigest(),
+        "hash_outputs": sha256(sha256(outputs).digest()).hexdigest(),
+    }
+
+
+def main():
+    import argparse
+    import json
+    from pathlib import Path
+    import sys
+
+    parser = argparse.ArgumentParser(description="Generate a SHA-256 checkpoint from a serialized BSV parent.")
+    parser.add_argument("parent", help="hex or binary transaction file, or - for stdin")
+    parser.add_argument("--input-format", choices=("hex", "raw"), default="hex")
+    parser.add_argument("--out", type=Path, help="new JSON file, otherwise stdout")
+    args = parser.parse_args()
+    try:
+        raw = sys.stdin.buffer.read() if args.parent == "-" else Path(args.parent).read_bytes()
+        if args.input_format == "hex":
+            raw = bytes.fromhex(raw.decode("ascii"))
+        output = json.dumps(checkpoint_record(raw), indent=2) + "\n"
+        if args.out is None:
+            sys.stdout.write(output)
+        else:
+            with args.out.open("x") as stream:
+                stream.write(output)
+    except (ValueError, OSError) as error:
+        parser.error(str(error))
+
+
+if __name__ == "__main__":
+    main()

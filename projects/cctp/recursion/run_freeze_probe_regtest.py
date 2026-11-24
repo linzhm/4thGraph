@@ -37,11 +37,14 @@ def prove_candidate(binary, directory, output, tx, previous, manifest, key):
     return prove_statement(binary, directory, output, freeze_probe.statement(tx, previous), manifest, key)
 
 
-def prove_statement(binary, directory, output, statement, manifest, key):
+def prove_statement(binary, directory, output, statement, manifest, key, *, raw_parent=None):
     """Generate and encode one plain or committed BLS12-381 statement proof."""
     start = perf_counter()
-    subprocess.run([str(binary.resolve()), "-mode", "prove", "-dir", str(directory),
-                    "-statement", statement.hex(), "-out", str(output)], check=True)
+    command = [str(binary.resolve()), "-mode", "prove", "-dir", str(directory),
+               "-statement", statement.hex(), "-out", str(output)]
+    if raw_parent is not None:
+        command += ["-parent", raw_parent.hex()]
+    subprocess.run(command, check=True)
     elapsed = perf_counter() - start
     data = json.loads(output.read_text())
     if (data["statement"] != statement.hex() or
