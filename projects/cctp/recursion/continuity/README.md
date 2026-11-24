@@ -53,6 +53,17 @@ PYTHONPATH=.:projects/groth16/reference:projects/cctp/reference:projects/cctp/re
 
 追加 `--mint-state-version 2` 可用累计净铸造量状态重跑。同一连续性密钥在独立 BSV Node 1.2.3 的高度 224–227 确认了两笔认证铸造及后继的 2→2、1→2。第二笔铸造消费第一笔的状态，累计净铸造量从 1,024 增至 1,408。两笔转账分别为 12,162,612 和 15,082,186 字节。这组基线仍携带完整父交易，转账形状也不同，固定形状的历史增量由新版联合证明单独验收。 [计数状态节点记录](../../fixtures/v3-counted-continuity-regtest-summary.json)
 
+## 在电路内认证父布局和重建摘要
+
+从 `projects/cctp/recursion` 运行：
+
+```sh
+CCTP_CONTINUITY_SOLVER_TEST=1 go test -count=1 \
+  -run 'Test(ChronicleParentStatementUsesTheSelectedLayout|ReconstructedParentsFeedTheRecursiveVerifier)$' -v ./continuity
+```
+
+单槽测试用 266 字节铸造形状和 295 字节转账形状，与 Python 原有 OTDA 和回执编码得到的摘要逐字节核对。覆盖实际 verifier outpoint、错 vout、替换摘要、回执前缀、非零填充和错误签名类型的序列。先选择预像及回执，再共用一次预像哈希和一次声明哈希，单槽测试由 912,161 条降到 583,954 条约束。双槽测试将重建的摘要接到现有同密钥递归验签。两份前序测试证明由同一个小型 BSB22 电路原生证明，替换成相同密钥下另一笔的证明失败。该组合求解有 9,301,078 条约束。测试使用合成交易和前序关系，完整铸造、守恒规则、对当前交易的链上绑定及连续入块由新版验收覆盖。
+
 ## 本地双链闭环
 
 安装 Foundry 并把 `forge`、`cast`、`anvil` 放入 `PATH`。下列程序启动隔离 Anvil 测试储备，连接已有的独立 BSV regtest，使用同一份连续性参数为十笔状态及代币交易出证。签发恢复、源链确认及余额对账使用持久 BridgeService。

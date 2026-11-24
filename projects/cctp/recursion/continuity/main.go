@@ -132,7 +132,7 @@ func (s *provingState) prove(label, path string, t Transcript, priors ...issuedP
 	return issuedProof{typed, digest}, nil
 }
 
-func solverWitness(c *Circuit) (backendWitness.Witness, solver.Option, error) {
+func solverWitness(c frontend.Circuit) (backendWitness.Witness, solver.Option, error) {
 	w, err := frontend.NewWitness(c, fr.Modulus())
 	challenge := solver.OverrideHint(solver.GetHintID(frontendcs.Bsb22CommitmentComputePlaceholder),
 		func(mod *big.Int, _ []*big.Int, out []*big.Int) error {

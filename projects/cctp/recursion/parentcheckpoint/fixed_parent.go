@@ -29,9 +29,11 @@ type BoundParentOutput struct {
 
 // BoundParentContext exposes the ordered fields of the very same transaction
 // as the selected TxOut for reconstructing the predecessor's statement.
+// Outputs concatenates all TxOuts in wire order and omits the count prefix.
 type BoundParentContext struct {
 	Version, Outputs, Locktime []frontend.Variable
 	Inputs                     []BoundParentInput
+	TxOuts                     [][]frontend.Variable
 }
 
 type BoundParentInput struct {
@@ -80,24 +82,9 @@ func BindFixedParentOutput(api frontend.API, raw, actualOutpoint []frontend.Vari
 	if len(raw) != fields.width || len(actualOutpoint) != 36 {
 		return selected, fmt.Errorf("expected %d raw parent bytes and a 36-byte outpoint", fields.width)
 	}
-	if len(eligibleVouts) == 0 {
-		return selected, fmt.Errorf("expected at least one eligible vout")
-	}
-	previous := -1
-	var selectedShape txOutField
-	for i, slot := range eligibleVouts {
-		if slot <= previous || slot >= len(fields.outputs) {
-			return selected, fmt.Errorf("eligible vouts must be strictly increasing and in range")
-		}
-		previous = slot
-		field := fields.outputs[slot]
-		if i == 0 {
-			selectedShape = field
-		}
-		if field.script-field.start != selectedShape.script-selectedShape.start ||
-			field.end-field.start != selectedShape.end-selectedShape.start {
-			return selected, fmt.Errorf("eligible vouts must share one TxOut shape")
-		}
+	selectedShape, err := eligibleParentShape(fields, eligibleVouts)
+	if err != nil {
+		return selected, err
 	}
 
 	for _, compact := range fields.compact {
@@ -139,20 +126,60 @@ func BindFixedParentOutput(api frontend.API, raw, actualOutpoint []frontend.Vari
 	}
 	selected.Script = selected.TxOut[selectedShape.script-selectedShape.start:]
 	selected.Satoshis = parentUint64(api, selected.TxOut[:8])
-	selected.Parent = BoundParentContext{
+	selected.Parent = parentContext(raw, fields)
+	return selected, nil
+}
+
+func eligibleParentShape(fields fixedParentFields, eligibleVouts []int) (txOutField, error) {
+	if err := validateEligibleVouts(fields, eligibleVouts); err != nil {
+		return txOutField{}, err
+	}
+	shape := fields.outputs[eligibleVouts[0]]
+	for _, slot := range eligibleVouts[1:] {
+		if !sameParentOutputShape(fields.outputs[slot], shape) {
+			return txOutField{}, fmt.Errorf("eligible vouts must share one TxOut shape")
+		}
+	}
+	return shape, nil
+}
+
+func sameParentOutputShape(left, right txOutField) bool {
+	return left.script-left.start == right.script-right.start && left.end-left.start == right.end-right.start
+}
+
+func validateEligibleVouts(fields fixedParentFields, eligibleVouts []int) error {
+	if len(eligibleVouts) == 0 {
+		return fmt.Errorf("expected at least one eligible vout")
+	}
+	previous := -1
+	for _, slot := range eligibleVouts {
+		if slot <= previous || slot >= len(fields.outputs) {
+			return fmt.Errorf("eligible vouts must be strictly increasing and in range")
+		}
+		previous = slot
+	}
+	return nil
+}
+
+func parentContext(raw []frontend.Variable, fields fixedParentFields) BoundParentContext {
+	context := BoundParentContext{
 		Version:  raw[:4],
 		Outputs:  raw[fields.outputs[0].start : fields.width-4],
-		Locktime: raw[fields.width-4:],
+		Locktime: raw[fields.width-4 : fields.width],
 		Inputs:   make([]BoundParentInput, len(fields.inputs)),
+		TxOuts:   make([][]frontend.Variable, len(fields.outputs)),
 	}
 	for i, input := range fields.inputs {
-		selected.Parent.Inputs[i] = BoundParentInput{
+		context.Inputs[i] = BoundParentInput{
 			Outpoint:  raw[input.start : input.start+36],
 			ScriptSig: raw[input.script:input.sequence],
 			Sequence:  raw[input.sequence : input.sequence+4],
 		}
 	}
-	return selected, nil
+	for i, output := range fields.outputs {
+		context.TxOuts[i] = raw[output.start:output.end]
+	}
+	return context
 }
 
 func (layout FixedParentLayout) fields() (fixedParentFields, error) {
