@@ -50,3 +50,19 @@ PYTHONPATH=.:projects/groth16/reference:projects/cctp/reference:projects/cctp/re
 ```
 
 [实际交易节点记录](../../fixtures/v3-continuity-regtest-summary.json) 覆盖高度 211–214 的两笔认证铸造、2→2 和后继 1→2。最后一笔交易为 15,081,190 字节，最大输入脚本为 14,106,366 字节。归档包含真实交易及全量证明，入金采用隔离测试签发。该配置测试了认证铸造和转账，带认证回执的冻结与解冻另有本地 Script 验证。
+
+## 本地双链闭环
+
+安装 Foundry 并把 `forge`、`cast`、`anvil` 放入 `PATH`。下列程序启动隔离 Anvil 测试储备，连接已有的独立 BSV regtest，使用同一份连续性参数为十笔状态及代币交易出证。签发恢复、源链确认及余额对账使用持久 BridgeService。
+
+```sh
+PYTHONPATH=.:projects/groth16/reference:projects/cctp/reference:projects/cctp/recursion \
+  ../cctp-test-tools/venv/bin/python projects/cctp/recursion/run_certified_lifecycle.py \
+  --node-url "$REGTEST_URL" --cookie "$REGTEST_COOKIE" \
+  --prover /tmp/cctp-continuity --setup-dir /tmp/cctp-continuity-demo \
+  --out /tmp/cctp-certified-cross-chain
+```
+
+[验收摘要](../../fixtures/v3-certified-cross-chain-regtest-summary.json) 记录冻结及解冻、部分和全额销毁、暂停后恢复铸造、两笔释放及钱包验收。[压缩归档](../../fixtures/v3-certified-cross-chain-regtest.json.xz) 保存原始 BSV 交易、证明和四份最终确认的 Anvil 回执。此实测采用实验节点策略及测试参数，后续容量和公开网络验收应分别记录其节点政策。
+
+在专用 regtest 上追加 `--reorg-probe`，可在最后一次释放后临时撤销对应 BSV 销毁块。程序用账本副本核对持久挂起及签发拦截，再恢复原 BSV 链头。

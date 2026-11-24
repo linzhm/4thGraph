@@ -1,0 +1,833 @@
+{
+  "scope": "Same-key continuity on independent BSV regtest with a local Anvil mock USDC reserve",
+  "asset_id": "fc776a621e77d7353e51ad374716444a11b4b4a42bd3188b2ed605ac73ffab0e",
+  "continuity_key_digest": "677731270de75ec11f65c92f2ac8b0c428df79e28a532a035b8402166eb04a9b",
+  "evm": {
+    "chain_id": 31337,
+    "reserve": "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512",
+    "token": "0x5FbDB2315678afecb367f032d93F642f64180aa3"
+  },
+  "mints": [
+    {
+      "source": {
+        "txid": "0xd7a832d88ea7ff43f92f5883aea8a41f3fde6789b75710b25facfde2ed6953cf",
+        "blockhash": "0xc8c3a77d41964d2cc0bc2d73f8a6d8ea428c75763030891fc8e21df9d6e57793",
+        "event_id": "c8ff72bc8af584279f588dfa39a0d86f3d9d355619121de88c10658f887aee7f",
+        "receipt_log_ordinal": 1,
+        "quantity": 1024
+      },
+      "intent": {
+        "event_id": "c8ff72bc8af584279f588dfa39a0d86f3d9d355619121de88c10658f887aee7f",
+        "authorization_digest": "595f0bbbc00639f5f8f7ccb24034f2521800630d7d555aba8968818c61aada99",
+        "phase_before_broadcast": "authorized",
+        "signer_interrupted": true,
+        "pre_sign_intent_persisted": true,
+        "recovered_signature_without_resigning": true,
+        "reconstructed_from_persisted_draft": true
+      },
+      "effect": {
+        "bsv_txid": "258be0ef3b1aeb6b62d78a568ec82b93cede791b7cd4e62bcc98440474646f49",
+        "bsv_blockhash": "4fe77584353864ccb6c24a4185db538d3b445b2d356a898236e353da3443b026",
+        "bsv_vout": 1,
+        "bsv_height": 320,
+        "phase_after_confirmation": "settled"
+      }
+    },
+    {
+      "source": {
+        "txid": "0xe496d7e9a653af8c2bcd056ef235cf857ac37a725318639ef502c9409b889196",
+        "blockhash": "0x314516540eb0d3d0a630d6d4c47b38f27dff0c97bbf7d0c59d02ae9a6d90e8cf",
+        "event_id": "029dc8ac787fc118a5d1d10e823300186476144aa958fafb9300dae5677ed7e6",
+        "receipt_log_ordinal": 1,
+        "quantity": 64
+      },
+      "intent": {
+        "event_id": "029dc8ac787fc118a5d1d10e823300186476144aa958fafb9300dae5677ed7e6",
+        "authorization_digest": "18cddd383c16b1f8a47131bc50ee05d94c61a9f4e5a7d086bee79edeb188156e",
+        "phase_before_broadcast": "authorized",
+        "signer_interrupted": false,
+        "pre_sign_intent_persisted": true,
+        "recovered_signature_without_resigning": true,
+        "reconstructed_from_persisted_draft": true
+      },
+      "effect": {
+        "bsv_txid": "05e77fde31fe9764f8b89e259d1d9f537c38181400ffd5bd73991b07f885e33d",
+        "bsv_blockhash": "1bad2eab780dcdbc2e3dc0ce64b997519a87b20ba4a3e76c975af105643a9b30",
+        "bsv_vout": 1,
+        "bsv_height": 341,
+        "phase_after_confirmation": "settled"
+      }
+    }
+  ],
+  "proof_checks": {
+    "mint-1024": {
+      "predecessors": [],
+      "public_signals": [
+        "37694197507690475348462655605360162166",
+        "287230457349014196216715561533330496096"
+      ],
+      "previous_proof_digests": [],
+      "proof_sha256": "909de92a0ef1392c37fab0e7d90b1aa2567085af8ba6dcc72480f900075d38b7",
+      "largest_input_script_bytes": 1146762,
+      "quantities": [
+        1024
+      ],
+      "rejections": {}
+    },
+    "split": {
+      "predecessors": [
+        {
+          "txid": "258be0ef3b1aeb6b62d78a568ec82b93cede791b7cd4e62bcc98440474646f49",
+          "vout": 1
+        }
+      ],
+      "public_signals": [
+        "319710912710772564346793545801574584353",
+        "213892765243343942585289392753516424343"
+      ],
+      "previous_proof_digests": [
+        "1c5ba36c47aa376d2481a9f8aba5f576d81692e97653da3718bb3f9f65f91a60"
+      ],
+      "proof_sha256": "33296bf42cefb70ff6ba3f391d52f0396dd4a285004cf7d4e0e3992c6cc837a7",
+      "largest_input_script_bytes": 4413688,
+      "quantities": [
+        640,
+        384
+      ],
+      "rejections": {}
+    },
+    "freeze-640": {
+      "predecessors": [
+        {
+          "txid": "54297c9ae9c11ab4f3fee53cc115d594537a4f4e23d971a1643b92f457b335be",
+          "vout": 0
+        }
+      ],
+      "public_signals": [
+        "52585781872093250255119286966058230803",
+        "125338914805858874262269069446167017813"
+      ],
+      "previous_proof_digests": [
+        "f08615002930695538ffef2769831021a0ea3f868fba30a316b0e02bf52f2c97"
+      ],
+      "proof_sha256": "89bb7f38e097ac4bf8a460c0b0d115633f896b8e5aa3216ebf1d83b8814920c0",
+      "largest_input_script_bytes": 7585641,
+      "quantities": [
+        640
+      ],
+      "rejections": {}
+    },
+    "unfreeze-640": {
+      "predecessors": [
+        {
+          "txid": "4c49d5c13adfceb4200b343e83c0304467cf39ef092b527ea92a5aff42a9a49b",
+          "vout": 0
+        }
+      ],
+      "public_signals": [
+        "224087556231622494900442854708426669222",
+        "275291677997245601117715016090763337419"
+      ],
+      "previous_proof_digests": [
+        "278fa737d479fe3ee3b5e995381824135e4b659cb0d217eaa0b08ef3574a3955"
+      ],
+      "proof_sha256": "6cbabb7258eba40aed73918b94712e48de1f3318ad9ce4c9bd94ddaf25db06aa",
+      "largest_input_script_bytes": 10757855,
+      "quantities": [
+        640
+      ],
+      "rejections": {}
+    },
+    "merge-1024": {
+      "predecessors": [
+        {
+          "txid": "4acf180ec5f81aa9b425549b205bf8d67fc601e35d8b9f8bd6eb5df327505503",
+          "vout": 0
+        },
+        {
+          "txid": "54297c9ae9c11ab4f3fee53cc115d594537a4f4e23d971a1643b92f457b335be",
+          "vout": 1
+        }
+      ],
+      "public_signals": [
+        "155963620456798205892659870738896570101",
+        "75028679706989526618390387792422469122"
+      ],
+      "previous_proof_digests": [
+        "a895b1875280877e92c470ea69317ca6cf1b3fa4e020779d1d45c8a3a5f71ecb",
+        "f08615002930695538ffef2769831021a0ea3f868fba30a316b0e02bf52f2c97"
+      ],
+      "proof_sha256": "8cb9690da0e67a4d652c973a1b3f0b2149af03589bceea666165b8dafd9cae16",
+      "largest_input_script_bytes": 20457938,
+      "quantities": [
+        1024
+      ],
+      "rejections": {}
+    },
+    "partial-burn-640": {
+      "predecessors": [
+        {
+          "txid": "984341f69717e282b5b86e904bf755c089e0d3c889193eb9fd604270efb0821f",
+          "vout": 0
+        }
+      ],
+      "public_signals": [
+        "95165436455201707654971373428058957847",
+        "259774558057039422353136256387082976650"
+      ],
+      "previous_proof_digests": [
+        "7555802d0aa2420581ff4839822ac6f53871ff830f20837ad1a6faf90d257e02"
+      ],
+      "proof_sha256": "f58d775c0d8d2c47ecfedff03f6f3e28acd82b6151716f26d32f8ce51bcd378c",
+      "largest_input_script_bytes": 24683672,
+      "quantities": [
+        384
+      ],
+      "rejections": {}
+    },
+    "pause-minting": {
+      "predecessors": [
+        {
+          "txid": "258be0ef3b1aeb6b62d78a568ec82b93cede791b7cd4e62bcc98440474646f49",
+          "vout": 0
+        }
+      ],
+      "public_signals": [
+        "86594666099285657761927680597182867824",
+        "212043455080254947736738721080166711384"
+      ],
+      "previous_proof_digests": [
+        "1c5ba36c47aa376d2481a9f8aba5f576d81692e97653da3718bb3f9f65f91a60"
+      ],
+      "proof_sha256": "ba660e352e9e1e5ead2c7685aeef685ca19edb2cd3a113c426d8a62369cd1d2d",
+      "largest_input_script_bytes": 4453247,
+      "quantities": [],
+      "rejections": {}
+    },
+    "resume-minting": {
+      "predecessors": [
+        {
+          "txid": "841eab5b019bf75b9d0d008d70389e6a35ae5a898b218c43d4d7dbb6056833ed",
+          "vout": 0
+        }
+      ],
+      "public_signals": [
+        "150173272774463084426209870394859626908",
+        "87404558213917217881296152116494815795"
+      ],
+      "previous_proof_digests": [
+        "412586aafb78028f5391398bf1ff69709f86157ebb99b21aae9fd4745ace0058"
+      ],
+      "proof_sha256": "5c62acb8c01ac0cb7b21a77962151e4f361372a3334542e2230190f570239371",
+      "largest_input_script_bytes": 7748750,
+      "quantities": [],
+      "rejections": {}
+    },
+    "mint-64-after-resume": {
+      "predecessors": [
+        {
+          "txid": "fdd1dfa64f54c22f9dfe2ec2f13cdab64595ccd5d7c115b2f98e600475e03a0a",
+          "vout": 0
+        }
+      ],
+      "public_signals": [
+        "16928824265839821968451043388474179436",
+        "186005119704911938076328502879469725001"
+      ],
+      "previous_proof_digests": [
+        "70fa51fe69f149bb81a583d65662a19c41c1816e9bf2cf9105594272e8eb5233"
+      ],
+      "proof_sha256": "81e0213fecc9220476211a5478e369db55c5624a178a640111d07b1ddef7c0da",
+      "largest_input_script_bytes": 11046854,
+      "quantities": [
+        64
+      ],
+      "rejections": {}
+    },
+    "full-burn-64": {
+      "predecessors": [
+        {
+          "txid": "05e77fde31fe9764f8b89e259d1d9f537c38181400ffd5bd73991b07f885e33d",
+          "vout": 1
+        }
+      ],
+      "public_signals": [
+        "136672044808642245352839447450272903573",
+        "137863221067879767389579695614415062950"
+      ],
+      "previous_proof_digests": [
+        "0cbc5f7a27a3f1654b57ad8b2c8abf6c8bef4871b2d44b92cb9ae1cbf56c6549"
+      ],
+      "proof_sha256": "3ce024b584c0dba67f9dae959cbb6d2845d373881db6a09a0e66689cdeb468b1",
+      "largest_input_script_bytes": 14309117,
+      "quantities": [],
+      "rejections": {}
+    }
+  },
+  "freeze_accounting": {
+    "deposited": 1024,
+    "minted": 1024,
+    "burned": 0,
+    "released": 0,
+    "net_reserve": 1024,
+    "actual_vault_balance": 1024,
+    "bsv_circulating": 1024,
+    "bsv_frozen": 640,
+    "pending_mint": 0,
+    "pending_release": 0,
+    "balanced": true,
+    "holds": 0
+  },
+  "releases": [
+    {
+      "txid": "0x6f20985db713f15dd0b52c7d7ddeed62b7eb4d93712bfe2017468e1179f743e0",
+      "blockhash": "0x12d3979649ddf43358b12ee26560416eee9d1bc89585ad8a7210f61f1783bdcb",
+      "receipt_log_ordinal": 1,
+      "burn_txid": "4f90565a04059a063f18493bfdbf7af913adeff86b68ac4e6062fa1653a0393e",
+      "burn_vout": 0,
+      "burn_blockhash": "52f35604d5d19e58b8def96483b630ca908b6744a92df69f054f71e5dd2fa5a2",
+      "burn_event_id": "99a78a836bb0193bfbb202ef03a1f24e25af07121cfca1f395748adcce53a7bd",
+      "attestation_digest": "9144819dc0ffaa979e465fcca95cd7f5832bf13c26b135146467b4544d88fe39",
+      "confirmation_depth_policy": 2,
+      "quantity": 640,
+      "actual_recipient_credit": 640,
+      "finalized": true,
+      "recovered_without_resigning": true,
+      "journal": {
+        "event_id": "99a78a836bb0193bfbb202ef03a1f24e25af07121cfca1f395748adcce53a7bd",
+        "authorization_digest": "9144819dc0ffaa979e465fcca95cd7f5832bf13c26b135146467b4544d88fe39",
+        "phase_before_broadcast": "authorized",
+        "signer_interrupted": true,
+        "pre_sign_intent_persisted": true,
+        "recovered_signature_without_resigning": true,
+        "observed_effect_phase": "submitted",
+        "final_effect_phase": "settled"
+      },
+      "before_broadcast_accounting": {
+        "deposited": 1024,
+        "minted": 1024,
+        "burned": 640,
+        "released": 0,
+        "net_reserve": 1024,
+        "actual_vault_balance": 1024,
+        "bsv_circulating": 384,
+        "bsv_frozen": 0,
+        "pending_mint": 0,
+        "pending_release": 640,
+        "balanced": true,
+        "holds": 0
+      }
+    },
+    {
+      "txid": "0xb02a00bdd3ce9e40404b7e6112df91fd10a049db30fc245e8acf573ef66afa09",
+      "blockhash": "0x98bf23c901ed9024998858b5721b4c0a97e589953ebdaf95770fae15aa96e941",
+      "receipt_log_ordinal": 1,
+      "burn_txid": "0cad0b33b26b795d4a6c15270fa7e2421d9864e0e71babc0a4005666680e13c1",
+      "burn_vout": 0,
+      "burn_blockhash": "5f9a04322f8c0991ffa91415cc4dbcafa00befcf3d3c5840b505cf3bb85ba87e",
+      "burn_event_id": "d4613038526c764deff12966516510c43b794e3cb1483a82a6c9f7fc76e24efd",
+      "attestation_digest": "e331961b132ad5401e861731b7f0741b60cf5a6be34aa327e39d1b609fadd262",
+      "confirmation_depth_policy": 2,
+      "quantity": 64,
+      "actual_recipient_credit": 64,
+      "finalized": true,
+      "recovered_without_resigning": true,
+      "journal": {
+        "event_id": "d4613038526c764deff12966516510c43b794e3cb1483a82a6c9f7fc76e24efd",
+        "authorization_digest": "e331961b132ad5401e861731b7f0741b60cf5a6be34aa327e39d1b609fadd262",
+        "phase_before_broadcast": "authorized",
+        "signer_interrupted": false,
+        "pre_sign_intent_persisted": true,
+        "recovered_signature_without_resigning": true,
+        "observed_effect_phase": "submitted",
+        "final_effect_phase": "settled"
+      },
+      "before_broadcast_accounting": {
+        "deposited": 1088,
+        "minted": 1088,
+        "burned": 704,
+        "released": 640,
+        "net_reserve": 448,
+        "actual_vault_balance": 448,
+        "bsv_circulating": 384,
+        "bsv_frozen": 0,
+        "pending_mint": 0,
+        "pending_release": 64,
+        "balanced": true,
+        "holds": 0
+      }
+    }
+  ],
+  "after_primary_scenario": {
+    "deposited": 1024,
+    "minted": 1024,
+    "burned": 640,
+    "released": 640,
+    "net_reserve": 384,
+    "actual_vault_balance": 384,
+    "bsv_circulating": 384,
+    "bsv_frozen": 0,
+    "pending_mint": 0,
+    "pending_release": 0,
+    "balanced": true,
+    "holds": 0
+  },
+  "final_accounting": {
+    "deposited": 1088,
+    "minted": 1088,
+    "burned": 704,
+    "released": 704,
+    "net_reserve": 384,
+    "actual_vault_balance": 384,
+    "bsv_circulating": 384,
+    "bsv_frozen": 0,
+    "pending_mint": 0,
+    "pending_release": 0,
+    "balanced": true,
+    "holds": 0
+  },
+  "journal": [
+    {
+      "sequence": 1,
+      "event_id": "c8ff72bc8af584279f588dfa39a0d86f3d9d355619121de88c10658f887aee7f",
+      "operation": "origin_finalized"
+    },
+    {
+      "sequence": 2,
+      "event_id": "c8ff72bc8af584279f588dfa39a0d86f3d9d355619121de88c10658f887aee7f",
+      "operation": "mint_state_reserved"
+    },
+    {
+      "sequence": 3,
+      "event_id": "c8ff72bc8af584279f588dfa39a0d86f3d9d355619121de88c10658f887aee7f",
+      "operation": "authorization_recorded"
+    },
+    {
+      "sequence": 4,
+      "event_id": "c8ff72bc8af584279f588dfa39a0d86f3d9d355619121de88c10658f887aee7f",
+      "operation": "origin_replay"
+    },
+    {
+      "sequence": 5,
+      "event_id": "c8ff72bc8af584279f588dfa39a0d86f3d9d355619121de88c10658f887aee7f",
+      "operation": "authorization_replay"
+    },
+    {
+      "sequence": 6,
+      "event_id": "c8ff72bc8af584279f588dfa39a0d86f3d9d355619121de88c10658f887aee7f",
+      "operation": "signature_recorded"
+    },
+    {
+      "sequence": 7,
+      "event_id": "c8ff72bc8af584279f588dfa39a0d86f3d9d355619121de88c10658f887aee7f",
+      "operation": "origin_replay"
+    },
+    {
+      "sequence": 8,
+      "event_id": "c8ff72bc8af584279f588dfa39a0d86f3d9d355619121de88c10658f887aee7f",
+      "operation": "authorization_replay"
+    },
+    {
+      "sequence": 9,
+      "event_id": "c8ff72bc8af584279f588dfa39a0d86f3d9d355619121de88c10658f887aee7f",
+      "operation": "effect_finalized"
+    },
+    {
+      "sequence": 10,
+      "event_id": "99a78a836bb0193bfbb202ef03a1f24e25af07121cfca1f395748adcce53a7bd",
+      "operation": "origin_finalized"
+    },
+    {
+      "sequence": 11,
+      "event_id": "99a78a836bb0193bfbb202ef03a1f24e25af07121cfca1f395748adcce53a7bd",
+      "operation": "authorization_recorded"
+    },
+    {
+      "sequence": 12,
+      "event_id": "99a78a836bb0193bfbb202ef03a1f24e25af07121cfca1f395748adcce53a7bd",
+      "operation": "origin_replay"
+    },
+    {
+      "sequence": 13,
+      "event_id": "99a78a836bb0193bfbb202ef03a1f24e25af07121cfca1f395748adcce53a7bd",
+      "operation": "authorization_replay"
+    },
+    {
+      "sequence": 14,
+      "event_id": "99a78a836bb0193bfbb202ef03a1f24e25af07121cfca1f395748adcce53a7bd",
+      "operation": "signature_recorded"
+    },
+    {
+      "sequence": 15,
+      "event_id": "99a78a836bb0193bfbb202ef03a1f24e25af07121cfca1f395748adcce53a7bd",
+      "operation": "origin_replay"
+    },
+    {
+      "sequence": 16,
+      "event_id": "99a78a836bb0193bfbb202ef03a1f24e25af07121cfca1f395748adcce53a7bd",
+      "operation": "authorization_replay"
+    },
+    {
+      "sequence": 17,
+      "event_id": "99a78a836bb0193bfbb202ef03a1f24e25af07121cfca1f395748adcce53a7bd",
+      "operation": "effect_observed"
+    },
+    {
+      "sequence": 18,
+      "event_id": "99a78a836bb0193bfbb202ef03a1f24e25af07121cfca1f395748adcce53a7bd",
+      "operation": "effect_finalized"
+    },
+    {
+      "sequence": 19,
+      "event_id": "99a78a836bb0193bfbb202ef03a1f24e25af07121cfca1f395748adcce53a7bd",
+      "operation": "origin_replay"
+    },
+    {
+      "sequence": 20,
+      "event_id": "029dc8ac787fc118a5d1d10e823300186476144aa958fafb9300dae5677ed7e6",
+      "operation": "origin_finalized"
+    },
+    {
+      "sequence": 21,
+      "event_id": "029dc8ac787fc118a5d1d10e823300186476144aa958fafb9300dae5677ed7e6",
+      "operation": "mint_state_reserved"
+    },
+    {
+      "sequence": 22,
+      "event_id": "029dc8ac787fc118a5d1d10e823300186476144aa958fafb9300dae5677ed7e6",
+      "operation": "authorization_recorded"
+    },
+    {
+      "sequence": 23,
+      "event_id": "029dc8ac787fc118a5d1d10e823300186476144aa958fafb9300dae5677ed7e6",
+      "operation": "signature_recorded"
+    },
+    {
+      "sequence": 24,
+      "event_id": "029dc8ac787fc118a5d1d10e823300186476144aa958fafb9300dae5677ed7e6",
+      "operation": "origin_replay"
+    },
+    {
+      "sequence": 25,
+      "event_id": "029dc8ac787fc118a5d1d10e823300186476144aa958fafb9300dae5677ed7e6",
+      "operation": "authorization_replay"
+    },
+    {
+      "sequence": 26,
+      "event_id": "029dc8ac787fc118a5d1d10e823300186476144aa958fafb9300dae5677ed7e6",
+      "operation": "effect_finalized"
+    },
+    {
+      "sequence": 27,
+      "event_id": "d4613038526c764deff12966516510c43b794e3cb1483a82a6c9f7fc76e24efd",
+      "operation": "origin_finalized"
+    },
+    {
+      "sequence": 28,
+      "event_id": "d4613038526c764deff12966516510c43b794e3cb1483a82a6c9f7fc76e24efd",
+      "operation": "authorization_recorded"
+    },
+    {
+      "sequence": 29,
+      "event_id": "d4613038526c764deff12966516510c43b794e3cb1483a82a6c9f7fc76e24efd",
+      "operation": "signature_recorded"
+    },
+    {
+      "sequence": 30,
+      "event_id": "d4613038526c764deff12966516510c43b794e3cb1483a82a6c9f7fc76e24efd",
+      "operation": "origin_replay"
+    },
+    {
+      "sequence": 31,
+      "event_id": "d4613038526c764deff12966516510c43b794e3cb1483a82a6c9f7fc76e24efd",
+      "operation": "authorization_replay"
+    },
+    {
+      "sequence": 32,
+      "event_id": "d4613038526c764deff12966516510c43b794e3cb1483a82a6c9f7fc76e24efd",
+      "operation": "effect_observed"
+    },
+    {
+      "sequence": 33,
+      "event_id": "d4613038526c764deff12966516510c43b794e3cb1483a82a6c9f7fc76e24efd",
+      "operation": "effect_finalized"
+    },
+    {
+      "sequence": 34,
+      "event_id": "d4613038526c764deff12966516510c43b794e3cb1483a82a6c9f7fc76e24efd",
+      "operation": "origin_replay"
+    }
+  ],
+  "node": "/Bitcoin SV:1.2.3/",
+  "transactions": {
+    "setup": {
+      "txid": "c74985ca1a710a9ea9ef3854ab5fd8585d8a340cf19be3171081ffcb6a2fb102",
+      "blockhash": "70c5a19499a2667a6dd152857f8ab7feb324dff7341e7451eb4bfa972696d886",
+      "height": 316,
+      "bytes": 267
+    },
+    "mint-genesis": {
+      "txid": "f8498f715f9d764ed4c31bb1a057cba0c44d069de6b752a278faa6a1cc8fb628",
+      "blockhash": "08cf3ea2497bf4ba191384bcc00fffec66078877c9bebcfb28c99526c38a8040",
+      "height": 317,
+      "bytes": 44372
+    },
+    "funding-mint-1024": {
+      "txid": "cb7567b6421b697848e466bebb7740832a4b4e959cdc4da1be28d56aea309f02",
+      "blockhash": "5058d8a35d17e59ee2207f0d6801707b023ca0286faf9706de43e7f42f340c85",
+      "height": 318,
+      "bytes": 1053220
+    },
+    "mint-1024": {
+      "txid": "258be0ef3b1aeb6b62d78a568ec82b93cede791b7cd4e62bcc98440474646f49",
+      "blockhash": "4fe77584353864ccb6c24a4185db538d3b445b2d356a898236e353da3443b026",
+      "height": 320,
+      "bytes": 2300229
+    },
+    "funding-split": {
+      "txid": "ace4bc7d55088e29fa5823a59df4d1653de5cabb33a1bb6b9f4715e7d2695dc4",
+      "blockhash": "3812936e0379eb97aa81a693221a0b17658cc86e629d08913276ada4b848a93d",
+      "height": 322,
+      "bytes": 1053220
+    },
+    "split": {
+      "txid": "54297c9ae9c11ab4f3fee53cc115d594537a4f4e23d971a1643b92f457b335be",
+      "blockhash": "5d04773718e7eff2c173e33ca98ebff16fe3f102d0bc99df19fb2d19d5abcec4",
+      "height": 323,
+      "bytes": 5474563
+    },
+    "funding-freeze-640": {
+      "txid": "6fc2bc299baeb798c93cbc5ec64aae06487343424d762187612f25db720d8dc2",
+      "blockhash": "420234d716780e47497ab3806aee58cb1f328f8da84a7c14813412363cdc19a1",
+      "height": 324,
+      "bytes": 1053220
+    },
+    "freeze-640": {
+      "txid": "4c49d5c13adfceb4200b343e83c0304467cf39ef092b527ea92a5aff42a9a49b",
+      "blockhash": "4c9d343ecf14aa353e8d4bdb9dac6ba4493008b3e095250401ec9cc5f4266325",
+      "height": 325,
+      "bytes": 8646778
+    },
+    "funding-unfreeze-640": {
+      "txid": "37ede2fb7e70db553d84d3d4c298be2a2c64b6c83a5eb03aee801ad027db42e0",
+      "blockhash": "4ce5eb831b7c56224a9a7c942185455c403b1ab40273a215a5a096dd328a148b",
+      "height": 326,
+      "bytes": 1053220
+    },
+    "unfreeze-640": {
+      "txid": "4acf180ec5f81aa9b425549b205bf8d67fc601e35d8b9f8bd6eb5df327505503",
+      "blockhash": "27025e46051ef5cd6b76f328739e3b0537276bacb311d3bb4137514362a69031",
+      "height": 327,
+      "bytes": 11818992
+    },
+    "funding-merge-1024": {
+      "txid": "00af85c2612913051d0de4f6b8f1c9c5cbc962a257e782f82c35911c6c5b9c94",
+      "blockhash": "6d48ff6c3678db8f754c5c0cdfe896276247918c36c50a6f7e9645189577fc5d",
+      "height": 328,
+      "bytes": 1053220
+    },
+    "merge-1024": {
+      "txid": "984341f69717e282b5b86e904bf755c089e0d3c889193eb9fd604270efb0821f",
+      "blockhash": "2075207bfbbedd010155df3ea7c7820c70a2b4ddb9951c95bff861b27047c8f3",
+      "height": 329,
+      "bytes": 22572492
+    },
+    "funding-partial-burn-640": {
+      "txid": "849c2a247c5a08dbf5dcfceedd2f69d76a6bc2a9b139c6ed9d92453029021795",
+      "blockhash": "4a902f60d61152ce7716607bb54e4f5ab21b3e9bf5783d73f79cc2240f88c95f",
+      "height": 330,
+      "bytes": 1053220
+    },
+    "partial-burn-640": {
+      "txid": "4f90565a04059a063f18493bfdbf7af913adeff86b68ac4e6062fa1653a0393e",
+      "blockhash": "52f35604d5d19e58b8def96483b630ca908b6744a92df69f054f71e5dd2fa5a2",
+      "height": 331,
+      "bytes": 25742267
+    },
+    "funding-pause-minting": {
+      "txid": "64a16843bf8a0a2e788206f5d6a35d278f06bf5e71251bf0ab9c941d1045193d",
+      "blockhash": "300eda212213cc372b32fce2f96710395ed3d0bd26145568b76f2af029abb4b2",
+      "height": 333,
+      "bytes": 1053220
+    },
+    "pause-minting": {
+      "txid": "841eab5b019bf75b9d0d008d70389e6a35ae5a898b218c43d4d7dbb6056833ed",
+      "blockhash": "1852e5c1caae2bf902916b07cc769601dcfda8eab801cc05b500212e45e3a440",
+      "height": 334,
+      "bytes": 5595734
+    },
+    "funding-resume-minting": {
+      "txid": "2257e58886f73300adeeb50f23caca75c689b90d55521a573ec26192b3ac598a",
+      "blockhash": "59bc494049aaaa1c458d5034d160527a59ae1d4841c7d0bacc1fd7173b4fac4e",
+      "height": 336,
+      "bytes": 1053220
+    },
+    "resume-minting": {
+      "txid": "fdd1dfa64f54c22f9dfe2ec2f13cdab64595ccd5d7c115b2f98e600475e03a0a",
+      "blockhash": "241129d5ea515a66e25f7e6d11f8d1691505a4f462ab054b703721e47a327b17",
+      "height": 337,
+      "bytes": 8891237
+    },
+    "funding-mint-64-after-resume": {
+      "txid": "00989c36c1f604e6076b923686abded95a3a407e0cae21a325584b70bfa7c131",
+      "blockhash": "18f0489f58c2e4dd29e4b431adcd3bab686b08b9392e25d193b0032aee7ba9f3",
+      "height": 339,
+      "bytes": 1053220
+    },
+    "mint-64-after-resume": {
+      "txid": "05e77fde31fe9764f8b89e259d1d9f537c38181400ffd5bd73991b07f885e33d",
+      "blockhash": "1bad2eab780dcdbc2e3dc0ce64b997519a87b20ba4a3e76c975af105643a9b30",
+      "height": 341,
+      "bytes": 12200320
+    },
+    "funding-full-burn-64": {
+      "txid": "b4415feb216bf0df777ebd51a2ef3698a9909c280a12fc29daf4b1ea450bfd4c",
+      "blockhash": "5a657cdda0ac6e90093964c5b1331a251e2f381a6b2c4f0a6cf98671b54534ac",
+      "height": 343,
+      "bytes": 1053220
+    },
+    "full-burn-64": {
+      "txid": "0cad0b33b26b795d4a6c15270fa7e2421d9864e0e71babc0a4005666680e13c1",
+      "blockhash": "5f9a04322f8c0991ffa91415cc4dbcafa00befcf3d3c5840b505cf3bb85ba87e",
+      "height": 344,
+      "bytes": 15365332
+    }
+  },
+  "wallet": [
+    {
+      "label": "mint-1024",
+      "txid": "258be0ef3b1aeb6b62d78a568ec82b93cede791b7cd4e62bcc98440474646f49",
+      "vout": 1,
+      "outpoint_wire": "496f6474044498cc2be6d47c1b79dece932bc88e568ad7626beb1a3befe08b2501000000",
+      "quantity": 1024,
+      "confirmations": 17,
+      "known_spend_status": "spent",
+      "frozen": false,
+      "blockhash": "4fe77584353864ccb6c24a4185db538d3b445b2d356a898236e353da3443b026",
+      "block_header": "000000209dc615a70798c5b34ecd323924813754899c4cc1ed1c1592693801c1eabb082deb865b1af7b5b0bb1ef09b7e5f456cdd2863dec11b31b8477d4f3d77efbd6ec27f68056bffff7f2001000000",
+      "block_height": 320,
+      "block_leaf_count": 2,
+      "merkle_index": 1,
+      "merkle_siblings_wire": [
+        "0a6099f6d5a86526c502b11fc9f001f691e3cf8c2bfd7ffa160b053e2c6d7321"
+      ]
+    },
+    {
+      "label": "split",
+      "txid": "54297c9ae9c11ab4f3fee53cc115d594537a4f4e23d971a1643b92f457b335be",
+      "vout": 0,
+      "outpoint_wire": "be35b357f4923b64a171d9234e4f7a5394d515c13ce5fef3b41ac1e99a7c295400000000",
+      "quantity": 640,
+      "confirmations": 14,
+      "known_spend_status": "spent",
+      "frozen": false,
+      "blockhash": "5d04773718e7eff2c173e33ca98ebff16fe3f102d0bc99df19fb2d19d5abcec4",
+      "block_header": "000000203da948b8a4ad763291089d626ec88c65170b1a2293a681aa97eb79036e9312380b35425f189d6df7c7a9a340c04d955134b6ee405edda1e31e1edb4cd12f89a0a868056bffff7f2000000000",
+      "block_height": 323,
+      "block_leaf_count": 2,
+      "merkle_index": 1,
+      "merkle_siblings_wire": [
+        "3084529084d4e4e481baeb3ad0490b725dacf3eb619a69499eba6a38c1b71e74"
+      ]
+    },
+    {
+      "label": "split",
+      "txid": "54297c9ae9c11ab4f3fee53cc115d594537a4f4e23d971a1643b92f457b335be",
+      "vout": 1,
+      "outpoint_wire": "be35b357f4923b64a171d9234e4f7a5394d515c13ce5fef3b41ac1e99a7c295401000000",
+      "quantity": 384,
+      "confirmations": 14,
+      "known_spend_status": "spent",
+      "frozen": false,
+      "blockhash": "5d04773718e7eff2c173e33ca98ebff16fe3f102d0bc99df19fb2d19d5abcec4",
+      "block_header": "000000203da948b8a4ad763291089d626ec88c65170b1a2293a681aa97eb79036e9312380b35425f189d6df7c7a9a340c04d955134b6ee405edda1e31e1edb4cd12f89a0a868056bffff7f2000000000",
+      "block_height": 323,
+      "block_leaf_count": 2,
+      "merkle_index": 1,
+      "merkle_siblings_wire": [
+        "3084529084d4e4e481baeb3ad0490b725dacf3eb619a69499eba6a38c1b71e74"
+      ]
+    },
+    {
+      "label": "freeze-640",
+      "txid": "4c49d5c13adfceb4200b343e83c0304467cf39ef092b527ea92a5aff42a9a49b",
+      "vout": 0,
+      "outpoint_wire": "9ba4a942ff5a2aa97e522b09ef39cf674430c0833e340b20b4cedf3ac1d5494c00000000",
+      "quantity": 640,
+      "confirmations": 12,
+      "known_spend_status": "spent",
+      "frozen": true,
+      "blockhash": "4c9d343ecf14aa353e8d4bdb9dac6ba4493008b3e095250401ec9cc5f4266325",
+      "block_header": "00000020a119dc3c36123481147c4aa88d8f321fcb58ee6a80b37a49470e7816d734024215b194329d41b05352158965d0e9c35dd848361d1fecf9f7dc1ca652848f5cf5d668056bffff7f2000000000",
+      "block_height": 325,
+      "block_leaf_count": 2,
+      "merkle_index": 1,
+      "merkle_siblings_wire": [
+        "08c4a361ac043b98430a7ae09e9e9cd94ff3d9327b762c76ba0cba1187aef57e"
+      ]
+    },
+    {
+      "label": "unfreeze-640",
+      "txid": "4acf180ec5f81aa9b425549b205bf8d67fc601e35d8b9f8bd6eb5df327505503",
+      "vout": 0,
+      "outpoint_wire": "03555027f35debd68b9f8b5de301c67fd6f85b209b5425b4a91af8c50e18cf4a00000000",
+      "quantity": 640,
+      "confirmations": 10,
+      "known_spend_status": "spent",
+      "frozen": false,
+      "blockhash": "27025e46051ef5cd6b76f328739e3b0537276bacb311d3bb4137514362a69031",
+      "block_header": "000000208b148a32dd96a0a515a27302b41a3b405c458521947c9a4a22567c1b83ebe54c5fbfc0d8a34adabca683c7ec9e855692bfa8ba21d196a66b426ee952a8af3cfd0369056bffff7f2000000000",
+      "block_height": 327,
+      "block_leaf_count": 2,
+      "merkle_index": 1,
+      "merkle_siblings_wire": [
+        "63a6fe857b717cf3c3840a6df056b05d1601c4c88fd3775c9bd3a0af3b01bac4"
+      ]
+    },
+    {
+      "label": "partial-burn-640",
+      "txid": "4f90565a04059a063f18493bfdbf7af913adeff86b68ac4e6062fa1653a0393e",
+      "vout": 1,
+      "outpoint_wire": "3e39a05316fa62604eac686bf8efad13f97abffd3b49183f069a05045a56904f01000000",
+      "quantity": 384,
+      "confirmations": 6,
+      "known_spend_status": "unspent",
+      "frozen": false,
+      "blockhash": "52f35604d5d19e58b8def96483b630ca908b6744a92df69f054f71e5dd2fa5a2",
+      "block_header": "000000205fc9880f24c29cf7733d78f59b3e1bb25a4f4eb57b601677ce5211d6602f904a8f59155bb231a78a4c7a5fa56ce35e5d5241510accc8dd7fb556ab4c016a16616c69056bffff7f2005000000",
+      "block_height": 331,
+      "block_leaf_count": 2,
+      "merkle_index": 1,
+      "merkle_siblings_wire": [
+        "c964c46f5dc0561d2742790b97382f5306c6b23b955e1aa462ebf67b3df1a7b3"
+      ]
+    }
+  ],
+  "release_replay": {
+    "original_release_txid": "0x6f20985db713f15dd0b52c7d7ddeed62b7eb4d93712bfe2017468e1179f743e0",
+    "attempt": "eth_call of exact confirmed calldata",
+    "source_chain": 31337,
+    "revert": "AlreadySettled(bytes32)",
+    "burn_id": "0x99a78a836bb0193bfbb202ef03a1f24e25af07121cfca1f395748adcce53a7bd",
+    "revert_data": "0xb196a44a99a78a836bb0193bfbb202ef03a1f24e25af07121cfca1f395748adcce53a7bd",
+    "calldata": "0xc0fe46fb00000000000000000000000000000000000000000000000000000000000000013e39a05316fa62604eac686bf8efad13f97abffd3b49183f069a05045a56904f0000000000000000000000000000000000000000000000000000000000000000a2a52fdde5714f059ff62da944678b90ca30b68364f9deb8589ed1d50456f352fc776a621e77d7353e51ad374716444a11b4b4a42bd3188b2ed605ac73ffab0e00000000000000000000000000000000000000000000000000000000000000070000000000000000000000003c44cdddb6a900fa2b585dd299e03d12fa4293bc000000000000000000000000000000000000000000000000000000000000028000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000016000000000000000000000000000000000000000000000000000000000000000418306edbbbea129f836439417b103610943a29fb6c5ee0bdbe5a43d07cab7e7cd718eb10724e7ce1085c4841f0705a52da999270c9edbd633c06445a8c0ea34f91b00000000000000000000000000000000000000000000000000000000000000"
+  },
+  "circuit_fingerprint": "70a485af0ccc64cffb4275515fabc57d9344b5104960a7ae22e2819cbd681704",
+  "max_transaction_bytes": 25742267,
+  "max_input_script_bytes": 24683672,
+  "archive_sha256": "19174d15a3643369cbd12658cc41ba79c03a0d1a2ec57bce6aa4ee446190e025",
+  "post_release_reorg": {
+    "burn_event_id": "d4613038526c764deff12966516510c43b794e3cb1483a82a6c9f7fc76e24efd",
+    "orphaned_bsv_block": "5f9a04322f8c0991ffa91415cc4dbcafa00befcf3d3c5840b505cf3bb85ba87e",
+    "reverted_bsv_height": 343,
+    "restored_bsv_tip": "13866c130e92455fbb4c4bb59119b9896d9867cac85e8e40dbb51f4da57e0dd8",
+    "ledger_phase_after_reopen": "held",
+    "prior_release_still_finalized": true,
+    "may_authorize_after_reopen": false,
+    "persisted_hold_reasons": [
+      "origin reorganized after external authorization",
+      "independent reserve and supply reconciliation disagrees"
+    ],
+    "source_rpc_or_signer_called": false
+  }
+}
