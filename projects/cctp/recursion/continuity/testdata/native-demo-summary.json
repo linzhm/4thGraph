@@ -69,5 +69,13 @@
     "recursive-one.json",
     "recursive-two.json"
   ],
+  "standalone_bsv_regtest": {
+    "node": "/Bitcoin SV:1.2.3/",
+    "proof_artifact": "recursive-two.json",
+    "height": 103,
+    "block_hash": "239dc556d31ed7136430a03b27204b388261ae20603df9ef58407cbd09bd47e8",
+    "txid": "7011f3d48d539eadb032a7be83789be6265214ac5136162e7857dbddc252d5cc",
+    "mutated_knowledge_proof": "mandatory-script-verify-flag-failed"
+  },
   "persistent_session_recompiled_the_same_cache_fingerprint": true
 }

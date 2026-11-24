@@ -15,6 +15,8 @@ SHA256d("BSV/CCTP/continuity/v1\0" || asset[32] || selfKeyDigest[32] ||
 
 原生测试用同一把密钥验证了两份零前序证明、引用这两份证明的双前序证明，以及引用该递归证明的单前序证明。测试 setup 用时 18 分 7.6 秒，证明密钥约 2.5 GiB，四次出证各用 38.7 至 42.6 秒。两代递归证明均通过 Python 摘要重建、Script 和 chain-gang 验证。此组使用合成交易上下文。证明材料、四个负例和参数指纹见 [测试记录](testdata/native-demo-summary.json)。
 
+Bitcoin SV Node 1.2.3 在独立验证器消费中接受第二代递归证明并于 regtest 高度 103 入块。节点在同一验证器 UTXO 上拒绝改写的知识证明。该次入块验证证明字节和 BSB22 Script，实代币的铸造、槽位和后继由下文的独立联测覆盖。
+
 在 `projects/cctp/recursion` 运行 Go 命令。`probe` 用嵌入的小型 BSB22 样例验证零前序 R1CS 形状。`demo` 生成一套独立参数和连续证明。`setup` 只生成参数，`prove` 复用已有参数并从前序证明 JSON 提取实际公开摘要。
 
 ```sh
