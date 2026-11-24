@@ -1,0 +1,126 @@
+{
+  "scope": "Anchored test mint, native freeze and unfreeze, and holder-authorized exact token rollover",
+  "source": "test deposit attestation",
+  "parent_profile": "legacy v2 native unfreeze",
+  "mode": "checkpoint",
+  "token_quantity": 640,
+  "carrier_satoshis": 1000,
+  "checkpoint": {
+    "format": "BSV parent SHA256 checkpoint v1",
+    "txid": "a00fc517aed14ba5be10a04a70dac5b53fec7cfb492211f5933999f1e2046100",
+    "txid_wire": "006104e2f1993993f5112249fb7cec3fb5c5da704aa010bea54bd1ae17c50fa0",
+    "raw_bytes": 3433,
+    "processed_bytes": 1856,
+    "midstate": "a6bf05a965ecb22420a3794fb95509b2b7f7fb7868a31d8cfa1bbfd3c10becdf",
+    "suffix": "7323a9a01f370300000000ffffffff01e803000000000000fd0a06124253562f434354502f746f6b656e2f7632004afa0aa7836ddcb852000e4f0a5471805d9f30a6aabfb788d7038722c88b145228800200000000000003774ae7f858a9411e5ef4246b70c65aac5649980be5c17891bbec17895da008cb0077828c7f777c630101866b76768254947f77044300000088aa76517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e01007e81209817f8165b81f259d928ce2ddbfc9b02070b87ce9562a055acbbdcf97e66be799321414136d08c5ed2bf3ba048afe6dcaebafeffffffffffffffffffffffffffffff009776697621414136d08c5ed2bf3ba048afe6dcaebafeffffffffffffffffffffffffffffff007c94a3826b012080517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e01206c947f77827d6b7e23022079be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798027c7e6c01249301307c7e7c7e01437e210279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798ad7501687f7782012c947f547f7701207f757c8258947f7c01607f517f776c7c7e7e7eaa8874519d76828c7f770141882103d01115d548e7561b15c38f004d734633687cf4419620095bc5b0f47070afe85aac679169766b768254947f77044100000088aa76517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e01007e81209817f8165b81f259d928ce2ddbfc9b02070b87ce9562a055acbbdcf97e66be799321414136d08c5ed2bf3ba048afe6dcaebafeffffffffffffffffffffffffffffff009776697621414136d08c5ed2bf3ba048afe6dcaebafeffffffffffffffffffffffffffffff007c94a3826b012080517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e01206c947f77827d6b7e23022079be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798027c7e6c01249301307c7e7c7e01417e210279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798ad756c547f7701207f7578aa8801247f7578aa04000000007e8801297f7c547f77517f75010188517f7c01007e81760002fd00a5697f77547f77517f7c010188587f778254947f75a820a0d725fd19a81f1576983620654ba3dba3cc0f69f555d1ecf01945cc8eb3bc0a8874519d76828c7f770141882103774ae7f858a9411e5ef4246b70c65aac5649980be5c17891bbec17895da008cbac6800000000",
+    "suffix_bytes": 1577,
+    "output_count_offset": 1871,
+    "output_count": 1,
+    "output_offsets": [
+      1872
+    ],
+    "suffix_sha256d": "92e27802aaf92c69ebc07d11336133cece3f196e1c951ae2a07e17d46fd769e4",
+    "hash_outputs": "d74dab4f0c6cc3c34ee68a220f295f3c25dcaa339a1f746c8146c011349b8241"
+  },
+  "parameters": {
+    "format": "CCTP token parent checkpoint test parameters v1",
+    "profile": "parent-checkpoint-token",
+    "test_only": true,
+    "constraints": 2988852,
+    "commitments": 0,
+    "statement_bytes": 174,
+    "circuit_sha256": "c3bd0aaa3dfd565a541baa7d90c8ea26a6d91d488aaec5b8b1ea25b45c057488",
+    "verifying_key_sha256": "40f2b28b088f79e8fc184413c27ed37b627bc76d696bfef958670b882e85f257",
+    "proving_key_sha256": "90a8b3ef0d3027d1f1aae62828808fb62ee8a39491442342d268a06035668f52"
+  },
+  "proof": {
+    "prove_process_seconds": 358.3358581250068,
+    "proof_artifact_sha256": "0a22c9c38f6e3f3f7202eeac663613bae932550ba475d78ea20fb0196196bce9",
+    "public_inputs": [
+      "134688318244128321772111542244002844591",
+      "149922038533246315200048254500904047060"
+    ],
+    "statement_digest": "655406ca71b332b56db0490e876d4faf70c9ef307a894e44b5f7b04b743311d4",
+    "native_prove_seconds": 15.480807,
+    "native_verify_seconds": 0.003189
+  },
+  "rejections": {
+    "changed-token-quantity": {
+      "txid": "b3916396bc58213e5c853e996a9ff5b4c0c7ca931e97bceba6f9572fc8074325",
+      "rejection": "sendrawtransaction: {'code': -26, 'message': '16: mandatory-script-verify-flag-failed (Script failed an OP_EQUALVERIFY operation)'}"
+    },
+    "wrong-holder": {
+      "txid": "c547340ba43b0080d4fae3f2a173f07b0a6c5293beff8840af26d4ca87d91b71",
+      "rejection": "sendrawtransaction: {'code': -26, 'message': '16: mandatory-script-verify-flag-failed (Script evaluated without error but finished with a false/empty top stack element)'}"
+    },
+    "wrong-midstate": {
+      "txid": "11821b2c0ee148d89ab9f801d2c8ad008a3a7ebfb5ad1ab8c5d065ab6f356155",
+      "rejection": "sendrawtransaction: {'code': -26, 'message': '16: mandatory-script-verify-flag-failed (Script failed an OP_NUMEQUALVERIFY operation)'}"
+    },
+    "wrong-suffix": {
+      "txid": "0a64bb87b9777becfc2c4cdfba2328133e35aac208afca4eb516129a3f71d0a1",
+      "rejection": "sendrawtransaction: {'code': -26, 'message': '16: mandatory-script-verify-flag-failed (Script failed an OP_NUMEQUALVERIFY operation)'}"
+    }
+  },
+  "parent_disclosure_with_encoding_bytes": 1613,
+  "proof_witness_bytes": 1077,
+  "child_witness_bytes_by_vin": [
+    2957,
+    452764
+  ],
+  "child_bytes": 457376,
+  "verifier_lock_bytes": 450840,
+  "verifier_funding_transaction_bytes": 450904,
+  "child_and_verifier_funding_bytes": 908280,
+  "child_fee_satoshis": 1000000,
+  "node_timings": {
+    "chain_gang_seconds": 0.04704679211135954,
+    "node_submission_seconds": 0.3572972909314558,
+    "node_mining_and_confirmation_seconds": 0.02197358396369964
+  },
+  "node": "/Bitcoin SV:1.2.3/",
+  "transactions": {
+    "setup": {
+      "txid": "371fa0a92373da779c0e54a23fee708c28820faac0993601b24b576bbcb78ca9",
+      "blockhash": "12405380a13dcb0acffe018910a142927d9739efd9a90d6f309ae5220b505211",
+      "height": 848,
+      "bytes": 208
+    },
+    "mint-genesis": {
+      "txid": "fc8438f7c9ba5e79f8e39794e838ffd3392daaf78bfdbef35551e72a35b2b6d0",
+      "blockhash": "608724e40a066e07f1145ad005ce3cd42b1f22d1e87f2c2d3eb7dfe02ec51168",
+      "height": 849,
+      "bytes": 41900
+    },
+    "mint": {
+      "txid": "f16d66085460b8dcafd1b0eaa50ca6debde08b3f3229091e6968fb8468065a38",
+      "blockhash": "70fb58935893d5ce152deef716b6b330ab0afe9bd17e231e82aa317657dacd50",
+      "height": 850,
+      "bytes": 94248
+    },
+    "freeze": {
+      "txid": "c7c4f7e8758a794a58bd1f593ad96089a14becb282cd30b95d95ef9632639cdc",
+      "blockhash": "37292a803ffb3ec22456f053ee6c844d2f468444bc4148dfe9e84c3f8cad6d3e",
+      "height": 851,
+      "bytes": 3432
+    },
+    "unfreeze-parent": {
+      "txid": "a00fc517aed14ba5be10a04a70dac5b53fec7cfb492211f5933999f1e2046100",
+      "blockhash": "5aa99e0243fbad58cb869e5b4dd30c1e5aadfabd40ee80a2ef60472223d25482",
+      "height": 852,
+      "bytes": 3433
+    },
+    "verifier-funding": {
+      "txid": "fb0bb8f52ec648e8d0ce758e7130566d7692622bcd397574139eda2634c6d972",
+      "blockhash": "30fab6cca6b6c974508b635de4497524232d0fd0c085ae55f50275b633cb6f2f",
+      "height": 853,
+      "bytes": 450904
+    },
+    "token-rollover": {
+      "txid": "18ef7f1fbb45ec270f1e9bcad26fe38d867c904bd2e204040e1d044f4404f436",
+      "blockhash": "2b2b8c20939bfff5ea661e923325d5df86114ba8556d1b4fdfbe7e49b76822c6",
+      "height": 854,
+      "bytes": 457376
+    }
+  }
+}
