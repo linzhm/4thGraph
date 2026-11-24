@@ -21,6 +21,17 @@ GOMAXPROCS=2 go test -count=1 -v ./parentbinding
 
 接入父交易验证时，独立证明需连续绑定 IV、分块顺序、已处理字节数和最终 SHA-256 填充，并计算第二轮 SHA-256。BSV Script 需要将计算出的 txid 对照实际输入 outpoint，再绑定用于解析 vout、金额、锁和原前序证明声明的字段。当前探针的测试密钥在本地临时生成，现有 continuity 密钥、公开声明和 Script 验证路径均未接入该探针。
 
+### 隐藏段数据
+
+`SHA256Leaf` 将整块原文字节作为私有见证，并公开起末状态各两个大端 uint128 与起始块序号。段长由电路固定。第零块从标准 IV 起算。两块宽度实测为 202,819 条约束及五个公开标量，不含 Gnark 的常量输入。聚合关系需验证相邻段的索引与状态衔接，并认证实际交易字段边界、最终填充和第二重 SHA-256。叶证明只证明该段的状态转换。 [分段电路](sha_leaf.go)
+
+本机用同一组测试参数为两个相邻的 128 字节向量分段出证。参数生成 47.23 秒，两段出证分别为 1.35 和 1.38 秒，原生验证约 2.5 毫秒。复用旧证明并替换其起始块索引被拒绝。该实测是分段组件，完整父交易证明及节点花费另行验收。
+
+```sh
+GOMAXPROCS=4 go test -count=1 -v ./parentbinding -run '^TestPrivateSHA256Leaf$'
+GOMAXPROCS=4 CCTP_SHA256_LEAF_NATIVE_TEST=1 go test -count=1 -v ./parentbinding -run '^TestPrivateSHA256Leaf$'
+```
+
 ## 生成父交易中间态
 
 在仓库根目录运行。输入是已序列化的 BSV 父交易原文，钱包应在父交易定稿后生成。

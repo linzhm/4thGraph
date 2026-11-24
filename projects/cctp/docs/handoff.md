@@ -103,4 +103,6 @@ PYTHONPATH=.:projects/groth16/reference ../cctp-test-tools/venv/bin/python -m un
 - [有界中间态证明](../fixtures/parent-checkpoint-regtest-summary.json) 已由独立节点确认。同一口径下，332 字节父交易的披露减掉 224 字节，证明增加 1,078 字节。当前小样的独立出资锁为一次性试验构件。
 - [真实 Token 原文对照](../fixtures/token-raw-parent-regtest-summary.json) 从锚定测试铸造经原生冻结和解冻，实际消费 3,433 字节的解冻父交易。新旧组以相同规则保持完整后继输出，并由 Token 锁要求本笔实际验证器。单列持币输入重复的验证器资金原文。v3 连续性父绑定、长父交易证明和跨链公开测试仍需独立完成。
 - [真实 Token 检查点对照](../fixtures/token-checkpoint-regtest-summary.json) 已入块，父披露和证明节省 746 字节。计入验证器资金以及持币输入里的资金副本后，总计 908,280 字节，对照原文组的 9,035 字节。
-- 连续转账优先避免新增父证明。[四笔 2→2 对照](../fixtures/conservation-repeat-regtest-summary.json) 使用现有协同输入取得字典，恢复完整父交易后按实际 txid 和 vout 验证。四笔各自入块，含两笔专用资金交易的合计从 6,621,204 字节降到 3,954,892 字节。每笔仍用原有独立守恒证明，父层只做 Script 认证。未被替换的历史字节仍逐代增加。此路径需再和生产连续性生命周期整合验收。
+- [四笔 2→2 字典对照](../fixtures/conservation-repeat-regtest-summary.json) 使用现有协同输入取得字典，恢复完整父交易后按实际 txid 和 vout 验证。四笔各自入块，含两笔专用资金交易的合计从 6,621,204 字节降到 3,954,892 字节。每笔用一份独立守恒证明，父层由 Script 认证。未被替换的历史字节仍逐代增加。此路径作为体积对照留存。
+- 主验收改为历史增量零字节，允许新增父绑定证明。新试验锚可使用 [Chronicle 专用路径](parent-binding.md#chronicle-新锁的预像和父哈希)。每个实际 Token 输入槽验证所选父输出和前序 B2G 声明。首轮从真实铸造接两笔同形状普通转账。 [铸造基例](mint.md#铸造如何进入连续性证明)
+- [私有 SHA-256 分段](../recursion/parentbinding/README.md#隐藏段数据) 已对两个相邻测试分段完成原生出证。完整父证明还须聚合分段、认证字段位置和真实 TxOut，并接入独立 BSV Node 的两次连续普通转账。
