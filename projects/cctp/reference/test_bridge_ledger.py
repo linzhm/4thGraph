@@ -1,6 +1,7 @@
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
 from pathlib import Path
+import sqlite3
 from tempfile import TemporaryDirectory
 import unittest
 
@@ -29,6 +30,9 @@ class BridgeLedgerTests(unittest.TestCase):
     def ref(index, *, block=1, position=1):
         return ChainReference(index.to_bytes(32, "little"), position, block.to_bytes(32, "little"), 100 + block)
 
+    def state_outpoint(self, index=100):
+        return self.ref(index, position=0).txid + bytes(4)
+
     def deposit(self, index=1, *, gross=1024, fee=0, block=1):
         ref = self.ref(index, block=block)
         pos = DepositPosition(84532, 7, self.reserve, ref.txid, ref.position)
@@ -43,13 +47,13 @@ class BridgeLedgerTests(unittest.TestCase):
         event = self.ledger.observe_deposit(deposit, ref, finalized=False)
         self.assertEqual(self.ledger.state(event).phase, "observed")
         with self.assertRaisesRegex(ValueError, "not finalized"):
-            self.ledger.authorize(event, b"a" * 32)
+            self.ledger.authorize_mint(event, b"a" * 32, self.state_outpoint())
         self.ledger.observe_deposit(deposit, ref, finalized=True)
         before = self.ledger.reconcile(source_balance=1029, live_supply=0, frozen_supply=0)
         self.assertEqual(before.totals.pending_mint, 1024)
         self.assertTrue(before.may_authorize)
 
-        self.assertTrue(self.ledger.authorize(event, b"a" * 32))
+        self.assertTrue(self.ledger.authorize_mint(event, b"a" * 32, self.state_outpoint()))
         self.ledger.observe_mint(event, self.ref(2), 1024, self.owner, finalized=True)
         frozen = self.ledger.reconcile(source_balance=1029, live_supply=1024, frozen_supply=640)
         self.assertEqual((frozen.live_supply, frozen.frozen_supply), (1024, 640))
@@ -88,13 +92,47 @@ class BridgeLedgerTests(unittest.TestCase):
         second_event = restarted.observe_deposit(second, second_ref, finalized=True)
         digest = bytes(range(32))
         with ThreadPoolExecutor(max_workers=5) as pool:
-            results = tuple(pool.map(lambda _: self.open().authorize(second_event, digest), range(12)))
+            results = tuple(pool.map(lambda _: self.open().authorize_mint(second_event, digest, self.state_outpoint(101)), range(12)))
         self.assertEqual(results.count(True), 1)
         self.assertEqual(restarted.state(second_event).authorization, digest)
         with self.assertRaisesRegex(ValueError, "different authorization"):
-            restarted.authorize(second_event, b"x" * 32)
+            restarted.authorize_mint(second_event, b"x" * 32, self.state_outpoint(101))
         with self.assertRaisesRegex(ValueError, "different bridge asset"):
             BridgeLedger(self.path, replace(self.asset, network=2), 84532, self.reserve)
+
+    def test_legacy_unscoped_intent_must_be_replayed_before_new_work(self):
+        first, first_ref = self.deposit()
+        second, second_ref = self.deposit(2)
+        legacy = self.ledger.observe_deposit(first, first_ref, finalized=True)
+        waiting = self.ledger.observe_deposit(second, second_ref, finalized=True)
+        signed_digest = b"a" * 32
+        # Model the previous schema's recorded signing intent, which did not
+        # have a record of the state outpoint used to compute the digest.
+        with sqlite3.connect(self.path) as old:
+            old.execute("UPDATE bridge_events SET authorization = ? WHERE event_id = ?", (signed_digest, legacy))
+        migrated = self.open()
+        with self.assertRaisesRegex(ValueError, "legacy mint authorization"):
+            migrated.authorize_mint(waiting, b"b" * 32, self.state_outpoint())
+        with self.assertRaisesRegex(ValueError, "different authorization"):
+            migrated.authorize_mint(legacy, b"x" * 32, self.state_outpoint())
+        self.assertFalse(migrated.authorize_mint(legacy, signed_digest, self.state_outpoint()))
+        with self.assertRaisesRegex(ValueError, "another mint already reserved"):
+            migrated.authorize_mint(waiting, b"b" * 32, self.state_outpoint())
+
+    def test_confirmed_mint_conflicting_with_reservation_creates_hold(self):
+        first, first_ref = self.deposit()
+        second, second_ref = self.deposit(2)
+        original = self.ledger.observe_deposit(first, first_ref, finalized=True)
+        other = self.ledger.observe_deposit(second, second_ref, finalized=True)
+        state = self.state_outpoint()
+        self.ledger.authorize_mint(original, b"a" * 32, state)
+        self.ledger.note_confirmed_mint_spend(state, other, b"b" * 32)
+        self.ledger.observe_mint(other, self.ref(3), 1024, self.owner, finalized=True)
+        restarted = self.open()
+        self.assertEqual(restarted.state(original).phase, "held")
+        self.assertEqual(restarted.state(other).phase, "settled")
+        with self.assertRaisesRegex(ValueError, "held for review"):
+            restarted.authorize_mint(original, b"a" * 32, state)
 
     def test_preaction_reorg_and_stale_evidence_do_not_reauthorize(self):
         deposit, old = self.deposit()
@@ -107,16 +145,16 @@ class BridgeLedgerTests(unittest.TestCase):
         self.assertEqual(self.ledger.state(event).phase, "orphaned")
         next_ref = replace(old, block_hash=b"b" * 32, height=110)
         self.ledger.observe_deposit(deposit, next_ref, finalized=True)
-        self.assertTrue(self.ledger.authorize(event, b"a" * 32))
+        self.assertTrue(self.ledger.authorize_mint(event, b"a" * 32, self.state_outpoint()))
         self.ledger.observe_mint(event, self.ref(2), 1024, self.owner, finalized=False)
         self.assertTrue(self.ledger.reorg_effect(event, self.ref(2)))
         self.assertEqual(self.ledger.state(event).phase, "authorized")
-        self.assertFalse(self.ledger.authorize(event, b"a" * 32))
+        self.assertFalse(self.ledger.authorize_mint(event, b"a" * 32, self.state_outpoint()))
 
     def test_deep_reorg_and_mismatch_are_durable_holds(self):
         deposit, ref = self.deposit()
         event = self.ledger.observe_deposit(deposit, ref, finalized=True)
-        self.ledger.authorize(event, b"a" * 32)
+        self.ledger.authorize_mint(event, b"a" * 32, self.state_outpoint())
         self.ledger.observe_mint(event, self.ref(2), 1024, self.owner, finalized=True)
         self.assertTrue(self.ledger.reorg_origin(event, ref))
         restarted = self.open()
@@ -128,7 +166,7 @@ class BridgeLedgerTests(unittest.TestCase):
         second, second_ref = self.deposit(3)
         other = restarted.observe_deposit(second, second_ref, finalized=True)
         with self.assertRaisesRegex(ValueError, "held for review"):
-            restarted.authorize(other, b"b" * 32)
+            restarted.authorize_mint(other, b"b" * 32, self.state_outpoint(102))
 
     def test_contradiction_and_duplicate_confirmed_effect_are_rejected(self):
         first, ref = self.deposit()

@@ -8,13 +8,15 @@ an authorization before handing the exact digest to any external signer.
 from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
+import os
 import sqlite3
+import stat
 
 from burn_receipt import BurnReceipt
 from mint_events import Deposit, compressed_key
 from projects.cctp.evm.bsv_burn_evidence import BurnReference
 from projects.cctp.evm.release_adapter import burn_event_id
-from shared.transaction import hash256
+from shared.transaction import Transaction, hash256
 from statement import AssetDescriptor, fixed, uint
 
 _SCHEMA = """
@@ -31,6 +33,17 @@ CREATE UNIQUE INDEX IF NOT EXISTS unique_effect_position
 ON bridge_events(lane, substr(effect_ref, 1, 36)) WHERE effect_phase > 0;
 CREATE UNIQUE INDEX IF NOT EXISTS unique_authorization
 ON bridge_events(authorization) WHERE authorization IS NOT NULL;
+CREATE TABLE IF NOT EXISTS authorization_signatures (
+    event_id BLOB PRIMARY KEY, digest BLOB NOT NULL, signature BLOB NOT NULL
+);
+CREATE TABLE IF NOT EXISTS mint_state_authorizations (
+    state_outpoint BLOB PRIMARY KEY,
+    event_id BLOB NOT NULL UNIQUE,
+    digest BLOB NOT NULL UNIQUE
+);
+CREATE TABLE IF NOT EXISTS mint_authorization_drafts (
+    event_id BLOB PRIMARY KEY, unsigned_transaction BLOB NOT NULL
+);
 CREATE UNIQUE INDEX IF NOT EXISTS unique_refund_position
 ON bridge_events(substr(refund_ref, 1, 36)) WHERE refund_ref IS NOT NULL;
 CREATE TABLE IF NOT EXISTS ledger_audit (
@@ -95,6 +108,14 @@ class EventState:
 
 
 @dataclass(frozen=True)
+class MintAuthorizationDraft:
+    deposit: Deposit
+    transaction: Transaction
+    state_outpoint: bytes
+    digest: bytes
+
+
+@dataclass(frozen=True)
 class LedgerTotals:
     expected_source_balance: int
     expected_live_supply: int
@@ -150,9 +171,15 @@ class BridgeLedger:
         self.asset = asset
         self.source_chain_id = source_chain_id
         self.reserve_contract = fixed(reserve_contract, 20)
-        if self.path == ":memory:" or not source_chain_id or not any(self.reserve_contract):
+        if self.path in ("", ":memory:") or not source_chain_id or not any(self.reserve_contract):
             raise ValueError("ledger needs a durable path and concrete reserve scope")
         descriptor = asset.encode() + uint(source_chain_id, 8) + self.reserve_contract
+        try:
+            fd = os.open(self.path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        except FileExistsError:
+            pass
+        else:
+            os.close(fd)
         with self._db() as conn:
             conn.executescript(_SCHEMA)
             conn.execute("BEGIN IMMEDIATE")
@@ -286,11 +313,30 @@ class BridgeLedger:
         return _measure(deposit.net_quantity, 0, deposit.owner)
 
     def authorize(self, event_id: bytes, digest: bytes) -> bool:
-        """Acquire the one external authorization attempt for an event.
+        """Acquire the one external release authorization attempt for an event.
 
         True grants new work. False means the same claim was already recorded.
-        Recovery can inspect the digest and retry only the identical claim.
+        Mint authorization requires the actual state outpoint.
         """
+        return self._authorize(event_id, digest, mint_state_outpoint=None, mint_draft=None)
+
+    def authorize_mint(
+        self, event_id: bytes, digest: bytes, state_outpoint: bytes, *, transaction: Transaction | None = None,
+    ) -> bool:
+        """Atomically bind one event and signing digest to a serial mint input."""
+        fixed(state_outpoint, 36)
+        if not any(state_outpoint[:32]) or state_outpoint[32:] != bytes(4):
+            raise ValueError("mint authorization requires actual state vout zero")
+        draft = None
+        if transaction is not None:
+            self._private_signature_cache()
+            if (not transaction.inputs or transaction.inputs[0].script
+                    or transaction.inputs[0].outpoint() != state_outpoint):
+                raise ValueError("mint recovery draft disagrees with the unsigned state spend")
+            draft = transaction.serialize()
+        return self._authorize(event_id, digest, mint_state_outpoint=state_outpoint, mint_draft=draft)
+
+    def _authorize(self, event_id, digest, mint_state_outpoint, mint_draft):
         fixed(event_id, 32)
         fixed(digest, 32)
         if not any(digest):
@@ -301,6 +347,20 @@ class BridgeLedger:
                 raise ValueError("canonical origin has not finalized")
             if self._holds(conn):
                 raise ValueError("outbound bridge actions are held for review")
+            if row["lane"] == "mint" and mint_state_outpoint is None:
+                raise ValueError("mint authorization must reserve its state outpoint")
+            if mint_state_outpoint is not None:
+                if row["lane"] != "mint":
+                    raise ValueError("only a mint may reserve the mint state outpoint")
+                self._reserve_mint_state(conn, row, mint_state_outpoint, event_id, digest)
+                if mint_draft is not None:
+                    existing = conn.execute(
+                        "SELECT unsigned_transaction FROM mint_authorization_drafts WHERE event_id = ?", (event_id,),
+                    ).fetchone()
+                    if existing is None:
+                        conn.execute("INSERT INTO mint_authorization_drafts VALUES (?, ?)", (event_id, mint_draft))
+                    elif existing["unsigned_transaction"] != mint_draft:
+                        raise ValueError("mint retry differs from the recorded transaction draft")
             if row["authorization"] is not None:
                 if row["authorization"] != digest:
                     raise ValueError("a different authorization is already recorded for this event")
@@ -314,6 +374,116 @@ class BridgeLedger:
                 raise ValueError("authorization digest belongs to another bridge event") from error
             self._audit(conn, event_id, "authorization_recorded", digest)
             return True
+
+    def _reserve_mint_state(self, conn, row, outpoint, event_id, digest):
+        reservation = conn.execute(
+            "SELECT event_id, digest FROM mint_state_authorizations WHERE state_outpoint = ?", (outpoint,),
+        ).fetchone()
+        if reservation is not None:
+            if reservation["event_id"] != event_id:
+                raise ValueError("another mint already reserved this state outpoint")
+            if reservation["digest"] != digest:
+                raise ValueError("a different authorization is already recorded for this mint state")
+            return
+        previous = conn.execute(
+            "SELECT state_outpoint FROM mint_state_authorizations WHERE event_id = ?", (event_id,),
+        ).fetchone()
+        if previous is not None:
+            raise ValueError("this mint authorization is bound to a different state outpoint")
+        if row["effect_phase"] or row["refund_ref"] is not None:
+            raise ValueError("event has already advanced beyond authorization")
+        if row["authorization"] is None and conn.execute(
+            "SELECT 1 FROM bridge_events AS event "
+            "LEFT JOIN mint_state_authorizations AS reservation ON reservation.event_id = event.event_id "
+            "WHERE event.lane = 'mint' AND event.authorization IS NOT NULL AND event.effect_phase != ? "
+            "AND reservation.state_outpoint IS NULL LIMIT 1", (_FINAL,),
+        ).fetchone():
+            # Older journals persisted an authorization digest without its
+            # predecessor. Only an identical replay may bind that attempt.
+            raise ValueError("unfinished legacy mint authorization has no bound state outpoint")
+        try:
+            conn.execute("INSERT INTO mint_state_authorizations VALUES (?, ?, ?)", (outpoint, event_id, digest))
+        except sqlite3.IntegrityError as error:
+            raise ValueError("mint authorization digest belongs to another state outpoint") from error
+        self._audit(conn, event_id, "mint_state_reserved", outpoint + digest)
+
+    def mint_authorization_draft(self, event_id: bytes) -> MintAuthorizationDraft:
+        self._private_signature_cache()
+        fixed(event_id, 32)
+        with self._db() as conn:
+            row = conn.execute(
+                "SELECT origin_data, origin_phase, effect_phase, refund_ref, state_outpoint, digest, "
+                "unsigned_transaction FROM bridge_events JOIN mint_state_authorizations USING (event_id) "
+                "JOIN mint_authorization_drafts USING (event_id) WHERE event_id = ?", (event_id,),
+            ).fetchone()
+            if (row is None or row["origin_phase"] != _FINAL or row["effect_phase"] == _FINAL
+                    or row["refund_ref"] is not None or self._holds(conn)):
+                raise ValueError("no recoverable mint authorization draft")
+            return MintAuthorizationDraft(Deposit.parse(row["origin_data"]), Transaction.parse(
+                row["unsigned_transaction"]), row["state_outpoint"], row["digest"])
+
+    def note_confirmed_mint_spend(self, state_outpoint: bytes, event_id: bytes, digest: bytes) -> None:
+        """Hold for review if a verified mint disagrees with a pending authorization."""
+        fixed(state_outpoint, 36)
+        fixed(event_id, 32)
+        fixed(digest, 32)
+        with self._db() as conn:
+            reservation = conn.execute(
+                "SELECT event_id, digest FROM mint_state_authorizations WHERE state_outpoint = ?", (state_outpoint,),
+            ).fetchone()
+            row = self._row(conn, event_id)
+            if reservation is not None and (reservation["event_id"], reservation["digest"]) != (event_id, digest):
+                self._hold(conn, reservation["event_id"], "confirmed mint used a differently reserved state outpoint")
+                self._audit(conn, reservation["event_id"], "mint_state_conflict", state_outpoint + event_id + digest)
+            if row is not None and row["authorization"] not in (None, digest):
+                self._hold(conn, event_id, "confirmed mint disagrees with recorded authorization")
+                self._audit(conn, event_id, "mint_authorization_conflict", state_outpoint + digest)
+
+    def _signed_row(self, conn, event_id, digest):
+        fixed(event_id, 32)
+        fixed(digest, 32)
+        row = self._row(conn, event_id)
+        if (row is None or row["authorization"] != digest or row["origin_phase"] != _FINAL
+                or row["refund_ref"] or row["effect_phase"] == _FINAL or self._holds(conn)):
+            raise ValueError("signing authorization is no longer available")
+        return conn.execute(
+            "SELECT signature FROM authorization_signatures WHERE event_id = ? AND digest = ?", (event_id, digest),
+        ).fetchone()
+
+    def authorization_signature(self, event_id: bytes, digest: bytes) -> bytes | None:
+        self._private_signature_cache()
+        with self._db() as conn:
+            row = self._signed_row(conn, event_id, digest)
+            return row["signature"] if row is not None else None
+
+    def record_authorization_signature(self, event_id: bytes, digest: bytes, signature: bytes) -> bytes:
+        """Cache a validated, scoped signature without putting it in audit output."""
+        if type(signature) is not bytes or not 1 <= len(signature) <= 73:
+            raise ValueError("invalid authorization signature encoding")
+        self._private_signature_cache()
+        with self._db() as conn:
+            row = self._signed_row(conn, event_id, digest)
+            if row is not None:
+                return row["signature"]
+            conn.execute("INSERT INTO authorization_signatures VALUES (?, ?, ?)", (event_id, digest, signature))
+            self._audit(conn, event_id, "signature_recorded", digest)
+            return signature
+
+    def _private_signature_cache(self) -> None:
+        mode = os.stat(self.path, follow_symlinks=False).st_mode
+        if not stat.S_ISREG(mode) or mode & 0o077:
+            raise ValueError("authorization cache requires an owner-only ledger file")
+
+    def hold(self, reason: str, evidence: bytes, *, event_id: bytes | None = None) -> None:
+        """Record an operator or adapter hold without altering observed balances."""
+        fixed(evidence, 32)
+        if event_id is not None:
+            fixed(event_id, 32)
+        if not reason or not any(evidence):
+            raise ValueError("hold requires a reason and evidence")
+        with self._db() as conn:
+            self._hold(conn, event_id, reason)
+            self._audit(conn, event_id, "hold_evidence", evidence)
 
     def reorg_origin(self, event_id: bytes, reference: ChainReference) -> bool:
         return self._reorg(event_id, "origin", reference)
@@ -435,8 +605,8 @@ class BridgeLedger:
                 phase = "authorized"
             else:
                 phase = "finalized" if origin == _FINAL else "observed"
-            return EventState(event_id, row["lane"], phase, ChainReference.parse(row["origin_ref"]),
-                              ChainReference.parse(row["effect_ref"]), row["authorization"],
+            return EventState(event_id, row["lane"], phase, ChainReference.parse(row["origin_ref"] if origin else None),
+                              ChainReference.parse(row["effect_ref"] if effect else None), row["authorization"],
                               ChainReference.parse(row["refund_ref"]), origin == _FINAL, effect == _FINAL)
 
     def _totals(self, conn) -> LedgerTotals:
