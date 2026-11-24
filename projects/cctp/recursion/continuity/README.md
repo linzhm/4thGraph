@@ -13,7 +13,7 @@ SHA256d("BSV/CCTP/continuity/v1\0" || asset[32] || selfKeyDigest[32] ||
 
 本版本编译到 8,062,485 条 R1CS 约束，含一个无公开索引的 BSB22 承诺。设置 `CCTP_CONTINUITY_SOLVER_TEST=1` 运行完整约束分派检查。它用两套独立的小型 BSB22 密钥给同一个摘要出证，使电路接受零、一、两个前序的有效形状，并拒绝摘要相同但来自另一密钥的证明。该检查使用求解器的测试挑战，独立于本电路完整 setup 和真实递归出证。
 
-本机独立测试 setup 用时 18 分 7.6 秒，证明密钥约 2.5 GiB。gnark 用同一密钥验证了两份基例、验证这两份基例的递归证明，以及验证该递归证明的后继。四次出证各用 38.7 至 42.6 秒。chain-gang 的独立 Script 检查通过了其中一份基例和第一层递归证明。该组证明使用合成交易摘要。实际交易测试在后文单独运行。
+原生测试用同一把密钥验证了两份零前序证明、引用这两份证明的双前序证明，以及引用该递归证明的单前序证明。测试 setup 用时 18 分 7.6 秒，证明密钥约 2.5 GiB，四次出证各用 38.7 至 42.6 秒。两代递归证明均通过 Python 摘要重建、Script 和 chain-gang 验证。此组使用合成交易上下文。证明材料、四个负例和参数指纹见 [测试记录](testdata/native-demo-summary.json)。
 
 在 `projects/cctp/recursion` 运行 Go 命令。`probe` 用嵌入的小型 BSB22 样例验证零前序 R1CS 形状。`demo` 生成一套独立参数和连续证明。`setup` 只生成参数，`prove` 复用已有参数并从前序证明 JSON 提取实际公开摘要。
 
@@ -28,7 +28,7 @@ go run ./continuity -mode prove -dir /tmp/cctp-continuity-demo \
 
 `key.json` 含验证密钥、承诺参数和 `continuity_key_digest`。证明文件加上各公开输入和扩展承诺字段，可用现有 Python `committed_verifier.load_artifact` 解析。`continuity` 元数据记录标准摘要材料。验证以公开输入和 BSV 提供的认证交易材料为准。保留本地 `proving.key`、`verifying.key` 和 `circuit.txt` 可以重新出证；程序拒绝加载不同约束指纹的缓存。
 
-连续生成多笔交易时可运行 `go run ./continuity -mode session -dir /tmp/cctp-continuity-demo`。同一进程只加载一次参数。标准输出先返回包含 `ready` 和 `continuity_key_digest` 的 JSON 行，随后每个请求返回一行 JSON。诊断信息写入标准错误。输入请求格式如下：
+连续生成多笔交易时可运行 `go run ./continuity -mode session -dir /tmp/cctp-continuity-demo`。同一进程只加载一次参数。标准输出先返回包含 `ready` 和 `continuity_key_digest` 的 JSON 行，随后每个请求返回一行 JSON。诊断信息写入标准错误。以下是一条请求示例。
 
 ```json
 {"id":"merge","asset":"ASSET_HEX32","context":"CONTEXT_HEX32","prior":["/tmp/left.json","/tmp/right.json"],"out":"/tmp/merged.json"}

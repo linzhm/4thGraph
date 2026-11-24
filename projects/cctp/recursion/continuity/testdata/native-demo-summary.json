@@ -1,0 +1,73 @@
+{
+  "scope": "One same-key continuity circuit and two recursive generations with synthetic transaction contexts",
+  "constraints": 8062485,
+  "self_key_digest": "677731270de75ec11f65c92f2ac8b0c428df79e28a532a035b8402166eb04a9b",
+  "circuit_fingerprint": "70a485af0ccc64cffb4275515fabc57d9344b5104960a7ae22e2819cbd681704",
+  "setup_seconds": 1087.572720708,
+  "native_proof_seconds": [
+    42.612364625,
+    39.035490208,
+    38.688639208,
+    39.002225958
+  ],
+  "cache_write_seconds": 5.291189209,
+  "maximum_resident_bytes": 19387367424,
+  "proofs": [
+    {
+      "artifact": "base-a.json",
+      "sha256": "5407f09dbeba95df71bb0a97f06c2cd204411070f5955e03947e7982858fb5c8",
+      "count": 0,
+      "digest": "2e3685940b3bb765893b49af04a9310c4c07f3351e9aad527c5da29da3ce50ad",
+      "prior_digests": [
+        "0000000000000000000000000000000000000000000000000000000000000000",
+        "0000000000000000000000000000000000000000000000000000000000000000"
+      ],
+      "native_gnark_verify": "passed"
+    },
+    {
+      "artifact": "base-b.json",
+      "sha256": "6dbf90734ec97185214490d086e3d594f0bc7b1fb732dba8cdbe77044ec312c1",
+      "count": 0,
+      "digest": "d4063d083246782a233d80f2fdd7889f7b62d4177898a615e8cd54577c42531a",
+      "prior_digests": [
+        "0000000000000000000000000000000000000000000000000000000000000000",
+        "0000000000000000000000000000000000000000000000000000000000000000"
+      ],
+      "native_gnark_verify": "passed"
+    },
+    {
+      "artifact": "recursive-one.json",
+      "sha256": "f40e1d1e79a3034164dded740bb87c581e1eea476f101b4d451daeee79decdd6",
+      "count": 2,
+      "digest": "6e4501dc4ec9bd6358f1413feba1c3abce36d7be25deef5726eb6eca8578a7a8",
+      "prior_digests": [
+        "2e3685940b3bb765893b49af04a9310c4c07f3351e9aad527c5da29da3ce50ad",
+        "d4063d083246782a233d80f2fdd7889f7b62d4177898a615e8cd54577c42531a"
+      ],
+      "native_gnark_verify": "passed"
+    },
+    {
+      "artifact": "recursive-two.json",
+      "sha256": "229d63264ee45d1065494912818dba65f42552733c5ad9690fc496cd3dab95de",
+      "count": 1,
+      "digest": "e8034d106dbbd2ed7cba586ee49acaf6c077063b33e54a3fca68e1e79831f00a",
+      "prior_digests": [
+        "6e4501dc4ec9bd6358f1413feba1c3abce36d7be25deef5726eb6eca8578a7a8",
+        "0000000000000000000000000000000000000000000000000000000000000000"
+      ],
+      "native_gnark_verify": "passed"
+    }
+  ],
+  "constraint_negatives_rejected": [
+    "ordered prior proof mismatch",
+    "different witnessed key",
+    "count exceeds two",
+    "nonzero inactive digest"
+  ],
+  "repeated_prior_digest_solved": true,
+  "recursive_artifacts_verified_by_python_script_and_chain_gang": [
+    "recursive-one.json",
+    "recursive-two.json"
+  ],
+  "persistent_session_recompiled_the_same_cache_fingerprint": true
+}
