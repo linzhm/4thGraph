@@ -80,8 +80,8 @@ def standalone_witness(key, relation, signals, proof):
     return unlocking_script(verifier_fields(key, relation, signals, proof)) + b"".join(map(number, signals))
 
 
-def load_artifact(data):
-    """Decode a fixture exported by the pinned recursion experiment."""
+def load_verifying_key(data):
+    """Decode the supported BSB22 key and its commitment parameters."""
     if (data["format"] != "CCTP recursion experiment v1" or data["protocol"] != "gnark Groth16 BSB22"
             or data["curve"] != "bls12-381" or data["hash_to_field"] != "gnark NewShort BLS12-381 MiMC"
             or data["committed_public_indexes"] != []):
@@ -89,10 +89,18 @@ def load_artifact(data):
     key = VerificationKey(point(data["g1_alpha"]), point(data["g2_beta"], twist=True),
                           point(data["g2_gamma"], twist=True), point(data["g2_delta"], twist=True),
                           tuple(point(value, allow_infinity=True) for value in data["ic"]))
-    if len(key.ic) != 4 or len(data["public_signals"]) != 2:
+    if len(key.ic) != 4:
         raise ValueError("invalid Groth16 public input shape")
     relation = CommitmentRelation(point(data["commitment_g2"], twist=True),
                                   point(data["commitment_g2_sigma_neg"], twist=True))
+    return key, relation
+
+
+def load_artifact(data):
+    """Decode a fixture exported by the pinned recursion experiment."""
+    key, relation = load_verifying_key(data)
+    if len(data["public_signals"]) != 2:
+        raise ValueError("invalid Groth16 public input shape")
     proof = Proof(point(data["proof_a"]), point(data["proof_b"], twist=True), point(data["proof_c"]))
     committed = CommittedProof(proof, point(data["commitment"]), point(data["commitment_knowledge_proof"]))
     signals = tuple(scalar(value, R) for value in data["public_signals"])

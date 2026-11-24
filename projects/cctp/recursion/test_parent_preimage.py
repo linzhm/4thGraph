@@ -44,6 +44,16 @@ class PredecessorPreimageTests(unittest.TestCase):
                                                    parent.inputs[1])).serialize()
         with self.assertRaises(ScriptError):
             evaluate(push(wrong_lock_parent) + push(wrong_lock_funding.serialize()) + lock_for(wrong_lock_parent))
+        bad_position = replace(parent, inputs=(replace(parent.inputs[0], vout=1), parent.inputs[1])).serialize()
+        with self.assertRaises(ScriptError):
+            evaluate(push(bad_position) + push(funding.serialize()) + lock_for(bad_position))
+        # The first output's one-byte script length replaced by a noncanonical
+        # CompactSize encoding. Give that exact raw parent its own hash check.
+        raw = parent.serialize()
+        offset = 4 + 1 + sum(len(item.serialize()) for item in parent.inputs) + 1 + 8
+        bad_size = raw[:offset] + b'\xfd\x01\x00' + raw[offset + 1:]
+        with self.assertRaises(ScriptError):
+            evaluate(push(bad_size) + push(funding.serialize()) + lock_for(bad_size))
         if find_spec("tx_engine") is not None:
             from shared.chain_gang import validate_at_heights
 

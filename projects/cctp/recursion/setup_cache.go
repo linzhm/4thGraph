@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
@@ -13,15 +14,24 @@ import (
 	"github.com/consensys/gnark/constraint"
 )
 
+const keyIOBuffer = 1 << 20
+
+func circuitFingerprint(ccs constraint.ConstraintSystem) (string, error) {
+	hash := sha256.New()
+	if _, err := ccs.WriteTo(hash); err != nil {
+		return "", fmt.Errorf("fingerprint compiled constraints: %w", err)
+	}
+	return "cctp-recursion-gnark-v0.16.5-bls12-381 " + hex.EncodeToString(hash.Sum(nil)) + "\n", nil
+}
+
 func provingSetup(ccs constraint.ConstraintSystem, cachePath string) (groth16.ProvingKey, groth16.VerifyingKey, error) {
 	if cachePath == "" {
 		return groth16.Setup(ccs)
 	}
-	hash := sha256.New()
-	if _, err := ccs.WriteTo(hash); err != nil {
-		return nil, nil, fmt.Errorf("fingerprint compiled constraints: %w", err)
+	fingerprint, err := circuitFingerprint(ccs)
+	if err != nil {
+		return nil, nil, err
 	}
-	fingerprint := "cctp-recursion-gnark-v0.16.5-bls12-381 " + hex.EncodeToString(hash.Sum(nil)) + "\n"
 	cachePath = filepath.Clean(cachePath)
 	cached, err := os.ReadFile(filepath.Join(cachePath, "circuit.txt"))
 	if err == nil {
@@ -74,7 +84,7 @@ func readKey(directory, name string, reader io.ReaderFrom) error {
 		return err
 	}
 	defer file.Close()
-	if _, err := reader.ReadFrom(file); err != nil {
+	if _, err := reader.ReadFrom(bufio.NewReaderSize(file, keyIOBuffer)); err != nil {
 		return fmt.Errorf("read %s: %w", name, err)
 	}
 	return nil
@@ -85,7 +95,11 @@ func writeKey(directory, name string, writer io.WriterTo) error {
 	if err != nil {
 		return err
 	}
-	_, err = writer.WriteTo(file)
+	buffer := bufio.NewWriterSize(file, keyIOBuffer)
+	_, err = writer.WriteTo(buffer)
+	if err == nil {
+		err = buffer.Flush()
+	}
 	closeErr := file.Close()
 	if err != nil {
 		return fmt.Errorf("write %s: %w", name, err)

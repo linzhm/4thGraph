@@ -1,0 +1,18 @@
+{
+  "scope": "gnark recursive aggregate proof and CCTP digest Script, standalone BSB22 spend",
+  "node": "/Bitcoin SV:1.2.3/",
+  "height": 308,
+  "block_hash": "6c431456e9e66043a0b28966f608de93a2f017c7563933d193636e7af5911c80",
+  "txid": "9688dbac6227428fc9789a97468647f66e2c7bb825c891af2265f5a3723a2f0c",
+  "funding_txid": "d7a0fe69b733df89af4b5d10d3297372b544dbbe7053521a5bf18df300ad5299",
+  "lock_bytes": 943750,
+  "witness_bytes": 1961,
+  "transaction_bytes": 2024,
+  "wrong_pok": "mandatory-script-verify-flag-failed",
+  "artifact": "two-leaf-outer-proof.json",
+  "input": "two-parents.json",
+  "setup_seconds": 857.426980834,
+  "prove_seconds": 82.351931542,
+  "verification_seconds": 0.002804292,
+  "max_rss_bytes": 11796545536
+}

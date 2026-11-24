@@ -4,6 +4,7 @@ import (
 	"math/big"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/consensys/gnark-crypto/ecc"
@@ -19,6 +20,8 @@ type artifactSmoke struct {
 	Low  frontend.Variable `gnark:",public"`
 	X    frontend.Variable
 	Y    frontend.Variable
+
+	requireY bool `gnark:"-"`
 }
 
 func (c *artifactSmoke) Define(api frontend.API) error {
@@ -28,6 +31,9 @@ func (c *artifactSmoke) Define(api frontend.API) error {
 	}
 	api.AssertIsDifferent(commitment, 0)
 	api.AssertIsEqual(api.Mul(c.X, c.Y), api.Add(c.High, c.Low))
+	if c.requireY {
+		api.AssertIsDifferent(c.Y, 0)
+	}
 	return nil
 }
 
@@ -76,5 +82,12 @@ func TestCommittedArtifact(t *testing.T) {
 	}
 	if err := exportOuterProof(path, vk.(*blsGroth16.VerifyingKey), proof.(*blsGroth16.Proof), signals); err != nil {
 		t.Fatal(err)
+	}
+	other, err := frontend.Compile(field, r1cs.NewBuilder, &artifactSmoke{requireY: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err = provingSetup(other, parameters); err == nil || !strings.Contains(err.Error(), "different constraint system") {
+		t.Fatalf("reused a setup for a changed circuit: %v", err)
 	}
 }

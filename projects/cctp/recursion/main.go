@@ -51,9 +51,7 @@ type innerWitness = recursive.Witness[sw_bls12381.ScalarField]
 
 type aggregate struct {
 	Digest     [2]frontend.Variable `gnark:",public"`
-	Context    []frontend.Variable  // Fixed-asset profile's candidate hash.
-	Asset      []frontend.Variable  // Portable profile's common asset ID.
-	ChildTail  []frontend.Variable  // Portable profile's child statement after asset ID.
+	Context    []frontend.Variable  // Candidate hash or the child statement after its domain.
 	ParentBody [2][bodySize]frontend.Variable
 	Proofs     [2]innerProof
 
@@ -91,18 +89,18 @@ func (c *aggregate) Define(api frontend.API) error {
 	}
 	commitment := uints.NewU8Array([]byte(outerDomain))
 	parentPrefix := uints.NewU8Array(c.identity[:])
-	if len(c.Asset) == 0 {
+	if len(c.Context) == 32 {
 		for _, value := range c.Context {
 			commitment = append(commitment, bytes.ValueOf(value))
 		}
 	} else {
 		child := uints.NewU8Array([]byte(parentDomain))
-		for i, value := range c.Asset {
+		for i, value := range c.Context[:assetSize] {
 			b := bytes.ValueOf(value)
 			child = append(child, b)
 			parentPrefix[len(parentDomain)+i] = b
 		}
-		for _, value := range c.ChildTail {
+		for _, value := range c.Context[assetSize:] {
 			child = append(child, bytes.ValueOf(value))
 		}
 		context, err := hash256(api, child)
@@ -269,10 +267,8 @@ func assignment(fixture fixture, portableAsset bool) (aggregate, aggregate, [2][
 	var valid aggregate
 	var statements [2][]byte
 	if portableAsset {
-		circuit.Asset = make([]frontend.Variable, assetSize)
-		circuit.ChildTail = make([]frontend.Variable, mimoSize-assetEnd)
-		valid.Asset = byteWitness(mimo[len(parentDomain):assetEnd])
-		valid.ChildTail = byteWitness(mimo[assetEnd:])
+		circuit.Context = make([]frontend.Variable, mimoSize-len(parentDomain))
+		valid.Context = byteWitness(mimo[len(parentDomain):])
 	} else {
 		circuit.Context = make([]frontend.Variable, 32)
 		valid.Context = byteWitness(context)
@@ -320,7 +316,7 @@ func byteWitness(input []byte) []frontend.Variable {
 	return values
 }
 
-func run(fixturePath string, prove, portableAsset bool, artifactPath, setupPath string) error {
+func run(fixturePath string, prove, setupOnly, portableAsset, fingerprint bool, artifactPath, setupPath, vkPath string) error {
 	data, err := os.ReadFile(fixturePath)
 	if err != nil {
 		return err
@@ -340,6 +336,13 @@ func run(fixturePath string, prove, portableAsset bool, artifactPath, setupPath 
 		return fmt.Errorf("compile: %w", err)
 	}
 	fmt.Printf("outer compile: %s, %d R1CS constraints\n", time.Since(started), ccs.GetNbConstraints())
+	if fingerprint {
+		value, err := circuitFingerprint(ccs)
+		if err != nil {
+			return err
+		}
+		fmt.Printf("setup fingerprint: %s", value)
+	}
 	for i, entry := range ccs.GetCommitments().(constraint.Groth16Commitments) {
 		fmt.Printf("BSB22 commitment %d: public wire indexes %v\n", i, entry.GetPublicCommitted())
 	}
@@ -367,13 +370,12 @@ func run(fixturePath string, prove, portableAsset bool, artifactPath, setupPath 
 	wrongProof := valid
 	wrongProof.Proofs[1] = valid.Proofs[0]
 	wrongContext := valid
+	wrongContext.Context = append([]frontend.Variable(nil), valid.Context...)
+	index := 0
 	if portableAsset {
-		wrongContext.ChildTail = append([]frontend.Variable(nil), valid.ChildTail...)
-		wrongContext.ChildTail[0] = valid.ChildTail[0].(uint8) ^ 1
-	} else {
-		wrongContext.Context = append([]frontend.Variable(nil), valid.Context...)
-		wrongContext.Context[0] = valid.Context[0].(uint8) ^ 1
+		index = assetSize
 	}
+	wrongContext.Context[index] = valid.Context[index].(uint8) ^ 1
 	wrongStatement := valid
 	changed := append([]byte(nil), statements[1]...)
 	changed[identitySize] ^= 1 // Alter the parent preimage commitment.
@@ -393,8 +395,8 @@ func run(fixturePath string, prove, portableAsset bool, artifactPath, setupPath 
 	}
 	if portableAsset {
 		foreignAsset := valid
-		foreignAsset.Asset = append([]frontend.Variable(nil), valid.Asset...)
-		foreignAsset.Asset[0] = valid.Asset[0].(uint8) ^ 1
+		foreignAsset.Context = append([]frontend.Variable(nil), valid.Context...)
+		foreignAsset.Context[0] = valid.Context[0].(uint8) ^ 1
 		foreignChild := parseHex(fixture.ContextStatement, mimoSize)
 		foreignChild[len(parentDomain)] ^= 1
 		foreignContext := doubleSHA(foreignChild)
@@ -419,13 +421,21 @@ func run(fixturePath string, prove, portableAsset bool, artifactPath, setupPath 
 		}
 		fmt.Printf("rejected %s\n", test.name)
 	}
-	if prove {
+	if prove || setupOnly {
 		started = time.Now()
 		pk, outerVK, err := provingSetup(ccs, setupPath)
 		if err != nil {
 			return err
 		}
 		fmt.Printf("outer experiment setup/load: %s\n", time.Since(started))
+		if vkPath != "" {
+			if err := exportVerifyingKey(vkPath, outerVK.(*blsGroth16.VerifyingKey)); err != nil {
+				return err
+			}
+		}
+		if setupOnly {
+			return nil
+		}
 		started = time.Now()
 		outerProof, err := groth16.Prove(ccs, pk, out,
 			recursive.GetNativeProverOptions(field, field))
@@ -462,12 +472,16 @@ func main() {
 	portableAsset := flag.Bool("portable-asset", false, "bind a shared asset witness to each parent and child statement")
 	artifact := flag.String("artifact", "", "write the outer proof, verifying key and public inputs as experimental JSON")
 	setup := flag.String("setup-dir", "", "save or load an experimental setup for this exact constraint system")
+	fingerprint := flag.Bool("fingerprint", false, "print the exact constraint-system fingerprint for setup reuse")
+	setupOnly := flag.Bool("setup-only", false, "prepare the setup cache and verifying key before the transaction is built")
+	verificationKey := flag.String("verifying-key", "", "export the outer verifying key without proof fields")
 	flag.Parse()
-	if flag.NArg() != 1 || ((*artifact != "" || *setup != "") && !*prove) {
-		fmt.Fprintln(os.Stderr, "usage: recursion [-portable-asset] [-prove [-artifact proof.json] [-setup-dir parameters]] fixture.json")
+	if flag.NArg() != 1 || (*prove && *setupOnly) || (*artifact != "" && !*prove) ||
+		((*setup != "" || *verificationKey != "") && !(*prove || *setupOnly)) {
+		fmt.Fprintln(os.Stderr, "usage: recursion [-portable-asset] [-fingerprint] [-prove|-setup-only] [-artifact proof.json] [-setup-dir parameters] [-verifying-key key.json] fixture.json")
 		os.Exit(2)
 	}
-	if err := run(flag.Arg(0), *prove, *portableAsset, *artifact, *setup); err != nil {
+	if err := run(flag.Arg(0), *prove, *setupOnly, *portableAsset, *fingerprint, *artifact, *setup, *verificationKey); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}

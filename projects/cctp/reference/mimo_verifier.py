@@ -142,11 +142,12 @@ class MimoProfile:
             raise ValueError("expected one to eight approved verifier locks")
         fixed(self.freeze_key, 33)
 
-    def relation(self, asset_id, reserve_domain=None):
+    def relation(self, asset_id, reserve_domain=None, *, keep_parents=False):
         """Derive [slots, preimage] above the proof stack.
 
         Witness order above proof: parent raws in vin order (excluding vin 0),
         serialized outputs, serialized prevouts, and the compact preimage.
+        With keep_parents, leave the authenticated parent raws below the result.
         """
         parse = _parse_active_token(asset_id, self.freeze_key, self.guards)
         code = (
@@ -184,7 +185,7 @@ class MimoProfile:
             )
         return (
             code + asm("OP_FROMALTSTACK OP_SIZE OP_0 OP_NUMEQUALVERIFY OP_2DROP OP_TOALTSTACK")
-            + asm("OP_DROP") * (self.incoming + 2)
+            + asm("OP_DROP") * (2 if keep_parents else self.incoming + 2)
             + asm("OP_FROMALTSTACK OP_FROMALTSTACK")
         )
 

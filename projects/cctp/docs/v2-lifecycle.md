@@ -42,3 +42,28 @@ bash shared/verify_node_apple.sh cctp-v2 19445 test_mimo_verifier
 钱包从真实区块头和 Merkle 路径验收 384 找零，独立查询其未花费，并查询同一条路线的早期输出为已花费。赎回证明签发前，宿主用 ConfirmedLineage 从经独立 BSV Node 验证的确认历史追到真实发行锚。此观察路径仍需替换为满足规格的电路内递归，对于公开测试网也要重新配置最终性、测试资产及发布策略。
 
 SQLite 桥账本可记录经认证的链上事件和签名前授权摘要，提供去重、补扫恢复、对照实际余额和异常挂起。其恢复及对账测试独立运行。后续服务联测还应实际注入深重组，验证账本挂起阻止签发并驱动链上暂停。
+
+
+## 竞态与恢复补充
+
+[冻结竞态记录](../fixtures/freeze-race-regtest-summary.json) 使用两笔独立锚定铸造输出。对每笔输出，先用节点和 chain-gang 分别验证签名齐全的冻结、支付两个候选，再交换提交顺序。先提交者入块，另一笔因同一 outpoint 的 mempool 竞争被拒。错误冻结授权，以及正确持有人签名和真实 Groth16 证明的冻结后支付，均被脚本拒绝。
+
+签发服务先持久记录准确摘要，再调用外部签名器。原参数重试可复用缓存签名。独立 BSV 节点与 Anvil 实测了 finalized 入金、确认门槛、重启后同一铸造交易复用，以及撤销 BSV 铸造块触发的持久挂起。释放服务的重试与重组联动使用模拟 RPC 测试。长运行观察进程及公开网络的重组恢复仍需集成验收。
+
+[公开测试网准备与核验工具](../evm/public-testnet.md) 生成可审阅的 Base Sepolia 测试储备部署数据，离线核验外部签名，读取最终确认的部署、入金与结清。还需完成真正的递归来源闭环，并配置获授权的测试签名器、测试资产和能验证及转发最终交易的 BSV 节点。
+
+## 双父递归交易复现
+
+[递归工程](../recursion/README.md)包括可复用的 v2 外层测试参数。先用 `prepare_v2.py` 生成与 v2 叶子电路相同的 1→2 证明种子，再按该文档编译 Go 程序、生成参数缓存及验证密钥。缓存和证明密钥放在独立的私有临时目录。供子交易使用的验证密钥必须与叶子代币锁白名单中的递归锁完全一致。
+
+```sh
+export PYTHONPATH=.:projects/groth16/reference:projects/cctp/reference:projects/cctp/recursion
+../cctp-test-tools/venv/bin/python projects/cctp/recursion/run_recursive_mimo.py \
+  --node-url "$REGTEST_URL" --cookie "$REGTEST_COOKIE" \
+  --vk /tmp/cctp-v2-portable-vk.json --prover /tmp/cctp-recursion-portable \
+  --setup-dir /tmp/cctp-v2-portable-setup --out /tmp/cctp-actual-recursive-spend
+```
+
+该场景从实际发行锚铸造两次 1,024 单位，用两笔独立的 1→2 交易分别产生父证明。子交易从实际花费的两个 vout 取得 640 和 324，输出 700 和 264。Script 按各父交易原文及其验证器实际 funding output 重建父证明语句。子交易的 SIGHASH_ALL、实际数量守恒及两份父语句顺序一起绑定到外层证明。
+
+`keycommit/` 单独测试了下一阶段所需的动态验证密钥认证。它按顺序承诺 gnark 实际使用的配对目标、IC 坐标、Gamma/Delta 负点与 BSB22 承诺密钥，并禁止未绑定的预计算配对线。测试用绑定的动态密钥验证真实 BSB22 证明，并拒绝换公开输入或替换密钥坐标。多层通用电路仍须把该密钥承诺和实际授权铸造锚点接入同一个受资产认可的交易语句。
