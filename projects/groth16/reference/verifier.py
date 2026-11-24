@@ -150,13 +150,16 @@ def prepared_lines(point):
     return tuple(steps)
 
 
-def miller(tower, a, b, c, delta_lines, initial=ONE, *, join_lines=False, projective=False):
+def miller(
+    tower, a, b, c, delta_lines, initial=ONE, *, join_lines=False, projective=False,
+    gamma_term=None,
+):
     """Positive-seed Ate loop. The fixed delta lines are generated once."""
     curve = Curve(tower.fp, twist=True)
     jacobian = Jacobian(curve)
     current = jacobian.lift(b) if projective else b
     value = initial
-    for bit, fixed in zip(BITS, delta_lines, strict=True):
+    for step_index, (bit, fixed) in enumerate(zip(BITS, delta_lines, strict=True)):
         value = tower.mul12(value, value)
         for index, (slope_delta, intercept_delta) in enumerate(fixed):
             if projective:
@@ -171,6 +174,16 @@ def miller(tower, a, b, c, delta_lines, initial=ONE, *, join_lines=False, projec
                 value = tower.mul12(value, tower.join_lines(line_b, line_delta))
             else:
                 value = tower.mul_line(tower.mul_line(value, line_b), line_delta)
+            if gamma_term is not None:
+                gamma_lines, gamma_point, finite = gamma_term
+                slope_gamma, intercept_gamma = gamma_lines[step_index][index]
+                line_gamma = evaluated_line(tower, gamma_point, slope_gamma, intercept_gamma)
+                identity = ((1, 0), (0, 0), (0, 0))
+                selected = tuple(
+                    tuple(tower.fp.select(finite, limb, fallback) for limb, fallback in zip(term, unit, strict=True))
+                    for term, unit in zip(line_gamma, identity, strict=True)
+                )
+                value = tower.mul_line(value, selected)
         if bit == "1" and initial != ONE:
             value = tower.mul12(value, initial)
     return value, current
@@ -261,14 +274,28 @@ def locking_script(
     reuse_constants=False,
 ):
     """Return script bytes, named offsets and a generated stack-depth estimate."""
-    delta_lines, constant = prepare_key(key, public_inputs)
+    dynamic = public_inputs is None
+    delta_lines, constant = prepare_key(key, (0, 0) if dynamic else public_inputs)
     program = Program()
     tower = Tower(program)
     g1, g2 = Curve(program), Curve(program, twist=True)
+    if dynamic:
+        low, high, claimed_x, claimed_y = (program.wire_field() for _ in range(4))
     a = tuple(program.wire_field() for _ in range(2))
     b = tuple(tuple(program.wire_field() for _ in range(2)) for _ in range(2))
     c = tuple(program.wire_field() for _ in range(2))
     z = tuple(tuple(program.wire_field() for _ in range(2)) for _ in range(6))
+    gamma_term = None
+    if dynamic:
+        from public_inputs import require_public_input_point
+
+        program.mark("public_inputs")
+        finite = require_public_input_point(program, key.ic, high, low, claimed_x, claimed_y)
+        gamma_term = (prepared_lines(key.gamma), g1.negate((claimed_x, claimed_y)), finite)
+        host = Host()
+        constant = fixed_miller(
+            Tower(host), Curve(host).negate(key.alpha), prepared_lines(key.beta),
+        )
     program.mark("subgroups_and_curve")
     g1_check = check_g1_projective if projective_g1 else check_g1
     g1_check(g1, a)
@@ -277,7 +304,7 @@ def locking_script(
     program.mark("miller")
     product, seed_multiple = miller(
         tower, a, b, g1.negate(c), delta_lines, z if fused else ONE,
-        join_lines=join_lines, projective=projective_g2,
+        join_lines=join_lines, projective=projective_g2, gamma_term=gamma_term,
     )
     check_g2(g2, b, seed_multiple, projective=projective_g2)
     program.mark("residue")

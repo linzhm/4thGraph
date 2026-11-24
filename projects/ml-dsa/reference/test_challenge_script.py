@@ -2,8 +2,8 @@
 
 import unittest
 
-from challenge_script import DEFAULT_STREAM_BYTES, sample_from_stream_script, sample_in_ball_script
-from fips204 import sample_challenge
+from challenge_script import sample_from_stream_script, sample_in_ball_script
+from fips204 import CHALLENGE_WEIGHT, SAMPLE_IN_BALL_BYTES, sample_challenge
 from polynomial import MODULUS
 from shared.chain_gang import validate_at_heights
 from shared.script import asm, push
@@ -38,12 +38,14 @@ class ChallengeScriptTests(unittest.TestCase):
                     with self.subTest(version=version, creation=creation, height=height, challenge=challenge.hex()):
                         self.check(script, challenge, expected, version=version, creation=creation, height=height)
 
-    def test_rejections_do_not_advance_the_challenge(self):
+    def test_appendix_c_limit_can_consume_the_last_byte(self):
+        self.assertEqual(SAMPLE_IN_BALL_BYTES, 221)
         script = sample_from_stream_script()
-        stream = b'\xff' * 8 + b'\xff' * (DEFAULT_STREAM_BYTES - 8 - 39) + bytes(range(39))
-        expected = pack([-1] * 39 + [0] * (256 - 39))
+        stream = b'\xff' * (SAMPLE_IN_BALL_BYTES - CHALLENGE_WEIGHT) + bytes(range(CHALLENGE_WEIGHT))
+        expected = pack([-1] * CHALLENGE_WEIGHT + [0] * (256 - CHALLENGE_WEIGHT))
         self.check(script, stream, expected)
-        self.check(script, b'\xff' * DEFAULT_STREAM_BYTES, None)
+        self.check(script, b'\xff' + stream[:-1], None)
+        self.check(script, b'\xff' * SAMPLE_IN_BALL_BYTES, None)
         self.check(script, stream[:-1], None)
 
 

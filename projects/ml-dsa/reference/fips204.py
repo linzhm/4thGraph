@@ -2,22 +2,24 @@
 
 from hashlib import shake_128, shake_256
 from hmac import compare_digest
-from itertools import islice
 
 from polynomial import DEGREE, MODULUS, inverse_ntt, ntt
 
 PUBLIC_KEY_BYTES = 1_312
 SIGNATURE_BYTES = 2_420
+CHALLENGE_BYTES = 32
+CHALLENGE_WEIGHT = 39
+CHALLENGE_SIGN_BYTES = 8
+# FIPS 204, Appendix C, Table 3, including the bytes reserved for signs.
+SAMPLE_IN_BALL_BYTES = 221
 
 # FIPS 204, Table 1, category 2.
 _K = _L = 4
 _D = 13
-_TAU = 39
 _BETA = 78
 _GAMMA1 = 1 << 17
 _GAMMA2 = (MODULUS - 1) // 88
 _OMEGA = 80
-_CHALLENGE_BYTES = 32
 _T1_WIDTH, _Z_WIDTH, _W1_WIDTH = 10, 18, 6
 
 
@@ -70,20 +72,16 @@ def _matrix_entry(seed, row, column):
                     return coefficients
 
 
-def sample_challenge(challenge, *, stream_bytes=None):
+def sample_challenge(challenge):
     """SampleInBall from SHAKE256, with the first 64 bits as sign bits."""
-    if not isinstance(challenge, bytes) or len(challenge) != _CHALLENGE_BYTES:
+    if not isinstance(challenge, bytes) or len(challenge) != CHALLENGE_BYTES:
         raise ValueError("ML-DSA-44 challenge must be 32 bytes")
-    stream = (value for block in _squeeze(shake_256(challenge), 136) for value in block)
-    if stream_bytes is not None:
-        stream = islice(stream, stream_bytes)
-    sign_bytes = bytes(islice(stream, 8))
-    if len(sign_bytes) != 8:
-        raise ValueError("SampleInBall exhausted its SHAKE stream")
-    signs = int.from_bytes(sign_bytes, "little")
+    stream = shake_256(challenge).digest(SAMPLE_IN_BALL_BYTES)
+    signs = int.from_bytes(stream[:CHALLENGE_SIGN_BYTES], "little")
+    draws = iter(stream[CHALLENGE_SIGN_BYTES:])
     polynomial = [0] * DEGREE
-    for index in range(DEGREE - _TAU, DEGREE):
-        sample = next((value for value in stream if value <= index), None)
+    for index in range(DEGREE - CHALLENGE_WEIGHT, DEGREE):
+        sample = next((value for value in draws if value <= index), None)
         if sample is None:
             raise ValueError("SampleInBall exhausted its SHAKE stream")
         polynomial[index] = polynomial[sample]
@@ -137,19 +135,23 @@ def verify(public_key, message, signature, *, context=b""):
     if len(public_key) != PUBLIC_KEY_BYTES or len(signature) != SIGNATURE_BYTES or len(context) > 255:
         return False
 
-    challenge = signature[:_CHALLENGE_BYTES]
-    hint_offset = _CHALLENGE_BYTES + _L * DEGREE * _Z_WIDTH // 8
+    challenge = signature[:CHALLENGE_BYTES]
+    hint_offset = CHALLENGE_BYTES + _L * DEGREE * _Z_WIDTH // 8
     hints = _hints(signature[hint_offset:])
     if hints is None:
         return False
-    z = [_GAMMA1 - value for value in _unpack(signature[_CHALLENGE_BYTES:hint_offset], _L * DEGREE, _Z_WIDTH)]
+    z = [_GAMMA1 - value for value in _unpack(signature[CHALLENGE_BYTES:hint_offset], _L * DEGREE, _Z_WIDTH)]
     if any(abs(coefficient) >= _GAMMA1 - _BETA for coefficient in z):
         return False
 
     public_hash = shake_256(public_key).digest(64)
     mu = shake_256(public_hash + bytes((0, len(context))) + context + message).digest(64)
     response = [z[column * DEGREE:(column + 1) * DEGREE] for column in range(_L)]
-    equation = verification_equation(public_key, sample_challenge(challenge), response)
+    try:
+        challenge_polynomial = sample_challenge(challenge)
+    except ValueError:
+        return False
+    equation = verification_equation(public_key, challenge_polynomial, response)
     encoded_high_bits = bytearray()
     for row, hint_positions in zip(equation, hints, strict=True):
         high_bits = [
@@ -157,5 +159,5 @@ def verify(public_key, message, signature, *, context=b""):
             for index, value in enumerate(row)
         ]
         encoded_high_bits += _pack(high_bits, _W1_WIDTH)
-    expected = shake_256(mu + encoded_high_bits).digest(_CHALLENGE_BYTES)
+    expected = shake_256(mu + encoded_high_bits).digest(CHALLENGE_BYTES)
     return compare_digest(challenge, expected)

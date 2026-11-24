@@ -25,7 +25,7 @@ Generate locking scripts, replay signed spends from reproducible vectors, and co
 | [Lamport OTS](projects/lamport-ots/README.md) | Hash-based authorization using SHA-256. Each key is for one UTXO and one signature. | [Security model](projects/lamport-ots/docs/security.md) · [Validation record](projects/lamport-ots/docs/validation.md) |
 | [WOTS+](projects/wots-plus/README.md) | SHA-256 hash-chain authorization with a 2,144-byte one-time signature | [Specification](projects/wots-plus/docs/spec.md) · [Verification](projects/wots-plus/README.md#run-the-checks) |
 | [SLH-DSA-SHA2-128s](projects/slh-dsa/README.md) | Stateless FIPS 205 signatures and a transaction-bound payment template | [Specification](projects/slh-dsa/docs/spec.md) · [Verification](projects/slh-dsa/README.md#run-the-checks) |
-| [ML-DSA-44](projects/ml-dsa/README.md) | FIPS 204 reference verification and an experimental payment template with bounded challenge sampling | [Implementation and measurements](projects/ml-dsa/README.md) |
+| [ML-DSA-44](projects/ml-dsa/README.md) | Pure FIPS 204 message verification and a transaction-bound payment template | [Implementation and measurements](projects/ml-dsa/README.md) |
 | [XMSS-SHA2_10_256](projects/xmss/README.md) | Stateful hash-based authorization with up to 1,024 distinct signing indices per root | [Specification](projects/xmss/docs/spec.md) · [Verification](projects/xmss/README.md#check-the-implementation) |
 | [Groth16](projects/groth16/README.md) | BLS12-381 proof verification, script size and wallet recognition for fixed public inputs | [Verifier design](projects/groth16/docs/verifier.md) · [Wallet descriptor](projects/groth16/docs/wallet.md) |
 
@@ -41,7 +41,7 @@ These are script byte counts for the reference templates using ordinary ForkID `
 | [Lamport OTS](projects/lamport-ots/template/measurement.json) | 22,780 B | 8,357 B |
 | [WOTS+](projects/wots-plus/docs/validation.md) | 42,266 B | 2,310 B |
 | [SLH-DSA-SHA2-128s](projects/slh-dsa/docs/script.md) | 189,819 B | 8,023 B |
-| [ML-DSA-44](projects/ml-dsa/README.md#script-sizes) | 893,470 B | 2,588 B |
+| [ML-DSA-44](projects/ml-dsa/README.md#script-sizes) | 926,403 B | 2,588 B |
 | [XMSS-SHA2_10_256](projects/xmss/README.md) | 55,691 B | 2,669 B |
 
 The Lamport locking script includes the public key. An ordinary OTDA unlocking script varies with the transaction data being signed.

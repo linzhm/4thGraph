@@ -4,6 +4,12 @@ This experiment generates BLS12-381 Groth16 verification scripts and a wallet de
 
 - [Verifier design and optimization](docs/verifier.md)
 - [Wallet recognition and acceptance](docs/wallet.md)
+- [Transaction binding and shared verifier](docs/transfer.md)
+- [Circom and snarkjs integration](docs/toolchain.md)
+- [1,024-unit issuance and regtest replay](docs/regtest.md)
+- [Issuer-controlled token freezing](docs/issuer-freeze.md)
+- [BSV USDC-backed bridge specification](docs/bsv-usdc-bridge-spec.md)
+- [Token protocol implementation checklist](docs/bsv-usdc-token-checklist.md)
 - [Reproducible two-input vector](template/vector.json)
 
 | Experiment | Locking script | Unlocking script | Combined | chain-gang median |
@@ -12,7 +18,7 @@ This experiment generates BLS12-381 Groth16 verification scripts and a wallet de
 | `groth16/beta` · projective G1, shared constants | 247,941 B | 7,640 B | **255,581 B** | 23.38 ms |
 | `groth16/gamma` · projective G1 and G2, shared constants | 261,602 B | **980 B** | 262,582 B | 25.57 ms |
 
-This branch defaults to alpha. Beta minimizes combined script bytes on this vector. Gamma minimizes the bytes handed over when the output is already funded. Alpha reproduces the original fused, joined-line scripts. The vector generator also includes the two earlier Miller-loop benchmarks. Timings are the median of 20 warmed complete-input checks per profile on the development Mac with chain-gang `d442b55`.
+The workspace defaults to beta, which minimizes combined script bytes on this vector. Gamma minimizes the bytes handed over when the output is already funded. Alpha reproduces the original fused, joined-line scripts. The vector generator also includes the two earlier Miller-loop benchmarks. Timings are the median of 20 warmed complete-input checks per profile on the development Mac with chain-gang `d442b55`.
 
 The generated output expresses a proof predicate. Use the research setup and fixture only for testing. A payment template needs an explicit owner or destination constraint, and a token protocol needs to bind its public statement to the actual inputs and outputs.
 

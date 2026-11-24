@@ -2,15 +2,13 @@
 
 from functools import cache
 
+from fips204 import CHALLENGE_BYTES, CHALLENGE_SIGN_BYTES, CHALLENGE_WEIGHT, SAMPLE_IN_BALL_BYTES
 from shake_script import shake256_script
 from shared.script import asm, number, push
 from polynomial import DEGREE, MODULUS
 
 _COEFFICIENT_BYTES = 3
 _POLYNOMIAL_BYTES = DEGREE * _COEFFICIENT_BYTES
-_TAU = 39
-_SIGN_BYTES = 8
-DEFAULT_STREAM_BYTES = 136
 
 
 def _replace_lane():
@@ -37,20 +35,20 @@ def _sample_byte():
 
 
 @cache
-def sample_from_stream_script(stream_bytes=DEFAULT_STREAM_BYTES):
+def sample_from_stream_script():
     """Decode a fixed-size SHAKE256 prefix into canonical c coefficients."""
-    if type(stream_bytes) is not int or stream_bytes < _SIGN_BYTES + _TAU:
-        raise ValueError('the XOF budget must hold the sign bits and 39 draws')
-    shape = asm('OP_SIZE') + number(stream_bytes) + asm('OP_NUMEQUALVERIFY OP_8 OP_SPLIT OP_SWAP')
+    shape = asm('OP_SIZE') + number(SAMPLE_IN_BALL_BYTES) + asm('OP_NUMEQUALVERIFY')
+    shape += number(CHALLENGE_SIGN_BYTES) + asm('OP_SPLIT OP_SWAP')
     shape += push(b'\x00') + asm('OP_CAT OP_BIN2NUM OP_0')
-    shape += number(_POLYNOMIAL_BYTES) + asm('OP_NUM2BIN') + number(DEGREE - _TAU)
-    draws = _sample_byte() * (stream_bytes - _SIGN_BYTES)
-    # FIPS 204 continues reading on rejection. The bounded Script can only
-    # succeed if the entire challenge was constructed within its XOF prefix.
-    return shape + draws + number(DEGREE) + asm('OP_NUMEQUALVERIFY OP_NIP OP_NIP')
+    shape += number(_POLYNOMIAL_BYTES) + asm('OP_NUM2BIN') + number(DEGREE - CHALLENGE_WEIGHT)
+    draws = _sample_byte() * (SAMPLE_IN_BALL_BYTES - CHALLENGE_SIGN_BYTES)
+    # Discard all sampler state before returning the one exhaustion error.
+    end = number(DEGREE) + asm('OP_NUMEQUAL OP_IF OP_NIP OP_NIP '
+                               'OP_ELSE OP_2DROP OP_DROP OP_0 OP_VERIFY OP_ENDIF')
+    return shape + draws + end
 
 
 @cache
-def sample_in_ball_script(stream_bytes=DEFAULT_STREAM_BYTES):
+def sample_in_ball_script():
     """Replace c-tilde32 with c packed as 256 three-byte LE residues."""
-    return shake256_script(32, stream_bytes) + sample_from_stream_script(stream_bytes)
+    return shake256_script(CHALLENGE_BYTES, SAMPLE_IN_BALL_BYTES) + sample_from_stream_script()

@@ -21,6 +21,9 @@ A BSV payment template for the hash of an uncompressed curveSM2 public key. The 
 
 [中文规范](docs/spec.zh-CN.md) · [English specification](docs/spec.en.md) · [Reference and tests](reference/README.md) · [Layout](template/layout.json) · [Standard vector](template/sm2-standard.json) · [Payment vector](template/spend-all.json) · [16 sighash vectors](template/sighash-modes.json)
 
+The Python wallet can also accept [GB/T 35275-2026 SignedData](reference/README.md#signeddata-payment-interop)
+from a configured signer using the direct, single-signer payment profile.
+
 ```sh
 cd projects/p2pkh-sm2/reference
 python3 generate_lock.py --owner-hash160 000102030405060708090a0b0c0d0e0f10111213

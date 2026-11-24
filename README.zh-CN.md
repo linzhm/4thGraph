@@ -25,7 +25,7 @@
 | [Lamport OTS](projects/lamport-ots/README.md) | 基于 SHA-256 的一次性授权。每组密钥对应一个 UTXO，只签一次。 | [安全分析](projects/lamport-ots/docs/security.md) · [验证记录](projects/lamport-ots/docs/validation.md) |
 | [WOTS+](projects/wots-plus/README.md) | 基于 SHA-256 哈希链的一次性授权，签名原始长度为 2,144 字节 | [协议规范](projects/wots-plus/docs/spec.md) · [复现验证](projects/wots-plus/README.md#run-the-checks) |
 | [SLH-DSA-SHA2-128s](projects/slh-dsa/README.md) | FIPS 205 无状态哈希签名及交易绑定付款模板 | [协议规范](projects/slh-dsa/docs/spec.md) · [复现验证](projects/slh-dsa/README.md#run-the-checks) |
-| [ML-DSA-44](projects/ml-dsa/README.md) | FIPS 204 参考验签，以及使用有界挑战采样的实验性付款模板 | [实现与测量](projects/ml-dsa/README.md) |
+| [ML-DSA-44](projects/ml-dsa/README.md) | FIPS 204 纯模式消息验签，以及交易绑定的付款模板 | [实现与测量](projects/ml-dsa/README.md) |
 | [XMSS-SHA2_10_256](projects/xmss/README.md) | 有状态哈希签名，每个根公钥最多使用 1,024 个独立签名索引 | [协议规范](projects/xmss/docs/spec.md) · [复现验证](projects/xmss/README.md#check-the-implementation) |
 | [Groth16](projects/groth16/README.md) | BLS12-381 证明验证，固定公开输入的脚本优化与钱包识别 | [验证器设计](projects/groth16/docs/verifier.md) · [钱包描述符](projects/groth16/docs/wallet.md) |
 
@@ -41,7 +41,7 @@
 | [Lamport OTS](projects/lamport-ots/template/measurement.json) | 22,780 字节 | 8,357 字节 |
 | [WOTS+](projects/wots-plus/docs/validation.md) | 42,266 字节 | 2,310 字节 |
 | [SLH-DSA-SHA2-128s](projects/slh-dsa/docs/script.md) | 189,819 字节 | 8,023 字节 |
-| [ML-DSA-44](projects/ml-dsa/README.md#script-sizes) | 893,470 字节 | 2,588 字节 |
+| [ML-DSA-44](projects/ml-dsa/README.md#script-sizes) | 926,403 字节 | 2,588 字节 |
 | [XMSS-SHA2_10_256](projects/xmss/README.md) | 55,691 字节 | 2,669 字节 |
 
 Lamport 的锁定脚本包含公钥。普通 OTDA 路径的解锁脚本随参与签名的交易数据变化。

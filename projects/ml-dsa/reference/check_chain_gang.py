@@ -4,7 +4,9 @@ from dataclasses import replace
 import unittest
 
 from hint_script import apply_hints_script
+from mldsa import test_only_vector as make_test_vector
 from ntt_script import ring_product_script, transform_script, verification_equation_script
+from script import verify_message_script
 from shared.chain_gang import validate_at_heights
 from shared.script import asm, push
 from shared.transaction import Input, Output, Transaction
@@ -55,6 +57,20 @@ class ChronicleArithmeticTests(unittest.TestCase):
                         parent, spend = _case(kernel, values, incorrect)
                         with self.assertRaisesRegex(ValueError, "Top of stack is false"):
                             _validate(parent, spend, version, creation_height, spending_height)
+
+    def test_generic_verifier_authenticates_context_for_empty_message(self):
+        message = b""
+        context = bytes(range(255))
+        key, signature = make_test_vector(bytes(range(32)), message, context=context)
+        verifier = verify_message_script(key, len(message), context=context)
+        parent, spend = _case(verifier, (message, signature), b"\x01")
+        _validate(parent, spend, 2, 3, 4)
+
+        changed_context = b"\xff" + context[1:]
+        verifier = verify_message_script(key, len(message), context=changed_context)
+        parent, spend = _case(verifier, (message, signature), b"\x01")
+        with self.assertRaisesRegex(ValueError, "Top of stack is false"):
+            _validate(parent, spend, 2, 3, 4)
 
 
 if __name__ == "__main__":

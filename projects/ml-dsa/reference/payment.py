@@ -1,7 +1,6 @@
 """Prepare and verify an external ML-DSA-44 signature for a BSV input."""
 
-from challenge_script import DEFAULT_STREAM_BYTES
-from fips204 import sample_challenge, verify
+from fips204 import verify
 from script import COMPANION_CODE, ORDINARY_CODE, locking_script
 from shared.spend_authorization import DEFAULT_SIGHASH, SpendAuthorization, prepare_authorization
 from shared.transaction import Input, Transaction, amount
@@ -16,8 +15,6 @@ def authorization(tx, index, previous_amount, sighash=DEFAULT_SIGHASH) -> SpendA
 def current_input_unlock(auth, public_key, signature):
     if not verify(public_key, auth.checked_digest(), signature):
         raise ValueError("invalid ML-DSA-44 signature from external signer")
-    # Keep the wallet's acceptance identical to the bounded Script sampler.
-    sample_challenge(signature[:32], stream_bytes=DEFAULT_STREAM_BYTES)
     return auth.witness(signature)
 
 
@@ -43,7 +40,8 @@ def sign_spend(tx, index, funding_raw, public_key, signer, *, sighash=DEFAULT_SI
         raise ValueError("funding output does not match public key and canonical template")
     auth = authorization(tx, index, previous.value, sighash)
     signature = signer(auth.checked_digest())
-    return tx.with_script(index, current_input_unlock(auth, public_key, signature))
+    witness = current_input_unlock(auth, public_key, signature)
+    return tx.with_script(index, witness)
 
 
 def sign_payment(funding_raw, vout, outputs, fee, public_key, signer, *, sighash=DEFAULT_SIGHASH):

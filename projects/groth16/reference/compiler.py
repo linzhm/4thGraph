@@ -50,6 +50,23 @@ class Program:
             return a * b
         return self._emit("MUL", a, b)
 
+    def divide(self, a, divisor):
+        if isinstance(a, int):
+            return a // divisor
+        return self._emit("DIV", a, divisor)
+
+    def less_than(self, a, limit):
+        if isinstance(a, int):
+            return int(a < limit)
+        return self._emit("LESSTHAN", a, limit)
+
+    def select(self, condition, when_true, when_false):
+        if isinstance(condition, int):
+            return when_true if condition else when_false
+        if when_true == when_false:
+            return when_true
+        return self._emit("SELECT", when_false, when_true, condition)
+
     def reduce(self, a):
         if isinstance(a, int):
             return a % Q
@@ -153,6 +170,8 @@ class Program:
             if opcode == "READ_FIELD":
                 emit(asm("OP_SWAP OP_SIZE 49 OP_LESSTHAN OP_VERIFY OP_BIN2NUM "
                          "OP_TUCK 0 OP_ROT OP_WITHIN OP_VERIFY"))
+            elif opcode == "SELECT":
+                emit(asm("OP_IF OP_NIP OP_ELSE OP_DROP OP_ENDIF"))
             else:
                 emit(asm("OP_" + opcode))
             del stack[-len(operands):]

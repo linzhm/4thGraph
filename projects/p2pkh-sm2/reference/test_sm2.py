@@ -21,8 +21,13 @@ ROOT=Path(__file__).resolve().parents[1]
 
 
 def der(tag,raw):
-    n=len(raw); length=bytes([n]) if n<128 else bytes([0x81,n])
-    return bytes([tag])+length+raw
+    size = len(raw)
+    if size < 128:
+        length = bytes((size,))
+    else:
+        encoded = size.to_bytes((size.bit_length() + 7) // 8, 'big')
+        length = bytes((0x80 | len(encoded),)) + encoded
+    return bytes((tag,)) + length + raw
 
 
 def der_signature(sig):

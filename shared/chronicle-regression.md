@@ -31,7 +31,7 @@ post-activation cases include unpaired OTDA `SINGLE` with `0x63` and `0xe3`.
 |---|---|
 | WOTS+ | 123 complete-input matrix cases and 128 explicit height, version, and sighash cases passed. The 16 existing payment vectors were reproduced. |
 | SLH-DSA-SHA2-128s | 128 height, version, and sighash cases and 64 output or locktime changes passed. Python and Script primitive tests passed. |
-| ML-DSA-44 | 128 height, version, and sighash cases and 64 output or locktime changes passed. The 60 arithmetic, 24 SHAKE, 12 signature-decoding and 21 challenge-sampling cases also passed. |
+| ML-DSA-44 | 128 height, version, and sighash cases and 64 output or locktime changes passed. The 60 arithmetic, 24 SHAKE, 12 signature-decoding and 22 challenge-sampling cases also passed. |
 | XMSS-SHA2_10_256 | 128 height, version, and sighash cases and 64 output or locktime changes passed on both the local merge and the portable pin. The 34 C-reference vectors reproduced byte for byte. |
 | Lamport OTS | 12 tests passed, including the existing complete-input matrix and vectors. |
 | P2PKH-SM2 | 14 reference and complete-input tests passed. |
@@ -39,5 +39,16 @@ post-activation cases include unpaired OTDA `SINGLE` with `0x63` and `0xe3`.
 | P2PKH-R1 | 4 fixture tests passed with the script-verification call directed to the explicit chain-gang context. |
 
 The R1 fixture replay exercises the chain-gang slice of its existing suite.
-Its RPC suite requires a separate node. Native BSV Node and Lean results for
-these new ports remain pending.
+Its RPC suite requires a separate node.
+
+## ML-DSA-44 and SM2 SignedData
+
+The ML-DSA-44 verifier uses the Appendix C sampler budget of 221 bytes.
+The latest payment replay matched all 192 cases on both the merged
+chain-gang build and `bsv-script-lean@1c051eaef1077cc95e5d1618686d5efacc4aa097`
+with Lean 4.34.0.
+The same chain-gang build passed the 15 external Pure ML-DSA-44 NIST ACVP
+verification cases and the new SM2 SignedData wallet tests. The local wheel
+used for this run had SHA-256
+`df72ab485f5e46ed777ba4d212f2e0aa41b53ee42f8352abe651d5d89c5d91b0`.
+Native BSV Node 1.2.3 RPC replay for the ML-DSA-44 matrix remains pending.
