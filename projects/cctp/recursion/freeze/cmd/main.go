@@ -24,10 +24,16 @@ import (
 	recursive "github.com/consensys/gnark/std/recursion/groth16"
 	"github.com/linzhm/BSV-Script-Lab/projects/cctp/recursion/conservation"
 	"github.com/linzhm/BSV-Script-Lab/projects/cctp/recursion/freeze"
+	"github.com/linzhm/BSV-Script-Lab/projects/cctp/recursion/inventoryorigin"
+	"github.com/linzhm/BSV-Script-Lab/projects/cctp/recursion/inventoryprove"
 	"github.com/linzhm/BSV-Script-Lab/projects/cctp/recursion/parentcheckpoint"
 )
 
 const (
+	originProfile               = "inventory-origin"
+	originFormat                = "CCTP inventory origin test parameters v1"
+	inventoryProfile            = "inventory-payment"
+	inventoryFormat             = "CCTP inventory payment test parameters v1"
 	plainProfile                = "plain"
 	bsb22Profile                = "bsb22"
 	conservationProfile         = "conservation"
@@ -59,6 +65,10 @@ func compileFreeze(profile string) (constraint.ConstraintSystem, manifest, error
 	privateBytes := freeze.PayloadSize
 	var circuit frontend.Circuit
 	switch profile {
+	case originProfile:
+		circuit = &inventoryorigin.Circuit{}
+		m.Format, m.StatementBytes = originFormat, inventoryorigin.StatementSize
+		privateBytes = inventoryorigin.OpeningSize
 	case plainProfile:
 		circuit = &freeze.PlainCircuit{}
 	case bsb22Profile:
@@ -68,6 +78,10 @@ func compileFreeze(profile string) (constraint.ConstraintSystem, manifest, error
 		circuit = &conservation.Circuit{}
 		m.Format, m.StatementBytes = conservationParameterFormat, conservation.EncodedSize
 		privateBytes = conservation.PayloadSize
+	case inventoryProfile:
+		circuit = &inventoryprove.Circuit{}
+		m.Format, m.StatementBytes = inventoryFormat, inventoryprove.PaymentSize
+		privateBytes = inventoryprove.PaymentSize - 1 + inventoryprove.WitnessSize
 	case parentCheckpointProfile:
 		circuit = &parentcheckpoint.Circuit{}
 		m.Format, m.StatementBytes = parentCheckpointFormat, parentcheckpoint.EncodedSize
@@ -162,7 +176,7 @@ func setup(directory, profile string) error {
 		profile = plainProfile
 	}
 	switch profile {
-	case plainProfile, bsb22Profile, conservationProfile, parentCheckpointProfile, tokenCheckpointProfile:
+	case originProfile, inventoryProfile, plainProfile, bsb22Profile, conservationProfile, parentCheckpointProfile, tokenCheckpointProfile:
 	default:
 		return fmt.Errorf("unknown circuit profile %q", profile)
 	}
@@ -214,6 +228,10 @@ func loadManifest(directory string) (manifest, error) {
 	}
 	expectedFormat, expectedBytes := parameterFormat, freeze.EncodedSize
 	switch m.Profile {
+	case originProfile:
+		expectedFormat, expectedBytes = originFormat, inventoryorigin.StatementSize
+	case inventoryProfile:
+		expectedFormat, expectedBytes = inventoryFormat, inventoryprove.PaymentSize
 	case conservationProfile:
 		expectedFormat, expectedBytes = conservationParameterFormat, conservation.EncodedSize
 	case parentCheckpointProfile:
@@ -239,6 +257,20 @@ func parseStatement(wire string) (freeze.Statement, error) {
 }
 
 func assignmentFor(profile, wire, parent string) (proofStatement, frontend.Circuit, error) {
+	if profile == originProfile || profile == inventoryProfile {
+		payment, err := hex.DecodeString(wire)
+		if err != nil {
+			return nil, nil, err
+		}
+		openings, err := hex.DecodeString(parent)
+		if err != nil {
+			return nil, nil, err
+		}
+		if profile == originProfile {
+			return inventoryorigin.Decode(payment, openings)
+		}
+		return inventoryprove.Decode(payment, openings)
+	}
 	if profile == parentCheckpointProfile || profile == tokenCheckpointProfile {
 		return checkpointAssignment(profile, wire, parent)
 	}
@@ -300,38 +332,58 @@ func checkpointAssignment(profile, wire, parent string) (proofStatement, fronten
 	return statement, assignment, err
 }
 
-func prove(directory, profile, wire, parent, output string) error {
+type loadedProver struct {
+	manifest manifest
+	ccs      constraint.ConstraintSystem
+	pk       groth16.ProvingKey
+	vk       *native.VerifyingKey
+}
+
+func loadProver(directory, profile string) (*loadedProver, error) {
+	saved, err := loadManifest(directory)
+	if err != nil {
+		return nil, err
+	}
+	if profile != "" && profile != saved.Profile {
+		return nil, fmt.Errorf("requested profile does not match the completed setup")
+	}
+	ccs, expected, err := compileFreeze(saved.Profile)
+	if err != nil {
+		return nil, err
+	}
+	expected.ProvingSHA256, expected.VerifyingSHA256 = saved.ProvingSHA256, saved.VerifyingSHA256
+	if expected != saved {
+		return nil, fmt.Errorf("setup manifest belongs to a different CCTP constraint system")
+	}
+	pk := groth16.NewProvingKey(ecc.BLS12_381)
+	vk := new(native.VerifyingKey)
+	if err := readNative(filepath.Join(directory, verifyingKeyName), saved.VerifyingSHA256, vk); err != nil {
+		return nil, err
+	}
+	if err := readNative(filepath.Join(directory, provingKeyName), saved.ProvingSHA256, pk); err != nil {
+		return nil, err
+	}
+	return &loadedProver{manifest: saved, ccs: ccs, pk: pk, vk: vk}, nil
+}
+
+func (s *loadedProver) prove(wire, parent, openings, output string, log io.Writer) error {
+	saved := s.manifest
 	if _, err := os.Lstat(output); err == nil || !os.IsNotExist(err) {
 		return fmt.Errorf("choose a new proof output path: %s", output)
 	}
-	saved, err := loadManifest(directory)
-	if err != nil {
-		return err
-	}
-	if profile != "" && profile != saved.Profile {
-		return fmt.Errorf("requested profile does not match the completed setup")
+	if saved.Profile == inventoryProfile || saved.Profile == originProfile {
+		if parent != "" {
+			return fmt.Errorf("inventory profile expects -openings")
+		}
+		parent = openings
+	} else if openings != "" {
+		return fmt.Errorf("-openings requires an inventory profile")
 	}
 	statement, assignment, err := assignmentFor(saved.Profile, wire, parent)
 	if err != nil {
 		return err
 	}
-	ccs, expected, err := compileFreeze(saved.Profile)
-	if err != nil {
-		return err
-	}
-	expected.ProvingSHA256, expected.VerifyingSHA256 = saved.ProvingSHA256, saved.VerifyingSHA256
-	if expected != saved {
-		return fmt.Errorf("setup manifest belongs to a different CCTP constraint system")
-	}
-	pk := groth16.NewProvingKey(ecc.BLS12_381)
-	vk := new(native.VerifyingKey)
-	if err := readNative(filepath.Join(directory, verifyingKeyName), saved.VerifyingSHA256, vk); err != nil {
-		return err
-	}
-	if err := readNative(filepath.Join(directory, provingKeyName), saved.ProvingSHA256, pk); err != nil {
-		return err
-	}
-	key, err := keyArtifact(saved, vk)
+	key, err := keyArtifact(saved, s.vk)
 	if err != nil {
 		return err
 	}
@@ -347,7 +399,7 @@ func prove(directory, profile, wire, parent, output string) error {
 		return err
 	}
 	started := time.Now()
-	proof, err := groth16.Prove(ccs, pk, witness, provingOptions...)
+	proof, err := groth16.Prove(s.ccs, s.pk, witness, provingOptions...)
 	provedAt := time.Now()
 	if err != nil {
 		return fmt.Errorf("%s witness does not prove: %w", saved.Profile, err)
@@ -357,7 +409,7 @@ func prove(directory, profile, wire, parent, output string) error {
 		return err
 	}
 	verificationStarted := time.Now()
-	if err := groth16.Verify(proof, vk, public, verificationOptions...); err != nil {
+	if err := groth16.Verify(proof, s.vk, public, verificationOptions...); err != nil {
 		return fmt.Errorf("generated proof failed native verification: %w", err)
 	}
 	verificationElapsed := time.Since(verificationStarted)
@@ -369,26 +421,37 @@ func prove(directory, profile, wire, parent, output string) error {
 	if err := writeJSON(output, key); err != nil {
 		return err
 	}
-	fmt.Printf("%s: proved and verified in %s, statement %x\n", saved.Profile, time.Since(started), statement.Digest())
+	fmt.Fprintf(log, "%s: proved and verified in %s, statement %x\n", saved.Profile, time.Since(started), statement.Digest())
 	return nil
 }
 
+func prove(directory, profile, wire, parent, openings, output string) error {
+	s, err := loadProver(directory, profile)
+	if err != nil {
+		return err
+	}
+	return s.prove(wire, parent, openings, output, os.Stdout)
+}
+
 func main() {
-	mode := flag.String("mode", "", "setup or prove")
-	profile := flag.String("profile", "", "plain (setup default), bsb22, conservation, parent-checkpoint, or parent-checkpoint-token; prove reads the setup profile")
+	mode := flag.String("mode", "", "setup, prove, or session")
+	profile := flag.String("profile", "", "plain (setup default), bsb22, conservation, parent-checkpoint, parent-checkpoint-token, or an inventory profile; prove reads the setup profile")
 	directory := flag.String("dir", "", "fresh setup directory or completed setup to reuse")
 	wire := flag.String("statement", "", "exact versioned statement encoded as hex")
 	parent := flag.String("parent", "", "actual parent transaction hex for a parent checkpoint proof")
+	openings := flag.String("openings", "", "private witness encoding, hex, for the selected inventory profile")
 	output := flag.String("out", "", "new proof JSON path")
 	flag.Parse()
 	var err error
 	switch {
 	case flag.NArg() != 0 || *directory == "":
 		err = fmt.Errorf("provide -mode and -dir; positional arguments are unsupported")
-	case *mode == "setup" && *wire == "" && *parent == "" && *output == "":
+	case *mode == "setup" && *wire == "" && *parent == "" && *openings == "" && *output == "":
 		err = setup(*directory, *profile)
+	case *mode == "session" && *wire == "" && *parent == "" && *openings == "" && *output == "":
+		err = proverSession(*directory, *profile)
 	case *mode == "prove" && *wire != "" && *output != "":
-		err = prove(*directory, *profile, *wire, *parent, *output)
+		err = prove(*directory, *profile, *wire, *parent, *openings, *output)
 	default:
 		err = fmt.Errorf("use setup with -dir or prove with -dir, -statement and -out")
 	}

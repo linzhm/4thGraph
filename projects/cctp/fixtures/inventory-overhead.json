@@ -1,0 +1,1661 @@
+{
+  "B": {
+    "scope": "2a2435e5f60caf1e9b87960fa6b6a500d39dfe6a92322874bf8d793f92e935c4",
+    "rows": {
+      "first-selection": {
+        "txid": "edd02355ba41e0c078cfa8d3abdfd6a5b07fcd7c7ffbbe8a074af0abe8517a05",
+        "total_with_dedicated_funding": 464769,
+        "payment": {
+          "version_locktime_counts": 10,
+          "outpoints_sequences": 160,
+          "input_script_lengths": 12,
+          "output_satoshis_and_script_lengths": 22,
+          "verifier_scriptSig": 3517,
+          "companion_scriptSig": 971,
+          "holder0_scriptSig": 2096,
+          "holder1_scriptSig": 2096,
+          "token_output_locks": 1830
+        },
+        "scriptSigs": {
+          "verifier": {
+            "source_proof_pushes": 1078,
+            "inventory_root_push": 1,
+            "inventory_root": 32,
+            "membership_indices": 2,
+            "membership_sibling_push": 4,
+            "membership_sibling": 128,
+            "source_state_push": 2,
+            "source_state": 100,
+            "successor_state_push": 2,
+            "successor_state": 100,
+            "otda_push": 3,
+            "otda_other": 69,
+            "otda_current_outpoints": 144,
+            "otda_output_amount_and_length": 22,
+            "otda_current_output_lock_copies": 1830
+          },
+          "companion": {
+            "ordered_prevouts_push": 2,
+            "ordered_prevouts": 144,
+            "preimage_push": 3,
+            "before_scriptCode": 104,
+            "scriptCode_length": 3,
+            "scriptCode_lock_copy": 663,
+            "after_scriptCode": 52
+          },
+          "holder0": {
+            "signature_push": 1,
+            "signature_der": 70,
+            "sighash_byte": 1,
+            "companion_funding_raw_push": 3,
+            "companion_funding_raw": 798,
+            "ordered_prevouts_push": 2,
+            "ordered_prevouts": 144,
+            "preimage_push": 3,
+            "before_scriptCode": 104,
+            "scriptCode_length": 3,
+            "scriptCode_lock_copy": 915,
+            "after_scriptCode": 52
+          },
+          "holder1": {
+            "signature_push": 1,
+            "signature_der": 70,
+            "sighash_byte": 1,
+            "companion_funding_raw_push": 3,
+            "companion_funding_raw": 798,
+            "ordered_prevouts_push": 2,
+            "ordered_prevouts": 144,
+            "preimage_push": 3,
+            "before_scriptCode": 104,
+            "scriptCode_length": 3,
+            "scriptCode_lock_copy": 915,
+            "after_scriptCode": 52
+          }
+        },
+        "actual_token_locks": [
+          {
+            "tag_and_scope_push": 61,
+            "state_push": 1,
+            "state": 50,
+            "holder_and_verifier_guard": 803
+          },
+          {
+            "tag_and_scope_push": 61,
+            "state_push": 1,
+            "state": 50,
+            "holder_and_verifier_guard": 803
+          }
+        ],
+        "verifier_funding": {
+          "version_locktime_counts": 10,
+          "outpoints_sequences": 40,
+          "input_script_lengths": 1,
+          "output_satoshis_and_script_lengths": 13,
+          "source_groth16_lock": 449730,
+          "verifier_native_lock": 3463
+        },
+        "companion_funding": {
+          "version_locktime_counts": 10,
+          "outpoints_sequences": 40,
+          "input_script_lengths": 1,
+          "output_satoshis_and_script_lengths": 11,
+          "signature_push": 1,
+          "signature_der": 71,
+          "sighash_byte": 1,
+          "companion_native_lock": 663
+        },
+        "history": {
+          "known_token_creation_and_ancestor_txs": 4,
+          "literal_token_history_bytes_in_scriptSigs": 0
+        }
+      },
+      "second-selection": {
+        "txid": "55ddae44e482605f614ecfc8ec5dac907d23c41bbdf792ecd23f28a42f167bad",
+        "total_with_dedicated_funding": 464766,
+        "payment": {
+          "version_locktime_counts": 10,
+          "outpoints_sequences": 160,
+          "input_script_lengths": 12,
+          "output_satoshis_and_script_lengths": 22,
+          "verifier_scriptSig": 3517,
+          "companion_scriptSig": 971,
+          "holder0_scriptSig": 2095,
+          "holder1_scriptSig": 2095,
+          "token_output_locks": 1830
+        },
+        "scriptSigs": {
+          "verifier": {
+            "source_proof_pushes": 1078,
+            "inventory_root_push": 1,
+            "inventory_root": 32,
+            "membership_indices": 2,
+            "membership_sibling_push": 4,
+            "membership_sibling": 128,
+            "source_state_push": 2,
+            "source_state": 100,
+            "successor_state_push": 2,
+            "successor_state": 100,
+            "otda_push": 3,
+            "otda_other": 69,
+            "otda_current_outpoints": 144,
+            "otda_output_amount_and_length": 22,
+            "otda_current_output_lock_copies": 1830
+          },
+          "companion": {
+            "ordered_prevouts_push": 2,
+            "ordered_prevouts": 144,
+            "preimage_push": 3,
+            "before_scriptCode": 104,
+            "scriptCode_length": 3,
+            "scriptCode_lock_copy": 663,
+            "after_scriptCode": 52
+          },
+          "holder0": {
+            "signature_push": 1,
+            "signature_der": 70,
+            "sighash_byte": 1,
+            "companion_funding_raw_push": 3,
+            "companion_funding_raw": 797,
+            "ordered_prevouts_push": 2,
+            "ordered_prevouts": 144,
+            "preimage_push": 3,
+            "before_scriptCode": 104,
+            "scriptCode_length": 3,
+            "scriptCode_lock_copy": 915,
+            "after_scriptCode": 52
+          },
+          "holder1": {
+            "signature_push": 1,
+            "signature_der": 70,
+            "sighash_byte": 1,
+            "companion_funding_raw_push": 3,
+            "companion_funding_raw": 797,
+            "ordered_prevouts_push": 2,
+            "ordered_prevouts": 144,
+            "preimage_push": 3,
+            "before_scriptCode": 104,
+            "scriptCode_length": 3,
+            "scriptCode_lock_copy": 915,
+            "after_scriptCode": 52
+          }
+        },
+        "actual_token_locks": [
+          {
+            "tag_and_scope_push": 61,
+            "state_push": 1,
+            "state": 50,
+            "holder_and_verifier_guard": 803
+          },
+          {
+            "tag_and_scope_push": 61,
+            "state_push": 1,
+            "state": 50,
+            "holder_and_verifier_guard": 803
+          }
+        ],
+        "verifier_funding": {
+          "version_locktime_counts": 10,
+          "outpoints_sequences": 40,
+          "input_script_lengths": 1,
+          "output_satoshis_and_script_lengths": 13,
+          "source_groth16_lock": 449730,
+          "verifier_native_lock": 3463
+        },
+        "companion_funding": {
+          "version_locktime_counts": 10,
+          "outpoints_sequences": 40,
+          "input_script_lengths": 1,
+          "output_satoshis_and_script_lengths": 11,
+          "signature_push": 1,
+          "signature_der": 70,
+          "sighash_byte": 1,
+          "companion_native_lock": 663
+        },
+        "history": {
+          "known_token_creation_and_ancestor_txs": 4,
+          "literal_token_history_bytes_in_scriptSigs": 0
+        }
+      },
+      "recipient-respend": {
+        "txid": "f78b240a85441cf9518326e31ed4927cf5e8658f937c7b1cbd2d8c3016ce9468",
+        "total_with_dedicated_funding": 464770,
+        "payment": {
+          "version_locktime_counts": 10,
+          "outpoints_sequences": 160,
+          "input_script_lengths": 12,
+          "output_satoshis_and_script_lengths": 22,
+          "verifier_scriptSig": 3517,
+          "companion_scriptSig": 971,
+          "holder0_scriptSig": 2096,
+          "holder1_scriptSig": 2097,
+          "token_output_locks": 1830
+        },
+        "scriptSigs": {
+          "verifier": {
+            "source_proof_pushes": 1078,
+            "inventory_root_push": 1,
+            "inventory_root": 32,
+            "membership_indices": 2,
+            "membership_sibling_push": 4,
+            "membership_sibling": 128,
+            "source_state_push": 2,
+            "source_state": 100,
+            "successor_state_push": 2,
+            "successor_state": 100,
+            "otda_push": 3,
+            "otda_other": 69,
+            "otda_current_outpoints": 144,
+            "otda_output_amount_and_length": 22,
+            "otda_current_output_lock_copies": 1830
+          },
+          "companion": {
+            "ordered_prevouts_push": 2,
+            "ordered_prevouts": 144,
+            "preimage_push": 3,
+            "before_scriptCode": 104,
+            "scriptCode_length": 3,
+            "scriptCode_lock_copy": 663,
+            "after_scriptCode": 52
+          },
+          "holder0": {
+            "signature_push": 1,
+            "signature_der": 70,
+            "sighash_byte": 1,
+            "companion_funding_raw_push": 3,
+            "companion_funding_raw": 798,
+            "ordered_prevouts_push": 2,
+            "ordered_prevouts": 144,
+            "preimage_push": 3,
+            "before_scriptCode": 104,
+            "scriptCode_length": 3,
+            "scriptCode_lock_copy": 915,
+            "after_scriptCode": 52
+          },
+          "holder1": {
+            "signature_push": 1,
+            "signature_der": 71,
+            "sighash_byte": 1,
+            "companion_funding_raw_push": 3,
+            "companion_funding_raw": 798,
+            "ordered_prevouts_push": 2,
+            "ordered_prevouts": 144,
+            "preimage_push": 3,
+            "before_scriptCode": 104,
+            "scriptCode_length": 3,
+            "scriptCode_lock_copy": 915,
+            "after_scriptCode": 52
+          }
+        },
+        "actual_token_locks": [
+          {
+            "tag_and_scope_push": 61,
+            "state_push": 1,
+            "state": 50,
+            "holder_and_verifier_guard": 803
+          },
+          {
+            "tag_and_scope_push": 61,
+            "state_push": 1,
+            "state": 50,
+            "holder_and_verifier_guard": 803
+          }
+        ],
+        "verifier_funding": {
+          "version_locktime_counts": 10,
+          "outpoints_sequences": 40,
+          "input_script_lengths": 1,
+          "output_satoshis_and_script_lengths": 13,
+          "source_groth16_lock": 449730,
+          "verifier_native_lock": 3463
+        },
+        "companion_funding": {
+          "version_locktime_counts": 10,
+          "outpoints_sequences": 40,
+          "input_script_lengths": 1,
+          "output_satoshis_and_script_lengths": 11,
+          "signature_push": 1,
+          "signature_der": 71,
+          "sighash_byte": 1,
+          "companion_native_lock": 663
+        },
+        "history": {
+          "known_token_creation_and_ancestor_txs": 8,
+          "literal_token_history_bytes_in_scriptSigs": 0
+        }
+      }
+    },
+    "previous_to_next": {
+      "payment": {
+        "holder1_scriptSig": 1
+      },
+      "scriptSigs": {
+        "verifier": {},
+        "companion": {},
+        "holder0": {},
+        "holder1": {
+          "signature_der": 1
+        }
+      },
+      "verifier_funding": {},
+      "companion_funding": {},
+      "total_with_dedicated_funding": 1
+    }
+  },
+  "C": {
+    "scope": "4818e279c661653b4b39e1abbddb17e2c5f73066403b1d39e7e6d26024e98128",
+    "rows": {
+      "first-selection": {
+        "txid": "40b5d0b79caa808fe3cd00430ecbf0a30f10df0414520bd4d3d977bf074b9d6b",
+        "total_with_dedicated_funding": 915278,
+        "payment": {
+          "version_locktime_counts": 10,
+          "outpoints_sequences": 160,
+          "input_script_lengths": 12,
+          "output_satoshis_and_script_lengths": 22,
+          "verifier_scriptSig": 4359,
+          "companion_scriptSig": 971,
+          "holder0_scriptSig": 2097,
+          "holder1_scriptSig": 2097,
+          "token_output_locks": 1830
+        },
+        "scriptSigs": {
+          "verifier": {
+            "source_proof_pushes": 1078,
+            "payment_proof_pushes": 1078,
+            "inventory_root_push": 1,
+            "inventory_root": 32,
+            "successor_state_push": 2,
+            "successor_state": 100,
+            "otda_push": 3,
+            "otda_other": 69,
+            "otda_current_outpoints": 144,
+            "otda_output_amount_and_length": 22,
+            "otda_current_output_lock_copies": 1830
+          },
+          "companion": {
+            "ordered_prevouts_push": 2,
+            "ordered_prevouts": 144,
+            "preimage_push": 3,
+            "before_scriptCode": 104,
+            "scriptCode_length": 3,
+            "scriptCode_lock_copy": 663,
+            "after_scriptCode": 52
+          },
+          "holder0": {
+            "signature_push": 1,
+            "signature_der": 71,
+            "sighash_byte": 1,
+            "companion_funding_raw_push": 3,
+            "companion_funding_raw": 798,
+            "ordered_prevouts_push": 2,
+            "ordered_prevouts": 144,
+            "preimage_push": 3,
+            "before_scriptCode": 104,
+            "scriptCode_length": 3,
+            "scriptCode_lock_copy": 915,
+            "after_scriptCode": 52
+          },
+          "holder1": {
+            "signature_push": 1,
+            "signature_der": 71,
+            "sighash_byte": 1,
+            "companion_funding_raw_push": 3,
+            "companion_funding_raw": 798,
+            "ordered_prevouts_push": 2,
+            "ordered_prevouts": 144,
+            "preimage_push": 3,
+            "before_scriptCode": 104,
+            "scriptCode_length": 3,
+            "scriptCode_lock_copy": 915,
+            "after_scriptCode": 52
+          }
+        },
+        "actual_token_locks": [
+          {
+            "tag_and_scope_push": 61,
+            "state_push": 1,
+            "state": 50,
+            "holder_and_verifier_guard": 803
+          },
+          {
+            "tag_and_scope_push": 61,
+            "state_push": 1,
+            "state": 50,
+            "holder_and_verifier_guard": 803
+          }
+        ],
+        "verifier_funding": {
+          "version_locktime_counts": 10,
+          "outpoints_sequences": 40,
+          "input_script_lengths": 1,
+          "output_satoshis_and_script_lengths": 13,
+          "source_groth16_lock": 449730,
+          "payment_groth16_lock": 449742,
+          "verifier_native_lock": 3386
+        },
+        "companion_funding": {
+          "version_locktime_counts": 10,
+          "outpoints_sequences": 40,
+          "input_script_lengths": 1,
+          "output_satoshis_and_script_lengths": 11,
+          "signature_push": 1,
+          "signature_der": 71,
+          "sighash_byte": 1,
+          "companion_native_lock": 663
+        },
+        "history": {
+          "known_token_creation_and_ancestor_txs": 4,
+          "literal_token_history_bytes_in_scriptSigs": 0
+        }
+      },
+      "second-selection": {
+        "txid": "93b4e8273689cea40e7335d7c1fb338ac25d665dc5da77949177d3b1109e6f55",
+        "total_with_dedicated_funding": 915278,
+        "payment": {
+          "version_locktime_counts": 10,
+          "outpoints_sequences": 160,
+          "input_script_lengths": 12,
+          "output_satoshis_and_script_lengths": 22,
+          "verifier_scriptSig": 4359,
+          "companion_scriptSig": 971,
+          "holder0_scriptSig": 2097,
+          "holder1_scriptSig": 2097,
+          "token_output_locks": 1830
+        },
+        "scriptSigs": {
+          "verifier": {
+            "source_proof_pushes": 1078,
+            "payment_proof_pushes": 1078,
+            "inventory_root_push": 1,
+            "inventory_root": 32,
+            "successor_state_push": 2,
+            "successor_state": 100,
+            "otda_push": 3,
+            "otda_other": 69,
+            "otda_current_outpoints": 144,
+            "otda_output_amount_and_length": 22,
+            "otda_current_output_lock_copies": 1830
+          },
+          "companion": {
+            "ordered_prevouts_push": 2,
+            "ordered_prevouts": 144,
+            "preimage_push": 3,
+            "before_scriptCode": 104,
+            "scriptCode_length": 3,
+            "scriptCode_lock_copy": 663,
+            "after_scriptCode": 52
+          },
+          "holder0": {
+            "signature_push": 1,
+            "signature_der": 71,
+            "sighash_byte": 1,
+            "companion_funding_raw_push": 3,
+            "companion_funding_raw": 798,
+            "ordered_prevouts_push": 2,
+            "ordered_prevouts": 144,
+            "preimage_push": 3,
+            "before_scriptCode": 104,
+            "scriptCode_length": 3,
+            "scriptCode_lock_copy": 915,
+            "after_scriptCode": 52
+          },
+          "holder1": {
+            "signature_push": 1,
+            "signature_der": 71,
+            "sighash_byte": 1,
+            "companion_funding_raw_push": 3,
+            "companion_funding_raw": 798,
+            "ordered_prevouts_push": 2,
+            "ordered_prevouts": 144,
+            "preimage_push": 3,
+            "before_scriptCode": 104,
+            "scriptCode_length": 3,
+            "scriptCode_lock_copy": 915,
+            "after_scriptCode": 52
+          }
+        },
+        "actual_token_locks": [
+          {
+            "tag_and_scope_push": 61,
+            "state_push": 1,
+            "state": 50,
+            "holder_and_verifier_guard": 803
+          },
+          {
+            "tag_and_scope_push": 61,
+            "state_push": 1,
+            "state": 50,
+            "holder_and_verifier_guard": 803
+          }
+        ],
+        "verifier_funding": {
+          "version_locktime_counts": 10,
+          "outpoints_sequences": 40,
+          "input_script_lengths": 1,
+          "output_satoshis_and_script_lengths": 13,
+          "source_groth16_lock": 449730,
+          "payment_groth16_lock": 449742,
+          "verifier_native_lock": 3386
+        },
+        "companion_funding": {
+          "version_locktime_counts": 10,
+          "outpoints_sequences": 40,
+          "input_script_lengths": 1,
+          "output_satoshis_and_script_lengths": 11,
+          "signature_push": 1,
+          "signature_der": 71,
+          "sighash_byte": 1,
+          "companion_native_lock": 663
+        },
+        "history": {
+          "known_token_creation_and_ancestor_txs": 4,
+          "literal_token_history_bytes_in_scriptSigs": 0
+        }
+      },
+      "recipient-respend": {
+        "txid": "489a5b5fe6a6960a2f6659d5f69fc7118d9eebb3369e335332ce9c79acc2f4c2",
+        "total_with_dedicated_funding": 915276,
+        "payment": {
+          "version_locktime_counts": 10,
+          "outpoints_sequences": 160,
+          "input_script_lengths": 12,
+          "output_satoshis_and_script_lengths": 22,
+          "verifier_scriptSig": 4359,
+          "companion_scriptSig": 971,
+          "holder0_scriptSig": 2096,
+          "holder1_scriptSig": 2096,
+          "token_output_locks": 1830
+        },
+        "scriptSigs": {
+          "verifier": {
+            "source_proof_pushes": 1078,
+            "payment_proof_pushes": 1078,
+            "inventory_root_push": 1,
+            "inventory_root": 32,
+            "successor_state_push": 2,
+            "successor_state": 100,
+            "otda_push": 3,
+            "otda_other": 69,
+            "otda_current_outpoints": 144,
+            "otda_output_amount_and_length": 22,
+            "otda_current_output_lock_copies": 1830
+          },
+          "companion": {
+            "ordered_prevouts_push": 2,
+            "ordered_prevouts": 144,
+            "preimage_push": 3,
+            "before_scriptCode": 104,
+            "scriptCode_length": 3,
+            "scriptCode_lock_copy": 663,
+            "after_scriptCode": 52
+          },
+          "holder0": {
+            "signature_push": 1,
+            "signature_der": 70,
+            "sighash_byte": 1,
+            "companion_funding_raw_push": 3,
+            "companion_funding_raw": 798,
+            "ordered_prevouts_push": 2,
+            "ordered_prevouts": 144,
+            "preimage_push": 3,
+            "before_scriptCode": 104,
+            "scriptCode_length": 3,
+            "scriptCode_lock_copy": 915,
+            "after_scriptCode": 52
+          },
+          "holder1": {
+            "signature_push": 1,
+            "signature_der": 70,
+            "sighash_byte": 1,
+            "companion_funding_raw_push": 3,
+            "companion_funding_raw": 798,
+            "ordered_prevouts_push": 2,
+            "ordered_prevouts": 144,
+            "preimage_push": 3,
+            "before_scriptCode": 104,
+            "scriptCode_length": 3,
+            "scriptCode_lock_copy": 915,
+            "after_scriptCode": 52
+          }
+        },
+        "actual_token_locks": [
+          {
+            "tag_and_scope_push": 61,
+            "state_push": 1,
+            "state": 50,
+            "holder_and_verifier_guard": 803
+          },
+          {
+            "tag_and_scope_push": 61,
+            "state_push": 1,
+            "state": 50,
+            "holder_and_verifier_guard": 803
+          }
+        ],
+        "verifier_funding": {
+          "version_locktime_counts": 10,
+          "outpoints_sequences": 40,
+          "input_script_lengths": 1,
+          "output_satoshis_and_script_lengths": 13,
+          "source_groth16_lock": 449730,
+          "payment_groth16_lock": 449742,
+          "verifier_native_lock": 3386
+        },
+        "companion_funding": {
+          "version_locktime_counts": 10,
+          "outpoints_sequences": 40,
+          "input_script_lengths": 1,
+          "output_satoshis_and_script_lengths": 11,
+          "signature_push": 1,
+          "signature_der": 71,
+          "sighash_byte": 1,
+          "companion_native_lock": 663
+        },
+        "history": {
+          "known_token_creation_and_ancestor_txs": 8,
+          "literal_token_history_bytes_in_scriptSigs": 0
+        }
+      }
+    },
+    "previous_to_next": {
+      "payment": {
+        "holder0_scriptSig": -1,
+        "holder1_scriptSig": -1
+      },
+      "scriptSigs": {
+        "verifier": {},
+        "companion": {},
+        "holder0": {
+          "signature_der": -1
+        },
+        "holder1": {
+          "signature_der": -1
+        }
+      },
+      "verifier_funding": {},
+      "companion_funding": {},
+      "total_with_dedicated_funding": -2
+    }
+  },
+  "D": {
+    "scope": "23ff47572abb5c3053aeea10cc034249623dbc013aa15492c01e1885d0d8d66e",
+    "rows": {
+      "first-selection": {
+        "txid": "1a7e8488f75b142f3f7059c99cb4ad109ac1a2eb451b023324ab791cafc7503f",
+        "total_with_dedicated_funding": 13927,
+        "payment": {
+          "version_locktime_counts": 10,
+          "outpoints_sequences": 160,
+          "input_script_lengths": 12,
+          "output_satoshis_and_script_lengths": 22,
+          "verifier_scriptSig": 2569,
+          "companion_scriptSig": 971,
+          "holder0_scriptSig": 2095,
+          "holder1_scriptSig": 2096,
+          "token_output_locks": 1830
+        },
+        "scriptSigs": {
+          "verifier": {
+            "approved_list_push": 2,
+            "approved_list": 128,
+            "inventory_root_push": 1,
+            "inventory_root": 32,
+            "membership_indices": 2,
+            "membership_sibling_push": 4,
+            "membership_sibling": 128,
+            "source_state_push": 2,
+            "source_state": 100,
+            "successor_state_push": 2,
+            "successor_state": 100,
+            "otda_push": 3,
+            "otda_other": 69,
+            "otda_current_outpoints": 144,
+            "otda_output_amount_and_length": 22,
+            "otda_current_output_lock_copies": 1830
+          },
+          "companion": {
+            "ordered_prevouts_push": 2,
+            "ordered_prevouts": 144,
+            "preimage_push": 3,
+            "before_scriptCode": 104,
+            "scriptCode_length": 3,
+            "scriptCode_lock_copy": 663,
+            "after_scriptCode": 52
+          },
+          "holder0": {
+            "signature_push": 1,
+            "signature_der": 70,
+            "sighash_byte": 1,
+            "companion_funding_raw_push": 3,
+            "companion_funding_raw": 797,
+            "ordered_prevouts_push": 2,
+            "ordered_prevouts": 144,
+            "preimage_push": 3,
+            "before_scriptCode": 104,
+            "scriptCode_length": 3,
+            "scriptCode_lock_copy": 915,
+            "after_scriptCode": 52
+          },
+          "holder1": {
+            "signature_push": 1,
+            "signature_der": 71,
+            "sighash_byte": 1,
+            "companion_funding_raw_push": 3,
+            "companion_funding_raw": 797,
+            "ordered_prevouts_push": 2,
+            "ordered_prevouts": 144,
+            "preimage_push": 3,
+            "before_scriptCode": 104,
+            "scriptCode_length": 3,
+            "scriptCode_lock_copy": 915,
+            "after_scriptCode": 52
+          }
+        },
+        "actual_token_locks": [
+          {
+            "tag_and_scope_push": 61,
+            "state_push": 1,
+            "state": 50,
+            "holder_and_verifier_guard": 803
+          },
+          {
+            "tag_and_scope_push": 61,
+            "state_push": 1,
+            "state": 50,
+            "holder_and_verifier_guard": 803
+          }
+        ],
+        "verifier_funding": {
+          "version_locktime_counts": 10,
+          "outpoints_sequences": 40,
+          "input_script_lengths": 1,
+          "output_satoshis_and_script_lengths": 11,
+          "verifier_native_lock": 3303
+        },
+        "companion_funding": {
+          "version_locktime_counts": 10,
+          "outpoints_sequences": 40,
+          "input_script_lengths": 1,
+          "output_satoshis_and_script_lengths": 11,
+          "signature_push": 1,
+          "signature_der": 70,
+          "sighash_byte": 1,
+          "companion_native_lock": 663
+        },
+        "history": {
+          "known_token_creation_and_ancestor_txs": 4,
+          "literal_token_history_bytes_in_scriptSigs": 0
+        }
+      },
+      "second-selection": {
+        "txid": "9b93bd00fc1a2addda5a070c6679c6b77a859947f9b1dc5cc436133f493b6e4e",
+        "total_with_dedicated_funding": 13927,
+        "payment": {
+          "version_locktime_counts": 10,
+          "outpoints_sequences": 160,
+          "input_script_lengths": 12,
+          "output_satoshis_and_script_lengths": 22,
+          "verifier_scriptSig": 2569,
+          "companion_scriptSig": 971,
+          "holder0_scriptSig": 2095,
+          "holder1_scriptSig": 2096,
+          "token_output_locks": 1830
+        },
+        "scriptSigs": {
+          "verifier": {
+            "approved_list_push": 2,
+            "approved_list": 128,
+            "inventory_root_push": 1,
+            "inventory_root": 32,
+            "membership_indices": 2,
+            "membership_sibling_push": 4,
+            "membership_sibling": 128,
+            "source_state_push": 2,
+            "source_state": 100,
+            "successor_state_push": 2,
+            "successor_state": 100,
+            "otda_push": 3,
+            "otda_other": 69,
+            "otda_current_outpoints": 144,
+            "otda_output_amount_and_length": 22,
+            "otda_current_output_lock_copies": 1830
+          },
+          "companion": {
+            "ordered_prevouts_push": 2,
+            "ordered_prevouts": 144,
+            "preimage_push": 3,
+            "before_scriptCode": 104,
+            "scriptCode_length": 3,
+            "scriptCode_lock_copy": 663,
+            "after_scriptCode": 52
+          },
+          "holder0": {
+            "signature_push": 1,
+            "signature_der": 70,
+            "sighash_byte": 1,
+            "companion_funding_raw_push": 3,
+            "companion_funding_raw": 797,
+            "ordered_prevouts_push": 2,
+            "ordered_prevouts": 144,
+            "preimage_push": 3,
+            "before_scriptCode": 104,
+            "scriptCode_length": 3,
+            "scriptCode_lock_copy": 915,
+            "after_scriptCode": 52
+          },
+          "holder1": {
+            "signature_push": 1,
+            "signature_der": 71,
+            "sighash_byte": 1,
+            "companion_funding_raw_push": 3,
+            "companion_funding_raw": 797,
+            "ordered_prevouts_push": 2,
+            "ordered_prevouts": 144,
+            "preimage_push": 3,
+            "before_scriptCode": 104,
+            "scriptCode_length": 3,
+            "scriptCode_lock_copy": 915,
+            "after_scriptCode": 52
+          }
+        },
+        "actual_token_locks": [
+          {
+            "tag_and_scope_push": 61,
+            "state_push": 1,
+            "state": 50,
+            "holder_and_verifier_guard": 803
+          },
+          {
+            "tag_and_scope_push": 61,
+            "state_push": 1,
+            "state": 50,
+            "holder_and_verifier_guard": 803
+          }
+        ],
+        "verifier_funding": {
+          "version_locktime_counts": 10,
+          "outpoints_sequences": 40,
+          "input_script_lengths": 1,
+          "output_satoshis_and_script_lengths": 11,
+          "verifier_native_lock": 3303
+        },
+        "companion_funding": {
+          "version_locktime_counts": 10,
+          "outpoints_sequences": 40,
+          "input_script_lengths": 1,
+          "output_satoshis_and_script_lengths": 11,
+          "signature_push": 1,
+          "signature_der": 70,
+          "sighash_byte": 1,
+          "companion_native_lock": 663
+        },
+        "history": {
+          "known_token_creation_and_ancestor_txs": 4,
+          "literal_token_history_bytes_in_scriptSigs": 0
+        }
+      },
+      "recipient-respend": {
+        "txid": "0ae9ab584fff01cbc301ed4c079ac71f52ba9d63e145ab47872b4c018dd9dda6",
+        "total_with_dedicated_funding": 13928,
+        "payment": {
+          "version_locktime_counts": 10,
+          "outpoints_sequences": 160,
+          "input_script_lengths": 12,
+          "output_satoshis_and_script_lengths": 22,
+          "verifier_scriptSig": 2569,
+          "companion_scriptSig": 971,
+          "holder0_scriptSig": 2096,
+          "holder1_scriptSig": 2096,
+          "token_output_locks": 1830
+        },
+        "scriptSigs": {
+          "verifier": {
+            "approved_list_push": 2,
+            "approved_list": 128,
+            "inventory_root_push": 1,
+            "inventory_root": 32,
+            "membership_indices": 2,
+            "membership_sibling_push": 4,
+            "membership_sibling": 128,
+            "source_state_push": 2,
+            "source_state": 100,
+            "successor_state_push": 2,
+            "successor_state": 100,
+            "otda_push": 3,
+            "otda_other": 69,
+            "otda_current_outpoints": 144,
+            "otda_output_amount_and_length": 22,
+            "otda_current_output_lock_copies": 1830
+          },
+          "companion": {
+            "ordered_prevouts_push": 2,
+            "ordered_prevouts": 144,
+            "preimage_push": 3,
+            "before_scriptCode": 104,
+            "scriptCode_length": 3,
+            "scriptCode_lock_copy": 663,
+            "after_scriptCode": 52
+          },
+          "holder0": {
+            "signature_push": 1,
+            "signature_der": 71,
+            "sighash_byte": 1,
+            "companion_funding_raw_push": 3,
+            "companion_funding_raw": 797,
+            "ordered_prevouts_push": 2,
+            "ordered_prevouts": 144,
+            "preimage_push": 3,
+            "before_scriptCode": 104,
+            "scriptCode_length": 3,
+            "scriptCode_lock_copy": 915,
+            "after_scriptCode": 52
+          },
+          "holder1": {
+            "signature_push": 1,
+            "signature_der": 71,
+            "sighash_byte": 1,
+            "companion_funding_raw_push": 3,
+            "companion_funding_raw": 797,
+            "ordered_prevouts_push": 2,
+            "ordered_prevouts": 144,
+            "preimage_push": 3,
+            "before_scriptCode": 104,
+            "scriptCode_length": 3,
+            "scriptCode_lock_copy": 915,
+            "after_scriptCode": 52
+          }
+        },
+        "actual_token_locks": [
+          {
+            "tag_and_scope_push": 61,
+            "state_push": 1,
+            "state": 50,
+            "holder_and_verifier_guard": 803
+          },
+          {
+            "tag_and_scope_push": 61,
+            "state_push": 1,
+            "state": 50,
+            "holder_and_verifier_guard": 803
+          }
+        ],
+        "verifier_funding": {
+          "version_locktime_counts": 10,
+          "outpoints_sequences": 40,
+          "input_script_lengths": 1,
+          "output_satoshis_and_script_lengths": 11,
+          "verifier_native_lock": 3303
+        },
+        "companion_funding": {
+          "version_locktime_counts": 10,
+          "outpoints_sequences": 40,
+          "input_script_lengths": 1,
+          "output_satoshis_and_script_lengths": 11,
+          "signature_push": 1,
+          "signature_der": 70,
+          "sighash_byte": 1,
+          "companion_native_lock": 663
+        },
+        "history": {
+          "known_token_creation_and_ancestor_txs": 8,
+          "literal_token_history_bytes_in_scriptSigs": 0
+        }
+      }
+    },
+    "previous_to_next": {
+      "payment": {
+        "holder0_scriptSig": 1
+      },
+      "scriptSigs": {
+        "verifier": {},
+        "companion": {},
+        "holder0": {
+          "signature_der": 1
+        },
+        "holder1": {}
+      },
+      "verifier_funding": {},
+      "companion_funding": {},
+      "total_with_dedicated_funding": 1
+    }
+  },
+  "E": {
+    "scope": "414b730ea491d5f1a47114256fa36321957f2cee22c881bb251072804f0b6ccb",
+    "rows": {
+      "payment-1": {
+        "txid": "57058a999829402db50723ad5633f441050191ad3fcbcc362d4a1e9a1f42cd54",
+        "total_with_dedicated_funding": 431278,
+        "payment": {
+          "version_locktime_counts": 10,
+          "outpoints_sequences": 2640,
+          "input_script_lengths": 198,
+          "output_satoshis_and_script_lengths": 704,
+          "verifier_scriptSig": 64841,
+          "companion_scriptSig": 3204,
+          "holders_64_scriptSig": 274432,
+          "token_output_locks": 56000
+        },
+        "scriptSigs": {
+          "verifier": {
+            "membership_sibling_push": 64,
+            "membership_sibling": 2048,
+            "packed_records_push": 3,
+            "membership_indices": 64,
+            "source_state": 3200,
+            "otda_push": 3,
+            "otda_other": 379,
+            "otda_current_outpoints": 2376,
+            "otda_output_amount_and_length": 704,
+            "otda_current_output_lock_copies": 56000
+          },
+          "companion": {
+            "ordered_prevouts_push": 3,
+            "ordered_prevouts": 2376,
+            "preimage_push": 3,
+            "before_scriptCode": 104,
+            "scriptCode_length": 3,
+            "scriptCode_lock_copy": 663,
+            "after_scriptCode": 52
+          },
+          "holders_64": {
+            "signature_push": 64,
+            "signature_der": 4480,
+            "sighash_byte": 64,
+            "companion_funding_raw_push": 192,
+            "companion_funding_raw": 51008,
+            "ordered_prevouts_push": 192,
+            "ordered_prevouts": 152064,
+            "preimage_push": 192,
+            "before_scriptCode": 6656,
+            "scriptCode_length": 192,
+            "scriptCode_lock_copy": 56000,
+            "after_scriptCode": 3328
+          }
+        },
+        "representative_holder": {
+          "signature_push": 1,
+          "signature_der": 70,
+          "sighash_byte": 1,
+          "companion_funding_raw_push": 3,
+          "companion_funding_raw": 797,
+          "ordered_prevouts_push": 3,
+          "ordered_prevouts": 2376,
+          "preimage_push": 3,
+          "before_scriptCode": 104,
+          "scriptCode_length": 3,
+          "scriptCode_lock_copy": 875,
+          "after_scriptCode": 52
+        },
+        "actual_token_locks_64": {
+          "tag_and_scope_push": 3904,
+          "state_push": 64,
+          "state": 3200,
+          "holder_and_verifier_guard": 48832
+        },
+        "verifier_funding": {
+          "version_locktime_counts": 10,
+          "outpoints_sequences": 40,
+          "input_script_lengths": 1,
+          "output_satoshis_and_script_lengths": 11,
+          "verifier_native_lock": 28390
+        },
+        "companion_funding": {
+          "version_locktime_counts": 10,
+          "outpoints_sequences": 40,
+          "input_script_lengths": 1,
+          "output_satoshis_and_script_lengths": 11,
+          "signature_push": 1,
+          "signature_der": 70,
+          "sighash_byte": 1,
+          "companion_native_lock": 663
+        },
+        "history": {
+          "known_token_creation_and_ancestor_txs": 66,
+          "literal_token_history_bytes_in_scriptSigs": 0
+        }
+      },
+      "payment-2": {
+        "txid": "bbc5e948e115721d912e962baa7ba42263acc6c5d90417c55a05f2d88082d6c6",
+        "total_with_dedicated_funding": 431278,
+        "payment": {
+          "version_locktime_counts": 10,
+          "outpoints_sequences": 2640,
+          "input_script_lengths": 198,
+          "output_satoshis_and_script_lengths": 704,
+          "verifier_scriptSig": 64841,
+          "companion_scriptSig": 3204,
+          "holders_64_scriptSig": 274432,
+          "token_output_locks": 56000
+        },
+        "scriptSigs": {
+          "verifier": {
+            "membership_sibling_push": 64,
+            "membership_sibling": 2048,
+            "packed_records_push": 3,
+            "membership_indices": 64,
+            "source_state": 3200,
+            "otda_push": 3,
+            "otda_other": 379,
+            "otda_current_outpoints": 2376,
+            "otda_output_amount_and_length": 704,
+            "otda_current_output_lock_copies": 56000
+          },
+          "companion": {
+            "ordered_prevouts_push": 3,
+            "ordered_prevouts": 2376,
+            "preimage_push": 3,
+            "before_scriptCode": 104,
+            "scriptCode_length": 3,
+            "scriptCode_lock_copy": 663,
+            "after_scriptCode": 52
+          },
+          "holders_64": {
+            "signature_push": 64,
+            "signature_der": 4480,
+            "sighash_byte": 64,
+            "companion_funding_raw_push": 192,
+            "companion_funding_raw": 51008,
+            "ordered_prevouts_push": 192,
+            "ordered_prevouts": 152064,
+            "preimage_push": 192,
+            "before_scriptCode": 6656,
+            "scriptCode_length": 192,
+            "scriptCode_lock_copy": 56000,
+            "after_scriptCode": 3328
+          }
+        },
+        "representative_holder": {
+          "signature_push": 1,
+          "signature_der": 70,
+          "sighash_byte": 1,
+          "companion_funding_raw_push": 3,
+          "companion_funding_raw": 797,
+          "ordered_prevouts_push": 3,
+          "ordered_prevouts": 2376,
+          "preimage_push": 3,
+          "before_scriptCode": 104,
+          "scriptCode_length": 3,
+          "scriptCode_lock_copy": 875,
+          "after_scriptCode": 52
+        },
+        "actual_token_locks_64": {
+          "tag_and_scope_push": 3904,
+          "state_push": 64,
+          "state": 3200,
+          "holder_and_verifier_guard": 48832
+        },
+        "verifier_funding": {
+          "version_locktime_counts": 10,
+          "outpoints_sequences": 40,
+          "input_script_lengths": 1,
+          "output_satoshis_and_script_lengths": 11,
+          "verifier_native_lock": 28390
+        },
+        "companion_funding": {
+          "version_locktime_counts": 10,
+          "outpoints_sequences": 40,
+          "input_script_lengths": 1,
+          "output_satoshis_and_script_lengths": 11,
+          "signature_push": 1,
+          "signature_der": 70,
+          "sighash_byte": 1,
+          "companion_native_lock": 663
+        },
+        "history": {
+          "known_token_creation_and_ancestor_txs": 69,
+          "literal_token_history_bytes_in_scriptSigs": 0
+        }
+      }
+    },
+    "previous_to_next": {
+      "payment": {},
+      "scriptSigs": {
+        "verifier": {},
+        "companion": {},
+        "holders_64": {}
+      },
+      "verifier_funding": {},
+      "companion_funding": {},
+      "total_with_dedicated_funding": 0
+    }
+  },
+  "E-compact": {
+    "scope": "dee240f1a303accfa0178e282911a55139f089e5820f1e7eae5660b8272a3ef2",
+    "rows": {
+      "payment-1": {
+        "txid": "0783f57de200a2c20970690a78737062da031018e1c323419cb2495e2aa4167f",
+        "total_with_dedicated_funding": 378747,
+        "payment": {
+          "version_locktime_counts": 10,
+          "outpoints_sequences": 2640,
+          "input_script_lengths": 200,
+          "output_satoshis_and_script_lengths": 704,
+          "verifier_scriptSig": 65545,
+          "companion_scriptSig": 3204,
+          "holders_64_scriptSig": 220480,
+          "token_output_locks": 56704
+        },
+        "scriptSigs": {
+          "verifier": {
+            "membership_sibling_push": 64,
+            "membership_sibling": 2048,
+            "packed_records_push": 3,
+            "membership_indices": 64,
+            "source_state": 3200,
+            "otda_push": 3,
+            "otda_other": 379,
+            "otda_current_outpoints": 2376,
+            "otda_output_amount_and_length": 704,
+            "otda_current_output_lock_copies": 56704
+          },
+          "companion": {
+            "ordered_prevouts_push": 3,
+            "ordered_prevouts": 2376,
+            "preimage_push": 3,
+            "before_scriptCode": 104,
+            "scriptCode_length": 3,
+            "scriptCode_lock_copy": 663,
+            "after_scriptCode": 52
+          },
+          "holders_64": {
+            "signature_push": 64,
+            "signature_der": 4480,
+            "sighash_byte": 64,
+            "companion_funding_raw_push": 192,
+            "companion_funding_raw": 51008,
+            "ordered_prevouts_push": 192,
+            "ordered_prevouts": 152064,
+            "preimage_push": 128,
+            "before_scriptCode": 6656,
+            "scriptCode_length": 64,
+            "scriptCode_compact_suffix": 2240,
+            "after_scriptCode": 3328
+          }
+        },
+        "representative_holder": {
+          "signature_push": 1,
+          "signature_der": 70,
+          "sighash_byte": 1,
+          "companion_funding_raw_push": 3,
+          "companion_funding_raw": 797,
+          "ordered_prevouts_push": 3,
+          "ordered_prevouts": 2376,
+          "preimage_push": 2,
+          "before_scriptCode": 104,
+          "scriptCode_length": 1,
+          "scriptCode_compact_suffix": 35,
+          "after_scriptCode": 52
+        },
+        "actual_token_locks_64": {
+          "tag_and_scope_push": 3904,
+          "state_push": 64,
+          "state": 3200,
+          "holder_and_verifier_guard": 49536
+        },
+        "verifier_funding": {
+          "version_locktime_counts": 10,
+          "outpoints_sequences": 40,
+          "input_script_lengths": 1,
+          "output_satoshis_and_script_lengths": 11,
+          "verifier_native_lock": 28401
+        },
+        "companion_funding": {
+          "version_locktime_counts": 10,
+          "outpoints_sequences": 40,
+          "input_script_lengths": 1,
+          "output_satoshis_and_script_lengths": 11,
+          "signature_push": 1,
+          "signature_der": 70,
+          "sighash_byte": 1,
+          "companion_native_lock": 663
+        },
+        "history": {
+          "known_token_creation_and_ancestor_txs": 66,
+          "literal_token_history_bytes_in_scriptSigs": 0
+        }
+      },
+      "payment-2": {
+        "txid": "1bf9a581ef52887f2f5ae9c080f38ab28a853ddd60304fb25632e4639b617fce",
+        "total_with_dedicated_funding": 378747,
+        "payment": {
+          "version_locktime_counts": 10,
+          "outpoints_sequences": 2640,
+          "input_script_lengths": 200,
+          "output_satoshis_and_script_lengths": 704,
+          "verifier_scriptSig": 65545,
+          "companion_scriptSig": 3204,
+          "holders_64_scriptSig": 220480,
+          "token_output_locks": 56704
+        },
+        "scriptSigs": {
+          "verifier": {
+            "membership_sibling_push": 64,
+            "membership_sibling": 2048,
+            "packed_records_push": 3,
+            "membership_indices": 64,
+            "source_state": 3200,
+            "otda_push": 3,
+            "otda_other": 379,
+            "otda_current_outpoints": 2376,
+            "otda_output_amount_and_length": 704,
+            "otda_current_output_lock_copies": 56704
+          },
+          "companion": {
+            "ordered_prevouts_push": 3,
+            "ordered_prevouts": 2376,
+            "preimage_push": 3,
+            "before_scriptCode": 104,
+            "scriptCode_length": 3,
+            "scriptCode_lock_copy": 663,
+            "after_scriptCode": 52
+          },
+          "holders_64": {
+            "signature_push": 64,
+            "signature_der": 4480,
+            "sighash_byte": 64,
+            "companion_funding_raw_push": 192,
+            "companion_funding_raw": 51008,
+            "ordered_prevouts_push": 192,
+            "ordered_prevouts": 152064,
+            "preimage_push": 128,
+            "before_scriptCode": 6656,
+            "scriptCode_length": 64,
+            "scriptCode_compact_suffix": 2240,
+            "after_scriptCode": 3328
+          }
+        },
+        "representative_holder": {
+          "signature_push": 1,
+          "signature_der": 70,
+          "sighash_byte": 1,
+          "companion_funding_raw_push": 3,
+          "companion_funding_raw": 797,
+          "ordered_prevouts_push": 3,
+          "ordered_prevouts": 2376,
+          "preimage_push": 2,
+          "before_scriptCode": 104,
+          "scriptCode_length": 1,
+          "scriptCode_compact_suffix": 35,
+          "after_scriptCode": 52
+        },
+        "actual_token_locks_64": {
+          "tag_and_scope_push": 3904,
+          "state_push": 64,
+          "state": 3200,
+          "holder_and_verifier_guard": 49536
+        },
+        "verifier_funding": {
+          "version_locktime_counts": 10,
+          "outpoints_sequences": 40,
+          "input_script_lengths": 1,
+          "output_satoshis_and_script_lengths": 11,
+          "verifier_native_lock": 28401
+        },
+        "companion_funding": {
+          "version_locktime_counts": 10,
+          "outpoints_sequences": 40,
+          "input_script_lengths": 1,
+          "output_satoshis_and_script_lengths": 11,
+          "signature_push": 1,
+          "signature_der": 70,
+          "sighash_byte": 1,
+          "companion_native_lock": 663
+        },
+        "history": {
+          "known_token_creation_and_ancestor_txs": 69,
+          "literal_token_history_bytes_in_scriptSigs": 0
+        }
+      }
+    },
+    "previous_to_next": {
+      "payment": {},
+      "scriptSigs": {
+        "verifier": {},
+        "companion": {},
+        "holders_64": {}
+      },
+      "verifier_funding": {},
+      "companion_funding": {},
+      "total_with_dedicated_funding": 0
+    }
+  },
+  "F": {
+    "scope": "bd808765b52be21b157f80f24706b143db15bd1cb7b92ed0234f5b488b8f0e1e",
+    "rows": {
+      "payment-1": {
+        "txid": "ef2faa6f454c3643a6a4deb048f1639a24a0831d31cbd93e6dbf43be7db50f87",
+        "total_with_dedicated_funding": 319101,
+        "payment": {
+          "version_locktime_counts": 10,
+          "outpoints_sequences": 2640,
+          "input_script_lengths": 198,
+          "output_satoshis_and_script_lengths": 704,
+          "verifier_scriptSig": 11155,
+          "companion_scriptSig": 3204,
+          "holders_64_scriptSig": 220480,
+          "token_output_locks": 56704
+        },
+        "scriptSigs": {
+          "verifier": {
+            "membership_sibling_push": 64,
+            "membership_sibling": 2048,
+            "packed_records_push": 3,
+            "membership_indices": 64,
+            "source_state": 3200,
+            "packed_successor_states_push": 3,
+            "packed_successor_states": 3200,
+            "ordered_prevouts_push": 3,
+            "ordered_prevouts": 2376,
+            "preimage_push": 2,
+            "before_scriptCode": 104,
+            "scriptCode_length": 1,
+            "scriptCode_compact_suffix": 35,
+            "after_scriptCode": 52
+          },
+          "companion": {
+            "ordered_prevouts_push": 3,
+            "ordered_prevouts": 2376,
+            "preimage_push": 3,
+            "before_scriptCode": 104,
+            "scriptCode_length": 3,
+            "scriptCode_lock_copy": 663,
+            "after_scriptCode": 52
+          },
+          "holders_64": {
+            "signature_push": 64,
+            "signature_der": 4480,
+            "sighash_byte": 64,
+            "companion_funding_raw_push": 192,
+            "companion_funding_raw": 51008,
+            "ordered_prevouts_push": 192,
+            "ordered_prevouts": 152064,
+            "preimage_push": 128,
+            "before_scriptCode": 6656,
+            "scriptCode_length": 64,
+            "scriptCode_compact_suffix": 2240,
+            "after_scriptCode": 3328
+          }
+        },
+        "representative_holder": {
+          "signature_push": 1,
+          "signature_der": 70,
+          "sighash_byte": 1,
+          "companion_funding_raw_push": 3,
+          "companion_funding_raw": 797,
+          "ordered_prevouts_push": 3,
+          "ordered_prevouts": 2376,
+          "preimage_push": 2,
+          "before_scriptCode": 104,
+          "scriptCode_length": 1,
+          "scriptCode_compact_suffix": 35,
+          "after_scriptCode": 52
+        },
+        "actual_token_locks_64": {
+          "tag_and_scope_push": 3904,
+          "state_push": 64,
+          "state": 3200,
+          "holder_and_verifier_guard": 49536
+        },
+        "verifier_funding": {
+          "version_locktime_counts": 10,
+          "outpoints_sequences": 40,
+          "input_script_lengths": 1,
+          "output_satoshis_and_script_lengths": 11,
+          "verifier_native_lock": 23147
+        },
+        "companion_funding": {
+          "version_locktime_counts": 10,
+          "outpoints_sequences": 40,
+          "input_script_lengths": 1,
+          "output_satoshis_and_script_lengths": 11,
+          "signature_push": 1,
+          "signature_der": 70,
+          "sighash_byte": 1,
+          "companion_native_lock": 663
+        },
+        "history": {
+          "known_token_creation_and_ancestor_txs": 66,
+          "literal_token_history_bytes_in_scriptSigs": 0
+        }
+      },
+      "payment-2": {
+        "txid": "f6f7f8b73b9d70b4b2f221ff6b71a0e34afd66717800dd7b6479ced24f3f8247",
+        "total_with_dedicated_funding": 319101,
+        "payment": {
+          "version_locktime_counts": 10,
+          "outpoints_sequences": 2640,
+          "input_script_lengths": 198,
+          "output_satoshis_and_script_lengths": 704,
+          "verifier_scriptSig": 11155,
+          "companion_scriptSig": 3204,
+          "holders_64_scriptSig": 220480,
+          "token_output_locks": 56704
+        },
+        "scriptSigs": {
+          "verifier": {
+            "membership_sibling_push": 64,
+            "membership_sibling": 2048,
+            "packed_records_push": 3,
+            "membership_indices": 64,
+            "source_state": 3200,
+            "packed_successor_states_push": 3,
+            "packed_successor_states": 3200,
+            "ordered_prevouts_push": 3,
+            "ordered_prevouts": 2376,
+            "preimage_push": 2,
+            "before_scriptCode": 104,
+            "scriptCode_length": 1,
+            "scriptCode_compact_suffix": 35,
+            "after_scriptCode": 52
+          },
+          "companion": {
+            "ordered_prevouts_push": 3,
+            "ordered_prevouts": 2376,
+            "preimage_push": 3,
+            "before_scriptCode": 104,
+            "scriptCode_length": 3,
+            "scriptCode_lock_copy": 663,
+            "after_scriptCode": 52
+          },
+          "holders_64": {
+            "signature_push": 64,
+            "signature_der": 4480,
+            "sighash_byte": 64,
+            "companion_funding_raw_push": 192,
+            "companion_funding_raw": 51008,
+            "ordered_prevouts_push": 192,
+            "ordered_prevouts": 152064,
+            "preimage_push": 128,
+            "before_scriptCode": 6656,
+            "scriptCode_length": 64,
+            "scriptCode_compact_suffix": 2240,
+            "after_scriptCode": 3328
+          }
+        },
+        "representative_holder": {
+          "signature_push": 1,
+          "signature_der": 70,
+          "sighash_byte": 1,
+          "companion_funding_raw_push": 3,
+          "companion_funding_raw": 797,
+          "ordered_prevouts_push": 3,
+          "ordered_prevouts": 2376,
+          "preimage_push": 2,
+          "before_scriptCode": 104,
+          "scriptCode_length": 1,
+          "scriptCode_compact_suffix": 35,
+          "after_scriptCode": 52
+        },
+        "actual_token_locks_64": {
+          "tag_and_scope_push": 3904,
+          "state_push": 64,
+          "state": 3200,
+          "holder_and_verifier_guard": 49536
+        },
+        "verifier_funding": {
+          "version_locktime_counts": 10,
+          "outpoints_sequences": 40,
+          "input_script_lengths": 1,
+          "output_satoshis_and_script_lengths": 11,
+          "verifier_native_lock": 23147
+        },
+        "companion_funding": {
+          "version_locktime_counts": 10,
+          "outpoints_sequences": 40,
+          "input_script_lengths": 1,
+          "output_satoshis_and_script_lengths": 11,
+          "signature_push": 1,
+          "signature_der": 70,
+          "sighash_byte": 1,
+          "companion_native_lock": 663
+        },
+        "history": {
+          "known_token_creation_and_ancestor_txs": 69,
+          "literal_token_history_bytes_in_scriptSigs": 0
+        }
+      }
+    },
+    "previous_to_next": {
+      "payment": {},
+      "scriptSigs": {
+        "verifier": {},
+        "companion": {},
+        "holders_64": {}
+      },
+      "verifier_funding": {},
+      "companion_funding": {},
+      "total_with_dedicated_funding": 0
+    },
+    "bytes_minus_E_compact_first_payment": {
+      "payment": {
+        "input_script_lengths": -2,
+        "verifier_scriptSig": -54390
+      },
+      "scriptSigs": {
+        "verifier": {
+          "otda_push": -3,
+          "otda_other": -379,
+          "otda_current_outpoints": -2376,
+          "otda_output_amount_and_length": -704,
+          "otda_current_output_lock_copies": -56704,
+          "packed_successor_states_push": 3,
+          "packed_successor_states": 3200,
+          "ordered_prevouts_push": 3,
+          "ordered_prevouts": 2376,
+          "preimage_push": 2,
+          "before_scriptCode": 104,
+          "scriptCode_length": 1,
+          "scriptCode_compact_suffix": 35,
+          "after_scriptCode": 52
+        },
+        "companion": {},
+        "holders_64": {}
+      },
+      "verifier_funding": {
+        "verifier_native_lock": -5254
+      },
+      "companion_funding": {},
+      "total_with_dedicated_funding": -59646
+    }
+  }
+}

@@ -116,3 +116,4 @@ PYTHONPATH=.:projects/groth16/reference ../cctp-test-tools/venv/bin/python -m un
 - [预先确认验证器 UTXO](../recursion/conservation/README.md#pre-confirmed-verifier-outpoints) 用实际 `txid:vout` 验证指定输入，两笔同形状守恒转账降至 28,156 和 52,603 字节。含实际创建验证器和协同 UTXO 的字节分别为 483,108 和 507,555。独立节点确认第二笔消费第一笔的两个 Token 输出，并拒绝同锁异 outpoint 的新证明。该试验仍携带直接父原文，使用有界白名单和隔离起点，递归来源及资金开放续补另行验收。
 - [多布局前序验证](../recursion/continuity/README.md#在电路内认证父布局和重建摘要) 按两种定稿布局计算真实长度的 txid，逐槽重建 Chronicle 前序摘要并送入旧同密钥递归验证构件。组合测试拒绝同密钥的另一父证明。三笔[有界原生铸造](../fixtures/v2-bounded-native-mint-regtest-summary.json)各 8,068 字节，保留现有稀疏事件根。第一笔入块原文已在 R1CS 打开实际状态 `vout 0` 和 Token `vout 1`，拒绝互换及回执输出。联合电路和连续证明入块尚待验收。
 - [旧版 64→64 容量结果](capacity.md#实测记录) 包括共父及 64 个不同直接父的实际出证与入块。异父结果已从本地归档补录，并复核付款及 64 个父的活动区块。旧版两槽聚合可以复用。新版须把实际父输出认证和局部守恒加入聚合声明，并将父原文移出花费见证。
+- [库存付款对照](inventory-payments.md) 已完成三条四源路线及三种连续 64→64 布局的独立节点试验。紧凑持币预像加共享验证器按状态重建输出，两代付款各 295,095 字节，全额计入专用资金各 319,101 字节。实验使用发行方批准的库存根和有限票据。后续优先解决开放的 B2G 根更新、可续补验证器以及持币 vin 重复携带的当前交易材料。

@@ -1,0 +1,77 @@
+{
+  "scope": "Subset membership component using synthetic outpoints and a fixed known root. No CCTP source certificate, actual token inputs or balance check in these transactions.",
+  "width": 128,
+  "selected": 64,
+  "root": "55bb008e40c8eb2798c60e3464fb60e4203f381f087ca4452da26a054b5ea21e",
+  "lock_bytes": 7151,
+  "funding_bytes_for_three_outputs": 21537,
+  "changed_member_rejection": "sendrawtransaction: {'code': -26, 'message': '16: mandatory-script-verify-flag-failed (Script failed an OP_EQUALVERIFY operation)'}",
+  "selections": {
+    "first64": {
+      "sibling_hash_bytes": 32,
+      "selection_record_bytes": 2112,
+      "witness_bytes": 2148,
+      "transaction_bytes": 2211,
+      "timings": {
+        "chain_gang_seconds": 0.00042512500658631325,
+        "node_submission_seconds": 0.004615125013515353,
+        "node_mining_and_confirmation_seconds": 0.008646874921396375
+      }
+    },
+    "alternating": {
+      "sibling_hash_bytes": 2048,
+      "selection_record_bytes": 2112,
+      "witness_bytes": 4227,
+      "transaction_bytes": 4290,
+      "timings": {
+        "chain_gang_seconds": 0.00029904197435826063,
+        "node_submission_seconds": 0.0045266670640558004,
+        "node_mining_and_confirmation_seconds": 0.009095249930396676
+      }
+    },
+    "seed42": {
+      "sibling_hash_bytes": 1536,
+      "selection_record_bytes": 2112,
+      "witness_bytes": 3699,
+      "transaction_bytes": 3762,
+      "timings": {
+        "chain_gang_seconds": 0.0002715419977903366,
+        "node_submission_seconds": 0.006592208053916693,
+        "node_mining_and_confirmation_seconds": 0.009240624960511923
+      }
+    }
+  },
+  "node": "/Bitcoin SV:1.2.3/",
+  "transactions": {
+    "setup": {
+      "txid": "fbd14a047f488fc4f8805272542e195e99a1109a123faed28dd079d26c51e615",
+      "blockhash": "25fbe4b225e6baec3d34fdac9f69febc7a8ccd21e67e4af863102573f28d250e",
+      "height": 218,
+      "bytes": 168
+    },
+    "membership-funding": {
+      "txid": "abad4ae2fdcc915518423f62bb04197b4150316b169485f0807c34e5b50821de",
+      "blockhash": "48139f8f0efa44f16798291da67eb888bca39303d43a93e7e285ee2f511545fb",
+      "height": 219,
+      "bytes": 21537
+    },
+    "first64": {
+      "txid": "0604d634ca21c94e2b3d8188f44c0ed1a42b9d3fd621bbc828b00e8e40b6825e",
+      "blockhash": "413ae07f3bde798164e00e5998073701caf662102b9f04f448d06d0816f6905d",
+      "height": 220,
+      "bytes": 2211
+    },
+    "alternating": {
+      "txid": "67b307a72fa75e4ff8104c53556afb0e83ee7daead4b98804482831d6099876c",
+      "blockhash": "23e732d9dcda6e07bdb01cc072d33487877130afae61a2f6916b94b37c57b9e6",
+      "height": 221,
+      "bytes": 4290
+    },
+    "seed42": {
+      "txid": "4bef91416d6cff2c78e70da52d08a9a371cb3fc02f01c092be3abf49bca4908c",
+      "blockhash": "41f20d8235d6b8a8ea05cabb823124db641481019016a498e9967df787465a16",
+      "height": 222,
+      "bytes": 3762
+    }
+  }
+}

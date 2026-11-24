@@ -1,0 +1,345 @@
+{
+  "profile": "B",
+  "scope": "2a2435e5f60caf1e9b87960fa6b6a500d39dfe6a92322874bf8d793f92e935c4",
+  "trust": "Test issuer approves origins and verifier companion tickets, including the new recipient list. D opens that list directly; B and C check a proof of its permutation into a Merkle root.",
+  "parameters": {
+    "origin": {
+      "format": "CCTP inventory origin test parameters v1",
+      "profile": "inventory-origin",
+      "test_only": true,
+      "constraints": 545181,
+      "commitments": 0,
+      "statement_bytes": 65,
+      "circuit_sha256": "32b33ed99623021a57f0ee8a0f65f4a325fa0c8dcfc1703bf12725f9fb6b3d9e",
+      "verifying_key_sha256": "5a1c58f260a1506020c2ce8266fb4c4e605863b427e9b0e21bfe1afb239526ba",
+      "proving_key_sha256": "660408e4b5aef3309d979339505346a412cdd3e9db529f9390e2b46114f0e76a"
+    },
+    "payment": null
+  },
+  "certificates": {
+    "initial": {
+      "native_prove_seconds": 1.702026541,
+      "native_verify_seconds": 0.001258791,
+      "process_seconds": 1.7153521250002086,
+      "process_mode": "resident",
+      "encoded_seconds": 0.815400333958678,
+      "artifact_sha256": "ecec3f185c536188ec0e61ab5e5565caae3b0510d1f96d75cfa9234a42ee58c2",
+      "witness_sha256": "723675c405adcedb5229d376602a588e4ea3225642948a3c658bde44a6fb8d9e",
+      "witness_bytes": 1078,
+      "digest": "0c394155f8df75314fbb374bafa54d45d07cbd6ae506213c305204587c326622",
+      "public_inputs": [
+        "16248022038395953040700016294512381253",
+        "277127109778200614620045698903173129762"
+      ],
+      "anchor": "3db4724c403b514eb2afb279b3e25f6c40efc47d5b4811dd0b329dfea7714cb5",
+      "root": "b91aa68e2f7de5a297f4f2927b6ed0589e0380af0ccbc0cd9740cad2b5b25bc3",
+      "members": [
+        {
+          "txid": "38b5d631cf47f69ed8cd39b8c747414f47712a1bac5e7e016634eb78f14549fb",
+          "vout": 0,
+          "outpoint_wire": "fb4945f178eb3466017e5eac1b2a71474f4147c7b839cdd89ef647cf31d6b53800000000",
+          "state": "6500000000000000e80300000000000002d7924d4f7d43ea965a465ae3095ff41131e5946f3c85f79e44adbcf8e27e080e00",
+          "leaf": "fa4bfc579ab1f4c906b80265a27eb2f395ddda38682bf6d3f0e586523feea6aa"
+        },
+        {
+          "txid": "a0a05ee9147a21ccf5402fa3f4dedee54fff6dfd1c7b6e3c8212c10436ebc231",
+          "vout": 0,
+          "outpoint_wire": "31c2eb3604c112823c6e7b1cfd6dff4fe5dedef4a32f40f5cc217a14e95ea0a000000000",
+          "state": "cb00000000000000e80300000000000003e60fce93b59e9ec53011aabc21c23e97b2a31369b87a5ae9c44ee89e2a6dec0a00",
+          "leaf": "f1d0dc478c3d81efa92feb4f2ed1ec9a802f25de7563bf3bbbc2a0f1ae25558d"
+        },
+        {
+          "txid": "b0319e5bd8f89a6864091d617e2c929313412dd8bd869f8c9461c12542ce4ce2",
+          "vout": 0,
+          "outpoint_wire": "e24cce4225c161948c9f86bdd82d411393922c7e611d0964689af8d85b9e31b000000000",
+          "state": "3301000000000000e80300000000000003defdea4cdb677750a420fee807eacf21eb9898ae79b9768766e4faa04a2d4a3400",
+          "leaf": "e6e7e90a8df82c0aeb75c1d5367738ff5dc3b66b2a34b21a619a3ece5a335d1f"
+        },
+        {
+          "txid": "bcd66b7058365e9cec308a7af173c0289623673fd30dd78639be3d7ce72b419b",
+          "vout": 0,
+          "outpoint_wire": "9b412be77c3dbe3986d70dd33f67239628c073f17a8a30ec9c5e3658706bd6bc00000000",
+          "state": "9901000000000000e803000000000000025601570cb47f238d2b0286db4a990fa0f3ba28d1a319f5e7cf55c2a2444da7cc00",
+          "leaf": "412378b661d599e1f190b96ebeeab734bcca62634f032e12007192eda6d0721c"
+        }
+      ]
+    },
+    "recipient": {
+      "native_prove_seconds": 1.717136708,
+      "native_verify_seconds": 0.001258083,
+      "process_seconds": 1.7302232909714803,
+      "process_mode": "resident",
+      "encoded_seconds": 0.812567583983764,
+      "artifact_sha256": "741375d5a6c0d643d4749009b7b1bde41d9e41585036d002bd6749ec793e34a4",
+      "witness_sha256": "b91f51ae89d0579cb0c53374413c047e233767bbad2aa6371cfa3a3f870d18e5",
+      "witness_bytes": 1078,
+      "digest": "d9a62f43af956dcc0bac1e4568d56b15e077ed8fa0640ede60bbb3bc902077d0",
+      "public_inputs": [
+        "289305354999722311058464209875556985621",
+        "298369772692328669372593642864042342352"
+      ],
+      "anchor": "0c31a8361c1213cc1bb66db767919225f9ab80ab362614e0618b9e737daf6209",
+      "root": "71d31ddbfffadd5b775b74aed2e88037e7121bab408872c2732e090c41440181",
+      "members": [
+        {
+          "txid": "edd02355ba41e0c078cfa8d3abdfd6a5b07fcd7c7ffbbe8a074af0abe8517a05",
+          "vout": 0,
+          "outpoint_wire": "057a51e8abf04a078abefb7f7ccd7fb0a5d6dfabd3a8cf78c0e041ba5523d0ed00000000",
+          "state": "2c010000000000004c04000000000000022b4ea0a797a443d293ef5cff444f4979f06acfebd7e86d277475656138385b6c00",
+          "leaf": "b924bb06240f3a29c740b1351b374c6953f9df9e01ed0e12e32f182751c239c4"
+        },
+        {
+          "txid": "d3f0454b8e0f2fb8c3c0137935555a91dc304bcc9bdb8114c3e71a9c28775501",
+          "vout": 0,
+          "outpoint_wire": "015577289c1ae7c31481db9bcc4b30dc915a55357913c0c3b82f0f8e4b45f0d300000000",
+          "state": "6100000000000000e803000000000000022b4ea0a797a443d293ef5cff444f4979f06acfebd7e86d277475656138385b6c00",
+          "leaf": "4adf01acbc1f7dcc5358280383aa0050efd81fb91fc34317910a5395bf27315a"
+        },
+        {
+          "txid": "edd02355ba41e0c078cfa8d3abdfd6a5b07fcd7c7ffbbe8a074af0abe8517a05",
+          "vout": 1,
+          "outpoint_wire": "057a51e8abf04a078abefb7f7ccd7fb0a5d6dfabd3a8cf78c0e041ba5523d0ed01000000",
+          "state": "6c00000000000000840300000000000002d7924d4f7d43ea965a465ae3095ff41131e5946f3c85f79e44adbcf8e27e080e00",
+          "leaf": "d37024e2838f4e5e513c2bf564360bdd3a5716ed968f8bd9c389a7b4f3429a82"
+        },
+        {
+          "txid": "a0a05ee9147a21ccf5402fa3f4dedee54fff6dfd1c7b6e3c8212c10436ebc231",
+          "vout": 0,
+          "outpoint_wire": "31c2eb3604c112823c6e7b1cfd6dff4fe5dedef4a32f40f5cc217a14e95ea0a000000000",
+          "state": "cb00000000000000e80300000000000003e60fce93b59e9ec53011aabc21c23e97b2a31369b87a5ae9c44ee89e2a6dec0a00",
+          "leaf": "f1d0dc478c3d81efa92feb4f2ed1ec9a802f25de7563bf3bbbc2a0f1ae25558d"
+        }
+      ]
+    }
+  },
+  "recipient_certificate_process_and_encoding_seconds": 2.5430961669189855,
+  "payments": [
+    {
+      "txid": "edd02355ba41e0c078cfa8d3abdfd6a5b07fcd7c7ffbbe8a074af0abe8517a05",
+      "selection": [
+        0,
+        2
+      ],
+      "source_certificate": "initial",
+      "verification_keys": 1,
+      "new_payment_proofs": 0,
+      "payment_proof": null,
+      "payment_prepare_to_signed_seconds": 0.001660916954278946,
+      "lock_generation_seconds": 1.0324219160247594,
+      "ticket_prepare_and_confirm_seconds": 0.12000125006306916,
+      "raw_bytes": 10714,
+      "verifier_funding_bytes": 453257,
+      "companion_funding_bytes": 798,
+      "total_including_both_tickets": 464769,
+      "witness_sizes": [
+        3517,
+        971,
+        2096,
+        2096
+      ],
+      "origin_witness_matches_cached": true,
+      "token_parent_raw_occurrences": 0,
+      "actual_input_outpoints": [
+        "5a8c8d2a1414163e124f3bc8b1e75e23bdbe9474cd441b891515d375c5b7344c00000000",
+        "c916f50f4dd2fb8b58b2b23bfe1029ba5a28447fda31df44ee1b0b1a12d0c8a500000000",
+        "fb4945f178eb3466017e5eac1b2a71474f4147c7b839cdd89ef647cf31d6b53800000000",
+        "e24cce4225c161948c9f86bdd82d411393922c7e611d0964689af8d85b9e31b000000000"
+      ],
+      "output_state_bytes": [
+        "2c010000000000004c04000000000000022b4ea0a797a443d293ef5cff444f4979f06acfebd7e86d277475656138385b6c00",
+        "6c00000000000000840300000000000002d7924d4f7d43ea965a465ae3095ff41131e5946f3c85f79e44adbcf8e27e080e00"
+      ],
+      "negatives": {
+        "inflation_with_new_holder_signatures": "sendrawtransaction: {'code': -26, 'message': '16: mandatory-script-verify-flag-failed (Script failed an OP_NUMEQUALVERIFY operation)'}",
+        "wrong_holder": "sendrawtransaction: {'code': -26, 'message': '16: mandatory-script-verify-flag-failed (Script evaluated without error but finished with a false/empty top stack element)'}",
+        "wrong_root": "sendrawtransaction: {'code': -26, 'message': '16: mandatory-script-verify-flag-failed (Script failed an OP_EQUALVERIFY operation)'}",
+        "swap_membership_paths": "sendrawtransaction: {'code': -26, 'message': '16: mandatory-script-verify-flag-failed (Script failed an OP_EQUALVERIFY operation)'}"
+      },
+      "node_timings": {
+        "chain_gang_seconds": 0.04262641700915992,
+        "node_submission_seconds": 0.39072433300316334,
+        "node_mining_and_confirmation_seconds": 0.009540500002913177
+      }
+    },
+    {
+      "txid": "55ddae44e482605f614ecfc8ec5dac907d23c41bbdf792ecd23f28a42f167bad",
+      "selection": [
+        1,
+        3
+      ],
+      "source_certificate": "initial",
+      "verification_keys": 1,
+      "new_payment_proofs": 0,
+      "payment_proof": null,
+      "payment_prepare_to_signed_seconds": 0.0016681250417605042,
+      "lock_generation_seconds": 0.00032774999272078276,
+      "ticket_prepare_and_confirm_seconds": 0.0457668750314042,
+      "raw_bytes": 10712,
+      "verifier_funding_bytes": 453257,
+      "companion_funding_bytes": 797,
+      "total_including_both_tickets": 464766,
+      "witness_sizes": [
+        3517,
+        971,
+        2095,
+        2095
+      ],
+      "origin_witness_matches_cached": true,
+      "token_parent_raw_occurrences": 0,
+      "actual_input_outpoints": [
+        "7027ed320443befca55dcf4a70df62703ae5b89aa30376273d3fd09b556ac66900000000",
+        "4a03ca9562747977a162b83abb5d0359441054c03d75f4899c10e28852502c5e00000000",
+        "31c2eb3604c112823c6e7b1cfd6dff4fe5dedef4a32f40f5cc217a14e95ea0a000000000",
+        "9b412be77c3dbe3986d70dd33f67239628c073f17a8a30ec9c5e3658706bd6bc00000000"
+      ],
+      "output_state_bytes": [
+        "90010000000000004c04000000000000024ce119c96e2fa357200b559b2f7dd5a5f02d5290aff74b03f3e471b273211c9700",
+        "d400000000000000840300000000000003e60fce93b59e9ec53011aabc21c23e97b2a31369b87a5ae9c44ee89e2a6dec0a00"
+      ],
+      "negatives": {},
+      "node_timings": {
+        "chain_gang_seconds": 0.0644588329596445,
+        "node_submission_seconds": 0.3339916249969974,
+        "node_mining_and_confirmation_seconds": 0.008575250045396388
+      }
+    },
+    {
+      "txid": "f78b240a85441cf9518326e31ed4927cf5e8658f937c7b1cbd2d8c3016ce9468",
+      "selection": [
+        0,
+        1
+      ],
+      "source_certificate": "recipient",
+      "verification_keys": 1,
+      "new_payment_proofs": 0,
+      "payment_proof": null,
+      "payment_prepare_to_signed_seconds": 0.0015787089942023158,
+      "lock_generation_seconds": 0.0002947920002043247,
+      "ticket_prepare_and_confirm_seconds": 0.059919166029430926,
+      "raw_bytes": 10715,
+      "verifier_funding_bytes": 453257,
+      "companion_funding_bytes": 798,
+      "total_including_both_tickets": 464770,
+      "witness_sizes": [
+        3517,
+        971,
+        2096,
+        2097
+      ],
+      "origin_witness_matches_cached": true,
+      "token_parent_raw_occurrences": 0,
+      "actual_input_outpoints": [
+        "c2fb8f5b559fb5ed234f98d04f13b2bf77daed3474cc751af5d8016419ef1c2200000000",
+        "96d6fcef149d2e854162579a48248a0ec547ac84debef7df1c88f24407a451f600000000",
+        "057a51e8abf04a078abefb7f7ccd7fb0a5d6dfabd3a8cf78c0e041ba5523d0ed00000000",
+        "015577289c1ae7c31481db9bcc4b30dc915a55357913c0c3b82f0f8e4b45f0d300000000"
+      ],
+      "output_state_bytes": [
+        "cd00000000000000e80300000000000002352bbf4a4cdd12564f93fa332ce333301d9ad40271f8107181340aef25be59d500",
+        "c0000000000000004c04000000000000022b4ea0a797a443d293ef5cff444f4979f06acfebd7e86d277475656138385b6c00"
+      ],
+      "negatives": {},
+      "node_timings": {
+        "chain_gang_seconds": 0.042040792061015964,
+        "node_submission_seconds": 0.5314287500223145,
+        "node_mining_and_confirmation_seconds": 0.01011441694572568
+      }
+    }
+  ],
+  "node": "/Bitcoin SV:1.2.3/",
+  "transactions": {
+    "issuance-anchor-and-coupons": {
+      "txid": "7f8cbcce86dca30269e960eb92a66634209ea03dd907b4d5cc7e8c66579620ea",
+      "blockhash": "610e79ea7a2351f11c8a88e964c8d22c2ed35d93d30284a9ac23b964992eedb6",
+      "height": 1425,
+      "bytes": 539
+    },
+    "test-issuer-origin-0": {
+      "txid": "38b5d631cf47f69ed8cd39b8c747414f47712a1bac5e7e016634eb78f14549fb",
+      "blockhash": "31a23fbc72dbdf2db60d8e568620cd89c1937c64009fb3c0a9ae9c8657171634",
+      "height": 1426,
+      "bytes": 1049
+    },
+    "test-issuer-origin-1": {
+      "txid": "a0a05ee9147a21ccf5402fa3f4dedee54fff6dfd1c7b6e3c8212c10436ebc231",
+      "blockhash": "08f43d9d040ce2553ac37e78341a741db4dbf168c35457bd77bd8fb29452d322",
+      "height": 1427,
+      "bytes": 1049
+    },
+    "test-issuer-origin-2": {
+      "txid": "b0319e5bd8f89a6864091d617e2c929313412dd8bd869f8c9461c12542ce4ce2",
+      "blockhash": "3adadc5dfdbd56fc87e85242010b4514a46d33a064309cc61c5e9f17e344d9df",
+      "height": 1428,
+      "bytes": 1049
+    },
+    "test-issuer-origin-3": {
+      "txid": "bcd66b7058365e9cec308a7af173c0289623673fd30dd78639be3d7ce72b419b",
+      "blockhash": "35812479268ee877d5eb0a7efb52b9fb3f513358f102008b97b6b087df0f76b6",
+      "height": 1429,
+      "bytes": 1050
+    },
+    "recipient-existing-coin": {
+      "txid": "d3f0454b8e0f2fb8c3c0137935555a91dc304bcc9bdb8114c3e71a9c28775501",
+      "blockhash": "4da89a1c245b802bb0d3376dd200e2d63dc918178702103778e20f98b46c4c6b",
+      "height": 1430,
+      "bytes": 1050
+    },
+    "first-selection-verifier": {
+      "txid": "4c34b7c575d31515891b44cd7494bebd235ee7b1c83b4f123e1614142a8d8c5a",
+      "blockhash": "6d2788aa51e0d31144ae022f46447c77fc25ae4a2a9b2a84250d7e438db50e3c",
+      "height": 1431,
+      "bytes": 453257
+    },
+    "first-selection-companion": {
+      "txid": "a5c8d0121a0b1bee44df31da7f44285aba2910fe3bb2b2588bfbd24d0ff516c9",
+      "blockhash": "0ae3525d99eadb12b0aa40b033addbc6ab0c461e6a08c7b5494f81eae09edc7c",
+      "height": 1432,
+      "bytes": 798
+    },
+    "first-selection": {
+      "txid": "edd02355ba41e0c078cfa8d3abdfd6a5b07fcd7c7ffbbe8a074af0abe8517a05",
+      "blockhash": "3df65f5df2caa52e00b945dfb3334c9373c1880604c6b7180c408c352a6ba36d",
+      "height": 1433,
+      "bytes": 10714
+    },
+    "recipient-respend-verifier": {
+      "txid": "221cef196401d8f51a75cc7434edda77bfb2134fd0984f23edb59f555b8ffbc2",
+      "blockhash": "2c16ae9a710618a067e273f8e1d2f3e663bddf232e01bf8e4e0798eba4f1320f",
+      "height": 1434,
+      "bytes": 453257
+    },
+    "recipient-respend-companion": {
+      "txid": "f651a40744f2881cdff7bede84ac47c50e8a24489a576241852e9d14effcd696",
+      "blockhash": "21606c256b7c90dd4828acc1b1561cf2fdf21c606ebfbe81c9b591c1aa51a416",
+      "height": 1435,
+      "bytes": 798
+    },
+    "recipient-respend": {
+      "txid": "f78b240a85441cf9518326e31ed4927cf5e8658f937c7b1cbd2d8c3016ce9468",
+      "blockhash": "00015ad99b3da68060f7d2a08626cabc3d3d7063a2bb5589bf80f47ced95a6f0",
+      "height": 1436,
+      "bytes": 10715
+    },
+    "second-selection-verifier": {
+      "txid": "69c66a559bd03f3d277603a39ab8e53a7062df704acf5da5fcbe430432ed2770",
+      "blockhash": "7d82f08574b7e84e41f170820277624a31a0ce7382f7683d7933fd19c1a92bd9",
+      "height": 1437,
+      "bytes": 453257
+    },
+    "second-selection-companion": {
+      "txid": "5e2c505288e2109c89f4753dc054104459035dbb3ab862a17779746295ca034a",
+      "blockhash": "5ad7e3f6164fbd85f14acbe72d72f49b3460b625f5f5b26ef9599feb267a7846",
+      "height": 1438,
+      "bytes": 797
+    },
+    "second-selection": {
+      "txid": "55ddae44e482605f614ecfc8ec5dac907d23c41bbdf792ecd23f28a42f167bad",
+      "blockhash": "7e8ae075884119f54f2e26b81b8d40cd9dfd57386dece351b53837f646ef960c",
+      "height": 1439,
+      "bytes": 10712
+    }
+  },
+  "resident_startup_seconds": {
+    "origin": 26.09967616596259
+  }
+}

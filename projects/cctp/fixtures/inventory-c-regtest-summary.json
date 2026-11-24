@@ -1,0 +1,400 @@
+{
+  "profile": "C",
+  "scope": "4818e279c661653b4b39e1abbddb17e2c5f73066403b1d39e7e6d26024e98128",
+  "trust": "Test issuer approves origins and verifier companion tickets, including the new recipient list. D opens that list directly; B and C check a proof of its permutation into a Merkle root.",
+  "parameters": {
+    "origin": {
+      "format": "CCTP inventory origin test parameters v1",
+      "profile": "inventory-origin",
+      "test_only": true,
+      "constraints": 545181,
+      "commitments": 0,
+      "statement_bytes": 65,
+      "circuit_sha256": "32b33ed99623021a57f0ee8a0f65f4a325fa0c8dcfc1703bf12725f9fb6b3d9e",
+      "verifying_key_sha256": "5a1c58f260a1506020c2ce8266fb4c4e605863b427e9b0e21bfe1afb239526ba",
+      "proving_key_sha256": "660408e4b5aef3309d979339505346a412cdd3e9db529f9390e2b46114f0e76a"
+    },
+    "payment": {
+      "format": "CCTP inventory payment test parameters v1",
+      "profile": "inventory-payment",
+      "test_only": true,
+      "constraints": 789237,
+      "commitments": 0,
+      "statement_bytes": 237,
+      "circuit_sha256": "842e66df6b01931b12c9f40bda8fc23a6c97b4ed816c53765150f6d88ecc8bd7",
+      "verifying_key_sha256": "b2c681bf19da2e4c6fdcc6d4ae34265ec0fc8014692f84ce95609dd06abe7c7b",
+      "proving_key_sha256": "208fff67a92a8038deb6b18a529cc97bb629545c04967e9ae97ccabe716ca79a"
+    }
+  },
+  "certificates": {
+    "initial": {
+      "native_prove_seconds": 1.691458125,
+      "native_verify_seconds": 0.001271875,
+      "process_seconds": 1.7150276659522206,
+      "process_mode": "resident",
+      "encoded_seconds": 0.8038392920279875,
+      "artifact_sha256": "d8294d34abdf30f941ce229257b3d14248f5374a07d9fb88d0ece11eb8f733ca",
+      "witness_sha256": "ff6c4e907a84c1e0664dcbb9fdcbac5187dd828e452baf838db89a29095d9e5c",
+      "witness_bytes": 1078,
+      "digest": "a3fc8207104f46280ef27f09767de0537621943338b77e85c4714c204c0dda71",
+      "public_inputs": [
+        "217975259394185272764207415765594136659",
+        "157023255153762342449828484127503800945"
+      ],
+      "anchor": "e0aa6515b01f4665ac9c7f5d692fe056b1676fe8c6797c67a4507b7fadd55106",
+      "root": "214a917eae3b9489728a84ebedf5d6a8be90a923d12a100ea0cfab413fb60cf7",
+      "members": [
+        {
+          "txid": "27dee373dc82925cfe98370429853afcae6237198e97ae4194ebd9fb1ddd7001",
+          "vout": 0,
+          "outpoint_wire": "0170dd1dfbd9eb9441ae978e193762aefc3a8529043798fe5c9282dc73e3de2700000000",
+          "state": "6500000000000000e80300000000000002d7924d4f7d43ea965a465ae3095ff41131e5946f3c85f79e44adbcf8e27e080e00",
+          "leaf": "64b03316fc92989782eada621f49e5ac6b09fc25efe1c95d8bf4569c1e334840"
+        },
+        {
+          "txid": "001ddc36fa862f39038b7019732bc0898f871a259ef297d0d875fa1b9ea160d3",
+          "vout": 0,
+          "outpoint_wire": "d360a19e1bfa75d8d097f29e251a878f89c02b7319708b03392f86fa36dc1d0000000000",
+          "state": "cb00000000000000e80300000000000003e60fce93b59e9ec53011aabc21c23e97b2a31369b87a5ae9c44ee89e2a6dec0a00",
+          "leaf": "54abba2c78560381be478c838b53b1339d245a6ffc36cefd13096320c2fa12e7"
+        },
+        {
+          "txid": "deb0432c66a3ddc9734e1e263bbc7cad1ab1baa66b01dae6b1d010f18f5b6e7a",
+          "vout": 0,
+          "outpoint_wire": "7a6e5b8ff110d0b1e6da016ba6bab11aad7cbc3b261e4e73c9dda3662c43b0de00000000",
+          "state": "3301000000000000e80300000000000003defdea4cdb677750a420fee807eacf21eb9898ae79b9768766e4faa04a2d4a3400",
+          "leaf": "5d7312afdc46f11d102590e4ae8a61694482fc94aab605cf6ac717093b324e7b"
+        },
+        {
+          "txid": "a5008234dbf1e542ff778d05c8ab3f67dc57c7f0803c121e2eab78c8586bfea9",
+          "vout": 0,
+          "outpoint_wire": "a9fe6b58c878ab2e1e123c80f0c757dc673fabc8058d77ff42e5f1db348200a500000000",
+          "state": "9901000000000000e803000000000000025601570cb47f238d2b0286db4a990fa0f3ba28d1a319f5e7cf55c2a2444da7cc00",
+          "leaf": "dd09edcde8b09a01fd479764c5996cd769c6437adbc48f9779c1444ca3b7a63b"
+        }
+      ]
+    },
+    "recipient": {
+      "native_prove_seconds": 1.641869667,
+      "native_verify_seconds": 0.001243959,
+      "process_seconds": 1.6548121660016477,
+      "process_mode": "resident",
+      "encoded_seconds": 0.8044231249950826,
+      "artifact_sha256": "72e54a1e890acd3c8540257226c72d78df71a9a98a4696053da2e0a792918cc1",
+      "witness_sha256": "8a30322dff4ea7be98cede63fe06054c528a57aa8e897e2ff6d10433083b5fe6",
+      "witness_bytes": 1078,
+      "digest": "46d717e917c644d63dbae6c0b6217117451ca545610bf2af48c9295a0049b573",
+      "public_inputs": [
+        "94162788492469696466557782377252352279",
+        "91865468115560476596620854955673761139"
+      ],
+      "anchor": "17944371bb1e9304c5417e13477f3e35357b240ef0964d021f52d012709a8321",
+      "root": "b5f1847c8db98c65d50800b090ce20b164cf613b761469b6dbb0f84a942edb1d",
+      "members": [
+        {
+          "txid": "40b5d0b79caa808fe3cd00430ecbf0a30f10df0414520bd4d3d977bf074b9d6b",
+          "vout": 0,
+          "outpoint_wire": "6b9d4b07bf77d9d3d40b521404df100fa3f0cb0e4300cde38f80aa9cb7d0b54000000000",
+          "state": "2c010000000000004c04000000000000022b4ea0a797a443d293ef5cff444f4979f06acfebd7e86d277475656138385b6c00",
+          "leaf": "2b4f065188ab210ba011ddd1a1d7312046cf6c15167570f07b924964aa6a31d6"
+        },
+        {
+          "txid": "514a90f5316037bcadf23b3710daebf08f724cbe04d3ef34e6f6c7216c4dada0",
+          "vout": 0,
+          "outpoint_wire": "a0ad4d6c21c7f6e634efd304be4c728ff0ebda10373bf2adbc376031f5904a5100000000",
+          "state": "6100000000000000e803000000000000022b4ea0a797a443d293ef5cff444f4979f06acfebd7e86d277475656138385b6c00",
+          "leaf": "c5d12d52b7071d33a4b7a654036756382a35e2d81a3348416ee7ee2e8e110e8f"
+        },
+        {
+          "txid": "40b5d0b79caa808fe3cd00430ecbf0a30f10df0414520bd4d3d977bf074b9d6b",
+          "vout": 1,
+          "outpoint_wire": "6b9d4b07bf77d9d3d40b521404df100fa3f0cb0e4300cde38f80aa9cb7d0b54001000000",
+          "state": "6c00000000000000840300000000000002d7924d4f7d43ea965a465ae3095ff41131e5946f3c85f79e44adbcf8e27e080e00",
+          "leaf": "81214eb48280d89c1e2d8d804bef9bbb5e4d6eb05999dc3ad496005b47467a37"
+        },
+        {
+          "txid": "001ddc36fa862f39038b7019732bc0898f871a259ef297d0d875fa1b9ea160d3",
+          "vout": 0,
+          "outpoint_wire": "d360a19e1bfa75d8d097f29e251a878f89c02b7319708b03392f86fa36dc1d0000000000",
+          "state": "cb00000000000000e80300000000000003e60fce93b59e9ec53011aabc21c23e97b2a31369b87a5ae9c44ee89e2a6dec0a00",
+          "leaf": "54abba2c78560381be478c838b53b1339d245a6ffc36cefd13096320c2fa12e7"
+        }
+      ]
+    }
+  },
+  "recipient_certificate_process_and_encoding_seconds": 2.4595045830355957,
+  "payments": [
+    {
+      "txid": "40b5d0b79caa808fe3cd00430ecbf0a30f10df0414520bd4d3d977bf074b9d6b",
+      "selection": [
+        0,
+        2
+      ],
+      "source_certificate": "initial",
+      "verification_keys": 2,
+      "new_payment_proofs": 1,
+      "payment_proof": {
+        "native_prove_seconds": 1.777363084,
+        "native_verify_seconds": 0.001265334,
+        "process_seconds": 1.8001052499748766,
+        "process_mode": "resident",
+        "encoded_seconds": 0.7957732919603586,
+        "artifact_sha256": "2fa1357c17a108f2e923f6b3bf947ac21a34a2b0d0eb341a6dbda50bf4eae8c7",
+        "witness_sha256": "e12e7145065e7cab298e828a8abdfc57115cb8c37969b6dff88f0bc2facd5e9d",
+        "witness_bytes": 1078,
+        "digest": "40c938c9c69f1b963026914dc9f68b42b2a24ef007ba0fbfb0cf421df64f6f62",
+        "public_inputs": [
+          "86115395200068967504175197477882202946",
+          "237445336385897085349197259669463068514"
+        ]
+      },
+      "payment_prepare_to_signed_seconds": 2.597907790914178,
+      "lock_generation_seconds": 2.092227541957982,
+      "ticket_prepare_and_confirm_seconds": 0.10092787502799183,
+      "raw_bytes": 11558,
+      "verifier_funding_bytes": 902922,
+      "companion_funding_bytes": 798,
+      "total_including_both_tickets": 915278,
+      "witness_sizes": [
+        4359,
+        971,
+        2097,
+        2097
+      ],
+      "origin_witness_matches_cached": true,
+      "token_parent_raw_occurrences": 0,
+      "actual_input_outpoints": [
+        "7c5982016321bd3b650d660df27c8c6cf0628ae4d87a69748f5f49fc02c0547a00000000",
+        "84a4bb5c8d3af3929342394f6106d82afe4f5609f9259812195ef4b6c791d26400000000",
+        "0170dd1dfbd9eb9441ae978e193762aefc3a8529043798fe5c9282dc73e3de2700000000",
+        "7a6e5b8ff110d0b1e6da016ba6bab11aad7cbc3b261e4e73c9dda3662c43b0de00000000"
+      ],
+      "output_state_bytes": [
+        "2c010000000000004c04000000000000022b4ea0a797a443d293ef5cff444f4979f06acfebd7e86d277475656138385b6c00",
+        "6c00000000000000840300000000000002d7924d4f7d43ea965a465ae3095ff41131e5946f3c85f79e44adbcf8e27e080e00"
+      ],
+      "negatives": {
+        "inflation_with_new_holder_signatures": "sendrawtransaction: {'code': -26, 'message': '16: mandatory-script-verify-flag-failed (Script failed an OP_NUMEQUALVERIFY operation)'}",
+        "wrong_holder": "sendrawtransaction: {'code': -26, 'message': '16: mandatory-script-verify-flag-failed (Script evaluated without error but finished with a false/empty top stack element)'}",
+        "wrong_root": "sendrawtransaction: {'code': -26, 'message': '16: mandatory-script-verify-flag-failed (Script failed an OP_NUMEQUALVERIFY operation)'}",
+        "new_recipient_with_stale_proof_and_new_signatures": "sendrawtransaction: {'code': -26, 'message': '16: mandatory-script-verify-flag-failed (Script failed an OP_NUMEQUALVERIFY operation)'}"
+      },
+      "node_timings": {
+        "chain_gang_seconds": 0.08606237499043345,
+        "node_submission_seconds": 0.6493824159260839,
+        "node_mining_and_confirmation_seconds": 0.013257791986688972
+      }
+    },
+    {
+      "txid": "93b4e8273689cea40e7335d7c1fb338ac25d665dc5da77949177d3b1109e6f55",
+      "selection": [
+        1,
+        3
+      ],
+      "source_certificate": "initial",
+      "verification_keys": 2,
+      "new_payment_proofs": 1,
+      "payment_proof": {
+        "native_prove_seconds": 1.730860125,
+        "native_verify_seconds": 0.001247042,
+        "process_seconds": 1.7438024170696735,
+        "process_mode": "resident",
+        "encoded_seconds": 0.9955373329576105,
+        "artifact_sha256": "8d8d5b21a74f3e8e799a4845c7b5940bfc2e10015eadc42a4030b10715e1d9dc",
+        "witness_sha256": "1b6709fe5e1d30a50a5bccaf80ab93c44973f86d3a530fc84715fd377dfc9db6",
+        "witness_bytes": 1078,
+        "digest": "9c49643da0c4a0575e2b2659ba1e386769160c36b4b5997f1e14bb8fc8df0804",
+        "public_inputs": [
+          "207740638136753505349392846867629226087",
+          "139683417811466794661215029881877760004"
+        ]
+      },
+      "payment_prepare_to_signed_seconds": 2.7426070830551907,
+      "lock_generation_seconds": 0.00030987500213086605,
+      "ticket_prepare_and_confirm_seconds": 0.06867320893798023,
+      "raw_bytes": 11558,
+      "verifier_funding_bytes": 902922,
+      "companion_funding_bytes": 798,
+      "total_including_both_tickets": 915278,
+      "witness_sizes": [
+        4359,
+        971,
+        2097,
+        2097
+      ],
+      "origin_witness_matches_cached": true,
+      "token_parent_raw_occurrences": 0,
+      "actual_input_outpoints": [
+        "fb97e60830b1919815ed13e72d55780ed53c45ede4212faadf43ac5b7484af9100000000",
+        "5b0100ed5f369595e82e0882362bf8c339e8d4eb719361207fec713a611773f000000000",
+        "d360a19e1bfa75d8d097f29e251a878f89c02b7319708b03392f86fa36dc1d0000000000",
+        "a9fe6b58c878ab2e1e123c80f0c757dc673fabc8058d77ff42e5f1db348200a500000000"
+      ],
+      "output_state_bytes": [
+        "90010000000000004c04000000000000024ce119c96e2fa357200b559b2f7dd5a5f02d5290aff74b03f3e471b273211c9700",
+        "d400000000000000840300000000000003e60fce93b59e9ec53011aabc21c23e97b2a31369b87a5ae9c44ee89e2a6dec0a00"
+      ],
+      "negatives": {
+        "other_selection_proof_same_origin_root": "sendrawtransaction: {'code': -26, 'message': '16: mandatory-script-verify-flag-failed (Script failed an OP_NUMEQUALVERIFY operation)'}"
+      },
+      "node_timings": {
+        "chain_gang_seconds": 0.08262066706083715,
+        "node_submission_seconds": 0.6572171669686213,
+        "node_mining_and_confirmation_seconds": 0.01575079106260091
+      }
+    },
+    {
+      "txid": "489a5b5fe6a6960a2f6659d5f69fc7118d9eebb3369e335332ce9c79acc2f4c2",
+      "selection": [
+        0,
+        1
+      ],
+      "source_certificate": "recipient",
+      "verification_keys": 2,
+      "new_payment_proofs": 1,
+      "payment_proof": {
+        "native_prove_seconds": 1.8810174160000002,
+        "native_verify_seconds": 0.001280291,
+        "process_seconds": 1.8953067500842735,
+        "process_mode": "resident",
+        "encoded_seconds": 0.8006034579593688,
+        "artifact_sha256": "a1bbc8de16c24019a72e601f678d346bf1137230058a977ea2469a7b3dd2cd64",
+        "witness_sha256": "6b66af5707612a4105099005bd860a0287b1f70b07a336f2f15940707add3198",
+        "witness_bytes": 1078,
+        "digest": "2d8b268dc13241beaee9cfbf59c47bd6a472a2bfef3ae9bee205ac65fe3fde53",
+        "public_inputs": [
+          "60537771036184772253591691094919510998",
+          "218588614107572144178371610020128218707"
+        ]
+      },
+      "payment_prepare_to_signed_seconds": 2.6979223750531673,
+      "lock_generation_seconds": 0.0003780829720199108,
+      "ticket_prepare_and_confirm_seconds": 0.09398645895998925,
+      "raw_bytes": 11556,
+      "verifier_funding_bytes": 902922,
+      "companion_funding_bytes": 798,
+      "total_including_both_tickets": 915276,
+      "witness_sizes": [
+        4359,
+        971,
+        2096,
+        2096
+      ],
+      "origin_witness_matches_cached": true,
+      "token_parent_raw_occurrences": 0,
+      "actual_input_outpoints": [
+        "84e9956c6649b5dad1b0a94f94859e68cc5d5c3f19aa877207010394a8080d8d00000000",
+        "4d8c4bbcb2ff4d4347ae781f943acecf57efabe4d934ab3e4582d058f8c2693b00000000",
+        "6b9d4b07bf77d9d3d40b521404df100fa3f0cb0e4300cde38f80aa9cb7d0b54000000000",
+        "a0ad4d6c21c7f6e634efd304be4c728ff0ebda10373bf2adbc376031f5904a5100000000"
+      ],
+      "output_state_bytes": [
+        "cd00000000000000e80300000000000002352bbf4a4cdd12564f93fa332ce333301d9ad40271f8107181340aef25be59d500",
+        "c0000000000000004c04000000000000022b4ea0a797a443d293ef5cff444f4979f06acfebd7e86d277475656138385b6c00"
+      ],
+      "negatives": {},
+      "node_timings": {
+        "chain_gang_seconds": 0.10159337497316301,
+        "node_submission_seconds": 0.6709593329578638,
+        "node_mining_and_confirmation_seconds": 0.013758875080384314
+      }
+    }
+  ],
+  "node": "/Bitcoin SV:1.2.3/",
+  "transactions": {
+    "issuance-anchor-and-coupons": {
+      "txid": "67d65954d64e9e446f12e993edb9bf3aa898a2c3e9c1d519ffb3c44f93531865",
+      "blockhash": "1e10161bb3ecab6f3b5451afe79789ce19b05893c949ce3200206d56531b756b",
+      "height": 1309,
+      "bytes": 540
+    },
+    "test-issuer-origin-0": {
+      "txid": "27dee373dc82925cfe98370429853afcae6237198e97ae4194ebd9fb1ddd7001",
+      "blockhash": "4b5d19c9f780291965830c6a9c6d48f49649121286e14062bcb8237e09cc8dc7",
+      "height": 1310,
+      "bytes": 1049
+    },
+    "test-issuer-origin-1": {
+      "txid": "001ddc36fa862f39038b7019732bc0898f871a259ef297d0d875fa1b9ea160d3",
+      "blockhash": "757cff8b1d178b62728bd07c4970da0c26ecdabbfc2bbfac85d03f138dadb107",
+      "height": 1311,
+      "bytes": 1049
+    },
+    "test-issuer-origin-2": {
+      "txid": "deb0432c66a3ddc9734e1e263bbc7cad1ab1baa66b01dae6b1d010f18f5b6e7a",
+      "blockhash": "7cea964c26d1866600cf054f2deb34b3ab14de83fccf992c613305956cf26f88",
+      "height": 1312,
+      "bytes": 1050
+    },
+    "test-issuer-origin-3": {
+      "txid": "a5008234dbf1e542ff778d05c8ab3f67dc57c7f0803c121e2eab78c8586bfea9",
+      "blockhash": "644bafa679aa67998a7c042c675953609b848cd3b5e7bf89e8c56b66c693009d",
+      "height": 1313,
+      "bytes": 1050
+    },
+    "recipient-existing-coin": {
+      "txid": "514a90f5316037bcadf23b3710daebf08f724cbe04d3ef34e6f6c7216c4dada0",
+      "blockhash": "74273242510201e251cc22a7f592cbdfc5415a5f557cab705b0689506707ca67",
+      "height": 1314,
+      "bytes": 1049
+    },
+    "first-selection-verifier": {
+      "txid": "7a54c002fc495f8f74697ad8e48a62f06c8c7cf20d660d653bbd21630182597c",
+      "blockhash": "792fe5c367fed114350cae745b077b72d51b13de1d328a84f916cc2df0aee2d9",
+      "height": 1315,
+      "bytes": 902922
+    },
+    "first-selection-companion": {
+      "txid": "64d291c7b6f45e19129825f909564ffe2ad806614f39429392f33a8d5cbba484",
+      "blockhash": "4195d06e3c8fca257a423523b85a6f7ad06e92b361c0347da83308a7c4fec26d",
+      "height": 1316,
+      "bytes": 798
+    },
+    "first-selection": {
+      "txid": "40b5d0b79caa808fe3cd00430ecbf0a30f10df0414520bd4d3d977bf074b9d6b",
+      "blockhash": "42280a7224850ac3b0b49d14d9c4d8dae9379615d72f3496df90cdf8dff41360",
+      "height": 1317,
+      "bytes": 11558
+    },
+    "recipient-respend-verifier": {
+      "txid": "8d0d08a8940301077287aa193f5c5dcc689e85944fa9b0d1dab549666c95e984",
+      "blockhash": "19e49375436427143dda1a2ea569f09f9d6d14e6f83000866c8410d0d279e4db",
+      "height": 1318,
+      "bytes": 902922
+    },
+    "recipient-respend-companion": {
+      "txid": "3b69c2f858d082453eab34d9e4abef57cfce3a941f78ae47434dffb2bc4b8c4d",
+      "blockhash": "1a5afbbe8411a5dee2a304b1529d8d08332f4bb7f38a4c1de348461abc3825c4",
+      "height": 1319,
+      "bytes": 798
+    },
+    "recipient-respend": {
+      "txid": "489a5b5fe6a6960a2f6659d5f69fc7118d9eebb3369e335332ce9c79acc2f4c2",
+      "blockhash": "7e62a5f94215fffb3dd9b98e9bef7088a9fd9aedebdbb5393eb8a8bb6b437cfc",
+      "height": 1320,
+      "bytes": 11556
+    },
+    "second-selection-verifier": {
+      "txid": "91af84745bac43dfaa2f21e4ed453cd50e78552de713ed159891b13008e697fb",
+      "blockhash": "11aebd216a2ebe6fa00b98f130c9ba4570935c0b1e2ac293194f595f4e01c984",
+      "height": 1321,
+      "bytes": 902922
+    },
+    "second-selection-companion": {
+      "txid": "f07317613a71ec7f20619371ebd4e839c3f82b3682082ee89595365fed00015b",
+      "blockhash": "1a0e903475a2128cc895baadce695e57c2e86dd2b29e941ef8f78e7e54243997",
+      "height": 1322,
+      "bytes": 798
+    },
+    "second-selection": {
+      "txid": "93b4e8273689cea40e7335d7c1fb338ac25d665dc5da77949177d3b1109e6f55",
+      "blockhash": "59cfc3ca0dc4da68ecc14b28a4e540bbada5970f9c9f3b7e2a4bbda284aa2c9e",
+      "height": 1323,
+      "bytes": 11558
+    }
+  },
+  "resident_startup_seconds": {
+    "origin": 25.691951125045307,
+    "payment": 33.78612962493207
+  }
+}

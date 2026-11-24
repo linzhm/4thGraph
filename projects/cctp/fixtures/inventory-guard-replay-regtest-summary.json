@@ -1,0 +1,212 @@
+{
+  "scope": "Read-only Bitcoin SV Node verifyscript over the specified vin of archived regtest spends. No variant was submitted or mined.",
+  "nodes": {
+    "narrow": "/Bitcoin SV:1.2.3/",
+    "wide": "/Bitcoin SV:1.2.3/"
+  },
+  "compact_holder": {
+    "mined_transaction": {
+      "txid": "0783f57de200a2c20970690a78737062da031018e1c323419cb2495e2aa4167f",
+      "blockhash": "19e015b5f0ac88676971180888399ec46a896e1507282c8e363448a154b98959",
+      "height": 669,
+      "bytes": 349487
+    },
+    "actual_token": {
+      "txid": "f550814c239b16449809e72ac042d3ace16fb86e1760f17c6b1504f1fffa8ed4",
+      "vout": 0
+    },
+    "variant_locktime": 1,
+    "vin": 2,
+    "results": {
+      "correct_reauthorization": {
+        "candidate_txid": "165ab887188c4416f112be794e0362f424fec1c5c7b267667706aa53d33076a0",
+        "vin_results": [
+          {
+            "vin": 2,
+            "result": "ok",
+            "flags": 4015147
+          }
+        ]
+      },
+      "previous_locktime_binding": {
+        "candidate_txid": "e6584c024dfdffe3a201769eb936c73fcb6701210cc23d7307aeb964ebf9ce55",
+        "vin_results": [
+          {
+            "vin": 2,
+            "result": "error",
+            "description": "Script evaluated without error but finished with a false/empty top stack element",
+            "flags": 4015147
+          }
+        ]
+      },
+      "wrong_holder": {
+        "candidate_txid": "a46174fdad330d8f893072d9b15678c37153ad5bc4f5223aa13a955d6ebec482",
+        "vin_results": [
+          {
+            "vin": 2,
+            "result": "error",
+            "description": "Script failed an OP_VERIFY operation",
+            "flags": 4015147
+          }
+        ]
+      },
+      "holder_only_signed_compact_suffix": {
+        "candidate_txid": "2b56d8eb520be6fcedecccf601cfdcc3e44af7c659c0b4a75d123efe1a84da1e",
+        "vin_results": [
+          {
+            "vin": 2,
+            "result": "error",
+            "description": "Script failed an OP_VERIFY operation",
+            "flags": 4015147
+          }
+        ]
+      },
+      "changed_companion": {
+        "candidate_txid": "0d98fe6e9d1b839160c527eb0f9804d3fbe885d2c69d49d815cc5ae7593f7bd5",
+        "vin_results": [
+          {
+            "vin": 2,
+            "result": "error",
+            "description": "Script failed an OP_EQUALVERIFY operation",
+            "flags": 4015147
+          }
+        ]
+      },
+      "changed_companion_and_internally_matching_prevouts": {
+        "candidate_txid": "3439a630175dc64a2d0be1ce0c14fa89a7cceedf18ab6f34c1dbb2aec1cf3ea5",
+        "vin_results": [
+          {
+            "vin": 2,
+            "result": "error",
+            "description": "Script evaluated without error but finished with a false/empty top stack element",
+            "flags": 4015147
+          }
+        ]
+      }
+    }
+  },
+  "same_lock_other_verifier_outpoint": {
+    "b": {
+      "mined_transaction": {
+        "txid": "edd02355ba41e0c078cfa8d3abdfd6a5b07fcd7c7ffbbe8a074af0abe8517a05",
+        "blockhash": "3df65f5df2caa52e00b945dfb3334c9373c1880604c6b7180c408c352a6ba36d",
+        "height": 1433,
+        "bytes": 10714
+      },
+      "original_verifier": "4c34b7c575d31515891b44cd7494bebd235ee7b1c83b4f123e1614142a8d8c5a:0",
+      "substitute_verifier": "69c66a559bd03f3d277603a39ab8e53a7062df704acf5da5fcbe430432ed2770:0",
+      "original": {
+        "candidate_txid": "edd02355ba41e0c078cfa8d3abdfd6a5b07fcd7c7ffbbe8a074af0abe8517a05",
+        "vin_results": [
+          {
+            "vin": 0,
+            "result": "ok",
+            "flags": 4015663
+          },
+          {
+            "vin": 1,
+            "result": "ok",
+            "flags": 4015663
+          },
+          {
+            "vin": 2,
+            "result": "ok",
+            "flags": 4015663
+          },
+          {
+            "vin": 3,
+            "result": "ok",
+            "flags": 4015663
+          }
+        ]
+      },
+      "substituted": {
+        "candidate_txid": "2d9cc49501d5e53d895015c5fb20fe882f2711f7d91499377b6d5991a0e9099a",
+        "vin_results": [
+          {
+            "vin": 0,
+            "result": "ok",
+            "flags": 4015663
+          },
+          {
+            "vin": 1,
+            "result": "error",
+            "description": "Script failed an OP_EQUALVERIFY operation",
+            "flags": 4015663
+          },
+          {
+            "vin": 2,
+            "result": "ok",
+            "flags": 4015663
+          },
+          {
+            "vin": 3,
+            "result": "ok",
+            "flags": 4015663
+          }
+        ]
+      }
+    },
+    "c": {
+      "mined_transaction": {
+        "txid": "40b5d0b79caa808fe3cd00430ecbf0a30f10df0414520bd4d3d977bf074b9d6b",
+        "blockhash": "42280a7224850ac3b0b49d14d9c4d8dae9379615d72f3496df90cdf8dff41360",
+        "height": 1317,
+        "bytes": 11558
+      },
+      "original_verifier": "7a54c002fc495f8f74697ad8e48a62f06c8c7cf20d660d653bbd21630182597c:0",
+      "substitute_verifier": "91af84745bac43dfaa2f21e4ed453cd50e78552de713ed159891b13008e697fb:0",
+      "original": {
+        "candidate_txid": "40b5d0b79caa808fe3cd00430ecbf0a30f10df0414520bd4d3d977bf074b9d6b",
+        "vin_results": [
+          {
+            "vin": 0,
+            "result": "ok",
+            "flags": 4015663
+          },
+          {
+            "vin": 1,
+            "result": "ok",
+            "flags": 4015663
+          },
+          {
+            "vin": 2,
+            "result": "ok",
+            "flags": 4015663
+          },
+          {
+            "vin": 3,
+            "result": "ok",
+            "flags": 4015663
+          }
+        ]
+      },
+      "substituted": {
+        "candidate_txid": "e63b868ed4ba12a9b2a2e6428b27d027b0b9df3cb8e9ef38ccb35aa0871ed461",
+        "vin_results": [
+          {
+            "vin": 0,
+            "result": "ok",
+            "flags": 4015663
+          },
+          {
+            "vin": 1,
+            "result": "error",
+            "description": "Script failed an OP_EQUALVERIFY operation",
+            "flags": 4015663
+          },
+          {
+            "vin": 2,
+            "result": "ok",
+            "flags": 4015663
+          },
+          {
+            "vin": 3,
+            "result": "ok",
+            "flags": 4015663
+          }
+        ]
+      }
+    }
+  }
+}

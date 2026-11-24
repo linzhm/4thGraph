@@ -1,0 +1,313 @@
+{
+  "profile": "D",
+  "scope": "23ff47572abb5c3053aeea10cc034249623dbc013aa15492c01e1885d0d8d66e",
+  "trust": "Test issuer approves origins and verifier companion tickets, including the new recipient list. D opens that list directly; B and C check a proof of its permutation into a Merkle root.",
+  "parameters": {
+    "origin": null,
+    "payment": null
+  },
+  "certificates": {
+    "initial": {
+      "source": "four approved leaf hashes in canonical issuance order",
+      "witness_bytes": 130,
+      "witness_sha256": "d77939a93c6f3f1796e2bb2a9010f23c3ed9400e51cdd1d8f68727c2cb4669ec",
+      "anchor": "fb5475e49e83f39b286fdb293534a4086341c0e8c52b2cd6dd425fad90372281",
+      "root": "8043376d40855f09f0c5186f9b9dda6b81d2d4507fd9e6e72c630bdec3a7065d",
+      "members": [
+        {
+          "txid": "faf48caf2c0848eebd86d2d03afc00faa008a7569beb9874ca151e9810c5f5aa",
+          "vout": 0,
+          "outpoint_wire": "aaf5c510981e15ca7498eb9b56a708a0fa00fc3ad0d286bdee48082caf8cf4fa00000000",
+          "state": "6500000000000000e80300000000000002d7924d4f7d43ea965a465ae3095ff41131e5946f3c85f79e44adbcf8e27e080e00",
+          "leaf": "e4345bbd8dd1696d1923e11a506209cf80aa70bdb50dc4ad35ec90e13c949f8a"
+        },
+        {
+          "txid": "85e3adca289edcce88d218d980fac30c3f5825026be56da2c160fa1222416460",
+          "vout": 0,
+          "outpoint_wire": "6064412212fa60c1a26de56b0225583f0cc3fa80d918d288cedc9e28caade38500000000",
+          "state": "cb00000000000000e80300000000000003e60fce93b59e9ec53011aabc21c23e97b2a31369b87a5ae9c44ee89e2a6dec0a00",
+          "leaf": "b4006fab9a093efd0d6b5aff0d829d9317edaeb2921de427b129075ccd36adb9"
+        },
+        {
+          "txid": "dd93f46e4af57ec291b6fde7105f040772d5c3ce8768981ee4d1862a478ed341",
+          "vout": 0,
+          "outpoint_wire": "41d38e472a86d1e41e986887cec3d57207045f10e7fdb691c27ef54a6ef493dd00000000",
+          "state": "3301000000000000e80300000000000003defdea4cdb677750a420fee807eacf21eb9898ae79b9768766e4faa04a2d4a3400",
+          "leaf": "832b66a0ebfd621ed8882dcce53341f58f0fbc859c94f2e7e1fffd09e4f7d5e6"
+        },
+        {
+          "txid": "93d1a5613238d053b98b74112471641e6e2ef328e1e94d9f8da56afec5198a4b",
+          "vout": 0,
+          "outpoint_wire": "4b8a19c5fe6aa58d9f4de9e128f32e6e1e64712411748bb953d0383261a5d19300000000",
+          "state": "9901000000000000e803000000000000025601570cb47f238d2b0286db4a990fa0f3ba28d1a319f5e7cf55c2a2444da7cc00",
+          "leaf": "9f03010e4853d26a17773da380b787851f82540fea6bea91259548b6ca11645c"
+        }
+      ]
+    },
+    "recipient": {
+      "source": "four approved leaf hashes in canonical issuance order",
+      "witness_bytes": 130,
+      "witness_sha256": "decdd4415f80f040ce64b6592ddc6b6eca5ed70ba0fa9fa3287e0458a4adac03",
+      "anchor": "f9994c323f7b2122c4701a729093a4ab180699592d9e2661dc575a9a68d31d29",
+      "root": "91a6e0b92c51af57fd2af2820a015900c2da2b01b5c312396994a2e7425885c5",
+      "members": [
+        {
+          "txid": "1a7e8488f75b142f3f7059c99cb4ad109ac1a2eb451b023324ab791cafc7503f",
+          "vout": 0,
+          "outpoint_wire": "3f50c7af1c79ab2433021b45eba2c19a10adb49cc959703f2f145bf788847e1a00000000",
+          "state": "2c010000000000004c04000000000000022b4ea0a797a443d293ef5cff444f4979f06acfebd7e86d277475656138385b6c00",
+          "leaf": "dc4fcfa36b80ad8f1b39bbcf0b735b63478bb43290e0b123835ab261ca9a4200"
+        },
+        {
+          "txid": "edd8ff939eb82d07a00fccbaadccca62aa616b540b6087605a4726907faec0f3",
+          "vout": 0,
+          "outpoint_wire": "f3c0ae7f9026475a6087600b546b61aa62caccadbacc0fa0072db89e93ffd8ed00000000",
+          "state": "6100000000000000e803000000000000022b4ea0a797a443d293ef5cff444f4979f06acfebd7e86d277475656138385b6c00",
+          "leaf": "0488668447b62b490189247b4b788f4a040efd0f35315507b13c8f6af25f1b51"
+        },
+        {
+          "txid": "1a7e8488f75b142f3f7059c99cb4ad109ac1a2eb451b023324ab791cafc7503f",
+          "vout": 1,
+          "outpoint_wire": "3f50c7af1c79ab2433021b45eba2c19a10adb49cc959703f2f145bf788847e1a01000000",
+          "state": "6c00000000000000840300000000000002d7924d4f7d43ea965a465ae3095ff41131e5946f3c85f79e44adbcf8e27e080e00",
+          "leaf": "5dac2aea9277796ee84d6b7a68c18f53a65be07e1f9ddec4e750320948676fd1"
+        },
+        {
+          "txid": "85e3adca289edcce88d218d980fac30c3f5825026be56da2c160fa1222416460",
+          "vout": 0,
+          "outpoint_wire": "6064412212fa60c1a26de56b0225583f0cc3fa80d918d288cedc9e28caade38500000000",
+          "state": "cb00000000000000e80300000000000003e60fce93b59e9ec53011aabc21c23e97b2a31369b87a5ae9c44ee89e2a6dec0a00",
+          "leaf": "b4006fab9a093efd0d6b5aff0d829d9317edaeb2921de427b129075ccd36adb9"
+        }
+      ]
+    }
+  },
+  "recipient_certificate_process_and_encoding_seconds": 8.670799434185028e-05,
+  "payments": [
+    {
+      "txid": "1a7e8488f75b142f3f7059c99cb4ad109ac1a2eb451b023324ab791cafc7503f",
+      "selection": [
+        0,
+        2
+      ],
+      "source_certificate": "initial",
+      "verification_keys": 0,
+      "new_payment_proofs": 0,
+      "payment_proof": null,
+      "payment_prepare_to_signed_seconds": 0.001405457966029644,
+      "lock_generation_seconds": 0.00027908303309231997,
+      "ticket_prepare_and_confirm_seconds": 0.014787667081691325,
+      "raw_bytes": 9765,
+      "verifier_funding_bytes": 3365,
+      "companion_funding_bytes": 797,
+      "total_including_both_tickets": 13927,
+      "witness_sizes": [
+        2569,
+        971,
+        2095,
+        2096
+      ],
+      "origin_witness_matches_cached": true,
+      "token_parent_raw_occurrences": 0,
+      "actual_input_outpoints": [
+        "0ec1c3741aa9b5adf3e9c9f7e586aa9ad04d9e3fee8e682bef1f84d5841a1f6500000000",
+        "80a27c5e07088bd874fca406ef0a5b9b3983bf2b47aa131823d8fa7915cc361600000000",
+        "aaf5c510981e15ca7498eb9b56a708a0fa00fc3ad0d286bdee48082caf8cf4fa00000000",
+        "41d38e472a86d1e41e986887cec3d57207045f10e7fdb691c27ef54a6ef493dd00000000"
+      ],
+      "output_state_bytes": [
+        "2c010000000000004c04000000000000022b4ea0a797a443d293ef5cff444f4979f06acfebd7e86d277475656138385b6c00",
+        "6c00000000000000840300000000000002d7924d4f7d43ea965a465ae3095ff41131e5946f3c85f79e44adbcf8e27e080e00"
+      ],
+      "negatives": {
+        "inflation_with_new_holder_signatures": "sendrawtransaction: {'code': -26, 'message': '16: mandatory-script-verify-flag-failed (Script failed an OP_NUMEQUALVERIFY operation)'}",
+        "wrong_holder": "sendrawtransaction: {'code': -26, 'message': '16: mandatory-script-verify-flag-failed (Script evaluated without error but finished with a false/empty top stack element)'}",
+        "wrong_root": "sendrawtransaction: {'code': -26, 'message': '16: mandatory-script-verify-flag-failed (Script failed an OP_EQUALVERIFY operation)'}",
+        "swap_membership_paths": "sendrawtransaction: {'code': -26, 'message': '16: mandatory-script-verify-flag-failed (Script failed an OP_EQUALVERIFY operation)'}"
+      },
+      "node_timings": {
+        "chain_gang_seconds": 0.0006359159015119076,
+        "node_submission_seconds": 0.0039402920519933105,
+        "node_mining_and_confirmation_seconds": 0.0057384580140933394
+      }
+    },
+    {
+      "txid": "9b93bd00fc1a2addda5a070c6679c6b77a859947f9b1dc5cc436133f493b6e4e",
+      "selection": [
+        1,
+        3
+      ],
+      "source_certificate": "initial",
+      "verification_keys": 0,
+      "new_payment_proofs": 0,
+      "payment_proof": null,
+      "payment_prepare_to_signed_seconds": 0.0015547079965472221,
+      "lock_generation_seconds": 0.0002737920731306076,
+      "ticket_prepare_and_confirm_seconds": 0.044034707942046225,
+      "raw_bytes": 9765,
+      "verifier_funding_bytes": 3365,
+      "companion_funding_bytes": 797,
+      "total_including_both_tickets": 13927,
+      "witness_sizes": [
+        2569,
+        971,
+        2095,
+        2096
+      ],
+      "origin_witness_matches_cached": true,
+      "token_parent_raw_occurrences": 0,
+      "actual_input_outpoints": [
+        "697c2c71d712b86472df7a381f543f0514832fb3afadf1723b269363f421461b00000000",
+        "b111ea196eeb4a36965bc58c27b145c8264b64ab62623f2d6d06db02b9b5725800000000",
+        "6064412212fa60c1a26de56b0225583f0cc3fa80d918d288cedc9e28caade38500000000",
+        "4b8a19c5fe6aa58d9f4de9e128f32e6e1e64712411748bb953d0383261a5d19300000000"
+      ],
+      "output_state_bytes": [
+        "90010000000000004c04000000000000024ce119c96e2fa357200b559b2f7dd5a5f02d5290aff74b03f3e471b273211c9700",
+        "d400000000000000840300000000000003e60fce93b59e9ec53011aabc21c23e97b2a31369b87a5ae9c44ee89e2a6dec0a00"
+      ],
+      "negatives": {},
+      "node_timings": {
+        "chain_gang_seconds": 0.0006018329877406359,
+        "node_submission_seconds": 0.007658042013645172,
+        "node_mining_and_confirmation_seconds": 0.011545417015440762
+      }
+    },
+    {
+      "txid": "0ae9ab584fff01cbc301ed4c079ac71f52ba9d63e145ab47872b4c018dd9dda6",
+      "selection": [
+        0,
+        1
+      ],
+      "source_certificate": "recipient",
+      "verification_keys": 0,
+      "new_payment_proofs": 0,
+      "payment_proof": null,
+      "payment_prepare_to_signed_seconds": 0.0013875000877305865,
+      "lock_generation_seconds": 0.0002779170172289014,
+      "ticket_prepare_and_confirm_seconds": 0.015689415973611176,
+      "raw_bytes": 9766,
+      "verifier_funding_bytes": 3365,
+      "companion_funding_bytes": 797,
+      "total_including_both_tickets": 13928,
+      "witness_sizes": [
+        2569,
+        971,
+        2096,
+        2096
+      ],
+      "origin_witness_matches_cached": true,
+      "token_parent_raw_occurrences": 0,
+      "actual_input_outpoints": [
+        "30337386f88d385abdcfffc1648f644ba4608c61aa9674e03a04a798ed9e639900000000",
+        "44cc670979ed608cc8fb005eba3d75b3c864ec8cf1760664b8c380bbf804d95a00000000",
+        "3f50c7af1c79ab2433021b45eba2c19a10adb49cc959703f2f145bf788847e1a00000000",
+        "f3c0ae7f9026475a6087600b546b61aa62caccadbacc0fa0072db89e93ffd8ed00000000"
+      ],
+      "output_state_bytes": [
+        "cd00000000000000e80300000000000002352bbf4a4cdd12564f93fa332ce333301d9ad40271f8107181340aef25be59d500",
+        "c0000000000000004c04000000000000022b4ea0a797a443d293ef5cff444f4979f06acfebd7e86d277475656138385b6c00"
+      ],
+      "negatives": {},
+      "node_timings": {
+        "chain_gang_seconds": 0.0006254999898374081,
+        "node_submission_seconds": 0.003912958083674312,
+        "node_mining_and_confirmation_seconds": 0.005422583897598088
+      }
+    }
+  ],
+  "node": "/Bitcoin SV:1.2.3/",
+  "transactions": {
+    "issuance-anchor-and-coupons": {
+      "txid": "034bed7f5bed1feb02d0424081013b51d0a57af7394786b259c5008a45967e57",
+      "blockhash": "1f0b5815302d70937bdeb52467dc4bc4be302d545bb1574fc651132b187cf6c1",
+      "height": 440,
+      "bytes": 539
+    },
+    "test-issuer-origin-0": {
+      "txid": "faf48caf2c0848eebd86d2d03afc00faa008a7569beb9874ca151e9810c5f5aa",
+      "blockhash": "4c6860b188dc067979e1ca527204139107e3ff3144b599b23b0c8769d8e67714",
+      "height": 441,
+      "bytes": 1050
+    },
+    "test-issuer-origin-1": {
+      "txid": "85e3adca289edcce88d218d980fac30c3f5825026be56da2c160fa1222416460",
+      "blockhash": "7d27fbebe6ab000b22d4da5d6f4352add573b8ac8629384c089f592b34a6a536",
+      "height": 442,
+      "bytes": 1050
+    },
+    "test-issuer-origin-2": {
+      "txid": "dd93f46e4af57ec291b6fde7105f040772d5c3ce8768981ee4d1862a478ed341",
+      "blockhash": "73418db17ce812ae27eea4a93cf168232e2badd4ef2956fe8aad56928ea48990",
+      "height": 443,
+      "bytes": 1050
+    },
+    "test-issuer-origin-3": {
+      "txid": "93d1a5613238d053b98b74112471641e6e2ef328e1e94d9f8da56afec5198a4b",
+      "blockhash": "2728a8cb3092ba0934f71d2809494c46a9f4cfcfda4ce664a81d65b949a377be",
+      "height": 444,
+      "bytes": 1050
+    },
+    "recipient-existing-coin": {
+      "txid": "edd8ff939eb82d07a00fccbaadccca62aa616b540b6087605a4726907faec0f3",
+      "blockhash": "7cd76eb55f487e05a5f234592e995f4dcad5746ab56e075f5bf22c23bef7e17c",
+      "height": 445,
+      "bytes": 1049
+    },
+    "first-selection-verifier": {
+      "txid": "651f1a84d5841fef2b688eee3f9e4dd09aaa86e5f7c9e9f3adb5a91a74c3c10e",
+      "blockhash": "1826df429ebf7c083a236063ba0c85a2c9c261fa835554b386c3f8e5f8564f0f",
+      "height": 446,
+      "bytes": 3365
+    },
+    "first-selection-companion": {
+      "txid": "1636cc1579fad8231813aa472bbf83399b5b0aef06a4fc74d88b08075e7ca280",
+      "blockhash": "15eef1b8fb6950ea9a779781cd85bb93b19fd336c68692f93bf1ca39e861a62e",
+      "height": 447,
+      "bytes": 797
+    },
+    "first-selection": {
+      "txid": "1a7e8488f75b142f3f7059c99cb4ad109ac1a2eb451b023324ab791cafc7503f",
+      "blockhash": "4610562acf62005bbf7bdc6df803532c8d0108c86dc2d00da237304fddb37a5c",
+      "height": 448,
+      "bytes": 9765
+    },
+    "recipient-respend-verifier": {
+      "txid": "99639eed98a7043ae07496aa618c60a44b648f64c1ffcfbd5a388df886733330",
+      "blockhash": "6b9d3007701ae5f742cdc21185eb42894175782958a38a5fdf916db9769fd8c1",
+      "height": 449,
+      "bytes": 3365
+    },
+    "recipient-respend-companion": {
+      "txid": "5ad904f8bb80c3b8640676f18cec64c8b3753dba5e00fbc88c60ed790967cc44",
+      "blockhash": "426c3c7289f24674d419d3102ff6198398ecd378a3c70f19917fe8a613785928",
+      "height": 450,
+      "bytes": 797
+    },
+    "recipient-respend": {
+      "txid": "0ae9ab584fff01cbc301ed4c079ac71f52ba9d63e145ab47872b4c018dd9dda6",
+      "blockhash": "20718c3324f4ac807fa5c47fe2122cd0612e96def2e006e241438ebc48131f72",
+      "height": 451,
+      "bytes": 9766
+    },
+    "second-selection-verifier": {
+      "txid": "1b4621f46393263b72f1adafb32f8314053f541f387adf7264b812d7712c7c69",
+      "blockhash": "5a24840456ff07a18a107c4ec685800a0ddba745c9806b703f186489128916e6",
+      "height": 452,
+      "bytes": 3365
+    },
+    "second-selection-companion": {
+      "txid": "5872b5b902db066d2d3f6262ab644b26c845b1278cc55b96364aeb6e19ea11b1",
+      "blockhash": "7b21d84e42c8cd1490f83d95b5784f278b4ec3d6d01bb68638eeec2eb525ce9a",
+      "height": 453,
+      "bytes": 797
+    },
+    "second-selection": {
+      "txid": "9b93bd00fc1a2addda5a070c6679c6b77a859947f9b1dc5cc436133f493b6e4e",
+      "blockhash": "7e8ff48f8405c57ec1045ce95d81063a19409e8a3067f6d9cbe947ad5804ecd7",
+      "height": 454,
+      "bytes": 9765
+    }
+  },
+  "resident_startup_seconds": {}
+}
