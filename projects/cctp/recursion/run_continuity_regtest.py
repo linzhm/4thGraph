@@ -139,14 +139,15 @@ def _checkpoint(node, prover, label, signed, funding, artifact, public, receipt,
     return signed, artifact, details
 
 
-def _mint(node, verifier, prover, label, state, events, funding, quantity, *, predecessor=None):
+def _mint(node, verifier, prover, label, state, events, funding, quantity, *, predecessor=None, recipient=None):
     policy = verifier.mint_policy
     asset = verifier.asset
     prior = None if predecessor is None else predecessor[0]
     receipt = ParentReceipt(() if prior is None else (verifier.proof_digest(state, prior),))
     deposit = Deposit(DepositPosition(policy.source_chain_id, asset.reserve_domain, policy.reserve_contract,
                                        hash256(label.encode("ascii")), 0),
-                      asset.reserve_asset, asset.network, asset.asset_id(), quantity, 0, node.owner_key)
+                      asset.reserve_asset, asset.network, asset.asset_id(), quantity, 0,
+                      node.owner_key if recipient is None else recipient)
     plan = prepare_mint(policy, state, events, deposit, Input(funding.txid_wire(), 0),
                         receipt=receipt, verifier_parent=funding)
     signed = authorize_mint(plan, lambda _: deposit, node.minter)

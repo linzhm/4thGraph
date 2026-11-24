@@ -8,6 +8,7 @@ of the output's known spend state remain separate wallet checks.
 
 from collections.abc import Callable
 from dataclasses import dataclass
+from decimal import Decimal, InvalidOperation
 from hashlib import sha256
 from typing import TYPE_CHECKING
 
@@ -16,7 +17,9 @@ from projects.cctp.evm.bsv_burn_evidence import (
 )
 from projects.cctp.evm.reserve_rpc import Rpc
 from shared.transaction import Input, Transaction, blob, hash256
+from statement import fixed, uint
 from transaction_relation import TokenState
+from wallet_receipt import BlockInclusion, SpendStatus, WalletReceipt
 
 if TYPE_CHECKING:
     from continuity_verifier import ContinuityVerifier
@@ -37,6 +40,16 @@ class CertifiedCreation:
     verifier_hash: bytes
     context: bytes
     proof_digest: bytes
+
+
+@dataclass(frozen=True)
+class SpendablePayment:
+    """A live UTXO observation plus evidence of historical certified creation."""
+    creation: CertifiedCreation
+    receipt: WalletReceipt
+    inclusion: BlockInclusion
+    tip_height: int
+    tip_hash: bytes
 
 
 @dataclass(frozen=True)
@@ -66,6 +79,9 @@ class CertifiedWalletProvenance:
         return True
 
     def check_creation(self, tx: Transaction, vout: int) -> CertifiedCreation:
+        return self._check_creation(tx, vout)
+
+    def _check_creation(self, tx: Transaction, vout: int, snapshot: BsvNodeSnapshot | None = None) -> CertifiedCreation:
         verifier = self.verifier
         if type(vout) is not int or not 0 <= vout < len(tx.outputs):
             raise CertifiedWalletError("invalid designated wallet vout")
@@ -86,7 +102,8 @@ class CertifiedWalletProvenance:
         subversion = server.get("subversion") if isinstance(server, dict) else None
         if not isinstance(subversion, str) or not subversion.startswith("/Bitcoin SV:"):
             raise CertifiedWalletError("certified wallet requires an independent Bitcoin SV full node RPC")
-        snapshot = BsvNodeSnapshot(self.bsv_rpc, self.confirmation_policy)
+        if snapshot is None:
+            snapshot = BsvNodeSnapshot(self.bsv_rpc, self.confirmation_policy)
 
         def location_of(txid):
             location = self.locate(txid)
@@ -175,3 +192,59 @@ class CertifiedWalletProvenance:
             kind, txid_wire, vout, state, location, tx.inputs[verifier_index].outpoint(),
             verifier_hash, context, receipt.digest(verifier.asset.asset_id(), verifier.key_digest, context),
         )
+
+    def check_spendable(self, tx: Transaction, vout: int, *, expected_owner: bytes, expected_quantity: int,
+                        inclusion: BlockInclusion | None = None) -> SpendablePayment:
+        """Match the order and check spendability at this node's observed tip and mempool.
+
+        The wallet configures the asset, verifier and confirmation policy before
+        receiving the payment. Recheck current availability before a later spend.
+        The outpoint is the idempotency key for a wallet's accounting ledger.
+        """
+        fixed(expected_owner, 33)
+        uint(expected_quantity, 8)
+        if expected_quantity == 0:
+            raise CertifiedWalletError("expected a positive payment quantity")
+        snapshot = BsvNodeSnapshot(self.bsv_rpc, self.confirmation_policy)
+        creation = self._check_creation(tx, vout, snapshot)
+        state = creation.state
+        if state.owner != expected_owner or state.quantity != expected_quantity:
+            raise CertifiedWalletError("certified output does not match the expected owner and quantity")
+        if state.frozen:
+            raise CertifiedWalletError("certified payment output is frozen")
+
+        location = creation.location
+        # The creation check authenticated and cached the adopted block's ordered
+        # txid -> index mapping for this same snapshot.
+        _, positions = snapshot.blocks[location.height]
+        index = positions[creation.txid_wire]
+        if inclusion is None:
+            header = self.bsv_rpc("getblockheader", location.block_hash[::-1].hex(), False)
+            inclusion = BlockInclusion.from_block(bytes.fromhex(header), location.height, tuple(positions), index)
+        if (inclusion.height != location.height or inclusion.block_hash() != location.block_hash
+                or inclusion.index != index or inclusion.leaf_count != len(positions)):
+            raise CertifiedWalletError("Merkle inclusion differs from the adopted transaction position")
+        inclusion.verify(creation.txid_wire)
+
+        # An output created in a confirmed block can already be spent in the
+        # node's mempool. The chain-only gettxout view would still return it.
+        coin = self.bsv_rpc("gettxout", tx.txid(), vout, True)
+        confirmations = snapshot.tip - location.height + 1
+        if not isinstance(coin, dict):
+            raise CertifiedWalletError("output is spent, conflicted or unavailable at the wallet node")
+        if (coin.get("bestblock") != snapshot.tip_hash[::-1].hex()
+                or type(coin.get("confirmations")) is not int or coin["confirmations"] != confirmations):
+            raise CertifiedWalletError("UTXO observation differs from the wallet chain snapshot")
+        script = coin.get("scriptPubKey")
+        try:
+            value = Decimal(str(coin.get("value")))
+        except InvalidOperation as exc:
+            raise CertifiedWalletError("invalid UTXO amount") from exc
+        actual = tx.outputs[vout]
+        if (not value.is_finite() or value != Decimal(actual.value).scaleb(-8)
+                or not isinstance(script, dict) or script.get("hex") != actual.script.hex()):
+            raise CertifiedWalletError("unspent output differs from the certified payment")
+        snapshot.check_active()
+        outpoint = Input(creation.txid_wire, vout).outpoint()
+        receipt = WalletReceipt(outpoint, state.quantity, state.owner, state.frozen, confirmations, SpendStatus.UNSPENT)
+        return SpendablePayment(creation, receipt, inclusion, snapshot.tip, snapshot.tip_hash)

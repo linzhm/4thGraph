@@ -1,0 +1,425 @@
+{
+  "scope": "Confirmed same-key v3 B2G with test deposits. Ordinary payments recover recursive proofs from real chain witnesses and require only the paying wallet's signatures.",
+  "asset_id": "58b2c99b56738f890137aa72c72f59ae617a9f1220c0481840ecb367c3ebc9e1",
+  "issuance_anchor": "530bcde0c3d68874b9a1067513051a2927447a8a5f83ee997c9f722bf174b69300000000",
+  "freeze_public_key": "03d01115d548e7561b15c38f004d734633687cf4419620095bc5b0f47070afe85a",
+  "mint_public_key": "03f28773c2d975288bc7d1d205c3748651b075fbc6610e58cddeeddf8f19405aa8",
+  "continuity_key_digest": "677731270de75ec11f65c92f2ac8b0c428df79e28a532a035b8402166eb04a9b",
+  "verifier_lock_hash": "1e6c230e8d61eae4c8db11c85c2c39b9b137e63ac5210986b0b24bdc8723a2d5",
+  "recipient_expected_asset": "58b2c99b56738f890137aa72c72f59ae617a9f1220c0481840ecb367c3ebc9e1",
+  "recipient_expected_verifier_hash": "1e6c230e8d61eae4c8db11c85c2c39b9b137e63ac5210986b0b24bdc8723a2d5",
+  "minted": 650,
+  "mint_signer_loaded_in_payment_process": false,
+  "ordinary_companion_inputs": 0,
+  "mint_proof_checks": {
+    "alice-first-mint": {
+      "predecessors": [
+        {
+          "txid": "9cb6e4f79894d4f7140633af51534054495417208a5ef846da3d7391c70b7846",
+          "vout": 0
+        }
+      ],
+      "public_signals": [
+        "208251831638968944106680179755722119464",
+        "80561945723909683221485747381374392219"
+      ],
+      "previous_proof_digests": [],
+      "proof_sha256": "eb34dbbe1f673c10e020362c531936e2242df7dfe6562a76f6c7804207a0ac8e",
+      "largest_input_script_bytes": 1075009,
+      "quantities": [
+        300
+      ],
+      "rejections": {}
+    },
+    "alice-second-mint": {
+      "predecessors": [
+        {
+          "txid": "40976bd557a6cef0c36a61b128c31dc2ba86fe878a7dfc3258b1a14164e26de8",
+          "vout": 0
+        }
+      ],
+      "public_signals": [
+        "8260236019470505711306859501054494559",
+        "190936669490661601363638425022319244781"
+      ],
+      "previous_proof_digests": [
+        "9cabd806bafc520a9859317148a299283c9baa96e1cf615d16f258141099979b"
+      ],
+      "proof_sha256": "76f9e9d52814af168ed1ffba61f12aefe2ab2ac736d81b2d54ea10ac2285d108",
+      "largest_input_script_bytes": 4171299,
+      "quantities": [
+        200
+      ],
+      "rejections": {}
+    },
+    "bob-existing-mint": {
+      "predecessors": [
+        {
+          "txid": "842b30465604dac282aea8cff674274d9401de4ea1d179de137054929bd8f6f0",
+          "vout": 0
+        }
+      ],
+      "public_signals": [
+        "77570550477639156170897662209764590461",
+        "68557926238669650038110774595910060326"
+      ],
+      "previous_proof_digests": [
+        "0636dd1437f23229c6e3eac702aa875f8fa5109ef2d8743e63ab6830e47b35ed"
+      ],
+      "proof_sha256": "ccec8b640643c62ce13e616743bc002329b549b41bb27652353560f352e51127",
+      "largest_input_script_bytes": 7267588,
+      "quantities": [
+        150
+      ],
+      "rejections": {}
+    }
+  },
+  "payments": [
+    {
+      "txid": "74e7b2fecb84d3d0c62490391b13919feb92ef45b9cfbbfb1edda58141907536",
+      "payer": "02352bbf4a4cdd12564f93fa332ce333301d9ad40271f8107181340aef25be59d5",
+      "parent_receipts": [
+        {
+          "txid": "40976bd557a6cef0c36a61b128c31dc2ba86fe878a7dfc3258b1a14164e26de8",
+          "vout": 1,
+          "owner": "02352bbf4a4cdd12564f93fa332ce333301d9ad40271f8107181340aef25be59d5",
+          "quantity": 300,
+          "frozen": false,
+          "spend_status": "unspent",
+          "confirmations": 7,
+          "tip": "51262e6b5810d2535b751a95bf9b1367e4ece2dac442cb48cd0ce2162b7ed336",
+          "tip_height": 111,
+          "block_header": "00000020dfbfbdeef6df6940882f1be3b6f4f45a94a5a8e1c230361fd89d9baecbea801c697a0e844c70efd57fa9144541ee91c910ddbbe987a5df1ac20da96eb1a785e0d2c1056bffff7f2001000000",
+          "height": 105,
+          "leaf_count": 2,
+          "index": 1,
+          "merkle_siblings_wire": [
+            "693b2c3d2f7027b0cad13b4517a2fb17854be153b66a32dfa7c4709e11383c0e"
+          ],
+          "verifier_outpoint_wire": "d21726b7dcbac890a6b4d15b09c27730818cc28e1475b9f54794f15aa153270a00000000",
+          "proof_digest": "9cabd806bafc520a9859317148a299283c9baa96e1cf615d16f258141099979b"
+        },
+        {
+          "txid": "842b30465604dac282aea8cff674274d9401de4ea1d179de137054929bd8f6f0",
+          "vout": 1,
+          "owner": "02352bbf4a4cdd12564f93fa332ce333301d9ad40271f8107181340aef25be59d5",
+          "quantity": 200,
+          "frozen": false,
+          "spend_status": "unspent",
+          "confirmations": 5,
+          "tip": "51262e6b5810d2535b751a95bf9b1367e4ece2dac442cb48cd0ce2162b7ed336",
+          "tip_height": 111,
+          "block_header": "000000205eb6acd0efab6d9aa219891dd8e2093e488715b2421cc8cd328b148931b26c60f28f870afdcc42ce01513a19627da4aab1b3a55422a63235a611d5fed349d97700c2056bffff7f2000000000",
+          "height": 107,
+          "leaf_count": 2,
+          "index": 1,
+          "merkle_siblings_wire": [
+            "d8d9b9dfc5e25bf5512aff8e8c6edb0400e2ba4ec316fb09ab4ef349b9fa88a6"
+          ],
+          "verifier_outpoint_wire": "2bfcb011e03d4642a5757a4ab30c47ef7d2125d9b998639eabc5b19540860a4900000000",
+          "proof_digest": "0636dd1437f23229c6e3eac702aa875f8fa5109ef2d8743e63ab6830e47b35ed"
+        }
+      ],
+      "funding_txid": "56c9b44858b0602558ee8c98a641fa08065af709ee1967e244e4ac91dd269d00",
+      "funding_bytes": 983184,
+      "payment_and_verifier_funding_bytes": 13326214,
+      "proof_sha256": "eee9362b8f8897d92f1498c07850d73a4ec8615fff253e429d766f41c3dd9cbe",
+      "proof_file": "alice-to-bob-proof.json",
+      "prior_proofs_from_node": [
+        "alice-to-bob-vin1-from-chain.json",
+        "alice-to-bob-vin2-from-chain.json"
+      ],
+      "prove_seconds": 49.19458933302667,
+      "proof_witness_bytes": 1862,
+      "verifier_material_bytes": 10364342,
+      "public_signals": [
+        "238436286500904566246101413763806861554",
+        "258058327210217852881106875858497263242"
+      ],
+      "parent_proof_digests": [
+        "9cabd806bafc520a9859317148a299283c9baa96e1cf615d16f258141099979b",
+        "0636dd1437f23229c6e3eac702aa875f8fa5109ef2d8743e63ab6830e47b35ed"
+      ],
+      "direct_token_parent_bytes": [
+        2156721,
+        5253011
+      ],
+      "funding_of_direct_parents_bytes": [
+        983111,
+        983111
+      ],
+      "negative": {
+        "new_holder_signatures_with_original_proof_on_changed_recipient": "sendrawtransaction: {'code': -26, 'message': '16: mandatory-script-verify-flag-failed (Script failed an OP_NUMEQUALVERIFY operation)'}"
+      },
+      "transaction_bytes": 12343030,
+      "input_witness_bytes": [
+        10366204,
+        985905,
+        985905
+      ],
+      "input_sats": 47977000,
+      "output_sats": 2000,
+      "fee_sats": 47975000
+    },
+    {
+      "txid": "9435be7736a1256789f0dd7b37bed4ab2eded38cbd3ed14cd6468c4443ed4c6e",
+      "payer": "03421f5fc9a21065445c96fdb91c0c1e2f2431741c72713b4b99ddcb316f31e9fc",
+      "parent_receipts": [
+        {
+          "txid": "74e7b2fecb84d3d0c62490391b13919feb92ef45b9cfbbfb1edda58141907536",
+          "vout": 0,
+          "owner": "03421f5fc9a21065445c96fdb91c0c1e2f2431741c72713b4b99ddcb316f31e9fc",
+          "quantity": 275,
+          "frozen": false,
+          "spend_status": "unspent",
+          "confirmations": 2,
+          "tip": "4716a319da14c68b3f27fca917c6fde0ea41278470c6a249542b09f896bd1084",
+          "tip_height": 113,
+          "block_header": "0000002036d37e2b16e20ccd48cb42c4dae2ece467139bbf951a755b53d210586b2e265184e5605261d04654da98615d69864354c28d991850da9efc889c0c43863bbd1d87c2056bffff7f2003000000",
+          "height": 112,
+          "leaf_count": 2,
+          "index": 1,
+          "merkle_siblings_wire": [
+            "c7580154cee25e7ea48b57e5a22114518ee187872afb88e22c4b3be5d44faa9f"
+          ],
+          "verifier_outpoint_wire": "009d26dd91ace444e26719ee09f75a0608fa41a6988cee582560b05848b4c95600000000",
+          "proof_digest": "b361288ce7ff715aa8fae7161ee318f2c22439d9a55da722ffbc85d2716f568a"
+        },
+        {
+          "txid": "409420541c50fe22a62ac264a934ec8b6f774ac9f0051d7ccddbf00ae1603337",
+          "vout": 1,
+          "owner": "03421f5fc9a21065445c96fdb91c0c1e2f2431741c72713b4b99ddcb316f31e9fc",
+          "quantity": 150,
+          "frozen": false,
+          "spend_status": "unspent",
+          "confirmations": 5,
+          "tip": "4716a319da14c68b3f27fca917c6fde0ea41278470c6a249542b09f896bd1084",
+          "tip_height": 113,
+          "block_header": "0000002076335c4140467f2d44bd85c2bb2c2c7a03aa5f3321b0f96c4cc26727f284aa2c79b09d59d05bfc763385cd8c93f2a6a74dde5279f60fb4621fdb23c26a5a26ba2ec2056bffff7f2000000000",
+          "height": 109,
+          "leaf_count": 2,
+          "index": 1,
+          "merkle_siblings_wire": [
+            "a3766f0bb752fb074c8663c337db337432fb0e78a095c2deb0806b3c6c2e8f36"
+          ],
+          "verifier_outpoint_wire": "11377e2c3acaff4e92846140ca3f4bcff84536dd2a93f3456efdb55003eef9d500000000",
+          "proof_digest": "3a5b8b6ab1491c55e6bf82e18e37837d3393c6bc0b1c0cbad9fa8fed7f734926"
+        }
+      ],
+      "funding_txid": "2633d943d51adb5cb172ae9a47b5d09b06b155bd188e738841ee3d906d058391",
+      "funding_bytes": 983183,
+      "payment_and_verifier_funding_bytes": 26608881,
+      "proof_sha256": "cf289527ac6dce5484481bd340405abf0a26ca072808714e67139dd901e60d5f",
+      "proof_file": "bob-to-carol-proof.json",
+      "prior_proofs_from_node": [
+        "bob-to-carol-vin1-from-chain.json",
+        "bob-to-carol-vin2-from-chain.json"
+      ],
+      "prove_seconds": 48.94681591598783,
+      "proof_witness_bytes": 1862,
+      "verifier_material_bytes": 23647013,
+      "public_signals": [
+        "278565796169846447843456603909807347716",
+        "311374470807284418557880612125195213414"
+      ],
+      "parent_proof_digests": [
+        "b361288ce7ff715aa8fae7161ee318f2c22439d9a55da722ffbc85d2716f568a",
+        "3a5b8b6ab1491c55e6bf82e18e37837d3393c6bc0b1c0cbad9fa8fed7f734926"
+      ],
+      "direct_token_parent_bytes": [
+        12343030,
+        8349301
+      ],
+      "funding_of_direct_parents_bytes": [
+        983184,
+        983111
+      ],
+      "negative": {},
+      "transaction_bytes": 25625698,
+      "input_witness_bytes": [
+        23648875,
+        985903,
+        985904
+      ],
+      "input_sats": 47977000,
+      "output_sats": 2000,
+      "fee_sats": 47975000
+    }
+  ],
+  "carol_receipt": {
+    "txid": "9435be7736a1256789f0dd7b37bed4ab2eded38cbd3ed14cd6468c4443ed4c6e",
+    "vout": 0,
+    "owner": "032fa2104d6b38d11b0230010559879124e42ab8dfeff5ff29dc9cdadd4ecacc3f",
+    "quantity": 350,
+    "frozen": false,
+    "spend_status": "unspent",
+    "confirmations": 2,
+    "tip": "38095e67e4f962464c70b11058d7f4fd4cf25403bd9fd43f3542e125f945e410",
+    "tip_height": 115,
+    "block_header": "000000208410bd96f8092b5449a2c670842741eae0fdc617a9fc273f8bc614da19a31647d3732c1af27f822bbb4e94faca9ddabaf1c476e43e7a7b849dc4aaa92c2161f7c0c2056bffff7f2000000000",
+    "height": 114,
+    "leaf_count": 2,
+    "index": 1,
+    "merkle_siblings_wire": [
+      "85a1cb5117166c526fa560019a3d19a92a33e1782d2f4bbd90d989f436f199ab"
+    ],
+    "verifier_outpoint_wire": "9183056d903dee4188738e18bd55b1069bd0b5479aae72b15cdb1ad543d9332600000000",
+    "proof_digest": "d191d222151f6f6b14f48b3e5ccb1804ea408aae75c05be7cb2972c414fd9a66"
+  },
+  "wallet_negatives": {
+    "wrong_order_amount": "certified output does not match the expected owner and quantity",
+    "change_belongs_to_bob": "certified output does not match the expected owner and quantity",
+    "continuity_receipt_vout": "designated vout is not a certified token output",
+    "bob_output_already_spent": "output is spent, conflicted or unavailable at the wallet node"
+  },
+  "payment_byte_delta": 13282668,
+  "funded_byte_delta": 13282667,
+  "confirmation_timings": {
+    "setup": {
+      "chain_gang_seconds": 0.0002186669735237956,
+      "node_submission_seconds": 0.029836083063855767,
+      "node_mining_and_confirmation_seconds": 0.013003874919377267
+    },
+    "mint-genesis": {
+      "chain_gang_seconds": 0.00012808304745703936,
+      "node_submission_seconds": 0.0044947919668629766,
+      "node_mining_and_confirmation_seconds": 0.007012665970250964
+    },
+    "alice-first-mint-verifier": {
+      "chain_gang_seconds": 0.000738375005312264,
+      "node_submission_seconds": 0.05965716694481671,
+      "node_mining_and_confirmation_seconds": 0.022665833006612957
+    },
+    "alice-first-mint": {
+      "chain_gang_seconds": 0.09198004205245525,
+      "node_submission_seconds": 0.8102057080250233,
+      "node_mining_and_confirmation_seconds": 0.03502224991098046
+    },
+    "alice-second-mint-verifier": {
+      "chain_gang_seconds": 0.0006364160217344761,
+      "node_submission_seconds": 0.036866124952211976,
+      "node_mining_and_confirmation_seconds": 0.02546170901041478
+    },
+    "alice-second-mint": {
+      "chain_gang_seconds": 0.10502587503287941,
+      "node_submission_seconds": 0.9480495000025257,
+      "node_mining_and_confirmation_seconds": 0.07341470895335078
+    },
+    "bob-existing-mint-verifier": {
+      "chain_gang_seconds": 0.0006031659431755543,
+      "node_submission_seconds": 0.036491667036898434,
+      "node_mining_and_confirmation_seconds": 0.02352799999061972
+    },
+    "bob-existing-mint": {
+      "chain_gang_seconds": 0.11271237500477582,
+      "node_submission_seconds": 0.9984136249404401,
+      "node_mining_and_confirmation_seconds": 0.12267391697969288
+    },
+    "wallet-satoshis": {
+      "chain_gang_seconds": 4.783296026289463e-05,
+      "node_submission_seconds": 0.002008749986998737,
+      "node_mining_and_confirmation_seconds": 0.005156666971743107
+    },
+    "alice-to-bob-verifier": {
+      "chain_gang_seconds": 0.0019445419311523438,
+      "node_submission_seconds": 0.04995025007519871,
+      "node_mining_and_confirmation_seconds": 0.02424554096069187
+    },
+    "alice-to-bob": {
+      "chain_gang_seconds": 0.12963720795232803,
+      "node_submission_seconds": 1.1312790419906378,
+      "node_mining_and_confirmation_seconds": 0.15113962499890476
+    },
+    "bob-to-carol-verifier": {
+      "chain_gang_seconds": 0.0014850839506834745,
+      "node_submission_seconds": 0.03736800001934171,
+      "node_mining_and_confirmation_seconds": 0.024957041023299098
+    },
+    "bob-to-carol": {
+      "chain_gang_seconds": 0.18861729209311306,
+      "node_submission_seconds": 1.7029949579155073,
+      "node_mining_and_confirmation_seconds": 0.583599292091094
+    }
+  },
+  "node": "/Bitcoin SV:1.2.3/",
+  "transactions": {
+    "setup": {
+      "txid": "93b674f12b729f7c99ee835f8a7a4427291a05137506a1b97488d6c3e0cd0b53",
+      "blockhash": "29b3b65303d50d14fa1900c9f4f9c2ca19467c1a0e50d161fbfb2dedada13d22",
+      "height": 102,
+      "bytes": 208
+    },
+    "mint-genesis": {
+      "txid": "9cb6e4f79894d4f7140633af51534054495417208a5ef846da3d7391c70b7846",
+      "blockhash": "779835a3ea604cd545ed5b10c0341a8c4f0886ac2b984a20e69415c1f2186723",
+      "height": 103,
+      "bytes": 43550
+    },
+    "alice-first-mint-verifier": {
+      "txid": "0a2753a15af19447f5b975148ec28c813077c2095bd1b4a690c8badcb72617d2",
+      "blockhash": "1c80eacbae9b9dd81f3630c2e1a8a5945af4f4b6e31b2f884069dff6eebdbfdf",
+      "height": 104,
+      "bytes": 983111
+    },
+    "alice-first-mint": {
+      "txid": "40976bd557a6cef0c36a61b128c31dc2ba86fe878a7dfc3258b1a14164e26de8",
+      "blockhash": "0c2167a672ef20549099f908d34ba60a0b0ff79a59a7a2614da7e89ac81540f6",
+      "height": 105,
+      "bytes": 2156721
+    },
+    "alice-second-mint-verifier": {
+      "txid": "490a864095b1c5ab9e6398b9d925217def470cb34a7a75a542463de011b0fc2b",
+      "blockhash": "606cb23189148b32cdc81c42b21587483e09e2d81d8919a29a6dabefd0acb65e",
+      "height": 106,
+      "bytes": 983111
+    },
+    "alice-second-mint": {
+      "txid": "842b30465604dac282aea8cff674274d9401de4ea1d179de137054929bd8f6f0",
+      "blockhash": "2d15b60c6b9eb1057e688ef8d57527105b1011d1b1188bfed42eb3472877c6f9",
+      "height": 107,
+      "bytes": 5253011
+    },
+    "bob-existing-mint-verifier": {
+      "txid": "d5f9ee0350b5fd6e45f3932add3645f8cf4b3fca406184924effca3a2c7e3711",
+      "blockhash": "2caa84f22767c24c6cf9b021335faa037a2c2cbbc285bd442d7f4640415c3376",
+      "height": 108,
+      "bytes": 983111
+    },
+    "bob-existing-mint": {
+      "txid": "409420541c50fe22a62ac264a934ec8b6f774ac9f0051d7ccddbf00ae1603337",
+      "blockhash": "316e20320889cfced1334b645631ac051b5966dc6b8f460e4f8c5fe8818b572a",
+      "height": 109,
+      "bytes": 8349301
+    },
+    "wallet-satoshis": {
+      "txid": "e8d294fd9b70585e37f755f9800dcfe1c0c6f0aef17742c94a788acdfd3229db",
+      "blockhash": "033c12ee59d23799a8a6b947dc3d45d09a40ed50fb31882114851a837c65bd64",
+      "height": 110,
+      "bytes": 139
+    },
+    "alice-to-bob-verifier": {
+      "txid": "56c9b44858b0602558ee8c98a641fa08065af709ee1967e244e4ac91dd269d00",
+      "blockhash": "51262e6b5810d2535b751a95bf9b1367e4ece2dac442cb48cd0ce2162b7ed336",
+      "height": 111,
+      "bytes": 983184
+    },
+    "alice-to-bob": {
+      "txid": "74e7b2fecb84d3d0c62490391b13919feb92ef45b9cfbbfb1edda58141907536",
+      "blockhash": "733a8fe6c5ea108771bbdb286896e29464678d045735518544f45f7a92eb7ade",
+      "height": 112,
+      "bytes": 12343030
+    },
+    "bob-to-carol-verifier": {
+      "txid": "2633d943d51adb5cb172ae9a47b5d09b06b155bd188e738841ee3d906d058391",
+      "blockhash": "4716a319da14c68b3f27fca917c6fde0ea41278470c6a249542b09f896bd1084",
+      "height": 113,
+      "bytes": 983183
+    },
+    "bob-to-carol": {
+      "txid": "9435be7736a1256789f0dd7b37bed4ab2eded38cbd3ed14cd6468c4443ed4c6e",
+      "blockhash": "638c7f81d1e569fe951f386532e5e4199001c3208afebb35364a607cedfcd171",
+      "height": 114,
+      "bytes": 25625698
+    }
+  }
+}

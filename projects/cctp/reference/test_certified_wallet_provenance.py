@@ -1,6 +1,7 @@
 """Exercise wallet creation evidence with a simulated full-node RPC."""
 
 from dataclasses import replace
+from decimal import Decimal
 from importlib.util import find_spec
 import json
 from pathlib import Path
@@ -178,3 +179,54 @@ class CertifiedWalletTests(unittest.TestCase):
         )
         self.assertEqual((result.quantity, result.confirmations, result.spend_status), (384, 7, SpendStatus.UNKNOWN))
         self.assertEqual(result.outpoint, txid + b"\x01\x00\x00\x00")
+
+    def test_spendable_requires_exact_order_and_current_mempool_view(self):
+        tx, vout = self.partial, 1
+        txid = tx.txid_wire()
+        header = bytes(36) + txid + bytes(12)
+        block = BlockInclusion.from_block(header, 14, (txid,), 0)
+        self.node.hashes[14] = block.block_hash()
+        self.node.locations[txid] = BsvTransactionLocation(block.block_hash(), 14)
+        tip = self.node.hashes[20]
+        output = tx.outputs[vout]
+        coin = {"bestblock": tip[::-1].hex(), "confirmations": 7,
+                "scriptPubKey": {"hex": output.script.hex()}, "value": Decimal(output.value).scaleb(-8)}
+        current = coin
+
+        def rpc(method, *args):
+            if method == "getblockheader":
+                self.assertEqual(args, (block.block_hash()[::-1].hex(), False))
+                return header.hex()
+            if method == "gettxout":
+                self.assertEqual(args, (tx.txid(), vout, True))
+                return current
+            return self.node(method, *args)
+
+        wallet = replace(self.wallet, bsv_rpc=rpc)
+        order = {"expected_quantity": 384, "expected_owner": self.owner}
+        payment = wallet.check_spendable(tx, vout, **order)
+        self.assertEqual(payment.inclusion, block)
+        self.assertEqual((payment.tip_height, payment.tip_hash), (20, tip))
+        self.assertEqual(payment.receipt.spend_status, SpendStatus.UNSPENT)
+        self.assertEqual(payment.receipt.outpoint, txid + vout.to_bytes(4, "little"))
+        self.assertEqual(payment, wallet.check_spendable(tx, vout, inclusion=block, **order))
+
+        for changed in ({"expected_quantity": 385}, {"expected_owner": fixture_signer(77)[0]}):
+            with self.subTest(changed=changed), self.assertRaisesRegex(CertifiedWalletError, "expected owner and quantity"):
+                wallet.check_spendable(tx, vout, **(order | changed))
+        with self.assertRaisesRegex(CertifiedWalletError, "frozen"):
+            wallet.check_spendable(self.frozen, 0, expected_quantity=640, expected_owner=self.owner)
+        with self.assertRaisesRegex(CertifiedWalletError, "transaction position"):
+            wallet.check_spendable(tx, vout, inclusion=replace(block, leaf_count=2), **order)
+        for changes, message in (({"value": 1}, "differs from the certified"),
+                                 ({"scriptPubKey": {"hex": ""}}, "differs from the certified"),
+                                 ({"bestblock": "ff" * 32}, "chain snapshot"),
+                                 ({"confirmations": 0}, "chain snapshot")):
+            current = coin | changes
+            with self.subTest(changes=changes), self.assertRaisesRegex(CertifiedWalletError, message):
+                wallet.check_spendable(tx, vout, **order)
+
+        current = None
+        self.assertEqual(wallet.check_creation(tx, vout), payment.creation)
+        with self.assertRaisesRegex(CertifiedWalletError, "spent, conflicted or unavailable"):
+            wallet.check_spendable(tx, vout, **order)

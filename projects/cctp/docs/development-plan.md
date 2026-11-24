@@ -2,7 +2,7 @@
 
 草案 · 2026-11-25
 
-以 [协议规格](bsv-usdc-bridge-spec.md) 和 [实现清单](bsv-usdc-token-checklist.md) 为准。第一条交付路径是独立测试储备到 BSV regtest，再接入跨链测试网。CCTP 用于受支持网络间的原生 USDC 调拨。Circle 合作接口、域注册及生产运营责任以 X01–X04 的确认结果为准。
+每个候选均按[资金恒等、真伪溯源、可扩容](bsv-usdc-bridge-spec.md#三项协议判据)独立验收。v3 用作有真实交易和证明可重放的比较对象，仍需审查电路和 Script 的组合关系、证明参数与钱包信任边界。第一条交付路径是独立测试储备到 BSV regtest，再接入跨链测试网。[实现清单](bsv-usdc-token-checklist.md)另列各阶段状态。CCTP 用于受支持网络间的原生 USDC 调拨。Circle 合作接口、域注册及生产运营责任以 X01–X04 的确认结果为准。
 
 现有 [Groth16 回归](../../groth16/docs/regtest.md) 可作为出证和交易构造基线。[v3 双链记录](../fixtures/v3-certified-cross-chain-regtest-summary.json) 已覆盖 BSV 上的同密钥前序验证和 Anvil 最终释放。验收时区分宿主参考模型、真实电路、BSV Node 和跨链适配器各自验证的关系。
 

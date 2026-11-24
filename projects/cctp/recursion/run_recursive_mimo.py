@@ -36,12 +36,16 @@ def _save(path, fields):
 
 
 class Regtest:
-    def __init__(self, url, cookie):
+    def __init__(self, url, cookie, *, public_authorities=None):
         self.node = Node(url, cookie)
         # Public fixture keys for isolated regtest.
         self.owner_key, self.owner = fixture_signer(11)
-        self.freeze_key, _ = fixture_signer(12)
-        self.minter_key, self.minter = fixture_signer(13)
+        if public_authorities is None:
+            self.freeze_key, _ = fixture_signer(12)
+            self.minter_key, self.minter = fixture_signer(13)
+        else:
+            self.minter_key, self.freeze_key = public_authorities
+            self.minter = None
         owner_hash = new("ripemd160", sha256(self.owner_key).digest()).digest()
         self.address = base58check(b"\x6f" + owner_hash)
         self.evidence = {"node": self.node.call("getnetworkinfo")["subversion"], "transactions": {}}

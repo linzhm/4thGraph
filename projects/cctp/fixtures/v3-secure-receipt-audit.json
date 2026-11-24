@@ -1,0 +1,226 @@
+{
+  "accounting": "Encoded field sizes include Script pushes. Raw history metrics omit pushes. Nested protocol-parent raw bytes are already inside direct parents and must not be added. The coinbase is included as external funding, outside the labeled transaction count.",
+  "labeled_transactions": 13,
+  "archived_transactions": 14,
+  "key_sha256": "f41241f79d5a925f85af3a72387cf89078189c0d67d788eb83a484786fa3cde2",
+  "verifier_lock_hash": "1e6c230e8d61eae4c8db11c85c2c39b9b137e63ac5210986b0b24bdc8723a2d5",
+  "proofs": {
+    "alice-first-mint": {
+      "txid": "40976bd557a6cef0c36a61b128c31dc2ba86fe878a7dfc3258b1a14164e26de8",
+      "verifier_vin": 1,
+      "native_artifact_sha256": "eb34dbbe1f673c10e020362c531936e2242df7dfe6562a76f6c7804207a0ac8e",
+      "public_signals": [
+        "208251831638968944106680179755722119464",
+        "80561945723909683221485747381374392219"
+      ],
+      "digest": "9cabd806bafc520a9859317148a299283c9baa96e1cf615d16f258141099979b",
+      "prior_digests": [],
+      "groth16_encoded_witness_bytes": 1861
+    },
+    "alice-second-mint": {
+      "txid": "842b30465604dac282aea8cff674274d9401de4ea1d179de137054929bd8f6f0",
+      "verifier_vin": 1,
+      "native_artifact_sha256": "76f9e9d52814af168ed1ffba61f12aefe2ab2ac736d81b2d54ea10ac2285d108",
+      "public_signals": [
+        "8260236019470505711306859501054494559",
+        "190936669490661601363638425022319244781"
+      ],
+      "digest": "0636dd1437f23229c6e3eac702aa875f8fa5109ef2d8743e63ab6830e47b35ed",
+      "prior_digests": [
+        "9cabd806bafc520a9859317148a299283c9baa96e1cf615d16f258141099979b"
+      ],
+      "groth16_encoded_witness_bytes": 1862
+    },
+    "bob-existing-mint": {
+      "txid": "409420541c50fe22a62ac264a934ec8b6f774ac9f0051d7ccddbf00ae1603337",
+      "verifier_vin": 1,
+      "native_artifact_sha256": "ccec8b640643c62ce13e616743bc002329b549b41bb27652353560f352e51127",
+      "public_signals": [
+        "77570550477639156170897662209764590461",
+        "68557926238669650038110774595910060326"
+      ],
+      "digest": "3a5b8b6ab1491c55e6bf82e18e37837d3393c6bc0b1c0cbad9fa8fed7f734926",
+      "prior_digests": [
+        "0636dd1437f23229c6e3eac702aa875f8fa5109ef2d8743e63ab6830e47b35ed"
+      ],
+      "groth16_encoded_witness_bytes": 1861
+    },
+    "alice-to-bob": {
+      "txid": "74e7b2fecb84d3d0c62490391b13919feb92ef45b9cfbbfb1edda58141907536",
+      "verifier_vin": 0,
+      "native_artifact_sha256": "eee9362b8f8897d92f1498c07850d73a4ec8615fff253e429d766f41c3dd9cbe",
+      "public_signals": [
+        "238436286500904566246101413763806861554",
+        "258058327210217852881106875858497263242"
+      ],
+      "digest": "b361288ce7ff715aa8fae7161ee318f2c22439d9a55da722ffbc85d2716f568a",
+      "prior_digests": [
+        "9cabd806bafc520a9859317148a299283c9baa96e1cf615d16f258141099979b",
+        "0636dd1437f23229c6e3eac702aa875f8fa5109ef2d8743e63ab6830e47b35ed"
+      ],
+      "groth16_encoded_witness_bytes": 1862
+    },
+    "bob-to-carol": {
+      "txid": "9435be7736a1256789f0dd7b37bed4ab2eded38cbd3ed14cd6468c4443ed4c6e",
+      "verifier_vin": 0,
+      "native_artifact_sha256": "cf289527ac6dce5484481bd340405abf0a26ca072808714e67139dd901e60d5f",
+      "public_signals": [
+        "278565796169846447843456603909807347716",
+        "311374470807284418557880612125195213414"
+      ],
+      "digest": "d191d222151f6f6b14f48b3e5ccb1804ea408aae75c05be7cb2972c414fd9a66",
+      "prior_digests": [
+        "b361288ce7ff715aa8fae7161ee318f2c22439d9a55da722ffbc85d2716f568a",
+        "3a5b8b6ab1491c55e6bf82e18e37837d3393c6bc0b1c0cbad9fa8fed7f734926"
+      ],
+      "groth16_encoded_witness_bytes": 1862
+    }
+  },
+  "payments": {
+    "alice-to-bob": {
+      "txid": "74e7b2fecb84d3d0c62490391b13919feb92ef45b9cfbbfb1edda58141907536",
+      "token_input_outpoints_wire": [
+        "e86de26441a1b15832fc7d8a87fe86bac21dc328b1616ac3f0cea657d56b974001000000",
+        "f0f6d89b92547013de79d1a14ede01944d2774f6cfa8ae82c2da045646302b8401000000"
+      ],
+      "token_input_units": [
+        300,
+        200
+      ],
+      "token_output_units": [
+        275,
+        225
+      ],
+      "input_satoshis": [
+        47975000,
+        1000,
+        1000
+      ],
+      "output_satoshis": [
+        1000,
+        1000,
+        0
+      ],
+      "fee_satoshis": 47975000,
+      "input_script_bytes": [
+        10366204,
+        985905,
+        985905
+      ],
+      "verifier_script_fields_including_pushes": {
+        "groth16_encoded_witness": 1862,
+        "verifier_funding": 983189,
+        "prior_verifier_funding_0": 983116,
+        "prior_verifier_funding_1": 983116,
+        "direct_parent_0": 2156726,
+        "direct_parent_1": 5253016,
+        "ordered_outputs": 4874,
+        "ordered_outpoints": 110,
+        "preimage": 194,
+        "mode": 1
+      },
+      "holder_script_fields_including_pushes": [
+        {
+          "signature": 73,
+          "verifier_funding": 983189,
+          "ordered_outpoints": 110,
+          "preimage": 2532,
+          "ordinary_branch": 1
+        },
+        {
+          "signature": 73,
+          "verifier_funding": 983189,
+          "ordered_outpoints": 110,
+          "preimage": 2532,
+          "ordinary_branch": 1
+        }
+      ],
+      "output_vector_bytes": 4871,
+      "transaction_framing_bytes": 145,
+      "direct_token_parent_raw_bytes": [
+        2156721,
+        5253011
+      ],
+      "direct_token_parent_raw_bytes_total": 7409732,
+      "nested_protocol_parent_raw_bytes_within_direct_total": 2200271,
+      "transaction_bytes": 12343030,
+      "dedicated_verifier_funding_bytes": 983184,
+      "package_bytes": 13326214
+    },
+    "bob-to-carol": {
+      "txid": "9435be7736a1256789f0dd7b37bed4ab2eded38cbd3ed14cd6468c4443ed4c6e",
+      "token_input_outpoints_wire": [
+        "3675904181a5dd1efbbbcfb945ef92eb9f91131b399024c6d0d384cbfeb2e77400000000",
+        "373360e10af0dbcd7c1d05f0c94a776f8bec34a964c22aa622fe501c5420944001000000"
+      ],
+      "token_input_units": [
+        275,
+        150
+      ],
+      "token_output_units": [
+        350,
+        75
+      ],
+      "input_satoshis": [
+        47975000,
+        1000,
+        1000
+      ],
+      "output_satoshis": [
+        1000,
+        1000,
+        0
+      ],
+      "fee_satoshis": 47975000,
+      "input_script_bytes": [
+        23648875,
+        985903,
+        985904
+      ],
+      "verifier_script_fields_including_pushes": {
+        "groth16_encoded_witness": 1862,
+        "verifier_funding": 983188,
+        "prior_verifier_funding_0": 983189,
+        "prior_verifier_funding_1": 983116,
+        "direct_parent_0": 12343035,
+        "direct_parent_1": 8349306,
+        "ordered_outputs": 4874,
+        "ordered_outpoints": 110,
+        "preimage": 194,
+        "mode": 1
+      },
+      "holder_script_fields_including_pushes": [
+        {
+          "signature": 72,
+          "verifier_funding": 983188,
+          "ordered_outpoints": 110,
+          "preimage": 2532,
+          "ordinary_branch": 1
+        },
+        {
+          "signature": 73,
+          "verifier_funding": 983188,
+          "ordered_outpoints": 110,
+          "preimage": 2532,
+          "ordinary_branch": 1
+        }
+      ],
+      "output_vector_bytes": 4871,
+      "transaction_framing_bytes": 145,
+      "direct_token_parent_raw_bytes": [
+        12343030,
+        8349301
+      ],
+      "direct_token_parent_raw_bytes_total": 20692331,
+      "nested_protocol_parent_raw_bytes_within_direct_total": 12662743,
+      "transaction_bytes": 25625698,
+      "dedicated_verifier_funding_bytes": 983183,
+      "package_bytes": 26608881
+    }
+  },
+  "second_minus_first_bytes": {
+    "transaction_bytes": 13282668,
+    "package_bytes": 13282667,
+    "direct_token_parent_raw_bytes_total": 13282599
+  }
+}
