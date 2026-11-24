@@ -8,7 +8,7 @@ from shared.script import asm, number, push
 from shared.transaction import amount, blob, hash256, preimage_forkid
 from statement import fixed, uint
 from statement_receipt import RECEIPT_PREFIX, receipt_output as statement_receipt
-from transfer import shared_guard_lock, verifier_input_script_hash
+from transfer import shared_guard_lock, verifier_input_outpoint_guard, verifier_input_script_hash
 
 
 DOMAIN = b"BSV/CCTP/conservation/v1\x00"
@@ -33,6 +33,25 @@ def state_record(output):
 
 def _prevouts(tx):
     return b"".join(item.outpoint() for item in tx.inputs)
+
+
+def prefunded_companion_lock(approved_outpoints):
+    """Bind the actual vin0 to one of the test policy's pre-confirmed verifiers."""
+    return (
+        asm("OP_DEPTH OP_2 OP_NUMEQUALVERIFY")
+        + verifier_input_outpoint_guard(approved_outpoints, input_count=4, input_index=0)
+        + asm("OP_1")
+    )
+
+
+def prefunded_companion_witness(tx, funding):
+    """Authenticate the current vin1 and ordered prevouts without verifier raw."""
+    if (len(tx.inputs) != 4 or len(funding.outputs) != 1
+            or tx.inputs[1].outpoint() != funding.txid_wire() + bytes(4)):
+        raise ValueError("expected the four-input profile and its actual companion at vin1")
+    previous = funding.outputs[0]
+    preimage = preimage_forkid(tx, 1, previous.value, previous.script, ALL)
+    return push(_prevouts(tx)) + push(preimage)
 
 
 def statement(tx, previous_outputs):

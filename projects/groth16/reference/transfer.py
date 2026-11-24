@@ -109,6 +109,39 @@ def statement_script(issuance_outpoint: bytes, *, compact_preimage=False) -> byt
     )
 
 
+def verifier_input_outpoint_guard(approved_outpoints, *, input_count: int, input_index: int) -> bytes:
+    """Consume ordered prevouts and a ForkID ALL preimage from the current input.
+
+    Require the designated input to spend one of the literal 36-byte outpoints.
+    The caller must establish the locking policy of those outputs when funding them.
+    """
+    if type(input_count) is not int or input_count < 1:
+        raise ValueError("expected a positive input count")
+    if type(input_index) is not int or not 0 <= input_index < input_count:
+        raise ValueError("verifier input index is outside the input layout")
+    approved = tuple(approved_outpoints)
+    if not approved or any(not isinstance(outpoint, bytes) or len(outpoint) != 36 for outpoint in approved):
+        raise ValueError("expected a nonempty allowlist of 36-byte outpoints")
+    if len(set(approved)) != len(approved):
+        raise ValueError("duplicate approved outpoint")
+
+    if len(approved) == 1:
+        membership = push(approved[0]) + asm("OP_EQUALVERIFY")
+    else:
+        membership = asm("OP_0") + b"".join(
+            asm("OP_OVER") + push(outpoint) + asm("OP_EQUAL OP_BOOLOR")
+            for outpoint in sorted(approved)
+        ) + asm("OP_NIP OP_VERIFY")
+
+    skip = number(input_index * 36) + asm("OP_SPLIT OP_NIP") if input_index else b""
+    return (
+        asm("OP_DUP") + authenticate_forkid_preimage()
+        + asm("OP_DROP OP_4 OP_SPLIT OP_NIP 32 OP_SPLIT OP_DROP OP_OVER OP_SIZE")
+        + number(input_count * 36) + asm("OP_NUMEQUALVERIFY OP_HASH256 OP_EQUALVERIFY")
+        + skip + asm("36 OP_SPLIT OP_DROP") + membership
+    )
+
+
 def verifier_input_script_hash(*, input_index: int = 0) -> bytes:
     """Consume parent bytes, serialized prevouts and preimage; leave the verifier hash.
 

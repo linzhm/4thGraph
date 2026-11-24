@@ -59,6 +59,71 @@ class TransferStatementTests(unittest.TestCase):
 
 
 class ScriptStatementTests(unittest.TestCase):
+    def test_funded_verifier_outpoint_at_the_designated_input(self):
+        from shared.chain_gang import validate_at_heights
+        from shared.script import asm, push
+        from shared.transaction import preimage_all
+        from transfer import verifier_input_outpoint_guard
+
+        first, second, other = (
+            replace(example(nonce)[0], outputs=(Output(1_000, asm("OP_1")),) * 2)
+            for nonce in (1, 3, 5)
+        )
+        first_outpoint = Input(first.txid_wire(), 1)
+        second_outpoint = Input(second.txid_wire(), 0)
+        other_outpoint = Input(other.txid_wire(), 0)
+        approved = (first_outpoint.outpoint(), second_outpoint.outpoint())
+        for allowlist in ((approved[0],), approved):
+            guard = verifier_input_outpoint_guard(allowlist, input_count=3, input_index=1)
+            self.assertEqual(guard, verifier_input_outpoint_guard(
+                reversed(allowlist), input_count=3, input_index=1,
+            ))
+            lock = asm("OP_7 OP_TOALTSTACK") + guard + asm(
+                "OP_8 OP_NUMEQUALVERIFY OP_FROMALTSTACK OP_7 OP_NUMEQUAL",
+            )
+            token = replace(example(7)[0], outputs=(Output(1_000, lock),))
+            token_outpoint = Input(token.txid_wire(), 0)
+
+            def validate(inputs, parents, *, disclosed=None, preimage=None):
+                tx = Transaction((token_outpoint, *inputs), (Output(1_000, asm("OP_1")),))
+                if disclosed is None:
+                    disclosed = b"".join(txin.outpoint() for txin in tx.inputs)
+                if preimage is None:
+                    preimage = preimage_all(tx, 0, 1_000, lock)
+                tx = tx.with_script(0, asm("OP_8") + push(disclosed) + push(preimage))
+                validate_at_heights(tx, [token, *parents], spend_height=4, activation_height=3,
+                                    utxo_heights=[3] * len(tx.inputs))
+
+            validate((first_outpoint, other_outpoint), (first, other))
+            if len(allowlist) == 2:
+                validate((second_outpoint, other_outpoint), (second, other))
+            original_inputs = (token_outpoint, first_outpoint, other_outpoint)
+            original_prevouts = b"".join(txin.outpoint() for txin in original_inputs)
+            original = Transaction(original_inputs, (Output(1_000, asm("OP_1")),))
+            original_preimage = preimage_all(original, 0, 1_000, lock)
+            for inputs, parents, kwargs in (
+                ((other_outpoint, first_outpoint), (other, first), {}),
+                ((other_outpoint, first_outpoint), (other, first), {"disclosed": original_prevouts}),
+                ((other_outpoint, first_outpoint), (other, first),
+                 {"disclosed": original_prevouts, "preimage": original_preimage}),
+                ((replace(first_outpoint, vout=0), other_outpoint), (first, other), {}),
+                ((first_outpoint,), (first,), {}),
+            ):
+                with self.subTest(allowlist=len(allowlist), inputs=inputs, kwargs=kwargs):
+                    with self.assertRaisesRegex((RuntimeError, ValueError), "Error evaluating the script"):
+                        validate(inputs, parents, **kwargs)
+
+    def test_outpoint_allowlist_rejects_invalid_configuration(self):
+        from transfer import verifier_input_outpoint_guard
+
+        outpoint = bytes(36)
+        for approved, count, index in (((), 2, 1), ((bytes(35),), 2, 1),
+                                       ((outpoint, outpoint), 2, 1), ((outpoint,), 0, 0),
+                                       ((outpoint,), 2, 2), ((outpoint,), 2, -1)):
+            with self.subTest(approved=approved, count=count, index=index):
+                with self.assertRaises(ValueError):
+                    verifier_input_outpoint_guard(approved, input_count=count, input_index=index)
+
     def test_authenticated_current_input(self):
         from shared.chain_gang import validate_at_heights
         from shared.script import asm, number, push

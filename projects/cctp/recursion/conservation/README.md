@@ -47,6 +47,22 @@ Both four-payment sequences were mined on separate Bitcoin SV 1.2.3 regtest node
 
 The fourth payment alone drops from 1,918,330 to 562,940 bytes. Lossless parent records save 40.3% over four payments and dedicated funding. Each payment still carries one independent conservation proof and requires zero parent-binding proofs. Both sequences used the same fixed regtest sponsor amounts. [Node results and byte accounting](../../fixtures/conservation-repeat-regtest-summary.json)
 
+## Pre-confirmed verifier outpoints
+
+The `--prefunded-verifiers` profile uses the existing raw-parent verifier and the same Groth16 parameters. It confirms the verifier UTXOs before creating the test origins. The companion authenticates the ordered prevouts against its own ForkID ALL preimage and requires the full `txid:vout` at vin0 to match one of those already funded outputs. Each holder input still requires the exact companion at vin1. The verifier at vin0 checks the actual token parents and selects both spent outputs. The proof circuit and verifier locking bytes are identical to the raw-parent baseline.
+
+| Measured bytes | Raw funding in witness | Pre-confirmed outpoint |
+|---|---:|---:|
+| First payment | 482,360 | 28,156 |
+| Second payment | 961,015 | 52,603 |
+| First payment with dedicated funding | 937,316 | 483,108 |
+| Second payment with dedicated funding | 1,415,971 | 507,555 |
+| Both payments with dedicated funding | 2,353,287 | 990,663 |
+
+Bitcoin SV Node 1.2.3 confirmed both spends. The second consumes vout0 and vout1 of the first. Neither payment contains the serialized bytes of any approved verifier funding transaction. The node rejected a fresh proof and holder signatures using the identical verifier lock at an unapproved outpoint. Its per-input check passed vin0, vin2 and vin3 and rejected vin1. The byte totals cover the valid payments and their verifier and companion funding. Setup, disposable origins and funding created for the rejection are recorded separately. [Proofs and node byte accounting](../../fixtures/conservation-prefunded-regtest-summary.json)
+
+Creating the verifier UTXO still costs 454,182 bytes per payment. The second payment still carries the 28,156-byte first payment as authenticated parent material. The fixed list is a test policy. The recursive CCTP path still requires a bounded historical witness and renewable funding authorization.
+
 ## Reproduce
 
 From `projects/cctp/recursion`, compile and generate an independent test setup.
@@ -66,3 +82,5 @@ PYTHONPATH=.:projects/groth16/reference:projects/cctp/reference:projects/cctp/re
   --prover /tmp/cctp-conservation-prover --parameters /tmp/cctp-conservation-params \
   --out /tmp/cctp-conservation-regtest
 ```
+
+Use `--prefunded-verifiers` and a distinct output directory to reproduce the pre-confirmed outpoint experiment.
