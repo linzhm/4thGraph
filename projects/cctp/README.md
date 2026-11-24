@@ -7,6 +7,8 @@ This project specifies a BSV token backed by source-chain USDC. The initial test
 - [Development plan and acceptance milestones](docs/development-plan.md)
 - [Development handoff](docs/handoff.md)
 - [Transfer commitment reference profile](docs/transfer-commitment.md)
+- [Actual transaction relation and acceptance boundary](docs/actual-transaction-relation.md)
+- [Base Sepolia source-chain candidate](docs/base-sepolia-plan.md)
 
 - [Bridge and token protocol specification](docs/bsv-usdc-bridge-spec.md)
 - [Implementation checklist and evidence](docs/bsv-usdc-token-checklist.md)

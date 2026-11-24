@@ -1,0 +1,17 @@
+{
+  "scope": "actual split relation; synthetic origin; no recursive provenance",
+  "node": "/Bitcoin SV:1.2.3/",
+  "constraints": 1598409,
+  "transaction_bytes": 454993,
+  "parent_txid": "c7d917840019f0e6165ce08dac2108bfe638bdfe4115b4866985bc121015b3a9",
+  "split_txid": "c699ccf7922101c385178ecb9306e3b2b1ae402471b29af56e37b72e4566e1f0",
+  "blockhash": "5c1c9f801421c1562ecd3e088ce4c158652c03dd6455cff26e6f5eec626417f0",
+  "reordered_outputs_rejection": "sendrawtransaction: {'code': -26, 'message': '16: mandatory-script-verify-flag-failed (Script evaluated without error but finished with a false/empty top stack element)'}",
+  "public_inputs": [
+    "246863139529726768466007132261443926992",
+    "17634801032828974325086490915376956513"
+  ],
+  "artifact": "actual-split-regtest.json.gz",
+  "artifact_sha256": "cccf55ede37cba6171e44d778b1f331ebc37ddb489ee7815c94bbb51b4f047e4",
+  "test_setup": "Public toxic waste and test-only owner key; synthetic token origin"
+}
