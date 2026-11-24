@@ -20,3 +20,5 @@ PYTHONPATH=.:projects/groth16/reference python -m unittest -v test_bsb22_indepen
 ```
 
 The independent BSV Node 1.2.3 replay accepted and mined the valid proof and rejected a change to one public input. The fixture used a 943,511-byte lock and a 1,864-byte unlocking witness. The isolated node allowed the generated Script size. [Regtest record](../reference/testdata/bsb22-arithmetic-regtest-summary.json) · [Replay command](../examples/run_bsb22_regtest.py)
+
+The [statement receipt verifier](../reference/statement_receipt.py) also composes the base verifier or optional BSB22 adapter with independent vin 1 transaction authentication. It reads two public limbs from a canonical 32-byte digest in the actual vout 1. An application such as CCTP checks that the receipt expresses its own exact transition and binds its token spend to the approved verifier UTXO. The same module validates arithmetic proof fixtures without importing CCTP. [Independent receipt tests](../reference/test_statement_receipt.py) · [CCTP split layout](../../cctp/recursion/freeze/README.md#separate-verifier-on-the-same-plain-parameters)

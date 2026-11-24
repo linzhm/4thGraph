@@ -1,0 +1,109 @@
+{
+  "scope": "Isolated issuer-only proof with separate verifier funding on Bitcoin SV regtest",
+  "asset_id": "3775c281dcdc43c7ed9d0d1a7a903a502cae4c91a25a06437ca97456ff449af1",
+  "token_lock_bytes": 1339,
+  "verifier_lock_bytes": 450739,
+  "verifier_lock_sha256": "e2cc74c9b543551748b349bdb09d9a06fab6bbecd2d6f1398d402721a5516f42",
+  "parameters": {
+    "format": "CCTP freeze test parameters v1",
+    "profile": "plain",
+    "test_only": true,
+    "constraints": 240219,
+    "commitments": 0,
+    "statement_bytes": 330,
+    "circuit_sha256": "f7c83464d67579813e1576ebf96666354688783e345ce33eaed147063fd76bf7",
+    "verifying_key_sha256": "30ac2df56f07e99da0a400e3451f942dece2bd02d6fbcb8154cb680b9269ef30",
+    "proving_key_sha256": "f95aeab39409002ed90ece73f614df2befa2c52657b006b07e40e0225abac1b4"
+  },
+  "proofs": {
+    "freeze": {
+      "prove_process_seconds": 35.32404670806136,
+      "proof_artifact_sha256": "45a3f7f0a38cf2ff18f2b387a4fe36f1dc18d3941cfd630877b9d6cf3d03677c",
+      "public_inputs": [
+        "263702118847763578178831044853715303569",
+        "332936735878007157980517962769304018491"
+      ],
+      "statement_digest": "c6632e42ed58618e1624a3272de5fc91fa79486d896f8c155698cabc212e5e3b",
+      "native_prove_seconds": 1.177602917,
+      "native_verify_seconds": 0.003134166,
+      "changed_pair_value": {
+        "txid": "6b58a374e4a38151b0c284bec246faecf3dd9ee1329b8b73e3ee548e74c981a5",
+        "rejection": "sendrawtransaction: {'code': -26, 'message': '16: mandatory-script-verify-flag-failed (Script failed an OP_NUMEQUALVERIFY operation)'}"
+      },
+      "token_witness_bytes": 453879,
+      "verifier_witness_bytes": 2767,
+      "proof_witness_bytes": 1077,
+      "verifier_funding_bytes": 450803,
+      "fee_satoshis": 1000000,
+      "node_timings": {
+        "chain_gang_seconds": 0.052393625024706125,
+        "node_submission_seconds": 0.39697079197503626,
+        "node_mining_and_confirmation_seconds": 0.021710833068937063
+      },
+      "token_preimage_bytes": 1498,
+      "verifier_preimage_bytes": 192
+    },
+    "unfreeze": {
+      "prove_process_seconds": 51.97869304101914,
+      "proof_artifact_sha256": "e890435a2763fae85710c85ce2926f53f5e19fc3ffd16555217169afe42eb768",
+      "public_inputs": [
+        "38555596761307582483648063275822538959",
+        "46237636998337533180248178566322095832"
+      ],
+      "statement_digest": "1d0189af663def9f9ce8fd5b4fcce0cf22c90b82d8396066317f99bbecee86d8",
+      "native_prove_seconds": 2.367006666,
+      "native_verify_seconds": 0.007720542,
+      "token_witness_bytes": 453879,
+      "verifier_witness_bytes": 2767,
+      "proof_witness_bytes": 1077,
+      "verifier_funding_bytes": 450803,
+      "fee_satoshis": 1000000,
+      "node_timings": {
+        "chain_gang_seconds": 0.08272633398883045,
+        "node_submission_seconds": 0.5669155829818919,
+        "node_mining_and_confirmation_seconds": 0.059462749981321394
+      },
+      "token_preimage_bytes": 1498,
+      "verifier_preimage_bytes": 192
+    }
+  },
+  "node": "/Bitcoin SV:1.2.3/",
+  "transactions": {
+    "setup": {
+      "txid": "647abdc53ee58e61d364bc06585bbbcfe3aa232e21de44910017853bf593a27e",
+      "blockhash": "23f2c7ba8542bbce2194124412673637a413deb7e2ab73632792bda8dd5cc52b",
+      "height": 415,
+      "bytes": 188
+    },
+    "test-origin": {
+      "txid": "a3e54922ebb9d0a24c9c192ed910b56723891f4bbca6d00fd446ed0408e80f28",
+      "blockhash": "5d31510546a59d073333e9402ca87cee1461b7df4c527580220160aa4177d6c1",
+      "height": 416,
+      "bytes": 1401
+    },
+    "verifier-funding-freeze": {
+      "txid": "1784f47446830a86358924b4c7f1283aff291b64635b3c9082ac6be436ac2c7e",
+      "blockhash": "6e699e78c5344d0dc9a37594cf7b9ce570eb3bfbe489bb583118a9423c9e8294",
+      "height": 417,
+      "bytes": 450803
+    },
+    "freeze": {
+      "txid": "c5ca17f4f2825105dbb4c2ddd584e1e1c7e3756d70ccb632e3640f1e80a54edf",
+      "blockhash": "5d0a4dcb70759c33d3c6bb626a9044e54e7fd6e994a58e8ae354884c4f0db0ef",
+      "height": 418,
+      "bytes": 458164
+    },
+    "verifier-funding-unfreeze": {
+      "txid": "489d4a3de28d38b4990574e6d91255916081a2da41924722e323b9362ac26c6c",
+      "blockhash": "261adbac722801bcebd59a2710c491dd11583dae4df9e3c801934ab716f1a9b1",
+      "height": 419,
+      "bytes": 450803
+    },
+    "unfreeze": {
+      "txid": "3069348252000036b95145df38df4c344460dc2cd9099ce29db5e742cb1cd7ba",
+      "blockhash": "28e11b2662e9e9b940459f87a02e9257577a73993e8cbcc3193b830a02125fb6",
+      "height": 420,
+      "bytes": 458164
+    }
+  }
+}
