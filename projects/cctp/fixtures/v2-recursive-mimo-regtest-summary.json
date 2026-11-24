@@ -1,0 +1,101 @@
+{
+  "scope": "Two real v2 split proofs, actual 2\u21922 spend, one layer of recursion, test-only setup",
+  "asset_id": "25da77fdd253c467950a2bdd58606a01e3428020dbbaa7b7157e32e473faaadc",
+  "spends": [
+    {
+      "txid": "42c58d1b33bddebdae451c5a114ccb9886691d1c3044acdf36295c9bb921e0e1",
+      "vout": 0
+    },
+    {
+      "txid": "cd14e7272e46278511e2918e2cfaf938a3a5d6ac1754021bfa6e3fe635b987c0",
+      "vout": 1
+    }
+  ],
+  "input_quantities": [
+    640,
+    324
+  ],
+  "output_quantities": [
+    700,
+    264
+  ],
+  "rejections": {
+    "swapped_funders": "sendrawtransaction: {'code': -26, 'message': '16: mandatory-script-verify-flag-failed (Script failed an OP_EQUALVERIFY operation)'}",
+    "changed_conserving_payout": "sendrawtransaction: {'code': -26, 'message': '16: mandatory-script-verify-flag-failed (Script failed an OP_NUMEQUALVERIFY operation)'}"
+  },
+  "public_signals": [
+    "184306850735684938870422803502354597063",
+    "109045523086664760801896366271068651013"
+  ],
+  "proof_file_sha256": "02f41e72b5d97a2a6ad1f3905afc42193c0ac47cffb8172a4fd6a73cee5d1b21",
+  "node": "/Bitcoin SV:1.2.3/",
+  "transactions": {
+    "setup": {
+      "txid": "425f3233138ffb32de6d6f6f94970fa59f7015c3ff0286256a212d286af181e0",
+      "blockhash": "167bb62fce5582f4e6b2e3e861ed8ffcf7c3fc583c2f2a48f4feb9a952a42d69",
+      "height": 1114,
+      "bytes": 218
+    },
+    "left-verifier": {
+      "txid": "b9bd32368ed789fbfa6b0f4fa4084f1777c9cbbac5647a51bf8dfd7fffcf31d1",
+      "blockhash": "5b71ac05fae3db6be9fdc66ed779ba46ef8fe354ab7ed94c17d08b563fdbe441",
+      "height": 1115,
+      "bytes": 456194
+    },
+    "right-verifier": {
+      "txid": "7586a31d7162de4745686ea7572118156330457d6d84493c9ed75001bba79e75",
+      "blockhash": "1b49cc3c868a126bf1eefd9717908926496a7c4e737cf4d1238ca8ddf4c77c9f",
+      "height": 1116,
+      "bytes": 456194
+    },
+    "child-verifier": {
+      "txid": "7bd2e60cc1d0a03d85288bccfa6e316867e10e5c09a493a44e9ac4b1ed511e40",
+      "blockhash": "25c09653664029868d91511852ced8a293d21376a194a99312fe925135c3807b",
+      "height": 1117,
+      "bytes": 962368
+    },
+    "mint-genesis": {
+      "txid": "886c00c8d798d159387dc3bd541265b147c6b938afc6c482d014d1f49421b314",
+      "blockhash": "5a679565402313916b6061f6de87edb7edd277e63672f9e3d17a58e261a560f3",
+      "height": 1118,
+      "bytes": 41939
+    },
+    "mint-0": {
+      "txid": "4e67722e64fb8404c5dd85906b078876dc9f4df9fa587e7ca20c9a3c29b087f5",
+      "blockhash": "5f530680128b4c1f78906960fbb9cc7e803adc8c8718fb458ef164ff595a3e88",
+      "height": 1119,
+      "bytes": 94364
+    },
+    "split-0": {
+      "txid": "42c58d1b33bddebdae451c5a114ccb9886691d1c3044acdf36295c9bb921e0e1",
+      "blockhash": "436d57ba2ceeaaba33be52e93c7d64ef964b1860d0695416fa005921385d79bb",
+      "height": 1120,
+      "bytes": 560292
+    },
+    "mint-1": {
+      "txid": "5c7e4a12b5fc5bc929d608c244420e09e410770d2c2a70dbef446d3279fbd3b3",
+      "blockhash": "1dfac89213a66a96de2d136da111aa965f064a3f4b335db107b3d3a38c5ce7c5",
+      "height": 1121,
+      "bytes": 94364
+    },
+    "split-1": {
+      "txid": "cd14e7272e46278511e2918e2cfaf938a3a5d6ac1754021bfa6e3fe635b987c0",
+      "blockhash": "31cc04be3d78af1d4ffec3fba298b4bcc7cf12b441354cf9e7ffb42182896817",
+      "height": 1122,
+      "bytes": 560292
+    },
+    "recursive-2to2": {
+      "txid": "9b0209a736abe6a33069bde58c0a4efed3d1fd13830a372206f891e66101303e",
+      "blockhash": "58f4ca173d518c6f1cbf72ae215cb732c5c50a20cd241382473b5096d4c659b5",
+      "height": 1123,
+      "bytes": 3970297
+    }
+  },
+  "evidence": {
+    "archive": "v2-recursive-mimo-regtest.json.gz",
+    "sha256": "0f9a4014a45b6f64dc64f35e945c1705eab317d727f79e84f780489f8d34be54"
+  },
+  "constraints": 4404943,
+  "configured_max_script_bytes": 10000000,
+  "proving_seconds": 25.04
+}

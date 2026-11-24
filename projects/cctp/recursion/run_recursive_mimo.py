@@ -21,6 +21,7 @@ from regtest_mint import Node, RpcFailure, base58check, sign_p2pkh
 from shared.chain_gang import validate_at_heights
 from shared.script import asm
 from shared.transaction import Input, Output, Transaction, hash256
+from snarkjs_adapter import load_artifacts as load_leaf_artifacts
 from statement import AssetDescriptor, Slot
 from test_mimo_verifier import TransferProver
 from test_operational_token import fixture_signer
@@ -140,6 +141,63 @@ def _prepare(node, leaf_prover, key, relation):
     return recursive, asset, policy, tx, child_funding, parents, preceding_funders, fixture_data
 
 
+
+def _save_prepared(out, node, prepared):
+    _, asset, _, tx, verifier, parents, funders, fixture = prepared
+    _save(out / "gnark-input.json", fixture)
+    _save(out / "spend.json", {
+        "asset": {
+            "network": asset.network, "issuance_outpoint": asset.issuance_outpoint.hex(),
+            "decimals": asset.decimals, "reserve_domain": asset.reserve_domain,
+            "reserve_asset": asset.reserve_asset.hex(), "policy_id": asset.policy_id.hex(),
+        },
+        "child": tx.serialize().hex(),
+        "verifier": verifier.serialize().hex(),
+        "parents": [parent.serialize().hex() for parent in parents],
+        "funders": [parent.serialize().hex() for parent in funders],
+        "evidence": node.evidence,
+    })
+
+
+
+def _restore(out, node, key, relation):
+    state = json.loads((out / "spend.json").read_text())
+    fixture = json.loads((out / "gnark-input.json").read_text())
+    descriptor = state["asset"]
+    for name in ("issuance_outpoint", "reserve_asset", "policy_id"):
+        descriptor[name] = bytes.fromhex(descriptor[name])
+    asset = AssetDescriptor(**descriptor)
+    if asset.network != 1 or asset.decimals != USDC_DECIMALS:
+        raise ValueError("checkpoint describes a different network or asset profile")
+
+    def tx(encoded):
+        return Transaction.parse(bytes.fromhex(encoded))
+
+    verifier = tx(state["verifier"])
+    parents = tuple(map(tx, state["parents"]))
+    funders = tuple(map(tx, state["funders"]))
+    references = state["evidence"]["transactions"]
+    for label, transaction in (
+        ("child-verifier", verifier),
+        *((f"split-{i}", parent) for i, parent in enumerate(parents)),
+        *zip(("left-verifier", "right-verifier"), funders, strict=True),
+    ):
+        proof = references[label]
+        block_hash = node.node.call("getblockhash", proof["height"])
+        if (block_hash != proof["blockhash"] or transaction.txid() != proof["txid"]
+                or transaction.txid() not in node.node.call("getblock", block_hash, 1)["tx"]):
+            raise ValueError(f"checkpoint transaction {label} no longer confirmed")
+
+    sample = fixture["parents"][0]
+    leaf_key, _, _ = load_leaf_artifacts(fixture["inner_vk"], sample["proof"], sample["signals"])
+    leaf = SplitLeaf(leaf_key, MimoProfile(1, 2, 2, node.freeze_key))
+    recursive = RecursiveMimo(leaf, key, relation)
+    policy = TokenPolicy((leaf.profile.lock(asset, leaf.key), recursive.lock(asset)), node.freeze_key)
+    node.evidence = state["evidence"]
+    child = tx(state["child"])
+    return recursive, asset, policy, child, verifier, parents, funders, fixture
+
+
 def _verify(node, prepared, artifact_path):
     recursive, asset, policy, tx, verifier, parents, funders, _ = prepared
     key, relation, signals, proof = load_artifact(json.loads(artifact_path.read_text()))
@@ -187,26 +245,34 @@ def main():
     parser.add_argument("--prover", type=Path)
     parser.add_argument("--setup-dir", type=Path)
     parser.add_argument("--out", type=Path, required=True)
+    parser.add_argument("--resume", action="store_true", help="reuse the recorded parent transactions")
     args = parser.parse_args()
     if not (args.node_url and args.cookie) or bool(args.prover) != bool(args.setup_dir):
         parser.error("provide regtest RPC and cookie, with both prover and cache or neither")
     key, relation = load_verifying_key(json.loads(args.vk.read_text()))
-    args.out.mkdir()
+    summary = args.out / "summary.json"
+    if args.resume and summary.exists():
+        parser.error("an acceptance summary has already been written")
     node = Regtest(args.node_url, args.cookie)
-    profile = MimoProfile(1, 2, 2, node.freeze_key)
-    with TemporaryDirectory(prefix="cctp-recursive-regtest-") as directory:
-        leaf_prover = TransferProver(Path(directory) / "leaf", profile)
-        prepared = _prepare(node, leaf_prover, key, relation)
-    fixture = (args.out / "gnark-input.json").resolve()
-    _save(fixture, prepared[-1])
-    if args.prover is None:
-        _save(args.out / "parent-report.json", node.evidence)
-        return
+    if args.resume:
+        prepared = _restore(args.out, node, key, relation)
+    else:
+        args.out.mkdir()
+        profile = MimoProfile(1, 2, 2, node.freeze_key)
+        with TemporaryDirectory(prefix="cctp-recursive-regtest-") as directory:
+            leaf_prover = TransferProver(Path(directory) / "leaf", profile)
+            prepared = _prepare(node, leaf_prover, key, relation)
+        _save_prepared(args.out, node, prepared)
+
     artifact = (args.out / "outer-proof.json").resolve()
-    subprocess.run([str(args.prover.resolve()), "-portable-asset", "-prove",
-                    "-setup-dir", str(args.setup_dir.resolve()), "-artifact", str(artifact), str(fixture)],
-                   check=True)
-    _save(args.out / "summary.json", _verify(node, prepared, artifact))
+    fixture = (args.out / "gnark-input.json").resolve()
+    if not artifact.exists():
+        if args.prover is None:
+            return
+        subprocess.run([str(args.prover.resolve()), "-portable-asset", "-prove",
+                        "-setup-dir", str(args.setup_dir.resolve()), "-artifact", str(artifact), str(fixture)],
+                       check=True)
+    _save(summary, _verify(node, prepared, artifact))
 
 
 if __name__ == "__main__":

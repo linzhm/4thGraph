@@ -45,3 +45,10 @@ PYTHONPATH=.:projects/groth16/reference ../cctp-test-tools/venv/bin/python -m un
 
 - [本地实链联测摘要](../fixtures/v2-cross-chain-regtest-summary.json) 记录 Anvil 入金、独立 BSV 铸造至销毁、Anvil 一次性释放、重读恢复及钱包验收。最终实际及账面储备与 BSV 流通各 384。赎回签发采用已确认交易历史的宿主来源核验。已加入持久化对账组件，需接入长运行服务并实测深重组后的暂停处理。
 - 当前 USDC 约定为固定六位小数，协议以 uint64 最小单位计量。1,024 最小单位的例子为 0.001024 USDC。管理后台最终接入时在输入边界遵守同一严格解析。
+
+
+## 同日续接：真实双父递归及持久化联测
+
+- [真实双父递归 2→2](../fixtures/v2-recursive-mimo-regtest-summary.json) 使用两笔实际锚定铸造后的独立 1→2 作为父交易。外层验证器已在独立 BSV 节点按真实 outpoint 和后继入块。节点拒绝换父验证器材料及重签的错误分配。归档包含原始交易和外层证明。测试参数和单层叶子限制仍适用。
+- [持久化闭环](../fixtures/v2-durable-cross-chain-regtest-summary.json) 已将 SQLite 状态、签发前授权保存和恢复接入本地双链。独立节点验证了冻结与支付竞态；铸造服务阻止同一状态输出的并发签发。
+- 下一步将动态密钥承诺接入统一递归协议，令真实铸造状态成为可追溯基例，并验证递归子交易作为新一层父交易。[公开测试网预检](../evm/public-testnet.md) 已提供部署草稿和签名离线核验。公开 RPC、测试链资金与最终脚本的转发政策仍需验收。管理后台继续留到最后集成。
