@@ -1,7 +1,7 @@
 """Consensus mint covenant and host transaction builder for the CCTP bridge."""
 
 from collections.abc import Callable
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from functools import cached_property
 from hashlib import sha256
 from typing import TYPE_CHECKING
@@ -23,7 +23,10 @@ if TYPE_CHECKING:
 
 STATE_DOMAIN = b"BSV/CCTP/mint-state/v1\0"
 STATE_MARKER = push(STATE_DOMAIN)
+COUNTED_STATE_MARKER = push(b"BSV/CCTP/mint-state/v2\0")
 ROOT_OFFSET = 3 + len(STATE_MARKER) + 1
+CUMULATIVE_MINTED_SIZE = 16
+CUMULATIVE_MINTED_SUFFIX_SIZE = CUMULATIVE_MINTED_SIZE + 2
 P2PKH_PREFIX = asm("OP_DUP OP_HASH160") + b"\x14"
 P2PKH_SUFFIX = asm("OP_EQUALVERIFY OP_CHECKSIG")
 RECORD_PREFIX = asm("OP_0 OP_RETURN") + push(DEPOSIT_DOMAIN)
@@ -131,6 +134,23 @@ def _certified_guard(verifier_hash: bytes) -> bytes:
     )
 
 
+def _increment_cumulative_minted() -> bytes:
+    """Replace the counter in [state TxOut, deposit, net] and retain the net."""
+    width = CUMULATIVE_MINTED_SIZE
+    return (
+        asm(f"OP_ROT OP_SIZE {width + 1} OP_SUB OP_SPLIT {width} OP_SPLIT OP_TOALTSTACK")
+        + _unsigned() + asm(f"OP_2 OP_PICK OP_ADD {width + 1} OP_NUM2BIN {width} OP_SPLIT")
+        + push(b"\0") + asm("OP_EQUALVERIFY OP_CAT OP_FROMALTSTACK OP_CAT OP_ROT OP_ROT")
+    )
+
+
+@dataclass(frozen=True)
+class MintState:
+    root: bytes
+    cumulative_minted: int
+    paused: bool
+
+
 @dataclass(frozen=True)
 class MintPolicy:
     asset: AssetDescriptor
@@ -142,9 +162,12 @@ class MintPolicy:
     pause_authority: bytes | None = None
     certified_verifier_hash: bytes | None = None
     certified_pause: bool = False
+    state_version: int = field(default=1, kw_only=True)
 
     def __post_init__(self):
         self.asset.encode()
+        if type(self.state_version) is not int or self.state_version not in (1, 2):
+            raise ValueError("expected mint state version 1 or 2")
         if self.asset.decimals != USDC_DECIMALS:
             raise ValueError("USDC mint requires six decimal places")
         uint(self.source_chain_id, 8)
@@ -262,7 +285,12 @@ class MintPolicy:
         script += (
             asm("OP_4 OP_PICK OP_DUP") + _slice(GROSS_OFFSET, 8) + _unsigned()
             + asm("OP_OVER") + _slice(FEE_OFFSET, 8) + _unsigned()
-            + asm("OP_SUB OP_DUP OP_0 OP_GREATERTHAN OP_VERIFY 9 OP_NUM2BIN 8 OP_SPLIT OP_DROP OP_SWAP")
+            + asm("OP_SUB OP_DUP OP_0 OP_GREATERTHAN OP_VERIFY")
+        )
+        if self.state_version == 2:
+            script += _increment_cumulative_minted()
+        script += (
+            asm("9 OP_NUM2BIN 8 OP_SPLIT OP_DROP OP_SWAP")
             + _slice(OWNER_OFFSET, 33) + asm(
                 "OP_DUP OP_1 OP_SPLIT OP_DROP OP_BIN2NUM OP_DUP OP_2 OP_NUMEQUAL "
                 "OP_SWAP OP_3 OP_NUMEQUAL OP_BOOLOR OP_VERIFY OP_0"
@@ -299,14 +327,40 @@ class MintPolicy:
             + (_finish_certified_outputs() if self.certified_pause else _finish_outputs())
         )
 
-    def state_lock(self, root: bytes, *, paused: bool = False) -> bytes:
+    @property
+    def state_marker(self) -> bytes:
+        return COUNTED_STATE_MARKER if self.state_version == 2 else STATE_MARKER
+
+    def state_lock(self, root: bytes, *, paused: bool = False, cumulative_minted: int = 0) -> bytes:
         if type(paused) is not bool or (paused and self.pause_authority is None):
             raise ValueError("mint pause requires a configured authority")
         flag = number(int(paused)) if self.pause_authority is not None else b""
-        script = STATE_MARKER + push(fixed(root, 32)) + asm("OP_NIP") + flag + self._covenant
+        total = uint(cumulative_minted, CUMULATIVE_MINTED_SIZE)
+        if self.state_version == 1 and cumulative_minted:
+            raise ValueError("mint state version 1 does not commit cumulative issuance")
+        # Keep the counter after the covenant so existing root and pause offsets
+        # remain stable and the suffix does not change the witness stack.
+        suffix = push(total) + asm("OP_DROP") if self.state_version == 2 else b""
+        script = self.state_marker + push(fixed(root, 32)) + asm("OP_NIP") + flag + self._covenant + suffix
         if len(compact(len(script))) != 3:
             raise ValueError("mint covenant script must use three-byte CompactSize")
         return script
+
+    def parse_state_lock(self, script: bytes) -> MintState:
+        """Decode state only from this policy's exact canonical locking script."""
+        root_offset = ROOT_OFFSET - 3
+        root = script[root_offset:root_offset + 32]
+        if len(root) != 32 or not script.startswith(self.state_marker):
+            raise ValueError("invalid prior mint state lock")
+        if self.state_version == 2:
+            total = int.from_bytes(script[1 - CUMULATIVE_MINTED_SUFFIX_SIZE:-1], "little")
+        else:
+            total = 0
+        if script == self.state_lock(root, cumulative_minted=total):
+            return MintState(root, total, False)
+        if self.pause_authority is not None and script == self.state_lock(root, paused=True, cumulative_minted=total):
+            return MintState(root, total, True)
+        raise ValueError("invalid prior mint state lock")
 
     def check_genesis(self, transaction: Transaction) -> None:
         """Check the sole issuance anchor was consumed at vin 0 by this transaction."""
@@ -349,11 +403,16 @@ def prepare_mint(
     verifier_parent: Transaction | None = None,
 ) -> MintPlan:
     policy.check_deposit(deposit)
-    if not prior.outputs or prior.outputs[0].script != policy.state_lock(events.root):
-        if (policy.pause_authority is not None and prior.outputs
-                and prior.outputs[0].script == policy.state_lock(events.root, paused=True)):
-            raise ValueError("minting is paused")
+    if not prior.outputs:
         raise ValueError("prior mint state and event set disagree")
+    try:
+        state = policy.parse_state_lock(prior.outputs[0].script)
+    except ValueError as error:
+        raise ValueError("prior mint state and event set disagree") from error
+    if state.root != events.root:
+        raise ValueError("prior mint state and event set disagree")
+    if state.paused:
+        raise ValueError("minting is paused")
     state_input = Input(prior.txid_wire(), 0)
     if sponsor.outpoint() == state_input.outpoint():
         raise ValueError("duplicate mint input")
@@ -366,8 +425,9 @@ def prepare_mint(
         if verifier_parent is not None:
             _check_verifier_parent(policy, sponsor, verifier_parent)
     successor, path = events.add(deposit.position.event_id())
+    total = state.cumulative_minted + deposit.net_quantity if policy.state_version == 2 else 0
     outputs = (
-        Output(prior.outputs[0].value, policy.state_lock(successor.root)),
+        Output(prior.outputs[0].value, policy.state_lock(successor.root, cumulative_minted=total)),
         policy.token_output(deposit.net_quantity, deposit.owner),
         _record(deposit),
     )
@@ -466,12 +526,20 @@ def prepare_pause(
 ) -> Transaction:
     if policy.pause_authority is None or type(paused) is not bool:
         raise ValueError("mint pause requires a configured authority and explicit status")
-    if not prior.outputs or prior.outputs[0].script != policy.state_lock(events.root, paused=not paused):
+    if not prior.outputs:
+        raise ValueError("pause transition must toggle the actual anchored state")
+    try:
+        state = policy.parse_state_lock(prior.outputs[0].script)
+    except ValueError as error:
+        raise ValueError("pause transition must toggle the actual anchored state") from error
+    if state.root != events.root or state.paused == paused:
         raise ValueError("pause transition must toggle the actual anchored state")
     state_input = Input(prior.txid_wire(), 0)
     if sponsor.outpoint() == state_input.outpoint():
         raise ValueError("duplicate mint input")
-    outputs = (Output(prior.outputs[0].value, policy.state_lock(events.root, paused=paused)),)
+    outputs = (Output(prior.outputs[0].value, policy.state_lock(
+        events.root, paused=paused, cumulative_minted=state.cumulative_minted,
+    )),)
     if policy.certified_pause:
         from projects.cctp.recursion.continuity_statement import ParentReceipt
 
@@ -517,6 +585,7 @@ class RecoveredMintState:
     transaction: Transaction
     events: MintEvents
     paused: bool
+    cumulative_minted: int | None = None
 
 
 def recover_mint_state(
@@ -552,7 +621,8 @@ def recover_mint_state(
         if replay != expected:
             raise ValueError("mint history does not extend the anchored state")
         prior = transaction
-    return RecoveredMintState(prior, events, paused)
+    total = policy.parse_state_lock(prior.outputs[0].script).cumulative_minted if policy.state_version == 2 else None
+    return RecoveredMintState(prior, events, paused, total)
 
 
 def recover_events(policy: MintPolicy, genesis: Transaction, confirmed_mints: tuple[Transaction, ...]) -> MintEvents:

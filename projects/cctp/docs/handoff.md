@@ -106,3 +106,4 @@ PYTHONPATH=.:projects/groth16/reference ../cctp-test-tools/venv/bin/python -m un
 - [四笔 2→2 字典对照](../fixtures/conservation-repeat-regtest-summary.json) 使用现有协同输入取得字典，恢复完整父交易后按实际 txid 和 vout 验证。四笔各自入块，含两笔专用资金交易的合计从 6,621,204 字节降到 3,954,892 字节。每笔用一份独立守恒证明，父层由 Script 认证。未被替换的历史字节仍逐代增加。此路径作为体积对照留存。
 - 主验收改为历史增量零字节，允许新增父绑定证明。新试验锚可使用 [Chronicle 专用路径](parent-binding.md#chronicle-新锁的预像和父哈希)。每个实际 Token 输入槽验证所选父输出和前序 B2G 声明。首轮从真实铸造接两笔同形状普通转账。 [铸造基例](mint.md#铸造如何进入连续性证明)
 - [私有 SHA-256 分段](../recursion/parentbinding/README.md#隐藏段数据) 已对两个相邻测试分段完成原生出证。完整父证明还须聚合分段、认证字段位置和真实 TxOut，并接入独立 BSV Node 的两次连续普通转账。
+- 新增 [v2 累计铸造状态](../fixtures/v2-counted-mint-regtest-summary.json)。独立节点确认 genesis、铸造、暂停、恢复和第二次铸造，累计为 `0 → 1,017 → 1,017 → 1,017 → 1,400`。状态锁固定增加 47 字节，旧版保持原编码。

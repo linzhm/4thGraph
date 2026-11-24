@@ -40,4 +40,4 @@ Genesis   = (asset, policyVersion, EMPTY_ROOT, 0, false)
 
 同一测试发行锚确认两笔认证铸造，验证第二笔实际消费第一笔的状态。两个 minted vout 用于第一笔 `2→2`，其两个 Token 后继用于第二笔 `2→2`。每槽独立认证实际 vout，链上见证不引入共父分组。两笔普通转账须各自入块，取真实序列化及全部专用资金记录。固定形状历史增量为零，同时记录定长槽位、签名编码、证明次数、出证耗时和峰值内存。另测重复使用入金、伪造累计量、错误发行锚和策略、错父 vout、复制回执、替换实际验证器及现有冻结规则。
 
-现有 v3 已验证过串行认证铸造，现有 SHA-256 叶也已完成原生出证。这两个结果支撑新关系的构建。累计字段、完整父绑定聚合以及两笔定长转账的入块仍需实测。 [v3 节点记录](../fixtures/v3-continuity-regtest-summary.json) · [定长验收状态](parent-binding.md#固定见证的验收)
+现有 v3 已验证过串行认证铸造。原生 v2 计数锁也已在独立节点走完两笔铸造与中间的暂停和恢复，节点拒绝篡改累计量。SHA-256 字段叶已完成原生出证并拒绝把真实哈希状态和另一笔交易的输出字段拼接。完整父绑定聚合和两笔定长转账的入块仍需实测。 [v3 节点记录](../fixtures/v3-continuity-regtest-summary.json) · [v2 计数节点记录](../fixtures/v2-counted-mint-regtest-summary.json) · [字段叶实测](../recursion/parentbinding/README.md#从分段打开固定位置的字段)

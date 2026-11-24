@@ -9,7 +9,7 @@ the mint spent the checked genesis covenant and satisfied its mint branch.
 from dataclasses import replace
 
 from mimo_verifier import _compact_size, _match_prefix, _parse_active_token, _split, _take_output_script, _unsigned
-from mint import MintPolicy, RECORD_PREFIX, ROOT_OFFSET, read_deposit, recover_mint_state
+from mint import CUMULATIVE_MINTED_SIZE, MintPolicy, RECORD_PREFIX, ROOT_OFFSET, read_deposit, recover_mint_state
 from mint_events import DEPOSIT_SIZE, EMPTY_ROOT
 from operational_token import TokenPolicy
 from shared.script import asm, number, push
@@ -164,7 +164,7 @@ def runtime_mint_state_script(mint_template: MintPolicy, freeze_key: bytes, *, g
     The caller authenticates the txid and selected vout zero. Genesis mode
     proves issuance directly from the asset anchor and empty, active state.
     The continuing mode authenticates the exact state script template, with
-    its event root and pause flag carried by the confirmed transaction. Its
+    its event root, pause flag and any cumulative total from that transaction. Its
     caller must separately establish prior state provenance.
     """
     if type(genesis_only) is not bool:
@@ -188,6 +188,11 @@ def runtime_mint_state_script(mint_template: MintPolicy, freeze_key: bytes, *, g
             check_pause = (asm("OP_DUP") + push(asm("OP_0")) + asm("OP_EQUAL OP_SWAP")
                            + push(asm("OP_1")) + asm("OP_EQUAL OP_BOOLOR OP_VERIFY"))
             fields.append((pause_offset, asm("OP_0"), check_pause))
+        if mint_template.state_version == 2:
+            # Normalize only the counter payload. Its push opcode and final DROP
+            # still participate in the complete state-template hash.
+            fields.append((len(template) - CUMULATIVE_MINTED_SIZE - 1,
+                           bytes(CUMULATIVE_MINTED_SIZE), asm("OP_DROP")))
 
     code = (asm("OP_SIZE 32 OP_NUMEQUALVERIFY OP_TOALTSTACK")
             + _state_output(mint_template, genesis_only=genesis_only)

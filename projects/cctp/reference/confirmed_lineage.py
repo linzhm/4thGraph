@@ -6,7 +6,7 @@ from functools import cached_property
 
 from burn_receipt import BurnReceipt, read_burn
 from mimo_verifier import MimoProfile
-from mint import MintPolicy, STATE_MARKER, recover_mint_state
+from mint import MintPolicy, recover_mint_state
 from operational_token import FORKID_ALL, FORKID_SINGLE, TokenPolicy
 from shared.script import asm, push
 from shared.transaction import Input, Output, Transaction, preimage_forkid
@@ -135,7 +135,7 @@ class _Walk:
         state = parent
         while True:
             if (state.txid_wire() in visited or not state.inputs or not state.outputs
-                    or not state.outputs[0].script.startswith(STATE_MARKER)):
+                    or not state.outputs[0].script.startswith(self.mint_policy.state_marker)):
                 raise ValueError("mint lineage does not reach the issuance anchor")
             visited.add(state.txid_wire())
             previous = state.inputs[0]
@@ -204,7 +204,7 @@ class _Walk:
             if not tx.inputs or len({item.outpoint() for item in tx.inputs}) != len(tx.inputs):
                 raise ValueError("invalid or repeated lineage input")
             parent, first = self.prevout(tx.inputs[0])
-            if first.script.startswith(STATE_MARKER):
+            if first.script.startswith(self.mint_policy.state_marker):
                 op = self._mint(tx, parent)
             elif first.script in self.lineage._profile_locks:
                 op = self._regular(tx, parent, self.lineage._profile_locks[first.script])

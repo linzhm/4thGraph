@@ -222,8 +222,43 @@ class MintTests(unittest.TestCase):
         self.assertFalse(restored.paused)
         self.assertEqual(restored.events, first.successor)
 
+    def test_counted_mint_state_checks_the_full_uint128_range(self):
+        policy = replace(self.policy, state_version=2)
+        sponsor = Input(self.sponsor.txid_wire(), 0)
+        deposit = replace(self.first, gross_quantity=9, fee_quantity=8)
+        events = MintEvents()
+
+        def state_output(total):
+            return Output(1500, policy.state_lock(EMPTY_ROOT, cumulative_minted=total))
+
+        # Synthetic previous outputs isolate arithmetic. Genesis separately requires zero.
+        for old_total in ((1 << 127) - 1, (1 << 128) - 2):
+            with self.subTest(old_total=old_total):
+                prior = replace(self.genesis, outputs=(state_output(old_total),))
+                plan = prepare_mint(policy, prior, events, deposit, sponsor)
+                signed = authorize_mint(plan, lambda _: deposit, sign)
+                self.assertEqual(run_script(signed, prior), ([b"\x01"], []))
+                self.assertEqual(policy.parse_state_lock(signed.outputs[0].script).cumulative_minted, old_total + 1)
+                with self.assertRaisesRegex(ValueError, "anchored empty mint state"):
+                    policy.check_genesis(prior)
+
+        overflow = replace(self.genesis, outputs=(state_output((1 << 128) - 1),))
+        with self.assertRaisesRegex(ValueError, "uint128"):
+            prepare_mint(policy, overflow, events, deposit, sponsor)
+        attempted_wrap = replace(plan.transaction, inputs=(Input(overflow.txid_wire(), 0), sponsor),
+                                 outputs=(Output(1500, policy.state_lock(plan.successor.root)), *plan.transaction.outputs[1:]))
+        with self.assertRaises(ScriptError):
+            run_script(force_sign(replace(plan, prior=overflow), transaction=attempted_wrap), overflow)
+
     @unittest.skipUnless(os.environ.get("CCTP_MINT_REGTEST_COOKIE"), "requires independent BSV regtest")
     def test_independent_node_mints_and_rejects_replay(self):
+        self._independent_node_mints(state_version=1)
+
+    @unittest.skipUnless(os.environ.get("CCTP_MINT_REGTEST_COOKIE"), "requires independent BSV regtest")
+    def test_independent_node_enforces_cumulative_minting(self):
+        self._independent_node_mints(state_version=2)
+
+    def _independent_node_mints(self, *, state_version):
         node = Node(os.environ.get("CCTP_MINT_REGTEST_URL", "http://127.0.0.1:19444"),
                     Path(os.environ["CCTP_MINT_REGTEST_COOKIE"]))
         owner_hash = new("ripemd160", sha256(public(OWNER)).digest()).digest()
@@ -233,10 +268,13 @@ class MintTests(unittest.TestCase):
         funded = sign_p2pkh(funded, coinbase, 0, OWNER)
         node.confirm(funded, address)
         anchor = Input(funded.txid_wire(), 0)
-        policy = replace(setup_policy(anchor), pause_authority=public(OTHER))
+        policy = replace(setup_policy(anchor), pause_authority=public(OTHER), state_version=state_version)
         genesis = Transaction((anchor,), (Output(100_000, policy.state_lock(EMPTY_ROOT)),))
         node.confirm(genesis, address)
         first_event, second_event = event(policy, 1, 1024), event(policy, 2, 384, OTHER)
+        if state_version == 2:
+            first_event = replace(first_event, fee_quantity=7)
+            second_event = replace(second_event, fee_quantity=1)
         first = prepare_mint(policy, genesis, MintEvents(), first_event, Input(funded.txid_wire(), 1))
         competitor = prepare_mint(policy, genesis, MintEvents(), first_event, Input(funded.txid_wire(), 2))
         first_tx = authorize_mint(first, lambda _: first_event, sign)
@@ -267,9 +305,25 @@ class MintTests(unittest.TestCase):
         history = (first_tx, paused, resumed)
         restarted = recover_mint_state(policy, genesis, history)
         second = prepare_mint(policy, restarted.transaction, restarted.events, second_event, sponsor)
+        if state_version == 2:
+            self.assertEqual(restarted.cumulative_minted, first_event.net_quantity)
+            for state_tx in (first_tx, paused, resumed):
+                self.assertEqual(policy.parse_state_lock(state_tx.outputs[0].script).cumulative_minted,
+                                 first_event.net_quantity)
+            gross = first_event.net_quantity + second_event.gross_quantity
+            wrong_state = replace(second.transaction.outputs[0], script=policy.state_lock(
+                second.successor.root, cumulative_minted=gross,
+            ))
+            bad_total = replace(second.transaction, outputs=(wrong_state, *second.transaction.outputs[1:]))
+            with self.assertRaises(RpcFailure) as wrong_total:
+                node.submit(force_sign(second, transaction=bad_total))
+            self.assertIn("mandatory-script-verify-flag-failed", str(wrong_total.exception))
         second_tx = authorize_mint(second, lambda _: second_event, sign)
         node.confirm(second_tx, address)
-        self.assertEqual(recover_events(policy, genesis, (*history, second_tx)), second.successor)
+        recovered = recover_mint_state(policy, genesis, (*history, second_tx))
+        self.assertEqual(recovered.events, second.successor)
+        if state_version == 2:
+            self.assertEqual(recovered.cumulative_minted, first_event.net_quantity + second_event.net_quantity)
 
         if os.environ.get("CCTP_MINT_REPORT"):
             import json
@@ -277,6 +331,7 @@ class MintTests(unittest.TestCase):
             second_block = node.call("getrawtransaction", second_tx.txid(), True)["blockhash"]
             report = {
                 "node": node.call("getnetworkinfo")["subversion"],
+                "mint_state_version": state_version,
                 "genesis_txid": genesis.txid(),
                 "first": {"txid": first_tx.txid(), "block": first_block, "quantity": first_event.net_quantity},
                 "second": {"txid": second_tx.txid(), "block": second_block, "quantity": second_event.net_quantity},
@@ -288,6 +343,15 @@ class MintTests(unittest.TestCase):
                 "first_mint_bytes": len(first_tx.serialize()),
                 "state_lock_bytes": len(genesis.outputs[0].script),
             }
+            if state_version == 2:
+                report.update({
+                    "cumulative_minted_by_stage": [
+                        policy.parse_state_lock(tx.outputs[0].script).cumulative_minted
+                        for tx in (genesis, first_tx, paused, resumed, second_tx)
+                    ],
+                    "wrong_cumulative_minted": str(wrong_total.exception),
+                    "second_mint_bytes": len(second_tx.serialize()),
+                })
             Path(os.environ["CCTP_MINT_REPORT"]).write_text(json.dumps(report, indent=2) + "\n")
 
 

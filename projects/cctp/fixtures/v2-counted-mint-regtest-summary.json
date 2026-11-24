@@ -1,0 +1,86 @@
+{
+  "node": "/Bitcoin SV:1.2.3/",
+  "mint_state_version": 2,
+  "genesis_txid": "2a46e4323fc01ef2d5c57bf57559b37599abece9ec29b1b9f1e145e203b5c913",
+  "first": {
+    "txid": "c337526e88ffc4f26662bc4f678b07fdeeb9c17a18fcc875f658bd2b65b601bd",
+    "block": "6b14ba481d1bbd69bc35f1ceb9efdc253c67f6bffb12ae7415d58d3b5310d8cc",
+    "quantity": 1017
+  },
+  "second": {
+    "txid": "8994bf7fa783d14f28e24828847243b26cb880a8cdc3a6ff7fab7fa2cf8e3f28",
+    "block": "605b6399ad049e65d60c540a3fc9b08db8809689dcdbfd13d184d9e802d3cd3f",
+    "quantity": 383
+  },
+  "pause_txid": "298570e5823c17df265091069da4ebfb643166bf8119f9a7173fecec9cf4d542",
+  "resume_txid": "c52adadcf12457d81b679723194a96e2f2a724cd9cf1be6f8930a33ee0f6412f",
+  "mint_while_paused": "sendrawtransaction: {'code': -26, 'message': '16: mandatory-script-verify-flag-failed (Script failed an OP_VERIFY operation)'}",
+  "competing_mint": "sendrawtransaction: {'code': -26, 'message': '258: txn-mempool-conflict'}",
+  "resigned_replay": "sendrawtransaction: {'code': -26, 'message': '16: mandatory-script-verify-flag-failed (Script failed an OP_EQUALVERIFY operation)'}",
+  "first_mint_bytes": 93866,
+  "state_lock_bytes": 41995,
+  "cumulative_minted_by_stage": [
+    0,
+    1017,
+    1017,
+    1017,
+    1400
+  ],
+  "wrong_cumulative_minted": "sendrawtransaction: {'code': -26, 'message': '16: mandatory-script-verify-flag-failed (Script failed an OP_EQUALVERIFY operation)'}",
+  "second_mint_bytes": 93866,
+  "scope": "Native v2 mint-state covenant with two locally attested deposits, pause/resume and fresh signatures on invalid transitions",
+  "fixed_state_lock_increase_bytes": 47,
+  "transactions": {
+    "genesis": {
+      "txid": "2a46e4323fc01ef2d5c57bf57559b37599abece9ec29b1b9f1e145e203b5c913",
+      "height": 957,
+      "blockhash": "768202d1d4f375f70ba08852e73b1d292fc76660c82b33fdf359fa7c26dc95ca",
+      "bytes": 42057,
+      "cumulative_minted": 0,
+      "paused": false,
+      "event_root": "3b4cff190dfd403bbaa31a16e846f7cbd676cc4d94de3f6ae4a7eddc82307ff0"
+    },
+    "first": {
+      "txid": "c337526e88ffc4f26662bc4f678b07fdeeb9c17a18fcc875f658bd2b65b601bd",
+      "height": 958,
+      "blockhash": "6b14ba481d1bbd69bc35f1ceb9efdc253c67f6bffb12ae7415d58d3b5310d8cc",
+      "bytes": 93866,
+      "cumulative_minted": 1017,
+      "paused": false,
+      "event_root": "7afdf29ac6ae5d0b5e5f69fb853a372fcf8ddbe2f2a05ff815a3784658e16eac",
+      "gross_minted": 1024,
+      "fee": 7,
+      "net_minted": 1017
+    },
+    "pause": {
+      "txid": "298570e5823c17df265091069da4ebfb643166bf8119f9a7173fecec9cf4d542",
+      "height": 959,
+      "blockhash": "703f6215f7329141f2640356e95b1fc4d43ca5b19b0805bbb595d9a2582742a4",
+      "bytes": 84407,
+      "cumulative_minted": 1017,
+      "paused": true,
+      "event_root": "7afdf29ac6ae5d0b5e5f69fb853a372fcf8ddbe2f2a05ff815a3784658e16eac"
+    },
+    "resume": {
+      "txid": "c52adadcf12457d81b679723194a96e2f2a724cd9cf1be6f8930a33ee0f6412f",
+      "height": 960,
+      "blockhash": "044f07d968b51b2e7963a9dbf5d916d11d0e63ea855dce1f1577b0d403e163b0",
+      "bytes": 84406,
+      "cumulative_minted": 1017,
+      "paused": false,
+      "event_root": "7afdf29ac6ae5d0b5e5f69fb853a372fcf8ddbe2f2a05ff815a3784658e16eac"
+    },
+    "second": {
+      "txid": "8994bf7fa783d14f28e24828847243b26cb880a8cdc3a6ff7fab7fa2cf8e3f28",
+      "height": 961,
+      "blockhash": "605b6399ad049e65d60c540a3fc9b08db8809689dcdbfd13d184d9e802d3cd3f",
+      "bytes": 93866,
+      "cumulative_minted": 1400,
+      "paused": false,
+      "event_root": "acca072ef9bb409d15412c7865003c8dbf24dfe194ad9bcb2f0a69fedab3fab9",
+      "gross_minted": 384,
+      "fee": 1,
+      "net_minted": 383
+    }
+  }
+}

@@ -75,11 +75,12 @@ class NativeProver:
         return artifact, key, commitment, signals, proof
 
 
-def _prepare(node, key_artifact):
+def _prepare(node, key_artifact, *, mint_state_version):
     setup = node.setup()
     anchor = Input(setup.txid_wire(), 3)
     asset = AssetDescriptor(1, anchor.outpoint(), USDC_DECIMALS, 7, b"r" * 32, b"p" * 32)
-    mint_template = MintPolicy(asset, 84532, b"r" * 20, node.minter_key, lambda _: b"")
+    mint_template = MintPolicy(asset, 84532, b"r" * 20, node.minter_key, lambda _: b"",
+                               state_version=mint_state_version)
     key, commitment = load_verifying_key(key_artifact)
     verifier = ContinuityVerifier(mint_template, node.freeze_key, key, commitment,
                                   bytes.fromhex(key_artifact["continuity_key_digest"]), certified_mints=True)
@@ -182,8 +183,8 @@ def _include(node, verifier, prover, label, funding, origins, quantities):
     return _checkpoint(node, prover, label, signed, funding, artifact, public, receipt, quantities, spent, rejected)
 
 
-def run(node, prover, key_artifact):
-    verifier, funders, genesis = _prepare(node, key_artifact)
+def run(node, prover, key_artifact, *, mint_state_version=1):
+    verifier, funders, genesis = _prepare(node, key_artifact, mint_state_version=mint_state_version)
     first, first_proof, first_check, events = _mint(
         node, verifier, prover, "certified-first-mint", genesis, MintEvents(), funders[0], parse_usdc("0.001024"),
     )
@@ -191,6 +192,12 @@ def run(node, prover, key_artifact):
         node, verifier, prover, "certified-next-mint", first, events, funders[1], parse_usdc("0.000384"),
         predecessor=(funders[0], first_proof),
     )
+    if mint_state_version == 2:
+        policy = verifier.mint_policy
+        totals = tuple(policy.parse_state_lock(tx.outputs[0].script).cumulative_minted for tx in (genesis, first, second))
+        if totals != (0, parse_usdc("0.001024"), parse_usdc("0.001408")):
+            raise AssertionError("confirmed mint states do not carry the expected cumulative issuance")
+        first_check["cumulative_minted"], second_check["cumulative_minted"] = totals[1:]
     third, third_proof, third_check = _include(
         node, verifier, prover, "two-continuity-parents", funders[2],
         ((first, 1, funders[0], first_proof), (second, 1, funders[1], second_proof)), (640, 768),
@@ -200,6 +207,7 @@ def run(node, prover, key_artifact):
     )
     return {
         "scope": "Two certified mints using test attestations and two MIMO hops under the same BSB22 key on BSV regtest.",
+        "mint_state_version": mint_state_version,
         "asset_id": verifier.asset.asset_id().hex(),
         "continuity_key_digest": verifier.key_digest.hex(),
         "proof_checks": {
@@ -217,6 +225,7 @@ def main():
     parser.add_argument("--prover", type=Path, required=True)
     parser.add_argument("--setup-dir", type=Path, required=True)
     parser.add_argument("--out", type=Path, required=True)
+    parser.add_argument("--mint-state-version", type=int, choices=(1, 2), default=1)
     args = parser.parse_args()
     if not (args.node_url and args.cookie):
         parser.error("independent BSV regtest RPC and cookie are required")
@@ -224,7 +233,7 @@ def main():
     args.out.mkdir()
     node = Regtest(args.node_url, args.cookie)
     with NativeProver(args.prover, args.setup_dir, args.out, key_artifact["continuity_key_digest"]) as prover:
-        _save(args.out / "summary.json", run(node, prover, key_artifact))
+        _save(args.out / "summary.json", run(node, prover, key_artifact, mint_state_version=args.mint_state_version))
 
 
 if __name__ == "__main__":

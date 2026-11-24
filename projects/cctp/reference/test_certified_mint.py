@@ -163,6 +163,38 @@ class CertifiedMintTests(unittest.TestCase):
         self.check_inputs(resumed, (paused, self.coin_parent))
         self.check_inputs(mint, (resumed, self.verifier_parent))
 
+    def test_counted_certified_pause_preserves_nonzero_cumulative_issuance(self):
+        lock = asm("OP_DEPTH OP_IF OP_DROP OP_ENDIF OP_1")
+        tokens = TokenPolicy((lock,), self.freeze)
+        policy = replace(self.policy, lock_token=tokens.lock, certified_verifier_hash=tokens.verifier_hashes()[0],
+                         pause_authority=self.freeze, certified_pause=True, state_version=2)
+        genesis = self.genesis_for(policy)
+        funders = tuple(self.fund_verifier(index, lock) for index in (1, 2, 3))
+        plan = self.plan_for(policy, genesis, MintEvents(), funders[0], self.deposit, self.receipt)
+        minted = self.authorize(plan)
+        self.check_inputs(minted, (genesis, funders[0]))
+
+        admin = lambda digest: legacy_fixture.sign(digest, legacy_fixture.OTHER)
+        receipt = ParentReceipt((b"p" * 32,))
+        paused = authorize_pause(policy, minted, plan.successor, self.input_at(funders[1]), admin, paused=True,
+                                 receipt=receipt, verifier_parent=funders[1])
+        resumed = authorize_pause(policy, paused, plan.successor, self.input_at(funders[2]), admin, paused=False,
+                                  receipt=receipt, verifier_parent=funders[2])
+        self.check_inputs(paused, (minted, funders[1]))
+        self.check_inputs(resumed, (paused, funders[2]))
+        self.assertEqual(resumed.outputs[0], minted.outputs[0])
+        self.assertEqual(recover_mint_state(policy, genesis, (minted, paused, resumed)).cumulative_minted, 1024)
+
+        reset_output = replace(paused.outputs[0], script=policy.state_lock(plan.successor.root, paused=True))
+        reset = replace(paused, outputs=(reset_output, paused.outputs[1]))
+        previous = minted.outputs[0]
+        preimage = preimage_all(reset, 0, previous.value, previous.script)
+        fields = (funders[1].serialize(), admin(hash256(preimage)) + b"\x41", b"", b"",
+                  b"".join(item.outpoint() for item in reset.inputs), receipt.output().serialize(), preimage)
+        reset = reset.with_script(0, b"".join(map(push, fields)) + asm("OP_1"))
+        with self.assertRaises(ScriptError):
+            legacy_fixture.run_script(reset, minted)
+
     def test_certified_pause_preserves_root_and_rebuilds_mint_history(self):
         lock = asm("OP_DEPTH OP_IF OP_DROP OP_ENDIF OP_1")
         tokens = TokenPolicy((lock,), self.freeze)

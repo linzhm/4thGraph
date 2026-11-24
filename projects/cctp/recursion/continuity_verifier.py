@@ -11,7 +11,7 @@ from continuity_preimage import current_funding_hash, prior_digest, statement_li
 from continuity_statement import OUTPUT_PREFIX, OUTPUT_SIZE, ParentReceipt, ZERO
 from issuance_base import MINTED_VOUT, check_first_mint, runtime_first_mint_base_script
 from mimo_verifier import MimoProfile, _match_prefix, _parse_active_token
-from mint import ROOT_OFFSET, STATE_MARKER, MintPolicy, read_deposit
+from mint import MintPolicy, read_deposit
 from operational_token import TokenPolicy
 from recursive_mimo import _add_quantities, _assert_u64, _slots
 from shared.script import asm, number, push
@@ -236,7 +236,8 @@ class ContinuityVerifier:
             return "burn", 0
         if self.certified_mints and len(tx.outputs) == 4:
             return "mint", 1
-        if self.certified_pause and len(tx.outputs) == 2 and tx.outputs[0].script.startswith(STATE_MARKER):
+        if (self.certified_pause and len(tx.outputs) == 2
+                and tx.outputs[0].script.startswith(self.mint_template.state_marker)):
             return "pause", 1
         if self.certified_admin and len(tx.outputs) == 2:
             return "admin", 1
@@ -392,13 +393,20 @@ class ContinuityVerifier:
         if self._layout(tx)[0] != "mint":
             raise ValueError("not a certified mint")
         receipt, context = self.context(tx, funding)
-        if tx.inputs[0].txid != state_parent.txid_wire():
+        if not state_parent.outputs or tx.inputs[0].outpoint() != Input(state_parent.txid_wire(), 0).outpoint():
             raise ValueError("wrong actual mint-state parent")
         deposit = read_deposit(tx)
         self.mint_policy.check_deposit(deposit)
         if tx.outputs[1] != self.mint_policy.token_output(deposit.net_quantity, deposit.owner):
             raise ValueError("mint output differs from authorized deposit")
         self._validate_prior_state(receipt, state_parent, previous_verifier)
+        if self.mint_policy.state_version == 2:
+            prior, successor = state_parent.outputs[0], tx.outputs[0]
+            before = self.mint_policy.parse_state_lock(prior.script)
+            after = self.mint_policy.parse_state_lock(successor.script)
+            if (before.paused or after.paused or successor.value != prior.value
+                    or after.cumulative_minted != before.cumulative_minted + deposit.net_quantity):
+                raise ValueError("wrong cumulative mint state successor")
         return receipt, context
 
     def _validate_prior_state(self, receipt, state_parent, previous_verifier):
@@ -414,19 +422,16 @@ class ContinuityVerifier:
         if self._layout(tx)[0] != "pause":
             raise ValueError("not a certified mint pause transition")
         receipt, context = self.context(tx, funding)
-        if tx.inputs[0].txid != state_parent.txid_wire() or not state_parent.outputs:
+        if not state_parent.outputs or tx.inputs[0].outpoint() != Input(state_parent.txid_wire(), 0).outpoint():
             raise ValueError("wrong actual mint-state parent")
         self._validate_prior_state(receipt, state_parent, previous_verifier)
         prior = state_parent.outputs[0]
-        offset = ROOT_OFFSET - 3
-        root = prior.script[offset:offset + 32]
-        active = self.mint_policy.state_lock(root)
-        paused = self.mint_policy.state_lock(root, paused=True)
-        if prior.script not in (active, paused):
-            raise ValueError("invalid prior mint state lock")
-        expected = Output(prior.value, paused if prior.script == active else active)
+        state = self.mint_policy.parse_state_lock(prior.script)
+        expected = Output(prior.value, self.mint_policy.state_lock(
+            state.root, paused=not state.paused, cumulative_minted=state.cumulative_minted,
+        ))
         if tx.outputs[0] != expected:
-            raise ValueError("pause must toggle the anchored state and preserve its root and value")
+            raise ValueError("pause must toggle the anchored state and preserve its root, cumulative issuance and value")
         return receipt, context
 
     def mint_witness(self, proof, tx, funding, state_parent, previous_verifier=None):

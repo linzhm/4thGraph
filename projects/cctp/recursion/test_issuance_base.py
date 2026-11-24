@@ -215,3 +215,19 @@ class CertifiedStateScriptTests(unittest.TestCase):
         ):
             with self.subTest(txid=state.txid()), self.assertRaises(ScriptError):
                 self.script_result(state, fragment, guard)
+
+    def test_counted_state_template_requires_zero_at_genesis_and_preserves_its_encoding(self):
+        policy = replace(self.policy, state_version=2)
+        genesis = self.fixture.genesis_for(policy)
+        base = runtime_mint_state_script(policy, self.fixture.freeze, genesis_only=True)
+        continuing = runtime_mint_state_script(policy, self.fixture.freeze, genesis_only=False)
+        self.assertEqual(self.script_result(genesis, base), ([b"\x01"], []))
+        state = replace(genesis.outputs[0], script=policy.state_lock(EMPTY_ROOT, cumulative_minted=1 << 127))
+        counted = replace(genesis, outputs=(state,))
+        with self.assertRaises(ScriptError):
+            self.script_result(counted, base)
+        self.assertEqual(self.script_result(counted, continuing), ([b"\x01"], []))
+        for malformed in (state.script[:-18] + b"\x11" + state.script[-17:], state.script[:-1] + asm("OP_1")):
+            forged = replace(counted, outputs=(replace(state, script=malformed),))
+            with self.assertRaises(ScriptError):
+                self.script_result(forged, continuing)
