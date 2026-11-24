@@ -1,0 +1,165 @@
+"""Authenticate wallet token creation under a configured continuity verifier.
+
+Use a deploying party's trusted independently validating Bitcoin SV node.
+Locator hints can come from an indexer, but the node validates their actual
+block membership and transaction bytes. Portable Merkle evidence and lookup
+of the output's known spend state remain separate wallet checks.
+"""
+
+from collections.abc import Callable
+from dataclasses import dataclass
+from hashlib import sha256
+from typing import TYPE_CHECKING
+
+from projects.cctp.evm.bsv_burn_evidence import (
+    BsvConfirmationPolicy, BsvNodeSnapshot, BsvTransactionLocation, read_bsv_raw_transaction,
+)
+from projects.cctp.evm.reserve_rpc import Rpc
+from shared.transaction import Input, Transaction, blob, hash256, preimage_all
+from transaction_relation import TokenState
+from transfer import COMPACT_SCRIPTCODE
+
+if TYPE_CHECKING:
+    from continuity_verifier import ContinuityVerifier
+
+
+class CertifiedWalletError(ValueError):
+    """The transaction or designated output does not carry certified token creation."""
+
+
+@dataclass(frozen=True)
+class CertifiedCreation:
+    operation: str
+    txid_wire: bytes
+    vout: int
+    state: TokenState
+    location: BsvTransactionLocation
+    verifier_outpoint: bytes
+    verifier_hash: bytes
+    context: bytes
+    proof_digest: bytes
+
+
+@dataclass(frozen=True)
+class CertifiedWalletProvenance:
+    verifier: "ContinuityVerifier"
+    bsv_rpc: Rpc
+    confirmation_policy: BsvConfirmationPolicy
+    locate: Callable[[bytes], BsvTransactionLocation | None]
+
+    def __post_init__(self):
+        from continuity_verifier import ContinuityVerifier
+
+        verifier = self.verifier
+        if not isinstance(verifier, ContinuityVerifier) or not verifier.certified_mints:
+            raise CertifiedWalletError("wallet requires a certified continuity mint policy")
+        if self.confirmation_policy.network != verifier.asset.network:
+            raise CertifiedWalletError("certified wallet verification network mismatch")
+        if sha256(blob(verifier.lock)).digest() != verifier.mint_policy.certified_verifier_hash:
+            raise CertifiedWalletError("wallet verifier does not match the certified mint policy")
+
+    def valid_creation(self, tx: Transaction, vout: int) -> bool:
+        """Boolean adapter for verify_payment's authenticated creation callback."""
+        try:
+            self.check_creation(tx, vout)
+        except ValueError:
+            return False
+        return True
+
+    def check_creation(self, tx: Transaction, vout: int) -> CertifiedCreation:
+        verifier = self.verifier
+        if type(vout) is not int or not 0 <= vout < len(tx.outputs):
+            raise CertifiedWalletError("invalid designated wallet vout")
+        kind, verifier_index = verifier._layout(tx)
+        payment_slots = {
+            "mint": (1,), "transfer": (0, 1), "single": (0,), "admin": (0,),
+            "burn": (1,) if verifier.burn_profile(tx) == 1 else (),
+        }
+        if vout not in payment_slots.get(kind, ()):
+            raise CertifiedWalletError("designated vout is not a certified token output")
+        state = verifier.policy.parse(tx.outputs[vout].script)
+        if state is None or state.asset_id != verifier.asset.asset_id():
+            raise CertifiedWalletError("wrong designated wallet asset or token lock")
+        if not 0 <= verifier_index < len(tx.inputs):
+            raise CertifiedWalletError("missing executing verifier input")
+        server = self.bsv_rpc("getnetworkinfo")
+        subversion = server.get("subversion") if isinstance(server, dict) else None
+        if not isinstance(subversion, str) or not subversion.startswith("/Bitcoin SV:"):
+            raise CertifiedWalletError("certified wallet requires an independent Bitcoin SV full node RPC")
+        snapshot = BsvNodeSnapshot(self.bsv_rpc, self.confirmation_policy)
+
+        def location_of(txid):
+            location = self.locate(txid)
+            if not isinstance(location, BsvTransactionLocation):
+                raise CertifiedWalletError("missing confirmed BSV wallet transaction location")
+            return location
+
+        loaded = {}
+
+        def confirmed_at(txid, location):
+            occurrence = snapshot.position(txid, location)
+            if txid not in loaded:
+                loaded[txid] = read_bsv_raw_transaction(self.bsv_rpc, txid)
+            return loaded[txid], occurrence
+
+        txid_wire = tx.txid_wire()
+        location = location_of(txid_wire)
+        confirmed, position = confirmed_at(txid_wire, location)
+        if confirmed != tx:
+            raise CertifiedWalletError("wallet transaction bytes differ from the adopted chain")
+
+        def prevout(item: Input, consumer):
+            parent, occurrence = confirmed_at(item.txid, location_of(item.txid))
+            if occurrence >= consumer or not 0 <= item.vout < len(parent.outputs):
+                raise CertifiedWalletError("BSV predecessor does not precede its spend or has an invalid vout")
+            return parent, occurrence
+
+        def executing_funding(transaction, occurrence, index):
+            if not 0 <= index < len(transaction.inputs):
+                raise CertifiedWalletError("missing actual verifier input")
+            funding, _ = prevout(transaction.inputs[index], occurrence)
+            verifier.policy.selected_verifier(transaction, funding.serialize(), index=index)
+            return funding
+
+        def previous_proof(parent, occurrence):
+            return executing_funding(parent, occurrence, verifier.verifier_input_index(parent))
+
+        funding = executing_funding(tx, position, verifier_index)
+        candidate_receipt, _ = verifier.context(tx, funding)
+        if kind in ("mint", "admin"):
+            parent, occurrence = prevout(tx.inputs[0], position)
+            prior_funding = (previous_proof(parent, occurrence)
+                             if kind == "admin" or candidate_receipt.parents else None)
+            supporting = () if prior_funding is None else (prior_funding,)
+            parents = (parent,)
+            if kind == "mint":
+                receipt, context = verifier.validate_mint(tx, funding, parent, prior_funding)
+                mode = 3 + len(receipt.parents)
+            else:
+                receipt, context = verifier.validate_admin(tx, funding, parent, prior_funding)
+                mode = 5
+                kind = "freeze" if state.frozen else "unfreeze"
+        else:
+            candidates = tuple(prevout(item, position) for item in tx.inputs[1:])
+            parents = tuple(parent for parent, _ in candidates)
+            supporting = tuple(previous_proof(parent, occurrence) for parent, occurrence in candidates)
+            if kind == "burn":
+                receipt, context, _ = verifier.validate_burn(tx, funding, parents, supporting)
+                mode = verifier.burn_mode(tx)
+                kind = "burn-change"
+            else:
+                receipt, context = verifier.validate(tx, funding, parents, supporting)
+                mode = verifier.transfer_mode(tx)
+
+        expected_context = hash256(preimage_all(tx, verifier_index, funding.outputs[0].value, COMPACT_SCRIPTCODE))
+        suffix = verifier.transaction_material(tx, funding, parents, supporting, count=mode,
+                                               verifier_index=verifier_index)
+        witness = tx.inputs[verifier_index].script
+        if context != expected_context or len(witness) <= len(suffix) or not witness.endswith(suffix):
+            raise CertifiedWalletError("certified witness does not attest the adopted wallet transaction context")
+        snapshot.check_active()
+        verifier_hash = sha256(blob(funding.outputs[0].script)).digest()
+        return CertifiedCreation(
+            kind, txid_wire, vout, state, location, tx.inputs[verifier_index].outpoint(),
+            verifier_hash, context, receipt.digest(verifier.asset.asset_id(), verifier.key_digest, context),
+        )

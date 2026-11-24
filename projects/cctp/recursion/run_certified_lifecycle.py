@@ -7,6 +7,7 @@ from pathlib import Path
 
 from burn_receipt import BurnReceipt
 from certified_burn_provenance import CertifiedBurnProvenance
+from certified_wallet_provenance import CertifiedWalletProvenance
 from committed_verifier import load_verifying_key
 from continuity_statement import ParentReceipt
 from continuity_verifier import ContinuityVerifier, SINGLE_OUTPUT_MARKER
@@ -21,6 +22,7 @@ from run_recursive_mimo import Regtest
 from shared.transaction import Input, Output, Transaction
 from test_operational_token import fixture_signer
 from usdc_amount import parse_usdc
+from wallet_receipt import SpendStatus
 
 
 @dataclass(frozen=True)
@@ -77,6 +79,13 @@ class Lifecycle:
             for record in self.node.evidence["transactions"].values()
         })
 
+    def locations(self):
+        return {
+            bytes.fromhex(record["txid"])[::-1]: BsvTransactionLocation(
+                bytes.fromhex(record["blockhash"])[::-1], record["height"],
+            ) for record in self.node.evidence["transactions"].values()
+        }
+
     def state_prior(self):
         return self.genesis if self.state is None else self.state.transaction
 
@@ -104,6 +113,7 @@ class Lifecycle:
         funding, prior = self.fund(label), self.state_prior()
         self.mine_confirmation()
         chain = self.adopted()
+
         def load_state():
             return chain.mint_state(self.mint_policy, self.genesis, self.transitions)
 
@@ -194,16 +204,30 @@ class Lifecycle:
     def release(self, item, live, *, interrupt=False):
         self.mine_confirmation()
         chain = self.adopted()
-        locations = {
-            bytes.fromhex(record["txid"])[::-1]: BsvTransactionLocation(
-                bytes.fromhex(record["blockhash"])[::-1], record["height"],
-            ) for record in self.node.evidence["transactions"].values()
-        }
-        provenance = CertifiedBurnProvenance(self.verifier, locations.get)
+        provenance = CertifiedBurnProvenance(self.verifier, self.locations().get)
         circulating, frozen = self.supply(*live)
         if frozen:
             raise AssertionError("unexpected frozen supply at release checkpoint")
         return self.bridge.release(chain, item.transaction, 0, provenance, circulating=circulating, interrupt=interrupt)
+
+    def wallet_acceptance(self, minted, frozen, change):
+        chain = self.adopted()
+        policy = chain.confirmation_policy(self.verifier.asset)
+        provenance = CertifiedWalletProvenance(self.verifier, chain.call, policy, self.locations().get)
+        evidence = []
+        for item, quantity, flag, status in (
+            (minted, 1024, False, SpendStatus.SPENT),
+            (frozen, 640, True, SpendStatus.SPENT),
+            (change, 384, False, SpendStatus.UNSPENT),
+        ):
+            receipt, fields = chain.payment(item.transaction, item.position, self.verifier.asset,
+                                             self.verifier.policy, provenance, self.node.owner_key)
+            if (receipt.quantity, receipt.frozen, receipt.spend_status) != (quantity, flag, status):
+                raise AssertionError("wallet receipt disagrees with the expected selected output")
+            evidence.append(fields)
+        if provenance.valid_creation(change.transaction, 0):
+            raise AssertionError("wallet accepted a burn receipt as a token output")
+        return evidence
 
     def supply(self, *live):
         circulating = frozen = 0
@@ -247,6 +271,7 @@ def run(node, prover, key_artifact, evm):
         "evm": {"chain_id": lab.reserve.scope.chain_id, "reserve": lab.reserve.vault, "token": lab.reserve.usdc},
         "mints": [first, second], "proof_checks": lab.proof_checks, "freeze_accounting": freeze_accounting,
         "releases": [primary_release, full_release], "after_primary_scenario": primary,
+        "wallet": lab.wallet_acceptance(minted, frozen, change),
         "final_accounting": lab.bridge.reconcile(*lab.supply(change)), "journal": lab.bridge.audit(), **node.evidence,
     }
 
