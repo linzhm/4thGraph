@@ -6,7 +6,7 @@ from shared.script import asm, number, push
 from shared.transaction import Output, Transaction, blob, hash256, preimage_forkid
 from statement import fixed
 from transaction_relation import TokenState
-from transfer import authenticate_forkid_preimage, verifier_input_script_hash
+from transfer import authenticate_forkid_preimage, shared_guard_lock, verifier_input_script_hash
 
 TOKEN_DOMAIN = b"BSV/CCTP/token/v2\x00"
 TOKEN_MARKER = push(TOKEN_DOMAIN)
@@ -14,6 +14,20 @@ METADATA_SIZE = 74
 FLAG_OFFSET = len(TOKEN_MARKER) + 1 + METADATA_SIZE - 1
 FORKID_ALL = 0x41
 FORKID_SINGLE = 0x43
+
+
+def _shared_guard_digest_script() -> bytes:
+    """Replace the only verifier digest in a canonical guard output script field."""
+    placeholder = b"BSV/CCTP/shared-ordinary-guard-template/v1\0"
+    placeholder_guard = sha256(blob(placeholder)).digest()
+    template = blob(shared_guard_lock(placeholder))
+    if template.count(placeholder_guard) != 1:
+        raise ValueError("shared guard template must contain exactly one verifier digest")
+    lead, tail = template.split(placeholder_guard)
+    another = placeholder + b"variant"
+    if lead + sha256(blob(another)).digest() + tail != blob(shared_guard_lock(another)):
+        raise ValueError("shared guard does not only vary by its verifier digest")
+    return push(lead) + asm("OP_SWAP OP_CAT") + push(tail) + asm("OP_CAT OP_SHA256")
 
 
 def _verify_signature(key: bytes) -> bytes:
@@ -83,6 +97,7 @@ class TokenPolicy:
     verifier_locks: tuple[bytes, ...]
     freeze_key: bytes
     certified_admin: bool = field(default=False, kw_only=True)
+    shared_ordinary_guard: bool = field(default=False, kw_only=True)
 
     def __post_init__(self):
         fixed(self.freeze_key, 33)
@@ -95,6 +110,9 @@ class TokenPolicy:
             raise ValueError("duplicate verifier lock")
         if type(self.certified_admin) is not bool or (self.certified_admin and len(locks) != 1):
             raise ValueError("certified administration requires one exact verifier lock")
+        if (type(self.shared_ordinary_guard) is not bool
+                or self.shared_ordinary_guard and not self.certified_admin):
+            raise ValueError("shared ordinary guard requires certified administration and one verifier")
 
     def verifier_hashes(self) -> tuple[bytes, ...]:
         return tuple(sorted(sha256(blob(lock)).digest() for lock in self.verifier_locks))
@@ -108,7 +126,32 @@ class TokenPolicy:
             raise ValueError("invalid verifier parent")
         return parent
 
+    def shared_guard_lock(self) -> bytes:
+        """Return the exact script for the optional vin-one companion funding."""
+        if not self.shared_ordinary_guard:
+            raise ValueError("shared ordinary guard is not enabled")
+        return shared_guard_lock(self.verifier_locks[0])
+
+    def selected_shared_guard(self, tx: Transaction, raw: bytes) -> Transaction:
+        expected = self.shared_guard_lock()
+        parent = Transaction.parse(raw)
+        if (len(tx.inputs) < 2 or tx.inputs[1].txid != parent.txid_wire() or tx.inputs[1].vout != 0
+                or len(parent.inputs) != 1 or len(parent.inputs[0].script) >= 253
+                or len(parent.outputs) != 1 or parent.outputs[0].script != expected):
+            raise ValueError("invalid shared guard parent at vin one")
+        return parent
+
     def _ordinary_guard(self) -> bytes:
+        if self.shared_ordinary_guard:
+            # Both branches consume the one universal digest stored above
+            # the mode check. The companion then enforces that same
+            # universal verifier's actual funding at vin zero.
+            return (
+                asm("OP_DUP OP_0 OP_EQUAL OP_OVER OP_1 OP_EQUAL OP_BOOLOR OP_VERIFY OP_IF")
+                + verifier_input_script_hash(input_index=1)
+                + asm("OP_FROMALTSTACK") + _shared_guard_digest_script() + asm("OP_EQUALVERIFY OP_ELSE")
+                + verifier_input_script_hash() + asm("OP_FROMALTSTACK OP_EQUALVERIFY OP_ENDIF")
+            )
         if self.certified_admin:
             return verifier_input_script_hash() + asm("OP_FROMALTSTACK OP_EQUALVERIFY")
         first, *remaining = self.verifier_hashes()
@@ -148,7 +191,16 @@ class TokenPolicy:
         return token
 
 
-def ordinary_witness(tx, index, parent, policy, verifier_parent, signer):
+def shared_guard_witness(tx, policy, verifier_parent, shared_guard_parent):
+    """Unlock the actual vin-one companion, binding the full verifier at vin zero."""
+    policy.selected_verifier(tx, verifier_parent.serialize())
+    guard = policy.selected_shared_guard(tx, shared_guard_parent.serialize()).outputs[0]
+    prevouts = b"".join(item.outpoint() for item in tx.inputs)
+    preimage = preimage_forkid(tx, 1, guard.value, guard.script, FORKID_ALL)
+    return push(verifier_parent.serialize()) + push(prevouts) + push(preimage)
+
+
+def ordinary_witness(tx, index, parent, policy, verifier_parent, signer, *, shared_guard_parent=None):
     """Use the external owner signer for the ForkID ALL digest."""
     txin = tx.inputs[index]
     if txin.txid != parent.txid_wire() or not 0 <= txin.vout < len(parent.outputs):
@@ -158,10 +210,20 @@ def ordinary_witness(tx, index, parent, policy, verifier_parent, signer):
     state = policy.parse(output.script)
     if state is None or state.frozen:
         raise ValueError("expected active token")
+    guard_parent = verifier_parent
+    selector = b""
+    if shared_guard_parent is not None:
+        if not policy.shared_ordinary_guard or index < 2:
+            raise ValueError("shared guard owner spends require token inputs after vin one")
+        policy.selected_shared_guard(tx, shared_guard_parent.serialize())
+        guard_parent = shared_guard_parent
+        selector = asm("OP_1")
+    elif policy.shared_ordinary_guard:
+        selector = asm("OP_0")
     prevouts = b"".join(item.outpoint() for item in tx.inputs)
     preimage = preimage_forkid(tx, index, output.value, output.script, FORKID_ALL)
     return (push(signer(hash256(preimage)) + bytes([FORKID_ALL]))
-            + push(verifier_parent.serialize()) + push(prevouts) + push(preimage) + asm("OP_0"))
+            + push(guard_parent.serialize()) + push(prevouts) + push(preimage) + selector + asm("OP_0"))
 
 
 def freeze_witness(tx, index, parent, policy, signer, *, verifier_parent=None):

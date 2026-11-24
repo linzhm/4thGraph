@@ -43,6 +43,7 @@ class ContinuityVerifier:
     certified_burns: bool = False
     certified_single_output: bool = False
     certified_pause: bool = False
+    shared_ordinary_guard: bool = False
 
     def __post_init__(self):
         fixed(self.key_digest, 32)
@@ -57,6 +58,8 @@ class ContinuityVerifier:
         if (type(self.certified_pause) is not bool or self.certified_pause
                 and (not self.certified_mints or self.mint_template.pause_authority is None)):
             raise ValueError("certified pause requires certified minting and a pause authority")
+        if type(self.shared_ordinary_guard) is not bool or self.shared_ordinary_guard and not self.certified_admin:
+            raise ValueError("shared ordinary guard requires certified token administration")
 
     @property
     def asset(self):
@@ -68,7 +71,8 @@ class ContinuityVerifier:
 
     @cached_property
     def policy(self):
-        return TokenPolicy((self.lock,), self.freeze_key, certified_admin=self.certified_admin)
+        return TokenPolicy((self.lock,), self.freeze_key, certified_admin=self.certified_admin,
+                           shared_ordinary_guard=self.shared_ordinary_guard)
 
     @cached_property
     def mint_policy(self):
@@ -101,7 +105,8 @@ class ContinuityVerifier:
         relation = profile.relation(
             self.asset.asset_id(), self.asset.reserve_domain, keep_parents=True, output_tail=len(marker) + OUTPUT_SIZE,
             parent_vout=MINTED_VOUT if count == 0 else None, certified_admin=self.certified_admin,
-            burn_first=burning, distinct_token_inputs=single,
+            burn_first=burning, distinct_token_inputs=single, shared_ordinary_guard=self.shared_ordinary_guard,
+            parent_output=self._parent_output(),
         )
         return (
             relation + asm("OP_3 OP_ROLL") + _conserve(incoming, profile.flow_outputs)
@@ -122,6 +127,9 @@ class ContinuityVerifier:
         return prior_digest(self.asset.asset_id(), self.key_digest, certified_admin=self.certified_admin,
                             certified_pause=self.certified_pause)
 
+    def _parent_output(self):
+        return None
+
     def _mint_path(self, genesis, *, pause=False):
         from issuance_base import runtime_mint_state_script
 
@@ -132,7 +140,8 @@ class ContinuityVerifier:
             + asm("OP_TOALTSTACK OP_SWAP OP_TOALTSTACK")
         )
         state = runtime_mint_state_script(self.mint_template, self.freeze_key, genesis_only=genesis,
-                                          certified_admin=self.certified_admin, certified_pause=self.certified_pause)
+                                          certified_admin=self.certified_admin, certified_pause=self.certified_pause,
+                                          shared_ordinary_guard=self.shared_ordinary_guard)
         if genesis:
             payload = state + push(ParentReceipt(()).payload())
         else:
@@ -150,9 +159,11 @@ class ContinuityVerifier:
         # The exact token lock at vin0 enforces the issuer signature and the
         # paired flag toggle. This path authenticates that token and its proof.
         parse_token = _parse_active_token(self.asset.asset_id(), self.freeze_key, 1,
-                                          certified_admin=True, allow_frozen=True)
+                                          certified_admin=True, allow_frozen=True,
+                                          shared_ordinary_guard=self.shared_ordinary_guard)
         return (
-            vin_one_transaction_material_check(preceding_outputs=1, select_parent_script=True)
+            vin_one_transaction_material_check(preceding_outputs=1, select_parent_script=True,
+                                               parent_output=self._parent_output())
             + asm("OP_DUP 6 OP_ROLL OP_SWAP") + current_funding_hash()
             + asm("OP_SWAP") + compact_preimage_digest_script()
             + asm("OP_TOALTSTACK OP_SWAP OP_TOALTSTACK OP_SWAP") + parse_token
@@ -163,7 +174,7 @@ class ContinuityVerifier:
             + asm("OP_EQUALVERIFY OP_FROMALTSTACK")
         )
 
-    def statement_script(self):
+    def _statement_variants(self):
         if self.certified_mints:
             variants = (
                 (1, self._path(1)), (2, self._path(2)),
@@ -181,6 +192,10 @@ class ContinuityVerifier:
                          (11, self._mint_path(genesis=False, pause=True)))
         if self.certified_single_output:
             variants += tuple((11 + count, self._path(count, single=True)) for count in (1, 2))
+        return variants
+
+    def statement_script(self):
+        variants = self._statement_variants()
         code = b""
         for mode, branch in variants[:-1]:
             code += asm("OP_DUP") + number(mode) + asm("OP_NUMEQUAL OP_IF OP_DROP") + branch + asm("OP_ELSE")

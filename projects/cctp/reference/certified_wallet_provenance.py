@@ -74,6 +74,7 @@ class CertifiedWalletProvenance:
         payment_slots = {
             "mint": (1,), "transfer": (0, 1), "single": (0,), "admin": (0,),
             "burn": (1,) if verifier.burn_profile(tx) == 1 else (),
+            "capacity": range(len(tx.outputs) - 1),
         }
         if vout not in payment_slots.get(kind, ()):
             raise CertifiedWalletError("designated vout is not a certified token output")
@@ -126,6 +127,7 @@ class CertifiedWalletProvenance:
 
         funding = executing_funding(tx, position, verifier_index)
         candidate_receipt, _ = verifier.context(tx, funding)
+        suffix = None
         if kind in ("mint", "admin"):
             parent, occurrence = prevout(tx.inputs[0], position)
             prior_funding = (previous_proof(parent, occurrence)
@@ -139,6 +141,16 @@ class CertifiedWalletProvenance:
                 receipt, context = verifier.validate_admin(tx, funding, parent, prior_funding)
                 mode = 5
                 kind = "freeze" if state.frozen else "unfreeze"
+        elif kind == "capacity":
+            companion, _ = prevout(tx.inputs[1], position)
+            groups = {}
+            for item in tx.inputs[2:]:
+                if item.txid not in groups:
+                    parent, occurrence = prevout(item, position)
+                    groups[item.txid] = (previous_proof(parent, occurrence), parent)
+            pairs = tuple(groups.values())
+            receipt, context = verifier.validate_capacity(tx, funding, companion, pairs)
+            suffix = verifier.capacity_witness_suffix(tx, funding, companion, pairs)
         else:
             candidates = tuple(prevout(item, position) for item in tx.inputs[1:])
             parents = tuple(parent for parent, _ in candidates)
@@ -152,8 +164,9 @@ class CertifiedWalletProvenance:
                 mode = verifier.transfer_mode(tx)
 
         expected_context = hash256(preimage_all(tx, verifier_index, funding.outputs[0].value, COMPACT_SCRIPTCODE))
-        suffix = verifier.transaction_material(tx, funding, parents, supporting, count=mode,
-                                               verifier_index=verifier_index)
+        if suffix is None:
+            suffix = verifier.transaction_material(tx, funding, parents, supporting, count=mode,
+                                                   verifier_index=verifier_index)
         witness = tx.inputs[verifier_index].script
         if context != expected_context or len(witness) <= len(suffix) or not witness.endswith(suffix):
             raise CertifiedWalletError("certified witness does not attest the adopted wallet transaction context")

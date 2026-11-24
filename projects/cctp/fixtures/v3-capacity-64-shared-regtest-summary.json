@@ -1,0 +1,696 @@
+{
+  "scope": "Shared-parent capacity payment on isolated BSV regtest, starting from a signed test deposit attestation.",
+  "capacity": 64,
+  "asset_id": "372b2b84b937050cf5a9939e88c93021225c619dbbc3047bd9e1f708eeef6df7",
+  "continuity_key_digest": "677731270de75ec11f65c92f2ac8b0c428df79e28a532a035b8402166eb04a9b",
+  "setup_and_funding_seconds": 4.1676222500391304,
+  "wall_seconds": 154.31150012509897,
+  "proof_checks": {
+    "certified-mint-test-attestation": {
+      "predecessors": [
+        {
+          "txid": "2aa223f077565e021cf23c4201967edaf0ed8c91f163d68d6b1480eca476526a",
+          "vout": 0
+        }
+      ],
+      "public_signals": [
+        "292490573994226863733817398664754352865",
+        "41007900842573735779544826605280279303"
+      ],
+      "previous_proof_digests": [],
+      "proof_sha256": "6a93e703ef58e4f5000b78e1a7525dbb271d8bbddc63989b35ef4311edaf6e30",
+      "largest_input_script_bytes": 2846699,
+      "quantities": [
+        1024
+      ],
+      "rejections": {},
+      "transaction_bytes": 5700101,
+      "input_witness_bytes": [
+        2804377,
+        2846699
+      ],
+      "input_sats": 197199216,
+      "output_sats": 99951000,
+      "fee_sats": 97248216,
+      "prepare_prove_and_confirm_seconds": 48.66725725005381
+    },
+    "capacity-64-fanout": {
+      "predecessors": [
+        {
+          "txid": "741bb9ae71ab6f9ba4e770366cc92321e32d2f81d88118e119700051abf14288",
+          "vout": 1
+        }
+      ],
+      "public_signals": [
+        "94494088611347860956703792858055418133",
+        "49034107958699658391417951425356055715"
+      ],
+      "previous_proof_digests": [
+        "dc0ba2af83e33e6106d8f52b3543d2e11ed9d59c7a69f664898657452795bb07"
+      ],
+      "proof_sha256": "6c875452e0ec97ad4a2252aa0b9dad54c49d261a5b7e6a3c9854fc524cf78975",
+      "largest_input_script_bytes": 11445669,
+      "quantities": [
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16
+      ],
+      "rejections": {},
+      "transaction_bytes": 14443527,
+      "input_witness_bytes": [
+        11445669,
+        2751737,
+        4875
+      ],
+      "input_sats": 196250216,
+      "output_sats": 64000,
+      "fee_sats": 196186216,
+      "capacity_mode": 17,
+      "distinct_token_parent_transactions": 1,
+      "companion_txid": "77541b01279e1ce00d0bac399482d0b66dd8344cd9779c69c0dac49acdd70eb4",
+      "prepare_seconds": 0.22368204197846353,
+      "prove_seconds": 44.72112724999897,
+      "witness_seconds": 1.3691771660232916,
+      "chain_gang_and_bsv_confirmation_seconds": 1.8332139590056613,
+      "confirmed_first_and_last_outputs": [
+        {
+          "txid": "7eb9391df124b6249e679adb381c3dd33f8633d935b3bb767d5d87a2a0440541",
+          "vout": 0,
+          "quantity": 16,
+          "sats": 1000
+        },
+        {
+          "txid": "7eb9391df124b6249e679adb381c3dd33f8633d935b3bb767d5d87a2a0440541",
+          "vout": 63,
+          "quantity": 16,
+          "sats": 1000
+        }
+      ]
+    },
+    "capacity-64-payment": {
+      "predecessors": [
+        {
+          "txid": "7eb9391df124b6249e679adb381c3dd33f8633d935b3bb767d5d87a2a0440541",
+          "vout": 0
+        },
+        {
+          "txid": "7eb9391df124b6249e679adb381c3dd33f8633d935b3bb767d5d87a2a0440541",
+          "vout": 1
+        },
+        {
+          "txid": "7eb9391df124b6249e679adb381c3dd33f8633d935b3bb767d5d87a2a0440541",
+          "vout": 2
+        },
+        {
+          "txid": "7eb9391df124b6249e679adb381c3dd33f8633d935b3bb767d5d87a2a0440541",
+          "vout": 3
+        },
+        {
+          "txid": "7eb9391df124b6249e679adb381c3dd33f8633d935b3bb767d5d87a2a0440541",
+          "vout": 4
+        },
+        {
+          "txid": "7eb9391df124b6249e679adb381c3dd33f8633d935b3bb767d5d87a2a0440541",
+          "vout": 5
+        },
+        {
+          "txid": "7eb9391df124b6249e679adb381c3dd33f8633d935b3bb767d5d87a2a0440541",
+          "vout": 6
+        },
+        {
+          "txid": "7eb9391df124b6249e679adb381c3dd33f8633d935b3bb767d5d87a2a0440541",
+          "vout": 7
+        },
+        {
+          "txid": "7eb9391df124b6249e679adb381c3dd33f8633d935b3bb767d5d87a2a0440541",
+          "vout": 8
+        },
+        {
+          "txid": "7eb9391df124b6249e679adb381c3dd33f8633d935b3bb767d5d87a2a0440541",
+          "vout": 9
+        },
+        {
+          "txid": "7eb9391df124b6249e679adb381c3dd33f8633d935b3bb767d5d87a2a0440541",
+          "vout": 10
+        },
+        {
+          "txid": "7eb9391df124b6249e679adb381c3dd33f8633d935b3bb767d5d87a2a0440541",
+          "vout": 11
+        },
+        {
+          "txid": "7eb9391df124b6249e679adb381c3dd33f8633d935b3bb767d5d87a2a0440541",
+          "vout": 12
+        },
+        {
+          "txid": "7eb9391df124b6249e679adb381c3dd33f8633d935b3bb767d5d87a2a0440541",
+          "vout": 13
+        },
+        {
+          "txid": "7eb9391df124b6249e679adb381c3dd33f8633d935b3bb767d5d87a2a0440541",
+          "vout": 14
+        },
+        {
+          "txid": "7eb9391df124b6249e679adb381c3dd33f8633d935b3bb767d5d87a2a0440541",
+          "vout": 15
+        },
+        {
+          "txid": "7eb9391df124b6249e679adb381c3dd33f8633d935b3bb767d5d87a2a0440541",
+          "vout": 16
+        },
+        {
+          "txid": "7eb9391df124b6249e679adb381c3dd33f8633d935b3bb767d5d87a2a0440541",
+          "vout": 17
+        },
+        {
+          "txid": "7eb9391df124b6249e679adb381c3dd33f8633d935b3bb767d5d87a2a0440541",
+          "vout": 18
+        },
+        {
+          "txid": "7eb9391df124b6249e679adb381c3dd33f8633d935b3bb767d5d87a2a0440541",
+          "vout": 19
+        },
+        {
+          "txid": "7eb9391df124b6249e679adb381c3dd33f8633d935b3bb767d5d87a2a0440541",
+          "vout": 20
+        },
+        {
+          "txid": "7eb9391df124b6249e679adb381c3dd33f8633d935b3bb767d5d87a2a0440541",
+          "vout": 21
+        },
+        {
+          "txid": "7eb9391df124b6249e679adb381c3dd33f8633d935b3bb767d5d87a2a0440541",
+          "vout": 22
+        },
+        {
+          "txid": "7eb9391df124b6249e679adb381c3dd33f8633d935b3bb767d5d87a2a0440541",
+          "vout": 23
+        },
+        {
+          "txid": "7eb9391df124b6249e679adb381c3dd33f8633d935b3bb767d5d87a2a0440541",
+          "vout": 24
+        },
+        {
+          "txid": "7eb9391df124b6249e679adb381c3dd33f8633d935b3bb767d5d87a2a0440541",
+          "vout": 25
+        },
+        {
+          "txid": "7eb9391df124b6249e679adb381c3dd33f8633d935b3bb767d5d87a2a0440541",
+          "vout": 26
+        },
+        {
+          "txid": "7eb9391df124b6249e679adb381c3dd33f8633d935b3bb767d5d87a2a0440541",
+          "vout": 27
+        },
+        {
+          "txid": "7eb9391df124b6249e679adb381c3dd33f8633d935b3bb767d5d87a2a0440541",
+          "vout": 28
+        },
+        {
+          "txid": "7eb9391df124b6249e679adb381c3dd33f8633d935b3bb767d5d87a2a0440541",
+          "vout": 29
+        },
+        {
+          "txid": "7eb9391df124b6249e679adb381c3dd33f8633d935b3bb767d5d87a2a0440541",
+          "vout": 30
+        },
+        {
+          "txid": "7eb9391df124b6249e679adb381c3dd33f8633d935b3bb767d5d87a2a0440541",
+          "vout": 31
+        },
+        {
+          "txid": "7eb9391df124b6249e679adb381c3dd33f8633d935b3bb767d5d87a2a0440541",
+          "vout": 32
+        },
+        {
+          "txid": "7eb9391df124b6249e679adb381c3dd33f8633d935b3bb767d5d87a2a0440541",
+          "vout": 33
+        },
+        {
+          "txid": "7eb9391df124b6249e679adb381c3dd33f8633d935b3bb767d5d87a2a0440541",
+          "vout": 34
+        },
+        {
+          "txid": "7eb9391df124b6249e679adb381c3dd33f8633d935b3bb767d5d87a2a0440541",
+          "vout": 35
+        },
+        {
+          "txid": "7eb9391df124b6249e679adb381c3dd33f8633d935b3bb767d5d87a2a0440541",
+          "vout": 36
+        },
+        {
+          "txid": "7eb9391df124b6249e679adb381c3dd33f8633d935b3bb767d5d87a2a0440541",
+          "vout": 37
+        },
+        {
+          "txid": "7eb9391df124b6249e679adb381c3dd33f8633d935b3bb767d5d87a2a0440541",
+          "vout": 38
+        },
+        {
+          "txid": "7eb9391df124b6249e679adb381c3dd33f8633d935b3bb767d5d87a2a0440541",
+          "vout": 39
+        },
+        {
+          "txid": "7eb9391df124b6249e679adb381c3dd33f8633d935b3bb767d5d87a2a0440541",
+          "vout": 40
+        },
+        {
+          "txid": "7eb9391df124b6249e679adb381c3dd33f8633d935b3bb767d5d87a2a0440541",
+          "vout": 41
+        },
+        {
+          "txid": "7eb9391df124b6249e679adb381c3dd33f8633d935b3bb767d5d87a2a0440541",
+          "vout": 42
+        },
+        {
+          "txid": "7eb9391df124b6249e679adb381c3dd33f8633d935b3bb767d5d87a2a0440541",
+          "vout": 43
+        },
+        {
+          "txid": "7eb9391df124b6249e679adb381c3dd33f8633d935b3bb767d5d87a2a0440541",
+          "vout": 44
+        },
+        {
+          "txid": "7eb9391df124b6249e679adb381c3dd33f8633d935b3bb767d5d87a2a0440541",
+          "vout": 45
+        },
+        {
+          "txid": "7eb9391df124b6249e679adb381c3dd33f8633d935b3bb767d5d87a2a0440541",
+          "vout": 46
+        },
+        {
+          "txid": "7eb9391df124b6249e679adb381c3dd33f8633d935b3bb767d5d87a2a0440541",
+          "vout": 47
+        },
+        {
+          "txid": "7eb9391df124b6249e679adb381c3dd33f8633d935b3bb767d5d87a2a0440541",
+          "vout": 48
+        },
+        {
+          "txid": "7eb9391df124b6249e679adb381c3dd33f8633d935b3bb767d5d87a2a0440541",
+          "vout": 49
+        },
+        {
+          "txid": "7eb9391df124b6249e679adb381c3dd33f8633d935b3bb767d5d87a2a0440541",
+          "vout": 50
+        },
+        {
+          "txid": "7eb9391df124b6249e679adb381c3dd33f8633d935b3bb767d5d87a2a0440541",
+          "vout": 51
+        },
+        {
+          "txid": "7eb9391df124b6249e679adb381c3dd33f8633d935b3bb767d5d87a2a0440541",
+          "vout": 52
+        },
+        {
+          "txid": "7eb9391df124b6249e679adb381c3dd33f8633d935b3bb767d5d87a2a0440541",
+          "vout": 53
+        },
+        {
+          "txid": "7eb9391df124b6249e679adb381c3dd33f8633d935b3bb767d5d87a2a0440541",
+          "vout": 54
+        },
+        {
+          "txid": "7eb9391df124b6249e679adb381c3dd33f8633d935b3bb767d5d87a2a0440541",
+          "vout": 55
+        },
+        {
+          "txid": "7eb9391df124b6249e679adb381c3dd33f8633d935b3bb767d5d87a2a0440541",
+          "vout": 56
+        },
+        {
+          "txid": "7eb9391df124b6249e679adb381c3dd33f8633d935b3bb767d5d87a2a0440541",
+          "vout": 57
+        },
+        {
+          "txid": "7eb9391df124b6249e679adb381c3dd33f8633d935b3bb767d5d87a2a0440541",
+          "vout": 58
+        },
+        {
+          "txid": "7eb9391df124b6249e679adb381c3dd33f8633d935b3bb767d5d87a2a0440541",
+          "vout": 59
+        },
+        {
+          "txid": "7eb9391df124b6249e679adb381c3dd33f8633d935b3bb767d5d87a2a0440541",
+          "vout": 60
+        },
+        {
+          "txid": "7eb9391df124b6249e679adb381c3dd33f8633d935b3bb767d5d87a2a0440541",
+          "vout": 61
+        },
+        {
+          "txid": "7eb9391df124b6249e679adb381c3dd33f8633d935b3bb767d5d87a2a0440541",
+          "vout": 62
+        },
+        {
+          "txid": "7eb9391df124b6249e679adb381c3dd33f8633d935b3bb767d5d87a2a0440541",
+          "vout": 63
+        }
+      ],
+      "public_signals": [
+        "322261664835472328487285963183079041241",
+        "249561715741395780341541496767224613028"
+      ],
+      "previous_proof_digests": [
+        "4716e6447aceccc5417820a611c9a11524e3a02ca7f4790dc254faa5cdb344a3"
+      ],
+      "proof_sha256": "ca5b59af7b5038edf6819704868f51d779944b4093371672d7468869a8a00d44",
+      "largest_input_script_bytes": 20191365,
+      "quantities": [
+        15,
+        17,
+        15,
+        17,
+        15,
+        17,
+        15,
+        17,
+        15,
+        17,
+        15,
+        17,
+        15,
+        17,
+        15,
+        17,
+        15,
+        17,
+        15,
+        17,
+        15,
+        17,
+        15,
+        17,
+        15,
+        17,
+        15,
+        17,
+        15,
+        17,
+        15,
+        17,
+        15,
+        17,
+        15,
+        17,
+        15,
+        17,
+        15,
+        17,
+        15,
+        17,
+        15,
+        17,
+        15,
+        17,
+        15,
+        17,
+        15,
+        17,
+        15,
+        17,
+        15,
+        17,
+        15,
+        17,
+        15,
+        17,
+        15,
+        17,
+        15,
+        17,
+        15,
+        17
+      ],
+      "rejections": {},
+      "transaction_bytes": 23646578,
+      "input_witness_bytes": [
+        20191365,
+        2754006,
+        7144,
+        7144,
+        7144,
+        7144,
+        7145,
+        7144,
+        7145,
+        7144,
+        7144,
+        7145,
+        7145,
+        7144,
+        7145,
+        7144,
+        7145,
+        7145,
+        7144,
+        7145,
+        7145,
+        7145,
+        7145,
+        7144,
+        7145,
+        7145,
+        7145,
+        7145,
+        7145,
+        7145,
+        7144,
+        7144,
+        7144,
+        7144,
+        7144,
+        7145,
+        7144,
+        7145,
+        7144,
+        7144,
+        7144,
+        7144,
+        7144,
+        7145,
+        7145,
+        7144,
+        7145,
+        7145,
+        7145,
+        7145,
+        7145,
+        7145,
+        7145,
+        7145,
+        7144,
+        7145,
+        7144,
+        7144,
+        7145,
+        7145,
+        7145,
+        7145,
+        7144,
+        7144,
+        7145,
+        7145
+      ],
+      "input_sats": 196313216,
+      "output_sats": 64000,
+      "fee_sats": 196249216,
+      "capacity_mode": 18,
+      "distinct_token_parent_transactions": 1,
+      "companion_txid": "6d433f9109e05b0aec36433bbd1a4b6dd78d4a6e39236dd02544df2e6b96ffa5",
+      "prepare_seconds": 0.34911779104731977,
+      "prove_seconds": 44.7851695419522,
+      "witness_seconds": 2.537615792010911,
+      "chain_gang_and_bsv_confirmation_seconds": 4.6753432910190895,
+      "confirmed_first_and_last_outputs": [
+        {
+          "txid": "c929a5f7acbcf65cd0cb3254eaf8cf7a58604b7513e5063ab265023280b1ed8a",
+          "vout": 0,
+          "quantity": 15,
+          "sats": 1000
+        },
+        {
+          "txid": "c929a5f7acbcf65cd0cb3254eaf8cf7a58604b7513e5063ab265023280b1ed8a",
+          "vout": 63,
+          "quantity": 17,
+          "sats": 1000
+        }
+      ],
+      "wallet": [
+        {
+          "txid": "c929a5f7acbcf65cd0cb3254eaf8cf7a58604b7513e5063ab265023280b1ed8a",
+          "vout": 0,
+          "outpoint_wire": "8aedb180320265b23a06e513754b60587acff8ea5432cbd05cf6bcacf7a529c900000000",
+          "quantity": 15,
+          "confirmations": 2,
+          "known_spend_status": "unspent",
+          "frozen": false,
+          "blockhash": "3001a133d2db53b947377c35e573e53363aa53c0e2b65bfb444a23f518ada0da",
+          "block_header": "00000020b96a23f55dc3f0420f72b1ff89e5b7f273b2654cf057182190bea9a7dba96a1f47d7a2a8faa6244fe398ef3d8d72f698ba0db4251e5b9e8af1bd514f3d4e87571570056bffff7f2005000000",
+          "block_height": 559,
+          "block_leaf_count": 2,
+          "merkle_index": 1,
+          "merkle_siblings_wire": [
+            "61f8d9f5705702aab95ccce6b27def01aef890f293c881d85ade6d191cf09cc7"
+          ],
+          "elapsed_seconds": 4.209531000000425
+        },
+        {
+          "txid": "c929a5f7acbcf65cd0cb3254eaf8cf7a58604b7513e5063ab265023280b1ed8a",
+          "vout": 63,
+          "outpoint_wire": "8aedb180320265b23a06e513754b60587acff8ea5432cbd05cf6bcacf7a529c93f000000",
+          "quantity": 17,
+          "confirmations": 2,
+          "known_spend_status": "unspent",
+          "frozen": false,
+          "blockhash": "3001a133d2db53b947377c35e573e53363aa53c0e2b65bfb444a23f518ada0da",
+          "block_header": "00000020b96a23f55dc3f0420f72b1ff89e5b7f273b2654cf057182190bea9a7dba96a1f47d7a2a8faa6244fe398ef3d8d72f698ba0db4251e5b9e8af1bd514f3d4e87571570056bffff7f2005000000",
+          "block_height": 559,
+          "block_leaf_count": 2,
+          "merkle_index": 1,
+          "merkle_siblings_wire": [
+            "61f8d9f5705702aab95ccce6b27def01aef890f293c881d85ade6d191cf09cc7"
+          ],
+          "elapsed_seconds": 3.771442166995257
+        }
+      ]
+    }
+  },
+  "node": "/Bitcoin SV:1.2.3/",
+  "transactions": {
+    "setup": {
+      "txid": "7f1e5e429608ae8c7624c8ce1131b658e6f3533a4191f58db2ecc7e52e94b374",
+      "blockhash": "1201f79574160e76bba894515f0b0453089c4f6906e28fedb5f79e0d5ce848b4",
+      "height": 550,
+      "bytes": 218
+    },
+    "mint-verifier": {
+      "txid": "1f06f856b33bfc7fdc0cc8d7695c99b102ec8821988f017b812fa9f1220028ec",
+      "blockhash": "75774b6163a6fff06e97f64497523b0db3c38a7c46c2cf20fed0351fe2232381",
+      "height": 551,
+      "bytes": 2750748
+    },
+    "fanout-verifier": {
+      "txid": "d5e05638bf009575b29c399026a6a08a43ca620891cb6364499b820fe14415fd",
+      "blockhash": "35457fed96d317ca6540b92a7089e400b8ac79fd43a6766d8032ef36a398a9b2",
+      "height": 552,
+      "bytes": 2750748
+    },
+    "fanout-companion": {
+      "txid": "77541b01279e1ce00d0bac399482d0b66dd8344cd9779c69c0dac49acdd70eb4",
+      "blockhash": "43d59e988f1d808f55620980323b654683901745e58cdfd3a180ac81ca37703c",
+      "height": 553,
+      "bytes": 774
+    },
+    "payment-verifier": {
+      "txid": "2bdd76216e8f70e8f9de021db2aef4b83235a332ec0318c744ec1d2c131132f5",
+      "blockhash": "070b7047547474a6b93d5101ea92850b9f2fc4672d358cb79a9ae7794a5248b3",
+      "height": 554,
+      "bytes": 2750748
+    },
+    "payment-companion": {
+      "txid": "6d433f9109e05b0aec36433bbd1a4b6dd78d4a6e39236dd02544df2e6b96ffa5",
+      "blockhash": "3152eb0e56d43d259c5bf88db7cad55a19bfedae426b30a3f75106ce51077966",
+      "height": 555,
+      "bytes": 774
+    },
+    "mint-genesis": {
+      "txid": "2aa223f077565e021cf23c4201967edaf0ed8c91f163d68d6b1480eca476526a",
+      "blockhash": "60752d80c8a4eddfc518897c57f2f33f46723bf70432a02fad9bbd5ca98a818f",
+      "height": 556,
+      "bytes": 44885
+    },
+    "certified-mint-test-attestation": {
+      "txid": "741bb9ae71ab6f9ba4e770366cc92321e32d2f81d88118e119700051abf14288",
+      "blockhash": "1ab11cbd05a2ffbc10651bcf24bee50c913e7193b1396e82fb6ff7268c08d589",
+      "height": 557,
+      "bytes": 5700101
+    },
+    "capacity-64-fanout": {
+      "txid": "7eb9391df124b6249e679adb381c3dd33f8633d935b3bb767d5d87a2a0440541",
+      "blockhash": "1f6aa9dba7a9be90211857f04c65b273f2b7e589ffb1720f42f0c35df5236ab9",
+      "height": 558,
+      "bytes": 14443527
+    },
+    "capacity-64-payment": {
+      "txid": "c929a5f7acbcf65cd0cb3254eaf8cf7a58604b7513e5063ab265023280b1ed8a",
+      "blockhash": "3001a133d2db53b947377c35e573e53363aa53c0e2b65bfb444a23f518ada0da",
+      "height": 559,
+      "bytes": 23646578
+    }
+  },
+  "fee_floor_observation": {
+    "initial_funding_bytes": 2750748,
+    "initial_fee_sats": 1000000,
+    "mining_fee_sats_per_byte": "0.5",
+    "initial_result": "admitted to mempool, omitted from block",
+    "retry": "funding fee sized from the actual locking script"
+  },
+  "circuit_fingerprint": "70a485af0ccc64cffb4275515fabc57d9344b5104960a7ae22e2819cbd681704",
+  "topology": "shared_parent",
+  "script_policy_bytes": 30000000,
+  "transaction_policy_bytes": 100000000,
+  "stack_policy_bytes": 300000000,
+  "source_attestation": "test-only signed deposit; no EVM transaction in the capacity run",
+  "archive_sha256": "6fcb4f55bfd99bbda1c6d5541c64142b5a865d61ebf6f317528d36d703eff55d"
+}

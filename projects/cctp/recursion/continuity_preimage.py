@@ -12,23 +12,30 @@ CURRENT_OUTPOINT = 68
 CURRENT_AMOUNT = 104 + len(blob(COMPACT_SCRIPTCODE))
 
 
-def _funding_output():
-    """Consume [one-input funding raw, vout-zero outpoint]; leave [sats, lock hash]."""
+def _funding_field():
+    """Consume [one-input funding raw, vout-zero outpoint]; leave [sats, script field]."""
     return (
         asm("32 OP_SPLIT") + push(bytes(4)) + asm("OP_EQUALVERIFY OP_OVER OP_HASH256 OP_EQUALVERIFY")
         + asm("OP_4 OP_SPLIT OP_NIP") + _count(1) + _read_input()
         + asm("OP_ROT OP_DROP OP_SWAP OP_DROP") + _count(1)
         + asm("OP_8 OP_SPLIT OP_SIZE OP_4 OP_SUB OP_SPLIT OP_DROP OP_DUP")
-        + _compact_size() + asm("OP_SWAP OP_SIZE OP_ROT OP_NUMEQUALVERIFY OP_DROP OP_SHA256")
+        + _compact_size() + asm("OP_SWAP OP_SIZE OP_ROT OP_NUMEQUALVERIFY OP_DROP")
     )
 
 
-def current_funding_hash():
+def _funding_output():
+    """Consume [one-input funding raw, vout-zero outpoint]; leave [sats, lock hash]."""
+    return _funding_field() + asm("OP_SHA256")
+
+
+def current_funding_hash(*, keep_lock_field=False):
     """Consume [funding raw, current preimage]; pin the actual verifier's own lock."""
+    retain = asm("OP_DUP") if keep_lock_field else b""
+    amount_roll = asm("OP_3 OP_ROLL") if keep_lock_field else asm("OP_ROT")
     return (
         asm("OP_DUP") + _split(CURRENT_OUTPOINT) + asm("OP_NIP 36 OP_SPLIT OP_DROP OP_SWAP OP_TOALTSTACK")
-        + _funding_output() + asm("OP_FROMALTSTACK") + _split(CURRENT_AMOUNT)
-        + asm("OP_NIP OP_8 OP_SPLIT OP_DROP OP_ROT OP_EQUALVERIFY")
+        + _funding_field() + retain + asm("OP_SHA256 OP_FROMALTSTACK") + _split(CURRENT_AMOUNT)
+        + asm("OP_NIP OP_8 OP_SPLIT OP_DROP") + amount_roll + asm("OP_EQUALVERIFY")
     )
 
 
@@ -118,7 +125,7 @@ def statement_limbs(asset_id, key_digest):
     return continuity_digest(asset_id, key_digest) + digest_limbs_script()
 
 
-def vin_one_transaction_material_check(*, preceding_outputs=3, select_parent_script=False):
+def vin_one_transaction_material_check(*, preceding_outputs=3, select_parent_script=False, parent_output=None):
     """Authenticate [parent, outputs, prevouts, preimage] for verifier vin1.
 
     Leave the actual parent, its selected output script if requested, the final
@@ -128,7 +135,7 @@ def vin_one_transaction_material_check(*, preceding_outputs=3, select_parent_scr
     if select_parent_script:
         selected = (
             asm("OP_TOALTSTACK OP_2 OP_PICK OP_HASH256 OP_EQUALVERIFY OP_1 OP_PICK OP_FROMALTSTACK")
-            + _unsigned() + _select_parent_output() + asm("OP_SWAP")
+            + _unsigned() + (_select_parent_output() if parent_output is None else parent_output) + asm("OP_SWAP")
         )
     else:
         selected = push(bytes(4)) + asm("OP_EQUALVERIFY OP_2 OP_PICK OP_HASH256 OP_EQUALVERIFY")

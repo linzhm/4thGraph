@@ -76,10 +76,11 @@ def _match_prefix(prefix):
     return _split(len(prefix)) + asm("OP_SWAP") + push(prefix) + asm("OP_EQUALVERIFY")
 
 
-def _parse_active_token(asset_id, freeze_key, guards, *, certified_admin=False, allow_frozen=False):
+def _parse_active_token(asset_id, freeze_key, guards, *, certified_admin=False, allow_frozen=False,
+                        shared_ordinary_guard=False):
     """Check the exact v2 script with local owner/amount and inherited guard set."""
     locks = tuple(b"CCTP template placeholder " + bytes([i]) for i in range(guards))
-    policy = TokenPolicy(locks, freeze_key, certified_admin=certified_admin)
+    policy = TokenPolicy(locks, freeze_key, certified_admin=certified_admin, shared_ordinary_guard=shared_ordinary_guard)
     owner = b"\x02" + bytes(range(32))
     template = policy.lock(TokenState(asset_id, 1, owner))
     guard_offsets = [template.index(digest) for digest in policy.verifier_hashes()]
@@ -163,7 +164,8 @@ class MimoProfile:
         fixed(self.freeze_key, 33)
 
     def relation(self, asset_id, reserve_domain=None, *, keep_parents=False, output_tail=0, parent_vout=None,
-                 certified_admin=False, burn_first=False, distinct_token_inputs=False):
+                 certified_admin=False, burn_first=False, distinct_token_inputs=False,
+                 shared_ordinary_guard=False, parent_output=None):
         """Derive [slots, preimage] above the proof stack.
 
         Witness order above proof: parent raws in vin order (excluding vin 0),
@@ -176,7 +178,9 @@ class MimoProfile:
         """
         if burn_first and not self.burn:
             raise ValueError("burn-first layout requires a burn profile")
-        parse = _parse_active_token(asset_id, self.freeze_key, self.guards, certified_admin=certified_admin)
+        parse = _parse_active_token(asset_id, self.freeze_key, self.guards, certified_admin=certified_admin,
+                                    shared_ordinary_guard=shared_ordinary_guard)
+        select = _select_parent_output() if parent_output is None else parent_output
         distinct_tokens = (asm("OP_DUP 36 OP_SPLIT OP_NIP 36 OP_SPLIT OP_EQUAL OP_NOT OP_VERIFY")
                            if (burn_first or distinct_token_inputs) and self.incoming == 2 else b"")
         code = (
@@ -198,7 +202,7 @@ class MimoProfile:
             code += (
                 _pick(depth) + _pick(3) + _split(36 * (i + 1)) + asm("OP_NIP")
                 + _split(36) + asm("OP_DROP 32 OP_SPLIT OP_TOALTSTACK OP_OVER OP_HASH256 OP_EQUALVERIFY")
-                + asm("OP_FROMALTSTACK") + require_vout + _unsigned() + _select_parent_output()
+                + asm("OP_FROMALTSTACK") + require_vout + _unsigned() + select
                 + parse + _append_slot(i + 1, first=i == 0)
             )
         code += (asm("OP_SWAP") + push(uint(self.flow_outputs, 2)) + asm("OP_CAT OP_SWAP")

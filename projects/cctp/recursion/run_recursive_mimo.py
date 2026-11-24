@@ -6,6 +6,7 @@ import subprocess
 from dataclasses import replace
 from hashlib import new, sha256
 from pathlib import Path
+from time import perf_counter
 from tempfile import TemporaryDirectory
 
 from ecdsa import SECP256k1, SigningKey
@@ -44,11 +45,18 @@ class Regtest:
         owner_hash = new("ripemd160", sha256(self.owner_key).digest()).digest()
         self.address = base58check(b"\x6f" + owner_hash)
         self.evidence = {"node": self.node.call("getnetworkinfo")["subversion"], "transactions": {}}
+        self.confirmation_timings = {}
 
     def include(self, label, tx, parents):
-        validate_at_heights(tx, parents, spend_height=200, activation_height=2,
-                            utxo_heights=(3,) * len(parents))
+        started = perf_counter()
+        # A shared creating transaction supplies multiple distinct vouts.
+        # Keep heights per actual vin while avoiding repeated multi-MB parses.
+        funding = tuple({id(parent): parent for parent in parents}.values())
+        validate_at_heights(tx, funding, spend_height=200, activation_height=2,
+                            utxo_heights=(3,) * len(tx.inputs))
+        checked = perf_counter()
         self.node.submit(tx)
+        submitted = perf_counter()
         blockhash = self.node.call("generatetoaddress", 1, self.address)[0]
         block = self.node.call("getblock", blockhash, 1)
         if tx.txid() not in block["tx"]:
@@ -56,6 +64,11 @@ class Regtest:
         self.evidence["transactions"][label] = {
             "txid": tx.txid(), "blockhash": blockhash, "height": block["height"],
             "bytes": len(tx.serialize()),
+        }
+        self.confirmation_timings[label] = {
+            "chain_gang_seconds": checked - started,
+            "node_submission_seconds": submitted - checked,
+            "node_mining_and_confirmation_seconds": perf_counter() - submitted,
         }
         return tx
 
