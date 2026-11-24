@@ -84,3 +84,9 @@ PYTHONPATH=.:projects/groth16/reference ../cctp-test-tools/venv/bin/python -m un
 - [共同验收](dual-route-validation.md) 和共用交易向量已同步到两个分支。单证明探索使用 `/Users/linzheming/Codex/BSV-Script-Lab/cctp-groth16-rules-worktree` 的 `cctp/groth16-rules-exploration`，基点为 `4e3b02294501afabf6d5b03490a8ce9bd4e452d1`。其首项是使用独立电路和密钥验证实际 `1→2`，记录原生出证、独立入块和对应负例。
 - Script 主线增加窄形状双预像。钱包在签名前设置实际 verifier vin 的序列值，Script 通过验签确认相同的类型，父摘要从该 vin 的序列重建。完整共享锁使用 `run_certified_lifecycle.py --chronicle-all` 验收。容量回执仍使用现有 `0x41`。
 - [Chronicle 独立节点边界矩阵](../fixtures/chronicle-activation-regtest-summary.json) 已确认 50 个有效案例入块、10 个无效案例被拒绝。边界试验使用专用夹具锁，覆盖激活前后、版本 1/2、实际新旧 UTXO、混签和管理配对。完整 CCTP 锁和独立父绑定证明分别留存证据。
+
+## 同日续接：冻结优先与通用验证构件
+
+- [当前范围](dual-route-validation.md) 先验收 BSV 冻结和解冻。已有 `1→2` 单证明探索留在独立分支，暂停扩展。源链按受信 RPC、最终性及授权签发接续。跨曲线递归和源链区块压缩暂停。
+- [普通 Groth16 与可选 BSB22](../../groth16/docs/bsb22.md) 共用验证器。分离后 CCTP 的 16 项锁、见证和声明字节一致，独立算术证明已由 BSV Node 入块并拒绝错误公开值。
+- [冻结规则小样](../recursion/freeze/README.md) 保留原生冻结授权，按真实交易构造公开输入。普通及 BSB22 电路对同一声明各自编译和求解，普通版没有 BSB22 承诺。实验锁独立于储备桥。原 Script 正例已在第二个隔离节点[重放入块](../fixtures/v3-certified-freeze-replay-summary.json)。

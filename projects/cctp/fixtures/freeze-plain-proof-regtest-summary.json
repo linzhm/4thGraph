@@ -1,0 +1,87 @@
+{
+  "scope": "Isolated issuer-only freeze probe on Bitcoin SV regtest with test-only parameters",
+  "asset_id": "a1306cd10a5d11afeef7c5db9cef2449e9be49a33ffc29621abd68e097c3124b",
+  "lock_bytes": 451089,
+  "parameters": {
+    "format": "CCTP freeze test parameters v1",
+    "profile": "plain",
+    "test_only": true,
+    "constraints": 240219,
+    "commitments": 0,
+    "statement_bytes": 330,
+    "circuit_sha256": "f7c83464d67579813e1576ebf96666354688783e345ce33eaed147063fd76bf7",
+    "verifying_key_sha256": "30ac2df56f07e99da0a400e3451f942dece2bd02d6fbcb8154cb680b9269ef30",
+    "proving_key_sha256": "f95aeab39409002ed90ece73f614df2befa2c52657b006b07e40e0225abac1b4"
+  },
+  "proofs": {
+    "freeze": {
+      "prove_process_seconds": 63.39395749999676,
+      "proof_artifact_sha256": "e0e7100cbc64a34afb90937c51a1ce0d89555e246b6f25679dfddf82f87c61d5",
+      "public_inputs": [
+        "321427051087152729227774726104073384917",
+        "47001149138068987450947350845747977093"
+      ],
+      "statement_digest": "f1d09927bae85089dc982f410ad033d5235c1790e3441d1f81bd6485d3215b85",
+      "native_prove_seconds": 1.898825625,
+      "native_verify_seconds": 0.001724,
+      "changed_pair_value": {
+        "txid": "e236123e10ed11c95b8a2d5f526852af7c36376019521b0d77b40bfbd22d3264",
+        "rejection": "sendrawtransaction: {'code': -26, 'message': '16: mandatory-script-verify-flag-failed (Script failed an OP_NUMEQUALVERIFY operation)'}"
+      },
+      "witness_bytes": 903586,
+      "proof_witness_bytes": 1078,
+      "fee_satoshis": 1000000,
+      "node_timings": {
+        "chain_gang_seconds": 0.06648191600106657,
+        "node_submission_seconds": 0.7764096669852734,
+        "node_mining_and_confirmation_seconds": 0.15794954204466194
+      }
+    },
+    "unfreeze": {
+      "prove_process_seconds": 51.83521816600114,
+      "proof_artifact_sha256": "d326d5f82cce357c4b08d0173a0a9bb901df81094fa9b1cc4f489e9775f6fe9f",
+      "public_inputs": [
+        "224656151552001507778998632395156557742",
+        "283207975268654424379614649130302959920"
+      ],
+      "statement_digest": "a90333713a7e6d1957325cc794490faed50fdf3bc7a4477c731b51961941f130",
+      "native_prove_seconds": 3.071366458,
+      "native_verify_seconds": 0.003040333,
+      "witness_bytes": 903586,
+      "proof_witness_bytes": 1078,
+      "fee_satoshis": 1000000,
+      "node_timings": {
+        "chain_gang_seconds": 0.18834558397065848,
+        "node_submission_seconds": 0.6682927500223741,
+        "node_mining_and_confirmation_seconds": 0.19057854101993144
+      }
+    }
+  },
+  "node": "/Bitcoin SV:1.2.3/",
+  "transactions": {
+    "setup": {
+      "txid": "e0d160664e3a0214cd7c8a93f71be57931f9f499b4b6a9d8298d3d09db6a0fce",
+      "blockhash": "4bdcfc27b4271b2f7f072734506b7c0e5dcea70a00755c14dadf83f69b783d77",
+      "height": 310,
+      "bytes": 168
+    },
+    "test-origin": {
+      "txid": "0441a9f6759d6621c833aee099bbe13b980ecf4088d88e0bd4140eb38857f810",
+      "blockhash": "0ae9b4fff1665910666e41cb1fadb246f0c7c6f043780f177ed663f6d02fd6b5",
+      "height": 311,
+      "bytes": 451173
+    },
+    "freeze": {
+      "txid": "8626842c83c13f645e2dbd9dd7fc8a6935a707e802da8757c558ea8f8968d09f",
+      "blockhash": "7ce0bb3f18734a4b0807bd68aaa2547f2a549caf1a01c446f43e2f9d0ea47cda",
+      "height": 312,
+      "bytes": 1354784
+    },
+    "unfreeze": {
+      "txid": "c595a69c1bbf5d40fc14735f5a74dc9c3468e980688a29c63709d94bb231a964",
+      "blockhash": "3f041770308a3613c2fc8b9a631f79e1e1a6f3cd89fd3433bacdedd1bfaca61a",
+      "height": 313,
+      "bytes": 1354784
+    }
+  }
+}
