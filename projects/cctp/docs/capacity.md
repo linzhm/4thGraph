@@ -30,3 +30,5 @@ PYTHONPATH=.:projects/groth16/reference:projects/cctp/reference:projects/cctp/re
   --prover /tmp/cctp-continuity --setup-dir /tmp/cctp-continuity-demo \
   --out /tmp/cctp-capacity-64
 ```
+
+追加 `--topology distinct` 可在 fanout 后为每个输出生成一笔独立认证转账，再把其证明组合到一笔付款。该路径使用压缩父交易记录和独立资金赞助，适合从干净的 BSV regtest 开始。`progress.json` 在准备、父交易确认和聚合出证各阶段原子更新，最终付款和钱包验收结束后生成 `summary.json`。
