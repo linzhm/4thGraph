@@ -1,0 +1,168 @@
+{
+  "scope": "Two certified mints using test attestations and two MIMO hops under the same BSB22 key on BSV regtest.",
+  "asset_id": "a50677626476280677bb86b95a25febf9a414304c3741a3310028bcf8240a5c7",
+  "continuity_key_digest": "677731270de75ec11f65c92f2ac8b0c428df79e28a532a035b8402166eb04a9b",
+  "proof_checks": {
+    "certified-first-mint": {
+      "predecessors": [
+        {
+          "txid": "375c1a328bee1d9386b3b9d94c1c567eb25496f3f80f02ac82d1bc4771c6aff8",
+          "vout": 0
+        }
+      ],
+      "public_signals": [
+        "19194724143808363202387887459090370171",
+        "86311570927082525851317403290212994459"
+      ],
+      "previous_proof_digests": [],
+      "proof_sha256": "42c5332f86518fa26c74edf1f0200e290e08c8aa4551d7abb943f112e53dd99f",
+      "largest_input_script_bytes": 1058973,
+      "quantities": [
+        1024
+      ],
+      "rejections": {}
+    },
+    "certified-next-mint": {
+      "predecessors": [
+        {
+          "txid": "53c96718145ce4550ee12baf25ae13a126f5f715c76ff175501c474410d4f79b",
+          "vout": 0
+        }
+      ],
+      "public_signals": [
+        "148210348419817570995527107074957439964",
+        "227278818945837040445904597393270261881"
+      ],
+      "previous_proof_digests": [
+        "0e70c4f76ab5caa2dbaeb53645b10e7b40ef00ff8fb637ef1fe51f5d853b8d9b"
+      ],
+      "proof_sha256": "d1b4d947580f849d4f78fe916f07bddb026ca14871fdb7fab5218e16dcedb7a1",
+      "largest_input_script_bytes": 4110595,
+      "quantities": [
+        384
+      ],
+      "rejections": {}
+    },
+    "two-continuity-parents": {
+      "predecessors": [
+        {
+          "txid": "53c96718145ce4550ee12baf25ae13a126f5f715c76ff175501c474410d4f79b",
+          "vout": 1
+        },
+        {
+          "txid": "11b7e321049f6284541f4695c3e34bb7f8ccc4ac11391eb7eb386f86537825c4",
+          "vout": 1
+        }
+      ],
+      "public_signals": [
+        "314208313696187986824701705287734963577",
+        "238218922430797992886143135835032005788"
+      ],
+      "previous_proof_digests": [
+        "0e70c4f76ab5caa2dbaeb53645b10e7b40ef00ff8fb637ef1fe51f5d853b8d9b",
+        "6f804659e19a5b0e0949a3de5c5af3dcaafc4eed9e6a279e2f23080e61724879"
+      ],
+      "proof_sha256": "460a3192eb618ebee43b4ebd480e8b0daa85fcea7639233d90d8d7108613a47f",
+      "largest_input_script_bytes": 10215267,
+      "quantities": [
+        640,
+        768
+      ],
+      "rejections": {
+        "substituted_predecessor_funding": "sendrawtransaction: {'code': -26, 'message': '16: mandatory-script-verify-flag-failed (Script failed an OP_EQUALVERIFY operation)'}",
+        "resigned_payout_with_old_proof": "sendrawtransaction: {'code': -26, 'message': '16: mandatory-script-verify-flag-failed (Script failed an OP_NUMEQUALVERIFY operation)'}"
+      }
+    },
+    "continuity-descendant": {
+      "predecessors": [
+        {
+          "txid": "f1ced2bb9ddd4c1bbde957db623c2bbb0a5b5019a7ac2e3ffb7648cb3b5b9ff8",
+          "vout": 1
+        }
+      ],
+      "public_signals": [
+        "196654241079595411103541764640426849079",
+        "61996234456917324070881896612362017451"
+      ],
+      "previous_proof_digests": [
+        "ec6251ec5352a776db8e9fefa594ad79b3374baca1edab0e4057e0f706ce2c9c"
+      ],
+      "proof_sha256": "90f4fcfb90ecd8b438958e55bcc9cfec5142a33ad74fb5171086f15ab3fb3e4d",
+      "largest_input_script_bytes": 14106366,
+      "quantities": [
+        384,
+        384
+      ],
+      "rejections": {}
+    }
+  },
+  "node": "/Bitcoin SV:1.2.3/",
+  "transactions": {
+    "setup": {
+      "txid": "593ef750902f6c62184a6bd93228054489fd0a1515653be1bab02b62480e9645",
+      "blockhash": "68fffceb59d49a40b342bfbf7af853fdb887e841ab196db4aad2a6c52c2c16c4",
+      "height": 205,
+      "bytes": 218
+    },
+    "funding-0": {
+      "txid": "2ab8c392fb3334c437122625b3bb66050b53bbd6d791644681fba5d2f7894ab6",
+      "blockhash": "30c7af9ad8b8fec3673c20eadd848994a68ba854797a5028df61e5623c6ff849",
+      "height": 206,
+      "bytes": 969642
+    },
+    "funding-1": {
+      "txid": "fdf7d38314e5822be4740a2852bc3bb6698a699fa2a8c00b5fbde47916e5e4f4",
+      "blockhash": "6e194baf515b59d09b17fecfea3e65abc50e028a3e3ce1faaf3ac4e9446072c5",
+      "height": 207,
+      "bytes": 969642
+    },
+    "funding-2": {
+      "txid": "b881abb2785389ee28dab47d039739d8661624b666a6cb57f72f9aa8cac39f26",
+      "blockhash": "4156a6f6f18372610ba80c9c8d02a44f89a4cd6644c69d50dfe38c7b646b27ee",
+      "height": 208,
+      "bytes": 969642
+    },
+    "funding-4": {
+      "txid": "4d4694efbdc1dcab95bf9e22ead3384811fdd455aed4cc0b5ecede61c346c38b",
+      "blockhash": "6c43ccf94bc35f130503d08c055d84086a73da4f31e195aa0e59b3fc32fcc18f",
+      "height": 209,
+      "bytes": 969642
+    },
+    "mint-genesis": {
+      "txid": "375c1a328bee1d9386b3b9d94c1c567eb25496f3f80f02ac82d1bc4771c6aff8",
+      "blockhash": "50012320bb14bd4684350efa93e65aeac50feeeaee28a2e640c49e1cd12625f4",
+      "height": 210,
+      "bytes": 42679
+    },
+    "certified-first-mint": {
+      "txid": "53c96718145ce4550ee12baf25ae13a126f5f715c76ff175501c474410d4f79b",
+      "blockhash": "2714895a8f4dba82a730703ea3a487df3fec87325a88005f82d17d0afdead8cd",
+      "height": 211,
+      "bytes": 2124650
+    },
+    "certified-next-mint": {
+      "txid": "11b7e321049f6284541f4695c3e34bb7f8ccc4ac11391eb7eb386f86537825c4",
+      "blockhash": "2885cacf65629039c15f67ccc98bea08aa2d30f6945dab11837b20b2ec47aa7d",
+      "height": 212,
+      "bytes": 5176273
+    },
+    "two-continuity-parents": {
+      "txid": "f1ced2bb9ddd4c1bbde957db623c2bbb0a5b5019a7ac2e3ffb7648cb3b5b9ff8",
+      "blockhash": "0ff84fa625fb8a3ac9a1cbcb42fc5c57f3667d25c9659e768cb3d5a66ba09c37",
+      "height": 213,
+      "bytes": 12161711
+    },
+    "continuity-descendant": {
+      "txid": "b832807c3697cf95fef9ab20863f6210bf8ebc8dbb69676f04d76d1e7d7bee9b",
+      "blockhash": "1dae47a0d1fc72df23caf09e7f3758bc571632f10e8c5c28845860fadd53af41",
+      "height": 214,
+      "bytes": 15081190
+    }
+  },
+  "profile": {
+    "certified_mints": true,
+    "certified_admin": false
+  },
+  "circuit_fingerprint": "70a485af0ccc64cffb4275515fabc57d9344b5104960a7ae22e2819cbd681704",
+  "archive_sha256": "f325907e8952cb3bd62fcf0a4606be89c2ab654d9b921bd47592d6dcaa0f4aa0"
+}

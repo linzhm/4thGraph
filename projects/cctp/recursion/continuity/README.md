@@ -48,3 +48,5 @@ PYTHONPATH=.:projects/groth16/reference:projects/cctp/reference:projects/cctp/re
   --prover /tmp/cctp-continuity --setup-dir /tmp/cctp-continuity-demo \
   --out /tmp/cctp-continuity-regtest
 ```
+
+[实际交易节点记录](../../fixtures/v3-continuity-regtest-summary.json) 覆盖高度 211–214 的两笔认证铸造、2→2 和后继 1→2。最后一笔交易为 15,081,190 字节，最大输入脚本为 14,106,366 字节。归档包含真实交易及全量证明，入金采用隔离测试签发。该配置测试了认证铸造和转账，带认证回执的冻结与解冻另有本地 Script 验证。
