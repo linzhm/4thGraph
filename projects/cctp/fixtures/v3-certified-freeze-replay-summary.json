@@ -1,0 +1,42 @@
+{
+  "scope": "Archived v3 blocks replayed and consensus-validated by an isolated Bitcoin SV regtest",
+  "node": "/Bitcoin SV:1.2.3/",
+  "asset_id": "fc776a621e77d7353e51ad374716444a11b4b4a42bd3188b2ed605ac73ffab0e",
+  "owner": "03774ae7f858a9411e5ef4246b70c65aac5649980be5c17891bbec17895da008cb",
+  "archive_sha256": "19174d15a3643369cbd12658cc41ba79c03a0d1a2ec57bce6aa4ee446190e025",
+  "paired_successors": [
+    {
+      "height": 325,
+      "blockhash": "4c9d343ecf14aa353e8d4bdb9dac6ba4493008b3e095250401ec9cc5f4266325",
+      "txid": "4c49d5c13adfceb4200b343e83c0304467cf39ef092b527ea92a5aff42a9a49b",
+      "consumed_txid": "54297c9ae9c11ab4f3fee53cc115d594537a4f4e23d971a1643b92f457b335be",
+      "consumed_vout": 0,
+      "successor_vout": 0,
+      "satoshis": 1000,
+      "quantity": 640,
+      "frozen": true,
+      "receipt_parents": [
+        "f08615002930695538ffef2769831021a0ea3f868fba30a316b0e02bf52f2c97"
+      ]
+    },
+    {
+      "height": 327,
+      "blockhash": "27025e46051ef5cd6b76f328739e3b0537276bacb311d3bb4137514362a69031",
+      "txid": "4acf180ec5f81aa9b425549b205bf8d67fc601e35d8b9f8bd6eb5df327505503",
+      "consumed_txid": "4c49d5c13adfceb4200b343e83c0304467cf39ef092b527ea92a5aff42a9a49b",
+      "consumed_vout": 0,
+      "successor_vout": 0,
+      "satoshis": 1000,
+      "quantity": 640,
+      "frozen": false,
+      "receipt_parents": [
+        "278fa737d479fe3ee3b5e995381824135e4b659cb0d217eaa0b08ef3574a3955"
+      ]
+    }
+  ],
+  "independent_unchanged_output": {
+    "txid": "54297c9ae9c11ab4f3fee53cc115d594537a4f4e23d971a1643b92f457b335be",
+    "vout": 1,
+    "quantity": 384
+  }
+}
