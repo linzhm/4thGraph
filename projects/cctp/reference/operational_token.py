@@ -64,12 +64,13 @@ class TokenPolicy:
     def verifier_hashes(self) -> tuple[bytes, ...]:
         return tuple(sorted(sha256(blob(lock)).digest() for lock in self.verifier_locks))
 
-    def selected_verifier(self, tx: Transaction, raw: bytes) -> Transaction:
+    def selected_verifier(self, tx: Transaction, raw: bytes, *, index=0) -> Transaction:
         parent = Transaction.parse(raw)
-        if (not tx.inputs or tx.inputs[0].txid != parent.txid_wire() or tx.inputs[0].vout != 0
+        if (type(index) is not int or not 0 <= index < len(tx.inputs)
+                or tx.inputs[index].txid != parent.txid_wire() or tx.inputs[index].vout != 0
                 or len(parent.inputs) != 1 or len(parent.inputs[0].script) >= 253
                 or len(parent.outputs) != 1 or parent.outputs[0].script not in self.verifier_locks):
-            raise ValueError("invalid input-zero verifier parent")
+            raise ValueError("invalid verifier parent")
         return parent
 
     def _ordinary_guard(self) -> bytes:

@@ -3,6 +3,8 @@
 from collections.abc import Callable
 from dataclasses import dataclass
 from functools import cached_property
+from hashlib import sha256
+from typing import TYPE_CHECKING
 
 from mint_events import (
     DEPOSIT_DOMAIN, DEPOSIT_SIZE, EMPTY_LEAF, EMPTY_ROOT, EVENT_ID_DOMAIN, FEE_OFFSET,
@@ -11,10 +13,13 @@ from mint_events import (
 )
 from shared.pushtx import PUBLIC, binding_der
 from shared.script import asm, number, push
-from shared.transaction import Input, Output, Transaction, amount, compact, hash256, preimage_all
+from shared.transaction import Input, Output, Transaction, amount, blob, compact, hash256, preimage_all
 from statement import AssetDescriptor, fixed, uint
 from transaction_relation import TokenState
 from usdc_amount import USDC_DECIMALS
+
+if TYPE_CHECKING:
+    from projects.cctp.recursion.continuity_statement import ParentReceipt
 
 STATE_DOMAIN = b"BSV/CCTP/mint-state/v1\0"
 STATE_MARKER = push(STATE_DOMAIN)
@@ -92,8 +97,28 @@ def _finish_outputs() -> bytes:
         + _size(28) + asm("OP_8 OP_SPLIT OP_SWAP")
         + push(bytes([25]) + P2PKH_PREFIX) + asm("OP_CAT OP_SWAP OP_CAT")
         + push(P2PKH_SUFFIX) + asm("OP_CAT OP_CAT OP_ELSE OP_DROP OP_ENDIF")
-        + asm("OP_HASH256 OP_OVER OP_SIZE 40 OP_SUB OP_SPLIT OP_NIP 32 OP_SPLIT OP_DROP "
-              "OP_EQUALVERIFY OP_2DROP OP_2DROP OP_2DROP OP_1")
+        + _verify_outputs_digest()
+    )
+
+
+def _verify_outputs_digest() -> bytes:
+    return asm("OP_HASH256 OP_OVER OP_SIZE 40 OP_SUB OP_SPLIT OP_NIP 32 OP_SPLIT OP_DROP "
+               "OP_EQUALVERIFY OP_2DROP OP_2DROP OP_2DROP OP_1")
+
+
+def _finish_certified_outputs() -> bytes:
+    from projects.cctp.recursion.continuity_statement import OUTPUT_PREFIX, OUTPUT_SIZE
+
+    # The receipt occupies the same witness slot used by legacy P2PKH change.
+    # Check the whole serialized output, including zero satoshis, canonical
+    # script prefix, cardinality and padding. The verifier input checks the
+    # meaning of the active predecessor digests.
+    return (
+        asm("OP_2 OP_PICK") + _size(OUTPUT_SIZE)
+        + asm("OP_DUP") + _slice(0, len(OUTPUT_PREFIX)) + push(OUTPUT_PREFIX) + asm("OP_EQUALVERIFY")
+        + asm("OP_DUP") + number(len(OUTPUT_PREFIX)) + asm("OP_SPLIT OP_NIP OP_1 OP_SPLIT OP_SWAP")
+        + _unsigned() + asm("OP_DUP 0 3 OP_WITHIN OP_VERIFY 32 OP_MUL OP_SPLIT OP_NIP")
+        + _unsigned() + asm("OP_0 OP_NUMEQUALVERIFY OP_CAT") + _verify_outputs_digest()
     )
 
 
@@ -106,6 +131,7 @@ class MintPolicy:
     lock_token: Callable[[TokenState], bytes]
     carrier: int = 1000
     pause_authority: bytes | None = None
+    certified_verifier_hash: bytes | None = None
 
     def __post_init__(self):
         self.asset.encode()
@@ -118,6 +144,8 @@ class MintPolicy:
             compressed_key(self.pause_authority)
             if self.pause_authority == self.attestor:
                 raise ValueError("mint and pause authorities must be distinct")
+        if self.certified_verifier_hash is not None and not any(fixed(self.certified_verifier_hash, 32)):
+            raise ValueError("certified mint requires a concrete verifier script hash")
         amount(self.carrier)
         if not self.source_chain_id or not any(self.reserve_contract) or not self.carrier:
             raise ValueError("expected a concrete source chain, reserve contract and token carrier")
@@ -189,7 +217,19 @@ class MintPolicy:
     def _mint_branch(self) -> bytes:
         # Unlocking stack (top at right): sig, Merkle path, deposit, prevouts,
         # optional change, preimage. The locking prefix adds the old root.
-        script = _authenticate(self.attestor)
+        script = b""
+        if self.certified_verifier_hash is not None:
+            from transfer import verifier_input_script_hash
+
+            # Certified mint adds the raw vin-one funding transaction below
+            # the normal mint fields. Authenticate it using this state's
+            # ForkID ALL preimage, then restore the legacy main stack shape.
+            script += (
+                asm("OP_DEPTH OP_8 OP_NUMEQUALVERIFY OP_7 OP_ROLL OP_4 OP_PICK OP_3 OP_PICK")
+                + verifier_input_script_hash(input_index=1)
+                + push(self.certified_verifier_hash) + asm("OP_EQUALVERIFY")
+            )
+        script += _authenticate(self.attestor)
         # Validate mint scope and use just the source position as the replay key.
         script += (
             asm("OP_4 OP_PICK") + _size(DEPOSIT_SIZE) + asm("OP_DUP")
@@ -223,12 +263,13 @@ class MintPolicy:
             )
             script += fragment + asm("OP_CAT")
         script += asm("OP_ROT OP_DROP OP_NIP OP_CAT")
-        # Build vout 2 (the exact signed deposit record) and optional P2PKH vout 3.
+        # Build vout 2 (the exact signed deposit record) and the configured vout 3.
         record_header = push(bytes(DEPOSIT_SIZE))[:-DEPOSIT_SIZE]
         record_size = len(RECORD_PREFIX) + len(record_header) + DEPOSIT_SIZE
         script += (
             push(amount(0) + compact(record_size) + RECORD_PREFIX + record_header)
-            + asm("OP_CAT OP_4 OP_PICK OP_CAT") + _finish_outputs()
+            + asm("OP_CAT OP_4 OP_PICK OP_CAT")
+            + (_finish_outputs() if self.certified_verifier_hash is None else _finish_certified_outputs())
         )
         return script
 
@@ -288,11 +329,13 @@ class MintPlan:
     transaction: Transaction
     path: tuple[bytes, ...]
     successor: MintEvents
+    verifier_parent: Transaction | None = None
 
 
 def prepare_mint(
     policy: MintPolicy, prior: Transaction, events: MintEvents, deposit: Deposit, sponsor: Input,
-    *, change: Output | None = None,
+    *, change: Output | None = None, receipt: "ParentReceipt | None" = None,
+    verifier_parent: Transaction | None = None,
 ) -> MintPlan:
     policy.check_deposit(deposit)
     if not prior.outputs or prior.outputs[0].script != policy.state_lock(events.root):
@@ -303,6 +346,14 @@ def prepare_mint(
     state_input = Input(prior.txid_wire(), 0)
     if sponsor.outpoint() == state_input.outpoint():
         raise ValueError("duplicate mint input")
+    if policy.certified_verifier_hash is None:
+        if verifier_parent is not None or receipt is not None:
+            raise ValueError("legacy mint does not accept a continuity verifier or receipt")
+    else:
+        if change is not None or receipt is None or sponsor.vout != 0:
+            raise ValueError("certified mint requires vin-one verifier vout zero and a continuity receipt")
+        if verifier_parent is not None:
+            _check_verifier_parent(policy, sponsor, verifier_parent)
     successor, path = events.add(deposit.position.event_id())
     outputs = (
         Output(prior.outputs[0].value, policy.state_lock(successor.root)),
@@ -312,8 +363,38 @@ def prepare_mint(
     if change is not None:
         _change_bytes(change)
         outputs += (change,)
+    if receipt is not None:
+        from projects.cctp.recursion.continuity_statement import ParentReceipt
+
+        receipt_output = receipt.output()
+        ParentReceipt.parse(receipt_output)
+        outputs += (receipt_output,)
     transaction = Transaction((state_input, sponsor), outputs)
-    return MintPlan(policy, prior, events, deposit, transaction, path, successor)
+    return MintPlan(policy, prior, events, deposit, transaction, path, successor, verifier_parent)
+
+
+def _check_verifier_parent(policy: MintPolicy, sponsor: Input, verifier_parent: Transaction | None) -> None:
+    if verifier_parent is None:
+        raise ValueError("certified mint requires the actual verifier funding transaction")
+    if (sponsor.vout != 0 or sponsor.txid != verifier_parent.txid_wire()
+            or len(verifier_parent.inputs) != 1 or len(verifier_parent.inputs[0].script) >= 253
+            or len(verifier_parent.outputs) != 1):
+        raise ValueError("incorrect certified mint verifier parent or outpoint")
+    script_hash = sha256(blob(verifier_parent.outputs[0].script)).digest()
+    if script_hash != policy.certified_verifier_hash:
+        raise ValueError("incorrect certified mint verifier script hash")
+
+
+def _mint_tail(policy: MintPolicy, transaction: Transaction) -> tuple[Output | None, "ParentReceipt | None"]:
+    if len(transaction.inputs) != 2 or len(transaction.outputs) not in (3, 4):
+        raise ValueError("invalid mint layout")
+    if policy.certified_verifier_hash is None:
+        return (transaction.outputs[3] if len(transaction.outputs) == 4 else None), None
+    if len(transaction.outputs) != 4:
+        raise ValueError("missing certified mint continuity receipt")
+    from projects.cctp.recursion.continuity_statement import ParentReceipt
+
+    return None, ParentReceipt.parse(transaction.outputs[3])
 
 
 def _change_bytes(output: Output) -> bytes:
@@ -326,15 +407,20 @@ def _change_bytes(output: Output) -> bytes:
 def mint_unlock(plan: MintPlan, der_signature: bytes) -> bytes:
     """Encode a Script witness for the policy's external SIGHASH_ALL signer."""
     tx = plan.transaction
-    if len(tx.inputs) != 2 or len(tx.outputs) not in (3, 4):
-        raise ValueError("invalid mint layout")
+    change, receipt = _mint_tail(plan.policy, tx)
     prevouts = b"".join(item.outpoint() for item in tx.inputs)
     preimage = preimage_all(tx, 0, plan.prior.outputs[0].value, plan.prior.outputs[0].script)
-    change = _change_bytes(tx.outputs[3]) if len(tx.outputs) == 4 else b""
+    tail = _change_bytes(change) if change is not None else b""
+    verifier = b""
+    if receipt is not None:
+        _check_verifier_parent(plan.policy, tx.inputs[1], plan.verifier_parent)
+        assert plan.verifier_parent is not None
+        verifier = push(plan.verifier_parent.serialize())
+        tail = receipt.output().serialize()
     witness = b"".join(push(field) for field in (
-        der_signature + b"\x41", b"".join(plan.path), plan.deposit.encode(), prevouts, change, preimage,
+        der_signature + b"\x41", b"".join(plan.path), plan.deposit.encode(), prevouts, tail, preimage,
     ))
-    return witness + (asm("OP_0") if plan.policy.pause_authority is not None else b"")
+    return verifier + witness + (asm("OP_0") if plan.policy.pause_authority is not None else b"")
 
 
 def authorize_mint(
@@ -347,10 +433,11 @@ def authorize_mint(
     The observer's trust and finality checks belong to the source-chain adapter.
     """
     tx = plan.transaction
-    if len(tx.inputs) != 2 or len(tx.outputs) not in (3, 4):
-        raise ValueError("invalid mint layout")
-    change = tx.outputs[3] if len(tx.outputs) == 4 else None
-    expected = prepare_mint(plan.policy, plan.prior, plan.events, plan.deposit, tx.inputs[1], change=change)
+    change, receipt = _mint_tail(plan.policy, tx)
+    if receipt is not None:
+        _check_verifier_parent(plan.policy, tx.inputs[1], plan.verifier_parent)
+    expected = prepare_mint(plan.policy, plan.prior, plan.events, plan.deposit, tx.inputs[1],
+                            change=change, receipt=receipt, verifier_parent=plan.verifier_parent)
     if (expected.transaction != tx or expected.path != plan.path or expected.successor != plan.successor):
         raise ValueError("plan disagrees with the canonical mint transition")
     if finalized_deposit(plan.deposit.position) != plan.deposit:
@@ -415,8 +502,9 @@ def recover_mint_state(
             paused = not paused
             expected = prepare_pause(policy, prior, events, transaction.inputs[1], paused=paused, change=change)
         else:
-            change = transaction.outputs[3] if size == 4 else None
-            plan = prepare_mint(policy, prior, events, read_deposit(transaction), transaction.inputs[1], change=change)
+            change, receipt = _mint_tail(policy, transaction)
+            plan = prepare_mint(policy, prior, events, read_deposit(transaction), transaction.inputs[1],
+                                change=change, receipt=receipt)
             expected, events = plan.transaction, plan.successor
         if transaction.with_script(0, b"").serialize() != expected.serialize():
             raise ValueError("mint history does not extend the anchored state")

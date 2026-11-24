@@ -142,12 +142,15 @@ class MimoProfile:
             raise ValueError("expected one to eight approved verifier locks")
         fixed(self.freeze_key, 33)
 
-    def relation(self, asset_id, reserve_domain=None, *, keep_parents=False):
+    def relation(self, asset_id, reserve_domain=None, *, keep_parents=False, output_tail=0, parent_vout=None):
         """Derive [slots, preimage] above the proof stack.
 
         Witness order above proof: parent raws in vin order (excluding vin 0),
         serialized outputs, serialized prevouts, and the compact preimage.
         With keep_parents, leave the authenticated parent raws below the result.
+        With output_tail, require exactly that many trailing serialized output
+        bytes and return both the inherited guard vector and those bytes
+        between slots and preimage for the caller to check.
         """
         parse = _parse_active_token(asset_id, self.freeze_key, self.guards)
         code = (
@@ -161,12 +164,14 @@ class MimoProfile:
             + _split(68) + asm("OP_NIP 36 OP_SPLIT OP_DROP OP_OVER 36 OP_SPLIT OP_DROP OP_EQUALVERIFY")
             + push(uint(self.incoming, 2)) + asm("OP_0")
         )
+        require_vout = (b"" if parent_vout is None else
+                        asm("OP_DUP") + push(uint(parent_vout, 4)) + asm("OP_EQUALVERIFY"))
         for i in range(self.incoming):
             depth = self.incoming + 3 - i
             code += (
                 _pick(depth) + _pick(3) + _split(36 * (i + 1)) + asm("OP_NIP")
                 + _split(36) + asm("OP_DROP 32 OP_SPLIT OP_TOALTSTACK OP_OVER OP_HASH256 OP_EQUALVERIFY")
-                + asm("OP_FROMALTSTACK") + _unsigned() + _select_parent_output()
+                + asm("OP_FROMALTSTACK") + require_vout + _unsigned() + _select_parent_output()
                 + parse + _append_slot(i + 1, first=i == 0)
             )
         code += (asm("OP_SWAP") + push(uint(self.flow_outputs, 2)) + asm("OP_CAT OP_SWAP")
@@ -182,6 +187,13 @@ class MimoProfile:
                 + _split(20) + asm("OP_SWAP") + push(bytes(20)) + asm("OP_EQUAL OP_NOT OP_VERIFY")
                 + _split(8) + asm("OP_OVER") + _unsigned() + asm("OP_SWAP") + _unsigned()
                 + asm("OP_GREATERTHAN OP_VERIFY OP_OVER") + _append_slot(self.outgoing)
+            )
+        if output_tail:
+            return (
+                code + asm("OP_FROMALTSTACK OP_SIZE") + number(output_tail) + asm("OP_NUMEQUALVERIFY")
+                + asm("OP_TOALTSTACK OP_TOALTSTACK OP_TOALTSTACK")
+                + asm("OP_DROP") * (2 if keep_parents else self.incoming + 2)
+                + asm("OP_FROMALTSTACK") * 4
             )
         return (
             code + asm("OP_FROMALTSTACK OP_SIZE OP_0 OP_NUMEQUALVERIFY OP_2DROP OP_TOALTSTACK")
