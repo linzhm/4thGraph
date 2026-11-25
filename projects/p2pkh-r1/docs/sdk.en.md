@@ -21,8 +21,10 @@ For mixed inputs or explicit NONE, SINGLE, ANYONECANPAY and OTDA, build each inp
 For a child payment, obtain the confirmed funding outpoint from the
 application's trusted chain view before invoking the signing callback.
 Apply the application's confirmation threshold and recheck the output index,
-amount, and lock against that transaction.
-[Unconfirmed parent txids](./chronicle.md#unconfirmed-parent-txids)
+amount, locking script, and unspent status. If a different txid confirmed,
+reconcile the wallet's outpoint and rebuild the child before requesting a
+new signature.
+[Recovering a child payment](./chronicle.md#recovering-a-child-payment)
 
 ## Regex and complete fingerprint
 

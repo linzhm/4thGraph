@@ -48,6 +48,9 @@ The wallet first constructs P from the actual spend and signature type, hashes P
 For a child payment, use the funding outpoint verified in the application's
 trusted chain view after the required confirmation depth. An unconfirmed parent
 txid can change when the rules permit another encoding of its unlocking script.
+Any version that confirms with a different txid invalidates a child pointing
+to the original outpoint. If the intended output is still available under the
+confirmed txid, the owner can authorize a new child against that outpoint.
 [Unconfirmed parent txids](./chronicle.md#unconfirmed-parent-txids)
 
 ## Signature coverage
