@@ -1,7 +1,5 @@
 from p2pkh_sm2 import locking_script_from_public_key
 from sm2 import USER_ID, encode_public, fixture_sign, mul
-from test_signed_data import ISSUER_AND_SERIAL, signed_data
-from test_sm2 import der_signature
 
 
 def raw_signer(scalar):
@@ -16,6 +14,9 @@ def cases():
     for scalar, sighash in ((1, 0x41), (2, 0x61)):
         yield dict(public_key=encode_public(mul(scalar)), signer=raw_signer(scalar), profile="v1.0.0",
                    bytes=144925, sighash=sighash)
+
+    from test_signed_data import ISSUER_AND_SERIAL, signed_data
+    from test_sm2 import der_signature
 
     def signed_data_provider(message, user_id):
         assert user_id == USER_ID

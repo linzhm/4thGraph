@@ -10,12 +10,19 @@
 
 ## 配置原生 P2PKH
 
-从仓库根目录运行。TypeScript 需要 Node.js 24 或以上版本，Go 需要 1.23 或以上版本，Rust 库使用 2021 edition。
+从仓库根目录运行以下命令，体验 Python 示例。
 
 ```sh
 python3.12 -m venv .venv
-.venv/bin/python -m pip install -r projects/p2pk-p2pkh-baseline/reference/requirements-sdk.txt
+.venv/bin/python -m pip install -r projects/p2pk-p2pkh-baseline/reference/requirements-sdk.txt ecdsa==0.19.1
+.venv/bin/python -m shared.sdk.examples.receive_and_pay
 ```
+
+离线示例创建并识别原生 P2PKH 锁，再签署一笔手续费为 100 聪的模拟交易，并输出模板、字节数和交易 ID。示例使用公开测试密钥，全程离线运行。`ecdsa` 包供测试签名器使用。[示例源码](examples/receive_and_pay.py)
+
+在命令末尾加上 `p2pkh-sm2`、`lamport-ots`、`wots-plus` 或 `ml-dsa` 可体验其他签名方案。SM2 依赖见其接入指南。此示例中的 Lamport 和 WOTS+ 只需 Python 标准库。ML-DSA-44 需要 OpenSSL 3.5 或以上版本，可通过 `ML_DSA_OPENSSL` 指定。R1 和 Deferred 的交易和启用复放见下方项目指南。
+
+TypeScript 示例需要 Node.js 24 或以上版本，Go 示例需要 Go 1.23 或以上版本，Rust 库采用 2021 版语言规范。
 
 源码入口为 [TypeScript 的 `WalletClient`](typescript/index.ts)、[Rust 的 `WalletClient::new`](rust/Cargo.toml)、[Go 的 `NewWallet`](go/go.mod) 和 [Python 的 `WalletClient`](python/client.py)。Python 项目可以从仓库根目录运行，或把仓库加入 `PYTHONPATH`。
 
@@ -69,6 +76,8 @@ TypeScript、Rust、Go 用偶数长度、无前缀的十六进制传递交易、
 
 普通付款默认使用 ForkID ALL（`0x41`）。`SINGLE` 需要同索引输出，选择 OTDA 时从可信链视图填写 `chronicleActive`。签名请求包含 `algorithm`、`payloadKind`（`digest` 或 `message`）、`signatureFormat`、`sighash`、`payload`，SM2 还提供 `userId`。各项目的签名方式和编码见下表。
 
+如果桥接进程启动失败，检查 Python 解释器路径、签名方案依赖和源码目录。手续费校验在调用签名器前完成。签名校验可能在回调返回后失败，此时保留签名器状态，并按项目指南处理重试，尤其是使用一次性密钥时。
+
 ## Rust、Go 和 Python 调用
 
 Rust 和 Go 的 `config` 填入与 TypeScript 相同的 Python 解释器和 bridge 绝对路径。Rust 示例里的 `approved_outputs` 为 `Vec<Output>`，Go 为 `[]sdk.Output`，Python 为 `(聪金额, 原始锁定脚本字节)` 的序列。
@@ -116,6 +125,8 @@ signed = wallet.sign_payment(
     lambda request: signer.sign_secp256k1_digest_der(request.payload),
 )
 ```
+
+Python 接入 Lamport 或 WOTS+ 时，用 `sign_once = durable_signer(database, project, spend_key, sign_digest)` 封装摘要签名器，再传入回调 `lambda request: sign_once(request.payload)`。各钱包进程和各模板格式共用同一个数据库和规范化的公钥。[一次性签名器](../one_time_signer.py)
 
 ## 选择签名方案
 
