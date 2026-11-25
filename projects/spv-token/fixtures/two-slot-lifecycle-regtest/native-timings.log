@@ -1,0 +1,74 @@
+{"level":"info","time":"2026-11-25T19:47:12+08:00","message":"compiling circuit"}
+{"level":"info","nbSecret":22430,"nbPublic":2,"time":"2026-11-25T19:47:12+08:00","message":"parsed circuit inputs"}
+{"level":"info","nbConstraints":13787986,"time":"2026-11-25T19:48:21+08:00","message":"building constraint builder"}
+compiled prepared-lifecycle: 13787986 constraints, 0 commitments, fingerprint 03e7831e77540ea4da010fac9a5c2b9eca560e499fb691524e0a8d49cadab128
+prepared-lifecycle: 13787986 constraints, test setup 12m41.66160025s, verifying key 82838b211d67c4a099b7e0f41cfbf30e689623038b92525576f64f5908d851af
+{"level":"debug","nbConstraints":13787986,"took":1702.622792,"time":"2026-11-25T20:01:08+08:00","message":"constraint system solver done"}
+{"level":"debug","curve":"bls12_381","acceleration":"none","nbConstraints":13787986,"backend":"groth16","took":21697.095333,"time":"2026-11-25T20:01:29+08:00","message":"prover done"}
+{"level":"debug","curve":"bls12_381","backend":"groth16","took":1.278167,"time":"2026-11-25T20:01:29+08:00","message":"verifier done"}
+prepared-lifecycle: proved and verified in 23.416460584s, statement 7e6085fa390bc246b854a390bf36c25bd0e94cd75d7d84c9c60e037835f2fc65
+{"level":"error","nbConstraints":13787986,"error":"constraint #13405097 is not satisfied: 1 ⋅ -1 != 0","time":"2026-11-25T20:01:32+08:00"}
+{"level":"debug","nbConstraints":13787986,"took":1409.305292,"time":"2026-11-25T20:01:33+08:00","message":"constraint system solver done"}
+{"level":"debug","curve":"bls12_381","acceleration":"none","nbConstraints":13787986,"backend":"groth16","took":21362.65875,"time":"2026-11-25T20:01:55+08:00","message":"prover done"}
+{"level":"debug","curve":"bls12_381","backend":"groth16","took":1.227625,"time":"2026-11-25T20:01:55+08:00","message":"verifier done"}
+prepared-lifecycle: proved and verified in 22.782554833s, statement b9f09e9e387635cb74e4d0215cc975ae1316e5410b70c7e6b38a5417e4436cdf
+{"level":"debug","nbConstraints":13787986,"took":1194.600292,"time":"2026-11-25T20:02:53+08:00","message":"constraint system solver done"}
+{"level":"debug","curve":"bls12_381","acceleration":"none","nbConstraints":13787986,"backend":"groth16","took":21111.022291,"time":"2026-11-25T20:03:14+08:00","message":"prover done"}
+{"level":"debug","curve":"bls12_381","backend":"groth16","took":1.217042,"time":"2026-11-25T20:03:14+08:00","message":"verifier done"}
+prepared-lifecycle: proved and verified in 22.318219416s, statement 7e6085fa390bc246b854a390bf36c25bd0e94cd75d7d84c9c60e037835f2fc65
+{"level":"error","nbConstraints":13787986,"error":"constraint #13405097 is not satisfied: 1 ⋅ -1 != 0","time":"2026-11-25T20:03:16+08:00"}
+{"level":"debug","nbConstraints":13787986,"took":1219.573375,"time":"2026-11-25T20:03:18+08:00","message":"constraint system solver done"}
+{"level":"debug","curve":"bls12_381","acceleration":"none","nbConstraints":13787986,"backend":"groth16","took":21374.974417,"time":"2026-11-25T20:03:39+08:00","message":"prover done"}
+{"level":"debug","curve":"bls12_381","backend":"groth16","took":1.21575,"time":"2026-11-25T20:03:39+08:00","message":"verifier done"}
+prepared-lifecycle: proved and verified in 22.605306459s, statement c117f01f38f6173d410b5fb29d5c4aca83f4ec9fb9305f39f007cd7ece002b22
+{"level":"error","nbConstraints":13787986,"error":"constraint #13405097 is not satisfied: 1 ⋅ -1 != 0","time":"2026-11-25T20:03:41+08:00"}
+{"level":"debug","nbConstraints":13787986,"took":1293.058417,"time":"2026-11-25T20:03:43+08:00","message":"constraint system solver done"}
+{"level":"debug","curve":"bls12_381","acceleration":"none","nbConstraints":13787986,"backend":"groth16","took":22067.596458,"time":"2026-11-25T20:04:05+08:00","message":"prover done"}
+{"level":"debug","curve":"bls12_381","backend":"groth16","took":1.263,"time":"2026-11-25T20:04:05+08:00","message":"verifier done"}
+prepared-lifecycle: proved and verified in 23.37189975s, statement 036deb337f26a8f5ea5544810cf35446283ac7ad8cc632de3083698555bfb2db
+{"level":"error","nbConstraints":13787986,"error":"constraint #13405101 is not satisfied: 1 ⋅ 2 != 0","time":"2026-11-25T20:04:07+08:00"}
+{"level":"debug","nbConstraints":13787986,"took":1176.658125,"time":"2026-11-25T20:04:08+08:00","message":"constraint system solver done"}
+{"level":"debug","curve":"bls12_381","acceleration":"none","nbConstraints":13787986,"backend":"groth16","took":21716.012,"time":"2026-11-25T20:04:30+08:00","message":"prover done"}
+{"level":"debug","curve":"bls12_381","backend":"groth16","took":1.195625,"time":"2026-11-25T20:04:30+08:00","message":"verifier done"}
+prepared-lifecycle: proved and verified in 22.900295667s, statement 0fa202c685bdcd56e2330ee7e1d6247ca825a7d8318477807790a31f00bfa036
+{"level":"debug","nbConstraints":13787986,"took":1172.277541,"time":"2026-11-25T20:04:34+08:00","message":"constraint system solver done"}
+{"level":"debug","curve":"bls12_381","acceleration":"none","nbConstraints":13787986,"backend":"groth16","took":21366.243209,"time":"2026-11-25T20:04:55+08:00","message":"prover done"}
+{"level":"debug","curve":"bls12_381","backend":"groth16","took":1.2045,"time":"2026-11-25T20:04:55+08:00","message":"verifier done"}
+prepared-lifecycle: proved and verified in 22.547633375s, statement 40796e0c3e9216f15a009c9b4834531028d915b078595c3f85acdf69c7ccf685
+{"level":"debug","nbConstraints":13787986,"took":1495.094875,"time":"2026-11-25T20:04:58+08:00","message":"constraint system solver done"}
+{"level":"debug","curve":"bls12_381","acceleration":"none","nbConstraints":13787986,"backend":"groth16","took":22252.864458,"time":"2026-11-25T20:05:21+08:00","message":"prover done"}
+{"level":"debug","curve":"bls12_381","backend":"groth16","took":1.205791,"time":"2026-11-25T20:05:21+08:00","message":"verifier done"}
+prepared-lifecycle: proved and verified in 23.754765541s, statement 341e8cd9a44629c9b9466a160a4c09178a9843ca982c7dec484c41964cb56ea6
+{"level":"error","nbConstraints":13787986,"error":"constraint #13405101 is not satisfied: 1 ⋅ 1 != 0","time":"2026-11-25T20:05:24+08:00"}
+{"level":"error","nbConstraints":13787986,"error":"constraint #13405101 is not satisfied: 1 ⋅ 1 != 0","time":"2026-11-25T20:05:25+08:00"}
+{"level":"debug","nbConstraints":13787986,"took":1519.9045,"time":"2026-11-25T20:05:26+08:00","message":"constraint system solver done"}
+{"level":"debug","curve":"bls12_381","acceleration":"none","nbConstraints":13787986,"backend":"groth16","took":21834.894333,"time":"2026-11-25T20:05:48+08:00","message":"prover done"}
+{"level":"debug","curve":"bls12_381","backend":"groth16","took":1.202667,"time":"2026-11-25T20:05:48+08:00","message":"verifier done"}
+prepared-lifecycle: proved and verified in 23.364925959s, statement 9ccffc8d8b4670fbf8e0ff765607f4a1a1ec21819a1ede08585c9a2f611ea27e
+{"level":"debug","nbConstraints":13787986,"took":1437.886,"time":"2026-11-25T20:05:52+08:00","message":"constraint system solver done"}
+{"level":"debug","curve":"bls12_381","acceleration":"none","nbConstraints":13787986,"backend":"groth16","took":22492.582167,"time":"2026-11-25T20:06:14+08:00","message":"prover done"}
+{"level":"debug","curve":"bls12_381","backend":"groth16","took":1.251459,"time":"2026-11-25T20:06:14+08:00","message":"verifier done"}
+prepared-lifecycle: proved and verified in 23.954849375s, statement 2b18cc518298a2259142a3be5137868a646b2e571bd7f5068666e49b3ae2653e
+{"level":"debug","nbConstraints":13787986,"took":1506.890625,"time":"2026-11-25T20:06:19+08:00","message":"constraint system solver done"}
+{"level":"debug","curve":"bls12_381","acceleration":"none","nbConstraints":13787986,"backend":"groth16","took":23363.198541,"time":"2026-11-25T20:06:42+08:00","message":"prover done"}
+{"level":"debug","curve":"bls12_381","backend":"groth16","took":1.2285,"time":"2026-11-25T20:06:42+08:00","message":"verifier done"}
+prepared-lifecycle: proved and verified in 24.880301958s, statement f9b6c14e579d031c5518dda02186fab239349cf8819950e2101e685878548938
+time: command terminated abnormally
+     1254.06 real      7047.12 user        71.59 sys
+         23462019072  maximum resident set size
+                   0  average shared memory size
+                   0  average unshared data size
+                   0  average unshared stack size
+             4927571  page reclaims
+                   0  page faults
+                   0  swaps
+                   0  block input operations
+                   0  block output operations
+                   0  messages sent
+                 102  messages received
+              276035  signals received
+              192510  voluntary context switches
+             9120440  involuntary context switches
+      68251743806318  instructions retired
+      21145496476348  cycles elapsed
+         25963076552  peak memory footprint

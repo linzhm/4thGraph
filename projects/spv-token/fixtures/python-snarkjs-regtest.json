@@ -1,0 +1,634 @@
+{
+  "scope": "Python wallet and proofs, standard BLS12-381 snarkjs files, isolated BSV regtest",
+  "toolchain": {
+    "snarkjs": "0.7.6",
+    "circom": "2.2.3",
+    "wasmtime": "51.0.0",
+    "device": "Apple M1 Max"
+  },
+  "split": {
+    "node": "/Bitcoin SV:1.2.3/",
+    "transactions": {
+      "setup": {
+        "txid": "821750902836acb3d297d0f81455d8839dd1478bbbb37779ef42915d43d8421a",
+        "blockhash": "07ebae158d9ec8977eb4cfb21c05e9f5ef830f200f7ba015c398664118476b1f",
+        "height": 313,
+        "bytes": 188
+      },
+      "standard-verifier": {
+        "txid": "73f4ddd87a8bd5328860ac388b311910705c61c4b5875d323762dcaa686d10e4",
+        "blockhash": "285558edd700ea793dcf48a48b70e751a5b21472b6ecf5ba66a0eebdf3319015",
+        "height": 314,
+        "bytes": 450694
+      },
+      "standard-token": {
+        "txid": "91764f8f89d9fd112964eeb0ba2aa4a339e9a71c60c952a2cc646cc767e02b64",
+        "blockhash": "0caed1a06ca27bd844885fe89a4d86e115e0b6b0bf47ee6274cff5ac8e10b8c1",
+        "height": 315,
+        "bytes": 911
+      },
+      "standard-split": {
+        "txid": "16094b609b4621965f9ae6719019e2b5889f70fce7c4ab98d4ce792108d6c495",
+        "blockhash": "4d0259c57540998e1c7746ba0f6fe59a72067fbb172276cf9b8f52d23eac7c28",
+        "height": 316,
+        "bytes": 454987
+      }
+    },
+    "scope": "funded CCTP split commitment",
+    "public_signals": [
+      "14125976904436695794866844260256597499",
+      "187801115160255142121955727524112288474"
+    ],
+    "witness_seconds": 4.1931816249853,
+    "proving": {
+      "verify_seconds": 0.0021045830799266696,
+      "prove_seconds": 50.040837957989424
+    },
+    "witness_wires": 250510,
+    "reordered_outputs_rejection": "sendrawtransaction: {'code': -26, 'message': '16: mandatory-script-verify-flag-failed (Script evaluated without error but finished with a false/empty top stack element)'}",
+    "verification": {
+      "chain_gang_seconds": 0.04275595804210752,
+      "node_submission_seconds": 0.3419375829398632,
+      "node_mining_and_confirmation_seconds": 0.015345124993473291
+    },
+    "snarkjs_witness_check": true,
+    "independent_snarkjs_proof_verification": true
+  },
+  "freeze": {
+    "scope": "Isolated issuer-only freeze probe on Bitcoin SV regtest with test-only parameters",
+    "asset_id": "65d26a8f97fd0cf8c1aa2553b095299cec8e090af93c6182e008e9fced833ac0",
+    "lock_bytes": 451091,
+    "verifying_key_sha256": "805a433c3698dca7410fdddc64c9e5f2b1ebfc39ec4338d509c7152b42267bd4",
+    "proofs": {
+      "freeze": {
+        "proving_seconds": 45.11677133303601,
+        "verify_seconds": 0.0021389169851318,
+        "total_proving_seconds": 48.663676749914885,
+        "public_inputs": [
+          "196721097937560240373568780170631494296",
+          "45341129738755016626085192496309812080"
+        ],
+        "verifying_key_sha256": "805a433c3698dca7410fdddc64c9e5f2b1ebfc39ec4338d509c7152b42267bd4",
+        "changed_pair_value": {
+          "txid": "ddc9f80f6755f47abdd0a5b8b39a41b54c07234092712281ea0012cdff2f552d",
+          "rejection": "sendrawtransaction: {'code': -26, 'message': '16: mandatory-script-verify-flag-failed (Script failed an OP_NUMEQUALVERIFY operation)'}"
+        },
+        "witness_bytes": 903589,
+        "proof_witness_bytes": 1078,
+        "fee_satoshis": 1000000,
+        "node_timings": {
+          "chain_gang_seconds": 0.047322832979261875,
+          "node_submission_seconds": 0.4058241250459105,
+          "node_mining_and_confirmation_seconds": 0.03208579192869365
+        }
+      },
+      "unfreeze": {
+        "proving_seconds": 44.556499667000026,
+        "verify_seconds": 0.0021262499503791332,
+        "total_proving_seconds": 48.01657916698605,
+        "public_inputs": [
+          "332074132966170496468732516598710747130",
+          "306285940122014764765309513802418365439"
+        ],
+        "verifying_key_sha256": "805a433c3698dca7410fdddc64c9e5f2b1ebfc39ec4338d509c7152b42267bd4",
+        "witness_bytes": 903589,
+        "proof_witness_bytes": 1078,
+        "fee_satoshis": 1000000,
+        "node_timings": {
+          "chain_gang_seconds": 0.0513262921012938,
+          "node_submission_seconds": 0.4442423329455778,
+          "node_mining_and_confirmation_seconds": 0.031802334007807076
+        }
+      }
+    },
+    "node": "/Bitcoin SV:1.2.3/",
+    "transactions": {
+      "setup": {
+        "txid": "e092a3b4f04232464f4f131294c4b21b6fe83bd99e9ecb26da3a5a35184a453b",
+        "blockhash": "352980322dc336692e9d584ba4c24a9c92062ab5b02bdcd9e2cbbfeb31ec9c64",
+        "height": 418,
+        "bytes": 168
+      },
+      "test-origin": {
+        "txid": "a6cb85817f458936a8345d0c145c23bd74fdef76ef0e085bc83659a755434e73",
+        "blockhash": "713f9ecc37a2c068690a6dbe565cfb366163c6ee33801331f50eab969314f91f",
+        "height": 419,
+        "bytes": 451175
+      },
+      "freeze": {
+        "txid": "af4d5e08ab2ce58a116d7fc4c782ce5f87b266e6c67206b36f9a42c1a6b1a3fb",
+        "blockhash": "21c01e342b740ca216cb2d16e0068d9500d320ceabfe5ee69da89239c287f034",
+        "height": 420,
+        "bytes": 1354789
+      },
+      "unfreeze": {
+        "txid": "fea4c8eedf60580fb829834ae9863387daa4c768dcfdcbf6af0bfe7acdfe6880",
+        "blockhash": "77b005a9c057eb8bc84904f04c6ef37156b90c1931397dea0f3e51c11a9b428e",
+        "height": 421,
+        "bytes": 1354789
+      }
+    }
+  },
+  "separate_verifier_freeze": {
+    "scope": "Isolated issuer-only proof with separate verifier funding on Bitcoin SV regtest",
+    "asset_id": "1d708590cd6eed85cc80512492cb6e04178693b2a6004161e012b93cd42f29bc",
+    "token_lock_bytes": 1339,
+    "verifier_lock_bytes": 450741,
+    "verifier_lock_sha256": "54203cd5cbd6d17741d7605f81a0fb933b97218cae8774e1c2b390cf41751736",
+    "verifying_key_sha256": "805a433c3698dca7410fdddc64c9e5f2b1ebfc39ec4338d509c7152b42267bd4",
+    "proofs": {
+      "freeze": {
+        "proving_seconds": 51.70779212506022,
+        "verify_seconds": 0.002131124958395958,
+        "total_proving_seconds": 55.309772082953714,
+        "public_inputs": [
+          "156512383916680470112137524146726808587",
+          "484545871493586715551466466797589844"
+        ],
+        "verifying_key_sha256": "805a433c3698dca7410fdddc64c9e5f2b1ebfc39ec4338d509c7152b42267bd4",
+        "changed_pair_value": {
+          "txid": "a55eed88c30e5ba87141f82a9a48224c350446ff5dce36eced52062f5b934723",
+          "rejection": "sendrawtransaction: {'code': -26, 'message': '16: mandatory-script-verify-flag-failed (Script failed an OP_NUMEQUALVERIFY operation)'}"
+        },
+        "token_witness_bytes": 453881,
+        "verifier_witness_bytes": 2768,
+        "proof_witness_bytes": 1078,
+        "verifier_funding_bytes": 450805,
+        "token_preimage_bytes": 1498,
+        "verifier_preimage_bytes": 192,
+        "fee_satoshis": 1000000,
+        "node_timings": {
+          "chain_gang_seconds": 0.04377620795276016,
+          "node_submission_seconds": 0.36090600001625717,
+          "node_mining_and_confirmation_seconds": 0.01575479202438146
+        }
+      },
+      "unfreeze": {
+        "proving_seconds": 55.81685095792636,
+        "verify_seconds": 0.0020504590356722474,
+        "total_proving_seconds": 59.59692337503657,
+        "public_inputs": [
+          "203534724284934694656559783374418914558",
+          "60665576315424439252639489191459947507"
+        ],
+        "verifying_key_sha256": "805a433c3698dca7410fdddc64c9e5f2b1ebfc39ec4338d509c7152b42267bd4",
+        "token_witness_bytes": 453880,
+        "verifier_witness_bytes": 2767,
+        "proof_witness_bytes": 1077,
+        "verifier_funding_bytes": 450805,
+        "token_preimage_bytes": 1498,
+        "verifier_preimage_bytes": 192,
+        "fee_satoshis": 1000000,
+        "node_timings": {
+          "chain_gang_seconds": 0.06008587498217821,
+          "node_submission_seconds": 0.4390100419986993,
+          "node_mining_and_confirmation_seconds": 0.23092158301733434
+        }
+      }
+    },
+    "node": "/Bitcoin SV:1.2.3/",
+    "transactions": {
+      "setup": {
+        "txid": "182949055d0e866bcc6b42b1499dc1dd839064c95a357d40f8faa22ce6ce4699",
+        "blockhash": "3ea2ef7a8df43f94792b18c6d1a030d4e534b6c482d10d2ad1f813a466b12c2b",
+        "height": 523,
+        "bytes": 188
+      },
+      "test-origin": {
+        "txid": "a4c46e29a57596100cff211fc3ce01946a31f96840bf30e53166ff03c7a106a1",
+        "blockhash": "4f09ff7191dffbf5289a193d56e53be41e18957ef503af494f8ff5cb56fc7067",
+        "height": 524,
+        "bytes": 1401
+      },
+      "verifier-funding-freeze": {
+        "txid": "19b7324a65f7f96ab70ee3e7af62c1c24a1101f21125f2b6a8e0fa8da02d8935",
+        "blockhash": "030b986f1f76f364538b8e0752af160727f09d46ccbc1ecbc6a277668e93943e",
+        "height": 525,
+        "bytes": 450805
+      },
+      "freeze": {
+        "txid": "d6827feb49f492f597754ba4f2a32b7ccbe0f83eea911b52fa85db4251161134",
+        "blockhash": "6e90f247885fcaf224362b6ab6bba4e46f4934a89446110ed77d4199b3da6057",
+        "height": 526,
+        "bytes": 458167
+      },
+      "verifier-funding-unfreeze": {
+        "txid": "fb8dca34a0a8ef17ab2d47c8ed1d16d2145db12627ec923a8a586795595203ef",
+        "blockhash": "16d11ad2b2734c281f5dfa282be0ab818a62f4482d38ce32e4356d7ac77a681f",
+        "height": 527,
+        "bytes": 450805
+      },
+      "unfreeze": {
+        "txid": "d1545cb0e45378c0775dd308bb0fddfbb2ef61c89f5f2068e4ced75cba0f7583",
+        "blockhash": "4ff695f6c8dc5ac7db09fe375c711ed7312f4e9cdedc0725db3f800f12fd17f8",
+        "height": 528,
+        "bytes": 458165
+      }
+    }
+  },
+  "conservation": {
+    "scope": "Isolated 2-to-2 conservation with independent test origins and one proof per payment",
+    "parent_mode": "raw transaction",
+    "transfer_count": 2,
+    "asset_id": "b86cfa630430656139d7e182fdf54590027fe195f2f4bf97117f29723fb7239a",
+    "verifying_key_sha256": "093f9700ca6e4fe24d9c70bc3fbb4c64fa652ea4db08cf9cf83396d5ec43a88c",
+    "proofs": {
+      "distinct-parents": {
+        "proving_seconds": 97.55136729206424,
+        "verify_seconds": 0.0031782080186530948,
+        "total_proving_seconds": 103.36145670793485,
+        "public_inputs": [
+          "7230732537358063566246943628646243379",
+          "111513455684653144515499158681898530356"
+        ],
+        "verifying_key_sha256": "093f9700ca6e4fe24d9c70bc3fbb4c64fa652ea4db08cf9cf83396d5ec43a88c",
+        "changed_successor_quantity": {
+          "txid": "bdac849c38b28e1d3f7ef45015fdd457890d2e1b86256873fbeb7e020261187d",
+          "rejection": "sendrawtransaction: {'code': -26, 'message': '16: mandatory-script-verify-flag-failed (Script failed an OP_NUMEQUALVERIFY operation)'}"
+        },
+        "token_parents": [
+          {
+            "txid": "e07e3edf8618215975c5749663edd7659caf8cd888b6bdff53f581a5ca587d7b",
+            "vout": 0
+          },
+          {
+            "txid": "e8ff0d4299c580c9e2a208c954081612189c01a48cce59b7efbef970195ae0aa",
+            "vout": 0
+          }
+        ],
+        "direct_parent_bytes": 3706,
+        "token_out_quantities": [
+          700,
+          324
+        ],
+        "token_out_sats": [
+          900,
+          1100
+        ],
+        "proof_count": 1,
+        "new_parent_binding_proofs": 0,
+        "proof_witness_bytes": 1078,
+        "witness_bytes": [
+          9584,
+          455220,
+          6855,
+          6855
+        ],
+        "encoded_direct_parent_bytes": 3712,
+        "verifier_funding_copies_in_witnesses": 1,
+        "proof_funding_bytes": 454195,
+        "companion_funding_bytes": 774,
+        "fee_satoshis": 1010000,
+        "node_timings": {
+          "chain_gang_seconds": 0.05635345901828259,
+          "node_submission_seconds": 1.0282498749438673,
+          "node_mining_and_confirmation_seconds": 0.15442279109265655
+        }
+      },
+      "same-parent-successors": {
+        "proving_seconds": 127.19635641702916,
+        "verify_seconds": 0.0022259579272940755,
+        "total_proving_seconds": 134.97210991708562,
+        "public_inputs": [
+          "38863887705764844094855408050556245319",
+          "63418809196740412509574769087048603085"
+        ],
+        "verifying_key_sha256": "093f9700ca6e4fe24d9c70bc3fbb4c64fa652ea4db08cf9cf83396d5ec43a88c",
+        "token_parents": [
+          {
+            "txid": "05d04c2f26240c1d3e735909e71c9d942c4b7f1039bdaebe79e7480e0285691f",
+            "vout": 0
+          },
+          {
+            "txid": "05d04c2f26240c1d3e735909e71c9d942c4b7f1039bdaebe79e7480e0285691f",
+            "vout": 1
+          }
+        ],
+        "direct_parent_bytes": 482372,
+        "token_out_quantities": [
+          625,
+          399
+        ],
+        "token_out_sats": [
+          1000,
+          1000
+        ],
+        "proof_count": 1,
+        "new_parent_binding_proofs": 0,
+        "proof_witness_bytes": 1077,
+        "witness_bytes": [
+          488249,
+          455220,
+          6856,
+          6855
+        ],
+        "encoded_direct_parent_bytes": 482378,
+        "verifier_funding_copies_in_witnesses": 1,
+        "proof_funding_bytes": 454195,
+        "companion_funding_bytes": 774,
+        "fee_satoshis": 1010000,
+        "node_timings": {
+          "chain_gang_seconds": 0.07275754201691598,
+          "node_submission_seconds": 0.9750579580431804,
+          "node_mining_and_confirmation_seconds": 0.1848697919631377
+        }
+      }
+    },
+    "token_lock_bytes": 1791,
+    "verifier_lock_bytes": 454131,
+    "companion_lock_bytes": 712,
+    "verifier_script_field_sha256": "99d37caf478f3ab86f950042c1738ff8c64537fd56dcb40d30576f895a74376e",
+    "node": "/Bitcoin SV:1.2.3/",
+    "transactions": {
+      "setup": {
+        "txid": "0460ec7c6747817272ab95f65a50aec6685e67f75a68f1064c1b9f3e254fc3fd",
+        "blockhash": "0fad36debd7e00411084f3842f95c5eaf2579e1c3217da1114be122d63408151",
+        "height": 630,
+        "bytes": 217
+      },
+      "test-origin-0": {
+        "txid": "e07e3edf8618215975c5749663edd7659caf8cd888b6bdff53f581a5ca587d7b",
+        "blockhash": "58909d9d90e2510523bbbf9214b82d08e8fa990c1d342e797768a0623fb081f3",
+        "height": 631,
+        "bytes": 1853
+      },
+      "test-origin-1": {
+        "txid": "e8ff0d4299c580c9e2a208c954081612189c01a48cce59b7efbef970195ae0aa",
+        "blockhash": "54a6f9dd7023d23deddd7e44380122e6ed5f5049c64c021ed979c0f5f4cbbf5e",
+        "height": 632,
+        "bytes": 1853
+      },
+      "distinct-parents-verifier-funding": {
+        "txid": "fb41f3011e2ca08e7ccf62bf265c13109cc92784817088f187f8bcfcc9fe31d2",
+        "blockhash": "3407067522a6d79677c2a9c72c825f6e3b7b14f16a5d2831edeb9861858d673c",
+        "height": 633,
+        "bytes": 454195
+      },
+      "distinct-parents-companion-funding": {
+        "txid": "294e6d959aef5897fa836893970318b64d3be47789370ad393e69f0098426712",
+        "blockhash": "3da756784db1ecedbd3bc1a040a89adafac3dc227d2b3d402dbda8ec19dbb148",
+        "height": 634,
+        "bytes": 774
+      },
+      "distinct-parents": {
+        "txid": "05d04c2f26240c1d3e735909e71c9d942c4b7f1039bdaebe79e7480e0285691f",
+        "blockhash": "540faee5912cc58d2a3731c02e80535c7f1821b9171121100cbb587de1343c14",
+        "height": 635,
+        "bytes": 482372
+      },
+      "same-parent-successors-verifier-funding": {
+        "txid": "806591c1e3d7c2e6b4177ef654a6f5b3d15d34bece3378ad1e974ac194f33e56",
+        "blockhash": "3eecff21b21140eb419a9a9b9f93475b06aa24949bc57375ba9385b4a18b7227",
+        "height": 636,
+        "bytes": 454195
+      },
+      "same-parent-successors-companion-funding": {
+        "txid": "331834433b870ad1be5031eb3ce2650f5c86a0093a24d436aaf8ec34f550dce4",
+        "blockhash": "1017815bc8a86c7aa88340baee400877c774d5c1ea3d7eba19fb40efef200d63",
+        "height": 637,
+        "bytes": 774
+      },
+      "same-parent-successors": {
+        "txid": "2e973835d140dab5e29677648dad13cfba89161bb023aca3927849222ac2147f",
+        "blockhash": "2089c644e2b2b67670a98c09f8be9affab4ecf28ec3e3729c8299d648956cb81",
+        "height": 638,
+        "bytes": 961040
+      }
+    }
+  },
+  "short_parent_checkpoint": {
+    "scope": "Two-output test parent authenticated by a separate plain Groth16 checkpoint input",
+    "checkpoint": {
+      "format": "BSV parent SHA256 checkpoint v1",
+      "txid": "5673ab2ad99b2fa9ee9aba2112f4d72568640c0d4c432c6495f02d7fdaca4ff5",
+      "txid_wire": "f54fcada7f2df095642c434c0d0c646825d7f41221ba9aeea92f9bd92aab7356",
+      "raw_bytes": 332,
+      "processed_bytes": 256,
+      "midstate": "3ab74eca8e782533e157c30ee655cc56eebfbd94a7cd72a3fd09493f09b356aa",
+      "suffix": "d1d2d3d4d5d6d7d8d9dadbdcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeffffffffff02e8030000000000000151d007000000000000015100000000",
+      "suffix_bytes": 76,
+      "output_count_offset": 307,
+      "output_count": 2,
+      "output_offsets": [
+        308,
+        318
+      ],
+      "suffix_sha256d": "7d47853f49746ccfce1d178357cb71e547c861c184b0b07248272f8b891d420c",
+      "hash_outputs": "746265682690dd2b1a282c12b4acf174a009ca1019fdcb6b49022849d63756ca"
+    },
+    "verifying_key_sha256": "3c52d77230c40e4ff62d0e68b7b32e65715db42cccc41a7b18d05a718240ab00",
+    "proof": {
+      "proving_seconds": 95.47933729190845,
+      "verify_seconds": 0.0021003750152885914,
+      "total_proving_seconds": 103.50108337495476,
+      "public_inputs": [
+        "165983527436096479850114715845178180853",
+        "251726007981513166870883119912426567672"
+      ],
+      "verifying_key_sha256": "3c52d77230c40e4ff62d0e68b7b32e65715db42cccc41a7b18d05a718240ab00"
+    },
+    "rejections": {
+      "wrong-midstate": {
+        "txid": "8bc99b5598376c25eef620ae6f9c545f372c813b7ae2a0c82beb585095e1cd43",
+        "rejection": "sendrawtransaction: {'code': -26, 'message': '16: mandatory-script-verify-flag-failed (Script failed an OP_NUMEQUALVERIFY operation)'}"
+      },
+      "wrong-suffix": {
+        "txid": "a3ed154f43b48d33c42652dc32f5151a53e71819afb03ef00b84d218c6376ed5",
+        "rejection": "sendrawtransaction: {'code': -26, 'message': '16: mandatory-script-verify-flag-failed (Script failed an OP_NUMEQUALVERIFY operation)'}"
+      },
+      "other-parent-outpoint": {
+        "txid": "cf324448e0754022aa7220ffc91723a438c11970dae6f6ed901d52f50c13ce99",
+        "rejection": "sendrawtransaction: {'code': -26, 'message': '16: mandatory-script-verify-flag-failed (Script failed an OP_NUMEQUALVERIFY operation)'}"
+      },
+      "other-output-slot": {
+        "txid": "370fdcb78d6bbb29e32c88fd272cde85da8fa4ff79b9661b9697f6ead2f31c96",
+        "rejection": "sendrawtransaction: {'code': -26, 'message': '16: mandatory-script-verify-flag-failed (Script failed an OP_EQUALVERIFY operation)'}"
+      }
+    },
+    "parent_disclosure_bytes": 108,
+    "parent_disclosure_with_encoding_bytes": 111,
+    "raw_parent_with_encoding_bytes": 335,
+    "proof_witness_bytes": 1078,
+    "verifier_lock_bytes": 450787,
+    "verifier_funding_transaction_bytes": 450851,
+    "checkpoint_spend_witness_bytes": 1456,
+    "node_timings": {
+      "chain_gang_seconds": 0.04333254194352776,
+      "node_submission_seconds": 0.34222629107534885,
+      "node_mining_and_confirmation_seconds": 0.02338016696739942
+    },
+    "node": "/Bitcoin SV:1.2.3/",
+    "transactions": {
+      "setup": {
+        "txid": "0f36bb222bde48674aad4b54156897853e2e829166694f755fd85c6d5d6cb085",
+        "blockhash": "4f8d38190a4f52cd02fd4bb0bc6943e5b6ed1da12619a6a9fc7da1e925300df1",
+        "height": 740,
+        "bytes": 188
+      },
+      "parent-funding": {
+        "txid": "ec3b36eaf67da226a3d4c0c1e95104194ed5932fa4621aa975da4d69f0992a8a",
+        "blockhash": "397abfa7941ad1c17097dbe6983753a8c1367ef3304cc384d7c1707e9140e6fb",
+        "height": 741,
+        "bytes": 62
+      },
+      "parent": {
+        "txid": "5673ab2ad99b2fa9ee9aba2112f4d72568640c0d4c432c6495f02d7fdaca4ff5",
+        "blockhash": "754911de50199cb069c58ed32f3cd7e172cdefa8641cba210d34cd712fb03857",
+        "height": 742,
+        "bytes": 332
+      },
+      "alternate-parent-funding": {
+        "txid": "9b24185ca99cc51babd86966af8fd913c12f9f9ea7f2790c75cf377441f92736",
+        "blockhash": "17d6fe320ce7493ffab11f0b21674ecf028d4410a38a7859d997cfb0a756c7a9",
+        "height": 743,
+        "bytes": 62
+      },
+      "alternate-parent": {
+        "txid": "63beae96463b5634c3158557ca116a9222e520cd076e53b9f27035cd24d7f66f",
+        "blockhash": "51d42ad5893274cc040ca9716c4f94182b0fa8c91d1d8797d80f111f0bf34090",
+        "height": 744,
+        "bytes": 332
+      },
+      "verifier-funding": {
+        "txid": "61bb79cee402cdbf0faf9ad1e8b8954c2adb15bd7cbeab3618448f550dc9adc5",
+        "blockhash": "2fea6be10187a7030c6ce6bd0d596366a855eb5018d83fd69d77df655f47c065",
+        "height": 745,
+        "bytes": 450851
+      },
+      "checkpoint-spend": {
+        "txid": "6adee824cf780edfb6617d4117045d04f03a555a024e1517d8691c138bf26b64",
+        "blockhash": "661d256cf94f2d58e1509a49d84a196c14005811a3e53e1391129cf7b37ec3c9",
+        "height": 746,
+        "bytes": 1560
+      }
+    }
+  },
+  "cardano_split_rerun": {
+    "phase1_power": 18,
+    "phase1_sha256": "5e14d0c7d096592a2ced33a8a8a331ca9ded1f805f78c1d4cd637aad28b15ab4",
+    "node": "/Bitcoin SV:1.2.3/",
+    "txid": "d805d0a4cfef74a1da4e71335da2f503bb5a99aa22a6a00da0539e67791632eb",
+    "blockhash": "5b1f58ac220c6d0b713711e354b907be98f4db749cb6ebd11d16ad026e482a97",
+    "height": 105,
+    "bytes": 454987,
+    "metal_python_prove_seconds": 49.96300891705323,
+    "snarkjs_valid_witness": true,
+    "snarkjs_valid_proof": true,
+    "reordered_outputs_rejected": true
+  },
+  "token_parent_checkpoint": {
+    "parent_bytes": 3433,
+    "constraints": 2385451,
+    "wires": 2367197,
+    "snarkjs_witness_check": true,
+    "cardano_regtest": {
+      "phase1_power": 22,
+      "phase1_bytes": 7247844401,
+      "phase1_sha256": "766e76de8927312dd271d8ff605dbc33c17fe2b654364e70a8672378f7f978f7",
+      "phase1_verified": true,
+      "zkey_sha256": "dec46bdf07df29347105d856fb1f51f2bb578212be4d400eb5688655ee7fa4ce",
+      "zkey_verified_from_recorded_initial_key": true,
+      "verifying_key_sha256": "7a63e815b1ab401b1c1f1f7ed07bb5301c29476bee903567e739ba67f6fb96ce",
+      "snarkjs_valid_proof": true,
+      "node": "/Bitcoin SV:1.2.3/",
+      "parent_txid": "c1f368445064d02f956dc992f0743553b34c84d3cd932a10698f7b46044e77a9",
+      "parent_height": 319,
+      "rollover_txid": "82b9455e400e171cab23cfabfabcf139dd51dc7a93c61c348dcf9aa263d7e741",
+      "rollover_blockhash": "3f86bf2a3e275571868b267011f706bcdfd245da6e27c6e1d4f676f95f3a6d2c",
+      "rollover_height": 321,
+      "python_proving_seconds": 601.9727370409528,
+      "witness_and_proving_seconds": 641.0659233339829,
+      "parent_disclosure_bytes": 1613,
+      "proof_witness_bytes": 1078,
+      "rollover_bytes": 457374,
+      "verifier_funding_transaction_bytes": 450902,
+      "rollover_and_verifier_funding_bytes": 908276,
+      "raw_parent_baseline_disclosure_bytes": 3436,
+      "raw_parent_baseline_rollover_and_verifier_funding_bytes": 9036,
+      "node_rejections": ["changed-token-quantity", "wrong-holder", "wrong-midstate", "wrong-suffix"]
+    }
+  },
+  "lifecycle": {
+    "constraints": 13787986,
+    "wires": 12061957,
+    "public_inputs": 2,
+    "required_bls12_381_power": 24,
+    "archived_statement_checks": {
+      "mint-300": {
+        "valid_witness": true,
+        "wires": 12061957,
+        "seconds": 31.158118749968708
+      },
+      "mint-200": {
+        "valid_witness": true,
+        "wires": 12061957,
+        "seconds": 42.60737058299128
+      },
+      "mint-150": {
+        "valid_witness": true,
+        "wires": 12061957,
+        "seconds": 41.64008895796724
+      },
+      "alice-to-bob": {
+        "valid_witness": true,
+        "wires": 12061957,
+        "seconds": 53.296602457994595
+      },
+      "bob-to-carol": {
+        "valid_witness": true,
+        "wires": 12061957,
+        "seconds": 70.86650204192847
+      },
+      "freeze-carol": {
+        "valid_witness": true,
+        "wires": 12061957,
+        "seconds": 35.84536158305127
+      },
+      "unfreeze-carol": {
+        "valid_witness": true,
+        "wires": 12061957,
+        "seconds": 23.179354707943276
+      },
+      "partial-burn": {
+        "valid_witness": true,
+        "wires": 12061957,
+        "seconds": 22.9944323329255
+      },
+      "full-burn": {
+        "valid_witness": true,
+        "wires": 12061957,
+        "seconds": 22.856228874996305
+      },
+      "changed-parent": {
+        "invalid_witness_rejected": true,
+        "error": "R1CS row 5751218 is unsatisfied",
+        "seconds": 9.399994750041515
+      }
+    },
+    "filecoin_challenge_https": "TLS timeout",
+    "filecoin_attested_s3_mirror": "403",
+    "standard_zkey_created": false,
+    "undersized_snarkjs_key_rejected": "circuit too big for this power of tau ceremony"
+  },
+  "artifact_sha256": {
+    "split/split.wasm": "664f737d2301dcc272dce2cdd0fe0fd603f6d084f02a5603622500270a20d870",
+    "split/split.r1cs": "83c27411442cf0dd988d7e937be35ee073b09cd1493b4df38deaffe0a7a18ff5",
+    "split/split.zkey": "6ee487b0094ed2285d8a3fa851b4a05144127f97b7e028553ca04ca759f5b8e4",
+    "freeze/freeze.wasm": "8014d09556c01b54f15f065d65d05ad65f31d3a063b1cf43dbab3238ede1ef8c",
+    "freeze/freeze.r1cs": "40d1cc9e1d69a98a9de2b8e13560834d8c3524c9de6095b3398d816c41cb380e",
+    "freeze/freeze.zkey": "1efcd09e84de9998093bb5f775a1d14f63d1d0880f92a4805ec475330e11410d",
+    "checkpoint/checkpoint.zkey": "88b9380f834ed769de2049d2f366d70468289419fd9bbeb82876516c853a23bb",
+    "checkpoint/checkpoint.r1cs": "85958ebb6e32f37ee64c43f0b68ebe47c3386c4595649ec91e8ae1332644723b",
+    "checkpoint/checkpoint.wasm": "a622196104ffff7d1c7538f7cd17e65adf7458d44df9fac1ee595123f3d56431",
+    "fr_ntt.wgsl": "923fbba9e75ec5c6c6a921e655db79ffa1520c85e1c33c6109155a95b3d472a6",
+    "assignments.r1cspy": "69e5b4409424a247c3b833776eee10d87fa8b82e51dedaa4bda42e273f358831",
+    "bob-to-carol.wtns": "cb44dc5aed8450397656463967c76d74be68c01db56c138712d6cc31c163c7ae",
+    "conservation/conservation.zkey": "a3ea9802f3e70ec129b21097b0435e44189ce732c9041c412e25a8593ab22ea7",
+    "conservation/conservation.wasm": "48932c3fd2b5b93886f0d012d4e80d9205e57f4decd005be057678430eedff55",
+    "conservation/conservation.r1cs": "b1aa295162f50ffa8a0c4d764a8b1baf0b7b872caf5b4f7a5e1454ae03253fe9",
+    "lifecycle.r1cs": "cc31a287914427442ee95370c40f2e9d52069a86e81c2f81b6a8e3ca2639c6cd",
+    "token-checkpoint/token.r1cs": "8e9a7d366b849ce0e87cf3f38e75fd122da75412636680bb2ad0df6ba1de6761",
+    "token-checkpoint/parent.wtns": "9d58212ac911fd616685d34376a1fcdaca7e5e3863772f51df63bce1eae146ca",
+    "token-checkpoint/token.wasm": "50fdc8645d702ceb01a4434576b6bdea0db1602f34e980e18a96761dab3a9b17"
+  }
+}

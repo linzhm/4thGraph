@@ -1,0 +1,1157 @@
+{
+  "scope": "Fixed two-slot lifecycle profile on independent regtest and mock USDC reserve on Anvil.",
+  "asset": {
+    "network": 1,
+    "decimals": 6,
+    "reserve_domain": 7,
+    "issuance_outpoint": "52a9605c5c3792b26ad3278e4f98aedc4b43b207fbad91d645bd0e5e6c3c95a200000000",
+    "reserve_asset": "0000000000000000000000005fbdb2315678afecb367f032d93f642f64180aa3",
+    "policy_id": "7070707070707070707070707070707070707070707070707070707070707070"
+  },
+  "issuer": "03fe72c435413d33d48ac09c9161ba8b09683215439d62b7940502bda8b202e6ce",
+  "manager": "029248279b09b4d68dab21a9b066edda83263c3d84e09572e269ca0cd7f5453714",
+  "verifier_lock_sha256": "44da79ea31ae058d755e85ee993b8a999ecca180291055b5632449e4d54c4b11",
+  "key_sha256": "82838b211d67c4a099b7e0f41cfbf30e689623038b92525576f64f5908d851af",
+  "constraints": 13787986,
+  "checkpoint_suffix_bytes": 10074,
+  "wire_bytes": 212506,
+  "history_growth_bytes": 0,
+  "total_funded_bytes": 6063591,
+  "shared_sponsor_setup_bytes": 1239,
+  "actions": {
+    "mint-300": {
+      "action": 0,
+      "actual_outpoints": [
+        "52a9605c5c3792b26ad3278e4f98aedc4b43b207fbad91d645bd0e5e6c3c95a200000000",
+        "c532d033ad5ec45f2fc8cff4f840b6ec3cfc4dbba4e7ddec1b8b92f30a4dcb8b00000000"
+      ],
+      "authorized_outputs": [
+        "032c010000000000000100000000000000000000000000000000000000000000000000000000000000000000000000000000",
+        "012c01000000000000000000000000000002352bbf4a4cdd12564f93fa332ce333301d9ad40271f8107181340aef25be59d5"
+      ],
+      "proof_seconds": 22.305791041,
+      "host_verify_seconds": 0.001234291,
+      "statement_sha256d": "7e6085fa390bc246b854a390bf36c25bd0e94cd75d7d84c9c60e037835f2fc65",
+      "cost": {
+        "groups": {
+          "preparation": [
+            {
+              "txid": "00fbe13c74a640e68657def14f56ae2e86a4acc19fbe0620ce1d8c76a96c20f1",
+              "bytes": 847,
+              "locking_bytes": 713,
+              "unlocking_bytes": 72,
+              "non_script_bytes": 62,
+              "input_script_bytes": [
+                72
+              ],
+              "output_script_bytes": [
+                713
+              ]
+            },
+            {
+              "txid": "c1af6ffaf7ebe9848b49a40d002310447fdaf28eebd4d82df7dc37397e8e8c3b",
+              "bytes": 460186,
+              "locking_bytes": 460050,
+              "unlocking_bytes": 72,
+              "non_script_bytes": 64,
+              "input_script_bytes": [
+                72
+              ],
+              "output_script_bytes": [
+                460050
+              ]
+            },
+            {
+              "txid": "8bcb4d0af3928b1becdde7a4bb4dfc3cecb640f8f4cfc82f5fc45ead33d032c5",
+              "bytes": 167,
+              "locking_bytes": 35,
+              "unlocking_bytes": 72,
+              "non_script_bytes": 60,
+              "input_script_bytes": [
+                72
+              ],
+              "output_script_bytes": [
+                35
+              ]
+            }
+          ],
+          "settlement": [
+            {
+              "txid": "3a0bc89c359c6938096aac476398a0cbecb639c92ea0add9eb09e83899981fe8",
+              "bytes": 212506,
+              "locking_bytes": 1745,
+              "unlocking_bytes": 210535,
+              "non_script_bytes": 226,
+              "input_script_bytes": [
+                101736,
+                104901,
+                1949,
+                1949
+              ],
+              "output_script_bytes": [
+                793,
+                793,
+                93,
+                66
+              ]
+            }
+          ]
+        },
+        "total": {
+          "bytes": 673706,
+          "locking_bytes": 462543,
+          "unlocking_bytes": 210751,
+          "non_script_bytes": 412
+        }
+      },
+      "spv_packet_bytes": {
+        "transactions": 673801,
+        "merkle_siblings": 160
+      },
+      "source_deposit": {
+        "txid": "0xbf465cc689e5b420ea093fb6a38a8652087f6a5fe88b0fa26828bec8a4fbecec",
+        "blockhash": "0x9a5da1a23137708518ee161a05e9743bf5abda3d6d87e490da830445bdf7f1f5",
+        "event_id": "3f86f773742fdfbfa94f0c3e798473918d243ee8306532837d7e2e19c0253b39",
+        "receipt_log_ordinal": 1,
+        "quantity": 300,
+        "vault_nonce": 1,
+        "cumulative_issued": 300
+      },
+      "repeated_source_event_rejected": "deposit does not follow the authenticated reserve nonce",
+      "spv_receipts": {
+        "1": {
+          "outpoint": "e81f989938e809ebd9ada02ec939b6eccba0986347ac6a0938699c359cc80b3a01000000",
+          "confirmed": 2,
+          "seconds": 0.0551207079552114,
+          "spend_status": "UNKNOWN"
+        }
+      }
+    },
+    "mint-200": {
+      "action": 0,
+      "actual_outpoints": [
+        "e81f989938e809ebd9ada02ec939b6eccba0986347ac6a0938699c359cc80b3a00000000",
+        "53ef31957d578b812609b95ffe8ae0166fd2438dbe46b49c65219d085dc322dc00000000"
+      ],
+      "authorized_outputs": [
+        "03f4010000000000000200000000000000000000000000000000000000000000000000000000000000000000000000000000",
+        "01c800000000000000000000000000000002352bbf4a4cdd12564f93fa332ce333301d9ad40271f8107181340aef25be59d5"
+      ],
+      "proof_seconds": 22.594690292,
+      "host_verify_seconds": 0.001235167,
+      "statement_sha256d": "c117f01f38f6173d410b5fb29d5c4aca83f4ec9fb9305f39f007cd7ece002b22",
+      "cost": {
+        "groups": {
+          "preparation": [
+            {
+              "txid": "529e4d4f589ec8ca8f654351ca031278a0002e1a8041578528e443a9c8b02786",
+              "bytes": 847,
+              "locking_bytes": 713,
+              "unlocking_bytes": 72,
+              "non_script_bytes": 62,
+              "input_script_bytes": [
+                72
+              ],
+              "output_script_bytes": [
+                713
+              ]
+            },
+            {
+              "txid": "222e9d02b20e59ffec53850e74fe1c1dfd4363a8c6d292b3843524129e2c89f1",
+              "bytes": 460186,
+              "locking_bytes": 460050,
+              "unlocking_bytes": 72,
+              "non_script_bytes": 64,
+              "input_script_bytes": [
+                72
+              ],
+              "output_script_bytes": [
+                460050
+              ]
+            },
+            {
+              "txid": "dc22c35d089d21659cb446be8d43d26f16e08afe5fb90926818b577d9531ef53",
+              "bytes": 167,
+              "locking_bytes": 35,
+              "unlocking_bytes": 72,
+              "non_script_bytes": 60,
+              "input_script_bytes": [
+                72
+              ],
+              "output_script_bytes": [
+                35
+              ]
+            }
+          ],
+          "settlement": [
+            {
+              "txid": "78b2f05551a61002860834ebe35c0dd015cff7d32d35a6f20fab41896061e625",
+              "bytes": 212506,
+              "locking_bytes": 1745,
+              "unlocking_bytes": 210535,
+              "non_script_bytes": 226,
+              "input_script_bytes": [
+                101736,
+                104901,
+                1949,
+                1949
+              ],
+              "output_script_bytes": [
+                793,
+                793,
+                93,
+                66
+              ]
+            }
+          ]
+        },
+        "total": {
+          "bytes": 673706,
+          "locking_bytes": 462543,
+          "unlocking_bytes": 210751,
+          "non_script_bytes": 412
+        }
+      },
+      "spv_packet_bytes": {
+        "transactions": 886212,
+        "merkle_siblings": 160
+      },
+      "source_deposit": {
+        "txid": "0x3927fd00b542abfc1413a1a63cfe5df204afa723d9d9f991ec2dfd42e1e07182",
+        "blockhash": "0x4187785e9375ddfde3ae9a5a76d2ed990927366dc531b65e1c94f8068123d44e",
+        "event_id": "0ff35dd85267ae96ef0e5e09fb156a7625565d3fb96714d5493f37a07b71f2fe",
+        "receipt_log_ordinal": 1,
+        "quantity": 200,
+        "vault_nonce": 2,
+        "cumulative_issued": 500
+      },
+      "spv_receipts": {
+        "1": {
+          "outpoint": "25e661608941ab0ff2a6352dd3f7cf15d00d5ce3eb3408860210a65155f0b27801000000",
+          "confirmed": 2,
+          "seconds": 0.056950500002130866,
+          "spend_status": "UNKNOWN"
+        }
+      }
+    },
+    "mint-150": {
+      "action": 0,
+      "actual_outpoints": [
+        "25e661608941ab0ff2a6352dd3f7cf15d00d5ce3eb3408860210a65155f0b27800000000",
+        "841d101b087bd16b79ac64057d754e8020c33e27cd672e39e5f70362bc262eec00000000"
+      ],
+      "authorized_outputs": [
+        "038a020000000000000300000000000000000000000000000000000000000000000000000000000000000000000000000000",
+        "019600000000000000000000000000000003421f5fc9a21065445c96fdb91c0c1e2f2431741c72713b4b99ddcb316f31e9fc"
+      ],
+      "proof_seconds": 23.360788208,
+      "host_verify_seconds": 0.001314333,
+      "statement_sha256d": "036deb337f26a8f5ea5544810cf35446283ac7ad8cc632de3083698555bfb2db",
+      "cost": {
+        "groups": {
+          "preparation": [
+            {
+              "txid": "adb26dabb08b598c5515bbe38554d3cbe8643d358b17eb3363a1e5b7a0c54893",
+              "bytes": 847,
+              "locking_bytes": 713,
+              "unlocking_bytes": 72,
+              "non_script_bytes": 62,
+              "input_script_bytes": [
+                72
+              ],
+              "output_script_bytes": [
+                713
+              ]
+            },
+            {
+              "txid": "2df24b2fc1ecd1fc77b84d68ed006156a145be17c1f8389c09c9f51a3d67b958",
+              "bytes": 460186,
+              "locking_bytes": 460050,
+              "unlocking_bytes": 72,
+              "non_script_bytes": 64,
+              "input_script_bytes": [
+                72
+              ],
+              "output_script_bytes": [
+                460050
+              ]
+            },
+            {
+              "txid": "ec2e26bc6203f7e5392e67cd273ec320804e757d0564ac796bd17b081b101d84",
+              "bytes": 167,
+              "locking_bytes": 35,
+              "unlocking_bytes": 72,
+              "non_script_bytes": 60,
+              "input_script_bytes": [
+                72
+              ],
+              "output_script_bytes": [
+                35
+              ]
+            }
+          ],
+          "settlement": [
+            {
+              "txid": "e064db2f57049494f1b9ad2ac378616bf979103a47b32eb7351769f4ffc833de",
+              "bytes": 212506,
+              "locking_bytes": 1745,
+              "unlocking_bytes": 210535,
+              "non_script_bytes": 226,
+              "input_script_bytes": [
+                101736,
+                104901,
+                1949,
+                1949
+              ],
+              "output_script_bytes": [
+                793,
+                793,
+                93,
+                66
+              ]
+            }
+          ]
+        },
+        "total": {
+          "bytes": 673706,
+          "locking_bytes": 462543,
+          "unlocking_bytes": 210751,
+          "non_script_bytes": 412
+        }
+      },
+      "spv_packet_bytes": {
+        "transactions": 886212,
+        "merkle_siblings": 160
+      },
+      "source_deposit": {
+        "txid": "0x26f946ee66f74e52ad36702752988e9b0b146984ac0c996785f405b18fae6ac6",
+        "blockhash": "0xdba6376b97f0ff63019e72588e97e538235624a5085d190752366277089469c3",
+        "event_id": "6b3df6be209e0d824b8b32cbca816e363a9e379893f250f03ff0f602c71e3719",
+        "receipt_log_ordinal": 1,
+        "quantity": 150,
+        "vault_nonce": 3,
+        "cumulative_issued": 650
+      },
+      "spv_receipts": {
+        "1": {
+          "outpoint": "de33c8fff4691735b72eb3473a1079f96b6178c32aadb9f1949404572fdb64e001000000",
+          "confirmed": 2,
+          "seconds": 0.05932791600935161,
+          "spend_status": "UNKNOWN"
+        }
+      }
+    },
+    "alice-to-bob": {
+      "action": 1,
+      "actual_outpoints": [
+        "e81f989938e809ebd9ada02ec939b6eccba0986347ac6a0938699c359cc80b3a01000000",
+        "25e661608941ab0ff2a6352dd3f7cf15d00d5ce3eb3408860210a65155f0b27801000000"
+      ],
+      "authorized_outputs": [
+        "011301000000000000000000000000000003421f5fc9a21065445c96fdb91c0c1e2f2431741c72713b4b99ddcb316f31e9fc",
+        "01e100000000000000000000000000000002352bbf4a4cdd12564f93fa332ce333301d9ad40271f8107181340aef25be59d5"
+      ],
+      "proof_seconds": 22.8927935,
+      "host_verify_seconds": 0.001209917,
+      "statement_sha256d": "0fa202c685bdcd56e2330ee7e1d6247ca825a7d8318477807790a31f00bfa036",
+      "cost": {
+        "groups": {
+          "preparation": [
+            {
+              "txid": "ba7180f422885e00f6e3e962b30d6f09e75c87109c252a6d23daa1b8fe730070",
+              "bytes": 847,
+              "locking_bytes": 713,
+              "unlocking_bytes": 72,
+              "non_script_bytes": 62,
+              "input_script_bytes": [
+                72
+              ],
+              "output_script_bytes": [
+                713
+              ]
+            },
+            {
+              "txid": "cdc9d608e80d9a54d96de8c04a9a4326217bfc7deee3511081e12d33354b21f2",
+              "bytes": 460186,
+              "locking_bytes": 460050,
+              "unlocking_bytes": 72,
+              "non_script_bytes": 64,
+              "input_script_bytes": [
+                72
+              ],
+              "output_script_bytes": [
+                460050
+              ]
+            }
+          ],
+          "settlement": [
+            {
+              "txid": "7c24c92c5d5f41c02ecd8a1479530b68c53e0405a6e3f596d25fc434d9a46184",
+              "bytes": 212506,
+              "locking_bytes": 1745,
+              "unlocking_bytes": 210535,
+              "non_script_bytes": 226,
+              "input_script_bytes": [
+                101736,
+                104901,
+                1949,
+                1949
+              ],
+              "output_script_bytes": [
+                793,
+                793,
+                93,
+                66
+              ]
+            }
+          ]
+        },
+        "total": {
+          "bytes": 673539,
+          "locking_bytes": 462508,
+          "unlocking_bytes": 210679,
+          "non_script_bytes": 352
+        }
+      },
+      "spv_packet_bytes": {
+        "transactions": 1098551,
+        "merkle_siblings": 160
+      },
+      "spv_receipts": {
+        "0": {
+          "outpoint": "8461a4d934c45fd296f5e3a605043ec5680b5379148acd2ec0415f5d2cc9247c00000000",
+          "confirmed": 2,
+          "seconds": 0.060385582968592644,
+          "spend_status": "UNKNOWN"
+        }
+      }
+    },
+    "bob-to-carol": {
+      "action": 1,
+      "actual_outpoints": [
+        "8461a4d934c45fd296f5e3a605043ec5680b5379148acd2ec0415f5d2cc9247c00000000",
+        "de33c8fff4691735b72eb3473a1079f96b6178c32aadb9f1949404572fdb64e001000000"
+      ],
+      "authorized_outputs": [
+        "015e010000000000000000000000000000032fa2104d6b38d11b0230010559879124e42ab8dfeff5ff29dc9cdadd4ecacc3f",
+        "014b00000000000000000000000000000003421f5fc9a21065445c96fdb91c0c1e2f2431741c72713b4b99ddcb316f31e9fc"
+      ],
+      "proof_seconds": 22.538650209,
+      "host_verify_seconds": 0.001217916,
+      "statement_sha256d": "40796e0c3e9216f15a009c9b4834531028d915b078595c3f85acdf69c7ccf685",
+      "cost": {
+        "groups": {
+          "preparation": [
+            {
+              "txid": "7e4e8301cf5ada30b91b26895750e2d7f20fca6e8e29285d7e9b18c5f43f532f",
+              "bytes": 847,
+              "locking_bytes": 713,
+              "unlocking_bytes": 72,
+              "non_script_bytes": 62,
+              "input_script_bytes": [
+                72
+              ],
+              "output_script_bytes": [
+                713
+              ]
+            },
+            {
+              "txid": "aeb5cc5a0258d2c41018928bbe2c5dda0061e99a07ab1762acc1c33943725248",
+              "bytes": 460186,
+              "locking_bytes": 460050,
+              "unlocking_bytes": 72,
+              "non_script_bytes": 64,
+              "input_script_bytes": [
+                72
+              ],
+              "output_script_bytes": [
+                460050
+              ]
+            }
+          ],
+          "settlement": [
+            {
+              "txid": "8df78099484fa3091e06451ca12728128b38115c9fa91a7e131e388131ab96ef",
+              "bytes": 212506,
+              "locking_bytes": 1745,
+              "unlocking_bytes": 210535,
+              "non_script_bytes": 226,
+              "input_script_bytes": [
+                101736,
+                104901,
+                1949,
+                1949
+              ],
+              "output_script_bytes": [
+                793,
+                793,
+                93,
+                66
+              ]
+            }
+          ]
+        },
+        "total": {
+          "bytes": 673539,
+          "locking_bytes": 462508,
+          "unlocking_bytes": 210679,
+          "non_script_bytes": 352
+        }
+      },
+      "spv_packet_bytes": {
+        "transactions": 1098551,
+        "merkle_siblings": 160
+      },
+      "spv_receipts": {
+        "0": {
+          "outpoint": "ef96ab3181381e137e1aa99f5c11388b122827a11c45061e09a34f489980f78d00000000",
+          "confirmed": 2,
+          "seconds": 0.06080808292608708,
+          "spend_status": "UNKNOWN"
+        }
+      }
+    },
+    "freeze-carol": {
+      "action": 2,
+      "actual_outpoints": [
+        "ef96ab3181381e137e1aa99f5c11388b122827a11c45061e09a34f489980f78d00000000",
+        "ef96ab3181381e137e1aa99f5c11388b122827a11c45061e09a34f489980f78d01000000"
+      ],
+      "authorized_outputs": [
+        "025e010000000000000000000000000000032fa2104d6b38d11b0230010559879124e42ab8dfeff5ff29dc9cdadd4ecacc3f",
+        "014b00000000000000000000000000000003421f5fc9a21065445c96fdb91c0c1e2f2431741c72713b4b99ddcb316f31e9fc"
+      ],
+      "proof_seconds": 23.748093,
+      "host_verify_seconds": 0.001221458,
+      "statement_sha256d": "341e8cd9a44629c9b9466a160a4c09178a9843ca982c7dec484c41964cb56ea6",
+      "cost": {
+        "groups": {
+          "preparation": [
+            {
+              "txid": "0188c2ee04d1c784027215dfd4a7ab866a2232a0cd3c8275ffe1e5fd45b87ac7",
+              "bytes": 847,
+              "locking_bytes": 713,
+              "unlocking_bytes": 72,
+              "non_script_bytes": 62,
+              "input_script_bytes": [
+                72
+              ],
+              "output_script_bytes": [
+                713
+              ]
+            },
+            {
+              "txid": "e93c885e06042f423a185c76e5b10e71c9d2054c6ef1123d5210ca97a637a618",
+              "bytes": 460186,
+              "locking_bytes": 460050,
+              "unlocking_bytes": 72,
+              "non_script_bytes": 64,
+              "input_script_bytes": [
+                72
+              ],
+              "output_script_bytes": [
+                460050
+              ]
+            }
+          ],
+          "settlement": [
+            {
+              "txid": "8f089ab5d2bdc0e1897e00bab585cda90197fa15611f7adaaeecba71da707092",
+              "bytes": 212506,
+              "locking_bytes": 1745,
+              "unlocking_bytes": 210535,
+              "non_script_bytes": 226,
+              "input_script_bytes": [
+                101736,
+                104901,
+                1949,
+                1949
+              ],
+              "output_script_bytes": [
+                793,
+                793,
+                93,
+                66
+              ]
+            }
+          ]
+        },
+        "total": {
+          "bytes": 673539,
+          "locking_bytes": 462508,
+          "unlocking_bytes": 210679,
+          "non_script_bytes": 352
+        }
+      },
+      "spv_packet_bytes": {
+        "transactions": 886045,
+        "merkle_siblings": 128
+      },
+      "spv_receipts": {
+        "0": {
+          "outpoint": "927070da71baecaeda7a1f6115fa9701a9cd85b5ba007e89e1c0bdd2b59a088f00000000",
+          "confirmed": 2,
+          "seconds": 0.07062541705090553,
+          "spend_status": "UNKNOWN"
+        }
+      }
+    },
+    "unfreeze-carol": {
+      "action": 3,
+      "actual_outpoints": [
+        "927070da71baecaeda7a1f6115fa9701a9cd85b5ba007e89e1c0bdd2b59a088f00000000",
+        "927070da71baecaeda7a1f6115fa9701a9cd85b5ba007e89e1c0bdd2b59a088f01000000"
+      ],
+      "authorized_outputs": [
+        "015e010000000000000000000000000000032fa2104d6b38d11b0230010559879124e42ab8dfeff5ff29dc9cdadd4ecacc3f",
+        "014b00000000000000000000000000000003421f5fc9a21065445c96fdb91c0c1e2f2431741c72713b4b99ddcb316f31e9fc"
+      ],
+      "proof_seconds": 23.354980584,
+      "host_verify_seconds": 0.001218041,
+      "statement_sha256d": "9ccffc8d8b4670fbf8e0ff765607f4a1a1ec21819a1ede08585c9a2f611ea27e",
+      "cost": {
+        "groups": {
+          "preparation": [
+            {
+              "txid": "6772ad6c18e7be0d623e426c6cd962ca032b0fe0448fb1be6483398c0d4efb7b",
+              "bytes": 847,
+              "locking_bytes": 713,
+              "unlocking_bytes": 72,
+              "non_script_bytes": 62,
+              "input_script_bytes": [
+                72
+              ],
+              "output_script_bytes": [
+                713
+              ]
+            },
+            {
+              "txid": "3497a354effc71dd9c766cf27745bf681f75df4aa13494cfaa891ffe538a2a23",
+              "bytes": 460186,
+              "locking_bytes": 460050,
+              "unlocking_bytes": 72,
+              "non_script_bytes": 64,
+              "input_script_bytes": [
+                72
+              ],
+              "output_script_bytes": [
+                460050
+              ]
+            }
+          ],
+          "settlement": [
+            {
+              "txid": "12becd73221f5caaf1b359939356e0f1e1d7055de509dcd2390700d7f1007645",
+              "bytes": 212506,
+              "locking_bytes": 1745,
+              "unlocking_bytes": 210535,
+              "non_script_bytes": 226,
+              "input_script_bytes": [
+                101736,
+                104901,
+                1949,
+                1949
+              ],
+              "output_script_bytes": [
+                793,
+                793,
+                93,
+                66
+              ]
+            }
+          ]
+        },
+        "total": {
+          "bytes": 673539,
+          "locking_bytes": 462508,
+          "unlocking_bytes": 210679,
+          "non_script_bytes": 352
+        }
+      },
+      "spv_packet_bytes": {
+        "transactions": 886045,
+        "merkle_siblings": 128
+      },
+      "spv_receipts": {
+        "0": {
+          "outpoint": "457600f1d7000739d2dc09e55d05d7e1f1e056939359b3f1aa5c1f2273cdbe1200000000",
+          "confirmed": 2,
+          "seconds": 0.06647562503349036,
+          "spend_status": "UNKNOWN"
+        }
+      }
+    },
+    "partial-burn": {
+      "action": 4,
+      "actual_outpoints": [
+        "457600f1d7000739d2dc09e55d05d7e1f1e056939359b3f1aa5c1f2273cdbe1200000000",
+        "457600f1d7000739d2dc09e55d05d7e1f1e056939359b3f1aa5c1f2273cdbe1201000000"
+      ],
+      "authorized_outputs": [
+        "0132000000000000000000000000000000032fa2104d6b38d11b0230010559879124e42ab8dfeff5ff29dc9cdadd4ecacc3f",
+        "014b00000000000000000000000000000003421f5fc9a21065445c96fdb91c0c1e2f2431741c72713b4b99ddcb316f31e9fc"
+      ],
+      "proof_seconds": 23.930609375,
+      "host_verify_seconds": 0.001271709,
+      "statement_sha256d": "2b18cc518298a2259142a3be5137868a646b2e571bd7f5068666e49b3ae2653e",
+      "cost": {
+        "groups": {
+          "preparation": [
+            {
+              "txid": "d419d316853b2ab1c4e9e6a90558d6e7eadc5b5d09920b3a5fa54336972ec090",
+              "bytes": 847,
+              "locking_bytes": 713,
+              "unlocking_bytes": 72,
+              "non_script_bytes": 62,
+              "input_script_bytes": [
+                72
+              ],
+              "output_script_bytes": [
+                713
+              ]
+            },
+            {
+              "txid": "e1ba1bcd83632c81ce0d9d95c15dfd38b70cb04b53b8d76eefdd7f097257f344",
+              "bytes": 460186,
+              "locking_bytes": 460050,
+              "unlocking_bytes": 72,
+              "non_script_bytes": 64,
+              "input_script_bytes": [
+                72
+              ],
+              "output_script_bytes": [
+                460050
+              ]
+            }
+          ],
+          "settlement": [
+            {
+              "txid": "ed353904bf431b5ad55ad1d862d1ce7c3af1e49a322ca063549bfb81ff0366fd",
+              "bytes": 212506,
+              "locking_bytes": 1745,
+              "unlocking_bytes": 210535,
+              "non_script_bytes": 226,
+              "input_script_bytes": [
+                101736,
+                104901,
+                1949,
+                1949
+              ],
+              "output_script_bytes": [
+                793,
+                793,
+                93,
+                66
+              ]
+            }
+          ]
+        },
+        "total": {
+          "bytes": 673539,
+          "locking_bytes": 462508,
+          "unlocking_bytes": 210679,
+          "non_script_bytes": 352
+        }
+      },
+      "spv_packet_bytes": {
+        "transactions": 886045,
+        "merkle_siblings": 128
+      }
+    },
+    "full-burn": {
+      "action": 4,
+      "actual_outpoints": [
+        "fd6603ff81fb9b5463a02c329ae4f13a7cced162d8d15ad55a1b43bf043935ed00000000",
+        "fd6603ff81fb9b5463a02c329ae4f13a7cced162d8d15ad55a1b43bf043935ed01000000"
+      ],
+      "authorized_outputs": [
+        "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+        "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+      ],
+      "proof_seconds": 24.870167166,
+      "host_verify_seconds": 0.001269542,
+      "statement_sha256d": "f9b6c14e579d031c5518dda02186fab239349cf8819950e2101e685878548938",
+      "cost": {
+        "groups": {
+          "preparation": [
+            {
+              "txid": "7ead56796daaa8f87dedb3865cb931943f41cc88872b9be8ebbf0af893be7b9e",
+              "bytes": 847,
+              "locking_bytes": 713,
+              "unlocking_bytes": 72,
+              "non_script_bytes": 62,
+              "input_script_bytes": [
+                72
+              ],
+              "output_script_bytes": [
+                713
+              ]
+            },
+            {
+              "txid": "f106c5dc52778a8d0fb59cf90e30fa6c5beb92d84b322ecb12619dedac426531",
+              "bytes": 460186,
+              "locking_bytes": 460050,
+              "unlocking_bytes": 72,
+              "non_script_bytes": 64,
+              "input_script_bytes": [
+                72
+              ],
+              "output_script_bytes": [
+                460050
+              ]
+            }
+          ],
+          "settlement": [
+            {
+              "txid": "a27e1ca0c57bf568e4bed3a00f8bbefd8e571121dec7360c7b72b6537a7b4dca",
+              "bytes": 212506,
+              "locking_bytes": 1745,
+              "unlocking_bytes": 210535,
+              "non_script_bytes": 226,
+              "input_script_bytes": [
+                101736,
+                104901,
+                1949,
+                1949
+              ],
+              "output_script_bytes": [
+                793,
+                793,
+                93,
+                66
+              ]
+            }
+          ]
+        },
+        "total": {
+          "bytes": 673539,
+          "locking_bytes": 462508,
+          "unlocking_bytes": 210679,
+          "non_script_bytes": 352
+        }
+      },
+      "spv_packet_bytes": {
+        "transactions": 886045,
+        "merkle_siblings": 128
+      }
+    }
+  },
+  "releases": [
+    {
+      "txid": "0xc6431856a46f9321a22455b646dd2d37fccc127954f640a8bd69231165e5fb38",
+      "blockhash": "0x0c58a2d81760bdba2bd5b0b307b4db2e722d8bfd4eba202f34b0f97eb3e8ae77",
+      "receipt_log_ordinal": 1,
+      "burn_txid": "ed353904bf431b5ad55ad1d862d1ce7c3af1e49a322ca063549bfb81ff0366fd",
+      "burn_vout": 2,
+      "burn_blockhash": "7e4008881e59f70e6318ce6ade319e84a65140340fca633bf352e3a6f09be9cc",
+      "burn_event_id": "401201ff492ed3f27bb213c5b33b9e218f43ea9ad27cd1bbd9bf22d00c9ae632",
+      "attestation_digest": "406be87c50e6b4f567c879a8462576004ddf0cdc21a0532bbb8298b454194a66",
+      "confirmation_depth_policy": 2,
+      "quantity": 300,
+      "actual_recipient_credit": 300,
+      "finalized": true,
+      "recovered_without_resigning": true,
+      "journal": {
+        "event_id": "401201ff492ed3f27bb213c5b33b9e218f43ea9ad27cd1bbd9bf22d00c9ae632",
+        "authorization_digest": "406be87c50e6b4f567c879a8462576004ddf0cdc21a0532bbb8298b454194a66",
+        "phase_before_broadcast": "authorized",
+        "signer_interrupted": true,
+        "pre_sign_intent_persisted": true,
+        "recovered_signature_without_resigning": true,
+        "observed_effect_phase": "submitted",
+        "final_effect_phase": "settled"
+      },
+      "before_broadcast_accounting": {
+        "deposited": 650,
+        "minted": 650,
+        "burned": 300,
+        "released": 0,
+        "net_reserve": 650,
+        "actual_vault_balance": 650,
+        "bsv_circulating": 350,
+        "bsv_frozen": 0,
+        "pending_mint": 0,
+        "pending_release": 300,
+        "balanced": true,
+        "holds": 0
+      },
+      "reserve_replay_rejected": "Error: execution reverted: AlreadySettled(0x401201ff492ed3f27bb213c5b33b9e218f43ea9ad27cd1bbd9bf22d00c9ae632)\n\nContext:\n- server returned an error response: error code 3: execution reverted: custom error 0xb196a44a: 401201ff492ed3f27bb213c5b33b9e218f43ea9ad27cd1bbd9bf22d00c9ae632, data: \"0xb196a44a401201ff492ed3f27bb213c5b33b9e218f43ea9ad27cd1bbd9bf22d00c9ae632\""
+    },
+    {
+      "txid": "0xf9b44a45d1f738fd3e04c067bea8baecb32c71c88b6b1efb6dcb1001b8ce45f2",
+      "blockhash": "0x7e6043e810fe23025cc4ad6ebcd89a64a1dfa732ff54189a0d8cae89163cefa7",
+      "receipt_log_ordinal": 1,
+      "burn_txid": "a27e1ca0c57bf568e4bed3a00f8bbefd8e571121dec7360c7b72b6537a7b4dca",
+      "burn_vout": 2,
+      "burn_blockhash": "5bef634088802b1ba8621a58a56782264ea99476ca1a324545c9afde429e15af",
+      "burn_event_id": "4f9b0ee3a608f5c1582b19dce9640f2c8f9e693a1f9cde00822ba0878b755163",
+      "attestation_digest": "06df88970b0f65a400078590bfa897f645d285a7434aa6d3650b31910c204ab2",
+      "confirmation_depth_policy": 2,
+      "quantity": 125,
+      "actual_recipient_credit": 125,
+      "finalized": true,
+      "recovered_without_resigning": true,
+      "journal": {
+        "event_id": "4f9b0ee3a608f5c1582b19dce9640f2c8f9e693a1f9cde00822ba0878b755163",
+        "authorization_digest": "06df88970b0f65a400078590bfa897f645d285a7434aa6d3650b31910c204ab2",
+        "phase_before_broadcast": "authorized",
+        "signer_interrupted": true,
+        "pre_sign_intent_persisted": true,
+        "recovered_signature_without_resigning": true,
+        "observed_effect_phase": "submitted",
+        "final_effect_phase": "settled"
+      },
+      "before_broadcast_accounting": {
+        "deposited": 650,
+        "minted": 650,
+        "burned": 425,
+        "released": 300,
+        "net_reserve": 350,
+        "actual_vault_balance": 350,
+        "bsv_circulating": 225,
+        "bsv_frozen": 0,
+        "pending_mint": 0,
+        "pending_release": 125,
+        "balanced": true,
+        "holds": 0
+      },
+      "reserve_replay_rejected": "Error: execution reverted: AlreadySettled(0x4f9b0ee3a608f5c1582b19dce9640f2c8f9e693a1f9cde00822ba0878b755163)\n\nContext:\n- server returned an error response: error code 3: execution reverted: custom error 0xb196a44a: 4f9b0ee3a608f5c1582b19dce9640f2c8f9e693a1f9cde00822ba0878b755163, data: \"0xb196a44a4f9b0ee3a608f5c1582b19dce9640f2c8f9e693a1f9cde00822ba0878b755163\""
+    }
+  ],
+  "reconciliation": {
+    "deposited": 650,
+    "minted": 650,
+    "burned": 425,
+    "released": 425,
+    "net_reserve": 225,
+    "actual_vault_balance": 225,
+    "bsv_circulating": 225,
+    "bsv_frozen": 0,
+    "pending_mint": 0,
+    "pending_release": 0,
+    "balanced": true,
+    "holds": 0
+  },
+  "proof_rejections": {
+    "mint-200-stale-nonce": "prepared-lifecycle witness does not prove: constraint #13405097 is not satisfied: 1 \u22c5 -1 != 0",
+    "mint-150-stale-nonce": "prepared-lifecycle witness does not prove: constraint #13405097 is not satisfied: 1 \u22c5 -1 != 0",
+    "mint-issuance-vout-as-token": "prepared-lifecycle witness does not prove: constraint #13405101 is not satisfied: 1 \u22c5 2 != 0",
+    "ordinary-frozen-spend": "prepared-lifecycle witness does not prove: constraint #13405101 is not satisfied: 1 \u22c5 1 != 0",
+    "frozen-burn": "prepared-lifecycle witness does not prove: constraint #13405101 is not satisfied: 1 \u22c5 1 != 0"
+  },
+  "node_rejections": {
+    "extra-copied-token": "sendrawtransaction: {'code': -26, 'message': '16: mandatory-script-verify-flag-failed (Script failed an OP_EQUALVERIFY operation)'}",
+    "wrong-manager-signature": "sendrawtransaction: {'code': -26, 'message': '16: mandatory-script-verify-flag-failed (Script failed an OP_CHECKSIGVERIFY operation)'}",
+    "changed-burn-recipient": "sendrawtransaction: {'code': -26, 'message': '16: mandatory-script-verify-flag-failed (Script failed an OP_EQUALVERIFY operation)'}"
+  },
+  "wallet_rejections": {
+    "frozen-not-an-active-receipt": "receipt outpoint, owner, amount or policy mismatch"
+  },
+  "evm": {
+    "chain_id": 31337,
+    "vault": "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512",
+    "token": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
+    "recipient": "3c44cdddb6a900fa2b585dd299e03d12fa4293bc"
+  },
+  "node": "/Bitcoin SV:1.2.3/",
+  "transactions": {
+    "setup": {
+      "txid": "a1f6782a1aa60910d1993af283ca2095e4bb9b056a829026a82fdb93158b4a7a",
+      "blockhash": "476a0984e0199b46be9b0a16397ab922a230aff9fdfb59d6c12f7ebb450a118c",
+      "height": 102,
+      "bytes": 229
+    },
+    "issuance-anchor": {
+      "txid": "a2953c6c5e0ebd45d691adfb07b2434bdcae984f8e27d36ab292375c5c60a952",
+      "blockhash": "207f73638fa64a385b32e9942c1973eeba65fc4872a707db9f9bee89b9537f47",
+      "height": 103,
+      "bytes": 95
+    },
+    "sponsor-wallets": {
+      "txid": "8014beca8fb7c4f492f1bce9bd6b7e1220dfe7de44a5d5c279b67b36c7c6e2b3",
+      "blockhash": "63622651faa6e9ab829a6e46401e2c95f286748c535eb5939f1a3eb8cf95a7d5",
+      "height": 104,
+      "bytes": 1239
+    },
+    "mint-300-companion": {
+      "txid": "00fbe13c74a640e68657def14f56ae2e86a4acc19fbe0620ce1d8c76a96c20f1",
+      "blockhash": "287911c9af34ef98d68b3d168f8f05d9304443433a6480bea89e69307cf3f234",
+      "height": 105,
+      "bytes": 847
+    },
+    "mint-300-verifier": {
+      "txid": "c1af6ffaf7ebe9848b49a40d002310447fdaf28eebd4d82df7dc37397e8e8c3b",
+      "blockhash": "683787b1b20e56df0ce2b6058b8ef207f4ed1f16ec4011f5c3c983fba0301dc0",
+      "height": 106,
+      "bytes": 460186
+    },
+    "mint-300-fee": {
+      "txid": "8bcb4d0af3928b1becdde7a4bb4dfc3cecb640f8f4cfc82f5fc45ead33d032c5",
+      "blockhash": "3fa4e89daaa09b9e927f93187956e073d90ea75e3fe88bbe7364e7526c3573a5",
+      "height": 107,
+      "bytes": 167
+    },
+    "mint-300": {
+      "txid": "3a0bc89c359c6938096aac476398a0cbecb639c92ea0add9eb09e83899981fe8",
+      "blockhash": "04adf93dfb3b9138027627253c7aed0dcb647240c7c750039eb2ecc132e4573e",
+      "height": 108,
+      "bytes": 212506
+    },
+    "mint-200-companion": {
+      "txid": "529e4d4f589ec8ca8f654351ca031278a0002e1a8041578528e443a9c8b02786",
+      "blockhash": "0d1341b679ce4deb33d908dd55cf321f7c41b3c09e5219113031ad2fad4c614c",
+      "height": 110,
+      "bytes": 847
+    },
+    "mint-200-verifier": {
+      "txid": "222e9d02b20e59ffec53850e74fe1c1dfd4363a8c6d292b3843524129e2c89f1",
+      "blockhash": "36401d075fb39867c0a0d73849e5eb77e0daeed51a45321d25a72cfbb72ea76c",
+      "height": 111,
+      "bytes": 460186
+    },
+    "mint-200-fee": {
+      "txid": "dc22c35d089d21659cb446be8d43d26f16e08afe5fb90926818b577d9531ef53",
+      "blockhash": "36341ad2c9aa719dc2533ba85248705a91e6d9c6ff1dae78baf2d9af9cf128d4",
+      "height": 112,
+      "bytes": 167
+    },
+    "mint-200": {
+      "txid": "78b2f05551a61002860834ebe35c0dd015cff7d32d35a6f20fab41896061e625",
+      "blockhash": "63c49f9035e5c20d01de7412e8d0a63f1c3b7b7ce88692daca287cc7258d7138",
+      "height": 113,
+      "bytes": 212506
+    },
+    "mint-150-companion": {
+      "txid": "adb26dabb08b598c5515bbe38554d3cbe8643d358b17eb3363a1e5b7a0c54893",
+      "blockhash": "6a0c3492ed150a05fdca99b4d1ea2c828f53bff66dc09f9e38cddf5b9b5d2b6e",
+      "height": 115,
+      "bytes": 847
+    },
+    "mint-150-verifier": {
+      "txid": "2df24b2fc1ecd1fc77b84d68ed006156a145be17c1f8389c09c9f51a3d67b958",
+      "blockhash": "1db3e7aca1d5c3b2c3826744a7364374f7a8b75ab2fc7d2d5fe8da1c447b1bf8",
+      "height": 116,
+      "bytes": 460186
+    },
+    "mint-150-fee": {
+      "txid": "ec2e26bc6203f7e5392e67cd273ec320804e757d0564ac796bd17b081b101d84",
+      "blockhash": "2c6019a8adea3e430ba129a4e6372628c574f0a41eb766773bfc34f7b2ea7e81",
+      "height": 117,
+      "bytes": 167
+    },
+    "mint-150": {
+      "txid": "e064db2f57049494f1b9ad2ac378616bf979103a47b32eb7351769f4ffc833de",
+      "blockhash": "210f6add4a89820b20df0200de1daf69b0cfb455009a993376efceb6b183d81c",
+      "height": 118,
+      "bytes": 212506
+    },
+    "alice-to-bob-companion": {
+      "txid": "ba7180f422885e00f6e3e962b30d6f09e75c87109c252a6d23daa1b8fe730070",
+      "blockhash": "4ebd32dc789ba45eebf39394e827a0b740a5cfd2cebd559652be0127bff70914",
+      "height": 120,
+      "bytes": 847
+    },
+    "alice-to-bob-verifier": {
+      "txid": "cdc9d608e80d9a54d96de8c04a9a4326217bfc7deee3511081e12d33354b21f2",
+      "blockhash": "641695496a1ad501d000104288dfaa569a88e0bf2209830978feeaa44b975c17",
+      "height": 121,
+      "bytes": 460186
+    },
+    "alice-to-bob": {
+      "txid": "7c24c92c5d5f41c02ecd8a1479530b68c53e0405a6e3f596d25fc434d9a46184",
+      "blockhash": "72287e63a4f885ce7955a85eb362d9be8eaa9af0434dd0fca41fa3df5ec472c4",
+      "height": 122,
+      "bytes": 212506
+    },
+    "bob-to-carol-companion": {
+      "txid": "7e4e8301cf5ada30b91b26895750e2d7f20fca6e8e29285d7e9b18c5f43f532f",
+      "blockhash": "7323dadc8fdc6d58668f62393e969054d503e6613b6ca09cfa164fc9520d84c1",
+      "height": 124,
+      "bytes": 847
+    },
+    "bob-to-carol-verifier": {
+      "txid": "aeb5cc5a0258d2c41018928bbe2c5dda0061e99a07ab1762acc1c33943725248",
+      "blockhash": "6ababecdbacb94a858847d31716dcfc85fe700c8827806a44d38c398077ead97",
+      "height": 125,
+      "bytes": 460186
+    },
+    "bob-to-carol": {
+      "txid": "8df78099484fa3091e06451ca12728128b38115c9fa91a7e131e388131ab96ef",
+      "blockhash": "0447ed0b594ec1b1d798dc4a6069c6733c710ccccfded7880e0e8c487c215f99",
+      "height": 126,
+      "bytes": 212506
+    },
+    "freeze-carol-companion": {
+      "txid": "0188c2ee04d1c784027215dfd4a7ab866a2232a0cd3c8275ffe1e5fd45b87ac7",
+      "blockhash": "66493449a84516b3d75915124a9637d02fabbd7317a8c436c58602f835deb754",
+      "height": 128,
+      "bytes": 847
+    },
+    "freeze-carol-verifier": {
+      "txid": "e93c885e06042f423a185c76e5b10e71c9d2054c6ef1123d5210ca97a637a618",
+      "blockhash": "0ef83dd44609ea76907e910efa503005b1a60f6e39411971700979f0b9ff927d",
+      "height": 129,
+      "bytes": 460186
+    },
+    "freeze-carol": {
+      "txid": "8f089ab5d2bdc0e1897e00bab585cda90197fa15611f7adaaeecba71da707092",
+      "blockhash": "360b73a2fba55ed85a228a3a80bdc85850871e7bb17e15b2cb4cbc5903361cdc",
+      "height": 130,
+      "bytes": 212506
+    },
+    "unfreeze-carol-companion": {
+      "txid": "6772ad6c18e7be0d623e426c6cd962ca032b0fe0448fb1be6483398c0d4efb7b",
+      "blockhash": "2755b7f4e9ec555ebb1c1c47186eb9028f4bcdff41dc4feeb16ef6a68d7c2684",
+      "height": 132,
+      "bytes": 847
+    },
+    "unfreeze-carol-verifier": {
+      "txid": "3497a354effc71dd9c766cf27745bf681f75df4aa13494cfaa891ffe538a2a23",
+      "blockhash": "4e05cfd3e1681697a0b8e8258c25cb334cfb8c965ce17b53c75e9012f42b1031",
+      "height": 133,
+      "bytes": 460186
+    },
+    "unfreeze-carol": {
+      "txid": "12becd73221f5caaf1b359939356e0f1e1d7055de509dcd2390700d7f1007645",
+      "blockhash": "10282df4ca2f0f176188d636e4cc47538f68183d7dbc92b8ae1e25c28e0b9c1d",
+      "height": 134,
+      "bytes": 212506
+    },
+    "partial-burn-companion": {
+      "txid": "d419d316853b2ab1c4e9e6a90558d6e7eadc5b5d09920b3a5fa54336972ec090",
+      "blockhash": "2d2a9d2bcb81016ab84cb9dc4f9deb454730a18d2e68a6c7637a0e85bb86efd8",
+      "height": 136,
+      "bytes": 847
+    },
+    "partial-burn-verifier": {
+      "txid": "e1ba1bcd83632c81ce0d9d95c15dfd38b70cb04b53b8d76eefdd7f097257f344",
+      "blockhash": "2611e22b10bf0cf5527f3c8249a519e65d1f1580744464e5e32824549fd1b0e6",
+      "height": 137,
+      "bytes": 460186
+    },
+    "partial-burn": {
+      "txid": "ed353904bf431b5ad55ad1d862d1ce7c3af1e49a322ca063549bfb81ff0366fd",
+      "blockhash": "7e4008881e59f70e6318ce6ade319e84a65140340fca633bf352e3a6f09be9cc",
+      "height": 138,
+      "bytes": 212506
+    },
+    "full-burn-companion": {
+      "txid": "7ead56796daaa8f87dedb3865cb931943f41cc88872b9be8ebbf0af893be7b9e",
+      "blockhash": "329cde6557b3ef2b64353f94587a9f96122673d52483537efedecc03b11269f7",
+      "height": 140,
+      "bytes": 847
+    },
+    "full-burn-verifier": {
+      "txid": "f106c5dc52778a8d0fb59cf90e30fa6c5beb92d84b322ecb12619dedac426531",
+      "blockhash": "006ec2e59bd2b0bd2ba95af02c7236a1566491535b4ea250d5c2e67651985078",
+      "height": 141,
+      "bytes": 460186
+    },
+    "full-burn": {
+      "txid": "a27e1ca0c57bf568e4bed3a00f8bbefd8e571121dec7360c7b72b6537a7b4dca",
+      "blockhash": "5bef634088802b1ba8621a58a56782264ea99476ca1a324545c9afde429e15af",
+      "height": 142,
+      "bytes": 212506
+    }
+  }
+}
