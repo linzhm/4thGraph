@@ -1,6 +1,7 @@
 """Constructor byte equivalence and complete spending through both engines."""
 from dataclasses import replace
 import unittest
+from unittest.mock import patch
 
 from generate_otda_constructor import generate
 from p2pkh_sm2 import _otda_pattern, current_input_unlock, locking_script_from_public_key, sign_input
@@ -49,8 +50,8 @@ class ConstructorTests(unittest.TestCase):
                 return signature
 
             args = index, parent.serialize(), key, signer, flag
-            tx_raw = sign_input(tx_raw, *args)
-            tx_compact = sign_input(tx_compact, *args, compress_otda=True)
+            tx_raw = sign_input(tx_raw, *args, compress_otda=False)
+            tx_compact = sign_input(tx_compact, *args)
             raw, compact = tx_raw.inputs[index].script, tx_compact.inputs[index].script
             self.assertEqual(compact != raw, expected[index])
             if expected[index]:
@@ -59,7 +60,7 @@ class ConstructorTests(unittest.TestCase):
             self.assertEqual(evaluate(compact), ([auth.preimage, key, signature], []))
             self.assertEqual(
                 compact, current_input_unlock(tx, index, parent.outputs[0].value, key, signature,
-                                              flag, compress_otda=True),
+                                              flag),
             )
         self.assertTrue(chain_verdict(tx_raw, self.funding))
         self.assertTrue(chain_verdict(tx_compact, self.funding))
@@ -101,12 +102,21 @@ class ConstructorTests(unittest.TestCase):
         check_node(changed, self.funding, 1, False)
         chain_check(changed, self.funding, 1, False)
 
+    def test_larger_constructor_falls_back_to_literal_encoding(self):
+        tx = Transaction(self.inputs, self.destinations)
+        pattern = _otda_pattern()
+        oversized = replace(pattern, program=pattern.program + bytes(len(tx.serialize())))
+        with patch('p2pkh_sm2._otda_pattern', return_value=oversized):
+            self.sign_modes(tx, 0x61, (False, False))
+
     def test_reconstruction_requires_chronicle_before_signing(self):
         tx = Transaction(self.inputs, self.destinations)
 
         def signer(*args):
             self.fail("inactive functional unlocking invoked the signer")
 
+        args = tx, 0, self.funding[0].serialize(), self.keys[0], signer
+        with self.assertRaisesRegex(ValueError, 'Chronicle sighash is disabled'):
+            sign_input(*args, 0x61, chronicle_active=False)
         with self.assertRaisesRegex(ValueError, 'requires an active Chronicle context'):
-            sign_input(tx, 0, self.funding[0].serialize(), self.keys[0], signer,
-                       chronicle_active=False, compress_otda=True)
+            sign_input(*args, 0x41, chronicle_active=False, compress_otda=True)

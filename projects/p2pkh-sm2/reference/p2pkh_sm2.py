@@ -66,12 +66,12 @@ def _otda_pattern():
 
 
 def _preimage_script(tx, index, auth, *, compress_otda, chronicle_active):
-    if type(compress_otda) is not bool:
+    if compress_otda is not None and type(compress_otda) is not bool:
         raise ValueError('compress_otda must be a boolean')
-    if compress_otda and not chronicle_active:
+    if compress_otda is True and not chronicle_active:
         raise ValueError('SM2 OTDA reconstruction requires an active Chronicle context')
     literal = push(auth.preimage)
-    if not compress_otda or tx.version != 2 or auth.companion:
+    if not chronicle_active or compress_otda is False or tx.version != 2 or auth.companion:
         return literal
     if auth.requested_type in RECONSTRUCT_ALL:
         outputs = tx.outputs
@@ -84,7 +84,7 @@ def _preimage_script(tx, index, auth, *, compress_otda, chronicle_active):
 
 
 def current_input_unlock(tx, index, previous_amount, key, signature, sighash_type=0x41,
-                         *, chronicle_active=True, version=TEMPLATE_VERSION, compress_otda=False):
+                         *, chronicle_active=True, version=TEMPLATE_VERSION, compress_otda=None):
     public_key_hash160(key)
     if version != TEMPLATE_VERSION:
         raise ValueError('unsupported P2PKH-SM2 template version')
@@ -104,7 +104,7 @@ def _encode_unlock(auth, key, signature, preimage_script):
     return preimage_script+push(key)+push(signature)
 
 
-def sign_previous(tx, index, previous, key, signer, sighash_type, chronicle_active, *, compress_otda=False):
+def sign_previous(tx, index, previous, key, signer, sighash_type, chronicle_active, *, compress_otda=None):
     template = identify(previous.script)
     if template is None or template[1] != public_key_hash160(key):
         raise ValueError('funding output does not belong to key/template')
@@ -115,11 +115,12 @@ def sign_previous(tx, index, previous, key, signer, sighash_type, chronicle_acti
 
 
 def sign_input(tx, index, funding_raw, key, signer, sighash_type=0x41, *, chronicle_active=True,
-               compress_otda=False):
+               compress_otda=None):
     """Sign one input after matching its outpoint to the previous transaction.
 
     The caller selects coverage and supplies the chain activation context.
-    compress_otda enables functional unlocking in eligible version-2 spends.
+    Eligible version-2 spends automatically use a shorter reconstruction.
+    Pass compress_otda=False to reproduce the literal encoding.
     Other inputs, including their existing unlocking scripts, are preserved.
     """
     if not 0 <= index < len(tx.inputs):

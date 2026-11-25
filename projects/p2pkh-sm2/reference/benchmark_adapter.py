@@ -7,7 +7,7 @@ from shared.benchmark_cases import Coin, Template, seed
 from shared.transaction import Output
 
 
-def sm2_coin(label, value, *, compress_otda=False):
+def sm2_coin(label, value, *, compress_otda=None):
     scalar = 1 + int.from_bytes(seed(label), "big") % (N - 2)
     key = encode_public(mul(scalar))
 
@@ -22,8 +22,8 @@ def sm2_coin(label, value, *, compress_otda=False):
 
 
 TEMPLATES = {
-    "v1.0.0": Template(sm2_coin),
-    "v1.0.0-reconstructed": Template(partial(sm2_coin, compress_otda=True)),
+    "v1.0.0": Template(partial(sm2_coin, compress_otda=False)),
+    "v1.1.0": Template(sm2_coin),
 }
 
 

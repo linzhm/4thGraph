@@ -76,6 +76,8 @@ You can pass an authenticated prevout directly. `prevoutFromFunding` reads seria
 
 Wallet signing defaults to ForkID ALL (`0x41`), and `SINGLE` requires an output at the same index. Set `chronicleActive` from the trusted chain context before choosing OTDA. The callback receives `algorithm`, `payloadKind` (`digest` or `message`), `signatureFormat`, `sighash`, `payload`, and the SM2 `userId` when present. Use the scheme-specific signing operation and encoding below.
 
+Leave the reconstruction option unset to use the scheme's default. SM2 automatically uses reconstruction when it shortens the OTDA unlock. In Go, `CompressOTDA` is a `*bool`, with `nil` for the default. In Rust, `compress_otda` is an `Option<bool>`, with `None` for the default. Use a pointer to `false`, `Some(false)`, or `false` in TypeScript and Python to reproduce the literal SM2 encoding.
+
 If the bridge fails to start, check the interpreter path, scheme dependencies, and source checkout. A fee mismatch fails before the signer runs. A signature error can occur after the callback returns, so retain the signer state and check the project's retry guidance, especially for one-time keys.
 
 ## Call from Rust, Go, and Python

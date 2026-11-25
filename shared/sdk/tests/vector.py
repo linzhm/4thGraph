@@ -33,9 +33,10 @@ def generate(project, node):
         tx = Transaction((Input(funding.txid_wire(), 0),), outputs)
         sighash = case.get("sighash", 0x41)
         active = bool(sighash & 0x20)
-        compress = case.get("compress_otda", False)
         signer_id = case.get("signer_identifier")
-        options = dict(chronicleActive=active, compressOtda=compress)
+        options = dict(chronicleActive=active)
+        if "compress_otda" in case:
+            options["compressOtda"] = case["compress_otda"]
         if signer_id is not None:
             options["signerIdentifier"] = signer_id
         calls = []
@@ -47,6 +48,13 @@ def generate(project, node):
 
         signed = adapter.sign_spend(tx, 0, funding.serialize(), key, fixture_signer, sighash, options)
         (arguments, signature), = calls
+        if "reconstructed" in case:
+            literal = adapter.sign_spend(tx, 0, funding.serialize(), key, case["signer"], sighash,
+                                         {**options, "compressOtda": False})
+            if case["reconstructed"]:
+                assert len(signed.inputs[0].script) < len(literal.inputs[0].script)
+            else:
+                assert signed.serialize() == literal.serialize()
         assert chain_verdict(signed, (funding,))
         if node:
             assert node.verdicts(signed, (funding,)) == [True]
@@ -55,8 +63,9 @@ def generate(project, node):
             assert supplied == arguments
             return signature
 
-        callback_options = dict(sighash=sighash, chronicle_active=active, compress_otda=compress,
-                                signer_identifier=signer_id)
+        callback_options = dict(sighash=sighash, chronicle_active=active, signer_identifier=signer_id)
+        if "compress_otda" in case:
+            callback_options["compress_otda"] = case["compress_otda"]
         assert client.lock(key, profile=profile) == lock
         recognized = adapter.recognize(lock, key)
         assert client.recognize(lock, public_key=key) == recognized

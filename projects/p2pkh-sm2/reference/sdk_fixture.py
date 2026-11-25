@@ -27,7 +27,9 @@ def cases():
 
     destination = locking_script_from_public_key(encode_public(mul(9)))
     yield dict(public_key=encode_public(mul(2)), signer=raw_signer(2), profile="v1.0.0",
-               bytes=144925, sighash=0xe3, compress_otda=True, destination=destination)
+               bytes=144925, sighash=0xe3, destination=destination, reconstructed=True)
     yield dict(public_key=encode_public(mul(3)), signer=signed_data_provider, profile="v1.0.0",
-               bytes=144925, sighash=0x61, compress_otda=True, destination=destination,
+               bytes=144925, sighash=0x61, destination=destination, reconstructed=True,
                signer_identifier=ISSUER_AND_SERIAL)
+    yield dict(public_key=encode_public(mul(2)), signer=raw_signer(2), profile="v1.0.0",
+               bytes=144925, sighash=0x61, compress_otda=False, destination=destination, reconstructed=False)
