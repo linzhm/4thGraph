@@ -120,10 +120,20 @@ content = verify_signed_data(envelope, {
 `signedAttrs`。对后者，还须核对唯一的 `messageDigest` 是否等于原文的 SM3 摘要。
 签名者信任、证书路径和吊销策略由调用方确定。
 
+通用验签默认要求 SM2 数据类型。其他应用类型由调用方通过 `expected_content_type`
+传入可信的点分 OID。该参数检查调用方的类型策略，直接签名覆盖原文字节。需要签名
+认证内容类型时，设置 `require_signed_content_type=True`，使每个签名者都必须提供
+一个与 `eContentType` 一致的已签 `contentType` 属性。该属性存在时总会检查一致性。
+
 封装的两个摘要字段接受 `1.2.156.10197.1.401` 和 `1.2.156.10197.1.401.1`，签名
 算法字段接受 SM2-1 的 `1.2.156.10197.1.301.1`。这三种标识的参数可省略，也可采用
 精确的 DER NULL 编码 `05 00`。`messageDigest` 使用 PKCS #9 的
 `1.2.840.113549.1.9.4`，值为一个 32 字节的 DER OCTET STRING。
+
+通用验签和格式校验要求每个签名者的摘要 OID 出现在 `digestAlgorithms` 中，并拒绝
+重复 OID。参数省略和 DER NULL 视为同一个 OID。其他 DER SET OF 集合继续遵循各字段
+的规则，例如通用验签会对相同的签名者记录去重。直接付款适配器保留现有的单一 SM3
+标识兼容性。
 
 按照本项目对 GB/T 35275-2026 的解释，通用验签默认使用 `signedAttrs` 原有的 DER
 `[0]` 字段字节。对使用通用 SET 标签构造签名输入的 CMS 封装，须显式指定
