@@ -11,7 +11,7 @@ r1_coin = runpy.run_path(str(R1_PATH))["r1_coin"]
 
 
 def deferred_coin(label, value):
-    target = r1_coin(label, value)
+    target = r1_coin(label, value, compiled="scheduled", compress="paired")
     funding = funding_output_from_owner_hash(value, recognize(target.output.script))
 
     def unlock(tx, index, parent, flag, _scratch):

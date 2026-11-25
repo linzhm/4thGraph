@@ -71,7 +71,7 @@ class CurveCompilerTests(unittest.TestCase):
 
     def test_owner_slot_and_full_template_recognition(self):
         owner = bytes(range(20))
-        canonical = locking_script_from_owner_hash(owner)
+        canonical = locking_script_from_owner_hash(owner, compiled_curve=False)
         compiled = locking_script_from_owner_hash(owner, compiled_curve=True)
         self.assertEqual(len(canonical), 59582)
         self.assertEqual(len(compiled), 47510)

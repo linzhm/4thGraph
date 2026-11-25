@@ -6,13 +6,17 @@ import { test } from "node:test";
 import { activationWitness, lockForKey, lockForOwner, recognize } from "./index.ts";
 
 const read = (path: string) => readFileSync(new URL(path, import.meta.url), "utf8");
-const template = Buffer.from(read("../../template/template.hex").replace(/\s/g, ""), "hex");
-const r1 = Buffer.from(read("../../../p2pkh-r1/template/template.hex").replace(/\s/g, ""), "hex");
+const hex = (path: string) => Buffer.from(read(path).replace(/\s/g, ""), "hex");
 
-test("generation, recognition and activation vectors", () => {
-  const layout = JSON.parse(read("../../template/layout.json"));
-  const activation = JSON.parse(read("../../template/activation-single.json"));
-  const modes = JSON.parse(read("../../template/sighash-modes.json"));
+function checkVectors(prefix: string, otherPrefix: string): void {
+  const deferred = "../../template/" + prefix;
+  const r1Directory = "../../../p2pkh-r1/template/";
+  const template = hex(deferred + "template.hex");
+  const r1 = hex(r1Directory + prefix + "template.hex");
+  const otherR1 = hex(r1Directory + otherPrefix + "template.hex");
+  const layout = JSON.parse(read(deferred + "layout.json"));
+  const activation = JSON.parse(read(deferred + "activation-single.json"));
+  const modes = JSON.parse(read(deferred + "sighash-modes.json"));
   for (const v of layout.vectors) {
     const satoshis = BigInt(v.value_sats);
     const key = Buffer.from(v.public_key_x963, "hex");
@@ -26,6 +30,7 @@ test("generation, recognition and activation vectors", () => {
     assert.equal(commitment.targetScriptSha256.toString("hex"), v.target_script_sha256);
     assert.equal(commitment.targetTxOutHash256.toString("hex"), v.target_txout_hash256);
     assert.equal(recognize(r1, script, satoshis + 1n), null);
+    assert.equal(recognize(otherR1, script, satoshis), null);
     const legacy = Buffer.concat([Buffer.from([65]), key, script.subarray(21)]);
     assert.equal(createHash("sha256").update(legacy).digest("hex"), v.legacy_locking_script_sha256);
     assert.deepEqual(recognize(r1, legacy, satoshis), {...commitment, publicKey: key});
@@ -44,4 +49,7 @@ test("generation, recognition and activation vectors", () => {
       }
     }
   }
-});
+}
+
+test("v0.1.0 generation, recognition and activation vectors", () => checkVectors("", "v0.2.0/"));
+test("v0.2.0 generation, recognition and activation vectors", () => checkVectors("v0.2.0/", ""));

@@ -1,14 +1,19 @@
 # Lamport OTS (SHA-256)
 
+[简体中文](README.zh-CN.md) · [BSV Script Lab](../../README.md)
+
 **Status** · v0.1 development baseline.
 
 Experimental, directly unrolled 256-bit Lamport one-time signatures in BSV Script.
 Includes secure random key generation, digest signing/verification, an in-memory
 one-use signing guard, complete transaction construction, and independent engine tests.
 
-**实验项目，不是已审计钱包。每组密钥只能签名一次，且只能用于一个 UTXO。**
 `OneTimeSigner` only prevents reuse of the same object in one process. It does not
 protect copied keys, process restarts, backups, rollback, or duplicate funding.
+
+## Developer resources
+
+[Protocol specification](docs/developer.en.md#protocol) · [Security analysis](docs/developer.en.md#security) · [Validation and measurements](docs/developer.en.md#validation) · [SDK and reference interfaces](docs/developer.en.md#sdk)
 
 ## Two explicitly different verifiers
 
@@ -120,3 +125,39 @@ The acceptance suite runs the 408-row payment decision matrix for both
 formats. It also flips one bit in each of the 512 proof positions of one
 committed spend, tests short and long proofs, and checks the Chronicle
 activation boundary in BSV Node.
+
+## Developer and wallet integration
+
+Create a transaction lock with `locking_script(public_key)`, or choose
+`committed_locking_script(public_key)` explicitly. The wallet needs the full
+ordered public key for both formats. Authenticate the funding transaction and
+compare the expected script and value before calling `sign_payment` or
+`sign_spend` in [payment.py](reference/payment.py). The external callback
+receives a 32-byte digest and returns an 8,192-byte raw signature. Store
+the one-time key reservation durably before returning that signature and
+retire the key if its state becomes uncertain. Use a fresh key for change.
+The wallet's responsibilities are specified in the [security analysis](docs/security.md).
+
+## Complete transactions and stack measurements
+
+These deterministic fixtures use commit `beeb4dd`. BSV Node 1.2.3 and the project's pinned chain-gang validate the complete inputs. The node replays scripts with supplied prevouts. Funded mempool and mining tests have separate records. Scripts and transactions are measured in bytes. Script sizes follow input and output order. `× n` indicates n equal sizes. Stack peaks refer to input zero, with independent peaks for main-stack items, altstack items, and combined payload. The development evaluator measures stack payload bytes on the successful path.
+
+| Template and mode | Inputs×outputs | Previous locks | Unlocks | New locks | Total | Main / alt items | Stack payload |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `full-key` · `0x41` | 2×2 | 22,780 × 2 | 8,357 × 2 | 22,780 × 2 | 62,392 | 7 / 34 | 8,515 |
+| `full-key` · `0x61` | 2×2 | 22,780 × 2 | 53,879 × 2 | 22,780 × 2 | 153,436 | 7 / 34 | 99,556 |
+| `committed-key` · `0x41` | 2×2 | 7,746 × 2 | 16,549 × 2 | 7,746 × 2 | 48,708 | 7 / 34 | 16,707 |
+| `committed-key` · `0x61` | 2×2 | 7,746 × 2 | 32,003 × 2 | 7,746 × 2 | 79,616 | 7 / 34 | 47,611 |
+
+## Marginal and lifecycle costs
+
+Each marginal cell shows the **change in total bytes (output locks / input unlocks / other bytes)**. Other bytes include values, outpoints, sequence numbers, and CompactSize fields. Previous locks identify the coins being spent and belong to their funding transactions. Both lifecycle totals include native P2PKH funding and exit. The second adds one payment between project outputs.
+
+| Template and mode | Added-input shape | Added-input bytes | Added-output shape | Added-output bytes | Fund and exit | One turnover |
+| --- | --- | --- | --- | --- | --- | --- |
+| `full-key` · `0x41` | 3×2 | 8,400 (0 / 8,357 / 43) | 2×3 | 22,791 (22,780 / 0 / 11) | 62,617 | 125,010 |
+| `full-key` · `0x61` | 3×2 | 54,045 (0 / 54,002 / 43) | 2×3 | 68,381 (22,780 / 45,586 / 15) | 62,631 | 216,068 |
+| `committed-key` · `0x41` | 3×2 | 16,592 (0 / 16,549 / 43) | 2×3 | 7,757 (7,746 / 0 / 11) | 48,933 | 97,641 |
+| `committed-key` · `0x61` | 3×2 | 32,169 (0 / 32,126 / 43) | 2×3 | 23,271 (7,746 / 15,514 / 11) | 48,948 | 128,564 |
+
+[Unified benchmark and reproduction](../../shared/benchmark.md)

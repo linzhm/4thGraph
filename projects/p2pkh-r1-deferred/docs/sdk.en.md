@@ -2,7 +2,9 @@
 
 [简体中文](sdk.zh-CN.md)
 
-All three source SDKs use the [deferred template](../template/template.hex) and the [canonical R1 template](../../p2pkh-r1/template/template.hex). Strip whitespace from the `.hex` files and decode the raw bytes starting at the first opcode. Amounts are integer satoshis. TypeScript uses `bigint`, Rust uses `u64`, and Go uses `int64`.
+All three source SDKs use the [deferred template](../template/v0.2.0/template.hex) and the [R1 v0.2.0 template](../../p2pkh-r1/template/v0.2.0/template.hex). Strip whitespace from the `.hex` files and decode the raw bytes starting at the first opcode. Amounts are integer satoshis. TypeScript uses `bigint`, Rust uses `u64`, and Go uses `int64`.
+
+Recognize and activate an existing short lock with the R1 version it originally committed to. v0.1.0 funding activates to its v0.1.0 target. [v0.1.0 R1 template](../../p2pkh-r1/template/template.hex)
 
 | Operation | TypeScript | Rust | Go |
 |---|---|---|---|
@@ -15,4 +17,4 @@ Construction takes both templates, the recipient key hash or full key, and the a
 
 Finalize the paired inputs and outputs, fee inputs, and change. The builder constructs a ForkID SINGLE preimage from the actual transaction and authenticated previous output. Pass only this preimage for a direct `0x43` or `0xc3` activation. For other modes, also pass the 33-byte `typeByte || HASH256(selectedPreimage)` and use the two-check scriptCode in the specification for the paired preimage. The helper validates the preimage fields and sighash combination before encoding the pushes. See the [Python reference](../reference/README.md) for complete transaction construction. Use the [ordinary R1 SDK](../../p2pkh-r1/docs/sdk.en.md) and its external signer callback for the activated output.
 
-Run `npm test`, `cargo test`, or `go test ./...` in the corresponding SDK directory. Each suite replays the [generation and recognition vectors](../template/layout.json) and the [twelve activation modes](../template/sighash-modes.json).
+Run `npm test`, `cargo test`, or `go test ./...` in the corresponding SDK directory. Each suite replays the [generation and recognition vectors](../template/v0.2.0/layout.json) and the [twelve activation modes](../template/v0.2.0/sighash-modes.json).

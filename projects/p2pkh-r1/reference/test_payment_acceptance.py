@@ -45,7 +45,7 @@ class PaymentAcceptanceTests(unittest.TestCase):
         self.check_complete_input_acceptance_domain(compiled_curve=True)
 
     def test_scheduled_curve_complete_input_acceptance_domain(self):
-        self.check_complete_input_acceptance_domain(compiled_curve="scheduled")
+        self.check_complete_input_acceptance_domain(compiled_curve=None)
 
     def check_complete_input_acceptance_domain(self, *, compiled_curve):
         owner_key, owner_public, owner_hash = signer(7)

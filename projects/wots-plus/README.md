@@ -1,5 +1,7 @@
 # WOTS+ (SHA-256)
 
+[简体中文](README.zh-CN.md) · [BSV Script Lab](../../README.md)
+
 **Status** · v0.1 development baseline.
 
 This experiment verifies a WOTS+ one-time signature in Bitcoin Script and binds
@@ -17,6 +19,10 @@ Use `locking_script(key)` for transaction-bound tests. The detached verifier
 from `locking_script(key, transaction=False)` accepts a caller-provided digest
 and is only for testing the primitive. The payment lock supports the twelve
 ForkID and Chronicle OTDA modes, with ForkID `ALL` (`0x41`) as the wallet default.
+
+## Developer resources
+
+[Protocol specification](docs/developer.en.md#protocol) · [Security analysis](docs/developer.en.md#security) · [Validation and measurements](docs/developer.en.md#validation) · [SDK and reference interfaces](docs/developer.en.md#sdk)
 
 ## Run the checks
 
@@ -124,3 +130,61 @@ The runner checks the transaction gate and the selected input's Script verdict
 for the sighash matrix and malformed witnesses. It also checks a ForkID `ALL`
 spend at Genesis-era heights before Chronicle. This is a separate executable
 specification check alongside BSV Node and chain-gang.
+
+## Developer and wallet integration
+
+Authenticate the chosen funding outpoint and match its transaction-bound
+script against the selected key and layout. Arrange the recipients, change
+and fee before using `sign_payment` for a single input or `sign_spend` for a
+prepared input. The signer receives a 32-byte digest and returns one
+2,144-byte signature. Keep the one-time reservation durable before the
+callback returns a signature. Generate a fresh key for every output,
+including change. [Payment implementation](reference/payment.py)
+
+The output cache reduces the bytes paid at funding and at every same-template
+output. OTDA output reconstruction reduces repeated copies in the input.
+In the paired SINGLE fixture, the two-stack payload peak is 70,280 bytes with
+either witness encoding, even as the signed transaction falls from 140,473
+to 78,921 bytes.
+
+## Complete transactions and stack measurements
+
+These deterministic fixtures use commit `beeb4dd`. BSV Node 1.2.3 and the project's pinned chain-gang validate the complete inputs. The node replays scripts with supplied prevouts. Funded mempool and mining tests have separate records. Scripts and transactions are measured in bytes. Script sizes follow input and output order. `× n` indicates n equal sizes. Stack peaks refer to input zero, with independent peaks for main-stack items, altstack items, and combined payload. The development evaluator measures stack payload bytes on the successful path.
+
+| Template and mode | Inputs×outputs | Previous locks | Unlocks | New locks | Total | Main / alt items | Stack payload |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `canonical` · `0x41` | 2×2 | 42,266 × 2 | 2,310 × 2 | 42,266 × 2 | 89,270 | 11 / 67 | 2,599 |
+| `canonical` · `0x61` | 2×2 | 42,266 × 2 | 86,806 × 2 | 42,266 × 2 | 258,266 | 11 / 67 | 171,454 |
+| `cached-constants` · `0x41` | 2×2 | 36,283 × 2 | 2,310 × 2 | 36,283 × 2 | 77,304 | 13 / 67 | 2,639 |
+| `cached-constants` · `0x61` | 2×2 | 36,283 × 2 | 74,840 × 2 | 36,283 × 2 | 222,368 | 13 / 67 | 147,522 |
+| `cached-steps` · `0x41` | 2×2 | 33,956 × 2 | 2,310 × 2 | 33,956 × 2 | 72,650 | 28 / 67 | 2,699 |
+| `cached-steps` · `0x61` | 2×2 | 33,956 × 2 | 70,186 × 2 | 33,956 × 2 | 208,406 | 28 / 67 | 138,214 |
+| `cached-steps-reconstructed` · `0x41` | 2×2 | 33,956 × 2 | 2,310 × 2 | 33,956 × 2 | 72,650 | 28 / 67 | 2,701 |
+| `cached-steps-reconstructed` · `0x61` | 2×2 | 33,956 × 2 | 5,530 × 2 | 33,956 × 2 | 79,090 | 28 / 67 | 138,214 |
+| `cached-steps-reconstructed` · `0x63` · before | 2×2 | 33,956 × 2 | 36,217 / 36,226 | 33,956 × 2 | 140,473 | 28 / 67 | 70,280 |
+| `cached-steps-reconstructed` · `0x63` · after | 2×2 | 33,956 × 2 | 5,441 / 5,450 | 33,956 × 2 | 78,921 | 28 / 67 | 70,280 |
+| `cached-steps-reconstructed` · `0xe3` · before | 2×2 | 33,956 × 2 | 36,176 / 36,185 | 33,956 × 2 | 140,391 | 28 / 67 | 70,198 |
+| `cached-steps-reconstructed` · `0xe3` · after | 2×2 | 33,956 × 2 | 5,399 / 5,408 | 33,956 × 2 | 78,837 | 28 / 67 | 70,198 |
+| `cached-steps-reconstructed` · `0xe1` · after | 2×2 | 33,956 × 2 | 5,488 × 2 | 33,956 × 2 | 79,006 | 28 / 67 | 138,132 |
+
+## Marginal and lifecycle costs
+
+Each marginal cell shows the **change in total bytes (output locks / input unlocks / other bytes)**. Other bytes include values, outpoints, sequence numbers, and CompactSize fields. Previous locks identify the coins being spent and belong to their funding transactions. Both lifecycle totals include native P2PKH funding and exit. The second adds one payment between project outputs.
+
+| Template and mode | Added-input shape | Added-input bytes | Added-output shape | Added-output bytes | Fund and exit | One turnover |
+| --- | --- | --- | --- | --- | --- | --- |
+| `canonical` · `0x41` | 3×2 | 2,353 (0 / 2,310 / 43) | 2×3 | 42,277 (42,266 / 0 / 11) | 89,496 | 178,766 |
+| `canonical` · `0x61` | 3×2 | 86,974 (0 / 86,929 / 45) | 2×3 | 126,831 (42,266 / 84,554 / 11) | 89,510 | 347,776 |
+| `cached-constants` · `0x41` | 3×2 | 2,353 (0 / 2,310 / 43) | 2×3 | 36,294 (36,283 / 0 / 11) | 77,529 | 154,833 |
+| `cached-constants` · `0x61` | 3×2 | 75,008 (0 / 74,963 / 45) | 2×3 | 108,882 (36,283 / 72,588 / 11) | 77,543 | 299,911 |
+| `cached-steps` · `0x41` | 3×2 | 2,353 (0 / 2,310 / 43) | 2×3 | 33,967 (33,956 / 0 / 11) | 72,876 | 145,525 |
+| `cached-steps` · `0x61` | 3×2 | 70,354 (0 / 70,309 / 45) | 2×3 | 101,901 (33,956 / 67,934 / 11) | 72,889 | 281,295 |
+| `cached-steps-reconstructed` · `0x41` | 3×2 | 2,353 (0 / 2,310 / 43) | 2×3 | 33,967 (33,956 / 0 / 11) | 72,875 | 145,525 |
+| `cached-steps-reconstructed` · `0x61` | 3×2 | 5,696 (0 / 5,653 / 43) | 2×3 | 34,145 (33,956 / 178 / 11) | 72,889 | 151,979 |
+| `cached-steps-reconstructed` · `0x63` · before | 3×2 | 2,440 (0 / 2,397 / 43) | 2×3 | 33,967 (33,956 / 0 / 11) | 72,830 | 213,303 |
+| `cached-steps-reconstructed` · `0x63` · after | 3×2 | 2,440 (0 / 2,397 / 43) | 2×3 | 33,967 (33,956 / 0 / 11) | 72,831 | 151,751 |
+| `cached-steps-reconstructed` · `0xe3` · before | 3×2 | 2,358 (0 / 2,315 / 43) | 2×3 | 33,967 (33,956 / 0 / 11) | 72,749 | 213,139 |
+| `cached-steps-reconstructed` · `0xe3` · after | 3×2 | 2,358 (0 / 2,315 / 43) | 2×3 | 33,967 (33,956 / 0 / 11) | 72,749 | 151,585 |
+| `cached-steps-reconstructed` · `0xe1` · after | 3×2 | 5,531 (0 / 5,488 / 43) | 2×3 | 34,145 (33,956 / 178 / 11) | 72,808 | 151,814 |
+
+[Unified benchmark and reproduction](../../shared/benchmark.md)

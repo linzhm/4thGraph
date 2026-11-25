@@ -7,7 +7,7 @@ from tx_engine import Script
 
 from assemble import assemble
 from curve_compiler import curve_blocks
-from fixed_templates import TEMPLATE_DIRECTORY
+from fixed_templates import RELEASE_DIRECTORY, TEMPLATE_DIRECTORY, TEMPLATE_VERSION
 from reconstruct import shared_kernel_program
 from signature import COMPRESSIBLE_OTDA_TYPES, PAIRED_OTDA_SINGLE_TYPES, ORDINARY_CODE, UNIVERSAL_FLAGS
 
@@ -80,7 +80,8 @@ def scheduled_artifacts():
     template = prefix + bytes(20) + suffix
     code = shared_kernel_program(prefix, suffix, injected=overrides)
     layout = {
-        "script_file": "scheduled.hex",
+        "template_version": TEMPLATE_VERSION,
+        "script_file": "template.hex",
         "script_bytes": len(template),
         "script_sha256": sha256(template).hexdigest(),
         "owner_hash160": {"offset": len(prefix), "length": 20},
@@ -90,7 +91,7 @@ def scheduled_artifacts():
         "compressed_preimage": {
             "spend_transaction_version": 2,
             "sighash_types": [f"{flag:02x}" for flag in sorted((*COMPRESSIBLE_OTDA_TYPES, *PAIRED_OTDA_SINGLE_TYPES))],
-            "program_file": "otda-scheduled-reconstruct.hex",
+            "program_file": "otda-reconstruct.hex",
             "program_bytes": len(code),
             "program_sha256": sha256(code).hexdigest(),
         },
@@ -98,7 +99,7 @@ def scheduled_artifacts():
     return {
         layout["script_file"]: template.hex() + "\n",
         layout["compressed_preimage"]["program_file"]: code.hex() + "\n",
-        "scheduled-layout.json": json.dumps(layout, indent=2) + "\n",
+        "layout.json": json.dumps(layout, indent=2) + "\n",
     }
 
 
@@ -106,15 +107,16 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--check", action="store_true", help="fail if any checked-in artifact differs")
     args = parser.parse_args()
-    if not args.check:
-        TEMPLATE_DIRECTORY.mkdir(parents=True, exist_ok=True)
-    for name, content in (build_artifacts() | scheduled_artifacts()).items():
-        path = TEMPLATE_DIRECTORY / name
-        if args.check:
-            if path.read_text(encoding="ascii") != content:
-                parser.exit(1, f"artifact differs: {path}\n")
-        else:
-            path.write_text(content, encoding="ascii")
+    for directory, artifacts in ((TEMPLATE_DIRECTORY, build_artifacts()), (RELEASE_DIRECTORY, scheduled_artifacts())):
+        if not args.check:
+            directory.mkdir(parents=True, exist_ok=True)
+        for name, content in artifacts.items():
+            path = directory / name
+            if args.check:
+                if path.read_text(encoding="ascii") != content:
+                    parser.exit(1, f"artifact differs: {path}\n")
+            else:
+                path.write_text(content, encoding="ascii")
 
 
 if __name__ == "__main__":

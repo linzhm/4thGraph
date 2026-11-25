@@ -1,6 +1,6 @@
 # Reference implementation
 
-The wallet creates outputs from [the canonical template](../template/template.hex) by default. The assembler rebuilds those bytes independently from the literal blocks in [lock.asm](./asm/lock.asm). Conformance compares three owner vectors, validates three consecutive ordinary payments, and exercises the twelve paired sighash modes and four unpaired SINGLE modes. Both BSV Node and chain-gang must accept each valid complete input, including the two OTDA companion cases. This is input-level regtest validation with supplied UTXOs and explicit script flags.
+The wallet creates outputs from [the v0.2.0 template](../template/v0.2.0/template.hex) by default. The [v0.1.0 template](../template/template.hex) remains available for historical outputs. Its assembly is reproduced independently from [lock.asm](./asm/lock.asm). Conformance compares three owner vectors, validates three consecutive ordinary payments, and exercises the twelve paired sighash modes and four unpaired SINGLE modes. Both BSV Node and chain-gang must accept each valid complete input, including the two OTDA companion cases. This is input-level regtest validation with supplied UTXOs and explicit script flags.
 
 Use Python 3.12 on Linux x86-64 with Git and a Rust toolchain available to build the pinned Python extension. Install the dependencies from requirements.txt before running the node comparison. It pins tx-engine to [8b60b71a12](https://github.com/linzhm/chain-gang/commit/8b60b71a12a69fdcb465d3e627dbf6f43d6ed081) from the fork's `fix/otda-complete-validation` branch. CI checks the installed Git commit before executing the full-input tests. The ordinary TypeScript, Rust and Go SDKs are independent of this dependency.
 
@@ -21,8 +21,7 @@ The [input acceptance matrix](acceptance.md) runs through the same verification 
 
 Use the Python generator to opt in to the 47,510-byte lock. The Python
 wallet recognizes this candidate by comparing all fixed bytes from the
-prebuilt template. The published 59,582-byte template is the default for
-the Python generator and the published SDKs.
+prebuilt template. This profile serves as a compiler comparison.
 
 ```sh
 python generate_lock.py --compiled-curve --owner-hash160 "${R1_OWNER_HASH160:?Set the recipient HASH160}"
@@ -135,15 +134,14 @@ output, respectively. The fixture checks each family's allowed modes
 and the other family's rejection, including unpaired SINGLE. These figures
 support keeping the full-mode template for the SDK candidate.
 
-### Scheduled full-mode candidate
+### P2PKH-R1 v0.2.0
 
-Pass `--scheduled-curve` to `generate_lock.py` or use
-`compiled_curve="scheduled"` with the Python lock constructors.
-The [scheduled layout](../template/candidates/scheduled-layout.json) fixes
-the 46,302-byte template and its 3,913-byte reconstruction program.
+The [versioned layout](../template/v0.2.0/layout.json) fixes the 46,302-byte lock
+and its 3,913-byte reconstruction program. The generator defaults to v0.2.0.
+Use `--version 0.1.0` to reproduce an older output.
 The owner HASH160 occupies the same 20-byte field. The Python, TypeScript,
 Rust and Go SDKs recognize the prebuilt template. The three non-Python
-SDKs replay its [ForkID ALL payment vector](../template/candidates/scheduled-spend-all.json)
+SDKs replay its [ForkID ALL payment vector](../template/v0.2.0/spend-all.json)
 with their ordinary signer callbacks.
 
 In the Python reference wallet, `sign_spend(..., compress_otda="paired")`
@@ -153,7 +151,7 @@ and preserves the preceding null outputs in the preimage. Version 1,
 unpaired SINGLE, and unrecognized outputs use their existing encodings.
 The wallet passes the original digest to the signer and includes the returned
 signature bytes in the witness. For version 2 OTDA ALL, the 47,510-byte
-compiled and 46,302-byte scheduled templates can share an unlocking script.
+compiled and 46,302-byte v0.2.0 templates can share an unlocking script.
 The wallet compares a single-template program, a program containing both
 templates and the literal preimage by encoded byte count. Outputs are
 recreated in their signed order. Other scripts in the transaction are
@@ -167,10 +165,10 @@ copied literally.
 The extra SINGLE input in the comparison has no same-index output. The
 acceptance tests verify individual output binding, full replays with both
 engines, byte-for-byte witness stack equivalence, and the existing 1,296-case
-authorization matrix for the scheduled lock.
+authorization matrix for v0.2.0.
 
-With one compiled and one scheduled R1 output and two R1 inputs, OTDA ALL
+With one compiled research output and one v0.2.0 R1 output and two R1 inputs, OTDA ALL
 takes 110,302 bytes using both templates. Reconstructing only one template
 takes 195,028 bytes. The added-input and added-output costs from this shape
-are 8,352 and 46,393 bytes, respectively. The extra output uses the scheduled
+are 8,352 and 46,393 bytes, respectively. The extra output uses the v0.2.0
 template.

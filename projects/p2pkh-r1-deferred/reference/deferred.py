@@ -13,6 +13,7 @@ from shared.transaction import (
 
 R1_REFERENCE = Path(__file__).resolve().parents[2] / 'p2pkh-r1/reference'
 sys.path.append(str(R1_REFERENCE))
+from fixed_templates import TEMPLATE_VERSION, TEMPLATE_VERSIONS
 from p2pkh_r1 import locking_script_from_owner_hash, public_key_hash160
 
 
@@ -30,17 +31,20 @@ class Commitment:
     owner_hash160: bytes
     script_hash: bytes
     output_hash: bytes
+    target_r1_version: str
     public_key: bytes | None = None
 
 
-def target_output(value: int, public_key: bytes) -> Output:
-    """Return the canonical P2PKH-R1 destination at the full input value."""
-    return target_output_from_owner_hash(value, public_key_hash160(public_key))
+def target_output(value: int, public_key: bytes, *, target_r1_version: str = TEMPLATE_VERSION) -> Output:
+    """Return the versioned P2PKH-R1 destination at the full input value."""
+    return target_output_from_owner_hash(value, public_key_hash160(public_key),
+                                         target_r1_version=target_r1_version)
 
 
-def target_output_from_owner_hash(value: int, owner_hash160: bytes) -> Output:
+def target_output_from_owner_hash(value: int, owner_hash160: bytes, *,
+                                  target_r1_version: str = TEMPLATE_VERSION) -> Output:
     amount(value)
-    return Output(value, locking_script_from_owner_hash(owner_hash160))
+    return Output(value, locking_script_from_owner_hash(owner_hash160, template_version=target_r1_version))
 
 
 @cache
@@ -60,21 +64,25 @@ def _locking_script(value: int, commitment: Commitment) -> bytes:
     })
 
 
-def _commitment(owner_hash160: bytes, target: Output, public_key: bytes | None = None) -> Commitment:
+def _commitment(owner_hash160: bytes, target: Output, target_r1_version: str,
+                public_key: bytes | None = None) -> Commitment:
     output_hash = hash256(target.serialize())
     if output_hash == bytes(32):
         raise ValueError('zero target commitment')
-    return Commitment(owner_hash160, sha256(target.script).digest(), output_hash, public_key)
+    return Commitment(owner_hash160, sha256(target.script).digest(), output_hash, target_r1_version, public_key)
 
 
-def funding_output(value: int, public_key: bytes) -> Output:
+def funding_output(value: int, public_key: bytes, *, target_r1_version: str = TEMPLATE_VERSION) -> Output:
     """Construct a hash-only output from a validated uncompressed P-256 key."""
-    return funding_output_from_owner_hash(value, public_key_hash160(public_key))
+    return funding_output_from_owner_hash(value, public_key_hash160(public_key),
+                                          target_r1_version=target_r1_version)
 
 
-def funding_output_from_owner_hash(value: int, owner_hash160: bytes) -> Output:
+def funding_output_from_owner_hash(value: int, owner_hash160: bytes, *,
+                                   target_r1_version: str = TEMPLATE_VERSION) -> Output:
     """Construct a short output from the same owner hash as ordinary P2PKH-R1."""
-    commitment = _commitment(owner_hash160, target_output_from_owner_hash(value, owner_hash160))
+    target = target_output_from_owner_hash(value, owner_hash160, target_r1_version=target_r1_version)
+    commitment = _commitment(owner_hash160, target, target_r1_version)
     return Output(value, _locking_script(value, commitment))
 
 
@@ -96,11 +104,14 @@ def recognize(output: Output, *, expected_key: bytes | None = None,
             return None
         if expected_key is not None and public_key is not None and expected_key != public_key:
             return None
-        target = target_output_from_owner_hash(output.value, owner)
-        commitment = _commitment(owner, target, public_key)
+        for version in TEMPLATE_VERSIONS:
+            target = target_output_from_owner_hash(output.value, owner, target_r1_version=version)
+            commitment = _commitment(owner, target, version, public_key)
+            if output.script == _locking_script(output.value, commitment):
+                return commitment
     except ValueError:
         return None
-    return commitment if output.script == _locking_script(output.value, commitment) else None
+    return None
 
 
 def activation_preimages(tx: Transaction, index: int, value: int, sighash: int) -> tuple[bytes, bytes]:

@@ -35,6 +35,7 @@ def main() -> None:
         fields = {
             'value_sats': output.value,
             'owner_hash160': commitment.owner_hash160.hex(),
+            'target_r1_version': commitment.target_r1_version,
             'target_script_sha256': commitment.script_hash.hex(),
             'target_txout_hash256': commitment.output_hash.hex(),
             'locking_script_bytes': len(output.script),

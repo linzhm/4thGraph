@@ -11,8 +11,8 @@ For example, an ordinary P2PKH payment can create an R1 output for Alice. When A
 ## Create and identify an output
 
 1. Validate the uncompressed 65-byte X9.63 encoding `04 || X_BE32 || Y_BE32` on secp256r1. Compute HASH160 of those 65 bytes. A wallet with the recipient's 20-byte hash may use it directly.
-2. Copy the canonical raw script and write the recipient hash at the zero-based half-open interval `[208, 228)`. The script is **59,582 bytes**. Only these 20 bytes vary between recipients.
-3. For recognition, check the length and ten-byte prefix `760052a569766b7c8201`. Extract the candidate owner hash. Require `SHA256(raw[:208] || raw[228:])` to equal `2129d374594069d08a9b2127555f48ea21c75fb06d1ad5e77c68ad251e97f784` before returning the type and hash. Byte zero is the first opcode. The public key itself is revealed on spend. [Canonical bytes](../template/template.hex) · [Layout and three vectors](../template/layout.json) · [Byte matcher and generator](../reference/p2pkh_r1.py)
+2. Copy the v0.2.0 lock and write the recipient hash at the zero-based interval `[208, 228)`. The script has **46,302 bytes**.
+3. Check the length and the fixed-byte fingerprint before returning the owner hash. Compute `SHA256(raw[:208] || raw[228:])` from the first opcode. The v0.2.0 fingerprint is `52a1d9eb9e236403c66e845e18cf31d9c3a5f4c2e0ed7ca0270a60ba4e867ca6`. For v0.1.0 prevouts, use their original length and fingerprint. [v0.2.0](../template/v0.2.0/layout.json) · [v0.1.0](../template/layout.json)
 
 Set `R1_OWNER_HASH160` to the recipient’s 20-byte HASH160 in hex.
 
@@ -21,7 +21,7 @@ cd projects/p2pkh-r1/reference
 python generate_lock.py --owner-hash160 "${R1_OWNER_HASH160:?Set the recipient HASH160}" --format raw > scriptPubKey.bin
 ```
 
-The CLI also accepts `--public-key HEX`. Omitting `--format raw` returns the length, owner hash and script SHA-256. The canonical template embeds the owner hash of vector C’s public test key. Outputs using that key are for local tests only. Vector C has script SHA-256 `b3acd6b92a23120bd24432ada2b1cac013fe06381d7ea96ac6c5a73c493f4287`. [Generator](../reference/generate_lock.py)
+The CLI also accepts `--public-key HEX`. Omitting `--format raw` returns the length, owner hash and script SHA-256. The v0.1.0 template embeds the owner hash of vector C’s public test key. Outputs using that key are for local tests only. Vector C has script SHA-256 `b3acd6b92a23120bd24432ada2b1cac013fe06381d7ea96ac6c5a73c493f4287`. [Generator](../reference/generate_lock.py)
 
 ## Spend one input
 
@@ -66,7 +66,7 @@ Each input chooses its own type. The template supports the ForkID BIP143 and Chr
 
 With no same-index output, BIP143 SINGLE sets hashOutputs to zero and still commits to the current outpoint. Unpaired OTDA SINGLE uses the node's constant digest 1. The derived selector is OP_1. The device signs one companion BIP143 SINGLE preimage bound to the current input, preserving the ANYONECANPAY selection. The script also checks the native OTDA constant using a public construction. The companion P is 163 bytes. An ordinary OTDA preimage can grow with this transaction. For instance, OTDA ALL includes the locking script of a new R1 output. [Native behavior](https://github.com/bitcoin-sv/bitcoin-sv/blob/6504a3aff65ba97c0f6c80962b033e35ecbfed4b/src/script/interpreter.cpp#L1894-L2124) · [Path construction](../reference/signature.py)
 
-The expanded program is 59,582 bytes. Its four-bit scalar-multiplication window occupies 57,224 bytes (96.0%). The ordinary k1 signature-construction block occupies 394 bytes, excluding the shared dispatch and native CHECKSIG instructions. These figures describe serialized code size. Node execution time is a separate measurement. [Window](../reference/asm/window.asm) · [Public k1 construction](../reference/asm/r1.asm)
+The expanded v0.1.0 program is 59,582 bytes. Its four-bit scalar-multiplication window occupies 57,224 bytes (96.0%). The ordinary k1 signature-construction block occupies 394 bytes, excluding the shared dispatch and native CHECKSIG instructions. These figures describe serialized code size. Node execution time is a separate measurement. [Window](../reference/asm/window.asm) · [Public k1 construction](../reference/asm/r1.asm)
 
 ## Signing message and serialization
 

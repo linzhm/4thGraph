@@ -1,5 +1,6 @@
 {
-  "script_file": "scheduled.hex",
+  "template_version": "0.2.0",
+  "script_file": "template.hex",
   "script_bytes": 46302,
   "script_sha256": "b24b3f88673fb063903b389086fcac17243ba4818d7e154de0df142d9c652314",
   "owner_hash160": {
@@ -30,7 +31,7 @@
       "e1",
       "e3"
     ],
-    "program_file": "otda-scheduled-reconstruct.hex",
+    "program_file": "otda-reconstruct.hex",
     "program_bytes": 3913,
     "program_sha256": "0caa0eec27f0ccf9ad2b7836efd0be32f2d2a0060d48718131fecef382bb720b"
   }

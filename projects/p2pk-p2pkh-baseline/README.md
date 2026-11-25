@@ -1,9 +1,15 @@
 # Native P2PK and P2PKH baseline
 
+[简体中文](README.zh-CN.md) · [BSV Script Lab](../../README.md)
+
 **Status** · v0.1 development baseline.
 
 Offline examples for conventional P2PKH and P2PK locking scripts. This is a
 test lab, not a wallet, production signer, covenant implementation, or node.
+
+## Developer resources
+
+[Protocol specification](docs/developer.en.md#protocol) · [Security analysis](docs/developer.en.md#security) · [Validation and measurements](docs/developer.en.md#validation) · [SDK and reference interfaces](docs/developer.en.md#sdk)
 
 ## Run
 
@@ -59,3 +65,42 @@ The [native acceptance matrix](reference/acceptance.md) exhaustively covers
 12 paired ForkID and Chronicle OTDA sighash combinations. It also checks
 80 unpaired SINGLE mutation cases and 192 cases around Chronicle activation.
 Explicit transaction commitments determine the expected result for each row.
+
+## Developer and wallet integration
+
+A normal P2PK output carries a compressed public key and CHECKSIG. Its input
+supplies a signature and the selected sighash byte. P2PKH outputs carry a
+20-byte HASH160. That input supplies the signature and the public key whose
+hash matches the lock. Use these fixtures to validate an existing wallet's
+serialization and signature handling. Authenticate the funding outpoint,
+value and locking script before requesting a signature.
+
+With the ForkID ALL benchmark, moving from P2PK to P2PKH saves 10 bytes
+on each output lock and adds about 34 bytes to each input unlock. The
+whole-transaction cost therefore depends on the number of each. The
+complete-input tests use the modes and activation contexts in the
+[acceptance matrix](reference/acceptance.md). The offline example and the unified benchmarks use separate fixtures with the shared Chronicle pin.
+
+## Complete transactions and stack measurements
+
+These deterministic fixtures use commit `beeb4dd`. BSV Node 1.2.3 and the project's pinned chain-gang validate the complete inputs. The node replays scripts with supplied prevouts. Funded mempool and mining tests have separate records. Scripts and transactions are measured in bytes. Script sizes follow input and output order. `× n` indicates n equal sizes. Stack peaks refer to input zero, with independent peaks for main-stack items, altstack items, and combined payload. The development evaluator measures stack payload bytes on the successful path.
+
+| Template and mode | Inputs×outputs | Previous locks | Unlocks | New locks | Total | Main / alt items | Stack payload |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `p2pk` · `0x41` | 2×2 | 35 × 2 | 73 × 2 | 35 × 2 | 326 | 2 / 0 | 105 |
+| `p2pk` · `0x61` | 2×2 | 35 × 2 | 72 / 73 | 35 × 2 | 325 | 2 / 0 | 104 |
+| `p2pkh` · `0x41` | 2×2 | 25 × 2 | 107 × 2 | 25 × 2 | 374 | 4 / 0 | 145 |
+| `p2pkh` · `0x61` | 2×2 | 25 × 2 | 107 × 2 | 25 × 2 | 374 | 4 / 0 | 145 |
+
+## Marginal and lifecycle costs
+
+Each marginal cell shows the **change in total bytes (output locks / input unlocks / other bytes)**. Other bytes include values, outpoints, sequence numbers, and CompactSize fields. Previous locks identify the coins being spent and belong to their funding transactions. Both lifecycle totals include native P2PKH funding and exit. The second adds one payment between project outputs.
+
+| Template and mode | Added-input shape | Added-input bytes | Added-output shape | Added-output bytes | Fund and exit | One turnover |
+| --- | --- | --- | --- | --- | --- | --- |
+| `p2pk` · `0x41` | 3×2 | 113 (0 / 72 / 41) | 2×3 | 43 (35 / -1 / 9) | 550 | 877 |
+| `p2pk` · `0x61` | 3×2 | 113 (0 / 72 / 41) | 2×3 | 45 (35 / 1 / 9) | 549 | 875 |
+| `p2pkh` · `0x41` | 3×2 | 146 (0 / 105 / 41) | 2×3 | 34 (25 / 0 / 9) | 598 | 972 |
+| `p2pkh` · `0x61` | 3×2 | 146 (0 / 105 / 41) | 2×3 | 33 (25 / -1 / 9) | 599 | 970 |
+
+[Unified benchmark and reproduction](../../shared/benchmark.md)
