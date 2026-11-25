@@ -32,7 +32,7 @@ type SigningOptions struct {
 	PublicKey        string `json:"publicKey"`
 	Sighash          *uint8 `json:"sighash,omitempty"`
 	ChronicleActive  bool   `json:"chronicleActive,omitempty"`
-	CompressOTDA     bool   `json:"compressOtda,omitempty"`
+	CompressOTDA     *bool  `json:"compressOtda,omitempty"`
 	SignerIdentifier string `json:"signerIdentifier,omitempty"`
 }
 
@@ -190,7 +190,7 @@ type WalletSigningOptions struct {
 	PublicKey        string `json:"publicKey"`
 	Sighash          *uint8 `json:"sighash,omitempty"`
 	ChronicleActive  bool   `json:"chronicleActive,omitempty"`
-	CompressOTDA     bool   `json:"compressOtda,omitempty"`
+	CompressOTDA     *bool  `json:"compressOtda,omitempty"`
 	SignerIdentifier string `json:"signerIdentifier,omitempty"`
 	HistoryPath      string `json:"historyPath,omitempty"`
 	SignMessage      bool   `json:"signMessage,omitempty"`

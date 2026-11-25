@@ -152,7 +152,9 @@ def replay(project, rows):
             return bytes.fromhex(row["signature"])
 
         options = dict(sighash=request["sighash"], chronicle_active=request["chronicleActive"],
-                       compress_otda=request.get("compressOtda", False), sign_message=request.get("signMessage", False))
+                       sign_message=request.get("signMessage", False))
+        if "compressOtda" in request:
+            options["compress_otda"] = request["compressOtda"]
         if "signerIdentifier" in request:
             options["signer_identifier"] = bytes.fromhex(request["signerIdentifier"])
         if "historyPath" in request:

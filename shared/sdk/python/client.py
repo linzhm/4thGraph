@@ -47,19 +47,23 @@ class Client:
 
     def sign_spend(self, transaction: bytes, funding: bytes, index: int, public_key: bytes,
                    signer: Callable[..., bytes], *, sighash: int = 0x41, chronicle_active: bool = False,
-                   compress_otda: bool = False, signer_identifier: bytes | None = None) -> bytes:
+                   compress_otda: bool | None = None, signer_identifier: bytes | None = None) -> bytes:
         request = dict(transaction=transaction.hex(), funding=funding.hex(), index=index, publicKey=public_key.hex(),
-                       sighash=sighash, chronicleActive=chronicle_active, compressOtda=compress_otda)
+                       sighash=sighash, chronicleActive=chronicle_active)
+        if compress_otda is not None:
+            request["compressOtda"] = compress_otda
         if signer_identifier is not None:
             request["signerIdentifier"] = signer_identifier.hex()
         return self._sign(request, signer)
 
     def sign_payment(self, funding: bytes, vout: int, outputs, fee_sats: int, public_key: bytes,
                      signer: Callable[..., bytes], *, sighash: int = 0x41, chronicle_active: bool = False,
-                     compress_otda: bool = False, signer_identifier: bytes | None = None) -> bytes:
+                     compress_otda: bool | None = None, signer_identifier: bytes | None = None) -> bytes:
         request = dict(funding=funding.hex(), index=vout, publicKey=public_key.hex(), feeSats=str(fee_sats),
                        outputs=[dict(valueSats=str(amount), script=script.hex()) for amount, script in outputs],
-                       sighash=sighash, chronicleActive=chronicle_active, compressOtda=compress_otda)
+                       sighash=sighash, chronicleActive=chronicle_active)
+        if compress_otda is not None:
+            request["compressOtda"] = compress_otda
         if signer_identifier is not None:
             request["signerIdentifier"] = signer_identifier.hex()
         return self._sign(request, signer)
@@ -116,11 +120,13 @@ class WalletClient:
         return self._bridge._call("recognizeLock", request)
 
     def _sign(self, request, key: bytes, signer: Callable[[SigningRequest], bytes], *,
-              sighash: int = 0x41, chronicle_active: bool = False, compress_otda: bool = False,
+              sighash: int = 0x41, chronicle_active: bool = False, compress_otda: bool | None = None,
               signer_identifier: bytes | None = None, history_path: Path | None = None,
               sign_message: bool = False) -> bytes:
         request.update(publicKey=key.hex(), sighash=sighash, chronicleActive=chronicle_active,
-                       compressOtda=compress_otda, signMessage=sign_message)
+                       signMessage=sign_message)
+        if compress_otda is not None:
+            request["compressOtda"] = compress_otda
         if signer_identifier is not None:
             request["signerIdentifier"] = signer_identifier.hex()
         if history_path is not None:

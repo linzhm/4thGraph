@@ -38,7 +38,8 @@ pub struct SigningOptions {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sighash: Option<u8>,
     pub chronicle_active: bool,
-    pub compress_otda: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub compress_otda: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub signer_identifier: Option<String>,
 }
@@ -210,7 +211,8 @@ pub struct WalletSigningOptions {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sighash: Option<u8>,
     pub chronicle_active: bool,
-    pub compress_otda: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub compress_otda: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub signer_identifier: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]

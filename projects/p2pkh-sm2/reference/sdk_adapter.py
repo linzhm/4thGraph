@@ -30,7 +30,7 @@ def sign_spend(tx, index, funding_raw, public_key, signer, sighash, options):
         signer = signed_data_signer(signer, public_key, signer_identifier=options["signerIdentifier"])
     return sign_input(tx, index, funding_raw, public_key, signer, sighash,
                       chronicle_active=options.get("chronicleActive", False),
-                      compress_otda=options.get("compressOtda", False))
+                      compress_otda=options.get("compressOtda"))
 
 
 def sign_previous(tx, index, previous, public_key, signer, sighash, options):
@@ -38,4 +38,4 @@ def sign_previous(tx, index, previous, public_key, signer, sighash, options):
         signer = signed_data_signer(signer, public_key, signer_identifier=options["signerIdentifier"])
     return authorize_previous(tx, index, previous, public_key, signer, sighash,
                               options.get("chronicleActive", False),
-                              compress_otda=options.get("compressOtda", False))
+                              compress_otda=options.get("compressOtda"))
