@@ -4,6 +4,8 @@ This offline experiment verifies the public upstream `TestReceiptV3_1` fixture w
 
 Cross-curve wrapping is paused. The probe has no bridge, consensus-finality, or BSV Script integration. Source-chain deposit and release authorization follow the existing [test reserve trust model](../../../evm/README.md).
 
+The [BSV parent checkpoint benchmark](benchmark/README.md) separately produces native RISC Zero STARK receipts and BLS12-381 Groth16 proofs for the same real BSV parent.
+
 ```sh
 go test -v ./parentbinding/risczero
 ```

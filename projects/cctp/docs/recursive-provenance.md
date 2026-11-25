@@ -22,6 +22,18 @@ CCTP 的代币依赖图允许拆分和合并。按照证明携带数据（PCD）
 
 父交易内的 `scriptSig` 由真实 txid 覆盖。后继证明可以把定稿父原文作为私有见证，在同一个递归电路内重算完整 txid，并对同一份字节解析选定输出及前序声明。链上只需要本笔证明和固定槽位。先用新交易形状测直接出证成本。SHA-256 分段是直接出证超预算时的链下优化，不是 B2G 的协议要求。采用分段优化时，各段须核对起始 IV、段序号与状态、交易字段、规范 CompactSize、总长度和填充以及第二重 SHA-256。现有叶证据只覆盖分段转换与固定位置字段。 [私有分段实测](../recursion/parentbinding/README.md#隐藏段数据)
 
+## CAT20 的链上回溯对照
+
+原 CAT20 在代币输入核对父交易及其某个实际输入，再打开该输入指向的祖父输出。开口要对应本资产的固定代币锁或专用铸造锁。合法前序花费执行同一条约束，因此节点可以逐笔维持从发行锚到代币输出的有效性。共享 Transfer Guard 以当前实际输入槽的状态为准求和，重建全部有序输出并核对 `hashOutputs`。代币输入验证所选 Guard 是实际花费的 UTXO、锁符合策略且本槽数量一致。准备 Guard 的交易和实际支付可以分开。收款钱包须在接收时核对所收输出的创建规则和真伪，脚本外观与区块包含只能提供待核对的候选。 [原版 CAT20 回溯](https://github.com/CATProtocol/cat-token-box/blob/8d5aeee7484bacc33d0014b44503c0b59d39aaff/packages/sdk/src/contracts/utils/backtrace.ts#L57-L90) · [代币与守卫的绑定](https://github.com/CATProtocol/cat-token-box/blob/8d5aeee7484bacc33d0014b44503c0b59d39aaff/packages/sdk/src/contracts/token/cat20.ts#L154-L172) · [守恒](https://github.com/CATProtocol/cat-token-box/blob/8d5aeee7484bacc33d0014b44503c0b59d39aaff/packages/sdk/src/contracts/token/transferGuard.ts#L74-L123)
+
+原版参考实现使用 Taproot。签名和合约开口在 witness 内，计算 txid 时只序列化基础交易。OPCAT 链另外定义了 TxHashPreimage，交易哈希的预像把每个解锁脚本、后继锁和输出状态数据放入独立的 32 字节哈希。其签名预像还承诺实际消费的钱数、锁和状态哈希向量。BSV Chronicle 能认证当前交易的签名预像，BSV 的 txid 仍覆盖每个定稿 `scriptSig`。把 CAT 的两代回溯直接编码成 BSV 父原文会让每笔父原文嵌有更早数据。对齐后的 SHA-256 检查点可以缩短披露，后继要另外认证真实前缀、字段边界和输出位置。 [BIP141](https://github.com/bitcoin/bips/blob/master/bip-0141.mediawiki#transaction-id) · [OPCAT 交易哈希与签名预像](https://docs.opcatlabs.io/overview/key-differences/) · [BSV 父交易对齐实测](secure-receipt.md#父交易的输出边界对齐)
+
+BSV 对照路线可以由 Script 维持递归 covenant。首次铸造固定实际发行 outpoint，后续铸造沿唯一铸造状态 UTXO 更新入金事件根及总量。每个实际代币输入把父交易与授权的祖父输出绑定到同一资产和策略，真实 Guard 集中核对本资产输入及全部后继。若金额和持有人编码在代币锁内，须按规范模板验证锁和状态，核对稳定策略身份。普通转账以六位整数最小单位求和，铸造和销毁分别核对明确的新增和扣减。设计中可用独立 SNARK 或 STARK 认证需要的难打开字段，再由各代真实执行的 Script 维持 B2G。该路线仍需在 BSV 实测小型父认证、Guard 绑定负例、独立收款、实际再哈希与零历史增长。 [父开口的同输入基准](../recursion/parentbinding/risczero/benchmark/README.md)
+
+用于替代 SegWit 披露优势的公开证明需要绑定父 `txid:vout`、被选 TxOut 的序列化哈希、父内实际来源 vin 及其 outpoint、该 outpoint 对应的前一代 TxOut 哈希，以及资产策略身份。证明使用包含全部解锁字节的实际父或祖父原文，从共识 SHA256d 得到真实 txid，按规范编码读取 vin 和 vout。认证过的中间态可以分段复用。签名预像、对齐后缀或自定义的简化交易哈希可以参与声明，实际输入身份仍由共识 outpoint 确定。
+
+父子交易布局下，付款人可以独立创建 Guard 或验证器资金，定稿后取得其 outpoint。付款子交易共同消费该 outpoint 和代币。Guard 将实际输入及输出承诺与证明绑定后才通过。定稿后的父证明可由收款人或公开证明服务预计算，以实际 outpoint、策略和证明程序身份作缓存键。这样可以把父 SHA-256 的出证时间移出付款等待，仍需计入前置时间和父子全包字节。采用原生递归 covenant 时，只有父级字段开口进入证明。采用递归证明时，同一组开口进入本笔 B2G 电路。分别测试两笔独立父的 `2→2`，再测 64 个独立父的付款，比较冷启动、缓存未命中、热路径和聚合的等待时间。
+
 ## 从 genesis 延续的铸造状态
 
 资产固定一个发行锚 outpoint。Genesis 消费这个锚，在 `vout 0` 创建唯一的初始铸造状态。之后每次铸造的 `vin 0` 消费上一笔实际状态输出，并在 `vout 0` 创建下一状态。直接消费 genesis 的输出最多发生一次。所有后续状态的证明回指同一发行锚。

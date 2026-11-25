@@ -1,0 +1,74 @@
+{
+  "machine": "Apple M1 Max, 64 GiB",
+  "scope": "Fixed-layout one-output parent opening. Both provers use the same previously mined BSV parent and public digest.",
+  "parent_bytes": 3433,
+  "parent_txid": "a00fc517aed14ba5be10a04a70dac5b53fec7cfb492211f5933999f1e2046100",
+  "parent_sha256": "986415d9f8d4bb389122b674f0812f9445c55fb280c53f45f2d37b69c502abc9",
+  "parent_output_index": 0,
+  "statement_digest": "655406ca71b332b56db0490e876d4faf70c9ef307a894e44b5f7b04b743311d4",
+  "groth16": {
+    "backend": "gnark BLS12-381, GOMAXPROCS=4",
+    "verifying_key_sha256": "40f2b28b088f79e8fc184413c27ed37b627bc76d696bfef958670b882e85f257",
+    "constraints": 2988852,
+    "session_including_cold_load_and_all_proofs": {
+      "wall_seconds": 307.45,
+      "peak_rss_bytes": 7094206464
+    },
+    "warm_proofs": [
+      {
+        "prove_seconds": 11.307216667,
+        "native_verify_seconds": 0.003366125
+      },
+      {
+        "prove_seconds": 16.245030416,
+        "native_verify_seconds": 0.001985542
+      },
+      {
+        "prove_seconds": 17.950626458,
+        "native_verify_seconds": 0.0012485
+      }
+    ],
+    "prior_bsv_proof_pushes_bytes": 1077,
+    "prior_bsv_verifier_lock_bytes": 450840
+  },
+  "stark": {
+    "backend": "RISC Zero 3.1.0, r0vm standalone, Poseidon2",
+    "image_id": "6f69a5d03690c2a5ddd67084c72cc5a5e7dea969f367978b3a222abf82461ab1",
+    "image_sha256": "228698492b1bd667e6a761a3aff7af3626f01ebf35ac0d62f7d2993b27eccf33",
+    "composite": [
+      {
+        "wall_seconds": 13.86,
+        "peak_rss_bytes": 1273937920,
+        "receipt_bytes": 244366,
+        "native_verify_seconds": 0.015843,
+        "receipt_sha256": "5868734abcde4e723e1e02703fdbaea3339a5393a7779af732bba880a9272b32"
+      },
+      {
+        "wall_seconds": 14.91,
+        "peak_rss_bytes": 1273806848,
+        "receipt_bytes": 244366,
+        "native_verify_seconds": 0.013876,
+        "receipt_sha256": "1edb9dc918d1c23414eb7d10a94102e2a6cd27d79e7a6989853045de5e3f550e"
+      },
+      {
+        "wall_seconds": 13.79,
+        "peak_rss_bytes": 1272938496,
+        "receipt_bytes": 244366,
+        "native_verify_seconds": 0.014304,
+        "receipt_sha256": "17aa03904f6b7048297b4a976a440930de4ebd2379162328503edc9a1d212876"
+      }
+    ],
+    "succinct": {
+      "wall_seconds": 25.66,
+      "peak_rss_bytes": 2261745664,
+      "receipt_bytes": 223290,
+      "native_verify_seconds": 0.013187,
+      "receipt_sha256": "2bef51f12ac42f8f9da70339e3e2c5ced7955cc4c6a251ff0c4f2014ede81c69"
+    },
+    "rejected": [
+      "different_expected_checkpoint_digest",
+      "different_expected_guest_image",
+      "malformed_output_count"
+    ]
+  }
+}
