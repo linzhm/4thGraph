@@ -133,8 +133,9 @@ def hash_script(length, state=IV, processed=0, *, optimized=False, compact=False
     """Top item is exactly length bytes. Replace it with SM3, preserving lower stack.
 
     state is a known fixed-prefix midstate; processed must be whole blocks.
-    The default emits the v1/v2 bytecode. optimized selects v3. compact
-    additionally enables the v4 constant, stack, and Boolean optimizations.
+    The default uses the baseline SM3 generator. optimized uses a static
+    schedule for padding-only blocks. compact also enables constant, stack,
+    and Boolean optimizations.
     """
     if processed%64: raise ValueError('midstate must start on a block boundary')
     optimized = optimized or compact
