@@ -85,6 +85,8 @@ committed at funding time. Keep the exact signed transaction bytes for
 rebroadcast when its original outpoint is still valid.
 
 The wallet emits a canonical unlocking script for the transaction it builds.
+With functional unlocking, different scripts can leave the same stack for the
+lock. Canonical stack values still leave room for different serialized bytes.
 Consensus and relay rules govern which encodings are accepted. A new lock with
 stricter stack-field checks would require its own script fingerprint and newly
 funded outputs.

@@ -33,6 +33,13 @@ owner signature is checked separately by the template's P-256 arithmetic.
 [Chronicle release](https://docs.bsvblockchain.org/network-topology/nodes/sv-node/chronicle-release)
 · [BSV Node 1.2.3 interpreter](https://github.com/bitcoin-sv/bitcoin-sv/blob/v1.2.3/src/script/interpreter.cpp#L31-L44)
 
+When functional unlocking is permitted, distinct unlocking scripts can leave
+the same stack for the lock. Stack-field checks constrain those values, and
+the txid includes the full unlocking script. When the node enforces push-only
+unlocking, it rejects non-push opcodes. With Chronicle active, BSV Node 1.2.3
+limits that push-only check to transaction versions up to 1 when the flag is set.
+[BSV Node 1.2.3 script validation](https://github.com/bitcoin-sv/bitcoin-sv/blob/v1.2.3/src/script/interpreter.cpp#L2120-L2159)
+
 Before signing a child that depends on this output, use a trusted chain view
 to apply the application's confirmation threshold and verify the confirmed
 txid, output index, amount, and lock. Derive the child's signing digest from
@@ -52,6 +59,11 @@ ForkID 和 OTDA 摘要约束的是所选签名类型承诺的交易字段。
 如果规则接受另一种解锁编码，第三方可以在保留这些字段授权的情况下改变 txid。
 原先的子交易引用的 outpoint 将无法花费实际确认的输出。签署子交易前，应从可信链视图
 核对父交易达到应用规定的确认深度，再用确认的 txid、vout、金额和锁构造花费。
+
+允许功能型解锁脚本时，不同的脚本字节可以给锁留下相同的栈。锁内的字段检查只能
+约束栈里的值，计算 txid 时仍会计入完整的解锁脚本。节点执行 push-only 规则时，
+带非 push 指令的解锁脚本会被拒绝。Chronicle 生效后，BSV Node 1.2.3 在设置该
+标志的情况下仅对版本不高于 1 的交易执行这项检查。
 
 普通 SDK 生成版本 2 的 ForkID 交易。Chronicle 生效后的原生编码约束取决于交易版本
 和适用的 flags。原生 LOW_S 检查作用于 secp256k1 绑定签名，R1 持有人的签名由
