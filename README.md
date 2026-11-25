@@ -19,6 +19,7 @@ BSV Script Lab provides locking templates that wallets can recognize, SDKs that 
 | [Lamport OTS](projects/lamport-ots/README.md) | Evaluate SHA-256 one-time signatures with full-key and committed-key locks | v0.1 development | [SDK](projects/lamport-ots/sdk/README.md) |
 | [WOTS+](projects/wots-plus/README.md) | Evaluate one-time signatures built from SHA-256 hash chains | v0.1 development | [SDK](projects/wots-plus/sdk/README.md) |
 | [Pure ML-DSA-44](projects/ml-dsa/README.md) | Evaluate FIPS 204 pure-mode ML-DSA-44 signatures in Script | v0.1 development | [SDK](projects/ml-dsa/sdk/README.md) |
+| [BSV SPV Token](projects/spv-token/README.md) | Verify token provenance and replay a two-slot USDC reserve lifecycle | regtest prototype | [Replay guide](projects/spv-token/README.md#replay-the-evidence) |
 
 For wallet integration, start with the project SDK to build and identify a lock, connect your signer, and replay a signed transaction vector. The projects provide TypeScript, Rust, and Go source SDKs and Python interfaces. The native, SM2, Lamport, WOTS+, and ML-DSA-44 SDKs use a local Python reference backend. [Local SDK setup](shared/sdk/README.md)
 

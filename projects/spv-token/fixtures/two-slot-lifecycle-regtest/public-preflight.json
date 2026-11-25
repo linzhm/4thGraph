@@ -1,0 +1,27 @@
+{
+  "base": {
+    "chain_id": 84532,
+    "latest_height": 63433090,
+    "finalized_height": 63427799,
+    "finalized_hash": "0x177c7b73122a418069c7ca5b753eb865bd17f46df4a2fa1d8c194986ec5c6e5c",
+    "usdc": "0x036cbd53842c5426634e7929541ec2318f3dcf7e",
+    "decimals": 6,
+    "usdc_runtime_keccak256": "0xedc5281a85c0efecd49999a1ef668390c59b88702f2d4a07029d7f5d63059d6c",
+    "canonical_block_hash_eth_call": true
+  },
+  "bsv": {
+    "status": "authorized_testnet_node_not_configured"
+  },
+  "public_acceptance_ready": false,
+  "blockers": [
+    "The integrated recursive lifecycle has no public testnet acceptance evidence.",
+    "Operators must control the designated external signers and fund both test networks.",
+    "Confirm relay/mining policy for the final BSV transaction and verifier script sizes."
+  ],
+  "bsv_explorer": {
+    "method": "read-only explorer lookup",
+    "height": 1771403,
+    "chronicle_activation_height": 1713168,
+    "chronicle_block": "00000000046e321cb1aa6941a7cdc2a97ca65d0caa19e7302df68d1045bd5435"
+  }
+}
