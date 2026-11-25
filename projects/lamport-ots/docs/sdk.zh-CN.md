@@ -31,6 +31,12 @@ const signedHex = wallet.signPayment({
 
 已构造的交易用 `signInput`，传入交易、本次输入索引和对应的 prevout。Rust、Go、Python 的等价入口在[调用表](../../../shared/sdk/README.zh-CN.md#调用与数据)。
 
+## 随付款请求保存密钥状态
+
+记录付款请求使用 `full-key` 还是 `committed-key`，并为两者保留按序排列的公钥。这 16,384 字节有固定顺序。承诺模板在组装花费证明时会用到这些字节。钱包恢复时应同时恢复公钥和密钥消耗记录。
+
+签名器释放 8,192 字节的签名前，先持久记录这把密钥已消耗。签名请求超时后，密钥可能已经用过。若已签交易可恢复，使用相同字节重播。新输出使用新密钥。[统一 SDK 的一次性签名接入](../../../shared/sdk/README.zh-CN.md#one-time-signing)
+
 ## 复放向量
 
 ```sh
