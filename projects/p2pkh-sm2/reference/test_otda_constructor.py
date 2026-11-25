@@ -1,0 +1,112 @@
+"""Constructor byte equivalence and complete spending through both engines."""
+from dataclasses import replace
+import unittest
+
+from generate_otda_constructor import generate
+from p2pkh_sm2 import _otda_pattern, current_input_unlock, locking_script_from_public_key, sign_input
+from shared.benchmark_validation import chain_verdict
+from shared.evaluate import evaluate
+from shared.transaction import Input, Output, Transaction
+from sighash import authorization
+from sm2 import USER_ID, encode_public, fixture_sign, mul
+from test_node import check_node
+from test_sighash import chain_check
+
+
+class ConstructorTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.scalars = (1, 7)
+        cls.keys = tuple(encode_public(mul(scalar)) for scalar in cls.scalars)
+        cls.locks = tuple(locking_script_from_public_key(key) for key in cls.keys)
+        cls.funding = tuple(
+            Transaction((Input(bytes([i + 1]) * 32, 0),), (Output(10_000, lock),))
+            for i, lock in enumerate(cls.locks)
+        )
+        cls.inputs = tuple(Input(parent.txid_wire(), 0) for parent in cls.funding)
+        cls.destinations = tuple(Output(9_900, lock) for lock in reversed(cls.locks))
+        cls.native = Output(9_800, b'\x51')
+
+    def test_frozen_program_is_reproducible_and_matches_lock(self):
+        pattern = _otda_pattern()
+        self.assertEqual(generate(), pattern.program)
+        self.assertEqual(evaluate(pattern.program), (list(pattern.fixed_parts), []))
+        for lock in self.locks:
+            fields = pattern.match(lock)
+            self.assertEqual(len(fields), 1)
+            self.assertEqual(b''.join((pattern.fixed_parts[0], *fields, pattern.fixed_parts[1])), lock)
+            self.assertIsNone(pattern.match(lock[:-1]))
+            self.assertIsNone(pattern.match(lock[:-1] + b'\x51'))
+
+    def sign_modes(self, tx, flag, expected):
+        tx_raw, tx_compact = tx, tx
+        for index, (parent, key, scalar) in enumerate(zip(self.funding, self.keys, self.scalars, strict=True)):
+            auth = authorization(tx, index, parent.outputs[0].value, flag)
+            signature = fixture_sign(scalar, auth.message, 71 + index)
+
+            def signer(message, user_id):
+                self.assertEqual((message, user_id), (auth.message, USER_ID))
+                return signature
+
+            args = index, parent.serialize(), key, signer, flag
+            tx_raw = sign_input(tx_raw, *args)
+            tx_compact = sign_input(tx_compact, *args, compress_otda=True)
+            raw, compact = tx_raw.inputs[index].script, tx_compact.inputs[index].script
+            self.assertEqual(compact != raw, expected[index])
+            if expected[index]:
+                self.assertLess(len(compact), len(raw))
+            self.assertEqual(evaluate(raw), ([auth.preimage, key, signature], []))
+            self.assertEqual(evaluate(compact), ([auth.preimage, key, signature], []))
+            self.assertEqual(
+                compact, current_input_unlock(tx, index, parent.outputs[0].value, key, signature,
+                                              flag, compress_otda=True),
+            )
+        self.assertTrue(chain_verdict(tx_raw, self.funding))
+        self.assertTrue(chain_verdict(tx_compact, self.funding))
+        for index in range(len(tx.inputs)):
+            check_node(tx_raw, self.funding, index)
+            check_node(tx_compact, self.funding, index)
+        return tx_compact
+
+    def test_all_single_and_literal_fallbacks(self):
+        sm2 = self.destinations
+        mixed = (self.native, sm2[1])
+        for version, flag, outputs, expected in (
+            (2, 0x61, sm2, (True, True)),
+            (2, 0x61, mixed, (True, True)),
+            (2, 0xe1, (*sm2, replace(self.native, value=1)), (True, True)),
+            (2, 0x63, sm2, (True, True)),
+            (2, 0xe3, sm2, (True, True)),
+            (2, 0xe3, mixed, (False, True)),
+            (2, 0x63, sm2[:1], (True, False)),
+            (2, 0x62, sm2, (False, False)),
+            (2, 0xe2, sm2, (False, False)),
+            (2, 0x61, (self.native, self.native), (False, False)),
+            (1, 0x61, sm2, (False, False)),
+            (2, 0x41, sm2, (False, False)),
+        ):
+            with self.subTest(version=version, flag=hex(flag), output_sizes=tuple(len(out.script) for out in outputs)):
+                self.sign_modes(Transaction(self.inputs, outputs, version=version), flag, expected)
+
+    def test_reconstruction_preserves_output_commitments(self):
+        tx = Transaction(self.inputs, self.destinations)
+        signed = self.sign_modes(tx, 0x61, (True, True))
+        changed = replace(signed, outputs=(replace(signed.outputs[0], value=9_899), signed.outputs[1]))
+        check_node(changed, self.funding, 0, False)
+        chain_check(changed, self.funding, 0, False)
+
+        single = self.sign_modes(tx, 0x63, (True, True))
+        changed = replace(single, outputs=(single.outputs[0], replace(single.outputs[1], value=9_899)))
+        check_node(changed, self.funding, 0)
+        check_node(changed, self.funding, 1, False)
+        chain_check(changed, self.funding, 1, False)
+
+    def test_reconstruction_requires_chronicle_before_signing(self):
+        tx = Transaction(self.inputs, self.destinations)
+
+        def signer(*args):
+            self.fail("inactive functional unlocking invoked the signer")
+
+        with self.assertRaisesRegex(ValueError, 'requires an active Chronicle context'):
+            sign_input(tx, 0, self.funding[0].serialize(), self.keys[0], signer,
+                       chronicle_active=False, compress_otda=True)

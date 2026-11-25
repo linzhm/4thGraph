@@ -26,4 +26,5 @@ def sign_spend(tx, index, funding_raw, public_key, signer, sighash, options):
     if "signerIdentifier" in options:
         signer = signed_data_signer(signer, public_key, signer_identifier=options["signerIdentifier"])
     return sign_input(tx, index, funding_raw, public_key, signer, sighash,
-                      chronicle_active=options.get("chronicleActive", False))
+                      chronicle_active=options.get("chronicleActive", False),
+                      compress_otda=options.get("compressOtda", False))

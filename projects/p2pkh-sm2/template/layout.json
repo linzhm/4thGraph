@@ -9,6 +9,12 @@
   "base_owner_hash160": "0000000000000000000000000000000000000000",
   "base_script_sha256": "196dfcb8244e863521447c7069297d31938fbd80a83d5976af618cf7fbcf9462",
   "fixed_bytes_sha256": "01562d7205072b9505e8c9d191d7439fc2cc67cbb1d508d683f7b3fac95c88b6",
+  "otda_constructor": {
+    "file": "otda-constructor.hex",
+    "bytes": 12703,
+    "sha256": "b7de4713abb250d9912f85aa80c888bf3db30a56aab7a084b8dcabc872518fc0",
+    "generator": "../reference/generate_otda_constructor.py"
+  },
   "supported_sighash_types": [
     "41",
     "42",

@@ -15,4 +15,6 @@ Install the [Python bridge dependencies](requirements.txt) with `python -m pip i
 
 [Common wallet workflow and configuration](../../../shared/sdk/README.md)
 
+After Chronicle activates, set `compressOtda` in TypeScript, `CompressOTDA` in Go, or `compress_otda` in Rust and Python, together with the corresponding Chronicle activation option. This applies to version-2 OTDA ALL and paired SINGLE spends and works with raw signature and SignedData callbacks. The SDK uses the constructor when reconstruction is shorter. [Eligibility and measured costs](../README.md#otda-constructor)
+
 Activate the project reference environment and run `bash shared/verify_node.sh -- bash shared/sdk/verify.sh p2pkh-sm2` from the repository root.

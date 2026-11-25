@@ -15,4 +15,6 @@ v1.0.0 锁以 65 字节未压缩 SM2 公钥或 20 字节收款哈希创建。回
 
 [共用钱包工作流与配置](../../../shared/sdk/README.zh-CN.md)
 
+Chronicle 激活后，可用 TypeScript 的 `compressOtda`、Go 的 `CompressOTDA`、Rust 和 Python 的 `compress_otda` 启用重建，同时把对应的 Chronicle 激活参数设为真。适用于版本 2 的 OTDA ALL 和配对 SINGLE，支持原始签名和 SignedData 回调。SDK 会在重建更短时选用构造器。[适用条件与实测成本](../README.zh-CN.md#otda-constructor)
+
 在仓库根目录设置项目参考环境后运行 `bash shared/verify_node.sh -- bash shared/sdk/verify.sh p2pkh-sm2`。

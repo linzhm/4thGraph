@@ -82,7 +82,7 @@ outpoint, its value, required confirmations and the recipient's lock before
 asking the signer to approve a payment. The GB/T envelope is processed by
 the off-chain adapter. The unlock carries the extracted raw signature.
 
-In the 2×2 fixture, ForkID ALL uses a 291-byte unlock. OTDA ALL serializes
+In the 2×2 fixture, ForkID ALL uses a 291-byte unlock. The literal OTDA ALL encoding serializes
 both outputs into each input's signing preimage and raises the unlock to
 290,109 bytes. A third output adds 144,925 bytes of output lock and also
 changes both existing OTDA unlocks. The marginal table shows those costs
@@ -108,3 +108,22 @@ Each marginal cell shows the **change in total bytes (output locks / input unloc
 | `v1.0.0` · `0x61` | 3×2 | 290,277 (0 / 290,232 / 45) | 2×3 | 434,814 (144,925 / 289,876 / 13) | 290,794 | 1,160,988 |
 
 [Unified benchmark and reproduction](../../shared/benchmark.md)
+
+<a name="otda-constructor"></a>
+
+## Reconstruct OTDA outputs
+
+The optional 12,703-byte constructor reuses SM3 round and message-expansion fragments, SM2 point addition and doubling, and repeated instruction runs. For each eligible output it fills the receiver's HASH160 slot in the 144,925-byte v1.0.0 lock. The signing callback receives the same digest and SM2 user ID as the literal encoding. Choose the unlocking encoding before using the signed transaction ID to build a child.
+
+After Chronicle activation, enable `compress_otda=True` in Python `sign_input` or set the corresponding SDK option. On version 2, OTDA ALL reconstructs matched outputs in their original order. Paired OTDA SINGLE reconstructs the same-index output and preserves the preceding null outputs in the preimage. Both support `ANYONECANPAY`. Other output templates keep their literal bytes. ForkID, NONE, unpaired SINGLE, version 1 and non-smaller encodings use the literal path. [SDK options](sdk/README.md) · [Constructor and generator](reference/README.md#otda-constructor)
+
+| OTDA ALL, bytes | Literal | Reconstructed |
+| --- | ---: | ---: |
+| Two inputs and two outputs | 870,194 | 316,018 |
+| First input's unlocking script | 290,109 | 13,023 |
+| Add one input | 290,277 | 13,189 |
+| Add one output | 434,814 | 145,022 |
+| Fund and exit | 290,794 | 290,794 |
+| Fund, turn over once, and exit | 1,160,988 | 606,812 |
+
+Both encodings use the same fixture keys and amounts and pass BSV Node 1.2.3 and the pinned chain-gang build. In the development evaluator, the 2×2 fixture peaks at 122 main-stack items, 133 altstack items, and 580,080 bytes of combined payload with either encoding. The unified benchmark uses the `v1.0.0-reconstructed` profile for the functional unlock.

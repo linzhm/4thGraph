@@ -6,10 +6,13 @@ from pathlib import Path
 from assemble import TEMPLATE_VERSION, assemble
 from sighash import authorization
 from sm2 import USER_ID,hash256,public_key_hash160,verify
+from shared.otda_reconstruction import Reconstruction
 from shared.script import push
 from shared.transaction import Transaction,Input,Output,preimage_all,amount
 
 MANIFEST=Path(__file__).resolve().parents[1]/'template/layout.json'
+RECONSTRUCT_ALL = frozenset((0x61, 0xe1))
+RECONSTRUCT_SINGLE = frozenset((0x63, 0xe3))
 
 
 @cache
@@ -52,38 +55,71 @@ def recognize(raw):
     return result[1] if result else None
 
 
+@cache
+def _otda_pattern():
+    layout = json.loads(MANIFEST.read_text())['otda_constructor']
+    program = bytes.fromhex(MANIFEST.with_name(layout['file']).read_text(encoding='ascii'))
+    if len(program) != layout['bytes'] or sha256(program).hexdigest() != layout['sha256']:
+        raise ValueError('SM2 OTDA constructor differs from its manifest')
+    template, start = _canonical()
+    return Reconstruction(program, (template[:start], template[start+20:]), (20,))
+
+
+def _preimage_script(tx, index, auth, *, compress_otda, chronicle_active):
+    if type(compress_otda) is not bool:
+        raise ValueError('compress_otda must be a boolean')
+    if compress_otda and not chronicle_active:
+        raise ValueError('SM2 OTDA reconstruction requires an active Chronicle context')
+    literal = push(auth.preimage)
+    if not compress_otda or tx.version != 2 or auth.companion:
+        return literal
+    if auth.requested_type in RECONSTRUCT_ALL:
+        outputs = tx.outputs
+    elif auth.requested_type in RECONSTRUCT_SINGLE:
+        outputs = (tx.outputs[index],)
+    else:
+        return literal
+    program = _otda_pattern().build(auth.preimage, outputs)
+    return program if program is not None and len(program) < len(literal) else literal
+
+
 def current_input_unlock(tx, index, previous_amount, key, signature, sighash_type=0x41,
-                         *, chronicle_active=True, version=TEMPLATE_VERSION):
+                         *, chronicle_active=True, version=TEMPLATE_VERSION, compress_otda=False):
     public_key_hash160(key)
     if version != TEMPLATE_VERSION:
         raise ValueError('unsupported P2PKH-SM2 template version')
     auth = authorization(tx, index, previous_amount, sighash_type, chronicle_active=chronicle_active)
-    return _encode_unlock(auth, key, signature)
+    preimage_script = _preimage_script(tx, index, auth, compress_otda=compress_otda,
+                                       chronicle_active=chronicle_active)
+    return _encode_unlock(auth, key, signature, preimage_script)
 
 
-def _encode_unlock(auth, key, signature):
-    preimage = auth.preimage
+def _encode_unlock(auth, key, signature, preimage_script):
     message = auth.message
     k1_n=0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141
     k1_gx=0x79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798
     if (int.from_bytes(message,'big')+k1_gx)%k1_n==0:
         raise ValueError('degenerate PUSHTX digest; rebuild the transaction')
     if not verify(key,message,signature): raise ValueError('invalid SM2 authorization')
-    return push(preimage)+push(key)+push(signature)
+    return preimage_script+push(key)+push(signature)
 
 
-def _sign_previous(tx, index, previous, key, signer, sighash_type, chronicle_active):
+def _sign_previous(tx, index, previous, key, signer, sighash_type, chronicle_active, *, compress_otda=False):
     template = identify(previous.script)
     if template is None or template[1] != public_key_hash160(key):
         raise ValueError('funding output does not belong to key/template')
     auth = authorization(tx, index, previous.value, sighash_type, chronicle_active=chronicle_active)
-    return tx.with_script(index, _encode_unlock(auth, key, signer(auth.message, USER_ID)))
+    preimage_script = _preimage_script(tx, index, auth, compress_otda=compress_otda,
+                                       chronicle_active=chronicle_active)
+    return tx.with_script(index, _encode_unlock(auth, key, signer(auth.message, USER_ID), preimage_script))
 
 
-def sign_input(tx, index, funding_raw, key, signer, sighash_type=0x41, *, chronicle_active=True):
+def sign_input(tx, index, funding_raw, key, signer, sighash_type=0x41, *, chronicle_active=True,
+               compress_otda=False):
     """Sign one input after matching its outpoint to the previous transaction.
 
     The caller selects coverage and supplies the chain activation context.
+    compress_otda enables functional unlocking in eligible version-2 spends.
     Other inputs, including their existing unlocking scripts, are preserved.
     """
     if not 0 <= index < len(tx.inputs):
@@ -93,7 +129,7 @@ def sign_input(tx, index, funding_raw, key, signer, sighash_type=0x41, *, chroni
     if funding.txid_wire() != current.txid or not 0 <= current.vout < len(funding.outputs):
         raise ValueError('funding transaction does not match current outpoint')
     return _sign_previous(tx, index, funding.outputs[current.vout], key, signer,
-                          sighash_type, chronicle_active)
+                          sighash_type, chronicle_active, compress_otda=compress_otda)
 
 
 def sign_payment(funding_raw,vout,outputs,fee,key,signer):
