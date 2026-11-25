@@ -1,12 +1,48 @@
 """Guard project migration, canonical R1 bytes, and local documentation links."""
 import hashlib
 import json
+import os
 from pathlib import Path
 import re
+from shutil import which
+import subprocess
+from tempfile import TemporaryDirectory
 import unittest
 from .script import assemble
 
 ROOT=Path(__file__).resolve().parents[1]
+SOURCE_DIRECTORIES = ('.github', 'handoff', 'projects', 'shared')
+BUILD_DIRECTORIES = {'.git', '.venv', '__pycache__', 'node_modules', 'target'}
+
+
+def markdown_files(root):
+    if (root / '.git').exists() and which('git'):
+        tracked = subprocess.run(
+            ['git', 'ls-files', '-z', '--', '*.md'], cwd=root, check=True, capture_output=True,
+        ).stdout
+        for name in tracked.split(b'\0'):
+            if name:
+                path = root / os.fsdecode(name)
+                if path.is_file():
+                    yield path
+        return
+
+    # Source exports have no index. Walk the repository's documentation roots
+    # and prune local dependency and build directories before reading files.
+    yield from (path for path in root.glob('*.md') if path.is_file())
+    for directory in SOURCE_DIRECTORIES:
+        for current, dirs, files in os.walk(root / directory):
+            dirs[:] = sorted(set(dirs) - BUILD_DIRECTORIES)
+            for name in sorted(files):
+                if name.endswith('.md'):
+                    yield Path(current) / name
+
+
+def write_markdown(root, relative, target):
+    path = root / relative
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(f'[Local reference]({target})\n', encoding='utf-8')
+    return path
 
 
 class LayoutTests(unittest.TestCase):
@@ -24,10 +60,48 @@ class LayoutTests(unittest.TestCase):
         for name in ('p2pkh-r1','p2pkh-r1-deferred','p2pkh-sm2'):
             for child in ('README.md','docs','reference','template'):
                 self.assertTrue((ROOT/'projects'/name/child).exists())
-        for path in ROOT.rglob('*.md'):
-            for target in re.findall(r'\]\(([^)]+)\)',path.read_text()):
+        self.check_local_links(ROOT)
+
+    def check_local_links(self, root):
+        for path in markdown_files(root):
+            for target in re.findall(r'\]\(([^)]+)\)',path.read_text(encoding='utf-8')):
                 if ':' in target or target.startswith('#'): continue
                 target=target.split('#')[0]
-                self.assertTrue((path.parent/target).exists(),f'{path.relative_to(ROOT)} -> {target}')
+                self.assertTrue((path.parent/target).exists(),f'{path.relative_to(root)} -> {target}')
+
+    @unittest.skipUnless(which('git'), 'requires Git for the checkout fixture')
+    def test_checkout_checks_tracked_markdown_only(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            subprocess.run(['git', 'init', '-q'], cwd=root, check=True, capture_output=True)
+            (root / '.gitignore').write_text('.venv/\nnode_modules/\ntarget/\n', encoding='utf-8')
+            tracked = write_markdown(root, 'Tracked guide 文档.md', '.gitignore')
+            subprocess.run(['git', 'add', '--', tracked.name], cwd=root, check=True, capture_output=True)
+            write_markdown(root, '.venv/lib/dependency/README.md', 'missing.md')
+            write_markdown(root, 'projects/demo/sdk/node_modules/dependency/README.md', 'missing.md')
+            write_markdown(root, 'projects/demo/target/README.md', 'missing.md')
+            write_markdown(root, 'local-archive/README.md', 'missing.md')
+
+            self.check_local_links(root)
+            write_markdown(root, tracked.name, 'missing.md')
+            with self.assertRaisesRegex(AssertionError, 'Tracked guide 文档.md -> missing.md'):
+                self.check_local_links(root)
+
+    def test_source_export_checks_project_docs_and_skips_build_directories(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / 'README.md').touch()
+            tracked = 'projects/demo/docs/guide.md'
+            write_markdown(root, tracked, '../../../README.md')
+            write_markdown(root, '.venv/lib/dependency/README.md', 'missing.md')
+            write_markdown(root, 'projects/demo/sdk/node_modules/dependency/README.md', 'missing.md')
+            write_markdown(root, 'projects/demo/target/README.md', 'missing.md')
+            write_markdown(root, 'local-archive/README.md', 'missing.md')
+
+            self.check_local_links(root)
+            write_markdown(root, tracked, 'missing.md')
+            with self.assertRaisesRegex(AssertionError, 'guide.md -> missing.md'):
+                self.check_local_links(root)
+
 
 if __name__=='__main__': unittest.main()
