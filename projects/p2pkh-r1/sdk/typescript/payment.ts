@@ -13,7 +13,7 @@ export interface Payment {
 }
 
 const order = 0xffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc632551n;
-const maxAmount = (1n << 63n) - 1n;
+const maxAmount = 2_100_000_000_000_000n;
 const version = Buffer.from("02000000", "hex");
 const sequence = Buffer.from("ffffffff", "hex");
 const locktime = Buffer.alloc(4);
@@ -45,7 +45,10 @@ function compactSize(n: number): Buffer {
     return b;
   }
   if (n <= 0xffffffff) return Buffer.concat([Buffer.from([254]), uint32(n)]);
-  return Buffer.concat([Buffer.from([255]), amount(BigInt(n))]);
+  const b = Buffer.alloc(9);
+  b[0] = 255;
+  b.writeBigUInt64LE(BigInt(n), 1);
+  return b;
 }
 function inverseLE(s: bigint): Buffer {
   let a = s, b = order, x = 1n, y = 0n;

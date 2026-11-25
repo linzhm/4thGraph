@@ -61,4 +61,10 @@ for (const [templateName, vectorName] of [
   assert.equal(createHash("sha256").update(first).digest().reverse().toString("hex"), v.signed_txid);
   await assert.rejects(signPayment(p, q, () => Buffer.alloc(64)), /invalid R1/);
   await assert.rejects(signPayment({...p, fee: 99n}, q, () => { throw Error("unexpected signer"); }), /balance/);
+  const maxAmount = 2_100_000_000_000_000n;
+  const atLimit = {...p, inputSatoshis: maxAmount,
+    outputs: [{satoshis: maxAmount - p.fee, script: Buffer.from([0x51])}]};
+  await assert.rejects(signPayment(atLimit, q, () => { throw Error("reached signer"); }), /reached signer/);
+  const overLimit = {...atLimit, inputSatoshis: maxAmount + 1n, fee: p.fee + 1n};
+  await assert.rejects(signPayment(overLimit, q, () => { throw Error("unexpected signer"); }), /invalid amount/);
 });

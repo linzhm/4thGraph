@@ -4,6 +4,8 @@ use p256::elliptic_curve::ops::Invert;
 use ripemd::Ripemd160;
 use sha2::{Digest, Sha256};
 
+const MAX_AMOUNT: u64 = 2_100_000_000_000_000;
+
 pub struct Output {
     pub satoshis: u64,
     pub script: Vec<u8>,
@@ -46,7 +48,7 @@ pub fn sign_payment(
     if recognize(&p.input_script) != Some(owner) {
         return Err("wrong funding lock".into());
     }
-    if p.input_satoshis > i64::MAX as u64 || p.outputs.is_empty() {
+    if p.input_satoshis > MAX_AMOUNT || p.outputs.is_empty() {
         return Err("invalid input amount or outputs".into());
     }
     let mut available = p.input_satoshis.checked_sub(p.fee).ok_or("fee exceeds input amount")?;

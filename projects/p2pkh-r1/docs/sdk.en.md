@@ -26,6 +26,9 @@ reconcile the wallet's outpoint and rebuild the child before requesting a
 new signature.
 [Recovering a child payment](./chronicle.md#recovering-a-child-payment)
 
+The payment SDKs cap the input amount at 2,100,000,000,000,000 satoshis.
+Nonnegative outputs and fees must balance against that input. [BSV amount range](https://github.com/bitcoin-sv/bitcoin-sv/blob/v1.2.3/src/amount.h#L113-L123)
+
 ## Regex and complete fingerprint
 
 1. Require exactly **59,582 bytes** of binary script.
