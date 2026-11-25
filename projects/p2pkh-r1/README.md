@@ -1,20 +1,24 @@
-# P2PKH-R1
+# P2PKH-R1 v0.2.0
 
-[BSV Script Lab](../../README.md) · First public script project / 首个公开脚本项目
+[简体中文](README.zh-CN.md) · [BSV Script Lab](../../README.md)
 
-A BSV payment script for a secp256r1 (P-256) public-key hash. The recipient signs the current input once. The unlocking script carries the signing preimage, public key, signature, verified inverse and a derived branch opcode. An ordinary ForkID ALL spend uses a 59,582-byte output script and a 326-byte unlocking script.
+P2PKH-R1 locks a BSV output to the HASH160 of the recipient's uncompressed secp256r1 (P-256) public key. The payer fills a 20-byte owner field. On spend, the wallet supplies the public key and one verified 64-byte `r || s` signature for the selected input.
 
-P2PKH-R1 允许付款人只凭 R1 公钥哈希创建输出。普通付款固定使用 ALL，签名器只签一次当前输入的摘要。解锁数据的大小与历史转付次数无关。
+## Current template
 
-| Developer resource | 中文 | English |
-|---|---|---|
-| Script template, wire format and signing rules | [协议规范](docs/spec.zh-CN.md) | [Specification](docs/spec.en.md) |
-| TypeScript, Rust and Go wallet integration | [SDK 接入](docs/sdk.zh-CN.md) | [SDK guide](docs/sdk.en.md) |
-| Compiled script sizes and test settings | [sCrypt 体积对照](docs/scrypt-comparison.md) | [sCrypt comparison](docs/scrypt-comparison.md) |
-| Consensus and policy considerations | [Chronicle 规则](docs/chronicle.md) | [Chronicle rules](docs/chronicle.md) |
+v0.2.0 is the current development version. Its [46,302-byte fixed lock](template/v0.2.0/template.hex) and [binary layout](template/v0.2.0/layout.json) define the format for new outputs. The 59,582-byte [v0.1.0 lock](template/template.hex) remains recognized and spendable. Both use the same owner field at offsets 208 through 227 and support all twelve ForkID and Chronicle OTDA sighash combinations. The wallet verifies the fixed bytes of the actual prevout to identify its template.
 
-The [binary layout and generation vectors](template/layout.json) define recognition. The [payment vector](template/spend-all.json) supplies a digest, fixed test signature, unlocking bytes and signed txid for offline replay. The canonical template, layout vector C and the payment vector share a public test key. Outputs using that key are for local tests only. Source SDKs support output generation, owner recognition and ordinary single-input payments. The [reference wallet and assembly](reference/README.md) also cover mixed inputs and Chronicle OTDA.
+Ordinary payments use ForkID ALL (`0x41`) and a 326-byte unlock. The v0.2.0 two-input, two-output fixture is 93,374 bytes, compared with 119,934 bytes for v0.1.0. OTDA is available after Chronicle activation. On version 2 transactions, the reference wallet can reconstruct recognized outputs for OTDA ALL and same-index outputs for paired SINGLE. An unpaired SINGLE uses the companion path.
 
-The Python reference wallet offers an opt-in 47,510-byte template with the full ForkID and OTDA signing modes, prebuilt lock bytes and optional OTDA witness compression. [Optimized template and measurements](reference/README.md#optimized-full-mode-template)
+## Wallet integration
 
-**Status** · v0.1 development baseline. Developer RFC, with no assigned BRC number. The [reference tests](reference/README.md) use the fork's pinned OTDA fix. Physical-device validation and independent security review remain open.
+Use the [TypeScript, Rust and Go SDK guide](docs/sdk.en.md) for receiving and ordinary ForkID ALL payments. The [Python reference wallet](reference/README.md) supports selecting a sighash per input, including mixed spends and Chronicle OTDA. Authenticate the funding outpoint, amount and script before asking an external signer to approve the intended outputs and fee.
+
+```sh
+cd projects/p2pkh-r1/reference
+python -m pip install -r requirements.txt
+python generate_lock.py --owner-hash160 "${R1_OWNER_HASH160:?Set the recipient HASH160}"
+bash verify.sh
+```
+
+See the [protocol specification](docs/spec.en.md), [acceptance matrix](reference/acceptance.md), and [payment vector](template/v0.2.0/spend-all.json). Fixture keys are public test data. Independent review and physical-device validation remain open.

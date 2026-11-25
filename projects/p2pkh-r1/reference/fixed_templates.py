@@ -6,7 +6,15 @@ import json
 from pathlib import Path
 
 
+TEMPLATE_VERSION = "0.2.0"
+LEGACY_TEMPLATE_VERSION = "0.1.0"
+TEMPLATE_VERSIONS = (TEMPLATE_VERSION, LEGACY_TEMPLATE_VERSION)
 TEMPLATE_DIRECTORY = Path(__file__).resolve().parents[1] / "template/candidates"
+RELEASE_DIRECTORY = TEMPLATE_DIRECTORY.parent / f"v{TEMPLATE_VERSION}"
+
+
+def _directory(scheduled):
+    return RELEASE_DIRECTORY if scheduled else TEMPLATE_DIRECTORY
 
 
 @dataclass(frozen=True)
@@ -31,12 +39,11 @@ class CompiledTemplate:
 
 @cache
 def _layout(*, scheduled=False):
-    file = "scheduled-layout.json" if scheduled else "layout.json"
-    return json.loads((TEMPLATE_DIRECTORY / file).read_text(encoding="ascii"))
+    return json.loads((_directory(scheduled) / "layout.json").read_text(encoding="ascii"))
 
 
-def _load_bytes(file, size, digest):
-    raw = bytes.fromhex((TEMPLATE_DIRECTORY / file).read_text(encoding="ascii"))
+def _load_bytes(directory, file, size, digest):
+    raw = bytes.fromhex((directory / file).read_text(encoding="ascii"))
     if len(raw) != size or sha256(raw).hexdigest() != digest:
         raise ValueError(f"artifact differs from P2PKH-R1 layout: {file}")
     return raw
@@ -45,7 +52,7 @@ def _load_bytes(file, size, digest):
 @cache
 def compiled_template(*, scheduled=False):
     layout = _layout(scheduled=scheduled)
-    raw = _load_bytes(layout["script_file"], layout["script_bytes"], layout["script_sha256"])
+    raw = _load_bytes(_directory(scheduled), layout["script_file"], layout["script_bytes"], layout["script_sha256"])
     start = layout["owner_hash160"]["offset"]
     end = start + 20
     if (layout["owner_hash160"]["length"] != 20 or not 0 <= start < end <= len(raw)
@@ -66,7 +73,8 @@ def compiled_owner(raw):
 def otda_reconstruction(*, shared_kernels=False, scheduled=False):
     layout = _layout(scheduled=scheduled)["compressed_preimage"]
     artifact = layout["shared_kernels"] if shared_kernels and not scheduled else layout
-    program = _load_bytes(artifact["program_file"], artifact["program_bytes"], artifact["program_sha256"])
+    program = _load_bytes(_directory(scheduled), artifact["program_file"], artifact["program_bytes"],
+                          artifact["program_sha256"])
     return layout["spend_transaction_version"], program
 
 

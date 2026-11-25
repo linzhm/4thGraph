@@ -11,6 +11,14 @@ import (
 )
 
 func TestPublicVectors(t *testing.T) {
+	t.Run("v0.1.0", func(t *testing.T) { checkPublicVectors(t, "", "v0.2.0/") })
+	t.Run("v0.2.0", func(t *testing.T) { checkPublicVectors(t, "v0.2.0/", "") })
+}
+
+func checkPublicVectors(t *testing.T, prefix, otherPrefix string) {
+	t.Helper()
+	const r1Directory = "../../../p2pkh-r1/template/"
+	deferredDirectory := "../../template/" + prefix
 	read := func(path string) string {
 		b, err := os.ReadFile(path)
 		if err != nil {
@@ -37,7 +45,7 @@ func TestPublicVectors(t *testing.T) {
 			LegacyHash string `json:"legacy_locking_script_sha256"`
 		} `json:"vectors"`
 	}
-	if err := json.Unmarshal([]byte(read("../../template/layout.json")), &layout); err != nil {
+	if err := json.Unmarshal([]byte(read(deferredDirectory+"layout.json")), &layout); err != nil {
 		t.Fatal(err)
 	}
 	var activation struct {
@@ -45,7 +53,7 @@ func TestPublicVectors(t *testing.T) {
 		Preimage string `json:"activation_preimage_hex"`
 		Witness  string `json:"unlocking_script_hex"`
 	}
-	if err := json.Unmarshal([]byte(read("../../template/activation-single.json")), &activation); err != nil {
+	if err := json.Unmarshal([]byte(read(deferredDirectory+"activation-single.json")), &activation); err != nil {
 		t.Fatal(err)
 	}
 	var modes struct {
@@ -56,11 +64,12 @@ func TestPublicVectors(t *testing.T) {
 			Witness   string `json:"unlocking_script_hex"`
 		} `json:"cases"`
 	}
-	if err := json.Unmarshal([]byte(read("../../template/sighash-modes.json")), &modes); err != nil {
+	if err := json.Unmarshal([]byte(read(deferredDirectory+"sighash-modes.json")), &modes); err != nil {
 		t.Fatal(err)
 	}
-	template := decode(read("../../template/template.hex"))
-	r1 := decode(read("../../../p2pkh-r1/template/template.hex"))
+	template := decode(read(deferredDirectory + "template.hex"))
+	r1 := decode(read(r1Directory + prefix + "template.hex"))
+	otherR1 := decode(read(r1Directory + otherPrefix + "template.hex"))
 	for _, vector := range layout.Vectors {
 		script, err := LockForKey(template, r1, decode(vector.PublicKey), vector.Satoshis)
 		if err != nil || sha256.Sum256(script) != [32]byte(decode(vector.LockHash)) {
@@ -87,6 +96,9 @@ func TestPublicVectors(t *testing.T) {
 		}
 		if _, ok := Recognize(r1, script, vector.Satoshis+1); ok {
 			t.Fatal("recognized a different amount")
+		}
+		if _, ok := Recognize(otherR1, script, vector.Satoshis); ok {
+			t.Fatal("recognized a different target version")
 		}
 		if vector.ID == activation.VectorID {
 			preimage := decode(activation.Preimage)

@@ -5,17 +5,45 @@ use serde_json::Value;
 use sha2::{Digest, Sha256};
 
 #[test]
-fn public_vectors() {
+fn v01_public_vectors() {
+    check_vectors(
+        include_str!("../../../template/template.hex"),
+        include_str!("../../../../p2pkh-r1/template/template.hex"),
+        include_str!("../../../../p2pkh-r1/template/v0.2.0/template.hex"),
+        include_str!("../../../template/layout.json"),
+        include_str!("../../../template/activation-single.json"),
+        include_str!("../../../template/sighash-modes.json"),
+    );
+}
+
+#[test]
+fn v02_public_vectors() {
+    check_vectors(
+        include_str!("../../../template/v0.2.0/template.hex"),
+        include_str!("../../../../p2pkh-r1/template/v0.2.0/template.hex"),
+        include_str!("../../../../p2pkh-r1/template/template.hex"),
+        include_str!("../../../template/v0.2.0/layout.json"),
+        include_str!("../../../template/v0.2.0/activation-single.json"),
+        include_str!("../../../template/v0.2.0/sighash-modes.json"),
+    );
+}
+
+fn check_vectors(
+    deferred_template: &str,
+    r1_template: &str,
+    other_r1_template: &str,
+    layout_json: &str,
+    activation_json: &str,
+    modes_json: &str,
+) {
     let decode_template =
         |text: &str| hex::decode(text.split_whitespace().collect::<String>()).unwrap();
-    let template = decode_template(include_str!("../../../template/template.hex"));
-    let r1 = decode_template(include_str!("../../../../p2pkh-r1/template/template.hex"));
-    let layout: Value =
-        serde_json::from_str(include_str!("../../../template/layout.json")).unwrap();
-    let activation: Value =
-        serde_json::from_str(include_str!("../../../template/activation-single.json")).unwrap();
-    let modes: Value =
-        serde_json::from_str(include_str!("../../../template/sighash-modes.json")).unwrap();
+    let template = decode_template(deferred_template);
+    let r1 = decode_template(r1_template);
+    let other_r1 = decode_template(other_r1_template);
+    let layout: Value = serde_json::from_str(layout_json).unwrap();
+    let activation: Value = serde_json::from_str(activation_json).unwrap();
+    let modes: Value = serde_json::from_str(modes_json).unwrap();
 
     for vector in layout["vectors"].as_array().unwrap() {
         let value = vector["value_sats"].as_u64().unwrap();
@@ -46,6 +74,7 @@ fn public_vectors() {
             field("target_txout_hash256")
         );
         assert!(recognize(&r1, &script, value + 1).is_none());
+        assert!(recognize(&other_r1, &script, value).is_none());
         let mut legacy = vec![65];
         legacy.extend_from_slice(&key);
         legacy.extend_from_slice(&script[21..]);

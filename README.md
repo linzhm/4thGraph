@@ -19,8 +19,8 @@ Generate locking scripts, replay signed spends from reproducible vectors, and co
 
 | Project | Version | What it explores | Start here |
 |---|---|---|---|
-| [P2PKH-R1](projects/p2pkh-r1/README.md) | v0.1 | P-256 ECDSA authorization for a public-key hash, with a single device signature for an ordinary payment | [Specification](projects/p2pkh-r1/docs/spec.en.md) · [TypeScript, Rust and Go SDK guide](projects/p2pkh-r1/docs/sdk.en.md) |
-| [P2PKH-R1-Deferred](projects/p2pkh-r1-deferred/README.md) | v0.1 | A 1,435-byte funding lock that commits to an ordinary R1 output for later activation | [Format and reference checks](projects/p2pkh-r1-deferred/README.md) |
+| [P2PKH-R1](projects/p2pkh-r1/README.md) | v0.2.0 | P-256 ECDSA authorization for a public-key hash, with a single device signature for an ordinary payment | [Specification](projects/p2pkh-r1/docs/spec.en.md) · [TypeScript, Rust and Go SDK guide](projects/p2pkh-r1/docs/sdk.en.md) |
+| [P2PKH-R1-Deferred](projects/p2pkh-r1-deferred/README.md) | v0.2.0 | A 1,435-byte funding lock that commits to an ordinary R1 output for later activation | [Format and reference checks](projects/p2pkh-r1-deferred/README.md) |
 | [P2PKH-SM2](projects/p2pkh-sm2/README.md) | v1.0.0 | A payment template that verifies SM2 and computes SM3 with ZA in Script | [Specification](projects/p2pkh-sm2/docs/spec.en.md) · [Python reference](projects/p2pkh-sm2/reference/README.md) |
 | [Lamport OTS](projects/lamport-ots/README.md) | v0.1 | Hash-based authorization using SHA-256. Each key is for one UTXO and one signature. | [Security model](projects/lamport-ots/docs/security.md) · [Validation record](projects/lamport-ots/docs/validation.md) |
 | [WOTS+](projects/wots-plus/README.md) | v0.1 | SHA-256 hash-chain authorization with a 2,144-byte one-time signature | [Specification](projects/wots-plus/docs/spec.md) · [Verification](projects/wots-plus/README.md#run-the-checks) |
@@ -36,7 +36,7 @@ These are script byte counts for the reference templates using ordinary ForkID `
 
 | Template | Locking script | Unlocking script |
 |---|---:|---:|
-| [P2PKH-R1](projects/p2pkh-r1/template/layout.json) | 59,582 B | 326 B |
+| [P2PKH-R1](projects/p2pkh-r1/template/v0.2.0/layout.json) | 46,302 B | 326 B |
 | [P2PKH-SM2 v1.0.0](projects/p2pkh-sm2/template/layout.json) | 144,925 B | 291 B |
 | [Lamport OTS](projects/lamport-ots/template/measurement.json) | 22,780 B | 8,357 B |
 | [WOTS+](projects/wots-plus/docs/validation.md) | 42,266 B | 2,310 B |

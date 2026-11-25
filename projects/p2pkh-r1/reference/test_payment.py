@@ -74,7 +74,7 @@ def check(tx, parents, ix, valid=True, *, chronicle=True, funding_height=3, extr
 class CurrentInputTests(unittest.TestCase):
     def test_assembly(self):
         for owner in (bytes(range(20)), bytes([0x11]) * 20, signer(1)[2]):
-            self.assertEqual(assemble(owner), locking_script_from_owner_hash(owner))
+            self.assertEqual(assemble(owner), locking_script_from_owner_hash(owner, compiled_curve=False))
 
     def test_compiled_curve_two_inputs_and_two_outputs(self):
         owners = [signer(index) for index in range(1, 5)]
@@ -164,7 +164,7 @@ class CurrentInputTests(unittest.TestCase):
         for compiled, file in (
             (False, "spend-all.json"),
             (True, "candidates/spend-all.json"),
-            ("scheduled", "candidates/scheduled-spend-all.json"),
+            ("scheduled", "v0.2.0/spend-all.json"),
         ):
             with self.subTest(compiled=compiled):
                 funding, signed, vector = signing_vector(compiled_curve=compiled)

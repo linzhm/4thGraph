@@ -1,4 +1,5 @@
 """BSV Node verifyscript replay against explicit prevouts on isolated regtest."""
+from dataclasses import replace
 import os
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -6,6 +7,8 @@ import unittest
 
 import requests
 
+from deferred import funding_output, recognize, target_output
+from fixed_templates import LEGACY_TEMPLATE_VERSION
 from test_deferred import (
     activation_fixture, engine_script, engine_tx, fixture, fixture_signature, mode_activations,
     wrong_activations, zero_commitment_case,
@@ -49,6 +52,20 @@ class NodeTests(unittest.TestCase):
                 public_key, lambda digest: fixture_signature(key, digest), Path(tmp) / 'wallet.sqlite',
             )
         self.assert_node_result(Transaction.parse(payment.serialize()), activation, 0, 'ok')
+
+    def test_two_target_versions_activate_together(self):
+        _, key, _, funding, unsigned = fixture()
+        value = funding.outputs[0].value
+        legacy = funding_output(value, key, target_r1_version=LEGACY_TEMPLATE_VERSION)
+        target = target_output(value, key, target_r1_version=recognize(legacy).target_r1_version)
+        funding = replace(funding, outputs=(legacy, *funding.outputs[1:]))
+        unsigned = replace(unsigned, inputs=tuple(replace(item, txid=funding.txid_wire()) for item in unsigned.inputs),
+                           outputs=(target, *unsigned.outputs[1:]))
+        activation = activation_fixture(funding, unsigned)
+        self.assertEqual([len(out.script) for out in activation.outputs[:2]], [59582, 46302])
+        engine_tx(activation).validate([engine_tx(funding)])
+        for index in range(3):
+            self.assert_node_result(activation, funding, index, 'ok')
 
     def test_rejected_activations(self):
         _, _, _, funding, unsigned = fixture()

@@ -12,7 +12,7 @@
 | Rust | `lock_for_key`, `lock_for_owner`, `recognize` | `payment::sign_payment(&payment, key, sign_digest)` | [source](../sdk/rust/src/lib.rs) · [payment](../sdk/rust/src/payment.rs) |
 | Go | `LockForKey`, `LockForOwner`, `Recognize` | `SignPayment(payment, key, signDigest)` | [source](../sdk/go/template.go) · [payment](../sdk/go/payment.go) |
 
-**收款。** 将 [template.hex](../template/template.hex) 去掉空白并解码为二进制，作为创建函数的第一个参数。第二个参数是 65 字节 R1 公钥或 20 字节 owner HASH160。函数校验固定程序、复制字节并替换所有者字段。识别函数只接受 raw scriptPubKey，成功时返回 20 字节哈希，调用方还应与预期收款人比较。模板固定字节、长度或 framing 不符时，TS 返回 null，Rust 返回 None，Go 返回 ok=false。本模板对未压缩公钥做 HASH160，接收压缩公钥的应用应先在本地验证并还原为 65 字节编码。
+**收款。** 将 [v0.2.0](../template/v0.2.0/template.hex) 去掉空白并解码为二进制，作为创建函数的第一个参数。第二个参数是 65 字节 R1 公钥或 20 字节 owner HASH160。函数校验固定程序、复制字节并替换所有者字段。识别函数只接受 raw scriptPubKey，成功时返回 20 字节哈希，调用方还应与预期收款人比较。模板固定字节、长度或 framing 不符时，TS 返回 null，Rust 返回 None，Go 返回 ok=false。本模板对未压缩公钥做 HASH160，接收压缩公钥的应用应先在本地验证并还原为 65 字节编码。
 
 **付款。** 调用方负责取得可信 UTXO，或在本地核对父交易 txid、vout、金额及 scriptPubKey。SDK 接收其显示顺序的 32 字节 txid、vout、聪金额、锁定脚本、有序的新输出列表（含找零）、已批准的手续费及本次公钥。金额使用整数聪，TypeScript 使用 bigint。SDK 验证所有者、费用平衡和非负金额，构造一笔版本 2、单输入、最终 sequence、零 locktime 的交易，固定使用 BIP143 ALL。摘要签名回调收到 32 字节摘要，两种签名回调均返回 64 字节 r∥s。SDK 验证签名、计算逆元、写入 OP_0 并返回完整的已签交易字节。回调失败或签名无效时，调用方只收到错误。设备授权、nonce 安全及跨调用签名记录由签名服务负责。三种 SDK 均不发送交易。
 
@@ -27,18 +27,18 @@
 
 ## 正则与完整指纹
 
-1. 检查原始脚本恰为 **59,582 字节**。
+1. 检查原始脚本恰为 **46,302 字节**。
 2. 将前 **228 字节**编码为小写 hex，用以下正则匹配整个头部。捕获组 1 解码后是候选的 20 字节收款哈希。
 
 ```regex
 ^760052a569766b7c8201[0-9a-f]{396}([0-9a-f]{40})$
 ```
 
-3. 在原始二进制上计算 `SHA256(script[0:208] || script[228:])`，必须等于 `2129d374594069d08a9b2127555f48ea21c75fb06d1ad5e77c68ad251e97f784`。只有这一步成功才返回捕获值。后缀即使只有一字节不同也会导致失败。对收款人做替换时，在已验证模板的副本上覆盖 `[208,228)`。[布局](../template/layout.json)
+3. 在原始二进制上计算 `SHA256(script[0:208] || script[228:])`，必须等于 `52a1d9eb9e236403c66e845e18cf31d9c3a5f4c2e0ed7ca0270a60ba4e867ca6`。只有这一步成功才返回捕获值。后缀即使只有一字节不同也会导致失败。对收款人做替换时，在已验证模板的副本上覆盖 `[208,228)`。[布局](../template/v0.2.0/layout.json)
 
 ## 对接设备与复验
 
-向量的摘要回调收到 `digest_hex`，返回 `signature_hex`。三个 SDK 均可复现向量中的解锁脚本及已签 txid。设备生成另一份有效签名时，签名和 txid 可以不同。对 DER 签名先解析两个正整数，再填充为两个大端 32 字节数。 [付款向量](../template/spend-all.json)
+向量的摘要回调收到 `digest_hex`，返回 `signature_hex`。三个 SDK 均可复现向量中的解锁脚本及已签 txid。设备生成另一份有效签名时，签名和 txid 可以不同。对 DER 签名先解析两个正整数，再填充为两个大端 32 字节数。 [付款向量](../template/v0.2.0/spend-all.json)
 
 设备直接签摘要时，使用 TypeScript 的 `signPayment`、Rust 的 `sign_payment` 或 Go 的 `SignPayment`，回调收到 `SHA256d(P)`。设备内部执行一次 SHA-256 时，使用 `signPaymentWithMessage`、`sign_payment_with_message` 或 `SignPaymentWithMessage`，回调收到 32 字节消息 `SHA256(P)`。两种入口都执行同样的交易预检，并用 `SHA256d(P)` 核对返回的 64 字节签名。
 
@@ -50,13 +50,9 @@
 
 三个包的测试覆盖 A/B/C 模板向量、公开点验证、固定字节变动、截断、追加以及普通付款签名回放、错误签名和错误手续费。测试不需要设备、网络节点或私钥。初次安装工具或依赖需要网络。完整节点差异测试见 [reference](../reference/README.md)。
 
-## 调度优化候选
+## 当前开发版本
 
-Python 可通过 `compiled_curve="scheduled"` 构造 46,302 字节的全模式锁，
-命令行选项为 `--scheduled-curve`。钱包只填充固定模板中的 20 字节
-收款公钥哈希。TypeScript、Rust 和 Go 可以识别该模板，并用原有签名器回调
-生成普通 ForkID ALL 付款。[模板布局](../template/candidates/scheduled-layout.json)
-· [付款向量](../template/candidates/scheduled-spend-all.json)
+新建输出使用 v0.2.0。Python 默认选择这一版本。已有 UTXO 按 v0.1.0 原有布局核对。三套 SDK 均识别两个版本，并支持普通 ForkID ALL 付款。 [v0.1.0 布局](../template/layout.json)
 
 Python 的 `sign_spend(..., compress_otda="paired")` 在支持 Chronicle
 功能解锁的版本 2 交易中重建 OTDA ALL 输出和有配对输出的 OTDA SINGLE。
@@ -64,6 +60,6 @@ Python 的 `sign_spend(..., compress_otda="paired")` 在支持 Chronicle
 交易版本 1、无配对 `SINGLE` 和未知输出格式走原有编码。签名器收到原预映像的
 摘要，返回的签名直接写入解锁脚本。
 
-版本 2 的 OTDA ALL 付款可以同时重建 47,510 字节和 46,302 字节两种候选输出。
+版本 2 的 OTDA ALL 付款可以同时重建 47,510 字节和 46,302 字节两种模板的输出。
 钱包比较原样预映像、只重建一种模板和重建两种模板的字节数，按已签名的次序
 重建输出。两进两出各使用一种模板时，整笔交易从 195,028 降到 110,302 字节。

@@ -2,7 +2,9 @@
 
 [English](sdk.en.md)
 
-三个源码 SDK 使用同一份[短锁模板](../template/template.hex)和[原有 R1 模板](../../p2pkh-r1/template/template.hex)。读取 `.hex` 时先去掉空白，再解码为从第一个 opcode 开始的字节。金额为整数聪。TypeScript 使用 `bigint`，Rust 使用 `u64`，Go 使用 `int64`。
+三个源码 SDK 使用同一份[短锁模板](../template/v0.2.0/template.hex)和[R1 v0.2.0 模板](../../p2pkh-r1/template/v0.2.0/template.hex)。读取 `.hex` 时先去掉空白，再解码为从第一个 opcode 开始的字节。金额为整数聪。TypeScript 使用 `bigint`，Rust 使用 `u64`，Go 使用 `int64`。
+
+已有短锁按其原先承诺的 R1 版本识别和启用。v0.1.0 入金对应原先承诺的 v0.1.0 目标。 [v0.1.0 R1 模板](../../p2pkh-r1/template/template.hex)
 
 | 接口 | TypeScript | Rust | Go |
 |---|---|---|---|
@@ -15,4 +17,4 @@
 
 组装启用交易时，先确定输入输出索引、手续费输入和找零。交易构造器根据实际交易和已认证的 prevout 生成 ForkID SINGLE 输出约束原像。直接使用 `0x43` 或 `0xc3` 时只传该原像。其他模式还需传 33 字节的 `typeByte || HASH256(selectedPreimage)`，并使用规范中双检查分支的 `scriptCode` 生成输出约束原像。SDK 检查原像字段及两种类型的组合，再编码解锁脚本。完整交易构造见 [Python 参考实现](../reference/README.md)。启用输出的后续付款使用[原有 R1 SDK](../../p2pkh-r1/docs/sdk.zh-CN.md)和外部签名器。
 
-从各 SDK 目录运行 `npm test`、`cargo test` 和 `go test ./...`。三套测试使用相同的[生成和识别向量](../template/layout.json)及[十二种启用模式向量](../template/sighash-modes.json)。
+从各 SDK 目录运行 `npm test`、`cargo test` 和 `go test ./...`。三套测试使用相同的[生成和识别向量](../template/v0.2.0/layout.json)及[十二种启用模式向量](../template/v0.2.0/sighash-modes.json)。

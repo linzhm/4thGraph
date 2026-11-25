@@ -19,8 +19,8 @@
 
 | 项目 | 版本 | 研究内容 | 开发入口 |
 |---|---|---|---|
-| [P2PKH-R1](projects/p2pkh-r1/README.md) | v0.1 | 以 P-256 公钥哈希收款，普通付款由设备签名一次 | [协议规范](projects/p2pkh-r1/docs/spec.zh-CN.md) · [TypeScript、Rust 和 Go 接入](projects/p2pkh-r1/docs/sdk.zh-CN.md) |
-| [P2PKH-R1-Deferred](projects/p2pkh-r1-deferred/README.md) | v0.1 | 1,435 字节的入金锁承诺后续启用的 R1 输出 | [锁定格式与复现验证](projects/p2pkh-r1-deferred/README.md) |
+| [P2PKH-R1](projects/p2pkh-r1/README.zh-CN.md) | v0.2.0 | 以 P-256 公钥哈希收款，普通付款由设备签名一次 | [协议规范](projects/p2pkh-r1/docs/spec.zh-CN.md) · [TypeScript、Rust 和 Go 接入](projects/p2pkh-r1/docs/sdk.zh-CN.md) |
+| [P2PKH-R1-Deferred](projects/p2pkh-r1-deferred/README.zh-CN.md) | v0.2.0 | 1,435 字节的入金锁承诺后续启用的 R1 输出 | [锁定格式与复现验证](projects/p2pkh-r1-deferred/README.zh-CN.md) |
 | [P2PKH-SM2](projects/p2pkh-sm2/README.zh-CN.md) | v1.0.0 | 用 Bitcoin Script 执行 SM2 验签，并计算 SM3 与 ZA | [协议规范](projects/p2pkh-sm2/docs/spec.zh-CN.md) · [Python 参考实现](projects/p2pkh-sm2/reference/README.zh-CN.md) |
 | [Lamport OTS](projects/lamport-ots/README.md) | v0.1 | 基于 SHA-256 的一次性授权。每组密钥对应一个 UTXO，只签一次。 | [安全分析](projects/lamport-ots/docs/security.md) · [验证记录](projects/lamport-ots/docs/validation.md) |
 | [WOTS+](projects/wots-plus/README.md) | v0.1 | 基于 SHA-256 哈希链的一次性授权，签名原始长度为 2,144 字节 | [协议规范](projects/wots-plus/docs/spec.md) · [复现验证](projects/wots-plus/README.md#run-the-checks) |
@@ -36,7 +36,7 @@ v0.1 表示开发基线。各项目文档记录可选模板及其验收范围。
 
 | 模板 | 锁定脚本 | 解锁脚本 |
 |---|---:|---:|
-| [P2PKH-R1](projects/p2pkh-r1/template/layout.json) | 59,582 字节 | 326 字节 |
+| [P2PKH-R1](projects/p2pkh-r1/template/v0.2.0/layout.json) | 46,302 字节 | 326 字节 |
 | [P2PKH-SM2 v1.0.0](projects/p2pkh-sm2/template/layout.json) | 144,925 字节 | 291 字节 |
 | [Lamport OTS](projects/lamport-ots/template/measurement.json) | 22,780 字节 | 8,357 字节 |
 | [WOTS+](projects/wots-plus/docs/validation.md) | 42,266 字节 | 2,310 字节 |

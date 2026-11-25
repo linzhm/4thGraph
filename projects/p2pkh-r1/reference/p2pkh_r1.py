@@ -6,7 +6,7 @@ import re
 
 from cryptography.hazmat.primitives.asymmetric import ec
 
-from fixed_templates import compiled_owner, compiled_template
+from fixed_templates import LEGACY_TEMPLATE_VERSION, TEMPLATE_VERSION, compiled_owner, compiled_template
 
 
 SCRIPT_SIZE = 59582
@@ -37,18 +37,31 @@ def _base_program() -> bytes:
     return raw
 
 
-def locking_script_from_owner_hash(owner_hash160: bytes, *, compiled_curve=False) -> bytes:
+def locking_script_from_owner_hash(owner_hash160: bytes, *, template_version=None, compiled_curve=None) -> bytes:
+    """Create v0.2.0 by default. Existing research options remain explicit."""
     if not isinstance(owner_hash160, bytes) or len(owner_hash160) != 20:
         raise ValueError("expected a 20-byte owner hash")
-    if compiled_curve:
-        return compiled_template(scheduled=compiled_curve == "scheduled").lock(owner_hash160)
+    if compiled_curve is not None:
+        if template_version is not None:
+            raise ValueError("choose either template_version or compiled_curve")
+        if compiled_curve is True:
+            return compiled_template().lock(owner_hash160)
+        if compiled_curve is False:
+            template_version = LEGACY_TEMPLATE_VERSION
+        elif compiled_curve != "scheduled":
+            raise ValueError("unknown curve compiler profile")
+    if template_version in (None, TEMPLATE_VERSION):
+        return compiled_template(scheduled=True).lock(owner_hash160)
+    if template_version != LEGACY_TEMPLATE_VERSION:
+        raise ValueError("unknown P2PKH-R1 template version")
     raw = _base_program()
     return raw[:OWNER_START] + owner_hash160 + raw[OWNER_END:]
 
 
-def locking_script_from_public_key(public_key: bytes, *, compiled_curve=False) -> bytes:
+def locking_script_from_public_key(public_key: bytes, *, template_version=None, compiled_curve=None) -> bytes:
     """Generate the ordinary payment script using only the recipient's R1 key."""
-    return locking_script_from_owner_hash(public_key_hash160(public_key), compiled_curve=compiled_curve)
+    return locking_script_from_owner_hash(public_key_hash160(public_key), template_version=template_version,
+                                          compiled_curve=compiled_curve)
 
 
 def recognize(raw: bytes) -> bytes | None:

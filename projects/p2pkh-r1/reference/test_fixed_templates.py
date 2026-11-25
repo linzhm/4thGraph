@@ -2,15 +2,18 @@
 from hashlib import sha256
 import json
 from pathlib import Path
+import subprocess
+import sys
 from tempfile import TemporaryDirectory
 import unittest
 from unittest.mock import patch
 
 from tx_engine import Script, Tx, TxIn, TxOut
 
-from fixed_templates import TEMPLATE_DIRECTORY, compiled_template, otda_reconstruction
+from fixed_templates import LEGACY_TEMPLATE_VERSION, RELEASE_DIRECTORY, TEMPLATE_DIRECTORY, TEMPLATE_VERSION
+from fixed_templates import compiled_template, otda_reconstruction
 from generate_templates import build_artifacts, scheduled_artifacts
-from p2pkh_r1 import locking_script_from_owner_hash, recognize
+from p2pkh_r1 import locking_script_from_owner_hash, locking_script_from_public_key, recognize
 from shared.evaluate import evaluate
 from shared.transaction import Transaction, hash256, preimage_forkid, preimage_otda
 from test_payment import check, child, fixture_signature, parent, signer
@@ -30,9 +33,31 @@ CHRONICLE_MAINNET_HEIGHT = 943_835
 
 
 class FixedTemplateTests(unittest.TestCase):
+    def test_default_wallet_and_cli_create_the_versioned_template(self):
+        _, key, owner = signer(17)
+        layout = json.loads((RELEASE_DIRECTORY / "layout.json").read_text(encoding="ascii"))
+        self.assertEqual(layout["template_version"], TEMPLATE_VERSION)
+        self.assertEqual({int(mode, 16) for mode in layout["supported_sighash_types"]}, UNIVERSAL_FLAGS)
+        script = locking_script_from_owner_hash(owner)
+        self.assertEqual(len(script), 46302)
+        self.assertEqual(script, locking_script_from_public_key(key, template_version=TEMPLATE_VERSION))
+        self.assertEqual(recognize(script), owner)
+        previous = locking_script_from_owner_hash(owner, template_version=LEGACY_TEMPLATE_VERSION)
+        self.assertEqual(len(previous), 59582)
+        self.assertEqual(recognize(previous), owner)
+        cli = [sys.executable, str(Path(__file__).with_name("generate_lock.py")), "--owner-hash160", owner.hex()]
+        for options, version, expected in (([], TEMPLATE_VERSION, script),
+                                           (["--version", LEGACY_TEMPLATE_VERSION], LEGACY_TEMPLATE_VERSION, previous)):
+            with self.subTest(version=version):
+                manifest = json.loads(subprocess.check_output([*cli, *options]))
+                self.assertEqual(manifest["template_version"], version)
+                self.assertEqual(manifest["script_sha256"], sha256(expected).hexdigest())
+                self.assertEqual(subprocess.check_output([*cli, *options, "--format", "raw"]), expected)
+
     def test_artifacts_and_owner_vectors(self):
-        for file, content in (build_artifacts() | scheduled_artifacts()).items():
-            self.assertEqual((TEMPLATE_DIRECTORY / file).read_text(encoding="ascii"), content, file)
+        for directory, artifacts in ((TEMPLATE_DIRECTORY, build_artifacts()), (RELEASE_DIRECTORY, scheduled_artifacts())):
+            for file, content in artifacts.items():
+                self.assertEqual((directory / file).read_text(encoding="ascii"), content, file)
         layout = json.loads((TEMPLATE_DIRECTORY / "layout.json").read_text(encoding="ascii"))
         template = compiled_template()
         for vector in layout["owner_vectors"]:
