@@ -1,0 +1,250 @@
+{
+  "scope": "fixed preconfirmed verifier funding control",
+  "open_replenishment": false,
+  "node": "/Bitcoin SV:1.2.3/",
+  "test_only_verifying_key_sha256": "e0eaa50d2aaa24c8012c091bac26693c525cb1f900ab870177d90debbf118e9d",
+  "first_block": {
+    "txid": "3278a56fef5fc860a3f1cdf64f35ed3ec8f573e04b811d5071519aba82ef7b80",
+    "blockhash": "3eaa61e96c1dfc7ba3100c7e6d05880bfe68f9a3f5127f8870544d159bc0b950",
+    "height": 110,
+    "bytes": 4075
+  },
+  "second_block": {
+    "txid": "472295b6d859e1e41f24470456dbffe2a959229fa59035a361f225285bca7985",
+    "blockhash": "2b40a5d8261fadcd0f5684ab47b2bf3c833d95a63f364ac92668fcb8b2706692",
+    "height": 111,
+    "bytes": 4075
+  },
+  "first_proof_archived": {
+    "wall_seconds": 14.836049709003419,
+    "prove_seconds": 14.821823917,
+    "native_verify_seconds": 0.001236084,
+    "statement_digest": "8960b7218d94510db5af815cbbedafc926ca9fcb85348d832b9e1aaa0f7b2ff2",
+    "proof_artifact_sha256": "1fca97f95cd4b62547b180947e6a40c5e575e9298b80a336984c3dbffe08952c",
+    "txid": "3278a56fef5fc860a3f1cdf64f35ed3ec8f573e04b811d5071519aba82ef7b80",
+    "direct_token_parents": [
+      "26ee4e92fe42d0a582e45b633c1a58cb810612b1ee08cc452be8f71aef275cf8:0",
+      "be19f32b2ba5753aeb056d57bdf3eff4b3cd0922c139cd1426c7395adcc7a72b:0"
+    ],
+    "direct_parent_bytes_private": [
+      903,
+      903
+    ],
+    "parent_raw_bytes_in_scripts": 0,
+    "input_witness_bytes": [
+      1624,
+      376,
+      376
+    ],
+    "tx_bytes": 4075,
+    "proof_witness_bytes": 1078
+  },
+  "second_proof_live": {
+    "wall_seconds": 19.446314582950436,
+    "prove_seconds": 19.431463333,
+    "native_verify_seconds": 0.001628,
+    "statement_digest": "8d6429ba20654e4b9a96370ae99ae23a024920f192d0956e316cf8bbdfb51978",
+    "proof_artifact_sha256": "818f89d70bca6350bde7f92ef5c6ede40a0d53d2e0e605df23e5f318342bb35e"
+  },
+  "prover_startup_seconds": 553.1848941670032,
+  "node_timings": {
+    "bob-to-carol": {
+      "chain_gang_seconds": 0.04389283305499703,
+      "node_submission_seconds": 0.3776069169398397,
+      "node_mining_and_confirmation_seconds": 0.021453791996464133
+    }
+  },
+  "bob": {
+    "outpoint_wire": "807bef82ba9a5171501d814be073f5c83eed354ff6cdf1a360c85fef6fa5783200000000",
+    "quantity": 275,
+    "owner": "03421f5fc9a21065445c96fdb91c0c1e2f2431741c72713b4b99ddcb316f31e9fc",
+    "confirmations": 1,
+    "fee_sats": 200000,
+    "spend_status": "unknown",
+    "verify_seconds": 0.04944095795508474,
+    "packet_bytes": {
+      "transactions": 910846,
+      "merkle_siblings": 128
+    }
+  },
+  "bob_prior": {
+    "outpoint_wire": "e0009aadfe9918c9dbf64c6297c82253c58f63af28df3f111d5eb8c73fddb40c00000000",
+    "quantity": 150,
+    "owner": "03421f5fc9a21065445c96fdb91c0c1e2f2431741c72713b4b99ddcb316f31e9fc",
+    "confirmations": 4,
+    "fee_sats": 999000,
+    "spend_status": "unknown",
+    "verify_seconds": 0.0002001670654863119,
+    "packet_bytes": {
+      "transactions": 1086,
+      "merkle_siblings": 64
+    }
+  },
+  "carol": {
+    "outpoint_wire": "8579ca5b2825f261a33590a59f2259a9e2ffdb560447241fe4e159d8b695224700000000",
+    "quantity": 350,
+    "owner": "032fa2104d6b38d11b0230010559879124e42ab8dfeff5ff29dc9cdadd4ecacc3f",
+    "confirmations": 1,
+    "fee_sats": 200000,
+    "spend_status": "unknown",
+    "verify_seconds": 0.0450881669530645,
+    "packet_bytes": {
+      "transactions": 914018,
+      "merkle_siblings": 128
+    }
+  },
+  "negative_cases": {
+    "copied_token": "unauthorized token creation or verifier",
+    "wrong_vout": "receipt outpoint, owner, amount or policy mismatch",
+    "wrong_amount": "receipt outpoint, owner, amount or policy mismatch",
+    "missing_parent": "missing actual parent data",
+    "wrong_block": "invalid transaction Merkle inclusion"
+  },
+  "payment_delta_bytes": 0,
+  "embedded_parent_bytes": 0,
+  "payment_and_funding": {
+    "groups": {
+      "payment": [
+        {
+          "txid": "3278a56fef5fc860a3f1cdf64f35ed3ec8f573e04b811d5071519aba82ef7b80",
+          "bytes": 4075,
+          "locking_bytes": 1538,
+          "unlocking_bytes": 2376,
+          "non_script_bytes": 161,
+          "input_script_bytes": [
+            1624,
+            376,
+            376
+          ],
+          "output_script_bytes": [
+            769,
+            769
+          ]
+        },
+        {
+          "txid": "472295b6d859e1e41f24470456dbffe2a959229fa59035a361f225285bca7985",
+          "bytes": 4075,
+          "locking_bytes": 1538,
+          "unlocking_bytes": 2376,
+          "non_script_bytes": 161,
+          "input_script_bytes": [
+            1624,
+            376,
+            376
+          ],
+          "output_script_bytes": [
+            769,
+            769
+          ]
+        }
+      ],
+      "verifier_funding": [
+        {
+          "txid": "bf79baf4854e5c381556edde2dd0140a9bb913682e83b53d7cd3d1a619fb18be",
+          "bytes": 904965,
+          "locking_bytes": 904888,
+          "unlocking_bytes": 0,
+          "non_script_bytes": 77,
+          "input_script_bytes": [
+            0
+          ],
+          "output_script_bytes": [
+            452444,
+            452444
+          ]
+        }
+      ],
+      "preparation": [],
+      "settlement": []
+    },
+    "total": {
+      "bytes": 913115,
+      "locking_bytes": 907964,
+      "unlocking_bytes": 4752,
+      "non_script_bytes": 399
+    }
+  },
+  "issuance": {
+    "groups": {
+      "issuance": [
+        {
+          "txid": "baf00ff8947465923fc7ede5858a688395d258cc22e9d5ed338848a174efb95b",
+          "bytes": 240,
+          "locking_bytes": 38,
+          "unlocking_bytes": 106,
+          "non_script_bytes": 96,
+          "input_script_bytes": [
+            106
+          ],
+          "output_script_bytes": [
+            1,
+            1,
+            1,
+            1,
+            34
+          ]
+        },
+        {
+          "txid": "32d974cb7432f2d79df4e00b9be16e174fd03a0057c390c29817356a22d1e194",
+          "bytes": 183,
+          "locking_bytes": 105,
+          "unlocking_bytes": 0,
+          "non_script_bytes": 78,
+          "input_script_bytes": [
+            0
+          ],
+          "output_script_bytes": [
+            35,
+            35,
+            35
+          ]
+        },
+        {
+          "txid": "26ee4e92fe42d0a582e45b633c1a58cb810612b1ee08cc452be8f71aef275cf8",
+          "bytes": 903,
+          "locking_bytes": 769,
+          "unlocking_bytes": 72,
+          "non_script_bytes": 62,
+          "input_script_bytes": [
+            72
+          ],
+          "output_script_bytes": [
+            769
+          ]
+        },
+        {
+          "txid": "be19f32b2ba5753aeb056d57bdf3eff4b3cd0922c139cd1426c7395adcc7a72b",
+          "bytes": 903,
+          "locking_bytes": 769,
+          "unlocking_bytes": 72,
+          "non_script_bytes": 62,
+          "input_script_bytes": [
+            72
+          ],
+          "output_script_bytes": [
+            769
+          ]
+        },
+        {
+          "txid": "0cb4dd3fc7b85e1d113fdf28af638fc55322c897624cf6dbc91899fead9a00e0",
+          "bytes": 903,
+          "locking_bytes": 769,
+          "unlocking_bytes": 72,
+          "non_script_bytes": 62,
+          "input_script_bytes": [
+            72
+          ],
+          "output_script_bytes": [
+            769
+          ]
+        }
+      ]
+    },
+    "total": {
+      "bytes": 3132,
+      "locking_bytes": 2450,
+      "unlocking_bytes": 322,
+      "non_script_bytes": 360
+    }
+  }
+}
