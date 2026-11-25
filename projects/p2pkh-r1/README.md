@@ -12,6 +12,12 @@ Create a P-256 receive script and sign an approved payment. The unified client s
 
 P2PKH-R1 locks a BSV output to the HASH160 of the recipient's uncompressed secp256r1 (P-256) public key. The payer fills a 20-byte owner field. On spend, the wallet supplies the public key and one verified 64-byte `r || s` signature for the selected input.
 
+## Use cases and trade-offs
+
+Use ordinary R1 to evaluate a wallet whose existing device or signing service can authorize a BSV payment with P-256. For example, run a payment using a device that accepts an already computed digest, then repeat with a SHA-256-on-device interface. Check which payload the device accepts and how it encodes the signature before handling funds. The wallet keeps a persistent nonce-reuse history across its signing processes. [Device integration](docs/sdk.en.md#device-signers-and-prepared-inputs)
+
+R1 creates the full payment lock when the payer funds the output. This suits a recipient who needs to make an ordinary signed payment from the resulting UTXO in one spend, subject to confirmation and relay policy. Evaluate Deferred when small deposit outputs are valuable and your wallet can accommodate a separate activation transaction. [Deferred workflow](../p2pkh-r1-deferred/README.md)
+
 ## Current template
 
 v0.2.0 is the current development version. Its [46,302-byte fixed lock](template/v0.2.0/template.hex) and [binary layout](template/v0.2.0/layout.json) define the format for new outputs. The 59,582-byte [v0.1.0 lock](template/template.hex) remains recognized and spendable. Both use the same owner field at offsets 208 through 227 and support all twelve ForkID and Chronicle OTDA sighash combinations. The wallet verifies the fixed bytes of the actual prevout to identify its template.
@@ -20,7 +26,7 @@ Ordinary payments use ForkID ALL (`0x41`) and a 326-byte unlock. The v0.2.0 two-
 
 ## Wallet integration
 
-Use the [TypeScript, Rust and Go SDK guide](docs/sdk.en.md) for receiving and ordinary ForkID ALL payments. The [Python reference wallet](reference/README.md) supports selecting a sighash per input, including mixed spends and Chronicle OTDA. Authenticate the funding outpoint, amount and script before asking an external signer to approve the intended outputs and fee.
+Use the unified SDK in TypeScript, Rust, Go, or Python for receiving and ordinary ForkID ALL payments. For prepared or mixed transactions, call `signInput` with the sighash for the selected input and supply the chain context for Chronicle OTDA. Authenticate each outpoint, amount and script, then approve the outputs and total fee before calling the signer. [SDK guide](docs/sdk.en.md) · [Python reference wallet](reference/README.md)
 
 ```sh
 cd projects/p2pkh-r1/reference
