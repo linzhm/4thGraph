@@ -8,7 +8,7 @@ This experiment generates BLS12-381 Groth16 verification scripts and a wallet de
 - [Optional gnark BSB22 adapter](docs/bsb22.md)
 - [Circom and snarkjs integration](docs/toolchain.md)
 - [1,024-unit issuance and regtest replay](docs/regtest.md)
-- [CCTP and BSV bridge project](../cctp/README.md)
+- [BSV SPV Token project](../spv-token/README.md)
 - [Reproducible two-input vector](template/vector.json)
 
 | Experiment | Locking script | Unlocking script | Combined | chain-gang median |

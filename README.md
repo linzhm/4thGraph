@@ -28,7 +28,7 @@ Generate locking scripts, replay signed spends from reproducible vectors, and co
 | [ML-DSA-44](projects/ml-dsa/README.md) | Pure FIPS 204 message verification and a transaction-bound payment template | [Implementation and measurements](projects/ml-dsa/README.md) |
 | [XMSS-SHA2_10_256](projects/xmss/README.md) | Stateful hash-based authorization with up to 1,024 distinct signing indices per root | [Specification](projects/xmss/docs/spec.md) · [Verification](projects/xmss/README.md#check-the-implementation) |
 | [Groth16](projects/groth16/README.md) | BLS12-381 proof verification, script size and wallet recognition for fixed public inputs | [Verifier design](projects/groth16/docs/verifier.md) · [Wallet descriptor](projects/groth16/docs/wallet.md) |
-| [CCTP](projects/cctp/README.md) | BSV token issuance, freeze, and redemption backed by source-chain USDC | [Protocol specification](projects/cctp/docs/bsv-usdc-bridge-spec.md) · [Implementation checklist](projects/cctp/docs/bsv-usdc-token-checklist.md) |
+| [BSV SPV Token](projects/spv-token/README.md) | BSV token provenance and independently verifiable payments, with a USDC reserve bridge | [Protocol specification](projects/spv-token/docs/bsv-usdc-bridge-spec.md) · [Implementation checklist](projects/spv-token/docs/bsv-usdc-token-checklist.md) |
 
 <details>
 <summary><strong>Compare script sizes</strong></summary>
