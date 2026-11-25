@@ -34,6 +34,8 @@
 
 ## SDK 与参考接口
 
+[TypeScript、Rust、Go 和 Python 源码 SDK](../sdk/README.zh-CN.md)
+
 通过 Python 的 `locking_script(public_key)` 建立付款锁。用 `sign_payment` 构造单输入付款，或用 `sign_spend` 签准备好的输入。外部签名器遵循纯模式和空上下文，回调返回 2,420 字节标准签名，由钱包先行核验再编码解锁。
 
 [钱包接口](../reference/payment.py) · [签名接口与测试向量生成](../reference/mldsa.py) · [脚本编译器](../reference/script.py)

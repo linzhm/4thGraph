@@ -34,6 +34,8 @@ Use Python 3.12 and OpenSSL 3.5 or later. See the [project replay commands](../R
 
 ## SDK and reference interfaces
 
+[TypeScript, Rust, Go and Python source SDKs](../sdk/README.md)
+
 Use the Python reference `locking_script(public_key)` to build a payment lock. Call `sign_payment` for a one-input payment or `sign_spend` for a prepared input. Connect a pure-mode external signer with empty context. The callback provides the raw 2,420-byte signature, which the wallet verifies before encoding the witness.
 
 [Wallet source](../reference/payment.py) · [Signature and fixture interfaces](../reference/mldsa.py) · [Script compiler](../reference/script.py)
