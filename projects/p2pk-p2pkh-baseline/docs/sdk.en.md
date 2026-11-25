@@ -36,6 +36,14 @@ const signedHex = wallet.signPayment({
 
 Use `signInput` for a prepared transaction. Supply the transaction, its input index and the corresponding prevout. See the [call table](../../../shared/sdk/README.md#calls-and-data) for the matching Rust, Go, and Python interfaces.
 
+## Check your signer and template
+
+- Start with the offline native P2PKH example. In your wallet's replay, compare the lock and the signature request before comparing the final transaction bytes.
+- Pass the 32-byte digest to a prehashed secp256k1 signing operation. If your signer returns fixed-width `r ∥ s`, encode it as low-S DER before returning it to the SDK. The client adds the sighash byte.
+- For regression tests, cover one P2PKH output locked by owner hash and one P2PK output created from the complete compressed key. Check that a different spending key fails recognition for each.
+
+[Offline quickstart](../../../shared/sdk/README.md#quickstart)
+
 ## Replay vectors
 
 ```sh

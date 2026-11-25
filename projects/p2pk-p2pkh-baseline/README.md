@@ -14,6 +14,12 @@ Native P2PKH is the first wallet integration example and the transaction-cost ba
 
 [Reproduce the benchmark](../../shared/benchmark.md)
 
+## Use cases and trade-offs
+
+Start here when bringing up a transaction builder, a secp256k1 signing device, or a wallet migration. Check serialization with the public vector first. Then connect your own signer and use the same workflow to compare another signature scheme.
+
+P2PKH is the usual choice when a payment request provides a public-key hash. The spending wallet reveals the full public key with the signature. P2PK is useful as a control when the payer already has the recipient's public key. For ForkID ALL, P2PK moves 10 bytes into each receive output and saves about 34 bytes per spending input. Compare both sides if your wallet batches funding or consolidates many inputs. [Transaction costs](#complete-transactions-and-stack-measurements)
+
 ## Run
 
 From `projects/p2pk-p2pkh-baseline/reference/`, with Python 3.12, a Rust
