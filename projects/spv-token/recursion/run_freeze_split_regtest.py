@@ -6,8 +6,9 @@ import json
 from pathlib import Path
 
 import freeze_split_token
-from run_freeze_probe_regtest import prove_candidate, read_key
-from run_recursive_mimo import Regtest
+from freeze_probe import DOMAIN
+from statement_prover import StatementProver, add_prover_arguments
+from regtest_support import Regtest
 from shared.transaction import Input, Output, Transaction, preimage_all
 from statement import AssetDescriptor
 from statement_receipt import verifier_lock, verifier_material
@@ -23,17 +24,13 @@ def _complete(tx, previous, funding, signer, proof_prefix):
     return tx.with_script(0, token_unlock).with_script(1, verifier_unlock)
 
 
-def run(node, binary, parameters, output):
+def run(node, prover, output):
     if node.node.call("getconnectioncount") != 0:
         raise ValueError("use an isolated BSV regtest")
     from test_operational_token import fixture_signer
 
     _, sign = fixture_signer(12)
-    manifest = json.loads((parameters / "manifest.json").read_text())
-    if manifest["test_only"] is not True:
-        raise ValueError("the isolated fixture requires test parameters")
-    key, commitment = read_key(json.loads((parameters / "key.json").read_text()), manifest["profile"])
-    proof_lock = verifier_lock(key, commitment)
+    proof_lock = verifier_lock(prover.key)
     setup = node.setup(outputs=3)
     anchor = Input(setup.txid_wire(), 0)
     asset = AssetDescriptor(1, anchor.outpoint(), USDC_DECIMALS, 7, b"r" * 32, b"p" * 32)
@@ -54,7 +51,7 @@ def run(node, binary, parameters, output):
             replace(tx, outputs=(*tx.outputs, freeze_split_token.receipt_output(tx, prev))), prev,
         ):
             raise AssertionError("adding the receipt changed the proof's public statement")
-        proof, record = prove_candidate(binary, parameters, output / f"{label}-proof.json", tx, prev, manifest, key)
+        proof, record = prover.prove(freeze_split_token.statement(tx, prev), output / f"{label}-proof.json")
         if label == "freeze":
             # The test issuer and the receipt authenticate the changed candidate.
             # The independent verifier must reject the original proof for it.
@@ -80,7 +77,7 @@ def run(node, binary, parameters, output):
         "scope": "Isolated issuer-only proof with separate verifier funding on Bitcoin SV regtest",
         "asset_id": asset.asset_id().hex(), "token_lock_bytes": len(token_lock), "verifier_lock_bytes": len(proof_lock),
         "verifier_lock_sha256": sha256(proof_lock).hexdigest(),
-        "parameters": manifest, "proofs": stages, **node.evidence,
+        "verifying_key_sha256": prover.key_digest, "proofs": stages, **node.evidence,
     }
 
 
@@ -88,12 +85,12 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--node-url", required=True)
     parser.add_argument("--cookie", type=Path, required=True)
-    parser.add_argument("--prover", type=Path, required=True)
-    parser.add_argument("--parameters", type=Path, required=True)
+    add_prover_arguments(parser)
     parser.add_argument("--out", type=Path, required=True)
     args = parser.parse_args()
     args.out.mkdir()
-    result = run(Regtest(args.node_url, args.cookie), args.prover, args.parameters, args.out)
+    prover = StatementProver(args.zkey, args.wasm, args.ntt_shader, DOMAIN)
+    result = run(Regtest(args.node_url, args.cookie), prover, args.out)
     with (args.out / "summary.json").open("x") as stream:
         json.dump(result, stream, indent=2)
         stream.write("\n")

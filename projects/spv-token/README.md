@@ -6,6 +6,9 @@ This project develops a BSV token protocol with verifiable provenance, conservat
 
 - [Development plan and acceptance milestones](docs/development-plan.md)
 - [Development handoff](docs/handoff.md)
+- [Python prover and snarkjs parameter workflow](docs/python-proving.md)
+- [D+A lifecycle acceptance](docs/route-d-a-lifecycle.md)
+- [Protocol requirements walkthrough](docs/protocol-requirements-walkthrough.md)
 - [Transfer commitment reference profile](docs/transfer-commitment.md)
 - [Actual transaction relation and acceptance boundary](docs/actual-transaction-relation.md)
 - [Independent parent binding and dual verifier sighashes](docs/parent-binding.md)
@@ -32,4 +35,6 @@ export PYTHONPATH=.:projects/spv-token:projects/spv-token/reference:projects/spv
 ../cctp-test-tools/venv/bin/python -m unittest discover -s projects/spv-token/reference -v
 ../cctp-test-tools/venv/bin/python -m unittest discover -s projects/spv-token/recursion -v
 ../cctp-test-tools/venv/bin/python -m unittest discover -s projects/spv-token/evm -v
+../cctp-test-tools/venv/bin/python projects/spv-token/recursion/run_prepared_lifecycle_regtest.py \
+  --out projects/spv-token/fixtures/route-d-a-lifecycle-regtest --replay
 ```

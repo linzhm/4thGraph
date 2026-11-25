@@ -1,6 +1,6 @@
 """Export receipt evidence from an untrusted regtest data source."""
 
-from run_covenant_backtrace_regtest import confirmed
+from regtest_support import confirmed
 from shared.transaction import Transaction
 from spv_payment import RegtestHeaderChain, TxInclusion
 from wallet_receipt import BlockInclusion
@@ -64,3 +64,23 @@ def packet_bytes(payment, parents):
     packets = (payment, *parents)
     return {"transactions": sum(len(packet.raw) for packet in packets),
             "merkle_siblings": sum(32 * len(packet.inclusion.siblings) for packet in packets)}
+
+
+
+def included_packet(node, label, tx):
+    """Attach the recorded block proof without a transaction index."""
+    entry = node.evidence["transactions"][label]
+    packet = packet_from_raw(node.node, tx.serialize(), entry["blockhash"])
+    if packet.inclusion.height != entry["height"]:
+        raise ValueError("confirmation height differs from the recorded block")
+    return packet
+
+
+def archive_packet(packet):
+    return {
+        "raw": packet.raw.hex(),
+        "height": packet.inclusion.height,
+        "index": packet.inclusion.index,
+        "leaf_count": packet.inclusion.leaf_count,
+        "siblings": [sibling.hex() for sibling in packet.inclusion.siblings],
+    }

@@ -3,23 +3,17 @@ import argparse
 import json
 from pathlib import Path
 
-from checkpoint_verifier import statement_bytes, verifier_lock, verifier_material
+from checkpoint_verifier import DOMAIN, statement_bytes, verifier_lock, verifier_material
 from parent_prefix import checkpoint_record
-from run_freeze_probe_regtest import prove_statement, read_key
-from run_recursive_mimo import Regtest
+from statement_prover import StatementProver, add_prover_arguments
+from regtest_support import Regtest
 from shared.script import asm, push
 from shared.transaction import Input, Output, Transaction
 
 
-def run(node, prover, parameters, out):
+def run(node, prover, out):
     if node.node.call("getconnectioncount") != 0:
         raise ValueError("use an isolated BSV regtest")
-    manifest = json.loads((parameters / "manifest.json").read_text())
-    if (manifest["test_only"] is not True or manifest["profile"] != "parent-checkpoint"
-            or manifest["commitments"] != 0):
-        raise ValueError("expected the plain parent checkpoint test parameters")
-    key, _ = read_key(json.loads((parameters / "key.json").read_text()), "plain")
-
     setup = node.setup(outputs=3)
     parent_outputs = (Output(1000, asm("OP_1")), Output(2000, asm("OP_1")))
     parents = []
@@ -40,12 +34,11 @@ def run(node, prover, parameters, out):
     (out / "parent.hex").write_text(raw.hex() + "\n")
     state, suffix = (bytes.fromhex(checkpoint[field]) for field in ("midstate", "suffix"))
 
-    lock = verifier_lock(key, required_output=parent_outputs[0])
+    lock = verifier_lock(prover.key, required_output=parent_outputs[0])
     funded = Output(1_000_000, lock)
     funding = node.include("verifier-funding", Transaction((Input(setup.txid_wire(), 2),), (funded,)), (setup,))
     public_statement = statement_bytes(parent.txid_wire(), state, suffix)
-    proof, evidence = prove_statement(prover, parameters, out / "checkpoint-proof.json", public_statement,
-                                      manifest, key, raw_parent=raw)
+    proof, evidence = prover.prove(public_statement, out / "checkpoint-proof.json", parent=list(raw))
 
     def candidate(previous, vout, disclosed_state, disclosed_suffix):
         draft = Transaction((Input(previous.txid_wire(), vout), Input(funding.txid_wire(), 0)),
@@ -71,7 +64,7 @@ def run(node, prover, parameters, out):
         raise AssertionError("the other parent output should retain its independent UTXO")
     return {
         "scope": "Two-output test parent authenticated by a separate plain Groth16 checkpoint input",
-        "checkpoint": checkpoint, "parameters": manifest, "proof": evidence, "rejections": rejections,
+        "checkpoint": checkpoint, "verifying_key_sha256": prover.key_digest, "proof": evidence, "rejections": rejections,
         "parent_disclosure_bytes": len(state) + len(suffix),
         "parent_disclosure_with_encoding_bytes": len(push(state)) + len(push(suffix)),
         "raw_parent_with_encoding_bytes": len(push(raw)),
@@ -87,12 +80,12 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--node-url", required=True)
     parser.add_argument("--cookie", type=Path, required=True)
-    parser.add_argument("--prover", type=Path, required=True)
-    parser.add_argument("--parameters", type=Path, required=True)
+    add_prover_arguments(parser)
     parser.add_argument("--out", type=Path, required=True)
     args = parser.parse_args()
     args.out.mkdir()
-    result = run(Regtest(args.node_url, args.cookie), args.prover, args.parameters, args.out)
+    prover = StatementProver(args.zkey, args.wasm, args.ntt_shader, DOMAIN)
+    result = run(Regtest(args.node_url, args.cookie), prover, args.out)
     with (args.out / "summary.json").open("x") as stream:
         json.dump(result, stream, indent=2)
         stream.write("\n")

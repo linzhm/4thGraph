@@ -251,17 +251,24 @@ class BridgeService:
             raise ValueError("release provenance must match the configured certified or legacy policy")
         if lineage.mint_policy != self.mint_policy:
             raise ValueError("burn lineage does not belong to this bridge")
+        def verify(burn, _asset):
+            receipt = (lineage.verify(burn, bsv_rpc, bsv_policy).receipt if certified_lineage
+                       else lineage.burn(reference.txid, reference.vout))
+            return receipt == burn.receipt
+
+        return self.authorize_bound_release(bsv_rpc, bsv_policy, reference, verify, sign_digest)
+
+    def authorize_bound_release(
+        self, bsv_rpc, bsv_policy, reference, verify_provenance, sign_digest,
+    ) -> ReleaseAuthorization | Settlement:
+        """Use the configured settlement verifier while retaining the durable release journal."""
         asset = self.mint_policy.asset
         event_id = burn_event_id(asset.network, reference)
         self._check_bsv_origin(bsv_rpc, bsv_policy, event_id)
         self._check_evm_origin(event_id, effect=True)
 
         def provenance(burn: CanonicalBurn, burn_asset) -> bool:
-            if burn_asset != asset:
-                return False
-            receipt = (lineage.verify(burn, bsv_rpc, bsv_policy).receipt if certified_lineage
-                       else lineage.burn(reference.txid, reference.vout))
-            if receipt != burn.receipt:
+            if burn_asset != asset or verify_provenance(burn, burn_asset) is not True:
                 return False
             actual = burn.reference
             self.ledger.observe_burn(burn.receipt, ChainReference(

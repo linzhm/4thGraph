@@ -1,0 +1,11 @@
+{
+  "format": "CCTP prepared lifecycle test parameters v1",
+  "profile": "prepared-lifecycle",
+  "test_only": true,
+  "constraints": 13787986,
+  "commitments": 0,
+  "statement_bytes": 619,
+  "circuit_sha256": "03e7831e77540ea4da010fac9a5c2b9eca560e499fb691524e0a8d49cadab128",
+  "verifying_key_sha256": "82838b211d67c4a099b7e0f41cfbf30e689623038b92525576f64f5908d851af",
+  "proving_key_sha256": "1894d71e87b3805bc8e641b1cbf7f7f5010500b4726764bbb209dead336595f7"
+}

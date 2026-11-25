@@ -8,8 +8,8 @@ from pathlib import Path
 import conservation_probe
 from conservation_inputs import actual_token_inputs_material, actual_token_inputs_script
 from operational_token import TokenPolicy, shared_guard_witness
-from run_freeze_probe_regtest import prove_statement, read_key
-from run_recursive_mimo import Regtest
+from statement_prover import StatementProver, add_prover_arguments
+from regtest_support import Regtest
 from shared.script import push
 from shared.transaction import Input, Output, Transaction, blob
 from statement import AssetDescriptor
@@ -65,19 +65,14 @@ def _check_unapproved_verifier(node, tx, parents):
     return {"txid": tx.txid(), "vin_results": statuses, "rejection": node.reject(tx)}
 
 
-def run(node, binary, parameters, out, *, transfers=2, compressed=False, prefunded=False):
+def run(node, prover, out, *, transfers=2, compressed=False, prefunded=False):
     if node.node.call("getconnectioncount") != 0:
         raise ValueError("use an isolated BSV regtest")
     if compressed and prefunded:
         raise ValueError("the pre-funded experiment uses the raw parent verification profile")
     from test_operational_token import fixture_signer
 
-    manifest = json.loads((parameters / "manifest.json").read_text())
-    if manifest["test_only"] is not True or manifest["profile"] != "conservation" or manifest["commitments"] != 0:
-        raise ValueError("expected the plain conservation test parameters")
-    data = json.loads((parameters / "key.json").read_text())
-    key, _ = read_key(data, "plain")
-    lock = verifier_lock(key, **SHAPE)
+    lock = verifier_lock(prover.key, **SHAPE)
     if compressed:
         from conservation_compact_companion import companion_lock as compact_companion_lock, companion_parent_material
         policy = None
@@ -133,8 +128,7 @@ def run(node, binary, parameters, out, *, transfers=2, compressed=False, prefund
              *(Input(parent.txid_wire(), vout) for parent, vout in parents)),
             tuple(token_output(*args) for args in outputs),
         )
-        proof, record = prove_statement(binary, parameters, out / f"{label}-proof.json",
-                                        conservation_probe.statement(tx, previous), manifest, key)
+        proof, record = prover.prove(conservation_probe.statement(tx, previous), out / f"{label}-proof.json")
         signers = tuple(holders[i][1] for i in (range(2, 4) if step % 2 else range(2)))
         material = (companion_parent_material(lock, companion_lock, parents) if compressed else
                     actual_token_inputs_material(parents, companion))
@@ -146,10 +140,8 @@ def run(node, binary, parameters, out, *, transfers=2, compressed=False, prefund
             if prefunded:
                 foreign = fund("unapproved-verifier-funding", 2 + 2 * transfers, sponsor)
                 substituted = replace(tx, inputs=(Input(foreign.txid_wire(), 0), *tx.inputs[1:]))
-                foreign_proof, evidence = prove_statement(
-                    binary, parameters, out / "unapproved-verifier-proof.json",
-                    conservation_probe.statement(substituted, previous), manifest, key,
-                )
+                foreign_proof, evidence = prover.prove(conservation_probe.statement(substituted, previous),
+                                                        out / "unapproved-verifier-proof.json")
                 substituted = _complete(substituted, parents, material, previous, signers, foreign, companion,
                                         policy, foreign_proof, compressed=False, prefunded=True)
                 record["same_lock_unapproved_verifier"] = {
@@ -187,7 +179,7 @@ def run(node, binary, parameters, out, *, transfers=2, compressed=False, prefund
         "parent_mode": "lossless dictionary" if compressed else "raw transaction", "transfer_count": transfers,
         **({"approved_verifiers": [{"txid": funding.txid(), "vout": 0} for funding in verifier_funders]}
            if prefunded else {}),
-        "asset_id": asset_id.hex(), "parameters": manifest, "proofs": records,
+        "asset_id": asset_id.hex(), "verifying_key_sha256": prover.key_digest, "proofs": records,
         "token_lock_bytes": len(origins[0].outputs[0].script),
         "verifier_lock_bytes": len(lock), "companion_lock_bytes": len(companion_lock),
         "verifier_script_field_sha256": sha256(blob(lock)).hexdigest(),
@@ -199,8 +191,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--node-url", required=True)
     parser.add_argument("--cookie", type=Path, required=True)
-    parser.add_argument("--prover", type=Path, required=True)
-    parser.add_argument("--parameters", type=Path, required=True)
+    add_prover_arguments(parser)
     parser.add_argument("--out", type=Path, required=True)
     parser.add_argument("--transfers", type=int, choices=range(2, 9), default=2)
     profile = parser.add_mutually_exclusive_group()
@@ -208,7 +199,8 @@ def main():
     profile.add_argument("--prefunded-verifiers", action="store_true")
     args = parser.parse_args()
     args.out.mkdir()
-    result = run(Regtest(args.node_url, args.cookie), args.prover, args.parameters, args.out,
+    prover = StatementProver(args.zkey, args.wasm, args.ntt_shader, conservation_probe.DOMAIN)
+    result = run(Regtest(args.node_url, args.cookie), prover, args.out,
                  transfers=args.transfers, compressed=args.compressed_parents, prefunded=args.prefunded_verifiers)
     with (args.out / "summary.json").open("x") as stream:
         json.dump(result, stream, indent=2)

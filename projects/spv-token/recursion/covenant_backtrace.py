@@ -46,11 +46,11 @@ def parent_layout(raw):
     raise ValueError("unsupported parent wire size")
 
 
-def _current_prevouts():
+def _current_prevouts(input_count=3):
     """Authenticate [prevouts, compact preimage]; defer native CHECKSIG."""
     return (
         asm("OP_DUP") + compact_preimage_digest_script() + asm("OP_DROP")
-        + asm("OP_OVER OP_SIZE 108 OP_NUMEQUALVERIFY OP_HASH256 OP_OVER")
+        + asm("OP_OVER OP_SIZE") + number(input_count * 36) + asm("OP_NUMEQUALVERIFY OP_HASH256 OP_OVER")
         + _slice(4, 32) + asm("OP_EQUALVERIFY")
     )
 
@@ -155,6 +155,12 @@ def guard_script(root_txid, *, prove_provenance=False):
     )
 
 
+def fixed_proof_witness(fields):
+    if len(fields) != PROOF_FIELDS:
+        raise ValueError("expected the compact plain Groth16 layout")
+    return b"".join(push(value.to_bytes(PROOF_BYTES, "little")) for value in reversed(fields))
+
+
 def _fixed_proof_script():
     return (
         asm("OP_TOALTSTACK OP_TOALTSTACK")
@@ -204,10 +210,7 @@ class Policy:
         public = int.from_bytes(digest[:16], "big"), int.from_bytes(digest[16:], "big")
         point = verification_key_point(self.key.ic, public) or (0, 0)
         fields = (*point, *unlocking_fields(self.key, public, proof, projective_g1=True, projective_g2=True))
-        if len(fields) != PROOF_FIELDS:
-            raise ValueError("expected the compact plain Groth16 layout")
-        proof_wire = b"".join(push(value.to_bytes(PROOF_BYTES, "little")) for value in reversed(fields))
-        return proof_wire + material
+        return fixed_proof_witness(fields) + material
 
 
 def holder_witness(tx, vin, previous, signer):

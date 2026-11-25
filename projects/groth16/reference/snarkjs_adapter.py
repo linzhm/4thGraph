@@ -102,19 +102,26 @@ def metadata(artifact):
         raise ValueError("expected Groth16 over BLS12-381")
 
 
-def load_artifacts(key_json, proof_json, signals_json):
+def load_verification_key(key_json):
     metadata(key_json)
-    if "protocol" in proof_json or "curve" in proof_json:
-        metadata(proof_json)
-    signals = tuple(scalar(value, R) for value in signals_json)
-    if key_json["nPublic"] != len(signals) or len(key_json["IC"]) != len(signals) + 1:
-        raise ValueError("public signal count does not match verification key")
-    key = VerificationKey(
+    count = key_json["nPublic"]
+    if type(count) is not int or count < 0 or len(key_json["IC"]) != count + 1:
+        raise ValueError("invalid verification key public signal count")
+    return VerificationKey(
         point(key_json["vk_alpha_1"]),
         point(key_json["vk_beta_2"], twist=True),
         point(key_json["vk_gamma_2"], twist=True),
         point(key_json["vk_delta_2"], twist=True),
         tuple(point(item, allow_infinity=True) for item in key_json["IC"]),
     )
+
+
+def load_artifacts(key_json, proof_json, signals_json):
+    if "protocol" in proof_json or "curve" in proof_json:
+        metadata(proof_json)
+    signals = tuple(scalar(value, R) for value in signals_json)
+    key = load_verification_key(key_json)
+    if key_json["nPublic"] != len(signals):
+        raise ValueError("public signal count does not match verification key")
     proof = Proof(point(proof_json["pi_a"]), point(proof_json["pi_b"], twist=True), point(proof_json["pi_c"]))
     return key, signals, proof

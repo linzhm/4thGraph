@@ -145,7 +145,7 @@ class DurableBridge:
             "phase_after_confirmation": state.phase,
         }
 
-    def release(self, chain, tx, vout, lineage, *, circulating, interrupt=False):
+    def release(self, chain, tx, vout, lineage, *, circulating, interrupt=False, proof_bound=False):
         reserve = self.reserve
         evm = reserve.evm
         policy = chain.confirmation_policy(reserve.asset)
@@ -156,7 +156,8 @@ class DurableBridge:
             return bytes.fromhex(sign_digest_for_test(reserve.test_signing_key, "0x" + digest.hex())[2:])
 
         def authorize(service, signer):
-            return service.authorize_release(chain.call, policy, reference, lineage, signer)
+            prepare = service.authorize_bound_release if proof_bound else service.authorize_release
+            return prepare(chain.call, policy, reference, lineage, signer)
 
         event_id = burn_event_id(reserve.asset.network, reference)
         authorization, journal = self._authorize_with_restart(event_id, authorize, sign, interrupt=interrupt)

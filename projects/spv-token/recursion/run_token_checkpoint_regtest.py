@@ -8,8 +8,9 @@ from mint import MintPolicy, authorize_mint, prepare_mint
 from mint_events import Deposit, DepositPosition, EMPTY_ROOT, MintEvents
 from operational_token import TokenPolicy, freeze_witness, ordinary_witness
 from parent_prefix import checkpoint_record
-from run_freeze_probe_regtest import prove_statement, read_key
-from run_recursive_mimo import Regtest
+from checkpoint_verifier import DOMAIN
+from statement_prover import StatementProver, add_prover_arguments
+from regtest_support import Regtest
 from shared.script import asm, push
 from shared.transaction import Input, Output, Transaction
 from statement import AssetDescriptor
@@ -63,38 +64,28 @@ def native_parent(node, lock):
     return unfrozen, funding, policy, state
 
 
-def run(node, out, *, prover=None, parameters=None):
+def run(node, out, *, prover=None):
     if node.node.call("getconnectioncount") != 0:
         raise ValueError("use an isolated BSV regtest")
     _, holder = fixture_signer(11)
-    if parameters is None:
-        lock = raw_verifier_lock()
-        manifest = key = None
-    else:
-        manifest = json.loads((parameters / "manifest.json").read_text())
-        if (manifest["test_only"] is not True or manifest["profile"] != "parent-checkpoint-token"
-                or manifest["commitments"] != 0):
-            raise ValueError("expected the plain native token checkpoint test parameters")
-        key, _ = read_key(json.loads((parameters / "key.json").read_text()), "plain")
-        lock = verifier_lock(key)
+    lock = raw_verifier_lock() if prover is None else verifier_lock(prover.key)
     parent, funding, policy, token = native_parent(node, lock)
     raw = parent.serialize()
     checkpoint = checkpoint_record(raw)
     state, suffix = (bytes.fromhex(checkpoint[field]) for field in ("midstate", "suffix"))
     (out / "parent.hex").write_text(raw.hex() + "\n")
     (out / "parent-checkpoint.json").write_text(json.dumps(checkpoint, indent=2) + "\n")
-    if parameters is None:
+    if prover is None:
         proof, evidence = b"", None
         disclosure = push(raw)
     else:
         message = statement_bytes(parent.txid_wire(), state, suffix)
-        proof, evidence = prove_statement(prover, parameters, out / "checkpoint-proof.json", message,
-                                          manifest, key, raw_parent=raw)
+        proof, evidence = prover.prove(message, out / "checkpoint-proof.json", parent=list(raw))
         disclosure = push(state) + push(suffix)
 
     def candidate(outputs, *, midstate=state, tail=suffix, signer=holder):
         draft = Transaction((Input(funding.txid_wire(), 0), Input(parent.txid_wire(), 0)), outputs)
-        checkpoint_witness = (raw_verifier_material(draft, funding, raw) if manifest is None else
+        checkpoint_witness = (raw_verifier_material(draft, funding, raw) if prover is None else
                               verifier_material(draft, funding, midstate, tail))
         owner_witness = ordinary_witness(draft, 1, parent, policy, funding, signer)
         return draft.with_script(0, proof + checkpoint_witness).with_script(1, owner_witness)
@@ -105,7 +96,7 @@ def run(node, out, *, prover=None, parameters=None):
         "changed-token-quantity": candidate((Output(same_output.value, policy.lock(replace(token, quantity=641))),)),
         "wrong-holder": candidate((same_output,), signer=wrong_key),
     }
-    if manifest is not None:
+    if prover is not None:
         negative["wrong-midstate"] = candidate((same_output,), midstate=bytes([state[0] ^ 1]) + state[1:])
         negative["wrong-suffix"] = candidate((same_output,), tail=suffix[:-1] + bytes([suffix[-1] ^ 1]))
     rejected = {label: {"txid": tx.txid(), "rejection": node.reject(tx)} for label, tx in negative.items()}
@@ -117,9 +108,9 @@ def run(node, out, *, prover=None, parameters=None):
     return {
         "scope": "Anchored test mint, native freeze and unfreeze, and holder-authorized exact token rollover",
         "source": "test deposit attestation", "parent_profile": "legacy v2 native unfreeze",
-        "mode": "raw-parent" if manifest is None else "checkpoint",
+        "mode": "raw-parent" if prover is None else "checkpoint",
         "token_quantity": token.quantity, "carrier_satoshis": same_output.value,
-        "checkpoint": checkpoint, "parameters": manifest, "proof": evidence, "rejections": rejected,
+        "checkpoint": checkpoint, "verifying_key_sha256": prover.key_digest if prover else None, "proof": evidence, "rejections": rejected,
         "parent_disclosure_with_encoding_bytes": len(disclosure), "proof_witness_bytes": len(proof),
         "child_witness_bytes_by_vin": [len(txin.script) for txin in payment.inputs],
         "child_bytes": len(payment.serialize()), "verifier_lock_bytes": len(lock),
@@ -136,13 +127,14 @@ def main():
     parser.add_argument("--node-url", required=True)
     parser.add_argument("--cookie", type=Path, required=True)
     parser.add_argument("--out", type=Path, required=True)
-    parser.add_argument("--prover", type=Path)
-    parser.add_argument("--parameters", type=Path)
+    add_prover_arguments(parser, required=False)
     args = parser.parse_args()
-    if (args.prover is None) != (args.parameters is None):
-        parser.error("supply both prover and parameters for checkpoint mode")
+    parameters = (args.zkey, args.wasm, args.ntt_shader)
+    if any(parameters) and not all(parameters):
+        parser.error("supply .zkey, WASM and NTT shader for checkpoint mode")
+    prover = StatementProver(*parameters, DOMAIN) if all(parameters) else None
     args.out.mkdir()
-    result = run(Regtest(args.node_url, args.cookie), args.out, prover=args.prover, parameters=args.parameters)
+    result = run(Regtest(args.node_url, args.cookie), args.out, prover=prover)
     (args.out / "summary.json").write_text(json.dumps(result, indent=2) + "\n")
 
 
