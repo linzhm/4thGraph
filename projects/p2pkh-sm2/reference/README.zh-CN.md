@@ -17,7 +17,8 @@ python3 -m unittest -v test_sm2
 生成的操作码。完整输入测试还使用独立的验证引擎。
 
 在装有 Rust 和 Cargo 的 Linux x86-64 环境中，安装[参考实现依赖](requirements.txt)，
-再用固定版本的 chain-gang 扩展和 BSV Node 1.2.3 验证完整输入。
+再用固定版本的 chain-gang 扩展和 BSV Node 1.2.3 验证完整输入。差分测试核对
+已安装的 Git 提交与 requirements.txt 是否一致，负向用例必须给出已知的拒绝理由。
 
 ```sh
 python3 -m pip install -r requirements.txt

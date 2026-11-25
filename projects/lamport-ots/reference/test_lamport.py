@@ -6,7 +6,7 @@ import unittest
 from lamport import *
 from script import locking_script, binding, N, R
 from payment import authorization, sign_payment, sign_spend
-from fixtures import fixture, test_secret, cases, mode_cases
+from fixtures import INVALID_PREVOUT_CASES, fixture, test_secret, cases, mode_cases
 from engines import development_valid, chain_valid
 from shared.evaluate import evaluate, ScriptError
 from shared.script import push
@@ -79,7 +79,8 @@ class LamportTests(unittest.TestCase):
         for label,tx,parents,index,expected in cases():
             with self.subTest(case=label):
                 self.assertEqual(development_valid(tx,parents[index],index),expected)
-                self.assertEqual(chain_valid(tx,parents),expected)
+                self.assertEqual(chain_valid(tx, parents, expect_bad_prevout=label in INVALID_PREVOUT_CASES),
+                                 expected)
 
     def test_full_sighash_matrix(self):
         for label,tx,parents,index,expected in mode_cases():
