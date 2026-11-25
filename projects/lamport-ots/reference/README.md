@@ -41,8 +41,13 @@ ordinary single-input payment. Use
 `sign_spend(tx, input_index, funding_raw, public_key, signer, sighash=...)`
 for a prepared transaction. Each API accepts `signer(digest32) -> signature8192`
 and returns a signed transaction. The callback is invoked once after preflight.
-Authenticate the funding and confirm the transaction and sighash before calling.
-Keep private keys and durable one-use state in the signer.
+Before calling the signer for a child payment, verify the parent has reached
+the required confirmation depth and use the verified, unspent outpoint. Approve
+the transaction and sighash. Keep private keys and durable one-use state in
+the signer. If a version under a different txid confirms after signature
+disclosure, keep the key marked consumed. Any recovery spend must use an
+independent path available in the existing lock.
+[Recovering a child payment](../docs/security.md#recovering-a-child-payment)
 
 Apple Container uses host RPC port 18449 by default; set `LAMPORT_RPC_PORT` if
 occupied. Its node has no peers and is removed after testing. The Linux launcher

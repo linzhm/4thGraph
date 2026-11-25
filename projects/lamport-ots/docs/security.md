@@ -61,6 +61,59 @@ hashOutputs. The final native check enforces that binding, including the
 current outpoint and amount. Distinct scriptCode separates the ordinary
 and companion modes even where their BIP143 type bytes coincide.
 
+## Unconfirmed parent txids
+
+The txid of a BSV funding transaction includes the serialized unlocking scripts
+in all its inputs. Where the applicable rules accept alternate witness encodings,
+the same input outpoints and ordered outputs can confirm under a different txid.
+Any valid replacement that confirms under a different txid affects an existing child
+that spends a Lamport output. The child references the original `txid:vout`, and
+moving the spend to the confirmed outpoint changes the required signing digest.
+This applies to the legacy, universal, and committed payment profiles. If a
+replacement also changes transaction contents, verify that it still makes the
+intended payment.
+[Transaction serialization](../../../shared/transaction.py)
+
+Transactions spending the same inputs compete for those UTXOs. First-seen
+information and conflict notifications help monitor a pending parent. Confirm
+which version won in the wallet's trusted chain view.
+[BSV Node conflict detection](https://github.com/bitcoin-sv/bitcoin-sv/blob/v1.2.3/src/validation.cpp#L1380-L1389)
+· [ARC transaction statuses](https://github.com/bitcoin-sv/arc#metamorph-transaction-statuses)
+
+### Recovering a child payment
+
+Before passing a digest to the Lamport signer, obtain the funding transaction
+from a trusted chain view and verify that it meets the application's required
+confirmation depth. If the original version did not confirm, track its inputs
+or known competing txids to locate the confirmed transaction. Check the output
+index, amount, and locking script against the intended payment, and verify that
+the output remains unspent. If the outpoint changed, update the wallet's record
+and mark any child and descendants tied to the old outpoint stale. The same
+reconciliation applies after a chain reorganization.
+
+- If the signer still records the key as unused and no signature has been
+  disclosed, build and authorize the child using the confirmed outpoint, then
+  generate its unlocking script.
+- If a signature was already disclosed for the old outpoint, retain the
+  consumed-key record and stop that key's signing workflow. Signing the new
+  digest with that key would violate the one-time guarantee. Spending the
+  recovered output requires an independent path already authorized by the
+  locking script. If the script provides no such path, locating the output
+  may leave the wallet without a safe spend.
+
+Keep the original signed child for byte-for-byte rebroadcast while its funding
+outpoint is still valid. Apply the same confirmation check before signing each
+new link in a payment chain.
+
+### Unlocking script encodings
+
+The wallet emits a canonical unlocking script for the transaction it builds.
+With functional unlocking, different scripts can leave the same stack for the
+lock. Canonical stack values still leave room for different serialized bytes.
+Consensus and relay rules govern which encodings are accepted. A new lock with
+stricter stack-field checks would require its own script fingerprint and newly
+funded outputs.
+
 ## One-time means one disclosure, not one confirmed transaction
 
 Never use a key for two messages, two inputs, two UTXOs, fee replacements, alternate

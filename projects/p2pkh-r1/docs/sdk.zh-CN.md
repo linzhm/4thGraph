@@ -18,6 +18,11 @@
 
 混合输入或显式 NONE、SINGLE、ANYONECANPAY、OTDA 的应用，按协议层的输入授权接口构造每个输入。当前三种移植的高级付款接口仅提供上述普通路径。[Python 参考实现](../reference/wallet.py) 提供 `sign_spend(tx, index, parent, requested_type, pubkey, sign_digest, history_path)`。其他语言扩展该接口时，必须基于真实交易与前序输出生成消息，并从类型、输入索引、输出数量推导分支位。普通付款无需开放类型或分支开关。
 
+构造子交易时，调用签名回调前先从应用的可信链视图取得已确认的父交易 outpoint，
+按应用要求检查确认深度，核对输出索引、金额及锁定脚本，确认输出仍未花费。
+若实际确认的 txid 变了，先更新钱包记录的 outpoint 并重建子交易，再请求新的签名。
+[恢复子交易](./chronicle.md#恢复子交易)
+
 ## 正则与完整指纹
 
 1. 检查原始脚本恰为 **59,582 字节**。
