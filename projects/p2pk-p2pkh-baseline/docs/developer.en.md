@@ -34,6 +34,8 @@ Run the [offline reproduction command](../README.md#run) or use the [unified ben
 
 ## SDK and reference interfaces
 
+[TypeScript, Rust, Go and Python source SDKs](../sdk/README.md)
+
 Use the [Python fixture generator](../reference/script_lab.py) as a serialization and verification example. An application uses its own wallet and native signing stack for real transactions. The [fixture JSON](../template/baseline.json) gives complete parent and spend bytes, scripts and expected results for comparing application output.
 
 [Project run guide](../README.md#run) · [Pinned dependency guidance](../../../shared/benchmark.md)

@@ -34,6 +34,8 @@ P2PK 把压缩公钥写在锁里，花费时提供签名。P2PKH 在锁里放公
 
 ## SDK 与参考接口
 
+[TypeScript、Rust、Go 和 Python 源码 SDK](../sdk/README.zh-CN.md)
+
 [Python 夹具源码](../reference/script_lab.py)提供序列化和验签示例。实际集成使用原有钱包签名接口。[向量 JSON](../template/baseline.json)可用来逐项校验生成的父交易、花费交易和脚本。
 
 [复现命令](../README.zh-CN.md#复现与验收) · [统一依赖与运行口径](../../../shared/benchmark.zh-CN.md)
