@@ -43,6 +43,13 @@ The lock checks HASH160(Q), verifies the R1 signature, and binds the authorizati
 
 The wallet first constructs P from the actual spend and signature type, hashes P, and asks the owner's R1 key to sign that digest. The R1 check proves owner authorization. The separate native secp256k1 PUSHTX check uses the same digest and public construction parameters; the spender needs only the R1 private key. The node evaluates that native signature against its own transaction context, within the chosen signature coverage. [nChain PUSHTX implementation](https://github.com/nchain-innovation/zkscript_package/blob/fc20fb743edbc5bc5aba9d16625d50d1f50a3ef4/src/zkscript/transaction_introspection/transaction_introspection.py)
 
+## Unconfirmed funding
+
+For a child payment, use the funding outpoint verified in the application's
+trusted chain view after the required confirmation depth. An unconfirmed parent
+txid can change when the rules permit another encoding of its unlocking script.
+[Unconfirmed parent txids](./chronicle.md#unconfirmed-parent-txids)
+
 ## Signature coverage
 
 Each input chooses its own type. The template supports the ForkID BIP143 and Chronicle OTDA algorithms. Each accepts ALL, NONE and SINGLE, with or without ANYONECANPAY. The payment helper uses `0x41`. The `0x20` signature-type bit selects OTDA under the applicable Chronicle activation rules. [Chronicle release](https://docs.bsvblockchain.org/network-topology/nodes/sv-node/chronicle-release) · [Node serialization and digest selection](https://github.com/bitcoin-sv/bitcoin-sv/blob/6504a3aff65ba97c0f6c80962b033e35ecbfed4b/src/script/interpreter.cpp#L1894-L2124)

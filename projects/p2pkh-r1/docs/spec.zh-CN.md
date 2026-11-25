@@ -43,6 +43,12 @@ python generate_lock.py --owner-hash160 "${R1_OWNER_HASH160:?请设置收款公�
 
 钱包先从实际交易和签名类型构造 P，再计算摘要，由所有者用 R1 私钥签一次。R1 验签证明所有者授权。随后 secp256k1 PUSHTX 复用这个摘要，按公开参数构造原生签名，节点用它核对自己正在验证的交易上下文。花费者只需持有 R1 私钥。两项检查共同绑定的是所选 SIGHASH 承诺的字段。[nChain PUSHTX 实现](https://github.com/nchain-innovation/zkscript_package/blob/fc20fb743edbc5bc5aba9d16625d50d1f50a3ef4/src/zkscript/transaction_introspection/transaction_introspection.py)
 
+## 未确认的父交易输出
+
+签署子交易前，应从可信链视图核对父交易达到应用要求的确认深度，并使用实际确认的
+outpoint。允许不同解锁编码的规则可能导致未确认父交易的 txid 改变。
+[未确认父交易](./chronicle.md#未确认父交易)
+
 ## 签名覆盖范围
 
 每个输入独立选择类型。支持 ForkID 的 BIP143 与 Chronicle OTDA 两种算法，每种支持 ALL、NONE、SINGLE，各自可加 ANYONECANPAY。普通付款接口固定使用 `0x41`。Chronicle 的 `0x20` 位与节点激活规则共同决定 OTDA 路径。此选择位于签名类型中。[Chronicle](https://docs.bsvblockchain.org/network-topology/nodes/sv-node/chronicle-release) · [节点序列化与摘要](https://github.com/bitcoin-sv/bitcoin-sv/blob/6504a3aff65ba97c0f6c80962b033e35ecbfed4b/src/script/interpreter.cpp#L1894-L2124)

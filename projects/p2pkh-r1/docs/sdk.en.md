@@ -18,6 +18,12 @@ The three source SDKs construct the same locking scripts, recognize raw outputs,
 
 For mixed inputs or explicit NONE, SINGLE, ANYONECANPAY and OTDA, build each input through the protocol-layer authorization interface. The three ported high-level payment APIs implement the ordinary profile above. The [Python reference](../reference/wallet.py) exposes `sign_spend(tx, index, parent, requested_type, pubkey, sign_digest, history_path)`. A port of that interface must construct the message from the real transaction and authenticated prevout, deriving the selector from type, input position and output count. The ordinary payment API has no sighash or selector argument.
 
+For a child payment, obtain the confirmed funding outpoint from the
+application's trusted chain view before invoking the signing callback.
+Apply the application's confirmation threshold and recheck the output index,
+amount, and lock against that transaction.
+[Unconfirmed parent txids](./chronicle.md#unconfirmed-parent-txids)
+
 ## Regex and complete fingerprint
 
 1. Require exactly **59,582 bytes** of binary script.

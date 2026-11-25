@@ -61,6 +61,34 @@ hashOutputs. The final native check enforces that binding, including the
 current outpoint and amount. Distinct scriptCode separates the ordinary
 and companion modes even where their BIP143 type bytes coincide.
 
+## Unconfirmed parent txids
+
+The txid of a Lamport payment includes the serialized unlocking scripts in all
+its inputs. When the node rules allow alternate witness encodings, the same
+authorized payment can be confirmed under a different txid. A child spending
+that payment names the original outpoint, so confirmation under another txid
+invalidates the reference and changes the digest needed for a replacement.
+This applies to the legacy, universal, and committed payment profiles.
+[Transaction serialization](../../../shared/transaction.py)
+
+Before passing a digest to the Lamport signer, obtain the funding transaction
+from a trusted chain view and verify that it meets the application's required
+confirmation depth. Derive the child's outpoint from that confirmed transaction
+and verify the output index, amount, and script. Make this check before the
+callback discloses any one-time signature.
+
+If a signature was already released for a child and the parent confirms under
+a different txid, retain the consumed-key record and stop that key's signing
+workflow. Authorizing a replacement digest with the same key would violate
+the one-time guarantee. Recovery of the output depends on the spending paths
+committed at funding time. Keep the exact signed transaction bytes for
+rebroadcast when its original outpoint is still valid.
+
+The wallet emits a canonical unlocking script for the transaction it builds.
+Consensus and relay rules govern which encodings are accepted. A new lock with
+stricter stack-field checks would require its own script fingerprint and newly
+funded outputs.
+
 ## One-time means one disclosure, not one confirmed transaction
 
 Never use a key for two messages, two inputs, two UTXOs, fee replacements, alternate

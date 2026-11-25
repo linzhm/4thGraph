@@ -24,6 +24,7 @@ def _ensure_active(db, pubkey):
 def sign_spend(tx, index, parent, requested_type, pubkey, sign_digest, history_path, *, compress_otda=False):
     """Validate the parent and policy; call sign_digest(bytes32) -> raw r||s once.
 
+    The caller verifies the required funding confirmation in its chain view.
     Use one persistent history per wallet across restarts and signing processes.
     The callback must keep its output private until this function returns.
     Set compress_otda only when Chronicle functional unlocking is available.

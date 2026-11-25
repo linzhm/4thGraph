@@ -70,9 +70,10 @@ def current_input_unlock(auth, public_key, signature, *, committed=False):
 def sign_spend(tx, index, funding_raw, public_key, signer, *, sighash=DEFAULT_SIGHASH):
     """Authorize a prepared input. signer(digest32) returns a packed 8192-byte signature.
 
-    The caller authenticates funding, approves the transaction and requested mode,
-    and supplies an external signer that persists one-time key consumption before
-    disclosure. The callback is invoked once after preflight; it is never retried.
+    The caller authenticates the funding outpoint and verifies the required
+    confirmation depth before approving the transaction and requested mode.
+    The external signer persists one-time key consumption before disclosure.
+    The callback is invoked once after preflight.
     """
     if not 0 <= index < len(tx.inputs):
         raise ValueError('input index out of range')
