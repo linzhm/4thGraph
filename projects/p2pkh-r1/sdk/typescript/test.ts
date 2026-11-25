@@ -41,7 +41,7 @@ for (const [templateName, vectorName] of [
   ["candidates/compiled.hex", "candidates/spend-all.json"],
   ["candidates/scheduled.hex", "candidates/scheduled-spend-all.json"],
 ]) test(`ordinary payment from ${templateName} reproduces the signed transaction`, async () => {
-  const { signPayment } = await import("./payment.ts");
+  const { signPayment, signPaymentWithMessage } = await import("./payment.ts");
   const v = JSON.parse(fixture(vectorName));
   const template = Buffer.from(fixture(templateName).replace(/\s/g, ""), "hex");
   const q = Buffer.from(v.public_key_x963, "hex");
@@ -56,6 +56,12 @@ for (const [templateName, vectorName] of [
     assert.equal(digest.toString("hex"), v.digest_hex);
     return Buffer.from(v.signature_hex, "hex");
   });
+  const messageSigned = await signPaymentWithMessage(p, q, message => {
+    assert.deepEqual(message, createHash("sha256").update(Buffer.from(v.preimage_hex, "hex")).digest());
+    message.fill(0); // The callback's copy cannot change verification.
+    return Buffer.from(v.signature_hex, "hex");
+  });
+  assert.deepEqual(messageSigned, signed);
   assert.ok(signed.includes(Buffer.from(v.script_sig_hex, "hex")));
   const first = createHash("sha256").update(signed).digest();
   assert.equal(createHash("sha256").update(first).digest().reverse().toString("hex"), v.signed_txid);

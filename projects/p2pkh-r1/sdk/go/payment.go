@@ -50,6 +50,16 @@ func compactSize(n int) []byte {
 
 // SignPayment authorizes one input with ForkID ALL. The callback signs a digest once.
 func SignPayment(p Payment, publicKey []byte, signDigest func([32]byte) ([]byte, error)) ([]byte, error) {
+	if signDigest == nil {
+		return nil, errors.New("invalid payment")
+	}
+	return SignPaymentWithMessage(p, publicKey, func(message [32]byte) ([]byte, error) {
+		return signDigest(sha256.Sum256(message[:]))
+	})
+}
+
+// SignPaymentWithMessage passes SHA256(P) to a signer that applies SHA-256 internally.
+func SignPaymentWithMessage(p Payment, publicKey []byte, signMessage func([32]byte) ([]byte, error)) ([]byte, error) {
 	q := bytes.Clone(publicKey)
 	curve := elliptic.P256()
 	x, y := elliptic.Unmarshal(curve, q)
@@ -66,7 +76,7 @@ func SignPayment(p Payment, publicKey []byte, signDigest func([32]byte) ([]byte,
 	if !ok || !bytes.Equal(owner[:], h.Sum(nil)) {
 		return nil, errors.New("wrong funding lock")
 	}
-	if len(p.Outputs) == 0 || p.Fee < 0 || p.InputSatoshis < p.Fee || signDigest == nil {
+	if len(p.Outputs) == 0 || p.Fee < 0 || p.InputSatoshis < p.Fee || signMessage == nil {
 		return nil, errors.New("invalid payment")
 	}
 	balance := p.InputSatoshis - p.Fee
@@ -93,8 +103,9 @@ func SignPayment(p Payment, publicKey []byte, signDigest func([32]byte) ([]byte,
 	value := binary.LittleEndian.AppendUint64(nil, uint64(p.InputSatoshis))
 	pre := bytes.Join([][]byte{version, prevHash[:], seqHash[:], outpoint, {2, 0x68, 0xac},
 		value, sequence, outHash[:], locktime, {0x41, 0, 0, 0}}, nil)
-	digest := hash256(pre)
-	sig, err := signDigest(digest)
+	message := sha256.Sum256(pre)
+	digest := sha256.Sum256(message[:])
+	sig, err := signMessage(message)
 	if err != nil {
 		return nil, err
 	}
