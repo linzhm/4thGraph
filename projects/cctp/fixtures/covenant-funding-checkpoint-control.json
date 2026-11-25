@@ -1,0 +1,211 @@
+{
+  "scope": "Script binding control with one literal checkpoint digest per funding output. No on-chain checkpoint proof verification or token lineage.",
+  "verifier_lock_sha256": "a0d5caaf704bb2996871c8cc299a099cd9c977934d83ae146733a36a626dde88",
+  "verifier_lock_bytes": 449774,
+  "guard_lock_bytes": 773,
+  "confirmations": [
+    {
+      "payer": "02352bbf4a4cdd12564f93fa332ce333301d9ad40271f8107181340aef25be59d5",
+      "txid": "21b19e6b497f3a5c3fc5eb28c668e908b6dcf478e92be8da761515e0eaea8101",
+      "verifier_outpoint": "be7b95c64ef1ca962364e0a085af1eb3cae29b8ff018e089eb3745d75bb57257:0",
+      "guard_outpoint": "80561ea64514ef0a6e778b9772867a35c0fbb1e93f62a433f5fcbf733d2c4882:0",
+      "payment_bytes": 5870,
+      "verifier_funding_bytes": 449910,
+      "guard_funding_bytes": 907,
+      "payment_and_funding_bytes": 456687,
+      "input_witness_bytes": [
+        1078,
+        448,
+        2037,
+        2037
+      ],
+      "funding_transaction_bytes_in_guard_witness": 0,
+      "checkpoint_disclosure_bytes": 106
+    },
+    {
+      "payer": "03421f5fc9a21065445c96fdb91c0c1e2f2431741c72713b4b99ddcb316f31e9fc",
+      "txid": "4d0709a715bd15b4aa621a7a7762e83816e6970375653c94b390955580d28b05",
+      "verifier_outpoint": "aa6b8ee445c7e307279116706c4c154f91af256901c507332db14b1b5657bb26:0",
+      "guard_outpoint": "0bab868ecb3633944f0f179f0d1db2b1b3b0d548f7d8f1891c1732ad9ddfd266:0",
+      "payment_bytes": 5870,
+      "verifier_funding_bytes": 449910,
+      "guard_funding_bytes": 907,
+      "payment_and_funding_bytes": 456687,
+      "input_witness_bytes": [
+        1078,
+        448,
+        2037,
+        2037
+      ],
+      "funding_transaction_bytes_in_guard_witness": 0,
+      "checkpoint_disclosure_bytes": 106
+    }
+  ],
+  "rejections": {
+    "different_verifier": "sendrawtransaction: {'code': -26, 'message': '16: mandatory-script-verify-flag-failed (Script failed an OP_VERIFY operation)'}",
+    "different_guard": "sendrawtransaction: {'code': -26, 'message': '16: mandatory-script-verify-flag-failed (Script failed an OP_EQUALVERIFY operation)'}",
+    "different_holder": "sendrawtransaction: {'code': -26, 'message': '16: mandatory-script-verify-flag-failed (Script evaluated without error but finished with a false/empty top stack element)'}",
+    "different_proof": "sendrawtransaction: {'code': -26, 'message': '16: mandatory-script-verify-flag-failed (Script failed an OP_NUMEQUALVERIFY operation)'}",
+    "same_lock_different_outpoint": "sendrawtransaction: {'code': -26, 'message': '16: mandatory-script-verify-flag-failed (Script failed an OP_VERIFY operation)'}",
+    "different_midstate": "sendrawtransaction: {'code': -26, 'message': '16: mandatory-script-verify-flag-failed (Script failed an OP_VERIFY operation)'}"
+  },
+  "confirmation_timings": {
+    "setup": {
+      "chain_gang_seconds": 0.002043333020992577,
+      "node_submission_seconds": 0.0701333750039339,
+      "node_mining_and_confirmation_seconds": 0.09496912499889731
+    },
+    "wallet-coins": {
+      "chain_gang_seconds": 0.00015287497080862522,
+      "node_submission_seconds": 0.005975084030069411,
+      "node_mining_and_confirmation_seconds": 0.03742270800285041
+    },
+    "alice-verifier": {
+      "chain_gang_seconds": 0.0007261249702423811,
+      "node_submission_seconds": 0.04279529198538512,
+      "node_mining_and_confirmation_seconds": 0.057647541048936546
+    },
+    "alice-guard": {
+      "chain_gang_seconds": 0.00013166700955480337,
+      "node_submission_seconds": 0.10381962498649955,
+      "node_mining_and_confirmation_seconds": 0.20689204207155854
+    },
+    "alice-holder-2": {
+      "chain_gang_seconds": 0.00014729192480444908,
+      "node_submission_seconds": 0.12362541700713336,
+      "node_mining_and_confirmation_seconds": 0.10805662500206381
+    },
+    "alice-holder-3": {
+      "chain_gang_seconds": 0.00013745902106165886,
+      "node_submission_seconds": 0.10224587505217642,
+      "node_mining_and_confirmation_seconds": 0.28207049996126443
+    },
+    "different-verifier": {
+      "chain_gang_seconds": 0.0006941669853404164,
+      "node_submission_seconds": 0.32858154200948775,
+      "node_mining_and_confirmation_seconds": 0.18686787493061274
+    },
+    "same-lock-different-outpoint": {
+      "chain_gang_seconds": 0.00021608301904052496,
+      "node_submission_seconds": 0.08062166697345674,
+      "node_mining_and_confirmation_seconds": 0.10662616707850248
+    },
+    "alice-probe": {
+      "chain_gang_seconds": 0.052866167039610445,
+      "node_submission_seconds": 0.5184437499847263,
+      "node_mining_and_confirmation_seconds": 0.05235695804003626
+    },
+    "bob-verifier": {
+      "chain_gang_seconds": 0.0007411669939756393,
+      "node_submission_seconds": 0.06620816700160503,
+      "node_mining_and_confirmation_seconds": 0.04198225005529821
+    },
+    "bob-guard": {
+      "chain_gang_seconds": 0.00012637500185519457,
+      "node_submission_seconds": 0.04980716702993959,
+      "node_mining_and_confirmation_seconds": 0.3686853749677539
+    },
+    "bob-holder-2": {
+      "chain_gang_seconds": 0.00016345898620784283,
+      "node_submission_seconds": 0.012911790981888771,
+      "node_mining_and_confirmation_seconds": 0.655887334025465
+    },
+    "bob-holder-3": {
+      "chain_gang_seconds": 0.00013358297292143106,
+      "node_submission_seconds": 0.05964083306025714,
+      "node_mining_and_confirmation_seconds": 0.6069069169461727
+    },
+    "bob-probe": {
+      "chain_gang_seconds": 0.0876640829956159,
+      "node_submission_seconds": 0.7239969169022515,
+      "node_mining_and_confirmation_seconds": 0.0615580000448972
+    }
+  },
+  "node": "/Bitcoin SV:1.2.3/",
+  "transactions": {
+    "setup": {
+      "txid": "eba36462fe052c5daf26b77b886c87b927ab6453fa1fdb79f19664872a201e9f",
+      "blockhash": "3d55ac2501490652785999c336fffaed57eeea525e664b24cd45006c92a0e7c6",
+      "height": 102,
+      "bytes": 233
+    },
+    "wallet-coins": {
+      "txid": "0d210a6f7dc55c52bed7183a55800481b61400f941fdf4a731fc3793be3a4bac",
+      "blockhash": "1937ad617e340af9a113f292a4edb7c8738ceb636e4658e9460a48b3245e7a4f",
+      "height": 103,
+      "bytes": 403
+    },
+    "alice-verifier": {
+      "txid": "be7b95c64ef1ca962364e0a085af1eb3cae29b8ff018e089eb3745d75bb57257",
+      "blockhash": "2f86e7f995666b50678928080b0291e14b07cc7f7f125a06c262fd0dd38c7ad0",
+      "height": 104,
+      "bytes": 449910
+    },
+    "alice-guard": {
+      "txid": "80561ea64514ef0a6e778b9772867a35c0fbb1e93f62a433f5fcbf733d2c4882",
+      "blockhash": "298c9b62dac6377b3c123689a6ed5074f589232913710aa67a90d16001fde57b",
+      "height": 105,
+      "bytes": 907
+    },
+    "alice-holder-2": {
+      "txid": "84fa20769a1c5775e985913ba1b6d6487f5ee947fd97425e808c27c16e5e7927",
+      "blockhash": "0fe33dee122bf0e5b4e33b828e71b99c191f8c09266f58759c05fb46f492977d",
+      "height": 106,
+      "bytes": 881
+    },
+    "alice-holder-3": {
+      "txid": "3fca580aae4c0c008ba5018da86968c225ed7fa66da34b5df62f8386b5bc420e",
+      "blockhash": "50bcbf10addc338893abd756bf9dad559832dfe37609be9b81234718f8641054",
+      "height": 107,
+      "bytes": 881
+    },
+    "different-verifier": {
+      "txid": "3c6c45d049a35c140715f1349561532f50fc0eb1475568ac2ffdb23db8e83da3",
+      "blockhash": "284bc2e08941b899dfacdccacde276e7cb6e382532cbd2091bcceea05e8958c7",
+      "height": 108,
+      "bytes": 61
+    },
+    "same-lock-different-outpoint": {
+      "txid": "c440a76d894d1617d4e72493b1f9a6ecb345202a11cb9c5f31a59c97536ce740",
+      "blockhash": "04b4613774f67cf36725dcdbacc8274039955128852d922915680fa9635d484a",
+      "height": 109,
+      "bytes": 449838
+    },
+    "alice-probe": {
+      "txid": "21b19e6b497f3a5c3fc5eb28c668e908b6dcf478e92be8da761515e0eaea8101",
+      "blockhash": "33d340fbc7dffbcca4a5ba7e891b237f7113eb815568a3d65a631d52229267fc",
+      "height": 110,
+      "bytes": 5870
+    },
+    "bob-verifier": {
+      "txid": "aa6b8ee445c7e307279116706c4c154f91af256901c507332db14b1b5657bb26",
+      "blockhash": "34fcd137183c612904262dcff2f9b20da5065e1b1afdb5ad4c2a48a498f2bdef",
+      "height": 111,
+      "bytes": 449910
+    },
+    "bob-guard": {
+      "txid": "0bab868ecb3633944f0f179f0d1db2b1b3b0d548f7d8f1891c1732ad9ddfd266",
+      "blockhash": "3faacf4ba00104dc32a615830daf612626904cce13bf7039b45d1451b74c41e5",
+      "height": 112,
+      "bytes": 907
+    },
+    "bob-holder-2": {
+      "txid": "7957d4f346554881cdeadfbe944d37b94db89fd77d4bd6763b28318a836473ef",
+      "blockhash": "60e41540aac2a46762e49edfc99b9fbff5c49f172ac6700c5792b7d5672f11bd",
+      "height": 113,
+      "bytes": 881
+    },
+    "bob-holder-3": {
+      "txid": "03b26d0646c5e02cd51cf18ace5c254b667318fdf3d407a594d37277269625ab",
+      "blockhash": "283ab8156ff6d5391dea84c7b7c31f4000153b6bd67eb7341f3df564c1f90aef",
+      "height": 114,
+      "bytes": 881
+    },
+    "bob-probe": {
+      "txid": "4d0709a715bd15b4aa621a7a7762e83816e6970375653c94b390955580d28b05",
+      "blockhash": "683226eb42c4088a33581f5f3886ca068dafb2010e2ea9b403f863421d4c1054",
+      "height": 115,
+      "bytes": 5870
+    }
+  }
+}

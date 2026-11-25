@@ -1,0 +1,57 @@
+{
+  "scope": "Host RISC Zero receipt verification for the two actual archived funding outpoints.",
+  "image_id": "dcc937fa5584eb70d31bcef5686f88f038ff133d95bf3f0398e9cbb39b92bf07",
+  "guest_binary_sha256": "10e589dfc6520f6beae6907ceb36a4401974b50f78f90f9c107e605c18402627",
+  "approved_verifier_script_field_sha256": "fcb1164d3478fc51ab9841a2dfb6dc9b7f7ba39678238ea4867affcac6e881c9",
+  "fundings": [
+    {
+      "source_spend_txid": "4ca77ee9085b525b36743ec2536071196fc8b4ec6d05588dfe3536ec6cc7c9ef",
+      "actual_verifier_outpoint": "a701b70ffed7d53f2b5dcff6b699501f27958fbebcc1175336ecea53972113e5:0",
+      "funding_bytes": 449910,
+      "output_count_offset": 118,
+      "satoshis": 400000,
+      "processed_bytes": 449856,
+      "midstate": "92dfed08ed47fa669a9996300f4b23622ac27fd4bda009a0c4643be358e977f9",
+      "suffix": "6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d5100000000",
+      "checkpoint_bytes": 106,
+      "statement_digest": "b76d6844c9f7a7b7648dbfd07b056827271c58f85cbcf012ed31e5c91f40a459",
+      "prove_wall_seconds": 739.97,
+      "native_verify_seconds": 0.013381,
+      "receipt_bytes": 223290,
+      "receipt_sha256": "660f7cda242dcaad75a1068324ad2c7884c9154ce0b72755eb227175e32bfcf0",
+      "peak_rss_bytes": 10698981376,
+      "receipt_archive": "covenant-funding-checkpoint-stark-alice.receipt.xz"
+    },
+    {
+      "source_spend_txid": "ec679aacc2e97e04a573c713611f5f393b35eec8a7f8246d8d7c31f3d3a2cfed",
+      "actual_verifier_outpoint": "dd51f666fc1d408b1126e57c8ece4a9d938516ecc7525113758b95dd7692e878:0",
+      "funding_bytes": 449910,
+      "output_count_offset": 118,
+      "satoshis": 400000,
+      "processed_bytes": 449856,
+      "midstate": "56a70ab410024f501b74913252ddc1f94e74b0a2d7bd99f311d18af916e21ecb",
+      "suffix": "6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d5100000000",
+      "checkpoint_bytes": 106,
+      "statement_digest": "d8ec0ed3f3002cc8e649304607e826f11a0472fa69bb1b287c930b2c7887fb48",
+      "prove_wall_seconds": 715.29,
+      "native_verify_seconds": 0.01322,
+      "receipt_bytes": 223290,
+      "receipt_sha256": "f5cd09e2f67c1eec570a0e179d569d4f190ed3f13b4ebc0445b790ea93646369",
+      "peak_rss_bytes": 10625974272,
+      "receipt_archive": "covenant-funding-checkpoint-stark-bob.receipt.xz"
+    }
+  ],
+  "rejections": {
+    "different_actual_verifier": "Error: \"receipt proves a different checkpoint digest\"",
+    "replay_with_other_funding_data": "Error: \"receipt proves a different checkpoint digest\"",
+    "wrong_vout": "Error: \"receipt proves a different checkpoint digest\"",
+    "wrong_lock": "Error: \"receipt proves a different checkpoint digest\"",
+    "wrong_state": "Error: \"receipt proves a different checkpoint digest\"",
+    "wrong_suffix": "Error: \"receipt proves a different checkpoint digest\"",
+    "wrong_output_boundary": "Error: \"receipt proves a different checkpoint digest\"",
+    "wrong_value": "Error: \"receipt proves a different checkpoint digest\"",
+    "wrong_total_length": "Error: \"receipt proves a different checkpoint digest\"",
+    "noncanonical_input_compact_size": "guest rejected before producing a receipt"
+  },
+  "prover": "risc0-r0vm 3.1.0 on Apple M1 Max"
+}

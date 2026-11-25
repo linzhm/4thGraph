@@ -70,6 +70,23 @@ Alice 与 Bob 各自从普通 BSV 钱包输入创建验证器资金及伴随资�
 
 验证器资金原文还在每笔花费的伴随输入里出现一次。若把同样的披露接进代币付款，后继 Groth16 必须对约 456 KB 的实际父交易重算 txid。以实测组件和当前 4,075 字节付款相比，多约 7,065 个 SHA-256 块。按[既有分块探针](../recursion/parentbinding/README.md)的斜率，单个这样的父交易就约增加 2.49 亿条约束。这是规模外推。现有 4,075 字节布局无法使用这类父交易。开放续补与代币溯源的联合两代验收仍待完成，续补组件两个等长样本也没有发生代币继承。
 
+## 验证器资金的认证中间态
+
+证明从定稿资金原文读取唯一的规范 TxOut，认证输出计数位置、金额和含 CompactSize 的锁字段哈希。程序由标准 SHA-256 IV 算到最后一个整块边界，再以真实总长度填充剩余字节并算出 SHA256d。公开摘要同时承诺资金 `txid:vout`、锁字段哈希、金额、输出边界、总长度、整块长度、中间态和后缀摘要。伴随 Script 对实际 `vin 1` 做 ForkID ALL 交易绑定，从已认证的 prevouts 取 `vin 0`，用锁内批准的锁字段哈希重建同一公开摘要。 [出证关系](../recursion/parentbinding/risczero/benchmark/src/bin/funding-checkpoint-guest.rs) · [Script 与披露编码](../recursion/funding_checkpoint.py)
+
+| 资金认证组件，每笔 | BSV 资金原文 | BSV 中间态对照 |
+|---|---:|---:|
+| 资金原文进入见证 | 449,910 B | 0 B |
+| 中间态、必要字段和后缀 | 0 B | 106 B |
+| 花费原文 | 456,237 B | 5,870 B |
+| 两笔专用资金及花费 | 906,993 B | 456,687 B |
+
+独立 BSV Node 1.2.3 以写入各自伴随锁的摘要为准确认两个组件花费。它拒绝了锁字节完全相同的另一出资 outpoint，也拒绝了改变中间态后重新签名的花费。另一个组件试验让宿主验证对原开放续补归档中实际 `vin 0` 的 STARK 收据。收据替换到另一真实资金 outpoint、改变 `vout`、锁字段哈希、金额、输出边界、总长度、中间态或后缀都会被宿主拒绝。入块字节表没有计入收据及链上 ZKP 验证器。 [BSV 对照摘要](../fixtures/covenant-funding-checkpoint-control.json) · [BSV 对照交易和区块](../fixtures/covenant-funding-checkpoint-control-regtest.json.xz)
+
+RISC Zero 3.1.0 在 Apple M1 Max 对两笔各 449,910 字节的资金交易出证，分别耗时 **739.97 秒**和 **715.29 秒**。两份 succinct 收据各 **223,290 字节**，宿主验真约 13 毫秒，进程峰值 RSS 约 10.7 GB。非规范 CompactSize 的原文在解析时被拒绝。 [证明结果和公开输入](../fixtures/covenant-funding-checkpoint-stark.json) · [Alice 收据](../fixtures/covenant-funding-checkpoint-stark-alice.receipt.xz) · [Bob 收据](../fixtures/covenant-funding-checkpoint-stark-bob.receipt.xz)
+
+开放续补还需要由代币锁认证实际执行的伴随策略，并使该策略直接检查已证明的摘要。仅把可替换的收据验证器放到另一个自由创建的 UTXO，会再次需要认证那个 UTXO 的真实锁身份。把当前 223 KB 的收据直接放进付款，还会让下一手的父交易超出现有 Groth16 电路的 4,075 B 布局。当前两项试验未组成新的两代代币付款。
+
 ## 复现
 
 从仓库根目录使用装有 chain-gang 的 Python，设置 `PYTHONPATH=.:projects/groth16/reference:projects/cctp/reference:projects/cctp/recursion`。运行节点采用无对等连接的 BSV regtest，启用 txindex，Genesis 和 Chronicle 分别设为高度 1 和 2。创建验证器的交易需要允许约 1 MB 的交易以及相应的脚本策略。
@@ -93,3 +110,15 @@ python3 projects/cctp/recursion/run_open_verifier_funding_regtest.py \
   --proof projects/cctp/fixtures/covenant-provenance-alice-proof.json \
   --out "$cctp_run/open-funding.json"
 ```
+
+中间态 BSV 对照另起一个全新节点，并给同一命令加 `--pinned-checkpoint-control`。STARK 使用[同一套 3.1.0 工具链](../recursion/parentbinding/risczero/benchmark/README.md)，构建 guest 时使用 `--bin funding-checkpoint-guest`，再经 `checkpoint-image` 转为 `$cctp_image`。
+
+```sh
+python3 projects/cctp/recursion/compare_funding_checkpoint_stark.py \
+  --archive projects/cctp/fixtures/covenant-open-funding-regtest.json.xz \
+  --r0vm "$CCTP_R0VM" --guest "$cctp_image" --verify "$cctp_checkpoint_verify" \
+  --lock-field-sha256 fcb1164d3478fc51ab9841a2dfb6dc9b7f7ba39678238ea4867affcac6e881c9 \
+  --out "$cctp_run/funding-stark"
+```
+
+复核归档收据时，用 `xz -dc` 还原收据，向 `checkpoint-verify` 传入收据路径、结果文件中的 `image_id` 及对应的 `statement_digest`。结果文件的 `receipt_sha256` 对应解压后的字节。
