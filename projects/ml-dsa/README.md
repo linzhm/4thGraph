@@ -95,3 +95,15 @@ The SHAKE measurements fix the input and output lengths at compile time.
 The fixed-key equation accepts packed challenge and response coefficients and
 produces four canonical residual polynomials. The arithmetic and SHAKE scripts
 are also independently replayable. [Deterministic fixture](template/deterministic.json)
+
+### Signed-residue NTT experiment
+
+`transform_script(signed_residues=True)` keeps intermediates as signed
+representatives of the field and restores canonical coefficients before
+serialization. The forward transform measures 38,454 bytes and the inverse
+40,940 bytes. The fixed-key equation measures 452,154 bytes for the same
+fixture, down from 500,794. Independent polynomial evaluation and complete
+input replay check the canonical result, including zero and alternating
+field-boundary coefficients. This experiment lives at the arithmetic
+kernel boundary. Full payment and external signature conformance use the
+canonical verifier.

@@ -104,3 +104,73 @@ encodings. Other sighash types and version 1 use literal preimages.
 The test runner verifies complete payments with BSV Node 1.2.3 and
 chain-gang. Candidate support across the other SDKs and miner relay policy
 require separate validation.
+
+### Shared-kernel reconstruction candidate
+
+Use `compress_otda="shared-kernels"` to select the prebuilt 3,921-byte
+reconstruction program. It caches point addition and doubling byte sequences
+on the stack before assembling the fixed output script. The resulting preimage
+and raw P-256 signature are identical to those from the 5,825-byte reconstruction.
+The transaction still uses the 47,510-byte full-mode output template.
+
+| Chronicle OTDA ALL with 2 R1 inputs and 2 R1 outputs | Previous | Shared kernels |
+| --- | ---: | ---: |
+| Unlock per input | 6,176 B | 4,272 B |
+| Full transaction | 107,490 B | 103,682 B |
+| Extra R1 input | 6,342 B | 4,438 B |
+| Extra R1 output | 47,601 B | 47,601 B |
+
+The reference checks byte-for-byte stack equality, two independent engines
+and the version 1 and other-mode fallbacks. The TypeScript, Rust and Go SDKs
+recognize the compiled lock and replay its deterministic ForkID ALL vector
+with the existing signer callback. The Python reference provides the complete
+sighash and reconstruction experiments.
+
+### Signature-mode sizing experiment
+
+The compiled universal lock measures 47,510 bytes. With the same curve
+arithmetic, the ForkID-only experiment measures 47,262 bytes and the
+OTDA-only experiment 47,480 bytes. The savings are 248 and 30 bytes per
+output, respectively. The fixture checks each family's allowed modes
+and the other family's rejection, including unpaired SINGLE. These figures
+support keeping the full-mode template for the SDK candidate.
+
+### Scheduled full-mode candidate
+
+Pass `--scheduled-curve` to `generate_lock.py` or use
+`compiled_curve="scheduled"` with the Python lock constructors.
+The [scheduled layout](../template/candidates/scheduled-layout.json) fixes
+the 46,302-byte template and its 3,913-byte reconstruction program.
+The owner HASH160 occupies the same 20-byte field. The Python, TypeScript,
+Rust and Go SDKs recognize the prebuilt template. The three non-Python
+SDKs replay its [ForkID ALL payment vector](../template/candidates/scheduled-spend-all.json)
+with their ordinary signer callbacks.
+
+In the Python reference wallet, `sign_spend(..., compress_otda="paired")`
+enables reconstruction with version 2 Chronicle OTDA ALL and with paired
+OTDA SINGLE (`0x63` and `0xe3`). SINGLE reconstructs the same-index output
+and preserves the preceding null outputs in the preimage. Version 1,
+unpaired SINGLE, and unrecognized outputs use their existing encodings.
+The wallet passes the original digest to the signer and includes the returned
+signature bytes in the witness. For version 2 OTDA ALL, the 47,510-byte
+compiled and 46,302-byte scheduled templates can share an unlocking script.
+The wallet compares a single-template program, a program containing both
+templates and the literal preimage by encoded byte count. Outputs are
+recreated in their signed order. Other scripts in the transaction are
+copied literally.
+
+| 2 R1 inputs and 2 R1 outputs | Transaction | Extra R1 input | Extra R1 output |
+| --- | ---: | ---: | ---: |
+| OTDA ALL | 101,250 B | 4,430 B | 46,393 B |
+| OTDA SINGLE | 101,179 B | 455 B | 46,313 B |
+
+The extra SINGLE input in the comparison has no same-index output. The
+acceptance tests verify individual output binding, full replays with both
+engines, byte-for-byte witness stack equivalence, and the existing 1,296-case
+authorization matrix for the scheduled lock.
+
+With one compiled and one scheduled R1 output and two R1 inputs, OTDA ALL
+takes 110,302 bytes using both templates. Reconstructing only one template
+takes 195,028 bytes. The added-input and added-output costs from this shape
+are 8,352 and 46,393 bytes, respectively. The extra output uses the scheduled
+template.

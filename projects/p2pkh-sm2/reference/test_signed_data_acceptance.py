@@ -634,7 +634,7 @@ class SignedDataAcceptance(SignedDataFixtures):
                 (lambda: signed_data_signer(lambda *_: envelope, self.key, signer_identifier=sid)(MESSAGE, USER_ID), self.raw_direct),
             )
             for index, (check, expected) in enumerate(checks):
-                with self.subTest(size=len(serial), entry_point=index):
+                with self.subTest(size=len(serial), sign_padding=serial[0] == 0, entry_point=index):
                     if accepted:
                         self.assertEqual(check(), expected)
                     else:
@@ -1023,14 +1023,15 @@ class SignedDataAcceptance(SignedDataFixtures):
         self.assertEqual(accepted, set(product(axes[0], allowed, allowed, ('absent', 'valid'))))
         self.assertEqual(len(accepted), 36)
 
-        for field, tag, member in (
-            ('certificates', 0xa0, der(0x30, b'')),
-            ('certificates', 0xa0, crl),
-            ('crls', 0xa1, der(0x30, b'')),
-            ('crls', 0xa1, cert),
+        for field, tag, member, reason in (
+            ('certificates', 0xa0, der(0x30, b''), 'empty sequence'),
+            ('certificates', 0xa0, crl, 'CRL in certificate set'),
+            ('crls', 0xa1, der(0x30, b''), 'empty sequence'),
+            ('crls', 0xa1, cert, 'certificate in CRL set'),
         ):
-            with self.subTest(wrong_schema=field), self.assertRaisesRegex(ValueError, 'invalid SignedData ' + field):
-                self.apply_adapter(signed_data(self.signatures['direct'], metadata=der(tag, member)))
+            with self.subTest(wrong_schema=field, reason=reason):
+                with self.assertRaisesRegex(ValueError, 'invalid SignedData ' + field):
+                    self.apply_adapter(signed_data(self.signatures['direct'], metadata=der(tag, member)))
         COMPLETED_WITNESSES.add('metadata')
 
         issued = load_der_x509_crl(crl)
@@ -1447,19 +1448,26 @@ class SignedDataReview(SignedDataFixtures):
                 body = build(der(0x30, private_extension), version=b'')
                 self.check_extension_envelope(tag, body, algorithm, 'extensions require')
 
-        self.check_extension_envelope(0xa0, cert_core, cert_algorithm)
-        self.check_extension_envelope(0xa1, crl_core, crl_algorithm)
         v2_certificate = b'\xa0\x03\x02\x01\x01' + cert_core
         issuer_id = der(0x81, b'\x00\xff')
         subject_id = der(0x82, b'\x01\x80')
-        self.check_extension_envelope(0xa0, v2_certificate + issuer_id + subject_id, cert_algorithm)
-        self.check_extension_envelope(0xa0, v2_certificate + der(0xa3, der(0x30, private_extension)),
-                                      cert_algorithm, 'certificate extensions require v3')
-        self.check_extension_envelope(0xa0, b'\xa0\x03\x02\x01\x00' + cert_core,
-                                      cert_algorithm, 'omitted v1 default')
-        self.check_extension_envelope(0xa0, cert_core + der(0x81, b'\x00\xff'),
-                                      cert_algorithm, 'unique identifiers require v2 or v3')
-        self.check_extension_envelope(0xa1, b'\x02\x01\x00' + crl_core, crl_algorithm, 'omitted v1 version')
+        version_cases = (
+            ('implicit v1 certificate', 0xa0, cert_core, cert_algorithm, None),
+            ('implicit v1 CRL', 0xa1, crl_core, crl_algorithm, None),
+            ('v2 certificate with unique IDs', 0xa0, v2_certificate + issuer_id + subject_id,
+             cert_algorithm, None),
+            ('v2 certificate with extensions', 0xa0,
+             v2_certificate + der(0xa3, der(0x30, private_extension)),
+             cert_algorithm, 'certificate extensions require v3'),
+            ('explicit v1 certificate', 0xa0, b'\xa0\x03\x02\x01\x00' + cert_core,
+             cert_algorithm, 'omitted v1 default'),
+            ('v1 certificate with unique ID', 0xa0, cert_core + issuer_id,
+             cert_algorithm, 'unique identifiers require v2 or v3'),
+            ('explicit v1 CRL', 0xa1, b'\x02\x01\x00' + crl_core, crl_algorithm, 'omitted v1 version'),
+        )
+        for name, tag, body, algorithm, error in version_cases:
+            with self.subTest(version_case=name):
+                self.check_extension_envelope(tag, body, algorithm, error)
         COMPLETED_WITNESSES.add('x509_extensions')
 
     def test_schema_aware_der_for_signed_and_unsigned_attributes(self):
@@ -1747,6 +1755,7 @@ class SignedDataReview(SignedDataFixtures):
                      for time, number, base in product(times, (1, 2, 3), (None, 0))}
         rows = tuple(product((None, 0), (None, 0), times, (1, 2, 3)))
         self.assertEqual(len(rows), 36)
+        visited = set()
         for first_role, second_role, second_time, second_number in rows:
             first = revisions[times[1], 2, first_role]
             second = revisions[second_time, second_number, second_role]
@@ -1757,15 +1766,20 @@ class SignedDataReview(SignedDataFixtures):
             elif (second_time > times[1] and second_number <= 2
                   or second_time < times[1] and second_number >= 2):
                 error = 'CRL numbers must increase with thisUpdate'
-            for first_input, second_input in ((first, second), (second, first)):
+            orders = ((first, second),) if first == second else ((first, second), (second, first))
+            for reverse, (first_input, second_input) in enumerate(orders):
+                row = (first_role, second_role, second_time, second_number, bool(reverse))
+                self.assertNotIn(row, visited)
+                visited.add(row)
                 with self.subTest(first_role=first_role, second_role=second_role,
-                                  second_time=second_time, second_number=second_number, reverse=first_input != first):
+                                  second_time=second_time, second_number=second_number, reverse=bool(reverse)):
                     if error is None:
                         validate_crl_series(iter((first_input, second_input)))
                     else:
                         with self.assertRaisesRegex(ValueError, error):
                             validate_crl_series(iter((first_input, second_input)))
 
+        self.assertEqual(len(visited), 70)  # A pair of identical inputs has only one order.
         release = issue(times[2], 3, base=0)
         earlier_1 = issue(times[0], 1)
         earlier_2 = issue(times[1], 2)

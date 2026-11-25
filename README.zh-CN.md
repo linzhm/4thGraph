@@ -129,3 +129,8 @@ Linux x86-64 用 `bash projects/lamport-ots/reference/verify.sh`，Apple Contain
 ## 仓库结构
 
 每个项目在 `projects/<name>/` 下维护规范、参考实现和测试向量。P2PKH-R1 还提供 TypeScript、Rust 和 Go SDK。共用的脚本编码、交易序列化和节点验证启动器见 [`shared/`](shared/README.md)。
+
+## 跨项目交易基准
+
+对照七个项目的完整签名交易、输入输出边际成本和付款生命周期。
+[运行基准与验收](shared/benchmark.zh-CN.md)

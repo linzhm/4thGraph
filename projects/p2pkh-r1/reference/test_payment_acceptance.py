@@ -44,6 +44,9 @@ class PaymentAcceptanceTests(unittest.TestCase):
     def test_compiled_curve_complete_input_acceptance_domain(self):
         self.check_complete_input_acceptance_domain(compiled_curve=True)
 
+    def test_scheduled_curve_complete_input_acceptance_domain(self):
+        self.check_complete_input_acceptance_domain(compiled_curve="scheduled")
+
     def check_complete_input_acceptance_domain(self, *, compiled_curve):
         owner_key, owner_public, owner_hash = signer(7)
         wrong_key, _, _ = signer(19)
@@ -117,7 +120,7 @@ class PaymentAcceptanceTests(unittest.TestCase):
         self.assertEqual(accepted, {"genesis": 80, "chronicle-old": 180, "chronicle-new": 180})
 
     def test_rejects_nonconforming_witnesses_in_each_path(self):
-        for compiled_curve in (False, True):
+        for compiled_curve in (False, True, "scheduled"):
             with self.subTest(compiled_curve=compiled_curve):
                 self.check_nonconforming_witnesses(compiled_curve=compiled_curve)
 

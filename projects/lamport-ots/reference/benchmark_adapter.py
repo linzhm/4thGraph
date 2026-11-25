@@ -1,0 +1,23 @@
+"""Compare both Lamport payment templates with separate one-time test keys."""
+from fixtures import test_secret
+from lamport import OneTimeSigner
+from payment import sign_spend
+from script import committed_locking_script, locking_script
+from shared.benchmark_cases import Coin, Template
+from shared.transaction import Output
+from shared.one_time_signer import durable_signer
+
+
+def coin(label, value, *, committed=False):
+    signer = OneTimeSigner(test_secret(label.encode()))
+    factory = committed_locking_script if committed else locking_script
+
+    def unlock(tx, index, parent, flag, scratch):
+        sign = durable_signer(scratch / "one-time-keys.db", 'lamport-ots-sha256', signer.public_key, signer.sign)
+        return sign_spend(tx, index, parent.serialize(), signer.public_key, sign, sighash=flag)
+
+    return Coin(Output(value, factory(signer.public_key)), unlock)
+
+
+TEMPLATES = {"full-key": Template(coin),
+             "committed-key": Template(lambda label, value: coin(label, value, committed=True))}

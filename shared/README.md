@@ -12,3 +12,6 @@
 - `chain_gang.py` verifies complete inputs at explicit Chronicle heights. The [regression record](chronicle-regression.md) includes the dependency pin and results.
 
 Cryptographic parameters, identity policy, witness format and authorization coverage belong to each project. This directory is not a new consensus engine.
+
+- [Signed transaction benchmark](benchmark.md) and [简体中文](benchmark.zh-CN.md) describe
+  the cross-project cost, acceptance, and funded regtest reports.

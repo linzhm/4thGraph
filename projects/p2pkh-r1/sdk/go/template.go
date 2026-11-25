@@ -11,15 +11,22 @@ import (
 	"golang.org/x/crypto/ripemd160"
 )
 
-const size, start, end = 59582, 208, 228
-const fingerprint = "2129d374594069d08a9b2127555f48ea21c75fb06d1ad5e77c68ad251e97f784"
+const start, end = 208, 228
 
 var header = regexp.MustCompile("^760052a569766b7c8201[0-9a-f]{396}([0-9a-f]{40})$")
 
 // Recognize accepts raw script bytes starting at the first opcode.
 func Recognize(script []byte) ([20]byte, bool) {
 	var owner [20]byte
-	if len(script) != size {
+	var fingerprint string
+	switch len(script) {
+	case 59582:
+		fingerprint = "2129d374594069d08a9b2127555f48ea21c75fb06d1ad5e77c68ad251e97f784"
+	case 47510:
+		fingerprint = "2c514b452c30fe908bfb59a5b630ec4402c5f356717c1235ffa75c0c1df8e208"
+	case 46302:
+		fingerprint = "52a1d9eb9e236403c66e845e18cf31d9c3a5f4c2e0ed7ca0270a60ba4e867ca6"
+	default:
 		return owner, false
 	}
 	match := header.FindStringSubmatch(hex.EncodeToString(script[:end]))

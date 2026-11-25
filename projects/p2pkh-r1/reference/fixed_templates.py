@@ -30,8 +30,9 @@ class CompiledTemplate:
 
 
 @cache
-def _layout():
-    return json.loads((TEMPLATE_DIRECTORY / "layout.json").read_text(encoding="ascii"))
+def _layout(*, scheduled=False):
+    file = "scheduled-layout.json" if scheduled else "layout.json"
+    return json.loads((TEMPLATE_DIRECTORY / file).read_text(encoding="ascii"))
 
 
 def _load_bytes(file, size, digest):
@@ -42,8 +43,8 @@ def _load_bytes(file, size, digest):
 
 
 @cache
-def compiled_template():
-    layout = _layout()
+def compiled_template(*, scheduled=False):
+    layout = _layout(scheduled=scheduled)
     raw = _load_bytes(layout["script_file"], layout["script_bytes"], layout["script_sha256"])
     start = layout["owner_hash160"]["offset"]
     end = start + 20
@@ -55,13 +56,25 @@ def compiled_template():
 
 
 def compiled_owner(raw):
-    if len(raw) != _layout()["script_bytes"]:
-        return None
-    return compiled_template().owner(raw)
+    for scheduled in (False, True):
+        if len(raw) == _layout(scheduled=scheduled)["script_bytes"]:
+            return compiled_template(scheduled=scheduled).owner(raw)
+    return None
 
 
 @cache
-def otda_reconstruction():
-    layout = _layout()["compressed_preimage"]
-    program = _load_bytes(layout["program_file"], layout["program_bytes"], layout["program_sha256"])
+def otda_reconstruction(*, shared_kernels=False, scheduled=False):
+    layout = _layout(scheduled=scheduled)["compressed_preimage"]
+    artifact = layout["shared_kernels"] if shared_kernels and not scheduled else layout
+    program = _load_bytes(artifact["program_file"], artifact["program_bytes"], artifact["program_sha256"])
     return layout["spend_transaction_version"], program
+
+
+@cache
+def otda_pattern(*, shared_kernels=False, scheduled=False):
+    from shared.otda_reconstruction import Reconstruction
+
+    version, program = otda_reconstruction(shared_kernels=shared_kernels, scheduled=scheduled)
+    template = compiled_template(scheduled=scheduled)
+    parts = template.script[:template.owner_start], template.script[template.owner_end:]
+    return version, Reconstruction(program, parts, (20,))

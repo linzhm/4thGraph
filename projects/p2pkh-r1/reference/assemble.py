@@ -5,13 +5,14 @@ from pathlib import Path
 from tx_engine import Script
 
 
-def assemble(owner: bytes, *, compiled_curve=False, entry="LOCK") -> bytes:
+def assemble(owner: bytes, *, compiled_curve=False, entry="LOCK", injected=None) -> bytes:
     if len(owner) != 20:
         raise ValueError("expected a 20-byte owner hash")
     overrides = {}
     if compiled_curve:
         from curve_compiler import curve_blocks
-        overrides = curve_blocks()
+        overrides = curve_blocks().copy()
+    overrides.update(injected or {})
     constants = {}
     blocks = {}
     for path in sorted(Path(__file__).with_name("asm").glob("*.asm")):
@@ -47,7 +48,7 @@ def assemble(owner: bytes, *, compiled_curve=False, entry="LOCK") -> bytes:
     data.append_pushdata(owner)
     constants["OWNER"] = data.raw_serialize()
     if not overrides.keys() <= blocks.keys():
-        raise ValueError("curve compiler emitted an unknown block")
+        raise ValueError("override targets an unknown block")
 
     @cache
     def emit(token):

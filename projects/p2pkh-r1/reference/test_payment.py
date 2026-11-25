@@ -161,19 +161,30 @@ class CurrentInputTests(unittest.TestCase):
                         check(child(different, amounts, {1: witness}), different, 1, False)
 
     def test_signing_vector(self):
-        key, pub, owner = signer(1)
-        funding = parent(locking_script(owner), 1000, "22")
-        unsigned = child([funding], [900])
-        auth = authorization(unsigned, 0, 1000, 0x41)
-        sig = fixture_signature(key, auth.digest())
-        unlocking = current_input_unlock(auth, pub, sig)
-        signed = child([funding], [900], {0: unlocking})
-        check(signed, [funding], 0)
-        signed.validate([funding])
-        vector = dict(test_only=True, type="41", input_index=0, previous_amount_sats=1000,
-                      parent_txid=funding.id(), unsigned_tx_hex=unsigned.serialize().hex(),
-                      owner_hash160=owner.hex(), public_key_x963=pub.hex(), preimage_hex=auth.preimage.hex(),
-                      digest_hex=auth.digest().hex(), signature_hex=sig.hex(),
-                      script_sig_hex=unlocking.raw_serialize().hex(), signed_txid=signed.id())
-        fixture = Path(__file__).resolve().parents[1] / "template/spend-all.json"
-        self.assertEqual(vector, json.loads(fixture.read_text()))
+        for compiled, file in (
+            (False, "spend-all.json"),
+            (True, "candidates/spend-all.json"),
+            ("scheduled", "candidates/scheduled-spend-all.json"),
+        ):
+            with self.subTest(compiled=compiled):
+                funding, signed, vector = signing_vector(compiled_curve=compiled)
+                check(signed, [funding], 0)
+                signed.validate([funding])
+                fixture = Path(__file__).resolve().parents[1] / "template" / file
+                self.assertEqual(vector, json.loads(fixture.read_text()))
+
+
+def signing_vector(*, compiled_curve):
+    key, pub, owner = signer(1)
+    funding = parent(locking_script(owner, compiled_curve=compiled_curve), 1000, "22")
+    unsigned = child([funding], [900])
+    auth = authorization(unsigned, 0, 1000, 0x41)
+    sig = fixture_signature(key, auth.digest())
+    unlocking = current_input_unlock(auth, pub, sig)
+    signed = child([funding], [900], {0: unlocking})
+    vector = dict(test_only=True, type="41", input_index=0, previous_amount_sats=1000,
+                  parent_txid=funding.id(), unsigned_tx_hex=unsigned.serialize().hex(),
+                  owner_hash160=owner.hex(), public_key_x963=pub.hex(), preimage_hex=auth.preimage.hex(),
+                  digest_hex=auth.digest().hex(), signature_hex=sig.hex(),
+                  script_sig_hex=unlocking.raw_serialize().hex(), signed_txid=signed.id())
+    return funding, signed, vector

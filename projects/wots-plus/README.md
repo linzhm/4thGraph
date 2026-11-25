@@ -67,6 +67,50 @@ path adds a WOTS+ two-input, two-output payment in between.
 Exit costs the same in both formats because the exit outputs are ordinary
 P2PKH and the WOTS+ signature and witness format are identical.
 
+### Step table candidate
+
+`locking_script(key, cached_constants="steps")` builds a 33,956-byte lock.
+It adds fifteen four-byte step indices to the existing stack cache. The
+steps feed exactly the same addresses into SHA-256. The ordinary signature
+and 2,310-byte ForkID witness keep their existing encodings. The two-in,
+two-out ForkID ALL example saves 4,654 bytes compared with the
+36,283-byte cache. Chronicle OTDA ALL saves 13,962 bytes.
+
+The development evaluator measured a main stack peak of 28 items, up from
+13 with the previous cache, with 67 altstack items in both. The same 1,230
+payment cases and 67 signature-chain mutations run against both engines.
+Use a fresh key across all formats.
+The [benchmark guide](../../shared/benchmark.md) describes the optional
+durable signer wrapper used for the synthetic keys.
+
+### OTDA output reconstruction
+
+Use `compress_otda=True` with `sign_spend` or `sign_payment` only when
+Chronicle functional unlocking is available. Version 2 OTDA ALL and paired
+OTDA SINGLE use the [prebuilt reconstruction program](template/cached-steps-layout.json)
+to recreate cached-steps outputs. SINGLE covers only its same-index output.
+Earlier null outputs stay in the signed prefix, and unpaired SINGLE
+uses the existing companion authorization. Mixed transactions copy
+unrecognized outputs literally. The wallet chooses the shorter encoding,
+signs once, and preserves the preimage and the signer's original signature.
+Other modes and version 1 use their existing encoding.
+
+| 2 WOTS+ inputs and 2 WOTS+ outputs, OTDA ALL | Literal | Reconstructed |
+| --- | ---: | ---: |
+| Transaction | 208,406 B | 79,090 B |
+| Extra input | 70,354 B | 5,696 B |
+| Extra output | 101,901 B | 34,145 B |
+
+Paired OTDA SINGLE with two WOTS+ inputs and two WOTS+ outputs measures
+78,921 bytes, down from 140,473 bytes. Adding an input with no corresponding
+output costs 2,440 bytes. Adding a cached-steps output without a matching
+input costs 33,967 bytes.
+
+The full-input tests verify both ANYONECANPAY settings, mixed outputs,
+byte-for-byte witness stack equivalence and the literal fallback.
+From the repository root, check the checked-in artifacts with
+`python projects/wots-plus/reference/generate_reconstruction.py --check`.
+
 ### Lean conformance
 
 Build the [bsv-script-lean evaluator](https://github.com/Calhooon/bsv-script-lean#try-it)

@@ -30,7 +30,11 @@ def main():
     owner.add_argument("--public-key", type=owner_from_key, dest="key_hash", metavar="HEX")
     owner.add_argument("--owner-hash160", type=owner_from_hash, metavar="HEX")
     parser.add_argument("--format", choices=("manifest", "raw"), default="manifest")
-    parser.add_argument("--compiled-curve", action="store_true", help="generate the experimental field AST template")
+    variant = parser.add_mutually_exclusive_group()
+    variant.add_argument("--compiled-curve", dest="compiled_curve", action="store_true",
+                         help="generate the original experimental field AST template")
+    variant.add_argument("--scheduled-curve", dest="compiled_curve", action="store_const", const="scheduled",
+                         help="generate the 46,302-byte scheduled field AST template")
     args = parser.parse_args()
     owner_hash = args.key_hash if args.key_hash is not None else args.owner_hash160
     raw = locking_script_from_owner_hash(owner_hash, compiled_curve=args.compiled_curve)
@@ -46,7 +50,7 @@ def main():
         "script_sha256": sha256(raw).hexdigest(),
     }
     if args.compiled_curve:
-        manifest["curve_compiler"] = "field-ast"
+        manifest["curve_compiler"] = "field-ast-scheduled" if args.compiled_curve == "scheduled" else "field-ast"
     print(json.dumps(manifest, indent=2))
 
 

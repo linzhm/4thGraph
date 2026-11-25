@@ -1,0 +1,37 @@
+{
+  "script_file": "scheduled.hex",
+  "script_bytes": 46302,
+  "script_sha256": "b24b3f88673fb063903b389086fcac17243ba4818d7e154de0df142d9c652314",
+  "owner_hash160": {
+    "offset": 208,
+    "length": 20
+  },
+  "fixed_bytes_sha256": "52a1d9eb9e236403c66e845e18cf31d9c3a5f4c2e0ed7ca0270a60ba4e867ca6",
+  "supported_sighash_types": [
+    "41",
+    "42",
+    "43",
+    "61",
+    "62",
+    "63",
+    "c1",
+    "c2",
+    "c3",
+    "e1",
+    "e2",
+    "e3"
+  ],
+  "ordinary_script_code_hex": "68ac",
+  "compressed_preimage": {
+    "spend_transaction_version": 2,
+    "sighash_types": [
+      "61",
+      "63",
+      "e1",
+      "e3"
+    ],
+    "program_file": "otda-scheduled-reconstruct.hex",
+    "program_bytes": 3913,
+    "program_sha256": "0caa0eec27f0ccf9ad2b7836efd0be32f2d2a0060d48718131fecef382bb720b"
+  }
+}

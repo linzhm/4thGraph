@@ -53,8 +53,22 @@ def _inverse_butterfly(twiddle):
     return code + asm("OP_FROMALTSTACK")
 
 
+def _signed_forward_butterfly(twiddle):
+    # Signed residues keep |coefficient| < q without normalizing after every
+    # butterfly. The unreduced product and sum fit below q² (< 2^46).
+    code = number(twiddle) + asm("OP_MUL")
+    code += asm("OP_2DUP OP_ADD") + _REDUCE + asm("OP_TOALTSTACK")
+    return code + asm("OP_SUB") + _REDUCE + asm("OP_FROMALTSTACK")
+
+
+def _signed_inverse_butterfly(twiddle):
+    code = asm("OP_2DUP OP_ADD") + _REDUCE + asm("OP_TOALTSTACK")
+    code += asm("OP_SUB") + number(twiddle) + asm("OP_MUL") + _REDUCE
+    return code + asm("OP_FROMALTSTACK")
+
+
 @cache
-def transform_script(*, inverse=False):
+def transform_script(*, inverse=False, signed_residues=False):
     """Replace the top canonical polynomial with its FIPS 204 NTT or INTT."""
     code = bytearray(_unpack())
     order = list(range(DEGREE))
@@ -62,11 +76,11 @@ def transform_script(*, inverse=False):
     if inverse:
         stages = range(log_degree)
         next_twiddle = DEGREE
-        butterfly = _inverse_butterfly
+        butterfly = _signed_inverse_butterfly if signed_residues else _inverse_butterfly
     else:
         stages = reversed(range(log_degree))
         next_twiddle = 0
-        butterfly = _forward_butterfly
+        butterfly = _signed_forward_butterfly if signed_residues else _forward_butterfly
     for stage in stages:
         width = 1 << stage
         for start in range(0, DEGREE, 2 * width):
@@ -82,9 +96,13 @@ def transform_script(*, inverse=False):
 
     # Reserve the result on the altstack while the last coefficients are rolled.
     scale = number(pow(DEGREE, -1, MODULUS)) + asm("OP_MUL") + _REDUCE if inverse else b""
+    normalize = (
+        asm("OP_DUP OP_0 OP_LESSTHAN OP_IF") + _Q + asm("OP_ADD OP_ENDIF")
+        if signed_residues else b""
+    )
     code += asm("OP_0 OP_TOALTSTACK")
     for index in range(DEGREE):
-        code += _take(order, index) + scale + _COEFF + asm("OP_NUM2BIN")
+        code += _take(order, index) + scale + normalize + _COEFF + asm("OP_NUM2BIN")
         code += asm("OP_FROMALTSTACK OP_SWAP OP_CAT OP_TOALTSTACK")
     return bytes(code) + asm("OP_FROMALTSTACK")
 
@@ -103,7 +121,7 @@ def ring_product_script():
     return bytes(code) + transform_script(inverse=True)
 
 
-def verification_equation_script(public_key):
+def verification_equation_script(public_key, *, signed_residues=False):
     """Evaluate the fixed-key verification equation on already-decoded polynomials.
 
     Input is one packed item containing c, z[0], ..., z[3] in canonical
@@ -114,7 +132,7 @@ def verification_equation_script(public_key):
     input_count = len(rows[0])
     code = bytearray(asm("OP_SIZE") + number(input_count * POLYNOMIAL_BYTES) + asm("OP_NUMEQUALVERIFY"))
     split_polynomial = number(POLYNOMIAL_BYTES) + asm("OP_SPLIT OP_SWAP")
-    code += (split_polynomial + transform_script() + asm("OP_TOALTSTACK")) * input_count
+    code += (split_polynomial + transform_script(signed_residues=signed_residues) + asm("OP_TOALTSTACK")) * input_count
     code += asm("OP_DROP OP_0") + asm("OP_FROMALTSTACK OP_SWAP OP_CAT") * input_count
 
     for row in rows:
@@ -127,7 +145,7 @@ def verification_equation_script(public_key):
                 code += _COEFF + asm("OP_SPLIT OP_DROP OP_BIN2NUM")
                 code += number(fixed[coefficient]) + asm("OP_MUL OP_ADD")
             code += _REDUCE + _COEFF + asm("OP_NUM2BIN OP_CAT")
-        code += transform_script(inverse=True) + asm("OP_TOALTSTACK")
+        code += transform_script(inverse=True, signed_residues=signed_residues) + asm("OP_TOALTSTACK")
 
     code += asm("OP_DROP OP_0") + asm("OP_FROMALTSTACK OP_SWAP OP_CAT") * len(rows)
     return bytes(code)
