@@ -7,14 +7,15 @@ test lab, not a wallet, production signer, covenant implementation, or node.
 
 ## Run
 
-From `projects/p2pk-p2pkh-baseline/reference/`, with Python 3.11+ and [uv](https://docs.astral.sh/uv/):
+From `projects/p2pk-p2pkh-baseline/reference/`, with Python 3.12, a Rust
+toolchain and uv. [uv documentation](https://docs.astral.sh/uv/)
 
 ```sh
 uv run --no-project --with-requirements requirements.txt python script_lab.py
 ```
 
-The first run may download dependencies from PyPI. The script itself has no
-network operations. After provisioning, add `--offline` after `uv run`.
+The first run may download and build the pinned dependency. The script itself
+has no network operations. After provisioning, add `--offline` after `uv run`.
 It exits nonzero on a script encoding or validation mismatch and otherwise
 emits raw parent/spend transactions, ASM, script hex and per-case outcomes.
 `../template/baseline.json` is the checked-in output. To check reproducibility,
@@ -34,11 +35,14 @@ signer uses SIGHASH_ALL with FORKID. These tests exercise parent-aware script
 validation, not prior-outpoint existence, node policy, regtest mining, or
 mainnet. Do not broadcast these fixtures.
 
-The only direct dependency is nChain's MIT-licensed
-[chain-gang Python binding, tx-engine 0.13.1](https://pypi.org/project/tx-engine/0.13.1/).
-The lab uses the Rust-backed engine through Python for assembly, signing, and
-validation. It does not use sCrypt. No P-256, PushTx, or other covenant
-features are included.
+The offline generator and acceptance tests share the repository's Chronicle
+pin of the chain-gang Python binding. Projects using that exact pin can share
+the same environment. The Rust-backed binding supplies assembly, signing,
+and validation. [Shared dependency](../../shared/requirements-chronicle.txt)
+
+To reproduce the original upstream control in its own environment, run
+`uv run --no-project --with 'tx-engine==0.13.1' python script_lab.py`.
+It reproduces the same checked-in baseline vector. [Upstream package](https://pypi.org/project/tx-engine/0.13.1/)
 
 ## Node cross-check
 
