@@ -14,12 +14,14 @@ For example, an ordinary P2PKH payment can create an R1 output for Alice. When A
 2. Copy the canonical raw script and write the recipient hash at the zero-based half-open interval `[208, 228)`. The script is **59,582 bytes**. Only these 20 bytes vary between recipients.
 3. For recognition, check the length and ten-byte prefix `760052a569766b7c8201`. Extract the candidate owner hash. Require `SHA256(raw[:208] || raw[228:])` to equal `2129d374594069d08a9b2127555f48ea21c75fb06d1ad5e77c68ad251e97f784` before returning the type and hash. Byte zero is the first opcode. The public key itself is revealed on spend. [Canonical bytes](../template/template.hex) · [Layout and three vectors](../template/layout.json) · [Byte matcher and generator](../reference/p2pkh_r1.py)
 
+Set `R1_OWNER_HASH160` to the recipient’s 20-byte HASH160 in hex.
+
 ```sh
 cd projects/p2pkh-r1/reference
-python generate_lock.py --owner-hash160 4ceab2c8be16c1d4c6b4147d39aa449c2d63f184 --format raw > scriptPubKey.bin
+python generate_lock.py --owner-hash160 "${R1_OWNER_HASH160:?Set the recipient HASH160}" --format raw > scriptPubKey.bin
 ```
 
-The CLI also accepts `--public-key HEX`. Omitting `--format raw` returns the length, owner hash and script SHA-256. Vector C has script SHA-256 `b3acd6b92a23120bd24432ada2b1cac013fe06381d7ea96ac6c5a73c493f4287`. [Generator](../reference/generate_lock.py)
+The CLI also accepts `--public-key HEX`. Omitting `--format raw` returns the length, owner hash and script SHA-256. The canonical template embeds the owner hash of vector C’s public test key. Outputs using that key are for local tests only. Vector C has script SHA-256 `b3acd6b92a23120bd24432ada2b1cac013fe06381d7ea96ac6c5a73c493f4287`. [Generator](../reference/generate_lock.py)
 
 ## Spend one input
 
