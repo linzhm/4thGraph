@@ -13,8 +13,8 @@ BSV Node 1.2.3 在临时隔离的回归网络上用显式上一输出与规则�
 使用 Python 3.12。为每个项目创建独立环境，解释器位于
 `$bench_env/<项目>/bin/python`。安装项目参考实现要求的依赖和
 `ecdsa==0.19.1`。WOTS+、ML-DSA-44 和原生锁基准使用
-[共享 Chronicle 依赖](requirements-chronicle.txt)。原生锁独立的离线
-示例使用自己的依赖。ML-DSA-44 需要 OpenSSL 3.5 或以上，
+[共享 Chronicle 依赖](requirements-chronicle.txt)。原生锁的离线示例也使用
+同一依赖。ML-DSA-44 需要 OpenSSL 3.5 或以上，
 可通过 `ML_DSA_OPENSSL` 指定可执行文件。按
 [SM2 参考指南](../projects/p2pkh-sm2/reference/README.zh-CN.md)
 构建 Rust 签名器，并把路径设到 `SM2_SIGNED_DATA_SIGNER`。

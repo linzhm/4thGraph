@@ -16,7 +16,7 @@ Use Python 3.12. Create each project environment at
 `$bench_env/<project>/bin/python`. Install the project's reference requirements
 and `ecdsa==0.19.1`. WOTS+, ML-DSA-44 and the native baseline use
 [the shared Chronicle pin](requirements-chronicle.txt) for this benchmark.
-The native project's separate offline example uses its own requirement.
+The native project's offline example uses the same pin.
 ML-DSA-44 requires OpenSSL 3.5 or later. Configure `ML_DSA_OPENSSL` if needed.
 For SM2, build the Rust signer and set its executable path in
 `SM2_SIGNED_DATA_SIGNER`. See the

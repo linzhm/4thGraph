@@ -29,10 +29,11 @@ The same test accepts `REGTEST_COOKIE` and an optional `REGTEST_URL` for an
 already-running isolated node. It checks the RPC verdict and reported flags
 for every row. All keys are public test fixtures.
 
-The acceptance dependency pin includes chain-gang's explicit Chronicle
-context API and unpaired OTDA SINGLE fix. The original vector generator
-retains its PyPI pin. In the acceptance fixture, that PyPI build rejected
-the valid unpaired OTDA inputs with `input out of tx_out range`.
+The generator and acceptance tests use the same shared Chronicle pin,
+including the explicit context API and unpaired OTDA SINGLE support.
+The original PyPI control remains available separately for reproducing
+the offline vector. In this acceptance fixture, that build rejected valid
+unpaired OTDA inputs with `input out of tx_out range`.
 [Acceptance dependency](https://github.com/linzhm/chain-gang/tree/74676b9c002c452e7f21a9ed9265f4972bef03f6)
 
 ## Complete enumeration of the declared domain
