@@ -59,12 +59,12 @@ Keep a specific Script Lab checkout available to the application and its local b
 
 | Language | Load the binding |
 | --- | --- |
-| TypeScript | Import the checkout's `shared/sdk/typescript/index.ts` from the Node.js process. Use `signPaymentAsync` or `signInputAsync` with an asynchronous device SDK. |
+| TypeScript | Import the checkout's `shared/sdk/typescript/index.ts` from the Node.js process. Use `signPaymentAsync` or `signInputAsync` with an asynchronous device SDK. The local bridge still runs synchronously. |
 | Rust | Run `cargo add --path /path/to/bsv-script-lab/shared/sdk/rust` from your crate. |
 | Go | From your wallet module, use `go work init .` if you need a workspace, then `go work use /path/to/bsv-script-lab/shared/sdk/go`. |
 | Python | Add the checkout to `PYTHONPATH` and import `WalletClient` from `shared.sdk.python.client`. By default the bridge uses the current interpreter. |
 
-Use the project guide's Python requirements for native P2PK/P2PKH, R1, Deferred R1, and SM2. The Lamport, WOTS+, and ML-DSA payment SDK paths use the standard library. The fixture signer for ML-DSA also needs OpenSSL with Pure ML-DSA-44 support. Node and chain-gang replays have additional dependencies. [Scheme integrations](#scheme-integrations)
+Use the project guide's Python requirements for native P2PK/P2PKH, R1, Deferred R1, and SM2. The Lamport, WOTS+, and ML-DSA payment SDK paths use the standard library. The fixture signer for ML-DSA also needs OpenSSL with Pure ML-DSA-44 support. Node and chain-gang replays have additional dependencies. Use separate Python environments for replays that require different chain-gang revisions. [Scheme integrations](#scheme-integrations)
 
 <a name="wallet-workflow"></a>
 
@@ -124,7 +124,7 @@ export function fillApprovedInputs(transaction: string, approvedInputs: readonly
 }
 ```
 
-Calculate the total fee as the sum of the authenticated input amounts minus the sum of the outputs before calling this helper. Keep the approved input and output order, sequences and locktime fixed while adding unlocks. Use the result of each call as the input to the next. For Deferred, assemble the committed same-index output and call `activate`, then sign the sponsor input with its own client. [Deferred integration](../../projects/p2pkh-r1-deferred/docs/sdk.en.md#quickstart)
+Calculate the total fee as the sum of the authenticated input amounts minus the sum of the outputs before calling this helper. Keep the approved input and output order, sequences and locktime fixed while adding unlocks. Use the result of each call as the input to the next, then verify that each required input has its unlock before broadcasting. For Deferred, assemble the committed same-index output and call `activate`, then sign the sponsor input with its own client. [Deferred integration](../../projects/p2pkh-r1-deferred/docs/sdk.en.md#quickstart)
 
 ## Call from Rust, Go, and Python
 

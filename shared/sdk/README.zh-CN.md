@@ -59,12 +59,12 @@ const signedHex = wallet.signPayment({
 
 | 语言 | 加载方式 |
 | --- | --- |
-| TypeScript | 在 Node.js 进程中导入该检出的 `shared/sdk/typescript/index.ts`。对接异步设备时，使用 `signPaymentAsync` 或 `signInputAsync`。 |
+| TypeScript | 在 Node.js 进程中导入该检出的 `shared/sdk/typescript/index.ts`。对接异步设备时，使用 `signPaymentAsync` 或 `signInputAsync`。本地桥接进程仍同步执行。 |
 | Rust | 在钱包的源码包中执行 `cargo add --path /path/to/bsv-script-lab/shared/sdk/rust`。 |
 | Go | 在钱包模块目录中，按需用 `go work init .` 创建工作区，再运行 `go work use /path/to/bsv-script-lab/shared/sdk/go`。 |
 | Python | 将检出目录加入 `PYTHONPATH`，从 `shared.sdk.python.client` 导入 `WalletClient`。桥接默认使用当前解释器。 |
 
-原生 P2PK/P2PKH、R1、Deferred R1 和 SM2 的 Python 环境按项目指南安装。Lamport、WOTS+ 和 ML-DSA 付款接口使用 Python 标准库。ML-DSA 的测试签名器还需要支持纯模式 ML-DSA-44 的 OpenSSL。节点和 chain-gang 复放需要另装测试依赖。[各项目接入指南](#scheme-integrations)
+原生 P2PK/P2PKH、R1、Deferred R1 和 SM2 的 Python 环境按项目指南安装。Lamport、WOTS+ 和 ML-DSA 付款接口使用 Python 标准库。ML-DSA 的测试签名器还需要支持纯模式 ML-DSA-44 的 OpenSSL。节点和 chain-gang 复放需要另装测试依赖。复放依赖不同 chain-gang 提交的项目时，分别建 Python 环境。[各项目接入指南](#scheme-integrations)
 
 <a name="wallet-workflow"></a>
 
@@ -124,7 +124,7 @@ export function fillApprovedInputs(transaction: string, approvedInputs: readonly
 }
 ```
 
-调用前用已核验的输入金额之和减去输出金额之和，审批整笔手续费。填写解锁时，按已审批的输入输出顺序、序列号和锁定时间执行。每次调用返回的整笔交易作为下一次的输入。Deferred 先组装同索引的承诺输出并调用 `activate`，再用赞助输入自己的客户端签名。[Deferred 接入](../../projects/p2pkh-r1-deferred/docs/sdk.zh-CN.md#quickstart)
+调用前用已核验的输入金额之和减去输出金额之和，审批整笔手续费。填写解锁时，按已审批的输入输出顺序、序列号和锁定时间执行。每次调用返回的整笔交易作为下一次的输入，广播前核对每个待签输入的解锁脚本是否齐备。Deferred 先组装同索引的承诺输出并调用 `activate`，再用赞助输入自己的客户端签名。[Deferred 接入](../../projects/p2pkh-r1-deferred/docs/sdk.zh-CN.md#quickstart)
 
 ## Rust、Go 和 Python 调用
 

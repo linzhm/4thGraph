@@ -14,7 +14,7 @@ BSV Script Lab 为钱包开发者提供可识别的锁定模板、统一的外�
 | --- | --- | --- | --- | --- |
 | [原生 P2PK 与 P2PKH](projects/p2pk-p2pkh-baseline/README.zh-CN.md) | 钱包首次接入、普通 secp256k1 付款、交易成本对照 | 选择在输出里放公钥还是公钥哈希 | v0.1 开发版 | [接入指南](projects/p2pk-p2pkh-baseline/docs/sdk.zh-CN.md#quickstart) |
 | [P2PKH-R1](projects/p2pkh-r1/README.zh-CN.md) | 接入已有 P‑256 签名设备或服务的钱包 | 核对设备的签名方式，并持久保存 P‑256 签名随机数历史 | v0.2.0 开发版 | [接入指南](projects/p2pkh-r1/docs/sdk.zh-CN.md#quickstart) |
-| [P2PKH-R1-Deferred](projects/p2pkh-r1-deferred/README.zh-CN.md) | 先用短锁接收入金，允许以后再启用的场景 | 预留手续费来源和启用步骤，届时生成完整 R1 输出 | v0.2.0 开发版 | [接入指南](projects/p2pkh-r1-deferred/docs/sdk.zh-CN.md#quickstart) |
+| [P2PKH-R1-Deferred](projects/p2pkh-r1-deferred/README.zh-CN.md) | 先用短锁接收入金，可以稍后单独启用的场景 | 预留手续费输入和启用步骤，届时生成完整 R1 输出 | v0.2.0 开发版 | [接入指南](projects/p2pkh-r1-deferred/docs/sdk.zh-CN.md#quickstart) |
 | [P2PKH-SM2](projects/p2pkh-sm2/README.zh-CN.md) | 接入 SM2 签名器或 GB/T 35275‑2026 SignedData 服务 | 核对 SM2 消息和用户标识，使用 SignedData 时绑定预期签名者 | v1.1.0 候选版 | [接入指南](projects/p2pkh-sm2/docs/sdk.zh-CN.md#quickstart) |
 | [Lamport OTS](projects/lamport-ots/README.zh-CN.md) | 研究 SHA‑256 一次性签名中公钥的存储与公开成本 | 每个 UTXO 使用新密钥，在更小的入金锁和更小的花费输入之间取舍 | v0.1 开发版 | [接入指南](projects/lamport-ots/docs/sdk.zh-CN.md#quickstart) |
 | [WOTS+](projects/wots-plus/README.zh-CN.md) | 研究更短的 SHA‑256 一次性签名及不同收款模板 | 管理一次性密钥，并比较缓存式锁和 OTDA 重建 | v0.1 开发版 | [接入指南](projects/wots-plus/docs/sdk.zh-CN.md#quickstart) |
@@ -41,6 +41,8 @@ P2PKH-R1 v0.2.0 将两进两出 ForkID ALL 交易由 **119,934 字节降到 93,3
 | 纯模式 ML-DSA-44 | 2 × 2 | 926,412 | 2,588 | 1,858,122 | 5,563,725 | — |
 
 单位均为字节。锁定、解锁和栈开销取 ForkID ALL 的第一个输入。栈峰值由本地求值器测得，统计主栈与备用栈的合计数据载荷。Deferred 启用交易包含一条手续费赞助输入。ML‑DSA‑44 暂无栈数据。各项目 README 列有逐输入、逐输出的大小、增量成本和生命周期总量。
+
+R1 v0.2.0 和 WOTS+ 缓存步骤模板的 OTDA ALL 数据取自显式启用重建的实测。
 
 SM2 候选版沿用 v1.0.0 的锁定模板 `1`，自动选择更短的 OTDA 解锁编码。实测两进两出 OTDA ALL 交易的每个输入解锁脚本从 290,109 字节降至 13,023 字节，整笔从 870,194 字节降至 316,018 字节，缩小 63.7%。[SM2 重建测量](projects/p2pkh-sm2/README.zh-CN.md#otda-constructor)
 
