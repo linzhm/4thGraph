@@ -77,7 +77,8 @@ def mode_fixture(flag, *, paired=True, version=2, lock_factory=None):
     other = Transaction((Input(b'\x44'*32, 0),), (Output(1000, b'\x51'),))
     outputs = (Output(500, b'\x51'), Output(10400, b'\x51')) if paired else (Output(10900, b'\x51'),)
     tx = Transaction((Input(other.txid_wire(), 0), Input(parent.txid_wire(), 0)), outputs, version=version)
-    signed = sign_spend(tx, 1, parent.serialize(), key, lambda digest: sign_digest(secret, digest), sighash=flag)
+    signed = sign_spend(tx, 1, parent.serialize(), key, lambda digest: sign_digest(secret, digest),
+                        sighash=flag, allow_unpaired_single=not paired)
     return secret, (other, parent), signed
 
 
