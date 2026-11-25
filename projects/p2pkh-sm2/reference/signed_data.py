@@ -13,11 +13,11 @@ from asn1crypto.x509 import Certificate as ASN1Certificate, DirectoryString, Nam
 from cryptography.exceptions import InvalidSignature, UnsupportedAlgorithm
 from cryptography.x509 import CertificateRevocationList, DirectoryName, DistributionPoint
 from cryptography.x509 import IssuingDistributionPoint, Name, ReasonFlags, Version
-from cryptography.x509 import ExtensionNotFound, UnrecognizedExtension, UnsupportedGeneralNameType
+from cryptography.x509 import DuplicateExtension, ExtensionNotFound, UnrecognizedExtension, UnsupportedGeneralNameType
 from cryptography.x509 import load_der_x509_certificate, load_der_x509_crl
 from cryptography.x509.oid import CRLEntryExtensionOID, ExtensionOID
 
-from certificate_path import verify_revocation_paths
+from certificate_path import _load_certificate, verify_revocation_paths
 from sm2 import N, USER_ID, be32, message_digest, parse_public, sm3, verify, verify_digest
 
 
@@ -888,10 +888,19 @@ def _extension_value(extensions, oid):
         return None
 
 
+def _revocation_certificate(encoded, role):
+    """Decode a certificate and report unsupported or invalid extensions as ValueError."""
+    certificate = _load_certificate(encoded, role)
+    try:
+        # Known extension values are decoded on first access.
+        certificate.extensions
+    except (DuplicateExtension, UnsupportedGeneralNameType, ValueError) as error:
+        raise ValueError(f'invalid {role} certificate extension: {error}') from error
+    return certificate
+
+
 def _crl_signer_certificate(encoded):
-    if not isinstance(encoded, bytes):
-        raise ValueError('expected a DER CRL issuer certificate')
-    certificate = load_der_x509_certificate(encoded)
+    certificate = _revocation_certificate(encoded, 'CRL issuer')
     if not certificate.subject.rdns:
         raise ValueError('CRL issuer certificate requires a nonempty subject')
     usage = _extension_value(certificate.extensions, ExtensionOID.KEY_USAGE)
@@ -1219,12 +1228,13 @@ def _verify_path_revocation(target, signers, paths, snapshots, trust_anchor, val
             raise ValueError('certificate path revocation evidence depends on an unverified issuer')
         for child in ready:
             parent = parents.pop(child)
+            role = 'CRL signer' if child in signers else 'intermediate'
+            certificate = _revocation_certificate(child, role)
             verdict = _assess_revocation_status(
-                child, authenticated_evidence.get(parent, ()), validation_time,
+                certificate, authenticated_evidence.get(parent, ()), validation_time,
                 issuer_key_id=_certificate_key_id(parent),
             )
             if verdict.status != 'unrevoked':
-                role = 'CRL signer' if child in signers else 'intermediate'
                 raise ValueError(f'{role} certificate revocation status is {verdict.status}')
             verified.add(child)
 
@@ -1251,6 +1261,7 @@ def assess_certificate_revocation(certificate, snapshots, *, validation_time, tr
     optional issuer_certificate pins the externally authenticated target
     issuer. Otherwise direct CRL keys must verify the target's signature,
     and the caller authenticates applicable delegated CRL signing keys.
+    Unsupported X.509 certificate versions raise ValueError.
     """
     if not isinstance(validation_time, datetime) or validation_time.utcoffset() is None:
         raise ValueError('CRL validation time must be a timezone-aware datetime')
@@ -1281,11 +1292,9 @@ def assess_certificate_revocation(certificate, snapshots, *, validation_time, tr
         raise ValueError('certificate path revocation requires an explicit trust anchor')
     elif intermediates:
         raise ValueError('certificate path intermediates require an explicit trust anchor')
-    elif issuer_certificate is not None:
-        if not isinstance(issuer_certificate, bytes):
-            raise ValueError('expected a DER target issuer certificate')
-        issuer = load_der_x509_certificate(issuer_certificate)
-        target = load_der_x509_certificate(certificate)
+    target = _revocation_certificate(certificate, 'target')
+    if issuer_certificate is not None:
+        issuer = _load_certificate(issuer_certificate, 'target issuer')
         if _issuer_key(issuer.subject) != _issuer_key(target.issuer):
             raise ValueError('target issuer certificate must match the certificate issuer name')
         try:
@@ -1296,7 +1305,7 @@ def assess_certificate_revocation(certificate, snapshots, *, validation_time, tr
             # Explicit pin for an issuer established by an external path verifier.
             pass
         issuer_key_id = _certificate_key_id(issuer_certificate)
-    return _assess_revocation_status(certificate, snapshots, validation_time,
+    return _assess_revocation_status(target, snapshots, validation_time,
                                      issuer_key_id=issuer_key_id, delegated_signers=delegated_signers)
 
 
@@ -1335,8 +1344,7 @@ def _crl_scope_reasons(target, snapshots, distribution_points, *, is_ca, issuer_
     return applicable
 
 
-def _assess_revocation_status(certificate, snapshots, validation_time, *, issuer_key_id=None, delegated_signers=None):
-    target = load_der_x509_certificate(certificate)
+def _assess_revocation_status(target, snapshots, validation_time, *, issuer_key_id=None, delegated_signers=None):
     basic = _extension_value(target.extensions, ExtensionOID.BASIC_CONSTRAINTS)
     is_ca = basic is not None and basic.ca
     distribution_points = _extension_value(target.extensions, ExtensionOID.CRL_DISTRIBUTION_POINTS)

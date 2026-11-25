@@ -11,7 +11,7 @@ import unittest
 from unittest.mock import patch
 
 from asn1crypto.core import Integer, ObjectIdentifier, OctetString, SetOf
-from asn1crypto.x509 import Certificate as ASN1Certificate
+from asn1crypto.x509 import Certificate as ASN1Certificate, Extension as ASN1Extension
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import padding, rsa
@@ -2262,6 +2262,71 @@ class SignedDataReview(SignedDataFixtures):
                 target = certificate(points=points, is_ca=is_ca).public_bytes(serialization.Encoding.DER)
                 self.assertEqual(assess_certificate_revocation(target, [snapshot], validation_time=check_time).status, expected)
         COMPLETED_WITNESSES.add('crl_assessment_scope')
+
+    def test_revocation_rejects_undecodable_certificates_with_value_error(self):
+        certificate, issue_crl, issue, _, _, _, check_time, _ = self.crl_assessment_fixture()
+        encoded_der = serialization.Encoding.DER
+
+        def version_2(cert):
+            encoded = ASN1Certificate.load(cert.public_bytes(encoded_der))
+            encoded['tbs_certificate']['version'] = 'v2'
+            encoded['tbs_certificate']['extensions'] = None
+            return encoded.dump()
+
+        def duplicate_extension(cert):
+            encoded = ASN1Certificate.load(cert.public_bytes(encoded_der))
+            extensions = encoded['tbs_certificate']['extensions']
+            extensions.append(extensions[-1].copy())
+            return encoded.dump()
+
+        def unsupported_general_name(cert):
+            encoded = ASN1Certificate.load(cert.public_bytes(encoded_der))
+            edi_party = der(0xa5, der(0xa1, der(0x0c, b'Test-only EDI party')))
+            names = der(0x30, edi_party)
+            oid = ObjectIdentifier(x509.ExtensionOID.SUBJECT_ALTERNATIVE_NAME.dotted_string).dump()
+            extension = ASN1Extension.load(der(0x30, oid + der(0x04, names)), strict=True)
+            encoded['tbs_certificate']['extensions'].append(extension)
+            return encoded.dump()
+
+        target, issuer = certificate(), certificate(ca_cert=True)
+        crl = issue_crl().public_bytes(encoded_der)
+        target_der = target.public_bytes(encoded_der)
+        anchor = issuer.public_bytes(encoded_der)
+        snapshot = issue()
+
+        def assess(encoded, **options):
+            return assess_certificate_revocation(encoded, [snapshot], validation_time=check_time, **options)
+
+        cases = (
+            ('v2 target', lambda: assess(version_2(target)), 'unsupported target certificate version'),
+            ('duplicate target extension', lambda: assess(duplicate_extension(target)),
+             'invalid target certificate extension'),
+            ('unsupported target GeneralName', lambda: assess(unsupported_general_name(target)),
+             'invalid target certificate extension'),
+            ('v2 CRL issuer', lambda: load_crl_snapshot(crl, version_2(issuer)),
+             'unsupported CRL issuer certificate version'),
+            ('duplicate CRL issuer extension', lambda: load_crl_snapshot(crl, duplicate_extension(issuer)),
+             'invalid CRL issuer certificate extension'),
+            ('unsupported CRL issuer GeneralName', lambda: load_crl_snapshot(crl, unsupported_general_name(issuer)),
+             'invalid CRL issuer certificate extension'),
+            ('v2 trust anchor', lambda: assess(target_der, trust_anchor=version_2(issuer)),
+             'unsupported trust anchor certificate version'),
+            ('v2 intermediate', lambda: assess(target_der, trust_anchor=anchor, intermediates=[version_2(target)]),
+             'unsupported intermediate certificate version'),
+            ('v2 target with pinned issuer', lambda: assess(version_2(target), issuer_certificate=anchor),
+             'unsupported target certificate version'),
+            ('unsupported target GeneralName with pinned issuer',
+             lambda: assess(unsupported_general_name(target), issuer_certificate=anchor),
+             'invalid target certificate extension'),
+            ('v2 pinned issuer', lambda: assess(target_der, issuer_certificate=version_2(issuer)),
+             'unsupported target issuer certificate version'),
+            ('invalid pinned issuer DER', lambda: assess(target_der, issuer_certificate=b'\x30\x00'),
+             'invalid DER target issuer certificate'),
+        )
+        for name, call, message in cases:
+            with self.subTest(name):
+                with self.assertRaisesRegex(ValueError, message):
+                    call()
 
     def test_issuer_default_cannot_supply_coverage_for_an_explicit_distribution_point(self):
         certificate, _, issue, authority, delegated, _, when, _ = self.crl_assessment_fixture()
