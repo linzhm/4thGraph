@@ -1,0 +1,34 @@
+{
+  "node": "/Bitcoin SV:1.2.3/",
+  "bob": {
+    "txid": "c955e9d1895288f87daa882cd343f7fb5efe506a7bbc5211db885841057a1485",
+    "vout": 0,
+    "units": 275,
+    "owner": "03421f5fc9a21065445c96fdb91c0c1e2f2431741c72713b4b99ddcb316f31e9fc",
+    "confirmations": 1,
+    "blockhash": "0e55097291ea78bb478bc306f84a77e182fb36cfc6360fc2b9f3fd897e92c970",
+    "height": 110,
+    "merkle_index": 1,
+    "merkle_header_hex": "000000204bbd30a136b94839ba154dc4d4b800d6f660e25f705c5449f3a16161cb858822b9da43d999a429bd78868a8d25bc23d1efc9e51e90824d81e94aeeaf525b46e93158066bffff7f2000000000",
+    "merkle_siblings_wire": [
+      "c90537f32041ef03b8428077c55260c7244b4761f3da9209a7703daccf9a38eb"
+    ]
+  },
+  "carol": {
+    "txid": "468212073c1659cad6923bf5c490ceca5714a29c5ee42acd15e4bb91eeb5b738",
+    "vout": 0,
+    "units": 350,
+    "owner": "032fa2104d6b38d11b0230010559879124e42ab8dfeff5ff29dc9cdadd4ecacc3f",
+    "confirmations": 1,
+    "blockhash": "00e99d87fa98ec28c67bbba5c10d04bfbd459d9bc267c2731312d3463b725a88",
+    "height": 111,
+    "merkle_index": 1,
+    "merkle_header_hex": "0000002070c9927e89fdf3b9c20f36c6cf36fb82e1774af806c38b47bb78ea917209550e70b95a0d8babd53cbb74ca3e501c0d410626891ab6bff52c86edf07247a4f6973f58066bffff7f2000000000",
+    "merkle_siblings_wire": [
+      "52dd2c555a04618054d21c873b69b67d72127026fff6e4043a8d2af27e218276"
+    ]
+  },
+  "bob_respend_accepted_on_clone": "468212073c1659cad6923bf5c490ceca5714a29c5ee42acd15e4bb91eeb5b738",
+  "mempool_excludes_bob_output": true,
+  "wrong_receipt_vout_rejection": "wrong receipt outpoint or order"
+}

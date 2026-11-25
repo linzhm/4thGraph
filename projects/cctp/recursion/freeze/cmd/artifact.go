@@ -47,13 +47,13 @@ func keyArtifact(m manifest, vk *native.VerifyingKey) (map[string]any, error) {
 		data["inventory_profile"] = m.Profile
 	case conservationProfile:
 		data["conservation_profile"] = m.Profile
-	case parentCheckpointProfile, tokenCheckpointProfile:
+	case parentCheckpointProfile, tokenCheckpointProfile, backtraceProfile:
 		data["parent_checkpoint_profile"] = m.Profile
 	default:
 		data["freeze_profile"] = m.Profile
 	}
 	switch m.Profile {
-	case originProfile, inventoryProfile, plainProfile, conservationProfile, parentCheckpointProfile, tokenCheckpointProfile:
+	case originProfile, inventoryProfile, plainProfile, conservationProfile, parentCheckpointProfile, tokenCheckpointProfile, backtraceProfile:
 		// Export the affine shape used by snarkjs_adapter, with Fp2 real first.
 		format := "CCTP freeze Groth16 artifact v1"
 		switch m.Profile {
@@ -67,6 +67,8 @@ func keyArtifact(m manifest, vk *native.VerifyingKey) (map[string]any, error) {
 			format = "CCTP parent checkpoint Groth16 artifact v1"
 		case tokenCheckpointProfile:
 			format = "CCTP token parent checkpoint Groth16 artifact v1"
+		case backtraceProfile:
+			format = "CCTP parent openings Groth16 artifact v1"
 		}
 		data["format"], data["protocol"], data["nPublic"] = format, "groth16", 2
 		data["vk_alpha_1"], data["vk_beta_2"] = encodeG1(vk.G1.Alpha), encodeG2(vk.G2.Beta)
@@ -95,7 +97,7 @@ func addProof(data map[string]any, profile string, proof *native.Proof, statemen
 	data["statement"] = hex.EncodeToString(statement.Encode())
 	data["statement_digest"] = hex.EncodeToString(digest[:])
 	switch profile {
-	case originProfile, inventoryProfile, plainProfile, conservationProfile, parentCheckpointProfile, tokenCheckpointProfile:
+	case originProfile, inventoryProfile, plainProfile, conservationProfile, parentCheckpointProfile, tokenCheckpointProfile, backtraceProfile:
 		if len(proof.Commitments) != 0 {
 			return fmt.Errorf("plain proof must have no commitment")
 		}

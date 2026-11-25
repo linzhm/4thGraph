@@ -1,0 +1,7 @@
+{
+  "issuance_root": "32d974cb7432f2d79df4e00b9be16e174fd03a0057c390c29817356a22d1e194",
+  "verifier_funding": "eff1ae0bd17a5bcd620da93c4bf97d329489d6515e29d644c0639a03ba82f275",
+  "verifier_lock_sha256": "535270ae1cd324a30432687ac95519b6b847ce69ad21d4d7c081fa4e0dbf15ed",
+  "verifying_key_sha256": "061c3a7724e65f69cb425c8349fe4907d716116d0b90fc0d3b186d42da71c61b",
+  "pin_height": 104
+}

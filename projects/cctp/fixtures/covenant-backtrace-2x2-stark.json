@@ -1,0 +1,39 @@
+{
+  "scope": "Actual identical opening statement and BSV parents. Wire substitution excludes the STARK verifier and its funding. These substitutions have not been broadcast.",
+  "image_id": "a93500b8d7cd9b21268c0d98d61dc53fb504c70d6f6de8f7d17c2479d503d4f7",
+  "guest_binary_sha256": "60c37452968a0512041096dcbd57057f45484ee985230ab7b1541d9262a09c76",
+  "payments": {
+    "alice-to-bob": {
+      "composite": {
+        "prove_process_seconds": 14.290304458001629,
+        "native_verify_seconds": 0.016011,
+        "receipt_bytes": 244366,
+        "receipt_sha256": "846e8b6d0ef84585a3535b91aeb84ccb5ffcb7ff91909ba83abd37210ddd1f8d",
+        "payment_bytes_with_raw_receipt_substituted": 247370
+      },
+      "succinct": {
+        "prove_process_seconds": 27.698552165995352,
+        "native_verify_seconds": 0.014318,
+        "receipt_bytes": 223290,
+        "receipt_sha256": "d3c9ad58936cfb86c0ab6c47c7e8d8c2b2933318a4f3e40b46c07a19859ad8c6",
+        "payment_bytes_with_raw_receipt_substituted": 226294
+      }
+    },
+    "bob-to-carol": {
+      "composite": {
+        "prove_process_seconds": 14.96836604096461,
+        "native_verify_seconds": 0.014127,
+        "receipt_bytes": 244366,
+        "receipt_sha256": "7aab2cd364116c53fb74e65e097c6a78c2e8744b31c97309de54f4a89ac17bac",
+        "payment_bytes_with_raw_receipt_substituted": 247370
+      },
+      "succinct": {
+        "prove_process_seconds": 27.88682845805306,
+        "native_verify_seconds": 0.013347,
+        "receipt_bytes": 223290,
+        "receipt_sha256": "c39bb81a1f8ef0d56d11bc21eced9014b6916fa2de79cfcc19d200729add7bee",
+        "payment_bytes_with_raw_receipt_substituted": 226294
+      }
+    }
+  }
+}
