@@ -38,6 +38,15 @@ pub fn sign_payment(
     public_key: &[u8],
     sign_digest: impl FnOnce([u8; 32]) -> Result<[u8; 64], String>,
 ) -> Result<Vec<u8>, String> {
+    sign_payment_with_message(p, public_key, |message| sign_digest(Sha256::digest(message).into()))
+}
+
+/// Sign SHA256(P) with a device that applies SHA-256 internally.
+pub fn sign_payment_with_message(
+    p: &Payment,
+    public_key: &[u8],
+    sign_message: impl FnOnce([u8; 32]) -> Result<[u8; 64], String>,
+) -> Result<Vec<u8>, String> {
     if public_key.len() != 65 || public_key[0] != 4 {
         return Err("expected uncompressed P-256 key".into());
     }
@@ -79,8 +88,9 @@ pub fn sign_payment(
     pre.extend(locktime);
     pre.extend(0x41u32.to_le_bytes());
 
-    let digest = hash256(&pre);
-    let raw = sign_digest(digest)?;
+    let message: [u8; 32] = Sha256::digest(&pre).into();
+    let digest: [u8; 32] = Sha256::digest(message).into();
+    let raw = sign_message(message)?;
     let sig = Signature::from_slice(&raw).map_err(|_| "invalid R1 scalars")?;
     key.verify_prehash(&digest, &sig).map_err(|_| "invalid R1 digest signature")?;
     let mut inverse = sig.s().invert().to_bytes().to_vec();

@@ -43,7 +43,7 @@ fn ordinary_payment() {
 }
 
 fn assert_payment(template: &str, vector: &str) {
-    use p2pkh_r1::payment::{sign_payment, Output, Payment};
+    use p2pkh_r1::payment::{sign_payment, sign_payment_with_message, Output, Payment};
     let v: Value = serde_json::from_str(vector).unwrap();
     let dec = |name: &str| hex::decode(v[name].as_str().unwrap()).unwrap();
     let base = hex::decode(template.split_whitespace().collect::<String>()).unwrap();
@@ -61,6 +61,11 @@ fn assert_payment(template: &str, vector: &str) {
         assert_eq!(digest.as_slice(), dec("digest_hex"));
         Ok(dec("signature_hex").try_into().unwrap())
     }).unwrap();
+    let message_signed = sign_payment_with_message(&payment, &key, |message| {
+        assert_eq!(message, <[u8; 32]>::from(Sha256::digest(dec("preimage_hex"))));
+        Ok(dec("signature_hex").try_into().unwrap())
+    }).unwrap();
+    assert_eq!(message_signed, tx);
     let mut txid = Sha256::digest(Sha256::digest(&tx));
     txid.reverse();
     assert_eq!(hex::encode(txid), v["signed_txid"].as_str().unwrap());

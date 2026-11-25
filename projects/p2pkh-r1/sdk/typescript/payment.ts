@@ -61,6 +61,12 @@ function inverseLE(s: bigint): Buffer {
 /** Spend one authenticated R1 UTXO with ForkID ALL. Returns the serialized transaction. */
 export async function signPayment(p: Payment, publicKey: Uint8Array,
   signDigest: (digest: Buffer) => Promise<Uint8Array> | Uint8Array): Promise<Buffer> {
+  return signPaymentWithMessage(p, publicKey, message => signDigest(sha256(message)));
+}
+
+/** Sign SHA256(P) with a device that applies SHA-256 internally. */
+export async function signPaymentWithMessage(p: Payment, publicKey: Uint8Array,
+  signMessage: (message: Buffer) => Promise<Uint8Array> | Uint8Array): Promise<Buffer> {
   const q = Buffer.from(publicKey);
   if (q.length !== 65 || q[0] !== 4) throw new Error("expected uncompressed P-256 key");
   const key = createPublicKey({ format: "jwk", key: {
@@ -77,8 +83,9 @@ export async function signPayment(p: Payment, publicKey: Uint8Array,
   const count = compactSize(p.outputs.length);
   const preimage = Buffer.concat([version, hash256(outpoint), hash256(sequence), outpoint,
     Buffer.from("0268ac", "hex"), inputValue, sequence, hash256(outputs), locktime, uint32(0x41)]);
-  const signature = Buffer.from(await signDigest(hash256(preimage)));
-  if (signature.length !== 64 || !verify("sha256", sha256(preimage), {key, dsaEncoding: "ieee-p1363"}, signature))
+  const message = sha256(preimage);
+  const signature = Buffer.from(await signMessage(Buffer.from(message)));
+  if (signature.length !== 64 || !verify("sha256", message, {key, dsaEncoding: "ieee-p1363"}, signature))
     throw new Error("invalid R1 digest signature");
   const s = BigInt("0x" + signature.subarray(32).toString("hex"));
   const witness = Buffer.concat([Buffer.from([0x4c, preimage.length]), preimage, Buffer.from([65]), q,

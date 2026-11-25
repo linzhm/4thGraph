@@ -2,6 +2,7 @@ package p2pkhr1
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"os"
@@ -39,6 +40,7 @@ func assertPayment(t *testing.T, templateName, vectorName string) {
 		Key       string `json:"public_key_x963"`
 		Owner     string `json:"owner_hash160"`
 		Digest    string `json:"digest_hex"`
+		Preimage  string `json:"preimage_hex"`
 		Signature string `json:"signature_hex"`
 		Witness   string `json:"script_sig_hex"`
 		SignedID  string `json:"signed_txid"`
@@ -70,6 +72,15 @@ func assertPayment(t *testing.T, templateName, vectorName string) {
 	})
 	if err != nil {
 		t.Fatal(err)
+	}
+	messageSigned, err := SignPaymentWithMessage(p, q, func(message [32]byte) ([]byte, error) {
+		if message != sha256.Sum256(dec(v.Preimage)) {
+			t.Fatal("message differs from SHA256 of the node vector preimage")
+		}
+		return dec(v.Signature), nil
+	})
+	if err != nil || !bytes.Equal(messageSigned, tx) {
+		t.Fatalf("message signer produced a different transaction: %v", err)
 	}
 	txid := hash256(tx)
 	slices.Reverse(txid[:])

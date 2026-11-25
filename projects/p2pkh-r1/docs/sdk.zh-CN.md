@@ -14,7 +14,7 @@
 
 **收款。** 将 [template.hex](../template/template.hex) 去掉空白并解码为二进制，作为创建函数的第一个参数。第二个参数是 65 字节 R1 公钥或 20 字节 owner HASH160。函数校验固定程序、复制字节并替换所有者字段。识别函数只接受 raw scriptPubKey，成功时返回 20 字节哈希，调用方还应与预期收款人比较。模板固定字节、长度或 framing 不符时，TS 返回 null，Rust 返回 None，Go 返回 ok=false。本模板对未压缩公钥做 HASH160，接收压缩公钥的应用应先在本地验证并还原为 65 字节编码。
 
-**付款。** 调用方负责取得可信 UTXO，或在本地核对父交易 txid、vout、金额及 scriptPubKey。SDK 接收其显示顺序的 32 字节 txid、vout、聪金额、锁定脚本、有序的新输出列表（含找零）、已批准的手续费及本次公钥。金额使用整数聪，TypeScript 使用 bigint。SDK 验证所有者、费用平衡和非负金额，构造一笔版本 2、单输入、最终 sequence、零 locktime 的交易，固定使用 BIP143 ALL。设备回调仅接收 32 字节摘要，返回 64 字节 r∥s。SDK 验证签名、计算逆元、写入 OP_0 并返回完整的已签交易字节。回调失败或签名无效时，调用方只收到错误。设备授权、nonce 安全及跨调用签名记录由签名服务负责。三种 SDK 均不发送交易。
+**付款。** 调用方负责取得可信 UTXO，或在本地核对父交易 txid、vout、金额及 scriptPubKey。SDK 接收其显示顺序的 32 字节 txid、vout、聪金额、锁定脚本、有序的新输出列表（含找零）、已批准的手续费及本次公钥。金额使用整数聪，TypeScript 使用 bigint。SDK 验证所有者、费用平衡和非负金额，构造一笔版本 2、单输入、最终 sequence、零 locktime 的交易，固定使用 BIP143 ALL。摘要签名回调收到 32 字节摘要，两种签名回调均返回 64 字节 r∥s。SDK 验证签名、计算逆元、写入 OP_0 并返回完整的已签交易字节。回调失败或签名无效时，调用方只收到错误。设备授权、nonce 安全及跨调用签名记录由签名服务负责。三种 SDK 均不发送交易。
 
 混合输入或显式 NONE、SINGLE、ANYONECANPAY、OTDA 的应用，按协议层的输入授权接口构造每个输入。当前三种移植的高级付款接口仅提供上述普通路径。[Python 参考实现](../reference/wallet.py) 提供 `sign_spend(tx, index, parent, requested_type, pubkey, sign_digest, history_path)`。其他语言扩展该接口时，必须基于真实交易与前序输出生成消息，并从类型、输入索引、输出数量推导分支位。普通付款无需开放类型或分支开关。
 
@@ -36,7 +36,9 @@
 
 ## 对接设备与复验
 
-先用 [spend-all.json](../template/spend-all.json) 内的签名替代真实设备。回调收到的摘要须等于 digest_hex，返回 signature_hex。三个 SDK 必须产生向量中的解锁脚本及已签 txid。然后将同一个回调换成设备接口，让设备对指定摘要签名。设备生成另一份有效签名时，签名和 txid 可以不同。对 DER 签名先解析两个正整数，再填充为两个大端 32 字节数。若设备接口会自行做一次 SHA-256，适配层须使用支持相应消息输入的接口；绝不能将 SDK 给出的双哈希摘要再交给自动哈希的消息签名接口。
+向量的摘要回调收到 `digest_hex`，返回 `signature_hex`。三个 SDK 均可复现向量中的解锁脚本及已签 txid。设备生成另一份有效签名时，签名和 txid 可以不同。对 DER 签名先解析两个正整数，再填充为两个大端 32 字节数。 [付款向量](../template/spend-all.json)
+
+设备直接签摘要时，使用 TypeScript 的 `signPayment`、Rust 的 `sign_payment` 或 Go 的 `SignPayment`，回调收到 `SHA256d(P)`。设备内部执行一次 SHA-256 时，使用 `signPaymentWithMessage`、`sign_payment_with_message` 或 `SignPaymentWithMessage`，回调收到 32 字节消息 `SHA256(P)`。两种入口都执行同样的交易预检，并用 `SHA256d(P)` 核对返回的 64 字节签名。
 
 ```sh
 (cd projects/p2pkh-r1/sdk/typescript && npm install && npm run check && npm test)
