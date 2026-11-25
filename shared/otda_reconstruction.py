@@ -24,30 +24,69 @@ class Reconstruction:
 
     def build(self, preimage, outputs):
         """Replace a contiguous suffix of real outputs; preserve all preceding bytes."""
-        slots = [(output, self.match(output.script)) for output in outputs]
-        if not any(fields is not None for _, fields in slots):
+        slots = [(output, self.match(output.script), 0) for output in outputs]
+        if not any(fields is not None for _, fields, _ in slots):
             return None
-        encoded = b"".join(output.serialize() for output, _ in slots)
-        if not preimage.endswith(encoded, 0, len(preimage) - 8):
-            raise ValueError("OTDA outputs differ from the signing preimage")
+        return _build(preimage, slots, (self,))
 
-        cat = asm("OP_CAT")
-        count = len(self.fixed_parts)
-        program = bytearray(self.program + push(preimage[:-len(encoded) - 8]))
-        for output, fields in slots:
-            raw = output.serialize()
-            if fields is None:
-                program.extend(push(raw) + cat)
-                continue
-            program.extend(push(raw[:-len(output.script)]) + cat)
-            for depth, value in zip(range(count, 1, -1), fields, strict=True):
-                program.extend(number(depth) + asm("OP_PICK OP_CAT") + push(value) + cat)
-            program.extend(asm("OP_OVER OP_CAT"))
-        program.extend(push(preimage[-8:]) + cat)
-        if count == 2:
-            # Keep the original R1 wire encoding.
-            program.extend(asm("OP_ROT OP_DROP OP_SWAP OP_DROP"))
+
+def reconstruct_mixed(preimage, outputs, patterns):
+    """Emit each used dictionary once and serialize all outputs in signed order."""
+    slots = []
+    used = set()
+    for output in outputs:
+        for index, pattern in enumerate(patterns):
+            fields = pattern.match(output.script)
+            if fields is not None:
+                used.add(index)
+                slots.append((output, fields, index))
+                break
         else:
-            program.extend(asm("OP_TOALTSTACK") + asm("OP_2DROP") * (count // 2)
-                           + asm("OP_DROP") * (count % 2) + asm("OP_FROMALTSTACK"))
-        return bytes(program)
+            slots.append((output, None, None))
+    if len(used) < 2:
+        return None
+    order = sorted(used)
+    remap = {index: position for position, index in enumerate(order)}
+    return _build(
+        preimage,
+        [(output, fields, remap.get(index)) for output, fields, index in slots],
+        tuple(patterns[index] for index in order),
+    )
+
+
+def _build(preimage, slots, patterns):
+    encoded = b"".join(output.serialize() for output, _, _ in slots)
+    if not preimage.endswith(encoded, 0, len(preimage) - 8):
+        raise ValueError("OTDA outputs differ from the signing preimage")
+
+    cat = asm("OP_CAT")
+    count = sum(len(pattern.fixed_parts) for pattern in patterns)
+    base_depth = []
+    next_depth = count
+    for pattern in patterns:
+        base_depth.append(next_depth)
+        next_depth -= len(pattern.fixed_parts)
+
+    program = bytearray()
+    for pattern in patterns:
+        program.extend(pattern.program)
+    program.extend(push(preimage[:-len(encoded) - 8]))
+    for output, fields, index in slots:
+        raw = output.serialize()
+        if fields is None:
+            program.extend(push(raw) + cat)
+            continue
+        program.extend(push(raw[:-len(output.script)]) + cat)
+        depth = base_depth[index]
+        for value in fields:
+            program.extend(number(depth) + asm("OP_PICK OP_CAT") + push(value) + cat)
+            depth -= 1
+        program.extend(asm("OP_OVER OP_CAT") if depth == 1 else number(depth) + asm("OP_PICK OP_CAT"))
+    program.extend(push(preimage[-8:]) + cat)
+    if count == 2:
+        # Keep the original R1 single-dictionary wire encoding.
+        program.extend(asm("OP_ROT OP_DROP OP_SWAP OP_DROP"))
+    else:
+        program.extend(asm("OP_TOALTSTACK") + asm("OP_2DROP") * (count // 2)
+                       + asm("OP_DROP") * (count % 2) + asm("OP_FROMALTSTACK"))
+    return bytes(program)

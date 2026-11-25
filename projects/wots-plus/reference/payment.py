@@ -13,6 +13,7 @@ from shared.transaction import (
 from wots import KEY_BYTES, verify_digest
 
 DEFAULT_SIGHASH = FORKID | SIGHASH_ALL
+COMPRESSIBLE_OTDA_TYPES = (0x61, 0xe1, 0x63, 0xe3)
 
 
 @dataclass(frozen=True)
@@ -96,8 +97,9 @@ def sign_spend(tx, index, funding_raw, public_key, signer, *, sighash=DEFAULT_SI
         raise ValueError('change must use a fresh WOTS+ key')
     auth = authorization(tx, index, previous.value, sighash)
     program = None
-    if compress_otda and tx.version == 2 and sighash in (0x61, 0xe1):
-        program = fixed_pattern().build(auth.preimage, tx.outputs)
+    if compress_otda and tx.version == 2 and not auth.companion and sighash in COMPRESSIBLE_OTDA_TYPES:
+        outputs = (tx.outputs[index],) if sighash & 31 == SIGHASH_SINGLE else tx.outputs
+        program = fixed_pattern().build(auth.preimage, outputs)
     signature = signer(_checked_digest(auth))
     witness = current_input_unlock(auth, public_key, signature)
     if program is not None:

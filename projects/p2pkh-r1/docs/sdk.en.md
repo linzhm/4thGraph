@@ -57,3 +57,9 @@ or paired SINGLE. SINGLE reconstructs its same-index output and retains
 the null placeholders that precede it in the preimage. Version 1, unpaired
 SINGLE, and unknown output formats use their existing encodings. The
 signer receives the original digest, and its signature goes into the witness.
+
+Version 2 OTDA ALL can reconstruct both the 47,510-byte compiled template
+and the 46,302-byte scheduled template. The wallet compares the literal,
+single-template and two-template encodings. A two-input, two-output
+payment with one output of each template measures 110,302 bytes, down
+from 195,028 bytes with single-template reconstruction.

@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
+from unittest.mock import patch
 
 from tx_engine import Script, Tx, TxIn, TxOut
 
@@ -137,6 +138,30 @@ class FixedTemplateTests(unittest.TestCase):
                     self.assertEqual(evaluate(before.script_sig.raw_serialize()),
                                      evaluate(after.script_sig.raw_serialize()))
                     self.assertLess(len(after.script_sig.raw_serialize()), len(before.script_sig.raw_serialize()))
+
+    def test_mixed_all_reconstructs_two_templates_and_measures_marginals(self):
+        keys, locks, funding = self.funding(compiled_curve="scheduled")
+        old = script(locking_script_from_owner_hash(keys[4][2], compiled_curve=True))
+        outputs = [locks[3], old, locks[5]]
+        shapes = ((2, 2), (3, 2), (2, 3))
+        sizes = {
+            0x61: ((195028, 110302), (245743, 118654), (243821, 156695)),
+            0xe1: ((194944, 110218), (245494, 118405), (243737, 156611)),
+        }
+        for flag, expected_sizes in sizes.items():
+            for (m, n), expected in zip(shapes, expected_sizes, strict=True):
+                with self.subTest(flag=hex(flag), inputs=m, outputs=n):
+                    prev = funding[:m]
+                    tx = Tx(2, [TxIn(p.id(), 0, Script()) for p in prev],
+                            [TxOut(500, lock) for lock in outputs[:n]], 0)
+                    with patch("signature.reconstruct_mixed", return_value=None):
+                        single_dictionary = self.sign(tx, prev, keys[:m], flag, compress="paired")
+                    mixed = self.sign(tx, prev, keys[:m], flag, compress="paired")
+                    self.check_chronicle(mixed, prev)
+                    self.assertEqual((len(single_dictionary.serialize()), len(mixed.serialize())), expected)
+                    for before, after in zip(single_dictionary.tx_ins, mixed.tx_ins, strict=True):
+                        self.assertEqual(evaluate(before.script_sig.raw_serialize()),
+                                         evaluate(after.script_sig.raw_serialize()))
 
     def test_paired_profile_falls_back_for_version_one_and_literal_outputs(self):
         keys, locks, funding = self.funding(compiled_curve="scheduled")

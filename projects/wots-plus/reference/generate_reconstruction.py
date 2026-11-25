@@ -5,6 +5,7 @@ import json
 
 from script import _chain, _payment_script
 from fixed_template import TEMPLATE_DIRECTORY
+from payment import COMPRESSIBLE_OTDA_TYPES
 from shared.script import asm, push
 from wots import CHAINS, N
 
@@ -34,7 +35,8 @@ def build_artifacts():
         "key_offsets": [len(first), len(first) + N + len(middle)],
         "reconstruction": {
             "file": "otda-all-reconstruct.hex", "bytes": len(program), "sha256": sha256(program).hexdigest(),
-            "spend_transaction_version": 2, "sighash_types": ["61", "e1"],
+            "spend_transaction_version": 2,
+            "sighash_types": [f"{flag:02x}" for flag in sorted(COMPRESSIBLE_OTDA_TYPES)],
         },
     }
     return {

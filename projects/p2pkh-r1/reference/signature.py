@@ -5,6 +5,7 @@ from hashlib import sha256
 from tx_engine import Script, sig_hash_preimage
 
 from fixed_templates import otda_pattern
+from shared.otda_reconstruction import reconstruct_mixed
 from shared.script import push
 from shared.transaction import Output
 
@@ -55,14 +56,14 @@ def _compressed_otda_preimage(tx, preimage, *, selected_index, shared_kernels):
         return None
     engine_outputs = tx.tx_outs if selected_index is None else (tx.tx_outs[selected_index],)
     outputs = tuple(Output(item.amount, item.script_pubkey.raw_serialize()) for item in engine_outputs)
-    best = None
+    patterns = []
     for scheduled in (False, True):
         version, pattern = otda_pattern(shared_kernels=shared_kernels, scheduled=scheduled)
         if tx.version == version:
-            program = pattern.build(preimage, outputs)
-            if program is not None and (best is None or len(program) < len(best)):
-                best = program
-    return best
+            patterns.append(pattern)
+    candidates = [pattern.build(preimage, outputs) for pattern in patterns]
+    candidates.append(reconstruct_mixed(preimage, outputs, patterns))
+    return min((program for program in candidates if program is not None), key=len, default=None)
 
 
 def current_input_unlock(auth, pubkey, signature, *, compress_otda_for=None, shared_kernels=False,

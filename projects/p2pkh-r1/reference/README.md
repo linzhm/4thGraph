@@ -152,8 +152,12 @@ OTDA SINGLE (`0x63` and `0xe3`). SINGLE reconstructs the same-index output
 and preserves the preceding null outputs in the preimage. Version 1,
 unpaired SINGLE, and unrecognized outputs use their existing encodings.
 The wallet passes the original digest to the signer and includes the returned
-signature bytes in the witness. For a mix of recognized templates it chooses
-the smallest encoding and copies the other outputs literally.
+signature bytes in the witness. For version 2 OTDA ALL, the 47,510-byte
+compiled and 46,302-byte scheduled templates can share an unlocking script.
+The wallet compares a single-template program, a program containing both
+templates and the literal preimage by encoded byte count. Outputs are
+recreated in their signed order. Other scripts in the transaction are
+copied literally.
 
 | 2 R1 inputs and 2 R1 outputs | Transaction | Extra R1 input | Extra R1 output |
 | --- | ---: | ---: | ---: |
@@ -164,3 +168,9 @@ The extra SINGLE input in the comparison has no same-index output. The
 acceptance tests verify individual output binding, full replays with both
 engines, byte-for-byte witness stack equivalence, and the existing 1,296-case
 authorization matrix for the scheduled lock.
+
+With one compiled and one scheduled R1 output and two R1 inputs, OTDA ALL
+takes 110,302 bytes using both templates. Reconstructing only one template
+takes 195,028 bytes. The added-input and added-output costs from this shape
+are 8,352 and 46,393 bytes, respectively. The extra output uses the scheduled
+template.

@@ -112,6 +112,8 @@ class NodeTests(unittest.TestCase):
         sizes = {
             0x61: (79090, 84786, 113235),
             0xe1: (79006, 84537, 113151),
+            0x63: (78921, 81361, 112888),
+            0xe3: (78837, 81195, 112804),
         }
         with TemporaryDirectory() as temp:
             for mode, expected_sizes in sizes.items():
@@ -129,7 +131,18 @@ class NodeTests(unittest.TestCase):
                             key = b"".join(fixed_pattern().match(parent.outputs[0].script))
                             literal = current_input_unlock(expected_auth, key, signature)
                             self.assertEqual((witness, alt), evaluate(literal))
-                            self.assertLess(len(tx.inputs[index].script), len(literal))
+                            if expected_auth.companion:
+                                self.assertEqual(tx.inputs[index].script, literal)
+                            else:
+                                self.assertLess(len(tx.inputs[index].script), len(literal))
+                        if mode in (0x63, 0xe3) and shape == (2, 2):
+                            for changed in range(2):
+                                outputs = list(tx.outputs)
+                                outputs[changed] = replace(outputs[changed], value=outputs[changed].value - 1)
+                                modified = replace(tx, outputs=tuple(outputs))
+                                self.assertFalse(chain_valid(modified, leg.parents))
+                                for index, parent in enumerate(leg.parents):
+                                    self.assertEqual(node_check(modified, parent, index), index != changed)
 
     def test_compressing_a_mixed_payment_signs_once_and_retains_literal_fallbacks(self):
         for version, mode, use_fixed_output, compresses in (

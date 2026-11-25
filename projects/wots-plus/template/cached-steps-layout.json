@@ -15,7 +15,9 @@
     "spend_transaction_version": 2,
     "sighash_types": [
       "61",
-      "e1"
+      "63",
+      "e1",
+      "e3"
     ]
   }
 }
