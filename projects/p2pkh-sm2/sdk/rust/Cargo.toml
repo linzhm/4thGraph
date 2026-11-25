@@ -1,0 +1,11 @@
+[package]
+name = "bsv-script-lab-sm2-sdk"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+bsv-script-lab-local-sdk = { path = "../../../../shared/sdk/rust" }
+
+[dev-dependencies]
+hex = "0.4"
+serde_json = "1"
