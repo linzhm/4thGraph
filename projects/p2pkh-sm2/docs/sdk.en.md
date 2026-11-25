@@ -2,7 +2,9 @@
 
 [简体中文](sdk.zh-CN.md) · [Developer guide](developer.en.md#sdk) · [Wallet quickstart](../../../shared/sdk/README.md)
 
-Use a 65-byte uncompressed SM2 key or a 20-byte owner hash for the v1.0.0 receive script. Pass the 32-byte transaction message and the supplied user ID to the SM2 signer. The raw response is the 64-byte `r ∥ s` signature. For a GB/T 35275-2026 provider, set `signerIdentifier` to the trusted DER issuer-and-serial hex and return the requested DER SignedData. When Chronicle is active, `compressOtda: true` enables the constructor for eligible version-2 OTDA ALL and paired SINGLE spends, including ANYONECANPAY. It uses the same signer contract.
+Use a 65-byte uncompressed SM2 key or a 20-byte owner hash for the receive script. The SDK option `template: "v1.0.0"` selects locking template `1`, which the v1.1.0 candidate also uses. Pass the 32-byte transaction message and the supplied user ID to the SM2 signer. The raw response is a 64-byte `r ∥ s` signature. For a GB/T 35275-2026 provider, set `signerIdentifier` to the trusted DER issuer-and-serial hex and return the requested DER SignedData.
+
+Set `chronicleActive` from the actual spend context when using OTDA. The SDK automatically selects the shorter encoding for eligible version-2 OTDA ALL and paired SINGLE spends, including ANYONECANPAY. The signer receives the same message and user ID for both encodings. Use the final signed transaction ID when constructing a child.
 
 <a name="quickstart"></a>
 
@@ -35,6 +37,8 @@ const signedHex = wallet.signPayment({
 ```
 
 Use `signInput` for a prepared transaction. Supply the transaction, its input index and the corresponding prevout. See the [call table](../../../shared/sdk/README.md#calls-and-data) for the matching Rust, Go, and Python interfaces.
+
+The SDK requires a same-index output when you request SINGLE. The Python reference also supports the unpaired OTDA companion encoding. [Reference wallet](../reference/README.md)
 
 ## Replay vectors
 

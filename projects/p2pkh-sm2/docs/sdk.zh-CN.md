@@ -2,7 +2,9 @@
 
 [English](sdk.en.md) · [开发指南](developer.zh-CN.md#sdk) · [统一钱包接入](../../../shared/sdk/README.zh-CN.md)
 
-v1.0.0 收款脚本可由 65 字节未压缩 SM2 公钥或 20 字节所有者哈希生成。将 32 字节交易消息和 SDK 提供的用户 ID 一起交给 SM2 签名器，返回 64 字节 `r ∥ s`。使用 GB/T 35275-2026 服务时，将 `signerIdentifier` 设为经信任的 DER 颁发者与序列号十六进制，返回 SDK 请求的 DER SignedData。Chronicle 已激活时，可用 `compressOtda: true` 为符合条件的版本 2 OTDA ALL 和配对 SINGLE 启用构造器，包含 ANYONECANPAY 组合。签名器契约相同。
+收款脚本可由 65 字节未压缩 SM2 公钥或 20 字节所有者哈希生成。SDK 的 `template: "v1.0.0"` 选择锁定模板 `1`，v1.1.0 候选版沿用此模板。将 32 字节交易消息和 SDK 提供的用户 ID 一起交给 SM2 签名器，返回 64 字节 `r ∥ s`。使用 GB/T 35275-2026 服务时，将 `signerIdentifier` 设为可信的 DER 颁发者与序列号十六进制，返回 SDK 请求的 DER SignedData。
+
+使用 OTDA 时，根据实际花费环境设置 `chronicleActive`。对符合条件的版本 2 OTDA ALL 和配对 SINGLE，SDK 自动选择更短的编码，包含 ANYONECANPAY 组合。两种编码给签名器提供同样的消息和用户 ID。构建子交易时使用最终已签交易的 ID。
 
 <a name="quickstart"></a>
 
@@ -35,6 +37,8 @@ const signedHex = wallet.signPayment({
 ```
 
 已构造的交易用 `signInput`，传入交易、本次输入索引和对应的 prevout。Rust、Go、Python 的等价入口在[调用表](../../../shared/sdk/README.zh-CN.md#调用与数据)。
+
+SDK 接收 SINGLE 时要求交易具备同索引输出。Python 参考钱包也支持无配对的 OTDA 伴随编码。[参考钱包](../reference/README.zh-CN.md)
 
 ## 复放向量
 
