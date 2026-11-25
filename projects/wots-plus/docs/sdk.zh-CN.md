@@ -31,6 +31,12 @@ const signedHex = wallet.signPayment({
 
 已构造的交易用 `signInput`，传入交易、本次输入索引和对应的 prevout。Rust、Go、Python 的等价入口在[调用表](../../../shared/sdk/README.zh-CN.md#调用与数据)。
 
+## 选择收款模板并演练重试
+
+先用 `canonical` 做对照，再按预期的输入输出数量比较 `cached-constants` 和 `cached-steps`。版本 2 Chronicle 交易新建符合条件的缓存步骤输出时，可设置 `compressOtda: true` 验证重建。每个输出保留其规范编码的 64 字节公钥。[模板实测](../README.zh-CN.md#完整交易与栈测量)
+
+签名器持久记录密钥状态，每个输出使用新密钥。广播重试时重播已保存的交易字节。不同交易需要重新授权，发起请求前先核对密钥是否已经消耗。测试应覆盖签名进程重启后，同一密钥的二次请求被阻止。[持久签名器参考实现](../../../shared/one_time_signer.py)
+
 ## 复放向量
 
 ```sh
