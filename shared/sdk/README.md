@@ -10,12 +10,19 @@ Use the shared source package for your language and select a scheme by project i
 
 ## Set up native P2PKH
 
-Run these commands from the repository root. The TypeScript example requires Node.js 24 or later. Go examples use Go 1.23 or later, and the Rust crate uses edition 2021.
+Run these commands from the repository root to try the Python example.
 
 ```sh
 python3.12 -m venv .venv
-.venv/bin/python -m pip install -r projects/p2pk-p2pkh-baseline/reference/requirements-sdk.txt
+.venv/bin/python -m pip install -r projects/p2pk-p2pkh-baseline/reference/requirements-sdk.txt ecdsa==0.19.1
+.venv/bin/python -m shared.sdk.examples.receive_and_pay
 ```
+
+The offline example creates and recognizes a native P2PKH lock, then signs a synthetic payment with a 100-satoshi fee. It prints the template, byte sizes and transaction ID. It uses a public test key and never connects to a node or broadcasts. The `ecdsa` package is for the test signer. [Example source](examples/receive_and_pay.py)
+
+Pass `p2pkh-sm2`, `lamport-ots`, `wots-plus`, or `ml-dsa` as the final argument to try another scheme. Install SM2's dependencies from its integration guide. Lamport and WOTS+ use the Python standard library for this example. ML-DSA-44 uses OpenSSL 3.5 or later, selected with `ML_DSA_OPENSSL` when needed. The R1 and Deferred guides below include their transaction and activation replays.
+
+The TypeScript example requires Node.js 24 or later. Go examples use Go 1.23 or later, and the Rust crate uses edition 2021.
 
 Use `WalletClient` from [TypeScript](typescript/index.ts), `WalletClient::new` from [Rust](rust/Cargo.toml), `NewWallet` from [Go](go/go.mod), or `WalletClient` from [Python](python/client.py). These are source packages. With Python, run from the repository root or put the checkout on `PYTHONPATH`.
 
@@ -69,6 +76,8 @@ You can pass an authenticated prevout directly. `prevoutFromFunding` reads seria
 
 Wallet signing defaults to ForkID ALL (`0x41`), and `SINGLE` requires an output at the same index. Set `chronicleActive` from the trusted chain context before choosing OTDA. The callback receives `algorithm`, `payloadKind` (`digest` or `message`), `signatureFormat`, `sighash`, `payload`, and the SM2 `userId` when present. Use the scheme-specific signing operation and encoding below.
 
+If the bridge fails to start, check the interpreter path, scheme dependencies, and source checkout. A fee mismatch fails before the signer runs. A signature error can occur after the callback returns, so retain the signer state and check the project's retry guidance, especially for one-time keys.
+
 ## Call from Rust, Go, and Python
 
 Set the same absolute interpreter and bridge paths in the Rust and Go `config`. Pass approved outputs as `Vec<Output>` in Rust, `[]sdk.Output` in Go, or a sequence of `(integer satoshis, raw script bytes)` in Python.
@@ -116,6 +125,8 @@ signed = wallet.sign_payment(
     lambda request: signer.sign_secp256k1_digest_der(request.payload),
 )
 ```
+
+For Lamport and WOTS+ in Python, wrap your digest signer with `durable_signer(database, project, spend_key, sign_digest)` and pass the resulting function as `lambda request: sign_once(request.payload)`, where `sign_once` is the returned wrapper. Use the same database and canonical public key across wallet processes and template formats. [One-time signer](../one_time_signer.py)
 
 ## Scheme integrations
 
