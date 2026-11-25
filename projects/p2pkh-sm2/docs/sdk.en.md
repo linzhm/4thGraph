@@ -40,6 +40,15 @@ Use `signInput` for a prepared transaction. Supply the transaction, its input in
 
 The SDK requires a same-index output when you request SINGLE. The Python reference also supports the unpaired OTDA companion encoding. [Reference wallet](../reference/README.md)
 
+## Select the provider's signing operation
+
+| Provider | Request and response |
+| --- | --- |
+| Raw SM2 | Sign the SDK's 32-byte message with the supplied SM2 user ID. The provider computes the SM2 ZA and SM3 inputs and returns 64 raw bytes `r ∥ s`. |
+| GB/T 35275-2026 SignedData | Pin the expected SM2 public key and DER issuer-and-serial identifier. Set `signerIdentifier` and return one direct signature over the exact requested message in DER SignedData. Use `SignedData.version = 1` and `SignerInfo.version = 2`. The payment adapter verifies the envelope and extracts the raw signature. |
+
+For a new provider, replay one raw payment and one SignedData payment if both operations are offered. Check that a changed message, key or signer identifier is rejected. For Chronicle OTDA, capture the final signed bytes before building any child because different encodings of the same signature authorization produce different txids. [SignedData integration and test signers](../reference/README.md#signeddata-payment-interop)
+
 ## Replay vectors
 
 ```sh

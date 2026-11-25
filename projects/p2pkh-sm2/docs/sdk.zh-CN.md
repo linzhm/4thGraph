@@ -40,6 +40,15 @@ const signedHex = wallet.signPayment({
 
 SDK 接收 SINGLE 时要求交易具备同索引输出。Python 参考钱包也支持无配对的 OTDA 伴随编码。[参考钱包](../reference/README.zh-CN.md)
 
+## 选择服务端的签名操作
+
+| 服务类型 | 请求和响应 |
+| --- | --- |
+| 原始 SM2 | 用 SDK 给出的 SM2 用户标识签署 32 字节消息。由服务计算 SM2 的 ZA 和 SM3 输入，返回 64 字节原始签名 `r ∥ s`。 |
+| GB/T 35275‑2026 SignedData | 在可信配置中绑定预期的 SM2 公钥以及 DER 颁发者与序列号，并设置 `signerIdentifier`。在 DER 封装中返回一份对请求消息的直接签名，使用 `SignedData.version = 1` 和 `SignerInfo.version = 2`。付款适配器核验后提取原始签名。 |
+
+新服务同时提供这两种操作时，分别复放一笔原始 SM2 付款和一笔 SignedData 付款，并检查修改消息、公钥或签名者标识后会被拒绝。使用 Chronicle OTDA 时，在组装子交易前保存最终已签字节，同一签名授权的不同解锁编码会产生不同的 txid。[SignedData 接入与测试签名器](../reference/README.zh-CN.md#signeddata-付款接入)
+
 ## 复放向量
 
 ```sh
