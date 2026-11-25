@@ -38,7 +38,15 @@ def sign_spend(tx, index, parent, requested_type, pubkey, sign_digest, history_p
     if txin.prev_tx.lower() != parent.id().lower() or not 0 <= txin.prev_index < len(parent.tx_outs):
         raise ValueError("parent outpoint mismatch")
     output = parent.tx_outs[txin.prev_index]
-    owner = recognize(output.script_pubkey.raw_serialize())
+    return previous_output_unlock(tx, index, output.amount, output.script_pubkey.raw_serialize(),
+                                  requested_type, pubkey, sign_digest, history_path,
+                                  compress_otda=compress_otda)
+
+
+def previous_output_unlock(tx, index, amount, script, requested_type, pubkey, signer, history_path,
+                           *, compress_otda=False, sign_message=False):
+    """Build an unlocking script for an already matched previous output."""
+    owner = recognize(script)
     if owner is None or requested_type not in UNIVERSAL_FLAGS:
         raise ValueError("unrecognized template or sighash type")
     if type(compress_otda) is not bool and compress_otda not in ("shared-kernels", "paired"):
@@ -48,7 +56,7 @@ def sign_spend(tx, index, parent, requested_type, pubkey, sign_digest, history_p
     key = ec.EllipticCurvePublicKey.from_encoded_point(ec.SECP256R1(), pubkey)
     if new("ripemd160", sha256(pubkey).digest()).digest() != owner:
         raise ValueError("owner key mismatch")
-    auth = authorization(tx, index, output.amount, requested_type)
+    auth = authorization(tx, index, amount, requested_type)
     digest = auth.digest()
 
     with closing(sqlite3.connect(history_path, timeout=30)) as db:
@@ -56,7 +64,7 @@ def sign_spend(tx, index, parent, requested_type, pubkey, sign_digest, history_p
                    "(pubkey BLOB NOT NULL, r BLOB NOT NULL, digest BLOB NOT NULL, PRIMARY KEY(pubkey,r))")
         db.execute("CREATE TABLE IF NOT EXISTS blocked_keys (pubkey BLOB PRIMARY KEY)")
         _ensure_active(db, pubkey)
-        signature = sign_digest(digest)
+        signature = signer(sha256(auth.preimage).digest() if sign_message else digest)
         if len(signature) != 64:
             raise ValueError("expected fixed-width r || s")
         r = int.from_bytes(signature[:32], "big")

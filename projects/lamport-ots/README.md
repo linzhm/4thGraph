@@ -2,6 +2,14 @@
 
 [简体中文](README.zh-CN.md) · [BSV Script Lab](../../README.md)
 
+## Developer resources
+
+**[Wallet SDK quickstart](docs/sdk.en.md#quickstart)** · [Unified wallet SDK](../../shared/sdk/README.md#quickstart)
+
+Choose a full-key or committed-key output and connect a signer that records one-time key consumption before releasing a signature.
+
+[Protocol](docs/developer.en.md#protocol) · [Security](docs/developer.en.md#security) · [Verify](#run) · [Transaction costs](#complete-transactions-and-stack-measurements)
+
 **Status** · v0.1 development baseline.
 
 Experimental, directly unrolled 256-bit Lamport one-time signatures in BSV Script.
@@ -10,10 +18,6 @@ one-use signing guard, complete transaction construction, and independent engine
 
 `OneTimeSigner` only prevents reuse of the same object in one process. It does not
 protect copied keys, process restarts, backups, rollback, or duplicate funding.
-
-## Developer resources
-
-[Protocol specification](docs/developer.en.md#protocol) · [Security analysis](docs/developer.en.md#security) · [Validation and measurements](docs/developer.en.md#validation) · [SDK and reference interfaces](docs/developer.en.md#sdk)
 
 ## Two explicitly different verifiers
 

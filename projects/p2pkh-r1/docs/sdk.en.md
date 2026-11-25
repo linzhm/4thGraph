@@ -2,32 +2,46 @@
 
 [中文](./sdk.zh-CN.md) · [Wire specification](./spec.en.md)
 
-## Public API
+<a name="quickstart"></a>
 
-The three source SDKs construct the same locking scripts, recognize raw outputs, and build an ordinary signed payment locally. TypeScript targets Node.js 24. Rust and Go are native libraries. Supply a signing callback to connect a hardware adapter.
+## Unified wallet API
 
-| Language | Create and recognize | Ordinary payment | Implementation |
-|---|---|---|---|
-| TypeScript | `lockForKey`, `lockForOwner`, `recognize` | `signPayment(payment, key, signDigest)` | [source](../sdk/typescript/index.ts) · [payment](../sdk/typescript/payment.ts) |
-| Rust | `lock_for_key`, `lock_for_owner`, `recognize` | `payment::sign_payment(&payment, key, sign_digest)` | [source](../sdk/rust/src/lib.rs) · [payment](../sdk/rust/src/payment.rs) |
-| Go | `LockForKey`, `LockForOwner`, `Recognize` | `SignPayment(payment, key, signDigest)` | [source](../sdk/go/template.go) · [payment](../sdk/go/payment.go) |
+Create new outputs with v0.2.0. The unified client can recognize existing and current templates. Use an uncompressed 65-byte P-256 key or pass `ownerHash160` for receiving. From the repository root, set up the project's reference environment.
 
-**Receive.** Remove whitespace and decode [v0.2.0](../template/v0.2.0/template.hex) once. Pass its bytes as the first constructor argument and a 65-byte R1 public key or 20-byte owner hash as the second. The constructor verifies the fixed program and changes the owner bytes in a copy. Recognition accepts a raw scriptPubKey and returns the 20-byte owner on success. Compare it with the intended recipient. A length, framing or program mismatch returns null in TS, None in Rust or ok=false in Go. An application accepting compressed public keys must validate and expand them before hashing the 65-byte encoding.
+```sh
+python3.12 -m venv .venv
+.venv/bin/python -m pip install -r projects/p2pkh-r1/reference/requirements.txt
+```
 
-**Pay.** The caller obtains an authenticated UTXO or verifies its funding txid, index, amount and script locally. Supply its 32-byte txid in display order, vout, satoshi value and scriptPubKey, the ordered outputs including change, approved fee and public key. Amounts are integer satoshis; TypeScript uses bigint. The SDK checks the owner, nonnegative amounts and exact fee balance. It constructs one version-2 input with final sequence, zero locktime and BIP143 ALL. The digest signer receives the 32-byte digest. Both callbacks return a 64-byte r∥s signature. The SDK verifies the signature, computes the inverse, writes OP_0 and returns the serialized signed transaction. Callback failures and invalid signatures return an error. The signer service owns device consent, nonce safety and any durable signing history. The SDK does not submit transactions.
+Use `config` from the [wallet quickstart](../../../shared/sdk/README.md) and authenticated wallet data.
 
-For mixed inputs or explicit NONE, SINGLE, ANYONECANPAY and OTDA, build each input through the protocol-layer authorization interface. The three ported high-level payment APIs implement the ordinary profile above. The [Python reference](../reference/wallet.py) exposes `sign_spend(tx, index, parent, requested_type, pubkey, sign_digest, history_path)`. A port of that interface must construct the message from the real transaction and authenticated prevout, deriving the selector from type, input position and output count. The ordinary payment API has no sighash or selector argument.
+```ts
+import { resolve } from "node:path";
+import { WalletClient } from "./shared/sdk/typescript/index.ts";
 
-For a child payment, obtain the confirmed funding outpoint from the
-application's trusted chain view before invoking the signing callback.
-Apply the application's confirmation threshold and recheck the output index,
-amount, locking script, and unspent status. If a different txid confirmed,
-reconcile the wallet's outpoint and rebuild the child before requesting a
-new signature.
-[Recovering a child payment](./chronicle.md#recovering-a-child-payment)
+const wallet = new WalletClient("p2pkh-r1", { ...config, template: "v0.2.0" });
+const receiveScript = wallet.createLock({ publicKey: receiveKeyHex });
+const prevout = wallet.prevoutFromFunding(fundingTxHex, fundingVout);
+if (!wallet.recognize({ script: prevout.script, publicKey: spendKeyHex })) {
+  throw new Error("Funding output does not match the spending key");
+}
+const signedHex = wallet.signPayment({
+  prevout,
+  publicKey: spendKeyHex,
+  outputs: approvedOutputs,
+  feeSats: approvedFeeSats.toString(),
+  historyPath: resolve(walletStateDir, "r1-signing.sqlite"),
+}, ({ payload }) => signer.signP256DigestRaw(payload));
+```
 
-The payment SDKs cap the input amount at 2,100,000,000,000,000 satoshis.
-Nonnegative outputs and fees must balance against that input. [BSV amount range](https://github.com/bitcoin-sv/bitcoin-sv/blob/v1.2.3/src/amount.h#L113-L123)
+The signer returns a 64-byte `r ∥ s` signature. The default payload is `SHA256d(P)`. For a device that applies SHA-256 internally, set `signMessage: true` and pass its `message` payload `SHA256(P)` to the device. Share a persistent `historyPath` across wallet processes to track P-256 nonce reuse. Use `signInput` for a prepared transaction. With Chronicle active, `compressOtda: true` can encode eligible version-2 OTDA unlocks. The native source entry points and low-level protocol operations are documented below.
+
+Replay the vector in all four languages from the repository root.
+
+```sh
+SCRIPT_LAB_SDK_PYTHON="$PWD/.venv/bin/python" \
+  bash shared/verify_node.sh -- bash shared/sdk/verify_wallet.sh p2pkh-r1
+```
 
 ## Regex and complete fingerprint
 
@@ -40,23 +54,15 @@ Nonnegative outputs and fees must balance against that input. [BSV amount range]
 
 3. Hash the raw bytes `SHA256(script[0:208] || script[228:])`. Require `52a1d9eb9e236403c66e845e18cf31d9c3a5f4c2e0ed7ca0270a60ba4e867ca6` before returning the capture. Changing a single fixed suffix byte fails recognition. To replace an owner, overwrite `[208,228)` in a verified copy. [Layout](../template/v0.2.0/layout.json)
 
-## Hardware adapter and replay
+## Device signers and prepared inputs
 
-The vector's digest callback receives `digest_hex` and returns `signature_hex`. All three SDKs reproduce the vector's scriptSig and signed txid. A different valid device signature may produce a different txid. Convert a DER signature by decoding its two positive integers and left-padding each to 32 big-endian bytes. [Payment vector](../template/v0.2.0/spend-all.json)
+A digest signer receives `SHA256d(P)`. Set `signMessage: true` for a device that takes `SHA256(P)` and applies SHA-256 itself. Both paths return 64 raw bytes, with `r` and `s` each padded to 32 bytes in big-endian order. TypeScript clients can use `signPaymentAsync` and `signInputAsync` for asynchronous devices.
 
-Use `signPayment` (TypeScript), `sign_payment` (Rust), or `SignPayment` (Go) with a prehashed signer. These callbacks receive `SHA256d(P)`. If the device applies SHA-256 internally, use `signPaymentWithMessage`, `sign_payment_with_message`, or `SignPaymentWithMessage`. Those callbacks receive the 32-byte message `SHA256(P)`. Both entry points validate the same transaction and verify the returned 64-byte signature against `SHA256d(P)`.
-
-```sh
-(cd projects/p2pkh-r1/sdk/typescript && npm install && npm run check && npm test)
-(cd projects/p2pkh-r1/sdk/rust && cargo test)
-(cd projects/p2pkh-r1/sdk/go && go test ./...)
-```
-
-The three test suites check the A/B/C constructor vectors, curve-point validation, fixed-byte changes, truncation, appended bytes, ordinary signed payments, incorrect signatures and fee mismatches. These tests require no device, node or signing secret. Installing dependencies initially requires network access. See the [reference guide](../reference/README.md) for node-level verification.
+Use `signInput` for mixed inputs and explicit sighash modes. The wallet assembles the intended transaction and verifies the previous output and fee before collecting signatures. If a different parent txid confirms, reconcile the outpoint and rebuild the child. [R1 signature and digest vector](../template/v0.2.0/spend-all.json) · [Recover a child payment](chronicle.md#recovering-a-child-payment)
 
 ## Current development version
 
-Use v0.2.0 for new outputs. Python uses it by default. For older UTXOs, use the original v0.1.0 layout. All three SDKs recognize both versions and construct ordinary ForkID ALL payments. [v0.1.0 layout](../template/layout.json)
+Use v0.2.0 for new outputs. Python uses it by default. For older UTXOs, use the original v0.1.0 layout. The shared client recognizes both versions and supports ordinary ForkID ALL payments. [v0.1.0 layout](../template/layout.json)
 
 In the Python reference, `sign_spend(..., compress_otda="paired")` enables
 output reconstruction in version 2 Chronicle OTDA transactions using ALL

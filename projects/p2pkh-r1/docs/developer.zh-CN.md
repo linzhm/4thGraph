@@ -34,6 +34,6 @@
 
 ## SDK 与参考接口
 
-TypeScript、Rust 和 Go 源码 SDK 可识别原始锁、写入所有者槽位，以及构造普通单输入 ForkID ALL 付款。设备内部做 SHA-256 时选消息回调，设备直接签已有摘要时选摘要回调，两者均返回 64 字节 `r || s`。混合交易或逐输入选择签名类型用 Python `sign_spend`。UTXO 查找、交易审批和广播由接入的钱包执行。
+[统一钱包接口](sdk.zh-CN.md#统一钱包接口)在 TypeScript、Rust、Go 和 Python 中提供生成锁、识别、普通付款和逐输入签名。P-256 签名器返回 64 字节 `r ∥ s`。设备内部执行一次 SHA-256 时使用 `signMessage`，钱包进程共用持久签名历史。
 
 [SDK 与测试命令](sdk.zh-CN.md) · [Python 参考实现](../reference/README.md)

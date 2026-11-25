@@ -2,15 +2,19 @@
 
 [简体中文](README.zh-CN.md) · [BSV Script Lab](../../README.md)
 
-Deferred moves the creation of a full R1 locking script from funding to activation. A [1,435-byte funding lock](template/v0.2.0/template.hex) commits to a [46,302-byte P2PKH-R1 v0.2.0 target](../p2pkh-r1/template/v0.2.0/template.hex) at the same value. Existing short locks keep the target version they originally committed to.
-
 ## Developer resources
 
-[Protocol specification](docs/developer.en.md#protocol) · [Security analysis](docs/developer.en.md#security) · [Validation and measurements](docs/developer.en.md#validation) · [SDK and reference interfaces](docs/developer.en.md#sdk)
+**[Wallet SDK quickstart](docs/sdk.en.md#quickstart)** · [Unified wallet SDK](../../shared/sdk/README.md#quickstart)
+
+Create a short deposit lock, arrange its committed R1 target at the same index, and call `activate`. Spend the resulting R1 output through the ordinary R1 integration.
+
+[Protocol](docs/spec.en.md) · [Security](docs/developer.en.md#security) · [Verify](#reproduce-and-integrate) · [Transaction costs](#measured-transaction-costs)
+
+Deferred moves the creation of a full R1 locking script from funding to activation. A [1,435-byte funding lock](template/v0.2.0/template.hex) commits to a [46,302-byte P2PKH-R1 v0.2.0 target](../p2pkh-r1/template/v0.2.0/template.hex) at the same value. Existing short locks keep the target version they originally committed to.
 
 ## Activation and later payment
 
-1. Create the funding output with `funding_output` or `funding_output_from_owner_hash`. On receipt, verify the short lock, value and both target commitments. The Python `recognize` result includes `target_r1_version`. With the source SDKs, match the output using the corresponding R1 template bytes.
+1. Create the funding output with `funding_output` or `funding_output_from_owner_hash`. On receipt, verify the short lock, value and both target commitments. The Python `recognize` result includes `target_r1_version`. The unified client reports this version as `targetTemplate`.
 2. Arrange the activation input and its same-index R1 output. Call `activate_input` and have the sponsor sign its own input if needed. The direct ForkID SINGLE unlock is 160 bytes. The two-check path carries a second digest commitment and takes 197 bytes. All twelve activation sighash combinations require the same-index output.
 3. Once activated, spend the full R1 output with the regular R1 wallet and signer. Chronicle OTDA reconstruction is available for supported later payments.
 

@@ -34,6 +34,6 @@ v0.1.0 短锁继续启用为原先承诺的 v0.1.0 目标。 [协议规范](spec
 
 ## SDK 与参考接口
 
-TypeScript、Rust 和 Go 源码 SDK 接收短锁和目标 R1 两份模板字节。新建时用 v0.2.0，读取旧短锁时选与实际承诺一致的 R1 模板。Python 的 `recognize` 返回 `target_r1_version`，`activate_input` 校验目标后为已安排好的输入编码解锁。交易编排和手续费赞助签名由钱包执行。
+用[统一钱包接口](sdk.zh-CN.md#统一钱包接口)生成并识别包含金额的短锁。将原承诺的 R1 输出放在与输入相同的位置，再对组装好的交易调用 `activate`。赞助输入单独签署，后续付款用普通 R1 钱包接口。
 
 [SDK 与测试命令](sdk.zh-CN.md) · [Python 参考实现](../reference/README.md)

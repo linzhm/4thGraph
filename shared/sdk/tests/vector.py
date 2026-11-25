@@ -16,16 +16,12 @@ from shared.transaction import Input, Output, Transaction
 
 def generate(project, node):
     adapter = adapter_for(project)
-    path = ROOT / "projects" / project / "sdk/fixture.py"
+    path = ROOT / "projects" / project / "reference/sdk_fixture.py"
     spec = spec_from_file_location("sdk_fixture", path)
     fixture = module_from_spec(spec)
     spec.loader.exec_module(fixture)
     vectors = []
-    python_sdk = spec_from_file_location("project_sdk", path.parent / "python/__init__.py")
-    entry = module_from_spec(python_sdk)
-    python_sdk.loader.exec_module(entry)
-    client = entry.create_client()
-    assert isinstance(client, Client)
+    client = Client(project)
     for case in fixture.cases():
         key = case["public_key"]
         profile = case["profile"]

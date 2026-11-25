@@ -2,16 +2,20 @@
 
 [简体中文](README.zh-CN.md) · [BSV Script Lab](../../README.md)
 
+## Developer resources
+
+**[Wallet SDK quickstart](docs/sdk.en.md#quickstart)** · [Unified wallet SDK](../../shared/sdk/README.md#quickstart)
+
+Choose a raw SM2 or SignedData signer. Turn on OTDA reconstruction for eligible payments.
+
+[Protocol](docs/spec.en.md) · [Security](docs/developer.en.md#security) · [Verify](#developer-checks-and-cost-analysis) · [Transaction costs](#complete-transactions-and-stack-measurements)
+
 P2PKH-SM2 lets a payer lock a BSV output to the HASH160 of the recipient’s
 uncompressed SM2 public key. To spend the output, the recipient reveals the
 public key and supplies one SM2 signature for the current input. Bitcoin Script
 uses SM3 to compute the SM2 identity digest ZA and the message digest. It
 verifies the SM2 signature and binds the authorization to the spending
 transaction through PUSHTX and native `OP_CHECKSIG`.
-
-## Developer resources
-
-[Protocol specification](docs/developer.en.md#protocol) · [Security analysis](docs/developer.en.md#security) · [Validation and measurements](docs/developer.en.md#validation) · [SDK and reference interfaces](docs/developer.en.md#sdk)
 
 ## Release baseline
 
@@ -115,7 +119,7 @@ Each marginal cell shows the **change in total bytes (output locks / input unloc
 
 The optional 12,703-byte constructor reuses SM3 round and message-expansion fragments, SM2 point addition and doubling, and repeated instruction runs. For each eligible output it fills the receiver's HASH160 slot in the 144,925-byte v1.0.0 lock. The signing callback receives the same digest and SM2 user ID as the literal encoding. Choose the unlocking encoding before using the signed transaction ID to build a child.
 
-After Chronicle activation, enable `compress_otda=True` in Python `sign_input` or set the corresponding SDK option. On version 2, OTDA ALL reconstructs matched outputs in their original order. Paired OTDA SINGLE reconstructs the same-index output and preserves the preceding null outputs in the preimage. Both support `ANYONECANPAY`. Other output templates keep their literal bytes. ForkID, NONE, unpaired SINGLE, version 1 and non-smaller encodings use the literal path. [SDK options](sdk/README.md) · [Constructor and generator](reference/README.md#otda-constructor)
+After Chronicle activation, enable `compress_otda=True` in Python `sign_input` or set the corresponding SDK option. On version 2, OTDA ALL reconstructs matched outputs in their original order. Paired OTDA SINGLE reconstructs the same-index output and preserves the preceding null outputs in the preimage. Both support `ANYONECANPAY`. Other output templates keep their literal bytes. ForkID, NONE, unpaired SINGLE, version 1 and non-smaller encodings use the literal path. [SDK options](docs/sdk.en.md) · [Constructor and generator](reference/README.md#otda-constructor)
 
 | OTDA ALL, bytes | Literal | Reconstructed |
 | --- | ---: | ---: |

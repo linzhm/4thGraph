@@ -157,3 +157,161 @@ func (c *Client) SignSpend(ctx context.Context, request Spend, signer Signer) (s
 func (c *Client) SignPayment(ctx context.Context, request Payment, signer Signer) (string, error) {
 	return c.sign(ctx, request, signer)
 }
+
+// Prevout identifies an output the wallet has authenticated in its chain view.
+type Prevout struct {
+	Output
+	TxID string `json:"txid"`
+	Vout uint32 `json:"vout"`
+}
+
+type LockRequest struct {
+	PublicKey    string `json:"publicKey,omitempty"`
+	OwnerHash160 string `json:"ownerHash160,omitempty"`
+	ValueSats    string `json:"valueSats,omitempty"`
+}
+
+type RecognizeRequest struct {
+	Script    string `json:"script"`
+	PublicKey string `json:"publicKey,omitempty"`
+	ValueSats string `json:"valueSats,omitempty"`
+}
+
+type WalletRecognition struct {
+	Recognition
+	Project            string `json:"project"`
+	PublicKey          string `json:"publicKey,omitempty"`
+	TargetTemplate     string `json:"targetTemplate,omitempty"`
+	TargetScriptSHA256 string `json:"targetScriptSha256,omitempty"`
+	TargetTxOutHash256 string `json:"targetTxOutHash256,omitempty"`
+}
+
+type WalletSigningOptions struct {
+	PublicKey        string `json:"publicKey"`
+	Sighash          *uint8 `json:"sighash,omitempty"`
+	ChronicleActive  bool   `json:"chronicleActive,omitempty"`
+	CompressOTDA     bool   `json:"compressOtda,omitempty"`
+	SignerIdentifier string `json:"signerIdentifier,omitempty"`
+	HistoryPath      string `json:"historyPath,omitempty"`
+	SignMessage      bool   `json:"signMessage,omitempty"`
+}
+
+type WalletPayment struct {
+	WalletSigningOptions
+	Prevout Prevout  `json:"prevout"`
+	Outputs []Output `json:"outputs"`
+	FeeSats string   `json:"feeSats"`
+}
+
+type WalletInput struct {
+	WalletSigningOptions
+	Prevout     Prevout `json:"prevout"`
+	Transaction string  `json:"transaction"`
+	InputIndex  uint32  `json:"inputIndex"`
+}
+
+type Activation struct {
+	Prevout         Prevout `json:"prevout"`
+	Transaction     string  `json:"transaction"`
+	InputIndex      uint32  `json:"inputIndex"`
+	Sighash         *uint8  `json:"sighash,omitempty"`
+	ChronicleActive bool    `json:"chronicleActive,omitempty"`
+}
+
+type SigningRequest struct {
+	Algorithm       string `json:"algorithm"`
+	PayloadKind     string `json:"payloadKind"`
+	SignatureFormat string `json:"signatureFormat"`
+	Sighash         uint8  `json:"sighash"`
+	Payload         []byte `json:"-"`
+	UserID          []byte `json:"-"`
+}
+
+type WalletSigner func(SigningRequest) ([]byte, error)
+
+type WalletClient struct {
+	bridge   *Client
+	template string
+}
+
+func NewWallet(project string, config Config, template string) *WalletClient {
+	return &WalletClient{bridge: New(project, config), template: template}
+}
+
+func (c *WalletClient) PrevoutFromFunding(ctx context.Context, funding string, vout uint32) (Prevout, error) {
+	request := struct {
+		Funding string `json:"funding"`
+		Vout    uint32 `json:"vout"`
+	}{funding, vout}
+	var result Prevout
+	err := c.bridge.call(ctx, "prevoutFromFunding", request, nil, "", &result)
+	return result, err
+}
+
+func (c *WalletClient) CreateLock(ctx context.Context, request LockRequest) (string, error) {
+	options := struct {
+		LockRequest
+		Template string `json:"template,omitempty"`
+	}{request, c.template}
+	var result string
+	err := c.bridge.call(ctx, "createLock", options, nil, "", &result)
+	return result, err
+}
+
+func (c *WalletClient) Recognize(ctx context.Context, request RecognizeRequest) (*WalletRecognition, error) {
+	var result *WalletRecognition
+	err := c.bridge.call(ctx, "recognizeLock", request, nil, "", &result)
+	return result, err
+}
+
+func (c *WalletClient) sign(ctx context.Context, options any, signer WalletSigner) (string, error) {
+	if signer == nil {
+		return "", errors.New("external signer is required")
+	}
+	snapshot, err := json.Marshal(options)
+	if err != nil {
+		return "", err
+	}
+	request := json.RawMessage(snapshot)
+	var prepared struct {
+		SigningRequest
+		Arguments []string `json:"arguments"`
+	}
+	if err := c.bridge.call(ctx, "prepareWallet", request, nil, "", &prepared); err != nil {
+		return "", err
+	}
+	if len(prepared.Arguments) < 1 || len(prepared.Arguments) > 2 {
+		return "", errors.New("invalid signing request arguments")
+	}
+	prepared.Payload, err = hex.DecodeString(prepared.Arguments[0])
+	if err != nil {
+		return "", err
+	}
+	if len(prepared.Arguments) == 2 {
+		prepared.UserID, err = hex.DecodeString(prepared.Arguments[1])
+		if err != nil {
+			return "", err
+		}
+	}
+	signature, err := signer(prepared.SigningRequest)
+	if err != nil {
+		return "", err
+	}
+	var result string
+	err = c.bridge.call(ctx, "finishWallet", request, prepared.Arguments, hex.EncodeToString(signature), &result)
+	return result, err
+}
+
+func (c *WalletClient) SignPayment(ctx context.Context, request WalletPayment, signer WalletSigner) (string, error) {
+	return c.sign(ctx, request, signer)
+}
+
+func (c *WalletClient) SignInput(ctx context.Context, request WalletInput, signer WalletSigner) (string, error) {
+	return c.sign(ctx, request, signer)
+}
+
+func (c *WalletClient) Activate(ctx context.Context, request Activation) (string, error) {
+	var result string
+	err := c.bridge.call(ctx, "activate", request, nil, "", &result)
+	return result, err
+}

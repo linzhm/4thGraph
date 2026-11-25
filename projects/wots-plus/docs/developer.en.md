@@ -34,8 +34,6 @@ Install the pinned [requirements](../reference/requirements.txt) and run `bash p
 
 ## SDK and reference interfaces
 
-[TypeScript, Rust, Go and Python source SDKs](../sdk/README.md)
-
-Use the Python reference `locking_script` to create a payment output and `sign_payment` or `sign_spend` to assemble a signed input. The external callback receives a 32-byte digest and returns a 2,144-byte signature. The reference wallet's `compress_otda=True` option selects an eligible compact witness. The signing service handles key consumption and the integrating wallet approves and broadcasts the transaction.
+Follow the [unified WOTS+ wallet guide](sdk.en.md) to choose an output template and connect an external one-time signer. The callback returns a 2,144-byte signature over the requested digest. Use `compressOtda` for eligible compact unlocks and persist key consumption in the signing service.
 
 [Payment source](../reference/payment.py) · [One-time signer interface](../reference/wots.py) · [Durable benchmark signer](../../../shared/one_time_signer.py)

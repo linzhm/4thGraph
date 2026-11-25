@@ -104,7 +104,7 @@ def _encode_unlock(auth, key, signature, preimage_script):
     return preimage_script+push(key)+push(signature)
 
 
-def _sign_previous(tx, index, previous, key, signer, sighash_type, chronicle_active, *, compress_otda=False):
+def sign_previous(tx, index, previous, key, signer, sighash_type, chronicle_active, *, compress_otda=False):
     template = identify(previous.script)
     if template is None or template[1] != public_key_hash160(key):
         raise ValueError('funding output does not belong to key/template')
@@ -128,7 +128,7 @@ def sign_input(tx, index, funding_raw, key, signer, sighash_type=0x41, *, chroni
     funding = Transaction.parse(funding_raw)
     if funding.txid_wire() != current.txid or not 0 <= current.vout < len(funding.outputs):
         raise ValueError('funding transaction does not match current outpoint')
-    return _sign_previous(tx, index, funding.outputs[current.vout], key, signer,
+    return sign_previous(tx, index, funding.outputs[current.vout], key, signer,
                           sighash_type, chronicle_active, compress_otda=compress_otda)
 
 
@@ -142,4 +142,4 @@ def sign_payment(funding_raw,vout,outputs,fee,key,signer):
     for out in outputs: out.serialize()
     if sum(x.value for x in outputs)+fee!=previous.value: raise ValueError('outputs and fee must equal input value')
     tx=Transaction((Input(funding.txid_wire(),vout),),outputs)
-    return _sign_previous(tx, 0, previous, key, signer, 0x41, False)
+    return sign_previous(tx, 0, previous, key, signer, 0x41, False)

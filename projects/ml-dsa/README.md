@@ -2,6 +2,14 @@
 
 [简体中文](README.zh-CN.md) · [BSV Script Lab](../../README.md)
 
+## Developer resources
+
+**[Wallet SDK quickstart](docs/sdk.en.md#quickstart)** · [Unified wallet SDK](../../shared/sdk/README.md#quickstart)
+
+Make a lock from the raw ML-DSA-44 public key and sign the payment message in Pure mode with an empty context.
+
+[Protocol](docs/developer.en.md#protocol) · [Security](docs/developer.en.md#security) · [Verify](#reproduce-the-checks) · [Transaction costs](#complete-transactions-and-stack-measurements)
+
 **Status** · v0.1 development baseline.
 
 The verifier uses the FIPS 204 Pure ML-DSA-44 public-key and signature
@@ -24,10 +32,6 @@ ForkID binding. The wallet checks the funding output before requesting an
 external signature. The caller authenticates the funding transaction and
 approves the transaction intent.
 [Transaction-binding construction](../../shared/pushtx.py)
-
-## Developer resources
-
-[Protocol specification](docs/developer.en.md#protocol) · [Security analysis](docs/developer.en.md#security) · [Validation and measurements](docs/developer.en.md#validation) · [SDK and reference interfaces](docs/developer.en.md#sdk)
 
 ## Sampling boundary
 

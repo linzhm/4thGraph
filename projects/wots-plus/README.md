@@ -2,6 +2,14 @@
 
 [简体中文](README.zh-CN.md) · [BSV Script Lab](../../README.md)
 
+## Developer resources
+
+**[Wallet SDK quickstart](docs/sdk.en.md#quickstart)** · [Unified wallet SDK](../../shared/sdk/README.md#quickstart)
+
+Choose a receive template and connect a durable one-time signer. The cached-step profile supports eligible OTDA reconstruction.
+
+[Protocol](docs/developer.en.md#protocol) · [Security](docs/developer.en.md#security) · [Verify](#run-the-checks) · [Transaction costs](#complete-transactions-and-stack-measurements)
+
 **Status** · v0.1 development baseline.
 
 This experiment verifies a WOTS+ one-time signature in Bitcoin Script and binds
@@ -19,10 +27,6 @@ Use `locking_script(key)` for transaction-bound tests. The detached verifier
 from `locking_script(key, transaction=False)` accepts a caller-provided digest
 and is only for testing the primitive. The payment lock supports the twelve
 ForkID and Chronicle OTDA modes, with ForkID `ALL` (`0x41`) as the wallet default.
-
-## Developer resources
-
-[Protocol specification](docs/developer.en.md#protocol) · [Security analysis](docs/developer.en.md#security) · [Validation and measurements](docs/developer.en.md#validation) · [SDK and reference interfaces](docs/developer.en.md#sdk)
 
 ## Run the checks
 

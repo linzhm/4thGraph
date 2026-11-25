@@ -16,22 +16,15 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-      - name: TypeScript vectors
-        working-directory: projects/p2pkh-r1-deferred/sdk/typescript
+      - name: Type-check the shared TypeScript SDK
+        working-directory: shared/sdk/typescript
         run: |
           npm install --ignore-scripts --no-audit --no-fund
           npm run check
-          npm test
       - uses: actions/setup-go@v5
         with:
           go-version: '1.25'
           cache: false
-      - name: Go vectors
-        working-directory: projects/p2pkh-r1-deferred/sdk/go
-        run: go test ./...
-      - name: Rust vectors
-        working-directory: projects/p2pkh-r1-deferred/sdk/rust
-        run: cargo test
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -53,3 +46,5 @@ jobs:
           PYTHONPATH=. python projects/p2pkh-r1-deferred/reference/generate_vectors.py
           python -m unittest discover -s projects/p2pkh-r1-deferred/reference -p test_deferred.py -v
           bash projects/p2pkh-r1-deferred/reference/verify.sh
+      - name: Replay the shared wallet SDK
+        run: bash shared/verify_node.sh -- bash shared/sdk/verify_wallet.sh p2pkh-r1-deferred

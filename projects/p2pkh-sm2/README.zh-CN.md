@@ -2,14 +2,18 @@
 
 [English](README.md) · [BSV Script Lab](../../README.zh-CN.md)
 
+## 开发入口
+
+**[钱包 SDK 快速上手](docs/sdk.zh-CN.md#quickstart)** · [统一钱包 SDK](../../shared/sdk/README.zh-CN.md#quickstart)
+
+选择原始 SM2 签名器或 SignedData 签名器。符合条件的付款可以启用 OTDA 重建。
+
+[协议规范](docs/spec.zh-CN.md) · [安全分析](docs/developer.zh-CN.md#security) · [复现与验证](#开发复现与输入输出分析) · [交易成本](#完整交易与栈测量)
+
 付款方可以用收款人未压缩 SM2 公钥的 HASH160 锁定一笔 BSV 输出。花费时，
 持有人公开该公钥，并为当前输入提供一次 SM2 签名。Bitcoin Script 使用 SM3 计算 SM2
 用户标识摘要 ZA 和消息摘要，然后验证 SM2 签名，并通过 PUSHTX 和原生
 `OP_CHECKSIG` 将授权绑定到实际的花费交易。
-
-## 开发入口
-
-[协议规范](docs/developer.zh-CN.md#protocol) · [安全分析](docs/developer.zh-CN.md#security) · [验证与测量](docs/developer.zh-CN.md#validation) · [SDK 与参考接口](docs/developer.zh-CN.md#sdk)
 
 ## 发布基线
 
@@ -97,7 +101,7 @@ bash verify.sh
 
 可选构造器为 12,703 字节，复用 SM3 压缩轮、消息扩展、SM2 点加、倍点及连续重复的指令片段。对每个适用输出，构造器把收款人的 HASH160 填入 144,925 字节的 v1.0.0 锁。签名回调接收与原始解锁相同的摘要和 SM2 用户标识。钱包应先确定解锁编码，再使用已签交易的 ID 构建子交易。
 
-Chronicle 激活后，在 Python 的 `sign_input` 设置 `compress_otda=True`，或使用对应的 SDK 选项。对版本 2 的交易，OTDA ALL 按原顺序重建匹配的输出。配对 OTDA SINGLE 只重建同索引输出，保留签名预映像中前置的空输出。两种路径均支持 `ANYONECANPAY`。其他模板的输出按原字节写入。ForkID、NONE、无配对 SINGLE、版本 1 及体积未缩小的交易使用原始解锁。[SDK 选项](sdk/README.zh-CN.md) · [构造器与生成方式](reference/README.zh-CN.md#otda-constructor)
+Chronicle 激活后，在 Python 的 `sign_input` 设置 `compress_otda=True`，或使用对应的 SDK 选项。对版本 2 的交易，OTDA ALL 按原顺序重建匹配的输出。配对 OTDA SINGLE 只重建同索引输出，保留签名预映像中前置的空输出。两种路径均支持 `ANYONECANPAY`。其他模板的输出按原字节写入。ForkID、NONE、无配对 SINGLE、版本 1 及体积未缩小的交易使用原始解锁。[SDK 选项](docs/sdk.zh-CN.md) · [构造器与生成方式](reference/README.zh-CN.md#otda-constructor)
 
 | OTDA ALL 场景，单位为字节 | 原始解锁 | 重建解锁 |
 | --- | ---: | ---: |

@@ -34,8 +34,6 @@ v1.0.0 付款锁将 SM2 签名绑定到当前 BSV 输入。GB/T 35275-2026 的 S
 
 ## SDK 与参考接口
 
-[TypeScript、Rust、Go 和 Python 源码 SDK](../sdk/README.zh-CN.md)
-
-Python 参考接口的 `locking_script_from_owner_hash` 创建锁。普通单输入付款用 `sign_payment`，已准备的交易逐输入用 `sign_input`。返回 DER 的服务可以接入 `signed_data_signer`。提供的 Rust 和 Python 命令行签名器供测试，实际接入由外部签名服务控制私钥。
+按[统一 SM2 钱包指南](sdk.zh-CN.md)生成或识别锁，再签署交易。签名器接收消息和 SM2 用户 ID，可返回原始签名或 DER SignedData。Rust 和 Python 命令行签名器用于公开夹具。
 
 [参考钱包源码](../reference/p2pkh_sm2.py) · [SignedData 接入示例](../reference/README.zh-CN.md#signeddata-付款接入) · [Rust 测试签名器](../reference/interop/rust-signer/README.zh-CN.md) · [Python 测试签名器](../reference/interop/python-signer/README.zh-CN.md)

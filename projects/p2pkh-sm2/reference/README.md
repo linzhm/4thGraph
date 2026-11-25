@@ -79,7 +79,7 @@ python projects/p2pkh-sm2/reference/generate_otda_constructor.py /tmp/sm2-otda.h
 cmp /tmp/sm2-otda.hex projects/p2pkh-sm2/template/otda-constructor.hex
 ```
 
-The constructor tests compare exact preimage, public key, and signature stack values, then verify complete spends against BSV Node and chain-gang. [Layout and fingerprint](../template/layout.json) · [Wallet integration](../sdk/README.md)
+The constructor tests compare exact preimage, public key, and signature stack values, then verify complete spends against BSV Node and chain-gang. [Layout and fingerprint](../template/layout.json) · [Wallet integration](../docs/sdk.en.md)
 
 ## SignedData payment interop
 

@@ -71,7 +71,7 @@ python projects/p2pkh-sm2/reference/generate_otda_constructor.py /tmp/sm2-otda.h
 cmp /tmp/sm2-otda.hex projects/p2pkh-sm2/template/otda-constructor.hex
 ```
 
-构造器测试逐字节比对预映像、公钥和签名三项栈值，并由 BSV Node 和 chain-gang 验证完整花费。[布局与指纹](../template/layout.json) · [钱包接入](../sdk/README.zh-CN.md)
+构造器测试逐字节比对预映像、公钥和签名三项栈值，并由 BSV Node 和 chain-gang 验证完整花费。[布局与指纹](../template/layout.json) · [钱包接入](../docs/sdk.zh-CN.md)
 
 ## SignedData 付款接入
 
