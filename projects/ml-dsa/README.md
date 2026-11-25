@@ -1,5 +1,7 @@
 # Pure ML-DSA-44
 
+[简体中文](README.zh-CN.md) · [BSV Script Lab](../../README.md)
+
 **Status** · v0.1 development baseline.
 
 The verifier uses the FIPS 204 Pure ML-DSA-44 public-key and signature
@@ -22,6 +24,10 @@ ForkID binding. The wallet checks the funding output before requesting an
 external signature. The caller authenticates the funding transaction and
 approves the transaction intent.
 [Transaction-binding construction](../../shared/pushtx.py)
+
+## Developer resources
+
+[Protocol specification](docs/developer.en.md#protocol) · [Security analysis](docs/developer.en.md#security) · [Validation and measurements](docs/developer.en.md#validation) · [SDK and reference interfaces](docs/developer.en.md#sdk)
 
 ## Sampling boundary
 
@@ -48,10 +54,12 @@ standard ML-DSA-44 Wycheproof cases. The bounded Python verifier and the
 detached Script verifier matched all 15 NIST ACVP external Pure ML-DSA-44
 sigVer cases, including messages up to 8,192 bytes and contexts up to 255 bytes.
 The payment format uses the empty context and a 32-byte transaction digest.
+Set the variables below to the local corpus files before running the checks.
+Use `ML_DSA_OPENSSL` to select a compatible OpenSSL executable.
 
 ```sh
-python projects/ml-dsa/reference/check_wycheproof.py <vectors.json>
-PYTHONPATH=. python projects/ml-dsa/reference/check_acvp.py <prompt.json> <expectedResults.json>
+python projects/ml-dsa/reference/check_wycheproof.py "$WYCHEPROOF_VECTORS"
+PYTHONPATH=. python projects/ml-dsa/reference/check_acvp.py "$ACVP_PROMPT" "$ACVP_EXPECTED"
 ```
 
 [Pinned Wycheproof corpus](https://github.com/C2SP/wycheproof/blob/8e7fa6f87e6993d7b613cf48b46512a32df8084a/testvectors_v1/mldsa_44_standard_verify_test.json)
@@ -107,3 +115,41 @@ input replay check the canonical result, including zero and alternating
 field-boundary coefficients. This experiment lives at the arithmetic
 kernel boundary. Full payment and external signature conformance use the
 canonical verifier.
+
+## Developer and wallet integration
+
+Use `locking_script(public_key)` to create a payment output and retain the
+authenticated 1,312-byte public key. Before authorizing a payment, compare the
+funding output with the script generated for that key, verify its amount and
+outpoint, and apply the wallet's confirmation requirement. Call `sign_payment`
+for a single-input payment or `sign_spend` for an already prepared input.
+The callback signs the supplied 32 bytes as the message with Pure ML-DSA-44
+and an empty context. It returns the 2,420-byte standard signature for
+verification and witness assembly. The message verifier can separately test
+variable-length messages and permitted contexts. [Wallet source](reference/payment.py)
+
+Fixed-key script generation can serialize different keys to slightly different
+lengths, so the single-lock arithmetic fixture above and the payment rows
+below have different values. In OTDA ALL, each witness also carries the full
+serialized outputs. That cost dominates the 5,563,725-byte two-in, two-out
+fixture. The signed-residue NTT numbers describe a component experiment.
+
+## Complete transactions and stack measurements
+
+These deterministic fixtures use commit `beeb4dd`. BSV Node 1.2.3 and the project's pinned chain-gang validate the complete inputs. The node replays scripts with supplied prevouts. Funded mempool and mining tests have separate records. Scripts and transactions are measured in bytes. Script sizes follow input and output order. `× n` indicates n equal sizes. Stack peaks refer to input zero, with independent peaks for main-stack items, altstack items, and combined payload. The development evaluator measures stack payload bytes on the successful path. The evaluator stops at `OP_GREATERTHANOREQUAL`, so stack results are unavailable for both ML-DSA-44 rows.
+
+| Template and mode | Inputs×outputs | Previous locks | Unlocks | New locks | Total | Main / alt items | Stack payload |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `pure-ml-dsa-44` · `0x41` | 2×2 | 926,412 × 2 | 2,588 × 2 | 926,410 / 926,414 | 1,858,122 | — / — | — |
+| `pure-ml-dsa-44` · `0x61` | 2×2 | 926,421 / 926,413 | 1,855,385 × 2 | 926,416 / 926,413 | 5,563,725 | — / — | — |
+
+## Marginal and lifecycle costs
+
+Each marginal cell shows the **change in total bytes (output locks / input unlocks / other bytes)**. Other bytes include values, outpoints, sequence numbers, and CompactSize fields. Previous locks identify the coins being spent and belong to their funding transactions. Both lifecycle totals include native P2PKH funding and exit. The second adds one payment between project outputs.
+
+| Template and mode | Added-input shape | Added-input bytes | Added-output shape | Added-output bytes | Fund and exit | One turnover |
+| --- | --- | --- | --- | --- | --- | --- |
+| `pure-ml-dsa-44` · `0x41` | 3×2 | 2,627 (-4 / 2,588 / 43) | 2×3 | 926,418 (926,405 / 0 / 13) | 1,858,346 | 3,716,464 |
+| `pure-ml-dsa-44` · `0x61` | 3×2 | 1,855,545 (-2 / 1,855,502 / 45) | 2×3 | 2,779,266 (926,409 / 1,852,844 / 13) | 1,858,363 | 7,422,076 |
+
+[Unified benchmark and reproduction](../../shared/benchmark.md)

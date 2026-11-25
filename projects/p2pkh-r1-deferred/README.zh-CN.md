@@ -4,6 +4,10 @@
 
 Deferred 将生成完整 R1 锁定脚本的成本推迟到启用阶段。[1,435 字节的入金短锁](template/v0.2.0/template.hex)承诺一个等额的 [46,302 字节 P2PKH-R1 v0.2.0 目标输出](../p2pkh-r1/template/v0.2.0/template.hex)。已有短锁继续采用其原先承诺的目标版本。
 
+## 开发入口
+
+[协议规范](docs/developer.zh-CN.md#protocol) · [安全分析](docs/developer.zh-CN.md#security) · [验证与测量](docs/developer.zh-CN.md#validation) · [SDK 与参考接口](docs/developer.zh-CN.md#sdk)
+
 ## 启用与后续付款
 
 1. 使用 `funding_output` 或 `funding_output_from_owner_hash` 生成入金输出。接收时核对短锁、金额和两项目标承诺。Python 的 `recognize` 返回 `target_r1_version`。使用源码 SDK 时，用相应版本的 R1 模板字节核对承诺。

@@ -1,7 +1,7 @@
 # P2PKH-R1 input acceptance
 
-The fixture evaluates the canonical ordinary P-256 lock at input index 1 of a
-two-input transaction. It uses public test keys and compares input validation
+The fixture evaluates the v0.2.0, v0.1.0 and compiled research P-256 locks
+separately at input index 1 of a two-input transaction. It uses public test keys and compares input validation
 with the commitments in the [project specification](../docs/spec.en.md#signature-coverage).
 The serialized test cases use the reference wallet's signing preimages and an
 independent P-256 implementation from `cryptography`. The verdict table uses
@@ -36,7 +36,7 @@ equal the product cardinality `2 × 2 × 12 × 3 × 9 = 1,296`. A subset of a fi
 set with the same cardinality equals the entire set.
 Deliberately omitting one tuple caused the cardinality check to fail at 1,295.
 
-BSV Node 1.2.3 matched all 1,296 results, with 80 accepted in Genesis and 180
+For each template, BSV Node 1.2.3 matched all 1,296 results, with 80 accepted in Genesis and 180
 accepted in each Chronicle context. The pinned chain-gang build matched the
 432-row Chronicle UTXO subset, with 180 accepts and 252 rejects. The extra
 witness checks replay four valid controls through BSV Node and 24 invalid
