@@ -3,13 +3,14 @@ import os
 from pathlib import Path
 import unittest
 import requests
-from fixtures import cases, fixture, test_secret, mode_cases
+from fixtures import INVALID_PREVOUT_CASES, cases, fixture, test_secret, mode_cases
 from lamport import OneTimeSigner, public_key, sign_digest
 from payment import sign_payment
 from script import locking_script
 from engines import chain_valid
 from shared.transaction import Output, Transaction, Input
 from shared.script import push
+from shared.differential import node_script_valid
 
 
 def node_check(tx, parent, index, *, chronicle=True, funding_height=3):
@@ -25,12 +26,7 @@ def node_check(tx, parent, index, *, chronicle=True, funding_height=3):
     response = requests.post(os.environ.get('REGTEST_URL','http://127.0.0.1:18443'),auth=tuple(cookie),timeout=30,
         json=dict(jsonrpc='1.0',id=1,method='verifyscript',params=[[request],False,5000]))
     response.raise_for_status()
-    data = response.json()
-    if data.get('error'): raise AssertionError(data['error'])
-    result = data['result'][0]
-    if result['flags'] != flags: raise AssertionError(result)
-    if result['result'] not in ('ok','error'): raise AssertionError(result)
-    return result['result'] == 'ok'
+    return node_script_valid(response.json(), flags, chronicle_active=chronicle)
 
 
 class NodeTests(unittest.TestCase):
@@ -39,7 +35,8 @@ class NodeTests(unittest.TestCase):
         for label,tx,parents,index,expected in cases():
             with self.subTest(case=label):
                 self.assertEqual(node_check(tx,parents[index],index),expected)
-                self.assertEqual(chain_valid(tx,parents),expected)
+                self.assertEqual(chain_valid(tx, parents, expect_bad_prevout=label in INVALID_PREVOUT_CASES),
+                                 expected)
                 count += 1
         print(f'BSV Node + chain-gang: {count} complete-input cases')
 

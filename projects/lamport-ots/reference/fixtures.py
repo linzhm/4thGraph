@@ -7,6 +7,9 @@ from shared.transaction import Transaction, Input, Output, preimage_all, hash256
 from shared.script import push
 
 
+INVALID_PREVOUT_CASES = frozenset({'outpoint_index', 'outpoint_hash', 'other_outpoint'})
+
+
 def test_secret(label=b'fixture-v1'):
     return b''.join(sha256(b'BSV-Script-Lab/Lamport/TEST-ONLY/'+label+i.to_bytes(2,'big')).digest() for i in range(512))
 

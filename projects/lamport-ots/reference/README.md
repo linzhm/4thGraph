@@ -3,6 +3,9 @@
 Python 3.12+; production primitive code uses only the standard library. Script
 serialization and transaction helpers are under the repository's `shared/` folder.
 Independent tests use the pinned chain-gang commit and BSV Node 1.2.3.
+Install tx-engine from requirements.txt so the test adapter can verify its
+Git revision. Negative cases require a known script rejection or the expected
+prevout error for a deliberately invalid outpoint.
 
 - `lamport.py`: random key generation, strict digest API, process-local one-time guard.
 - `script.py`: deterministic unrolled verifier and fixed-r PUSHTX binding.
@@ -42,6 +45,6 @@ Authenticate the funding and confirm the transaction and sighash before calling.
 Keep private keys and durable one-use state in the signer.
 
 Apple Container uses host RPC port 18449 by default; set `LAMPORT_RPC_PORT` if
-occupied. Its node has no peers and is removed after testing. Linux CI uses port
-18443 and verifies the release archive against a repository-pinned SHA-256 digest
-before extraction.
+occupied. Its node has no peers and is removed after testing. The Linux launcher
+defaults to port 18443 and accepts `REGTEST_RPC_PORT` for concurrent runs. It verifies
+the release archive against a repository-pinned SHA-256 digest before extraction.

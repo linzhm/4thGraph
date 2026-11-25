@@ -19,7 +19,8 @@ generated opcodes. The complete-input tests also use independent engines.
 
 On Linux x86-64 with Rust and Cargo, install the [reference dependencies](requirements.txt)
 and run the complete-input tests against the pinned chain-gang extension and
-BSV Node 1.2.3.
+BSV Node 1.2.3. The differential tests match the installed Git revision to
+requirements.txt and require a known rejection reason for negative cases.
 
 ```sh
 python3 -m pip install -r requirements.txt
