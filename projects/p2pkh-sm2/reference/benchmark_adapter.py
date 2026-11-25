@@ -1,11 +1,13 @@
 """Benchmark fixtures for the publicly released SM2 payment template."""
+from functools import partial
+
 from p2pkh_sm2 import locking_script_from_public_key, sign_input
 from sm2 import N, encode_public, fixture_sign, mul
 from shared.benchmark_cases import Coin, Template, seed
 from shared.transaction import Output
 
 
-def sm2_coin(label, value):
+def sm2_coin(label, value, *, compress_otda=False):
     scalar = 1 + int.from_bytes(seed(label), "big") % (N - 2)
     key = encode_public(mul(scalar))
 
@@ -14,12 +16,15 @@ def sm2_coin(label, value):
         return fixture_sign(scalar, message, nonce, user_id)
 
     def unlock(tx, index, parent, flag, _scratch):
-        return sign_input(tx, index, parent.serialize(), key, sign, flag)
+        return sign_input(tx, index, parent.serialize(), key, sign, flag, compress_otda=compress_otda)
 
     return Coin(Output(value, locking_script_from_public_key(key)), unlock)
 
 
-TEMPLATES = {"v1.0.0": Template(sm2_coin)}
+TEMPLATES = {
+    "v1.0.0": Template(sm2_coin),
+    "v1.0.0-reconstructed": Template(partial(sm2_coin, compress_otda=True)),
+}
 
 
 def components(samples):

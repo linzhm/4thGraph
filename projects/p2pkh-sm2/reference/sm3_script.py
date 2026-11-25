@@ -137,6 +137,11 @@ def hash_script(length, state=IV, processed=0, *, optimized=False, compact=False
     schedule for padding-only blocks. compact also enables constant, stack,
     and Boolean optimizations.
     """
+    return compile_hash(length, state, processed, optimized=optimized, compact=compact)
+
+
+def compile_hash(length, state=IV, processed=0, *, optimized=False, compact=False, fragments=None):
+    """Emit SM3 Script and optionally collect named instruction ranges for construction."""
     if processed%64: raise ValueError('midstate must start on a block boundary')
     optimized = optimized or compact
     b=Builder(optimized, compact)
@@ -157,14 +162,18 @@ def hash_script(length, state=IV, processed=0, *, optimized=False, compact=False
             words=[f'w{j}' for j in range(68)]
             for j in range(16): b.word(words[j],offset+j*4)
             for j in range(16,68):
+                start = len(b.code)
                 x=xor(xor(words[j-16],words[j-9]),rot(words[j-3],15))
                 if optimized:
                     b.assign('expansion_mix',x)
                     x='expansion_mix'
                 b.assign(words[j],xor(xor(perm(x,15,23),rot(words[j-13],7)),words[j-6]))
                 if optimized: b.drop('expansion_mix')
+                if fragments is not None:
+                    fragments.setdefault('message_expansion', []).append(bytes(b.code[start:]))
         for i,c in enumerate('abcdefgh'): b.assign(c,'h'+str(i))
         for j in range(64):
+            start = len(b.code)
             a_rot12=rot('a',12)
             if optimized:
                 b.assign('a_rot12',a_rot12)
@@ -185,6 +194,10 @@ def hash_script(length, state=IV, processed=0, *, optimized=False, compact=False
             b.assign('tt1',plus(ff,'d','ss2',cross_word))
             b.assign('tt2',plus(gg,'h','ss1',words[j]))
             for name,expr in [('d','c'),('c',rot('b',9)),('b','a'),('a','tt1'),('h','g'),('g',rot('f',19)),('f','e'),('e',perm('tt2',9,17))]: b.assign(name,expr)
+            if fragments is not None:
+                kind = 'padding' if static_padding else 'data'
+                phase = 'early' if j < 16 else 'late'
+                fragments.setdefault(f'{kind}_round_{phase}', []).append(bytes(b.code[start:]))
         for i,c in enumerate('abcdefgh'): b.assign('h'+str(i),xor('h'+str(i),c))
         for name in [*(() if static_padding else words),*'abcdefgh','ss1','ss2','tt1','tt2']: b.drop(name)
     b.drop('data')

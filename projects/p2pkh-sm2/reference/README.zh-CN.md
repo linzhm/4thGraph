@@ -60,6 +60,19 @@ OTDA，包括混用签名模式的输入、全 SM2 的两进两出付款、由�
 [标准向量](../template/sm2-standard.json) · [BSV Node 源码](https://github.com/bitcoin-sv/bitcoin-sv/tree/6504a3aff65ba97c0f6c80962b033e35ecbfed4b)
 · [chain-gang 源码](https://github.com/linzhm/chain-gang/tree/8b60b71a12a69fdcb465d3e627dbf6f43d6ed081)
 
+<a name="otda-constructor"></a>
+
+## 复现 OTDA 构造器
+
+钱包加载固定构造器，并按布局清单核对字节数和 SHA-256。离线生成器从 SM3 编译器收集具名的指令范围，再从中提取固定片段，与点运算块组合。在仓库根目录生成并比对文件。
+
+```sh
+python projects/p2pkh-sm2/reference/generate_otda_constructor.py /tmp/sm2-otda.hex
+cmp /tmp/sm2-otda.hex projects/p2pkh-sm2/template/otda-constructor.hex
+```
+
+构造器测试逐字节比对预映像、公钥和签名三项栈值，并由 BSV Node 和 chain-gang 验证完整花费。[布局与指纹](../template/layout.json) · [钱包接入](../sdk/README.zh-CN.md)
+
 ## SignedData 付款接入
 
 外部签名器可以按 GB/T 35275-2026 返回 DER 编码的 `SignedData`。封装携带签名值、

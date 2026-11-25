@@ -21,7 +21,7 @@ PROJECTS = {
     "p2pkh-r1": (CORE_PIN, ("test_payment", "test_payment_acceptance", "test_fixed_templates",
                             "test_curve_compiler", "test_lock_security")),
     "p2pkh-r1-deferred": (CORE_PIN, ("test_activation_acceptance", "test_node")),
-    "p2pkh-sm2": (CORE_PIN, ("test_sm2", "test_sighash", "test_node", "test_signed_data",
+    "p2pkh-sm2": (CORE_PIN, ("test_sm2", "test_sighash", "test_node", "test_otda_constructor", "test_signed_data",
                             "test_signed_data_acceptance")),
     "lamport-ots": (CORE_PIN, ("test_acceptance", "test_node", "test_lamport")),
     "wots-plus": (CONTEXT_PIN, ("test_acceptance", "test_node", "test_wots")),

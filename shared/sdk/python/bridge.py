@@ -110,7 +110,7 @@ def run(message):
     compress = boolean(options, "compressOtda")
     if sighash & CHRONICLE and not chronicle_active:
         raise ValueError("Chronicle authorization requires an active spend context")
-    if compress and project != "wots-plus":
+    if compress and project not in ("p2pkh-sm2", "wots-plus"):
         raise ValueError("this SDK project does not support OTDA reconstruction")
     if compress and not chronicle_active:
         raise ValueError("functional unlocking requires an active spend context")

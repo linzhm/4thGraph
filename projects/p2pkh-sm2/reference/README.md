@@ -68,6 +68,19 @@ isolate the effect of the activation flags.
 
 [Standard vector](../template/sm2-standard.json) · [BSV Node source](https://github.com/bitcoin-sv/bitcoin-sv/tree/6504a3aff65ba97c0f6c80962b033e35ecbfed4b) · [chain-gang source](https://github.com/linzhm/chain-gang/tree/8b60b71a12a69fdcb465d3e627dbf6f43d6ed081)
 
+<a name="otda-constructor"></a>
+
+## Reproduce the OTDA constructor
+
+The wallet loads the frozen program and checks its byte length and SHA-256 against the layout manifest. The offline generator collects named instruction ranges from the SM3 compiler, selects fixed fragments from those ranges, and combines them with the point arithmetic blocks. Rebuild the program from the repository root and compare it with the checked-in file.
+
+```sh
+python projects/p2pkh-sm2/reference/generate_otda_constructor.py /tmp/sm2-otda.hex
+cmp /tmp/sm2-otda.hex projects/p2pkh-sm2/template/otda-constructor.hex
+```
+
+The constructor tests compare exact preimage, public key, and signature stack values, then verify complete spends against BSV Node and chain-gang. [Layout and fingerprint](../template/layout.json) · [Wallet integration](../sdk/README.md)
+
 ## SignedData payment interop
 
 [GB/T 35275-2026](https://openstd.samr.gov.cn/bzgk/std/newGbInfo?hcno=28A18B702BDC318803E598F5E502E2CC)
