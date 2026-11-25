@@ -14,12 +14,14 @@
 2. 从规范模板复制原始脚本，替换从零起算的区间 `[208, 228)` 为收款哈希。脚本总长 **59,582 字节**。任何所有者生成的脚本只在这 20 字节处有差异。
 3. 识别时先核对原始脚本长度及开头十字节 `760052a569766b7c8201`。提取该区间后，要求 `SHA256(raw[:208] || raw[228:])` 等于 `2129d374594069d08a9b2127555f48ea21c75fb06d1ad5e77c68ad251e97f784`，才可报告类型和收款哈希。输入从第一个 opcode 开始。字段是公钥哈希，完整公钥在花费时揭示。[模板字节](../template/template.hex) · [布局及三个互操作向量](../template/layout.json) · [字节匹配与生成函数](../reference/p2pkh_r1.py)
 
+将 `R1_OWNER_HASH160` 设为收款人 20 字节 HASH160 的十六进制值。
+
 ```sh
 cd projects/p2pkh-r1/reference
-python generate_lock.py --owner-hash160 4ceab2c8be16c1d4c6b4147d39aa449c2d63f184 --format raw > scriptPubKey.bin
+python generate_lock.py --owner-hash160 "${R1_OWNER_HASH160:?请设置收款公钥哈希}" --format raw > scriptPubKey.bin
 ```
 
-也可传入 `--public-key HEX`。省略 `--format raw` 会返回长度、所有者哈希及脚本 SHA-256。向量 C 的脚本 SHA-256 为 `b3acd6b92a23120bd24432ada2b1cac013fe06381d7ea96ac6c5a73c493f4287`。[生成器](../reference/generate_lock.py)
+也可传入 `--public-key HEX`。省略 `--format raw` 会返回长度、所有者哈希及脚本 SHA-256。规范模板内置向量 C 的公开测试公钥哈希，对应输出仅用于本地测试。向量 C 的脚本 SHA-256 为 `b3acd6b92a23120bd24432ada2b1cac013fe06381d7ea96ac6c5a73c493f4287`。[生成器](../reference/generate_lock.py)
 
 ## 花费一个输入
 
