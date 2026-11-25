@@ -45,6 +45,6 @@ Authenticate the funding and confirm the transaction and sighash before calling.
 Keep private keys and durable one-use state in the signer.
 
 Apple Container uses host RPC port 18449 by default; set `LAMPORT_RPC_PORT` if
-occupied. Its node has no peers and is removed after testing. Linux CI uses port
-18443 and verifies the release archive against a repository-pinned SHA-256 digest
-before extraction.
+occupied. Its node has no peers and is removed after testing. The Linux launcher
+defaults to port 18443 and accepts `REGTEST_RPC_PORT` for concurrent runs. It verifies
+the release archive against a repository-pinned SHA-256 digest before extraction.
