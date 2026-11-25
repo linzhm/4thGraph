@@ -832,6 +832,10 @@ class SignedDataAcceptance(SignedDataFixtures):
         envelope = signed_data(signature, attached=MESSAGE, signed_attrs=attrs, content_oid=content_type)
         self.assertEqual(verify_signed_data(envelope, self.trusted_signers, expected_content_type='1.2.3.4',
                                             require_signed_content_type=True, attribute_schemas={}), MESSAGE)
+        with self.assertRaisesRegex(ValueError, r'invalid DER value for SignedData attribute 1\.2\.840\.113549\.1\.9\.3'):
+            verify_signed_data(envelope, self.trusted_signers, expected_content_type='1.2.3.4',
+                               require_signed_content_type=True,
+                               attribute_schemas={'1.2.840.113549.1.9.3': OctetString})
         with self.assertRaisesRegex(ValueError, 'requires a signed contentType'):
             direct = signed_data(self.signatures['direct'], attached=MESSAGE)
             verify_signed_data(direct, self.trusted_signers, require_signed_content_type=True)

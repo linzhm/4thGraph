@@ -389,8 +389,10 @@ def _message_digest_octets(encoded):
     return digest
 
 
-def _content_type_value(encoded):
-    value = _DER(encoded)
+def _content_type_attribute_oid(values):
+    if len(values) != 1:
+        raise ValueError('contentType must have one OBJECT IDENTIFIER value')
+    value = _DER(values[0])
     oid = value.take(0x06)
     value.done()
     _check_oid(oid, 'contentType OID')
@@ -404,14 +406,13 @@ def _check_attribute_schema(oid, values, schemas):
         _message_digest_octets(values[0])
         return
     if oid == _CONTENT_TYPE:
-        if len(values) != 1:
-            raise ValueError('contentType must have one OBJECT IDENTIFIER value')
-        _content_type_value(values[0])
-        return
+        _content_type_attribute_oid(values)
 
     identifier = ObjectIdentifier(contents=oid).dotted
     schema = schemas.get(identifier)
     if schema is None:
+        if oid == _CONTENT_TYPE:
+            return
         raise MissingAttributeSchema(f'missing ASN.1 schema for SignedData attribute {identifier}')
     for encoded in values:
         _check_schema_der(schema, encoded, f'SignedData attribute {identifier}')
@@ -1508,9 +1509,7 @@ def _check_signed_attributes(encoded, attribute_schemas, content_type, *, requir
         if oid == _MESSAGE_DIGEST:
             digests.append(values)
         elif oid == _CONTENT_TYPE:
-            if len(values) != 1:
-                raise ValueError('contentType must have one OBJECT IDENTIFIER value')
-            content_types.append(_content_type_value(values[0]))
+            content_types.append(_content_type_attribute_oid(values))
     if len(digests) != 1 or len(digests[0]) != 1:
         raise ValueError('signedAttrs requires exactly one messageDigest with one value')
     if require_signed_content_type and not content_types:
