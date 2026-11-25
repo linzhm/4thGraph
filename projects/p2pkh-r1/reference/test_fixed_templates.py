@@ -12,7 +12,7 @@ from fixed_templates import TEMPLATE_DIRECTORY, compiled_template, otda_reconstr
 from generate_templates import build_artifacts, scheduled_artifacts
 from p2pkh_r1 import locking_script_from_owner_hash, recognize
 from shared.evaluate import evaluate
-from shared.transaction import Transaction, preimage_otda
+from shared.transaction import Transaction, hash256, preimage_forkid, preimage_otda
 from test_payment import check, child, fixture_signature, parent, signer
 from signature import UNIVERSAL_FLAGS, authorization, current_input_unlock
 from specialize import specialized_lock
@@ -138,6 +138,100 @@ class FixedTemplateTests(unittest.TestCase):
                     self.assertEqual(evaluate(before.script_sig.raw_serialize()),
                                      evaluate(after.script_sig.raw_serialize()))
                     self.assertLess(len(after.script_sig.raw_serialize()), len(before.script_sig.raw_serialize()))
+
+    def test_reconstruction_matches_signer_and_both_engines_across_modes(self):
+        modes = (0x41, 0x42, 0x43, 0x61, 0x62, 0x63, 0xc1, 0xc2, 0xc3, 0xe1, 0xe2, 0xe3)
+        self.assertEqual(UNIVERSAL_FLAGS, set(modes))
+        # Use three public fixture keys and three different previous locks.
+        keys = [signer(i) for i in (41, 42, 43)]
+        funding = []
+        for i, ((_, _, owner), profile) in enumerate(zip(keys, (False, True, "scheduled"), strict=True)):
+            lock = script(locking_script_from_owner_hash(owner, compiled_curve=profile))
+            funding.append(Tx(2, [TxIn(f"{i + 51:02x}" * 32, 0, Script())],
+                              [TxOut(1, P2PKH), TxOut(1000, lock)], 0))
+        inputs = [TxIn(prev.id(), 1, Script(), 0xfffffffe - i) for i, prev in enumerate(funding)]
+        scheduled = script(locking_script_from_owner_hash(bytes(range(20)), compiled_curve="scheduled"))
+        compiled = script(locking_script_from_owner_hash(bytes(reversed(range(20))), compiled_curve=True))
+        layouts = (
+            (compiled, P2PKH, scheduled, compiled, scheduled),
+            (scheduled, compiled),
+        )
+        with TemporaryDirectory() as temp:
+            history = Path(temp) / "history.db"
+            for version in (1, 2):
+                for locks in layouts:
+                    outputs = [TxOut(500 - i, lock) for i, lock in enumerate(locks)]
+                    tx = Tx(version, inputs, outputs, 17)
+                    for flag in modes:
+                        with self.subTest(version=version, mode=hex(flag), shape=(len(inputs), len(locks))):
+                            signed = self.sign_reconstruction_case(tx, funding, keys, flag, history)
+                            self.check_chronicle(signed, funding, push_only=version == 1)
+                            if version == 2 and len(locks) == 5 and flag & 0x20:
+                                self.check_otda_output_scope(signed, funding, flag)
+
+    def sign_reconstruction_case(self, tx, funding, keys, flag, history):
+        wire = Transaction.parse(tx.serialize())
+        signed_inputs = []
+        is_otda_single = flag in (0x63, 0xe3)
+        for i, (prev, (key, public, _)) in enumerate(zip(funding, keys, strict=True)):
+            approvals = []
+
+            def callback(digest):
+                signature = fixture_signature(key, digest)
+                approvals.append((digest, signature))
+                return signature
+
+            original = tx.tx_ins[i]
+            amount = prev.tx_outs[original.prev_index].amount
+            witness = sign_spend(tx, i, prev, flag, public, callback, history, compress_otda="paired")
+            companion = is_otda_single and i >= len(wire.outputs)
+            if flag & 0x20 and not companion:
+                preimage = preimage_otda(wire, i, bytes.fromhex("68ac"), flag)
+            else:
+                code = bytes.fromhex("63ad67ab68ac" if companion else "68ac")
+                preimage = preimage_forkid(wire, i, amount, code, flag & ~0x20)
+            (digest, signature), = approvals
+            self.assertEqual(digest, hash256(preimage), i)
+            auth = authorization(tx, i, amount, flag)
+            literal = current_input_unlock(auth, public, signature).raw_serialize()
+            raw = witness.raw_serialize()
+            stack, alt = evaluate(raw)
+            self.assertEqual(stack[0], preimage, i)
+            self.assertEqual((stack, alt), evaluate(literal), i)
+            compresses = flag in (0x61, 0xe1) or (
+                is_otda_single and not companion and wire.outputs[i].script != P2PKH.raw_serialize()
+            )
+            if tx.version == 2 and compresses:
+                self.assertLess(len(raw), len(literal), i)
+            else:
+                self.assertEqual(raw, literal, i)
+            signed_inputs.append(TxIn(original.prev_tx, original.prev_index, witness, original.sequence))
+        return Tx(tx.version, signed_inputs, tx.tx_outs, tx.locktime)
+
+    def check_otda_output_scope(self, signed, funding, flag):
+        # Keep the transaction structurally valid in each case and change one
+        # class of signed output bytes at a time.
+        original = signed.tx_outs
+        changed_lock = script(locking_script_from_owner_hash(bytes([17]) * 20, compiled_curve=True))
+        changes = (
+            ("amount", [TxOut(original[0].amount - 1, original[0].script_pubkey), *original[1:]], {0}),
+            ("owner", [TxOut(original[0].amount, changed_lock), *original[1:]], {0}),
+            ("order", [original[2], original[1], original[0], *original[3:]], {0, 2}),
+            ("unpaired output", [*original[:-1], TxOut(original[-1].amount - 1, original[-1].script_pubkey)],
+             {len(original) - 1}),
+        )
+        for field, outputs, changed in changes:
+            with self.subTest(field=field):
+                tx = Tx(signed.version, signed.tx_ins, outputs, signed.locktime)
+                base = flag & 31
+                accepted = [base == 2 or (base == 3 and i not in changed) for i in range(len(funding))]
+                if all(accepted):
+                    tx.validate_at_height(funding, CHRONICLE_MAINNET_HEIGHT, "BSV_Mainnet")
+                else:
+                    with self.assertRaises(ValueError):
+                        tx.validate_at_height(funding, CHRONICLE_MAINNET_HEIGHT, "BSV_Mainnet")
+                for i, valid in enumerate(accepted):
+                    check(tx, funding, i, valid=valid)
 
     def test_mixed_all_reconstructs_two_templates_and_measures_marginals(self):
         keys, locks, funding = self.funding(compiled_curve="scheduled")

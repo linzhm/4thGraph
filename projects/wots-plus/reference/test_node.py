@@ -7,14 +7,14 @@ from pathlib import Path
 import unittest
 
 import requests
-from tx_engine import Script, Tx, TxIn, TxOut
+from tx_engine import Script, Tx, TxIn, TxOut, sig_hash_preimage
 
 from fixtures import fixture_seeds, funding_transaction, malformed_cases, mode_cases
 from payment import authorization, current_input_unlock, sign_payment, sign_spend
-from script import locking_script
+from script import ORDINARY_CODE, locking_script
 from shared.benchmark_cases import SHAPES, batch
 from shared.evaluate import evaluate
-from shared.transaction import Input, Output, Transaction
+from shared.transaction import SIGHASH_TYPES, Input, Output, Transaction, hash256
 from wots import OneTimeSigner
 from fixed_template import TEMPLATE_DIRECTORY, fixed_pattern
 from generate_reconstruction import build_artifacts
@@ -143,6 +143,60 @@ class NodeTests(unittest.TestCase):
                                 self.assertFalse(chain_valid(modified, leg.parents))
                                 for index, parent in enumerate(leg.parents):
                                     self.assertEqual(node_check(modified, parent, index), index != changed)
+
+    def test_reconstruction_matches_signer_and_both_engines_across_modes(self):
+        modes = (0x41, 0x42, 0x43, 0x61, 0x62, 0x63, 0xc1, 0xc2, 0xc3, 0xe1, 0xe2, 0xe3)
+        self.assertEqual(SIGHASH_TYPES, set(modes))
+        recipients = [OneTimeSigner(*fixture_seeds(f"coverage/recipient/{i}".encode())) for i in range(3)]
+        fixed = [locking_script(recipient.public_key, cached_constants="steps") for recipient in recipients]
+        for version in (1, 2):
+            for locks in ((fixed[0], b"\x51", fixed[1], fixed[2]), (fixed[0], fixed[1])):
+                for mode in modes:
+                    with self.subTest(version=version, mode=hex(mode), shape=(3, len(locks))):
+                        self.check_reconstruction_case(version, mode, locks)
+
+    def check_reconstruction_case(self, version, mode, locks):
+        # Each of these public fixture keys is used for exactly one signature.
+        keys = [OneTimeSigner(*fixture_seeds(bytes((version, mode, len(locks), i)))) for i in range(3)]
+        parents = tuple(funding_transaction(key.public_key, cached_constants=profile)
+                        for key, profile in zip(keys, (False, True, "steps"), strict=True))
+        tx = Transaction(tuple(Input(parent.txid_wire(), 0, sequence=0xfffffffe - i)
+                               for i, parent in enumerate(parents)),
+                         tuple(Output(5000 - i, lock) for i, lock in enumerate(locks)),
+                         version=version, locktime=17)
+        engine = engine_transaction(tx)
+        code = Script()
+        code.append_data(ORDINARY_CODE)
+        for i, (key, parent) in enumerate(zip(keys, parents, strict=True)):
+            approved = []
+
+            def callback(digest):
+                approved.append(digest)
+                return key(digest)
+
+            auth = authorization(tx, i, parent.outputs[0].value, mode)
+            tx = sign_spend(tx, i, parent.serialize(), key.public_key, callback,
+                            sighash=mode, compress_otda=True)
+            witness = tx.inputs[i].script
+            stack, alt = evaluate(witness)
+            preimage, signature, _ = stack
+            self.assertEqual(approved, [hash256(preimage)], i)
+            self.assertEqual(preimage, auth.preimage, i)
+            if mode & 0x20 and not auth.companion:
+                oracle = bytes(sig_hash_preimage(engine, i, code, parent.outputs[0].value, mode))
+                self.assertEqual(preimage, oracle, i)
+            literal = current_input_unlock(auth, key.public_key, signature)
+            self.assertEqual((stack, alt), evaluate(literal), i)
+            compresses = mode in (0x61, 0xe1) or (
+                mode in (0x63, 0xe3) and i < len(locks) and locks[i] != b"\x51"
+            )
+            if version == 2 and compresses:
+                self.assertLess(len(witness), len(literal), i)
+            else:
+                self.assertEqual(witness, literal, i)
+        self.assertTrue(chain_valid(tx, parents))
+        for i, parent in enumerate(parents):
+            self.assertTrue(node_check(tx, parent, i), i)
 
     def test_compressing_a_mixed_payment_signs_once_and_retains_literal_fallbacks(self):
         for version, mode, use_fixed_output, compresses in (
