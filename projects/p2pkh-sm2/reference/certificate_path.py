@@ -21,7 +21,10 @@ def _openssl_executable(path):
         path = which('openssl', path=os.pathsep.join(_OPENSSL_INSTALL_DIRECTORIES))
         if path is None:
             raise ValueError('OpenSSL not found in system install directories; supply openssl_path')
-    executable = Path(path)
+    try:
+        executable = Path(path)
+    except TypeError as error:
+        raise ValueError('openssl_path must be an absolute executable path') from error
     if not executable.is_absolute():
         raise ValueError('openssl_path must be an absolute executable path')
     return executable

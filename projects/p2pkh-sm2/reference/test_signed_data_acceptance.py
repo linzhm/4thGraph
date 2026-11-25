@@ -2710,18 +2710,21 @@ class SignedDataReview(SignedDataFixtures):
         executable = certificate_path._openssl_executable(None)
         environment = {'PATH': '/unused', 'OPENSSL_CONF': '/unused/openssl.cnf',
                        'OPENSSL_MODULES': '/unused/modules'}
-        with patch.dict(os.environ, environment):
+        with TemporaryDirectory() as directory, patch.dict(os.environ, environment):
+            explicit = Path(directory) / 'explicit-openssl'
+            explicit.symlink_to(executable)
             with patch.object(certificate_path.subprocess, 'run', wraps=subprocess.run) as run:
-                for path in (None, executable):
+                for path in (None, explicit):
                     self.assertEqual(assess_certificate_revocation(
                         anchor, (), validation_time=now, trust_anchor=anchor, openssl_path=path,
                     ).status, 'undetermined')
-                with self.assertRaisesRegex(ValueError, 'absolute executable path'):
-                    assess_certificate_revocation(anchor, (), validation_time=now,
-                                                  trust_anchor=anchor, openssl_path='openssl')
+                for invalid in ('openssl', 42):
+                    with self.assertRaisesRegex(ValueError, 'absolute executable path'):
+                        assess_certificate_revocation(anchor, (), validation_time=now,
+                                                      trust_anchor=anchor, openssl_path=invalid)
             self.assertEqual(run.call_count, 2)
-            for call in run.call_args_list:
-                self.assertEqual(call.args[0][0], executable)
+            for call, expected in zip(run.call_args_list, (executable, explicit), strict=True):
+                self.assertEqual(call.args[0][0], expected)
                 self.assertEqual(call.kwargs['env'], {'LC_ALL': 'C', 'OPENSSL_CONF': os.devnull})
 
     def test_openssl_issued_sm2_certificate_and_crl_share_trust_anchor(self):
