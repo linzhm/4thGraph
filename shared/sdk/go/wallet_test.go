@@ -20,6 +20,7 @@ func TestWalletReplay(t *testing.T) {
 	}
 	var cases []struct {
 		Profile, Funding, Lock, Signed string
+		ExistingOutput                 bool
 		Vout                           uint32
 		Recognition                    WalletRecognition
 		Request                        WalletInput
@@ -45,15 +46,18 @@ func TestWalletReplay(t *testing.T) {
 			if row.Signature == nil {
 				value = prevout.ValueSats
 			}
-			lock, err := wallet.CreateLock(ctx, LockRequest{PublicKey: row.Request.PublicKey, ValueSats: value})
-			if err != nil || lock != row.Lock {
-				t.Fatalf("incorrect lock: %v", err)
+			lock := row.Lock
+			if !row.ExistingOutput {
+				generated, err := wallet.CreateLock(ctx, LockRequest{PublicKey: row.Request.PublicKey, ValueSats: value})
+				if err != nil || generated != lock {
+					t.Fatalf("incorrect lock: %v", err)
+				}
 			}
 			recognized, err := wallet.Recognize(ctx, RecognizeRequest{Script: lock, PublicKey: row.Request.PublicKey, ValueSats: value})
 			if err != nil || recognized == nil || *recognized != row.Recognition {
 				t.Fatalf("incorrect recognition: %v", err)
 			}
-			if recognized.OwnerHash160 != "" {
+			if recognized.OwnerHash160 != "" && !row.ExistingOutput {
 				byOwner, err := wallet.CreateLock(ctx, LockRequest{OwnerHash160: recognized.OwnerHash160, ValueSats: value})
 				if err != nil || byOwner != lock {
 					t.Fatalf("incorrect owner lock: %v", err)

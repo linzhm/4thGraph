@@ -34,6 +34,6 @@ Install the pinned [requirements](../reference/requirements.txt) and run `bash p
 
 ## SDK and reference interfaces
 
-Follow the [unified Lamport wallet guide](../sdk/README.md) to generate a full-key or committed-key output and connect an external signer. The signer returns the 8,192-byte raw signature over the requested digest. The wallet needs durable consumption records and a fresh key for change.
+Follow the [unified Lamport wallet guide](sdk.en.md) to generate a full-key or committed-key output and connect an external signer. The signer returns the 8,192-byte raw signature over the requested digest. The wallet needs durable consumption records and a fresh key for change.
 
 [Reference developer workflow](../reference/README.md) · [Payment source](../reference/payment.py) · [Original funding and spend vector](../template/vector.json)

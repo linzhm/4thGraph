@@ -11,6 +11,7 @@ if (!project || !fixture || !bridge) throw new Error("Missing SDK replay configu
 
 interface Vector {
   profile: string;
+  existingOutput?: boolean;
   funding: string;
   vout: number;
   lock: string;
@@ -26,14 +27,16 @@ interface Vector {
 const vectors: Vector[] = JSON.parse(readFileSync(fixture, "utf8"));
 assert.ok(vectors.length);
 for (const row of vectors) {
-  test(`${row.profile} 0x${row.request.sighash?.toString(16)}`, () => {
+  test(`${row.profile} 0x${row.request.sighash?.toString(16)}`, async () => {
     const client = new WalletClient(project, { bridge, python: process.env.SCRIPT_LAB_SDK_PYTHON, template: row.profile });
     const prevout = client.prevoutFromFunding(row.funding, row.vout);
     assert.deepEqual(prevout, row.request.prevout);
     const scope = row.signature === null ? { valueSats: prevout.valueSats } : {};
-    assert.equal(client.createLock({ publicKey: row.request.publicKey, ...scope }), row.lock);
+    if (!row.existingOutput) {
+      assert.equal(client.createLock({ publicKey: row.request.publicKey, ...scope }), row.lock);
+    }
     assert.deepEqual(client.recognize({ script: row.lock, publicKey: row.request.publicKey, ...scope }), row.recognition);
-    if (row.recognition.ownerHash160) {
+    if (row.recognition.ownerHash160 && !row.existingOutput) {
       assert.equal(client.createLock({ ownerHash160: row.recognition.ownerHash160, ...scope }), row.lock);
     }
     const { transaction, inputIndex, ...options } = row.request;
@@ -57,5 +60,16 @@ for (const row of vectors) {
     assert.throws(() => client.signPayment({ ...payment, feeSats: "99" }, signer));
     assert.throws(() => client.signInput({ ...row.request, inputIndex: 1 }, signer));
     assert.equal(calls, 2);
+    if (project === "p2pkh-r1") {
+      const pending = { ...payment };
+      assert.equal(await client.signPaymentAsync(pending, async (request) => {
+        await Promise.resolve();
+        pending.feeSats = "99";
+        return signer(request);
+      }), row.signed);
+      assert.equal(await client.signInputAsync(row.request, async (request) => signer(request)), row.signed);
+      await assert.rejects(client.signPaymentAsync(payment, async () => { throw new Error("device cancelled"); }),
+                           /device cancelled/);
+    }
   });
 }

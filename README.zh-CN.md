@@ -4,7 +4,7 @@
 
 BSV Script Lab 提供钱包可识别的锁定模板、可接入外部签名器的源码 SDK，以及可复放的签名交易向量。你可以从原生 P2PKH 基准出发，接入 P‑256 或 SM2，也可以用统一的测量口径比较 Lamport、WOTS+ 和纯模式 ML‑DSA‑44。
 
-[选择项目](#project-index) · [比较交易成本](#transaction-costs) · [复现交易基准](shared/benchmark.zh-CN.md) · [English](README.md)
+**[钱包 SDK 快速上手](shared/sdk/README.zh-CN.md#quickstart)** · [选择项目](#project-index) · [比较交易成本](#transaction-costs) · [复现交易基准](shared/benchmark.zh-CN.md) · [English](README.md)
 
 <a name="project-index"></a>
 
@@ -12,13 +12,13 @@ BSV Script Lab 提供钱包可识别的锁定模板、可接入外部签名器�
 
 | 项目 | 使用场景 | 版本 | 钱包接入 |
 | --- | --- | --- | --- |
-| [原生 P2PK 与 P2PKH](projects/p2pk-p2pkh-baseline/README.zh-CN.md) | 以原生 secp256k1 脚本建立体积和签名基准 | v0.1 开发版 | [SDK](projects/p2pk-p2pkh-baseline/sdk/README.zh-CN.md) |
-| [P2PKH-R1](projects/p2pkh-r1/README.zh-CN.md) | 用固定模板向 P‑256 公钥哈希付款 | v0.2.0 开发版 | [SDK](projects/p2pkh-r1/docs/sdk.zh-CN.md) |
-| [P2PKH-R1-Deferred](projects/p2pkh-r1-deferred/README.zh-CN.md) | 用短锁收款，之后启用为普通 R1 输出 | v0.2.0 开发版 | [SDK](projects/p2pkh-r1-deferred/docs/sdk.zh-CN.md) |
-| [P2PKH-SM2](projects/p2pkh-sm2/README.zh-CN.md) | 使用 SM2 签名付款，在链下接收 GB/T 35275‑2026 SignedData | v1.0.0 公开版 | [SDK](projects/p2pkh-sm2/sdk/README.zh-CN.md) |
-| [Lamport OTS](projects/lamport-ots/README.zh-CN.md) | 评估 SHA‑256 一次性签名，比较完整公钥锁和公钥承诺锁 | v0.1 开发版 | [SDK](projects/lamport-ots/sdk/README.zh-CN.md) |
-| [WOTS+](projects/wots-plus/README.zh-CN.md) | 评估基于 SHA‑256 哈希链的一次性签名 | v0.1 开发版 | [SDK](projects/wots-plus/sdk/README.zh-CN.md) |
-| [纯模式 ML-DSA-44](projects/ml-dsa/README.zh-CN.md) | 评估在脚本中验证 FIPS 204 纯模式 ML‑DSA‑44 签名 | v0.1 开发版 | [SDK](projects/ml-dsa/sdk/README.zh-CN.md) |
+| [原生 P2PK 与 P2PKH](projects/p2pk-p2pkh-baseline/README.zh-CN.md) | 以原生 secp256k1 脚本建立体积和签名基准 | v0.1 开发版 | [接入指南](projects/p2pk-p2pkh-baseline/docs/sdk.zh-CN.md#quickstart) |
+| [P2PKH-R1](projects/p2pkh-r1/README.zh-CN.md) | 用固定模板向 P‑256 公钥哈希付款 | v0.2.0 开发版 | [接入指南](projects/p2pkh-r1/docs/sdk.zh-CN.md#quickstart) |
+| [P2PKH-R1-Deferred](projects/p2pkh-r1-deferred/README.zh-CN.md) | 用短锁收款，之后启用为普通 R1 输出 | v0.2.0 开发版 | [接入指南](projects/p2pkh-r1-deferred/docs/sdk.zh-CN.md#quickstart) |
+| [P2PKH-SM2](projects/p2pkh-sm2/README.zh-CN.md) | 使用 SM2 签名付款，在链下接收 GB/T 35275‑2026 SignedData | v1.0.0 公开版 | [接入指南](projects/p2pkh-sm2/docs/sdk.zh-CN.md#quickstart) |
+| [Lamport OTS](projects/lamport-ots/README.zh-CN.md) | 评估 SHA‑256 一次性签名，比较完整公钥锁和公钥承诺锁 | v0.1 开发版 | [接入指南](projects/lamport-ots/docs/sdk.zh-CN.md#quickstart) |
+| [WOTS+](projects/wots-plus/README.zh-CN.md) | 评估基于 SHA‑256 哈希链的一次性签名 | v0.1 开发版 | [接入指南](projects/wots-plus/docs/sdk.zh-CN.md#quickstart) |
+| [纯模式 ML-DSA-44](projects/ml-dsa/README.zh-CN.md) | 评估在脚本中验证 FIPS 204 纯模式 ML‑DSA‑44 签名 | v0.1 开发版 | [接入指南](projects/ml-dsa/docs/sdk.zh-CN.md#quickstart) |
 
 先用原生 P2PKH 跑通第一笔付款。七个项目在 TypeScript、Rust、Go 和 Python 中使用同一套钱包调用，各项目指南说明签名器参数、模板选项和本地依赖。 [钱包 SDK 快速接入](shared/sdk/README.zh-CN.md)
 

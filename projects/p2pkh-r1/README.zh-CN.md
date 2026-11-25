@@ -2,11 +2,15 @@
 
 [English](README.md) · [BSV Script Lab](../../README.zh-CN.md)
 
-P2PKH-R1 用未压缩的 secp256r1（P-256）公钥的 HASH160 锁定 BSV 输出。付款人只需填入 20 字节收款人哈希。花费时，钱包提供公钥和当前输入的一份经校验的 64 字节 `r || s` 签名。
-
 ## 开发入口
 
-[协议规范](docs/developer.zh-CN.md#protocol) · [安全分析](docs/developer.zh-CN.md#security) · [验证与测量](docs/developer.zh-CN.md#validation) · [SDK 与参考接口](docs/developer.zh-CN.md#sdk)
+**[钱包 SDK 快速上手](docs/sdk.zh-CN.md#quickstart)** · [统一钱包 SDK](../../shared/sdk/README.zh-CN.md#quickstart)
+
+生成 P-256 收款脚本并签署已审批的付款。统一客户端支持逐输入签名和 Chronicle OTDA。
+
+[协议规范](docs/spec.zh-CN.md) · [安全分析](docs/developer.zh-CN.md#security) · [复现与验证](reference/acceptance.md) · [交易成本](#完整交易与栈测量)
+
+P2PKH-R1 用未压缩的 secp256r1（P-256）公钥的 HASH160 锁定 BSV 输出。付款人只需填入 20 字节收款人哈希。花费时，钱包提供公钥和当前输入的一份经校验的 64 字节 `r || s` 签名。
 
 ## 当前模板
 

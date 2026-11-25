@@ -6,6 +6,7 @@ import sys
 
 from vector import Node, adapter_for, chain_verdict, generate
 from shared.sdk.python.client import WalletClient
+from shared.script import push
 from shared.transaction import Input, Output, Transaction
 
 CALLBACKS = {
@@ -19,19 +20,40 @@ CALLBACKS = {
 
 
 def r1_vectors(project, directory, node):
-    from cryptography.hazmat.primitives import hashes, serialization
-    from cryptography.hazmat.primitives.asymmetric import ec, utils
-    from tx_engine import Tx
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric import ec
 
     adapter = adapter_for(project)
     private = ec.derive_private_key(5, ec.SECP256R1())
     public_key = private.public_key().public_bytes(
         serialization.Encoding.X962, serialization.PublicFormat.UncompressedPoint,
     )
-    profile = "v0.2.0"
     deferred = project == "p2pkh-r1-deferred"
+    layouts = [("v0.2.0", False), ("v0.1.0", False)]
+    if deferred:
+        layouts.append(("v0.1.0", True))
+    for profile, embedded_key in layouts:
+        yield from r1_layout_vectors(project, directory, node, adapter, private, public_key,
+                                     profile, embedded_key)
+
+
+def r1_layout_vectors(project, directory, node, adapter, private, public_key, profile, embedded_key):
+    from cryptography.hazmat.primitives import hashes
+    from cryptography.hazmat.primitives.asymmetric import ec, utils
+    from tx_engine import Tx
+
+    deferred = project == "p2pkh-r1-deferred"
+    existing_output = deferred and profile == "v0.1.0"
     value = 10_000
-    lock = adapter.lock(public_key, profile, value) if deferred else adapter.lock(public_key, profile)
+    if existing_output:
+        from deferred import funding_output
+        lock = funding_output(value, public_key, target_r1_version="0.1.0").script
+        if embedded_key:
+            lock = push(public_key) + lock[21:]
+    elif deferred:
+        lock = adapter.lock(public_key, profile, value)
+    else:
+        lock = adapter.lock(public_key, profile)
     # Put the lock at vout 1 and spend it at input 0.
     funding = Transaction((Input(b"\xf1" * 32, 0),), (Output(1, b"\x51"), Output(value, lock)))
     vout = 1
@@ -40,7 +62,7 @@ def r1_vectors(project, directory, node):
         compress = sighash == 0x61
         if deferred:
             from deferred import activate_input, target_output
-            outputs = (target_output(value, public_key),)
+            outputs = (target_output(value, public_key, target_r1_version=profile[1:]),)
         else:
             outputs = (Output(value - 100, lock if compress else b"\x51"),)
         tx = Transaction((Input(funding.txid_wire(), vout),), outputs)
@@ -75,6 +97,7 @@ def r1_vectors(project, directory, node):
             assert node.verdicts(signed, (funding,)) == [True]
         yield {
             "profile": profile, "lock": lock.hex(), "recognition": recognition, "request": request, "vout": vout,
+            "existingOutput": existing_output,
             "outputs": [dict(script=out.script.hex(), valueSats=str(out.value)) for out in outputs],
             "signature": signature.hex() if signature else None, "arguments": arguments,
             "signed": signed.serialize().hex(),
@@ -95,13 +118,14 @@ def replay(project, rows):
         key = bytes.fromhex(request["publicKey"])
         lock = bytes.fromhex(row["lock"])
         scoped = {"value_sats": prevout.value_sats} if project == "p2pkh-r1-deferred" else {}
-        assert client.create_lock(public_key=key, **scoped) == lock
+        if not row.get("existingOutput"):
+            assert client.create_lock(public_key=key, **scoped) == lock
         row["recognition"]["project"] = project
         if project == "p2pk-p2pkh-baseline" and row["profile"] == "p2pk":
             row["recognition"]["publicKey"] = key.hex()
         assert client.recognize(lock, public_key=key, **scoped) == row["recognition"]
         assert client.recognize(b"\x00" + lock[1:], public_key=key, **scoped) is None
-        if owner := row["recognition"].get("ownerHash160"):
+        if (owner := row["recognition"].get("ownerHash160")) and not row.get("existingOutput"):
             assert client.create_lock(owner_hash160=bytes.fromhex(owner), **scoped) == lock
         if project == "p2pkh-r1-deferred":
             assert client.activate(tx, request["inputIndex"], prevout, sighash=request["sighash"],

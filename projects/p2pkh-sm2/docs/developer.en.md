@@ -34,6 +34,6 @@ Use Python 3.12, OpenSSL with SM2/SM3 and Rust. Install the pinned [requirements
 
 ## SDK and reference interfaces
 
-Follow the [unified SM2 wallet guide](../sdk/README.md) to create or recognize the lock and sign a transaction. Connect a signer that accepts the supplied message and SM2 user ID, and choose raw signature or DER SignedData. The Rust and Python command-line providers are public fixture signers.
+Follow the [unified SM2 wallet guide](sdk.en.md) to create or recognize the lock and sign a transaction. Connect a signer that accepts the supplied message and SM2 user ID, and choose raw signature or DER SignedData. The Rust and Python command-line providers are public fixture signers.
 
 [Reference wallet](../reference/p2pkh_sm2.py) · [SignedData adapter and example](../reference/README.md#signeddata-payment-interop) · [Rust test signer](../reference/interop/rust-signer/README.md) · [Python test signer](../reference/interop/python-signer/README.md)

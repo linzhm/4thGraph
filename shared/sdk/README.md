@@ -4,13 +4,17 @@
 
 Use the same wallet workflow for every Script Lab project. Start with native P2PKH to check transaction serialization and your secp256k1 signer, then select another project and connect its signer. A client uses a local Python 3.12 process and the templates in this checkout.
 
+Use the shared source package for your language and select a scheme by project identifier. Each integration guide covers its template, signer format and project-specific workflow.
+
+<a name="quickstart"></a>
+
 ## Set up native P2PKH
 
 Run these commands from the repository root. The TypeScript example requires Node.js 24 or later. Go examples use Go 1.23 or later, and the Rust crate uses edition 2021.
 
 ```sh
 python3.12 -m venv .venv
-.venv/bin/python -m pip install -r projects/p2pk-p2pkh-baseline/sdk/requirements.txt
+.venv/bin/python -m pip install -r projects/p2pk-p2pkh-baseline/reference/requirements-sdk.txt
 ```
 
 Use `WalletClient` from [TypeScript](typescript/index.ts), `WalletClient::new` from [Rust](rust/Cargo.toml), `NewWallet` from [Go](go/go.mod), or `WalletClient` from [Python](python/client.py). These are source packages. With Python, run from the repository root or put the checkout on `PYTHONPATH`.
@@ -41,6 +45,12 @@ const signedHex = wallet.signPayment({
 ```
 
 The signer returns a low-S DER signature. The SDK appends the sighash byte and verifies the signature before returning serialized transaction hex. Your wallet submits the transaction after applying its own approval and broadcasting policies. Set `template: "p2pk"` when constructing the client to create P2PK outputs through the same API. Recognition checks the actual script and can recognize both formats.
+
+For a separate wallet checkout, add the same Rust crate with `cargo add --path /path/to/bsv-script-lab/shared/sdk/rust`, or add the same Go module with `go work use /path/to/bsv-script-lab/shared/sdk/go`. Select the Python environment for your scheme in the client configuration. For TypeScript hardware adapters with an asynchronous signing API, use `signPaymentAsync` or `signInputAsync`.
+
+## Design references
+
+Script Lab uses one source library per language and selects the payment template by project, following the separation of transaction objects and locking templates in the BSV SDK. The signing callback keeps key custody with the application, as in the BDK transaction-signing flow. TypeScript's separate async methods follow bitcoinjs-lib's signer API and preserve the wallet's approved transaction while a device is pending. [BSV template API](https://hub.bsvblockchain.org/bsv-code-academy/code-features/code-features/custom-templates) · [BDK signing workflow](https://bookofbdk.com/design/signing/) · [bitcoinjs-lib async signer](https://bitcoinjs.github.io/bitcoinjs-lib/interfaces/SignerAsync.html)
 
 ## Calls and data
 
@@ -111,13 +121,13 @@ signed = wallet.sign_payment(
 
 | Project | Signing request | Select this guide |
 | --- | --- | --- |
-| Native P2PK and P2PKH | secp256k1 digest, low-S DER | [Native SDK](../../projects/p2pk-p2pkh-baseline/sdk/README.md) |
-| P2PKH-R1 | P-256 digest or device-hashed message, 64-byte `r ∥ s` | [R1 SDK](../../projects/p2pkh-r1/docs/sdk.en.md) |
-| P2PKH-R1-Deferred | Activation builds the unlocking script from the committed R1 output | [Deferred SDK](../../projects/p2pkh-r1-deferred/docs/sdk.en.md) |
-| P2PKH-SM2 | SM2 message and user ID, 64-byte `r ∥ s` or DER SignedData | [SM2 SDK](../../projects/p2pkh-sm2/sdk/README.md) |
-| Lamport OTS | 32-byte digest, 8,192-byte signature | [Lamport SDK](../../projects/lamport-ots/sdk/README.md) |
-| WOTS+ | 32-byte digest, 2,144-byte signature | [WOTS+ SDK](../../projects/wots-plus/sdk/README.md) |
-| Pure ML-DSA-44 | 32-byte message with empty context, 2,420-byte signature | [ML-DSA SDK](../../projects/ml-dsa/sdk/README.md) |
+| Native P2PK and P2PKH | secp256k1 digest, low-S DER | [Native SDK](../../projects/p2pk-p2pkh-baseline/docs/sdk.en.md#quickstart) |
+| P2PKH-R1 | P-256 digest or device-hashed message, 64-byte `r ∥ s` | [R1 SDK](../../projects/p2pkh-r1/docs/sdk.en.md#quickstart) |
+| P2PKH-R1-Deferred | Activation builds the unlocking script from the committed R1 output | [Deferred SDK](../../projects/p2pkh-r1-deferred/docs/sdk.en.md#quickstart) |
+| P2PKH-SM2 | SM2 message and user ID, 64-byte `r ∥ s` or DER SignedData | [SM2 SDK](../../projects/p2pkh-sm2/docs/sdk.en.md#quickstart) |
+| Lamport OTS | 32-byte digest, 8,192-byte signature | [Lamport SDK](../../projects/lamport-ots/docs/sdk.en.md#quickstart) |
+| WOTS+ | 32-byte digest, 2,144-byte signature | [WOTS+ SDK](../../projects/wots-plus/docs/sdk.en.md#quickstart) |
+| Pure ML-DSA-44 | 32-byte message with empty context, 2,420-byte signature | [ML-DSA SDK](../../projects/ml-dsa/docs/sdk.en.md#quickstart) |
 
 ## Replay the baseline
 

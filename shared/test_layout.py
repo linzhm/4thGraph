@@ -9,6 +9,7 @@ import subprocess
 from tempfile import TemporaryDirectory
 import unittest
 from .script import assemble
+from .sdk.python.bridge import WALLET_PROJECTS
 
 ROOT=Path(__file__).resolve().parents[1]
 SOURCE_DIRECTORIES = ('.github', 'handoff', 'projects', 'shared')
@@ -61,6 +62,20 @@ class LayoutTests(unittest.TestCase):
             for child in ('README.md','docs','reference','template'):
                 self.assertTrue((ROOT/'projects'/name/child).exists())
         self.check_local_links(ROOT)
+
+    def test_sdk_quickstarts_are_reachable(self):
+        for filename, language in (("README.md", "en"), ("README.zh-CN.md", "zh-CN")):
+            overview = (ROOT / filename).read_text(encoding="utf-8")
+            shared_guide = (ROOT / "shared/sdk" / filename).read_text(encoding="utf-8")
+            self.assertIn(f"](shared/sdk/{filename}#quickstart)", overview)
+            self.assertIn('<a name="quickstart"></a>', shared_guide)
+            for name in sorted(WALLET_PROJECTS):
+                with self.subTest(project=name, language=language):
+                    project = ROOT / "projects" / name
+                    guide = f"docs/sdk.{language}.md"
+                    self.assertIn(f"]({guide}#quickstart)", (project / filename).read_text(encoding="utf-8"))
+                    self.assertIn(f"](../../projects/{name}/{guide}#quickstart)", shared_guide)
+                    self.assertIn('<a name="quickstart"></a>', (project / guide).read_text(encoding="utf-8"))
 
     def check_local_links(self, root):
         for path in markdown_files(root):

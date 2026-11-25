@@ -4,7 +4,7 @@
 
 BSV Script Lab provides locking templates that wallets can recognize, SDKs that work with external signers, and signed transaction vectors you can replay. Start with native P2PKH, integrate P-256 or SM2, or compare Lamport, WOTS+, and pure ML-DSA-44 using the same benchmark methodology.
 
-[Choose a project](#project-index) · [Compare transaction costs](#transaction-costs) · [Reproduce the benchmarks](shared/benchmark.md) · [简体中文](README.zh-CN.md)
+**[Wallet SDK quickstart](shared/sdk/README.md#quickstart)** · [Choose a project](#project-index) · [Compare transaction costs](#transaction-costs) · [Reproduce the benchmarks](shared/benchmark.md) · [简体中文](README.zh-CN.md)
 
 <a name="project-index"></a>
 
@@ -12,13 +12,13 @@ BSV Script Lab provides locking templates that wallets can recognize, SDKs that 
 
 | Project | Use it to | Version | Wallet integration |
 | --- | --- | --- | --- |
-| [Native P2PK and P2PKH](projects/p2pk-p2pkh-baseline/README.md) | Establish a size and signing baseline with native secp256k1 scripts | v0.1 development | [SDK](projects/p2pk-p2pkh-baseline/sdk/README.md) |
-| [P2PKH-R1](projects/p2pkh-r1/README.md) | Pay to a P-256 public-key hash using a fixed locking template | v0.2.0 development | [SDK](projects/p2pkh-r1/docs/sdk.en.md) |
-| [P2PKH-R1-Deferred](projects/p2pkh-r1-deferred/README.md) | Receive funds with a short lock and activate a standard R1 output later | v0.2.0 development | [SDK](projects/p2pkh-r1-deferred/docs/sdk.en.md) |
-| [P2PKH-SM2](projects/p2pkh-sm2/README.md) | Pay with SM2 signatures and accept GB/T 35275-2026 SignedData off-chain | v1.0.0 public release | [SDK](projects/p2pkh-sm2/sdk/README.md) |
-| [Lamport OTS](projects/lamport-ots/README.md) | Evaluate SHA-256 one-time signatures with full-key and committed-key locks | v0.1 development | [SDK](projects/lamport-ots/sdk/README.md) |
-| [WOTS+](projects/wots-plus/README.md) | Evaluate one-time signatures built from SHA-256 hash chains | v0.1 development | [SDK](projects/wots-plus/sdk/README.md) |
-| [Pure ML-DSA-44](projects/ml-dsa/README.md) | Evaluate FIPS 204 pure-mode ML-DSA-44 signatures in Script | v0.1 development | [SDK](projects/ml-dsa/sdk/README.md) |
+| [Native P2PK and P2PKH](projects/p2pk-p2pkh-baseline/README.md) | Establish a size and signing baseline with native secp256k1 scripts | v0.1 development | [Integration guide](projects/p2pk-p2pkh-baseline/docs/sdk.en.md#quickstart) |
+| [P2PKH-R1](projects/p2pkh-r1/README.md) | Pay to a P-256 public-key hash using a fixed locking template | v0.2.0 development | [Integration guide](projects/p2pkh-r1/docs/sdk.en.md#quickstart) |
+| [P2PKH-R1-Deferred](projects/p2pkh-r1-deferred/README.md) | Receive funds with a short lock and activate a standard R1 output later | v0.2.0 development | [Integration guide](projects/p2pkh-r1-deferred/docs/sdk.en.md#quickstart) |
+| [P2PKH-SM2](projects/p2pkh-sm2/README.md) | Pay with SM2 signatures and accept GB/T 35275-2026 SignedData off-chain | v1.0.0 public release | [Integration guide](projects/p2pkh-sm2/docs/sdk.en.md#quickstart) |
+| [Lamport OTS](projects/lamport-ots/README.md) | Evaluate SHA-256 one-time signatures with full-key and committed-key locks | v0.1 development | [Integration guide](projects/lamport-ots/docs/sdk.en.md#quickstart) |
+| [WOTS+](projects/wots-plus/README.md) | Evaluate one-time signatures built from SHA-256 hash chains | v0.1 development | [Integration guide](projects/wots-plus/docs/sdk.en.md#quickstart) |
+| [Pure ML-DSA-44](projects/ml-dsa/README.md) | Evaluate FIPS 204 pure-mode ML-DSA-44 signatures in Script | v0.1 development | [Integration guide](projects/ml-dsa/docs/sdk.en.md#quickstart) |
 
 Start with native P2PKH to run your first payment. The projects share the same wallet calls in TypeScript, Rust, Go, and Python. Each project guide covers its signing request, template options, and local dependencies. [Wallet SDK quickstart](shared/sdk/README.md)
 

@@ -37,27 +37,33 @@ fn replay() {
             .is_null()
             .then(|| prevout.output.value_sats.clone());
         let pubkey = Some(input.options.public_key.clone());
-        let lock = client
-            .create_lock(LockRequest {
-                public_key: pubkey.clone(),
-                value_sats: value_sats.clone(),
-                ..Default::default()
-            })
-            .unwrap();
-        assert!(lock == field("lock"), "locking script mismatch");
+        let lock = field("lock").to_owned();
         let expected: WalletRecognition =
             serde_json::from_value(row["recognition"].clone()).unwrap();
-        if let Some(owner) = &expected.lock.owner_hash160 {
-            assert!(
+        if row["existingOutput"] != true {
+            assert_eq!(
                 client
                     .create_lock(LockRequest {
-                        owner_hash160: Some(owner.clone()),
+                        public_key: pubkey.clone(),
                         value_sats: value_sats.clone(),
                         ..Default::default()
                     })
-                    .unwrap()
-                    == lock
+                    .unwrap(),
+                lock,
+                "locking script mismatch"
             );
+            if let Some(owner) = &expected.lock.owner_hash160 {
+                assert_eq!(
+                    client
+                        .create_lock(LockRequest {
+                            owner_hash160: Some(owner.clone()),
+                            value_sats: value_sats.clone(),
+                            ..Default::default()
+                        })
+                        .unwrap(),
+                    lock
+                );
+            }
         }
         assert_eq!(
             client

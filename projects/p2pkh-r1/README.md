@@ -2,11 +2,15 @@
 
 [简体中文](README.zh-CN.md) · [BSV Script Lab](../../README.md)
 
-P2PKH-R1 locks a BSV output to the HASH160 of the recipient's uncompressed secp256r1 (P-256) public key. The payer fills a 20-byte owner field. On spend, the wallet supplies the public key and one verified 64-byte `r || s` signature for the selected input.
-
 ## Developer resources
 
-[Protocol specification](docs/developer.en.md#protocol) · [Security analysis](docs/developer.en.md#security) · [Validation and measurements](docs/developer.en.md#validation) · [SDK and reference interfaces](docs/developer.en.md#sdk)
+**[Wallet SDK quickstart](docs/sdk.en.md#quickstart)** · [Unified wallet SDK](../../shared/sdk/README.md#quickstart)
+
+Create a P-256 receive script and sign an approved payment. The unified client supports prepared inputs and Chronicle OTDA.
+
+[Protocol](docs/spec.en.md) · [Security](docs/developer.en.md#security) · [Verify](reference/acceptance.md) · [Transaction costs](#complete-transactions-and-stack-measurements)
+
+P2PKH-R1 locks a BSV output to the HASH160 of the recipient's uncompressed secp256r1 (P-256) public key. The payer fills a 20-byte owner field. On spend, the wallet supplies the public key and one verified 64-byte `r || s` signature for the selected input.
 
 ## Current template
 

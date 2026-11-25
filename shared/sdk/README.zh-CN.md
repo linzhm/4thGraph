@@ -4,13 +4,17 @@
 
 七个项目使用同一套钱包调用。先用原生 P2PKH 跑通交易序列化和 secp256k1 签名，再切换到所选项目和签名器。SDK 通过本地 Python 3.12 进程调用参考实现，并读取当前仓库中的模板。
 
+应用接入所选语言的通用源码包，再用项目标识选择签名方案。项目接入指南分别说明模板、签名格式和特有流程。
+
+<a name="quickstart"></a>
+
 ## 配置原生 P2PKH
 
 从仓库根目录运行。TypeScript 需要 Node.js 24 或以上版本，Go 需要 1.23 或以上版本，Rust 库使用 2021 edition。
 
 ```sh
 python3.12 -m venv .venv
-.venv/bin/python -m pip install -r projects/p2pk-p2pkh-baseline/sdk/requirements.txt
+.venv/bin/python -m pip install -r projects/p2pk-p2pkh-baseline/reference/requirements-sdk.txt
 ```
 
 源码入口为 [TypeScript 的 `WalletClient`](typescript/index.ts)、[Rust 的 `WalletClient::new`](rust/Cargo.toml)、[Go 的 `NewWallet`](go/go.mod) 和 [Python 的 `WalletClient`](python/client.py)。Python 项目可以从仓库根目录运行，或把仓库加入 `PYTHONPATH`。
@@ -41,6 +45,12 @@ const signedHex = wallet.signPayment({
 ```
 
 签名器返回 low-S DER 签名。SDK 验签并添加 sighash 字节，返回序列化交易。钱包按自己的审批和广播流程提交交易。初始化时加上 `template: "p2pk"`，即可用同一套接口创建 P2PK 输出。识别按实际脚本判定，两种格式都可以识别。
+
+钱包位于独立仓库时，Rust 用 `cargo add --path /path/to/bsv-script-lab/shared/sdk/rust`，Go 用 `go work use /path/to/bsv-script-lab/shared/sdk/go`。所选签名方案的 Python 运行环境通过客户端配置指定。对接异步签名设备时，TypeScript 使用 `signPaymentAsync` 或 `signInputAsync`。
+
+## 接口设计参考
+
+Script Lab 每种语言提供一个源码库，通过项目标识选择付款模板。交易和模板的职责划分参考 BSV SDK，签名回调参考 BDK 将密钥交给应用管理的工作流。TypeScript 为硬件设备提供独立的异步签名方法，调用方式参考 bitcoinjs-lib。设备等待授权期间，SDK 使用调用时已审批的交易副本。[BSV 模板接口](https://hub.bsvblockchain.org/bsv-code-academy/code-features/code-features/custom-templates) · [BDK 签名流程](https://bookofbdk.com/design/signing/) · [bitcoinjs-lib 异步签名接口](https://bitcoinjs.github.io/bitcoinjs-lib/interfaces/SignerAsync.html)
 
 ## 调用与数据
 
@@ -111,13 +121,13 @@ signed = wallet.sign_payment(
 
 | 项目 | 签名请求 | 接入指南 |
 | --- | --- | --- |
-| 原生 P2PK/P2PKH | secp256k1 摘要，low-S DER | [原生 SDK](../../projects/p2pk-p2pkh-baseline/sdk/README.zh-CN.md) |
-| P2PKH-R1 | P-256 摘要或交给设备散列的消息，64 字节 `r ∥ s` | [R1 SDK](../../projects/p2pkh-r1/docs/sdk.zh-CN.md) |
-| P2PKH-R1-Deferred | 启用操作依据承诺的 R1 输出生成解锁脚本 | [Deferred SDK](../../projects/p2pkh-r1-deferred/docs/sdk.zh-CN.md) |
-| P2PKH-SM2 | SM2 消息和用户 ID，64 字节 `r ∥ s` 或 DER SignedData | [SM2 SDK](../../projects/p2pkh-sm2/sdk/README.zh-CN.md) |
-| Lamport OTS | 32 字节摘要，8,192 字节签名 | [Lamport SDK](../../projects/lamport-ots/sdk/README.zh-CN.md) |
-| WOTS+ | 32 字节摘要，2,144 字节签名 | [WOTS+ SDK](../../projects/wots-plus/sdk/README.zh-CN.md) |
-| 纯模式 ML-DSA-44 | 32 字节消息和空上下文，2,420 字节签名 | [ML-DSA SDK](../../projects/ml-dsa/sdk/README.zh-CN.md) |
+| 原生 P2PK/P2PKH | secp256k1 摘要，low-S DER | [原生 SDK](../../projects/p2pk-p2pkh-baseline/docs/sdk.zh-CN.md#quickstart) |
+| P2PKH-R1 | P-256 摘要或交给设备散列的消息，64 字节 `r ∥ s` | [R1 SDK](../../projects/p2pkh-r1/docs/sdk.zh-CN.md#quickstart) |
+| P2PKH-R1-Deferred | 启用操作依据承诺的 R1 输出生成解锁脚本 | [Deferred SDK](../../projects/p2pkh-r1-deferred/docs/sdk.zh-CN.md#quickstart) |
+| P2PKH-SM2 | SM2 消息和用户 ID，64 字节 `r ∥ s` 或 DER SignedData | [SM2 SDK](../../projects/p2pkh-sm2/docs/sdk.zh-CN.md#quickstart) |
+| Lamport OTS | 32 字节摘要，8,192 字节签名 | [Lamport SDK](../../projects/lamport-ots/docs/sdk.zh-CN.md#quickstart) |
+| WOTS+ | 32 字节摘要，2,144 字节签名 | [WOTS+ SDK](../../projects/wots-plus/docs/sdk.zh-CN.md#quickstart) |
+| 纯模式 ML-DSA-44 | 32 字节消息和空上下文，2,420 字节签名 | [ML-DSA SDK](../../projects/ml-dsa/docs/sdk.zh-CN.md#quickstart) |
 
 ## 复放基线
 

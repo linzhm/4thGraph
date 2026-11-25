@@ -50,7 +50,7 @@ def adapter_for(project):
     if project not in WALLET_PROJECTS:
         raise ValueError("unknown SDK project")
     root = ROOT / "projects" / project
-    spec = spec_from_file_location("sdk_adapter", root / "sdk/adapter.py")
+    spec = spec_from_file_location("sdk_adapter", root / "reference/sdk_adapter.py")
     adapter = module_from_spec(spec)
     # Each request gets its own process and one project's reference modules.
     sys.path.insert(0, str(root / "reference"))

@@ -128,6 +128,7 @@ export interface SigningRequest {
   userId?: Uint8Array;
 }
 export type WalletSigner = (request: SigningRequest) => Uint8Array;
+export type AsyncWalletSigner = (request: SigningRequest) => Promise<Uint8Array>;
 
 export class WalletClient extends BridgeClient {
   readonly #template?: string;
@@ -149,22 +150,37 @@ export class WalletClient extends BridgeClient {
     return this.call("recognizeLock", request);
   }
 
-  #sign(request: WalletInput | WalletPayment, signer: WalletSigner): string {
+  #prepare(request: WalletInput | WalletPayment) {
     const snapshot = JSON.parse(JSON.stringify(request));
     const { arguments: args, ...metadata } =
       this.call<Omit<SigningRequest, "payload" | "userId"> & { arguments: string[] }>("prepareWallet", snapshot);
     const [payload, userId] = args.map((value) => Buffer.from(value, "hex"));
-    const signature = signer({ ...metadata, payload, userId });
+    return { snapshot, args, request: { ...metadata, payload, userId } };
+  }
+
+  #finish(snapshot: WalletInput | WalletPayment, args: string[], signature: Uint8Array): string {
     if (!(signature instanceof Uint8Array)) throw new TypeError("Signer must return signature bytes");
     return this.call("finishWallet", snapshot, { arguments: args, signature: Buffer.from(signature).toString("hex") });
   }
 
   signPayment(request: WalletPayment, signer: WalletSigner): string {
-    return this.#sign(request, signer);
+    const prepared = this.#prepare(request);
+    return this.#finish(prepared.snapshot, prepared.args, signer(prepared.request));
   }
 
   signInput(request: WalletInput, signer: WalletSigner): string {
-    return this.#sign(request, signer);
+    const prepared = this.#prepare(request);
+    return this.#finish(prepared.snapshot, prepared.args, signer(prepared.request));
+  }
+
+  async signPaymentAsync(request: WalletPayment, signer: AsyncWalletSigner): Promise<string> {
+    const prepared = this.#prepare(request);
+    return this.#finish(prepared.snapshot, prepared.args, await signer(prepared.request));
+  }
+
+  async signInputAsync(request: WalletInput, signer: AsyncWalletSigner): Promise<string> {
+    const prepared = this.#prepare(request);
+    return this.#finish(prepared.snapshot, prepared.args, await signer(prepared.request));
   }
 
   activate(request: InputRequest): string {

@@ -2,11 +2,15 @@
 
 [English](README.md) · [BSV Script Lab](../../README.zh-CN.md)
 
-Lamport OTS 是 v0.1 开发基线，使用 SHA-256 在 Bitcoin Script 中验证一次性签名。私钥和公钥各为 16,384 字节，原始签名为 8,192 字节。每组密钥只用于一个 UTXO 并只签一次。完整的付款构造还将签名绑定到当前交易输入。
-
 ## 开发入口
 
-[协议规范](docs/developer.zh-CN.md#protocol) · [安全分析](docs/developer.zh-CN.md#security) · [验证与测量](docs/developer.zh-CN.md#validation) · [SDK 与参考接口](docs/developer.zh-CN.md#sdk)
+**[钱包 SDK 快速上手](docs/sdk.zh-CN.md#quickstart)** · [统一钱包 SDK](../../shared/sdk/README.zh-CN.md#quickstart)
+
+选择完整公钥锁或公钥承诺锁，接入能在返回签名前持久化一次性密钥消费记录的签名器。
+
+[协议规范](docs/developer.zh-CN.md#protocol) · [安全分析](docs/developer.zh-CN.md#security) · [复现与验证](#复现方法) · [交易成本](#完整交易与栈测量)
+
+Lamport OTS 是 v0.1 开发基线，使用 SHA-256 在 Bitcoin Script 中验证一次性签名。私钥和公钥各为 16,384 字节，原始签名为 8,192 字节。每组密钥只用于一个 UTXO 并只签一次。完整的付款构造还将签名绑定到当前交易输入。
 
 ## 模板、使用与规范
 

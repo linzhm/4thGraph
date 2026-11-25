@@ -34,6 +34,6 @@ Use Python 3.12 and OpenSSL 3.5 or later. See the [project replay commands](../R
 
 ## SDK and reference interfaces
 
-Follow the [unified ML-DSA wallet guide](../sdk/README.md) to create outputs and sign a payment or a prepared input. The external signer applies Pure ML-DSA-44 to the requested 32-byte message with an empty context and returns the raw 2,420-byte signature.
+Follow the [unified ML-DSA wallet guide](sdk.en.md) to create outputs and sign a payment or a prepared input. The external signer applies Pure ML-DSA-44 to the requested 32-byte message with an empty context and returns the raw 2,420-byte signature.
 
 [Wallet source](../reference/payment.py) · [Signature and fixture interfaces](../reference/mldsa.py) · [Script compiler](../reference/script.py)

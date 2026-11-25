@@ -2,11 +2,15 @@
 
 [English](README.md) · [BSV Script Lab](../../README.zh-CN.md)
 
-WOTS+ 是 v0.1 开发基线，按 RFC 8391 的 `WOTSP-SHA2_256` 哈希链验证一次性签名。项目定义 64 字节的 BSV 公钥编码，原始签名为 2,144 字节。付款锁将证明绑定到实际花费的交易输入。 [编码规范](docs/spec.md) · [RFC 8391](https://www.rfc-editor.org/rfc/rfc8391)
-
 ## 开发入口
 
-[协议规范](docs/developer.zh-CN.md#protocol) · [安全分析](docs/developer.zh-CN.md#security) · [验证与测量](docs/developer.zh-CN.md#validation) · [SDK 与参考接口](docs/developer.zh-CN.md#sdk)
+**[钱包 SDK 快速上手](docs/sdk.zh-CN.md#quickstart)** · [统一钱包 SDK](../../shared/sdk/README.zh-CN.md#quickstart)
+
+选择收款模板并接入有持久化记录的一次性签名器。缓存步骤模板支持符合条件的 OTDA 重建。
+
+[协议规范](docs/developer.zh-CN.md#protocol) · [安全分析](docs/developer.zh-CN.md#security) · [复现与验证](#开发和钱包接入) · [交易成本](#完整交易与栈测量)
+
+WOTS+ 是 v0.1 开发基线，按 RFC 8391 的 `WOTSP-SHA2_256` 哈希链验证一次性签名。项目定义 64 字节的 BSV 公钥编码，原始签名为 2,144 字节。付款锁将证明绑定到实际花费的交易输入。 [编码规范](docs/spec.md) · [RFC 8391](https://www.rfc-editor.org/rfc/rfc8391)
 
 ## 模板与签名模式
 
