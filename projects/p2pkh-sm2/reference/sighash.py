@@ -1,4 +1,4 @@
-"""Signing messages for v2. Only the effective input coverage enters the signature."""
+"""Construct signing messages for the published P2PKH-SM2 payment template."""
 from dataclasses import dataclass
 from shared.transaction import (ANYONECANPAY, CHRONICLE, SIGHASH_SINGLE as SINGLE,
                                 SIGHASH_TYPES as SUPPORTED_TYPES, hash256,
