@@ -20,7 +20,7 @@ BSV Script Lab 提供钱包可识别的锁定模板、可接入外部签名器�
 | [WOTS+](projects/wots-plus/README.zh-CN.md) | 评估基于 SHA‑256 哈希链的一次性签名 | v0.1 开发版 | [SDK](projects/wots-plus/sdk/README.zh-CN.md) |
 | [纯模式 ML-DSA-44](projects/ml-dsa/README.zh-CN.md) | 评估在脚本中验证 FIPS 204 纯模式 ML‑DSA‑44 签名 | v0.1 开发版 | [SDK](projects/ml-dsa/sdk/README.zh-CN.md) |
 
-接入时先选项目，用 SDK 生成和识别锁定脚本，接入自己的签名器，再复放一笔签名交易。各项目提供 TypeScript、Rust、Go 源码 SDK 和 Python 接口。原生锁、SM2、Lamport、WOTS+ 和 ML‑DSA‑44 的 SDK 使用本地 Python 参考后端。[本地 SDK 配置](shared/sdk/README.zh-CN.md)
+先用原生 P2PKH 跑通第一笔付款。七个项目在 TypeScript、Rust、Go 和 Python 中使用同一套钱包调用，各项目指南说明签名器参数、模板选项和本地依赖。 [钱包 SDK 快速接入](shared/sdk/README.zh-CN.md)
 
 <a name="transaction-costs"></a>
 

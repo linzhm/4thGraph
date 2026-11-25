@@ -31,7 +31,7 @@ export interface Payment extends SigningOptions {
   feeSats: string;
 }
 
-export class LocalClient {
+class BridgeClient {
   readonly #project: string;
   readonly #command: readonly [string, string];
 
@@ -40,7 +40,7 @@ export class LocalClient {
     this.#command = [config.python ?? "python3", config.bridge];
   }
 
-  #call<T>(operation: string, request: object, extra = {}): T {
+  protected call<T>(operation: string, request: object, extra = {}): T {
     const input = JSON.stringify({ protocol: 1, project: this.#project, operation, request, ...extra });
     const [python, bridge] = this.#command;
     const response = spawnSync(python, [bridge], {
@@ -52,25 +52,27 @@ export class LocalClient {
     if (!reply.ok) throw new Error(reply.error);
     return reply.result as T;
   }
+}
 
+export class LocalClient extends BridgeClient {
   lock(publicKey: string, profile?: string): string {
-    return this.#call("lock", { publicKey, profile });
+    return this.call("lock", { publicKey, profile });
   }
 
   lockForOwner(ownerHash160: string): string {
-    return this.#call("lockOwner", { ownerHash160 });
+    return this.call("lockOwner", { ownerHash160 });
   }
 
   recognize(script: string, publicKey?: string): Recognition | null {
-    return this.#call("recognize", { script, publicKey });
+    return this.call("recognize", { script, publicKey });
   }
 
   #sign(options: Spend | Payment, signer: Signer): string {
     const snapshot = JSON.parse(JSON.stringify(options));
-    const args = this.#call<string[]>("prepare", snapshot);
+    const args = this.call<string[]>("prepare", snapshot);
     const signature = signer(...args.map((argument) => Buffer.from(argument, "hex")));
     if (!(signature instanceof Uint8Array)) throw new TypeError("Signer must return signature bytes");
-    return this.#call("finish", snapshot, { arguments: args, signature: Buffer.from(signature).toString("hex") });
+    return this.call("finish", snapshot, { arguments: args, signature: Buffer.from(signature).toString("hex") });
   }
 
   signSpend(options: Spend, signer: Signer): string {
@@ -79,5 +81,93 @@ export class LocalClient {
 
   signPayment(options: Payment, signer: Signer): string {
     return this.#sign(options, signer);
+  }
+}
+
+export interface Prevout extends Output {
+  txid: string;
+  vout: number;
+}
+export interface WalletRecognition extends Recognition {
+  project: string;
+  publicKey?: string;
+  targetTemplate?: string;
+  targetScriptSha256?: string;
+  targetTxOutHash256?: string;
+}
+export type LockRequest = ({ publicKey: string; ownerHash160?: never } |
+  { ownerHash160: string; publicKey?: never }) & { valueSats?: string };
+export interface InputRequest {
+  prevout: Prevout;
+  transaction: string;
+  inputIndex: number;
+  sighash?: number;
+  chronicleActive?: boolean;
+}
+export interface WalletSigningOptions {
+  prevout: Prevout;
+  publicKey: string;
+  sighash?: number;
+  chronicleActive?: boolean;
+  compressOtda?: boolean;
+  signerIdentifier?: string;
+  historyPath?: string;
+  signMessage?: boolean;
+}
+export interface WalletPayment extends WalletSigningOptions {
+  outputs: Output[];
+  feeSats: string;
+}
+export type WalletInput = InputRequest & WalletSigningOptions;
+export interface SigningRequest {
+  algorithm: string;
+  payloadKind: "digest" | "message";
+  signatureFormat: string;
+  sighash: number;
+  payload: Uint8Array;
+  userId?: Uint8Array;
+}
+export type WalletSigner = (request: SigningRequest) => Uint8Array;
+
+export class WalletClient extends BridgeClient {
+  readonly #template?: string;
+
+  constructor(project: string, config: Config & { template?: string }) {
+    super(project, config);
+    this.#template = config.template;
+  }
+
+  prevoutFromFunding(funding: string, vout: number): Prevout {
+    return this.call("prevoutFromFunding", { funding, vout });
+  }
+
+  createLock(request: LockRequest): string {
+    return this.call("createLock", { ...request, template: this.#template });
+  }
+
+  recognize(request: { script: string; publicKey?: string; valueSats?: string }): WalletRecognition | null {
+    return this.call("recognizeLock", request);
+  }
+
+  #sign(request: WalletInput | WalletPayment, signer: WalletSigner): string {
+    const snapshot = JSON.parse(JSON.stringify(request));
+    const { arguments: args, ...metadata } =
+      this.call<Omit<SigningRequest, "payload" | "userId"> & { arguments: string[] }>("prepareWallet", snapshot);
+    const [payload, userId] = args.map((value) => Buffer.from(value, "hex"));
+    const signature = signer({ ...metadata, payload, userId });
+    if (!(signature instanceof Uint8Array)) throw new TypeError("Signer must return signature bytes");
+    return this.call("finishWallet", snapshot, { arguments: args, signature: Buffer.from(signature).toString("hex") });
+  }
+
+  signPayment(request: WalletPayment, signer: WalletSigner): string {
+    return this.#sign(request, signer);
+  }
+
+  signInput(request: WalletInput, signer: WalletSigner): string {
+    return this.#sign(request, signer);
+  }
+
+  activate(request: InputRequest): string {
+    return this.call("activate", request);
   }
 }

@@ -34,7 +34,7 @@ Run the [offline reproduction command](../README.md#run) or use the [unified ben
 
 ## SDK and reference interfaces
 
-[TypeScript, Rust, Go and Python source SDKs](../sdk/README.md)
+Start with the [unified P2PKH quickstart](../sdk/README.md). Create a lock, recognize the funded output, and use `signPayment` with a secp256k1 signer. Select the P2PK template in the same client for the second native control.
 
 Use the [Python fixture generator](../reference/script_lab.py) as a serialization and verification example. An application uses its own wallet and native signing stack for real transactions. The [fixture JSON](../template/baseline.json) gives complete parent and spend bytes, scripts and expected results for comparing application output.
 

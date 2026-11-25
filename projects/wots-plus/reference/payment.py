@@ -85,7 +85,14 @@ def sign_spend(tx, index, funding_raw, public_key, signer, *, sighash=DEFAULT_SI
     if not tx.outputs:
         raise ValueError('payment requires outputs')
     tx.serialize()
-    previous = funding.outputs[current.vout]
+    return sign_previous(tx, index, funding.outputs[current.vout], public_key, signer,
+                         sighash=sighash, compress_otda=compress_otda)
+
+
+def sign_previous(tx, index, previous, public_key, signer, *, sighash=DEFAULT_SIGHASH, compress_otda=False):
+    """Authorize an input with its already matched previous output."""
+    if type(compress_otda) is not bool:
+        raise ValueError('compress_otda must be a boolean')
     if not any(previous.script == locking_script(public_key, cached_constants=profile)
                for transaction, profile in _layouts_for_sizes({len(previous.script)}) if transaction):
         raise ValueError('funding output does not match public key and canonical template')

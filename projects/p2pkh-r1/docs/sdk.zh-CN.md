@@ -2,6 +2,45 @@
 
 [English](./sdk.en.md) · [线格式规范](./spec.zh-CN.md)
 
+## 统一钱包接口
+
+使用版本 0.2.0 创建新收款输出。统一客户端用同一套调用识别已核验的旧版输出和新版输出。公钥为 65 字节未压缩 P-256 编码，也可以用 `ownerHash160` 创建收款脚本。运行时使用项目参考环境，在仓库根目录安装以下依赖。
+
+```sh
+python3.12 -m venv .venv
+.venv/bin/python -m pip install -r projects/p2pkh-r1/reference/requirements.txt
+```
+
+使用[统一接入指南](../../../shared/sdk/README.zh-CN.md)里的 `config` 和已核验的交易数据。
+
+```ts
+import { resolve } from "node:path";
+import { WalletClient } from "./shared/sdk/typescript/index.ts";
+
+const wallet = new WalletClient("p2pkh-r1", { ...config, template: "v0.2.0" });
+const receiveScript = wallet.createLock({ publicKey: receiveKeyHex });
+const prevout = wallet.prevoutFromFunding(fundingTxHex, fundingVout);
+if (!wallet.recognize({ script: prevout.script, publicKey: spendKeyHex })) {
+  throw new Error("Funding output does not match the spending key");
+}
+const signedHex = wallet.signPayment({
+  prevout,
+  publicKey: spendKeyHex,
+  outputs: approvedOutputs,
+  feeSats: approvedFeeSats.toString(),
+  historyPath: resolve(walletStateDir, "r1-signing.sqlite"),
+}, ({ payload }) => signer.signP256DigestRaw(payload));
+```
+
+签名器返回 64 字节 `r ∥ s`。默认输入是 `SHA256d(P)`。如果设备内部执行一次 SHA-256，在请求中设 `signMessage: true`，回调会收到 `SHA256(P)`，其 `payloadKind` 为 `message`。各进程为同一钱包共用持久的 `historyPath`，用于记录重复的 P-256 签名 nonce。多输入付款用 `signInput`。Chronicle 激活后，符合条件的版本 2 OTDA 花费可用 `compressOtda: true`。TS、Rust、Go 的独立实现和高级协议接口见下文。
+
+从仓库根目录复放四语言向量。
+
+```sh
+SCRIPT_LAB_SDK_PYTHON="$PWD/.venv/bin/python" \
+  bash shared/verify_node.sh -- bash shared/sdk/verify_wallet.sh p2pkh-r1
+```
+
 ## 公开接口
 
 应用可将三个 SDK 以源码集成。它们在本地运行，生成同一把锁、识别同一份字节，并对相同输入构造相同的普通付款。TS 面向 Node.js 24，Rust 和 Go 为原生库。签名回调可以连接设备适配层。

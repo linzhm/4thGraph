@@ -20,7 +20,7 @@ BSV Script Lab provides locking templates that wallets can recognize, SDKs that 
 | [WOTS+](projects/wots-plus/README.md) | Evaluate one-time signatures built from SHA-256 hash chains | v0.1 development | [SDK](projects/wots-plus/sdk/README.md) |
 | [Pure ML-DSA-44](projects/ml-dsa/README.md) | Evaluate FIPS 204 pure-mode ML-DSA-44 signatures in Script | v0.1 development | [SDK](projects/ml-dsa/sdk/README.md) |
 
-For wallet integration, start with the project SDK to build and identify a lock, connect your signer, and replay a signed transaction vector. The projects provide TypeScript, Rust, and Go source SDKs and Python interfaces. The native, SM2, Lamport, WOTS+, and ML-DSA-44 SDKs use a local Python reference backend. [Local SDK setup](shared/sdk/README.md)
+Start with native P2PKH to run your first payment. The projects share the same wallet calls in TypeScript, Rust, Go, and Python. Each project guide covers its signing request, template options, and local dependencies. [Wallet SDK quickstart](shared/sdk/README.md)
 
 <a name="transaction-costs"></a>
 

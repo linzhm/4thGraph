@@ -34,6 +34,6 @@ From the repository root, install the pinned [reference requirements](../referen
 
 ## SDK and reference interfaces
 
-The TypeScript, Rust and Go source SDKs recognize the raw lock, fill the owner slot and construct ordinary single-input ForkID ALL payments. Use the message-signing callback for a device that applies SHA-256 internally and the digest-signing callback for a device that signs an already computed digest. Both return 64-byte `r || s`. Use the Python `sign_spend` interface for prepared inputs with per-input sighash selection. Broadcasting, UTXO discovery and transaction approval belong to the integrating wallet.
+The [unified wallet API](sdk.en.md#unified-wallet-api) offers lock creation, recognition, ordinary payment, and signing a prepared input in TypeScript, Rust, Go and Python. The P-256 signer returns a 64-byte `r ∥ s` signature. Use `signMessage` for a device that applies SHA-256 internally and share a persistent signing history across wallet processes.
 
 [SDK guide and test commands](sdk.en.md) · [Python reference](../reference/README.md)

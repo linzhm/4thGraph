@@ -142,7 +142,14 @@ def activate_input(tx: Transaction, index: int, funding_raw: bytes, *,
     funding = Transaction.parse(funding_raw)
     if current.txid != funding.txid_wire() or not 0 <= current.vout < len(funding.outputs):
         raise ValueError('funding outpoint mismatch')
-    previous = funding.outputs[current.vout]
+    return activate_previous(tx, index, funding.outputs[current.vout], sighash=sighash)
+
+
+def activate_previous(tx: Transaction, index: int, previous: Output, *,
+                      sighash: int = ACTIVATION_SIGHASH) -> Transaction:
+    """Prepare activation with an already matched previous output."""
+    if index >= len(tx.outputs):
+        raise ValueError('activation needs a same-index output')
     commitment = recognize(previous)
     if commitment is None:
         raise ValueError('funding output is not a canonical deferred lock')

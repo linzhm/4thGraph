@@ -2,6 +2,45 @@
 
 [中文](./sdk.zh-CN.md) · [Wire specification](./spec.en.md)
 
+## Unified wallet API
+
+Create new outputs with v0.2.0. The unified client can recognize existing and current templates. Use an uncompressed 65-byte P-256 key or pass `ownerHash160` for receiving. From the repository root, set up the project's reference environment.
+
+```sh
+python3.12 -m venv .venv
+.venv/bin/python -m pip install -r projects/p2pkh-r1/reference/requirements.txt
+```
+
+Use `config` from the [wallet quickstart](../../../shared/sdk/README.md) and authenticated wallet data.
+
+```ts
+import { resolve } from "node:path";
+import { WalletClient } from "./shared/sdk/typescript/index.ts";
+
+const wallet = new WalletClient("p2pkh-r1", { ...config, template: "v0.2.0" });
+const receiveScript = wallet.createLock({ publicKey: receiveKeyHex });
+const prevout = wallet.prevoutFromFunding(fundingTxHex, fundingVout);
+if (!wallet.recognize({ script: prevout.script, publicKey: spendKeyHex })) {
+  throw new Error("Funding output does not match the spending key");
+}
+const signedHex = wallet.signPayment({
+  prevout,
+  publicKey: spendKeyHex,
+  outputs: approvedOutputs,
+  feeSats: approvedFeeSats.toString(),
+  historyPath: resolve(walletStateDir, "r1-signing.sqlite"),
+}, ({ payload }) => signer.signP256DigestRaw(payload));
+```
+
+The signer returns a 64-byte `r ∥ s` signature. The default payload is `SHA256d(P)`. For a device that applies SHA-256 internally, set `signMessage: true` and pass its `message` payload `SHA256(P)` to the device. Share a persistent `historyPath` across wallet processes to track P-256 nonce reuse. Use `signInput` for a prepared transaction. With Chronicle active, `compressOtda: true` can encode eligible version-2 OTDA unlocks. The native source entry points and low-level protocol operations are documented below.
+
+Replay the vector in all four languages from the repository root.
+
+```sh
+SCRIPT_LAB_SDK_PYTHON="$PWD/.venv/bin/python" \
+  bash shared/verify_node.sh -- bash shared/sdk/verify_wallet.sh p2pkh-r1
+```
+
 ## Public API
 
 The three source SDKs construct the same locking scripts, recognize raw outputs, and build an ordinary signed payment locally. TypeScript targets Node.js 24. Rust and Go are native libraries. Supply a signing callback to connect a hardware adapter.

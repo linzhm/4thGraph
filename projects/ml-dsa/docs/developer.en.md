@@ -34,8 +34,6 @@ Use Python 3.12 and OpenSSL 3.5 or later. See the [project replay commands](../R
 
 ## SDK and reference interfaces
 
-[TypeScript, Rust, Go and Python source SDKs](../sdk/README.md)
-
-Use the Python reference `locking_script(public_key)` to build a payment lock. Call `sign_payment` for a one-input payment or `sign_spend` for a prepared input. Connect a pure-mode external signer with empty context. The callback provides the raw 2,420-byte signature, which the wallet verifies before encoding the witness.
+Follow the [unified ML-DSA wallet guide](../sdk/README.md) to create outputs and sign a payment or a prepared input. The external signer applies Pure ML-DSA-44 to the requested 32-byte message with an empty context and returns the raw 2,420-byte signature.
 
 [Wallet source](../reference/payment.py) · [Signature and fixture interfaces](../reference/mldsa.py) · [Script compiler](../reference/script.py)

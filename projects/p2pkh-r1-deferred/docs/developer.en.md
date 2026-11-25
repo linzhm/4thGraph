@@ -34,6 +34,6 @@ Install the pinned [requirements](../reference/requirements.txt) and run `bash p
 
 ## SDK and reference interfaces
 
-The TypeScript, Rust and Go SDKs take the short-lock template and the selected R1 target template as bytes. Use the v0.2.0 pair for new funding. For an existing output, choose the target template that fully matches its commitment. Python `recognize` reports `target_r1_version`, and `activate_input` encodes a prepared input after checking its target. The wallet provides the sponsor transaction plan and signs sponsor inputs separately.
+Use the [unified wallet API](sdk.en.md#unified-wallet-api) to create and recognize the amount-bearing short lock. Call `activate` on an assembled transaction that puts the originally committed R1 output at the input's index. Sign sponsor inputs separately and use the ordinary R1 wallet API for subsequent spends.
 
 [SDK guide and test commands](sdk.en.md) · [Python reference](../reference/README.md)

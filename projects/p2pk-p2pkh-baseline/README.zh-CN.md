@@ -2,7 +2,9 @@
 
 [English](README.md) · [BSV Script Lab](../../README.zh-CN.md)
 
-v0.1 开发基线，用于验证钱包对传统 BSV 锁定脚本、解锁脚本和签名模式的序列化。P2PK 锁包含压缩公钥，解锁只推送带签名类型字节的签名。P2PKH 锁包含 20 字节公钥 HASH160，花费时还要推送匹配的压缩公钥。钱包发起签名前，应核对被花费的 outpoint、金额和锁定脚本。
+原生 P2PKH 是 Script Lab 的第一个钱包接入示例，也是对照其他签名方案的交易成本基准。P2PK 使用同一个 secp256k1 签名器，把公钥放在输出锁中，供对照输入和输出的成本。两种模板都有可复放的公开向量。
+
+[跑通第一笔原生付款](sdk/README.zh-CN.md) · [复现基准](../../shared/benchmark.zh-CN.md)
 
 ## 开发入口
 

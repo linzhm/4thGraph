@@ -34,8 +34,6 @@
 
 ## SDK 与参考接口
 
-[TypeScript、Rust、Go 和 Python 源码 SDK](../sdk/README.zh-CN.md)
-
-Python 参考接口以 `locking_script` 构造钱包收款锁。用 `sign_payment` 完成单输入付款，或者通过 `sign_spend` 给已构造的交易签一个输入。回调收 32 字节摘要，返回 2,144 字节原始签名。`compress_otda=True` 可选择符合条件的紧凑解锁。密钥消费记录由签名器维护，交易审批和广播由钱包完成。
+按[统一 WOTS+ 钱包指南](../sdk/README.zh-CN.md)选择输出模板并接入外部一次性签名器。回调对请求中的摘要返回 2,144 字节签名。符合条件时可用 `compressOtda` 生成紧凑解锁脚本，密钥消耗由签名服务持久记录。
 
 [付款接口](../reference/payment.py) · [一次性签名接口](../reference/wots.py) · [基准持久签名器](../../../shared/one_time_signer.py)

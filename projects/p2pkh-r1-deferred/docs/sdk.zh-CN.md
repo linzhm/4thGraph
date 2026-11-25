@@ -2,6 +2,46 @@
 
 [English](sdk.en.md)
 
+## 统一钱包接口
+
+用 `createLock` 生成指定金额的短锁。识别时同时传入原始脚本和输出金额。已经存在的短锁按原承诺的 R1 版本启用。先从仓库根目录安装参考环境。
+
+```sh
+python3.12 -m venv .venv
+.venv/bin/python -m pip install -r projects/p2pkh-r1-deferred/reference/requirements.txt
+```
+
+使用[统一接入指南](../../../shared/sdk/README.zh-CN.md)里的 `config` 和已核验的交易数据。
+
+```ts
+import { WalletClient } from "./shared/sdk/typescript/index.ts";
+
+const deferred = new WalletClient("p2pkh-r1-deferred", { ...config, template: "v0.2.0" });
+const shortLock = deferred.createLock({ publicKey: receiveKeyHex, valueSats });
+const prevout = deferred.prevoutFromFunding(fundingTxHex, fundingVout);
+const commitment = deferred.recognize({
+  script: prevout.script, valueSats: prevout.valueSats, publicKey: spendKeyHex,
+});
+if (!commitment) throw new Error("Unrecognized Deferred output");
+
+const r1 = new WalletClient("p2pkh-r1", { ...config, template: commitment.targetTemplate });
+const targetScript = r1.createLock({ publicKey: spendKeyHex });
+// Put { script: targetScript, valueSats: prevout.valueSats } at inputIndex in the
+// approved transaction's output list and include any needed fee-paying input.
+const activatedHex = deferred.activate({ transaction: preparedHex, inputIndex, prevout });
+```
+
+`activate` 默认使用 ForkID SINGLE（`0x43`），只填指定输入，不调用私钥签名器。预先组装交易，将承诺的完整 R1 输出放到同索引，金额与短锁一致。若有额外的付费输入，钱包另行签署。启用后用普通 R1 SDK 花费。
+
+从仓库根目录复放四语言向量。
+
+```sh
+SCRIPT_LAB_SDK_PYTHON="$PWD/.venv/bin/python" \
+  bash shared/verify_node.sh -- bash shared/sdk/verify_wallet.sh p2pkh-r1-deferred
+```
+
+## 原有源码 SDK
+
 三个源码 SDK 使用同一份[短锁模板](../template/v0.2.0/template.hex)和[R1 v0.2.0 模板](../../p2pkh-r1/template/v0.2.0/template.hex)。读取 `.hex` 时先去掉空白，再解码为从第一个 opcode 开始的字节。金额为整数聪。TypeScript 使用 `bigint`，Rust 使用 `u64`，Go 使用 `int64`。
 
 已有短锁按其原先承诺的 R1 版本识别和启用。v0.1.0 入金对应原先承诺的 v0.1.0 目标。 [v0.1.0 R1 模板](../../p2pkh-r1/template/template.hex)

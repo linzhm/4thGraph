@@ -88,7 +88,12 @@ def sign_spend(tx, index, funding_raw, public_key, signer, *, sighash=DEFAULT_SI
     if not tx.outputs:
         raise ValueError('payment requires outputs')
     tx.serialize()
-    previous = funding.outputs[current.vout]
+    return sign_previous(tx, index, funding.outputs[current.vout], public_key, signer,
+                         sighash=sighash, allow_unpaired_single=allow_unpaired_single)
+
+
+def sign_previous(tx, index, previous, public_key, signer, *, sighash=DEFAULT_SIGHASH, allow_unpaired_single=False):
+    """Authorize an input with its already matched previous output."""
     universal = locking_script(public_key)
     legacy = legacy_locking_script(public_key)
     committed = committed_locking_script(public_key)

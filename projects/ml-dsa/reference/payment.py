@@ -35,7 +35,12 @@ def sign_spend(tx, index, funding_raw, public_key, signer, *, sighash=DEFAULT_SI
     if not tx.outputs:
         raise ValueError("payment requires outputs")
     tx.serialize()
-    previous = funding.outputs[current.vout]
+    return sign_previous(tx, index, funding.outputs[current.vout], public_key, signer,
+                         sighash=sighash)
+
+
+def sign_previous(tx, index, previous, public_key, signer, *, sighash=DEFAULT_SIGHASH):
+    """Authorize an input with its already matched previous output."""
     if previous.script != locking_script(public_key):
         raise ValueError("funding output does not match public key and canonical template")
     auth = authorization(tx, index, previous.value, sighash)

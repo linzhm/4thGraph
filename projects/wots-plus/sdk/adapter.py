@@ -1,4 +1,5 @@
 """WOTS+ payment formats, including the cached-steps OTDA option."""
+from payment import sign_previous as authorize_previous
 from payment import sign_spend as authorize
 from script import locking_script
 
@@ -23,4 +24,9 @@ def recognize(script, public_key):
 
 def sign_spend(tx, index, funding_raw, public_key, signer, sighash, options):
     return authorize(tx, index, funding_raw, public_key, signer, sighash=sighash,
+                     compress_otda=options.get("compressOtda", False))
+
+
+def sign_previous(tx, index, previous, public_key, signer, sighash, options):
+    return authorize_previous(tx, index, previous, public_key, signer, sighash=sighash,
                      compress_otda=options.get("compressOtda", False))

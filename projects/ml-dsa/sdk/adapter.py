@@ -1,4 +1,5 @@
 """Pure ML-DSA-44 payment authorization for an external empty-context signer."""
+from payment import sign_previous as authorize_previous
 from payment import sign_spend as authorize
 from script import locking_script
 
@@ -17,3 +18,7 @@ def recognize(script, public_key):
 
 def sign_spend(tx, index, funding_raw, public_key, signer, sighash, options):
     return authorize(tx, index, funding_raw, public_key, signer, sighash=sighash)
+
+
+def sign_previous(tx, index, previous, public_key, signer, sighash, options):
+    return authorize_previous(tx, index, previous, public_key, signer, sighash=sighash)

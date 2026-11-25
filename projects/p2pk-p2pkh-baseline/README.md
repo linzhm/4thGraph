@@ -2,10 +2,9 @@
 
 [简体中文](README.zh-CN.md) · [BSV Script Lab](../../README.md)
 
-**Status** · v0.1 development baseline.
+Native P2PKH is the first wallet integration example and the transaction-cost baseline for Script Lab. P2PK uses the same secp256k1 signer and provides a control for placing the public key in the output lock. Both templates have public fixtures that you can replay as you integrate another project.
 
-Offline examples for conventional P2PKH and P2PK locking scripts. This is a
-test lab, not a wallet, production signer, covenant implementation, or node.
+[Build your first native payment](sdk/README.md) · [Reproduce the benchmark](../../shared/benchmark.md)
 
 ## Developer resources
 

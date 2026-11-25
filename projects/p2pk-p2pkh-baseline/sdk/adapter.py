@@ -26,13 +26,15 @@ def lock(public_key, profile):
     return lock_owner(owner)
 
 
-def lock_owner(owner):
+def lock_owner(owner, profile=None):
+    if profile not in (None, "p2pkh"):
+        raise ValueError("P2PK requires the full public key")
     if len(owner) != 20:
         raise ValueError("expected a 20-byte owner hash")
     return b"\x76\xa9" + push(owner) + b"\x88\xac"
 
 
-def recognize(script, public_key):
+def recognize(script, public_key, *, include_public_key=False):
     if len(script) == 25 and script[:3] == b"\x76\xa9\x14" and script[-2:] == b"\x88\xac":
         if public_key is None or script == lock(public_key, "p2pkh"):
             return {"template": "p2pkh", "ownerHash160": script[3:23].hex()}
@@ -42,6 +44,8 @@ def recognize(script, public_key):
         except ValueError:
             return None
         if public_key is None or script[1:34] == public_key:
+            if include_public_key:
+                return {"template": "p2pk", "publicKey": script[1:34].hex()}
             return {"template": "p2pk"}
     return None
 
@@ -49,8 +53,12 @@ def recognize(script, public_key):
 def sign_spend(tx, index, funding_raw, public_key, signer, sighash, options):
     from shared.transaction import Transaction
 
-    key = _key(public_key)
     previous = Transaction.parse(funding_raw).outputs[tx.inputs[index].vout]
+    return sign_previous(tx, index, previous, public_key, signer, sighash, options)
+
+
+def sign_previous(tx, index, previous, public_key, signer, sighash, options):
+    key = _key(public_key)
     recognized = recognize(previous.script, public_key)
     if recognized is None:
         raise ValueError("funding output does not match the native key")
