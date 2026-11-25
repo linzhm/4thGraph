@@ -18,11 +18,10 @@ jobs:
         run: |
           python -m pip install -r projects/lamport-ots/reference/requirements.txt
           python - <<'PY'
-          import json
-          from importlib.metadata import distribution
-          source = json.loads(distribution('tx-engine').read_text('direct_url.json'))
-          assert source['vcs_info']['commit_id'] == '5cb8c6e410dbfad1c619cec3ca54d1bcaacd4eb7'
+          from shared.differential import require_chain_gang_pin
+          print('Verified chain-gang commit', require_chain_gang_pin('projects/lamport-ots/reference/requirements.txt'))
           PY
+          python -m unittest shared.test_differential -v
       - name: Cryptography, generated Script, adversarial payments and vectors
         run: python -m unittest discover -s projects/lamport-ots/reference -p test_lamport.py -v
       - name: Complete transactions in BSV Node and chain-gang

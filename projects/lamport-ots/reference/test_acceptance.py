@@ -6,7 +6,7 @@ import os
 import unittest
 
 from engines import chain_valid
-from fixtures import cases, mode_fixture, test_secret
+from fixtures import INVALID_PREVOUT_CASES, cases, mode_fixture, test_secret
 from lamport import OneTimeSigner, public_key, sign_digest, verify_digest
 from payment import sign_spend
 from script import committed_locking_script, locking_script
@@ -211,7 +211,8 @@ class LamportAcceptance(unittest.TestCase):
                 visited.add(name)
                 expected = name in {'valid', 'multi_input'}
                 self.assertEqual(fixture_verdict, expected)
-                self.assertEqual(chain_valid(tx, parents), expected, 'chain-gang')
+                self.assertEqual(chain_valid(tx, parents, expect_bad_prevout=name in INVALID_PREVOUT_CASES),
+                                 expected, 'chain-gang')
                 if os.environ.get('REGTEST_COOKIE'):
                     self.assertEqual(node_check(tx, parents[index], index), expected, 'BSV Node')
         self.assertEqual(visited, LEGACY_CASES)

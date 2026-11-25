@@ -8,6 +8,7 @@ from test_sm2 import fixture
 from test_sighash import chain_check, mode_cases, activation_cases
 from p2pkh_sm2 import *
 from sm2 import *
+from shared.differential import node_script_valid
 from shared.script import push
 
 
@@ -23,11 +24,10 @@ def check_node(tx, parents, index, valid=True, *, chronicle_active=True, old_out
                  txo=dict(lock=previous.script.hex(),value=previous.value,height=3 if chronicle_active and not old_output else 1))
     response=requests.post(os.environ.get('REGTEST_URL', 'http://127.0.0.1:18443'),auth=tuple(cookie),timeout=30,
         json=dict(jsonrpc='1.0',id=1,method='verifyscript',params=[[request],False,5000]))
-    response.raise_for_status(); data=response.json()
-    if data.get('error'): raise AssertionError(data['error'])
-    result=data['result'][0]
-    if result['result']!=('ok' if valid else 'error') or result['flags']!=flags:
-        raise AssertionError((valid,result))
+    response.raise_for_status()
+    data = response.json()
+    if node_script_valid(data, flags, chronicle_active=chronicle_active) != valid:
+        raise AssertionError((valid, data['result'][0]))
 
 
 def check(tx, parents, index, valid=True):
@@ -61,7 +61,9 @@ class NodeTests(unittest.TestCase):
         signed=tx.with_script(1,current_input_unlock(tx,1,1000,key,sig))
         check(signed,[other,parent],1)
         check(replace(signed,outputs=tuple(reversed(signed.outputs))),[other,parent],1,False)
-        check(replace(signed,inputs=(replace(signed.inputs[0],txid=b'\x77'*32),signed.inputs[1])),[other,parent],1,False)
+        alternative = replace(other, locktime=1)
+        changed = replace(signed, inputs=(replace(signed.inputs[0], txid=alternative.txid_wire()), signed.inputs[1]))
+        check(changed, [alternative, parent], 1, False)
 
     def test_two_sm2_inputs_and_two_sm2_outputs(self):
         keys = (encode_public(mul(1)), encode_public(mul(7)))

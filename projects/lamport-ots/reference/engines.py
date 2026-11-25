@@ -1,10 +1,16 @@
 """Independent complete-transaction engine adapter, plus a development checker."""
+from pathlib import Path
+
 from ecdsa import VerifyingKey, SECP256k1, BadSignatureError
 from ecdsa.util import sigdecode_der
 from tx_engine import Script, Tx, TxIn, TxOut
 from script import COMPANION_CODE, ORDINARY_CODE
 from shared.transaction import CHRONICLE, SIGHASH_SINGLE, SIGHASH_TYPES, hash256, preimage_forkid, preimage_otda
 from shared.evaluate import evaluate, ScriptError
+from shared.differential import chain_gang_valid, require_chain_gang_pin
+
+
+require_chain_gang_pin(Path(__file__).with_name('requirements.txt'))
 
 
 def native_checker(tx, index, amount, *, legacy=True, companion=False):
@@ -52,8 +58,7 @@ def engine_tx(tx):
     return result
 
 
-def chain_valid(tx, parents):
-    try:
-        engine_tx(tx).validate([engine_tx(p) for p in parents])
-        return True
-    except (RuntimeError, ValueError): return False
+def chain_valid(tx, parents, *, expect_bad_prevout=False):
+    spend = engine_tx(tx)
+    funding = [engine_tx(parent) for parent in parents]
+    return chain_gang_valid(spend, funding, expect_bad_prevout=expect_bad_prevout)
