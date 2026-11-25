@@ -4,10 +4,12 @@ The wallet creates outputs from [the canonical template](../template/template.he
 
 Use Python 3.12 on Linux x86-64 with Git and a Rust toolchain available to build the pinned Python extension. Install the dependencies from requirements.txt before running the node comparison. It pins tx-engine to [8b60b71a12](https://github.com/linzhm/chain-gang/commit/8b60b71a12a69fdcb465d3e627dbf6f43d6ed081) from the fork's `fix/otda-complete-validation` branch. CI checks the installed Git commit before executing the full-input tests. The ordinary TypeScript, Rust and Go SDKs are independent of this dependency.
 
+Set `R1_OWNER_HASH160` to the recipient’s 20-byte HASH160 in hex. The canonical template’s embedded owner, layout vector C, and the [payment fixture](../template/spend-all.json) use the same publicly known test key. Outputs using that key are for offline and regtest use only.
+
 ```sh
 cd projects/p2pkh-r1/reference
 python -m pip install -r requirements.txt
-python generate_lock.py --owner-hash160 4ceab2c8be16c1d4c6b4147d39aa449c2d63f184
+python generate_lock.py --owner-hash160 "${R1_OWNER_HASH160:?Set the recipient HASH160}"
 bash verify.sh
 ```
 
@@ -23,7 +25,7 @@ prebuilt template. The published 59,582-byte template is the default for
 the Python generator and the published SDKs.
 
 ```sh
-python generate_lock.py --compiled-curve --owner-hash160 4ceab2c8be16c1d4c6b4147d39aa449c2d63f184
+python generate_lock.py --compiled-curve --owner-hash160 "${R1_OWNER_HASH160:?Set the recipient HASH160}"
 ```
 
 The compiler starts with named expressions for the existing projective
@@ -75,7 +77,7 @@ run when building the wallet artifacts.
 
 ```sh
 python generate_templates.py --check
-python generate_lock.py --compiled-curve --owner-hash160 4ceab2c8be16c1d4c6b4147d39aa449c2d63f184
+python generate_lock.py --compiled-curve --owner-hash160 "${R1_OWNER_HASH160:?Set the recipient HASH160}"
 ```
 
 The 47,510-byte lock supports all twelve original types and the existing

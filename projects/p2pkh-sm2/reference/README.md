@@ -157,6 +157,16 @@ for GB/T 35275-2026 `signedAttrs`. Select `signed_attrs_encoding='cms-set'`
 explicitly for a CMS-style signature over the universal SET encoding.
 Each verification uses the selected encoding. [Encoding evidence](signed-data-acceptance.md#signed-attributes-and-algorithm-parameters)
 
+### SignedData resource limits
+
+The format check, general verifier and payment adapter share local parsing
+limits. An envelope may occupy up to 8 MiB, contain 65,536 DER elements and
+reach a nesting depth of 32. Traversal charges each encoded TLV's size to a
+shared 64 MiB budget, including values inside embedded X.509 extensions.
+Each attribute set and each attribute's value set may contain up to 1,024
+entries. The general verifier accepts up to 64 MiB of detached content.
+Budget exhaustion raises `SignedDataLimitsExceeded`.
+
 ### Structure and ASN.1 schemas
 
 For schema-aware `AttributeValue` validation, pass `attribute_schemas`, a
@@ -221,7 +231,18 @@ the target and CRL signer paths under one explicitly trusted DER
 certificate. This mode uses the local OpenSSL verifier with the supplied
 validation time. The certificate signature uses OpenSSL's configured
 algorithm behavior. `sm2_user_id` configures the separate CRL signature
-check. Callers with independently validated paths can omit `trust_anchor`.
+check. Direct CRLs must use the public key of the target's selected issuer.
+Freshness and conflict checking use the issuer name, public key and CRL
+scope. An indirect CRL must match a distribution point signed by the
+target's issuer and have an authorized signer on, or issued by a CA on,
+the target path. Ambiguous same-name delegated keys for the same applicable
+distribution point contribute no coverage.
+
+Callers with independently validated paths can omit `trust_anchor` and pin
+the authenticated target `issuer_certificate`. When neither is supplied,
+the direct CRL signer's key must verify the target certificate signature
+using the installed cryptographic library. The caller authenticates
+delegated CRL signing keys when using externally validated paths.
 
 Set `require_chain_revocation=True` with the explicit trust anchor to
 require fresh, complete revocation evidence for each selected intermediate

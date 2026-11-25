@@ -4,19 +4,20 @@ from calendar import monthrange
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
+from hashlib import sha256
 from itertools import groupby
 from types import MappingProxyType
 
 from asn1crypto.core import ObjectIdentifier
 from asn1crypto.x509 import Certificate as ASN1Certificate, DirectoryString, Name as ASN1Name
-from cryptography.exceptions import UnsupportedAlgorithm
+from cryptography.exceptions import InvalidSignature, UnsupportedAlgorithm
 from cryptography.x509 import CertificateRevocationList, DirectoryName, DistributionPoint
 from cryptography.x509 import IssuingDistributionPoint, Name, ReasonFlags, Version
-from cryptography.x509 import ExtensionNotFound, UnrecognizedExtension, UnsupportedGeneralNameType
+from cryptography.x509 import DuplicateExtension, ExtensionNotFound, UnrecognizedExtension, UnsupportedGeneralNameType
 from cryptography.x509 import load_der_x509_certificate, load_der_x509_crl
 from cryptography.x509.oid import CRLEntryExtensionOID, ExtensionOID
 
-from certificate_path import verify_revocation_paths
+from certificate_path import _load_certificate, verify_revocation_paths
 from sm2 import N, USER_ID, be32, message_digest, parse_public, sm3, verify, verify_digest
 
 
@@ -82,9 +83,10 @@ _CONSTRUCTED_CHARACTER_STRINGS = frozenset((
 
 
 class _DER:
-    def __init__(self, data):
+    def __init__(self, data, *, budget=None):
         self.data = data
         self.position = 0
+        self.budget = budget
 
     def next_is(self, tag):
         return self.position < len(self.data) and self.data[self.position] == tag
@@ -130,6 +132,62 @@ class _DER:
         start = self.position
         self.take(tag)
         return self.data[start:self.position]
+
+
+class SignedDataLimitsExceeded(ValueError):
+    """SignedData exceeded the verifier's local parsing budget."""
+
+
+# Application resource limits for untrusted SignedData and open DER values.
+_MAX_ENVELOPE_BYTES = 8 * 1024 * 1024
+_MAX_DETACHED_BYTES = 64 * 1024 * 1024
+_MAX_DER_NODES = 65_536
+_MAX_DER_DEPTH = 32
+_MAX_DER_WORK_BYTES = 64 * 1024 * 1024
+_MAX_ATTRIBUTES = 1_024
+_MAX_ATTRIBUTE_VALUES = 1_024
+
+
+@dataclass
+class _DERBudget:
+    nodes: int = 0
+    work: int = 0
+
+    def charge(self, size):
+        self.nodes += 1
+        self.work += size
+        if self.nodes > _MAX_DER_NODES:
+            raise SignedDataLimitsExceeded('SignedData DER element limit exceeded')
+        if self.work > _MAX_DER_WORK_BYTES:
+            raise SignedDataLimitsExceeded('SignedData DER aggregate byte limit exceeded')
+
+
+def _walk_der(encoded, *, defer_syntax=False, budget=None):
+    """Yield TLVs with shared bounds and retain only the current ancestry."""
+    stack = [_DER(memoryview(encoded))]
+    if budget is None:
+        budget = _DERBudget()
+    while stack:
+        fields = stack[-1]
+        if fields.position == len(fields.data):
+            stack.pop()
+            continue
+        start = fields.position
+        tag = fields.data[start]
+        try:
+            value = fields.take()
+        except ValueError:
+            if not defer_syntax:
+                raise
+            # Leave field-specific diagnostics to the semantic parser.
+            stack.pop()
+            continue
+        budget.charge(fields.position - start)
+        if tag & 0x20 and len(stack) >= _MAX_DER_DEPTH:
+            raise SignedDataLimitsExceeded('SignedData DER nesting limit exceeded')
+        yield tag, value
+        if tag & 0x20 and value:
+            stack.append(_DER(value))
 
 
 class MissingAttributeSchema(ValueError):
@@ -229,10 +287,14 @@ def _check_name(encoded, *, field='issuer'):
             attribute.done()
 
 
-def _set_members(content, tag=None):
+def _set_members(content, tag=None, *, limit=None):
     fields = _DER(content)
     previous = b''
+    count = 0
     while fields.position < len(content):
+        count += 1
+        if limit is not None and count > limit:
+            raise SignedDataLimitsExceeded('SignedData attribute collection limit exceeded')
         encoded = fields.take_encoded(tag)
         if encoded < previous:
             raise ValueError('DER SET OF members out of order')
@@ -255,63 +317,54 @@ def _check_bit_string(value):
         raise ValueError('invalid DER BIT STRING')
 
 
-def _check_open_value(encoded):
-    # Walk nested TLVs iteratively. Attribute-specific value syntax remains
-    # determined by the OID, outside the payment adapter.
-    pending = [_DER(memoryview(encoded))]
-    while pending:
-        fields = pending.pop()
-        while fields.position < len(fields.data):
-            tag = fields.data[fields.position]
-            value = fields.take()
-            if tag == 0x21 or (tag == 0x01 and value not in (b'\x00', b'\xff')):
-                raise ValueError('invalid DER BOOLEAN')
-            if tag == 0x22 or (tag == 0x02 and not _minimal_integer(value)):
-                raise ValueError('invalid DER INTEGER')
-            if tag == 0x03:
-                _check_bit_string(value)
-            if tag == 0x23:
-                raise ValueError('invalid DER BIT STRING')
-            if tag == 0x24:
-                raise ValueError('invalid DER OCTET STRING')
-            if tag == 0x25 or (tag == 0x05 and value):
-                raise ValueError('invalid DER NULL')
-            if tag == 0x06:
-                _check_oid(value)
-            if tag == 0x26:
-                raise ValueError('invalid DER attribute OID')
-            if tag == 0x0d:
-                _check_oid(value, 'RELATIVE-OID')
-            if tag == 0x2d:
-                raise ValueError('invalid DER RELATIVE-OID')
-            if tag == 0x2a or (tag == 0x0a and not _minimal_integer(value)):
-                raise ValueError('invalid DER ENUMERATED')
-            if tag in (0x10, 0x11):
-                raise ValueError('DER SEQUENCE and SET must be constructed')
-            if tag in _CONSTRUCTED_CHARACTER_STRINGS:
-                raise ValueError('DER character strings must be primitive')
-            if tag in _UNICODE_STRINGS:
-                label, encoding = _UNICODE_STRINGS[tag]
-                try:
-                    decoded = bytes(value).decode(encoding)
-                except UnicodeDecodeError as error:
-                    raise ValueError(f'invalid DER {label}') from error
-                if tag == 0x1e and any(ord(character) > 0xffff for character in decoded):
-                    raise ValueError('invalid DER BMPString')
-            if tag == 0x12 and any(octet not in _NUMERIC_STRING for octet in value):
-                raise ValueError('invalid DER NumericString')
-            if tag == 0x13 and any(octet not in _PRINTABLE_STRING for octet in value):
-                raise ValueError('invalid DER PrintableString')
-            if tag == 0x16 and not bytes(value).isascii():
-                raise ValueError('invalid DER IA5String')
-            if tag == 0x1a and any(not 0x20 <= octet <= 0x7e for octet in value):
-                raise ValueError('invalid DER VisibleString')
-            if tag in (0x17, 0x18):
-                _check_der_time(tag, bytes(value))
-            if tag in (0x37, 0x38):
-                raise ValueError('DER times must be primitive')
-            if tag & 0x20:
-                pending.append(_DER(value))
+def _check_open_value(encoded, *, budget=None):
+    for tag, value in _walk_der(encoded, budget=budget):
+        if tag == 0x21 or (tag == 0x01 and value not in (b'\x00', b'\xff')):
+            raise ValueError('invalid DER BOOLEAN')
+        if tag == 0x22 or (tag == 0x02 and not _minimal_integer(value)):
+            raise ValueError('invalid DER INTEGER')
+        if tag == 0x03:
+            _check_bit_string(value)
+        if tag == 0x23:
+            raise ValueError('invalid DER BIT STRING')
+        if tag == 0x24:
+            raise ValueError('invalid DER OCTET STRING')
+        if tag == 0x25 or (tag == 0x05 and value):
+            raise ValueError('invalid DER NULL')
+        if tag == 0x06:
+            _check_oid(value)
+        if tag == 0x26:
+            raise ValueError('invalid DER attribute OID')
+        if tag == 0x0d:
+            _check_oid(value, 'RELATIVE-OID')
+        if tag == 0x2d:
+            raise ValueError('invalid DER RELATIVE-OID')
+        if tag == 0x2a or (tag == 0x0a and not _minimal_integer(value)):
+            raise ValueError('invalid DER ENUMERATED')
+        if tag in (0x10, 0x11):
+            raise ValueError('DER SEQUENCE and SET must be constructed')
+        if tag in _CONSTRUCTED_CHARACTER_STRINGS:
+            raise ValueError('DER character strings must be primitive')
+        if tag in _UNICODE_STRINGS:
+            label, encoding = _UNICODE_STRINGS[tag]
+            try:
+                decoded = bytes(value).decode(encoding)
+            except UnicodeDecodeError as error:
+                raise ValueError(f'invalid DER {label}') from error
+            if tag == 0x1e and any(ord(character) > 0xffff for character in decoded):
+                raise ValueError('invalid DER BMPString')
+        if tag == 0x12 and any(octet not in _NUMERIC_STRING for octet in value):
+            raise ValueError('invalid DER NumericString')
+        if tag == 0x13 and any(octet not in _PRINTABLE_STRING for octet in value):
+            raise ValueError('invalid DER PrintableString')
+        if tag == 0x16 and not bytes(value).isascii():
+            raise ValueError('invalid DER IA5String')
+        if tag == 0x1a and any(not 0x20 <= octet <= 0x7e for octet in value):
+            raise ValueError('invalid DER VisibleString')
+        if tag in (0x17, 0x18):
+            _check_der_time(tag, bytes(value))
+        if tag in (0x37, 0x38):
+            raise ValueError('DER times must be primitive')
 
 
 def _check_schema_der(schema, encoded, label):
@@ -351,7 +404,7 @@ def _attribute(encoded, schemas=None):
     attribute = _DER(_DER(encoded).take(0x30))
     oid = attribute.take(0x06)
     _check_oid(oid)
-    values = tuple(_set_members(attribute.take(0x31)))
+    values = tuple(_set_members(attribute.take(0x31), limit=_MAX_ATTRIBUTE_VALUES))
     for value in values:
         _check_open_value(value)
     attribute.done()
@@ -478,7 +531,7 @@ def _check_crl_extension_value(oid, _critical, encoded):
         fields.done()
 
 
-def _check_extensions(encoded, *, check_value=None, schemas=None):
+def _check_extensions(encoded, *, check_value=None, schemas=None, budget=None):
     outer = _DER(encoded)
     extensions = _DER(outer.take(0x30))
     outer.done()
@@ -495,7 +548,7 @@ def _check_extensions(encoded, *, check_value=None, schemas=None):
             raise ValueError('X.509 extension critical must be TRUE or omitted')
         value = _DER(entry.take(0x04))
         encoded_value = value.take_encoded()
-        _check_open_value(encoded_value)
+        _check_open_value(encoded_value, budget=budget)
         value.done()
         entry.done()
         if check_value is not None:
@@ -572,7 +625,7 @@ def _check_certificate_profile(extensions, *, subject_present):
                 raise ValueError(f'{name} requires a CA certificate')
 
 
-def _check_certificate(encoded, *, profile=False, schemas=None):
+def _check_certificate(encoded, *, profile=False, schemas=None, budget=None):
     fields = _DER(_DER(encoded).take(0x30))
     tbs = _DER(fields.take(0x30))
     version = b'\x00'
@@ -607,7 +660,7 @@ def _check_certificate(encoded, *, profile=False, schemas=None):
         if version != b'\x02':
             raise ValueError('certificate extensions require v3')
         _check_extensions(tbs.take(0xa3), check_value=_check_certificate_extension_value if profile else None,
-                          schemas=schemas)
+                          schemas=schemas, budget=budget)
     tbs.done()
     if version == b'\x01':
         # GB/T 20518 permits v2, which cryptography's certificate loader rejects.
@@ -691,7 +744,7 @@ def _check_crl_entry_profile(serial, extensions, *, is_delta):
         raise ValueError('certificateIssuer must contain at least one name')
 
 
-def _check_crl(encoded, *, profile=False, schemas=None):
+def _check_crl(encoded, *, profile=False, schemas=None, budget=None):
     fields = _DER(_DER(encoded).take(0x30))
     tbs = _DER(fields.take(0x30))
     version_2 = tbs.next_is(0x02)
@@ -716,13 +769,13 @@ def _check_crl(encoded, *, profile=False, schemas=None):
             if entry.next_is(0x30):
                 if not version_2:
                     raise ValueError('revoked certificate extensions require CRL v2')
-                _check_extensions(entry.take_encoded(0x30), schemas=schemas)
+                _check_extensions(entry.take_encoded(0x30), schemas=schemas, budget=budget)
             entry.done()
     if tbs.next_is(0xa0):
         if not version_2:
             raise ValueError('CRL extensions require v2')
         _check_extensions(tbs.take(0xa0), check_value=_check_crl_extension_value if profile else None,
-                          schemas=schemas)
+                          schemas=schemas, budget=budget)
     tbs.done()
     crl = load_der_x509_crl(encoded)
     if not crl.issuer.rdns:
@@ -835,10 +888,19 @@ def _extension_value(extensions, oid):
         return None
 
 
+def _revocation_certificate(encoded, role):
+    """Decode a certificate and report unsupported or invalid extensions as ValueError."""
+    certificate = _load_certificate(encoded, role)
+    try:
+        # Known extension values are decoded on first access.
+        certificate.extensions
+    except (DuplicateExtension, UnsupportedGeneralNameType, ValueError) as error:
+        raise ValueError(f'invalid {role} certificate extension: {error}') from error
+    return certificate
+
+
 def _crl_signer_certificate(encoded):
-    if not isinstance(encoded, bytes):
-        raise ValueError('expected a DER CRL issuer certificate')
-    certificate = load_der_x509_certificate(encoded)
+    certificate = _revocation_certificate(encoded, 'CRL issuer')
     if not certificate.subject.rdns:
         raise ValueError('CRL issuer certificate requires a nonempty subject')
     usage = _extension_value(certificate.extensions, ExtensionOID.KEY_USAGE)
@@ -939,6 +1001,7 @@ class CRLRevocationSnapshot:
     _distribution: IssuingDistributionPoint | None = field(default=None, repr=False)
     _authenticated: bool = field(default=False, repr=False)
     _issuer_certificate: bytes | None = field(default=None, repr=False)
+    _signer_key_id: bytes | None = field(default=None, repr=False)
 
     def revocation_for(self, issuer: Name, serial_number: int) -> CRLRevocation | None:
         """Return the entry in this scope, or None when the issuer and serial are absent."""
@@ -993,12 +1056,18 @@ def _crl_revocations(revision, issuer_resolver):
     return entries
 
 
+def _certificate_key_id(encoded):
+    certificate = ASN1Certificate.load(encoded, strict=True)
+    return sha256(certificate['tbs_certificate']['subject_public_key_info'].dump()).digest()
+
+
 def _crl_snapshot(revision, entries, *, issuer_certificate):
     crl = revision.crl
     distribution = _extension_value(crl.extensions, ExtensionOID.ISSUING_DISTRIBUTION_POINT)
     return CRLRevocationSnapshot(revision.number, revision.issued, crl.next_update_utc,
                                  revision.scope, MappingProxyType(entries), crl.issuer,
-                                 distribution, issuer_certificate is not None, issuer_certificate)
+                                 distribution, issuer_certificate is not None, issuer_certificate,
+                                 _certificate_key_id(issuer_certificate) if issuer_certificate is not None else None)
 
 
 def load_crl_snapshot(crl, issuer_certificate, *, sm2_user_id=None, issuer_resolver=None, extension_schemas=None):
@@ -1114,11 +1183,12 @@ def _latest_crl_scopes(snapshots, validation_time):
     latest = {}
     conflicts = set()
     for snapshot in snapshots:
-        if not isinstance(snapshot, CRLRevocationSnapshot) or not snapshot._authenticated:
+        if (not isinstance(snapshot, CRLRevocationSnapshot) or not snapshot._authenticated
+                or snapshot._issuer_certificate is None or snapshot._signer_key_id is None):
             raise ValueError('certificate revocation assessment requires authenticated CRL snapshots')
         if snapshot.this_update > validation_time:
             continue
-        key = _issuer_key(snapshot.issuer), snapshot.issuing_distribution_point
+        key = _issuer_key(snapshot.issuer), snapshot._signer_key_id, snapshot.issuing_distribution_point
         previous = latest.get(key)
         if previous is not None:
             current_rank = snapshot.this_update, snapshot.number
@@ -1132,7 +1202,7 @@ def _latest_crl_scopes(snapshots, validation_time):
         conflicts.discard(key)
         latest[key] = snapshot
     if conflicts:
-        raise ValueError('conflicting authenticated CRL snapshots share issuer, scope, time and number')
+        raise ValueError('conflicting authenticated CRL snapshots share issuer key, scope, time and number')
     return (snapshot for snapshot in latest.values() if validation_time < snapshot.next_update)
 
 
@@ -1158,29 +1228,50 @@ def _verify_path_revocation(target, signers, paths, snapshots, trust_anchor, val
             raise ValueError('certificate path revocation evidence depends on an unverified issuer')
         for child in ready:
             parent = parents.pop(child)
-            verdict = _assess_revocation_status(child, authenticated_evidence.get(parent, ()), validation_time)
+            role = 'CRL signer' if child in signers else 'intermediate'
+            certificate = _revocation_certificate(child, role)
+            verdict = _assess_revocation_status(
+                certificate, authenticated_evidence.get(parent, ()), validation_time,
+                issuer_key_id=_certificate_key_id(parent),
+            )
             if verdict.status != 'unrevoked':
-                role = 'CRL signer' if child in signers else 'intermediate'
                 raise ValueError(f'{role} certificate revocation status is {verdict.status}')
             verified.add(child)
 
 
+def _delegated_signers_for_path(target_path, signers, paths):
+    # The signed distribution point declares a cRLIssuer. Its CRL-signing
+    # certificate must be issued by an authority on the target's path.
+    authorities = set(target_path[1:] or target_path)
+    return {
+        signer for signer in signers if signer in authorities
+        or (len(paths[signer]) > 1 and paths[signer][1] in authorities)
+    }
+
+
 def assess_certificate_revocation(certificate, snapshots, *, validation_time, trust_anchor=None, intermediates=(),
-                                  require_chain_revocation=False):
+                                  require_chain_revocation=False, issuer_certificate=None):
     """Assess a DER certificate against caller-supplied authenticated CRL snapshots.
 
     Supply a DER trust_anchor and any untrusted DER intermediates to verify
     the target and snapshot signer paths under that anchor. Set
     require_chain_revocation to require unrevoked status for every used
     intermediate and CRL signer except the anchor. Each certificate's
-    evidence comes from its validated parent. Otherwise the caller
-    establishes the applicable trust and revocation evidence.
+    evidence comes from its validated parent. With no trust anchor, an
+    optional issuer_certificate pins the externally authenticated target
+    issuer. Otherwise direct CRL keys must verify the target's signature,
+    and the caller authenticates applicable delegated CRL signing keys.
+    Unsupported X.509 certificate versions raise ValueError.
     """
     if not isinstance(validation_time, datetime) or validation_time.utcoffset() is None:
         raise ValueError('CRL validation time must be a timezone-aware datetime')
     if not isinstance(certificate, bytes):
         raise ValueError('expected a DER certificate for revocation assessment')
+    issuer_key_id = None
+    delegated_signers = None
     if trust_anchor is not None:
+        if issuer_certificate is not None:
+            raise ValueError('select either a trust anchor or an externally authenticated issuer certificate')
         snapshots = tuple(snapshots)
         signers = []
         for snapshot in snapshots:
@@ -1191,18 +1282,69 @@ def assess_certificate_revocation(certificate, snapshots, *, validation_time, tr
         signers = dict.fromkeys(signers)
         paths = verify_revocation_paths(certificate, signers, trust_anchor=trust_anchor,
                                        intermediates=intermediates, validation_time=validation_time,
-                                       identify=require_chain_revocation)
+                                       identify=True)
+        target_path = paths[certificate]
+        issuer_key_id = _certificate_key_id(target_path[1] if len(target_path) > 1 else trust_anchor)
+        delegated_signers = _delegated_signers_for_path(target_path, signers, paths)
         if require_chain_revocation:
             _verify_path_revocation(certificate, signers, paths, snapshots, trust_anchor, validation_time)
     elif require_chain_revocation:
         raise ValueError('certificate path revocation requires an explicit trust anchor')
     elif intermediates:
         raise ValueError('certificate path intermediates require an explicit trust anchor')
-    return _assess_revocation_status(certificate, snapshots, validation_time)
+    target = _revocation_certificate(certificate, 'target')
+    if issuer_certificate is not None:
+        issuer = _load_certificate(issuer_certificate, 'target issuer')
+        if _issuer_key(issuer.subject) != _issuer_key(target.issuer):
+            raise ValueError('target issuer certificate must match the certificate issuer name')
+        try:
+            target.verify_directly_issued_by(issuer)
+        except (TypeError, ValueError, InvalidSignature) as error:
+            raise ValueError('target certificate does not verify under the supplied issuer certificate') from error
+        except UnsupportedAlgorithm:
+            # Explicit pin for an issuer established by an external path verifier.
+            pass
+        issuer_key_id = _certificate_key_id(issuer_certificate)
+    return _assess_revocation_status(target, snapshots, validation_time,
+                                     issuer_key_id=issuer_key_id, delegated_signers=delegated_signers)
 
 
-def _assess_revocation_status(certificate, snapshots, validation_time):
-    target = load_der_x509_certificate(certificate)
+def _crl_scope_reasons(target, snapshots, distribution_points, *, is_ca, issuer_key_id, delegated_signers):
+    applicable = {}
+    direct_verdicts = {}
+    for point in distribution_points:
+        matches = []
+        delegate_keys = {}
+        for index, snapshot in enumerate(snapshots):
+            reasons = _crl_distribution_coverage(snapshot, point, target, is_ca=is_ca)
+            if not reasons:
+                continue
+            key = snapshot._signer_key_id
+            if point.crl_issuer is None:
+                if issuer_key_id is not None:
+                    if key != issuer_key_id:
+                        continue
+                else:
+                    if key not in direct_verdicts:
+                        try:
+                            target.verify_directly_issued_by(load_der_x509_certificate(snapshot._issuer_certificate))
+                            direct_verdicts[key] = True
+                        except (ValueError, TypeError, InvalidSignature, UnsupportedAlgorithm):
+                            direct_verdicts[key] = False
+                    if not direct_verdicts[key]:
+                        continue
+                matches.append((index, reasons, None))
+            elif delegated_signers is None or snapshot._issuer_certificate in delegated_signers:
+                name = _issuer_key(snapshot.issuer)
+                delegate_keys.setdefault(name, set()).add(key)
+                matches.append((index, reasons, name))
+        for index, reasons, delegate in matches:
+            if delegate is None or len(delegate_keys[delegate]) == 1:
+                applicable.setdefault(index, set()).update(reasons)
+    return applicable
+
+
+def _assess_revocation_status(target, snapshots, validation_time, *, issuer_key_id=None, delegated_signers=None):
     basic = _extension_value(target.extensions, ExtensionOID.BASIC_CONSTRAINTS)
     is_ca = basic is not None and basic.ca
     distribution_points = _extension_value(target.extensions, ExtensionOID.CRL_DISTRIBUTION_POINTS)
@@ -1213,12 +1355,11 @@ def _assess_revocation_status(certificate, snapshots, validation_time):
         )
     covered = set()
     revocations = []
-    for snapshot in _latest_crl_scopes(snapshots, validation_time):
-        matched = (_crl_distribution_coverage(snapshot, point, target, is_ca=is_ca)
-                   for point in distribution_points)
-        reasons = frozenset().union(*(coverage for coverage in matched if coverage is not None))
-        if not reasons:
-            continue
+    fresh = tuple(_latest_crl_scopes(snapshots, validation_time))
+    applicable = _crl_scope_reasons(target, fresh, distribution_points, is_ca=is_ca,
+                                    issuer_key_id=issuer_key_id, delegated_signers=delegated_signers)
+    for index, reasons in applicable.items():
+        snapshot = fresh[index]
         entry = snapshot.revocation_for(target.issuer, target.serial_number)
         if entry is not None:
             distribution = snapshot._distribution
@@ -1226,10 +1367,12 @@ def _assess_revocation_status(certificate, snapshots, validation_time):
             if (entry.reason != ReasonFlags.unspecified and only_reasons is not None
                     and entry.reason not in only_reasons):
                 continue
-            if entry.reason == ReasonFlags.unspecified or entry.reason in reasons:
-                if entry.revocation_date > validation_time:
-                    continue
-                revocations.append(entry)
+            if entry.revocation_date > validation_time:
+                continue
+            # RFC 5280 §6.3.3(j): a listing on an applicable CRL revokes the
+            # certificate whatever its reason. The reasons mask only governs
+            # coverage for certificates that are absent from the list.
+            revocations.append(entry)
         covered.update(reasons)
     if revocations:
         revocation = min(revocations, key=lambda entry: (entry.revocation_date, entry.reason.value,
@@ -1240,22 +1383,27 @@ def _assess_revocation_status(certificate, snapshots, validation_time):
     return CertificateRevocationAssessment(status, frozenset(covered))
 
 
-def _check_optional_set(fields, tag, field_name, parse_member, *, nonempty=False):
+def _check_optional_set(fields, tag, field_name, parse_member, *, nonempty=False, limit=None):
     if not fields.next_is(tag):
         return
     try:
         content = fields.take(tag)
         if nonempty and not content:
             raise ValueError('empty DER SET OF')
-        for member in _set_members(content, 0x30):
+        for member in _set_members(content, 0x30, limit=limit):
             parse_member(member)
-    except (MissingAttributeSchema, MissingExtensionSchema):
+    except (MissingAttributeSchema, MissingExtensionSchema, SignedDataLimitsExceeded):
         raise
     except ValueError as error:
         raise ValueError(f'invalid SignedData {field_name}: {error}') from error
 
 
 def _signed_data(envelope):
+    if len(envelope) > _MAX_ENVELOPE_BYTES:
+        raise SignedDataLimitsExceeded('SignedData envelope byte limit exceeded')
+    budget = _DERBudget()
+    for _ in _walk_der(envelope, defer_syntax=True, budget=budget):
+        pass
     outer = _DER(envelope)
     content_info = _DER(outer.take(0x30))
     outer.done()
@@ -1263,7 +1411,7 @@ def _signed_data(envelope):
         raise ValueError('expected SM2 SignedData content type')
     tagged = _DER(content_info.take(0xa0))
     content_info.done()
-    signed_data = _DER(tagged.take(0x30))
+    signed_data = _DER(tagged.take(0x30), budget=budget)
     tagged.done()
     if signed_data.take(0x02) != b'\x01':
         raise ValueError('unsupported SignedData version')
@@ -1285,9 +1433,13 @@ def _content(fields):
 
 def _signer_infos(fields, *, x509_profile=False, extension_schemas=None):
     _check_optional_set(fields, 0xa0, 'certificates',
-                        lambda member: _check_certificate(member, profile=x509_profile, schemas=extension_schemas))
+                        lambda member: _check_certificate(
+                            member, profile=x509_profile, schemas=extension_schemas, budget=fields.budget,
+                        ))
     _check_optional_set(fields, 0xa1, 'crls',
-                        lambda member: _check_crl(member, profile=x509_profile, schemas=extension_schemas))
+                        lambda member: _check_crl(
+                            member, profile=x509_profile, schemas=extension_schemas, budget=fields.budget,
+                        ))
     signers = fields.take(0x31)
     fields.done()
     return signers
@@ -1303,7 +1455,7 @@ def _signer_signature(signer, attribute_schemas=None):
     _algorithm(signer, _SIGNATURE_ALGORITHM_PARAMETERS)
     signature = _signature(signer.take(0x04))
     _check_optional_set(signer, 0xa1, 'unsignedAttrs',
-                        lambda member: _attribute(member, attribute_schemas), nonempty=True)
+                        lambda member: _attribute(member, attribute_schemas), nonempty=True, limit=_MAX_ATTRIBUTES)
     signer.done()
     return signature
 
@@ -1330,18 +1482,16 @@ def _direct_signature(envelope, message, signer_identifier):
     return _signer_signature(signer)
 
 
-def _check_signed_attributes(encoded, content_digest, attribute_schemas):
+def _check_signed_attributes(encoded, attribute_schemas):
     members = _DER(encoded).take(0xa0)
     digests = []
-    for member in _set_members(members, 0x30):
+    for member in _set_members(members, 0x30, limit=_MAX_ATTRIBUTES):
         oid, values = _attribute(member, attribute_schemas)
         if oid == _MESSAGE_DIGEST:
             digests.append(values)
     if len(digests) != 1 or len(digests[0]) != 1:
         raise ValueError('signedAttrs requires exactly one messageDigest with one value')
-    digest = _message_digest_octets(digests[0][0])
-    if content_digest is not None and digest != content_digest:
-        raise ValueError('signedAttrs messageDigest differs from SM3 of the content')
+    return _message_digest_octets(digests[0][0])
 
 
 def _general_fields(envelope, *, require_signer=False, x509_profile=False, extension_schemas=None):
@@ -1360,7 +1510,7 @@ def _general_fields(envelope, *, require_signer=False, x509_profile=False, exten
     return content, signers
 
 
-def _decode_signers(signers, attribute_schemas, *, content_digest=None):
+def _decode_signers(signers, attribute_schemas):
     previous = None
     for encoded in _set_members(signers, 0x30):
         if encoded == previous:
@@ -1371,10 +1521,11 @@ def _decode_signers(signers, attribute_schemas, *, content_digest=None):
         _check_issuer_and_serial_number(identifier)
         _digest_algorithm(signer)
         attributes = None
+        attribute_digest = None
         if signer.next_is(0xa0):
             attributes = signer.take_encoded(0xa0)
-            _check_signed_attributes(attributes, content_digest, attribute_schemas)
-        yield identifier, attributes, _signer_signature(signer, attribute_schemas)
+            attribute_digest = _check_signed_attributes(attributes, attribute_schemas)
+        yield identifier, attributes, attribute_digest, _signer_signature(signer, attribute_schemas)
 
 
 def validate_signed_data_format(envelope, *, require_signer=False, attribute_schemas=None, extension_schemas=None):
@@ -1405,8 +1556,11 @@ def verify_signed_data(envelope, trusted_signers, *, detached_content=None, attr
     cms-set explicitly to verify a CMS-style signature over the universal
     SET encoding. A verification call uses a single encoding.
     """
-    if detached_content is not None and not isinstance(detached_content, bytes):
-        raise ValueError('expected detached content octets')
+    if detached_content is not None:
+        if not isinstance(detached_content, bytes):
+            raise ValueError('expected detached content octets')
+        if len(detached_content) > _MAX_DETACHED_BYTES:
+            raise SignedDataLimitsExceeded('SignedData detached content byte limit exceeded')
     if signed_attrs_encoding not in ('cms-set', 'context-field'):
         raise ValueError('expected cms-set or context-field for signedAttrs encoding')
 
@@ -1418,11 +1572,15 @@ def verify_signed_data(envelope, trusted_signers, *, detached_content=None, attr
     elif detached_content is not None and detached_content != content:
         raise ValueError('supplied content differs from encapsulated SignedData content')
 
-    content_digest = sm3(content)
+    content_digest = None
     direct_digests = {}
     verified = set()
-    for identifier, attributes, signature in _decode_signers(signers, attribute_schemas,
-                                                            content_digest=content_digest):
+    for identifier, attributes, attribute_digest, signature in _decode_signers(signers, attribute_schemas):
+        if attribute_digest is not None:
+            if content_digest is None:
+                content_digest = sm3(content)
+            if attribute_digest != content_digest:
+                raise ValueError('signedAttrs messageDigest differs from SM3 of the content')
         if identifier not in trusted_signers:
             raise ValueError('untrusted SignedData signer identifier')
         key, user_id = trusted_signers[identifier]

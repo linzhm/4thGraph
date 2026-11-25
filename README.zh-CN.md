@@ -80,12 +80,12 @@ python3 -m unittest shared.test_layout -v
 <details>
 <summary><strong>P2PKH-R1 · 生成锁定脚本并验证完整输入</strong></summary>
 
-在 Linux x86-64 环境使用 Python 3.12、Git 和 Rust。
+在 Linux x86-64 环境使用 Python 3.12、Git 和 Rust。生成锁定脚本前，将 `R1_OWNER_HASH160` 设为收款人 20 字节公钥哈希的十六进制值。随附的 R1 测试密钥是公开的，对应输出仅用于本地测试。
 
 ```sh
 cd projects/p2pkh-r1/reference
 python -m pip install -r requirements.txt
-python generate_lock.py --owner-hash160 4ceab2c8be16c1d4c6b4147d39aa449c2d63f184
+python generate_lock.py --owner-hash160 "${R1_OWNER_HASH160:?请设置收款公钥哈希}"
 bash verify.sh
 ```
 

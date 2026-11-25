@@ -80,12 +80,12 @@ python3 -m unittest shared.test_layout -v
 <details>
 <summary><strong>P2PKH-R1 · Rebuild a lock and verify complete inputs</strong></summary>
 
-Use Python 3.12, Git and Rust on Linux x86-64.
+Use Python 3.12, Git and Rust on Linux x86-64. Set `R1_OWNER_HASH160` to the recipient’s 20-byte public-key hash in hex before generating a lock. The bundled R1 test key is public. Use its outputs only for local tests.
 
 ```sh
 cd projects/p2pkh-r1/reference
 python -m pip install -r requirements.txt
-python generate_lock.py --owner-hash160 4ceab2c8be16c1d4c6b4147d39aa449c2d63f184
+python generate_lock.py --owner-hash160 "${R1_OWNER_HASH160:?Set the recipient HASH160}"
 bash verify.sh
 ```
 

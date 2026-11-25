@@ -328,7 +328,8 @@ assessment under a caller-selected trust anchor.
 `assess_certificate_revocation` combines caller-selected authenticated
 snapshots from complete CRLs or merged CRLs. The result is `revoked`,
 `unrevoked` or `undetermined`, together with reason coverage. A valid
-revocation entry determines `revoked`. An absent entry yields
+revocation entry on an applicable snapshot determines `revoked`, whatever
+its reason code. Reason masks govern coverage only. An absent entry yields
 `unrevoked` only when the usable snapshots cover all eight reasons.
 
 | Normative area | Executable evidence |
@@ -464,3 +465,13 @@ both signature algorithm identifiers of the embedded certificate contain
 explicit DER NULL. The standalone version test checks the normative version
 rule with a separate, valid v2 payment envelope.
 [Hexadecimal transcription](https://www.gm7.org/archives/108338)
+
+### Daybreak regression evidence
+
+| Finding | Witnesses exercised by the normal verification runner |
+| --- | --- |
+| `acf_69f5661c16d250ae2ea735495e86ed2a` | Same-name signer keys have separate freshness scopes. Direct coverage follows the selected issuer key. Delegation uses issuers on the target path. |
+| `acf_c7cfda72b09a4d8273163aebceabe2e4` | Format, general and payment entry points enforce byte, element, depth and collection boundaries. Embedded extension values charge the same budget. The over-budget signed attributes case verifies that hashing has yet to start. |
+
+The test runner checks both entries in the [executable traceability
+table](test_signed_data_acceptance.py).

@@ -11,13 +11,14 @@ import unittest
 from unittest.mock import patch
 
 from asn1crypto.core import Integer, ObjectIdentifier, OctetString, SetOf
-from asn1crypto.x509 import Certificate as ASN1Certificate
+from asn1crypto.x509 import Certificate as ASN1Certificate, Extension as ASN1Extension
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import padding, rsa
 from cryptography.x509 import Name, NameAttribute, ReasonFlags, load_der_x509_certificate, load_der_x509_crl
 from cryptography.x509.oid import NameOID
 import certificate_path
+import signed_data as verifier
 from ecdsa.der import read_length, remove_integer, remove_sequence
 from ecdsa.util import sigdecode_der
 from signed_data import AmbiguousCertificateIssuer, MissingAttributeSchema, MissingExtensionSchema
@@ -53,6 +54,9 @@ TABLE_2 = ('version', 'digestAlgorithms', 'encapContentInfo', 'certificates', 'c
 TABLE_3 = ('version', 'issuerAndSerialNumber', 'digestAlgorithm', 'signedAttrs',
            'signatureAlgorithm', 'signature', 'unsignedAttrs')
 CLAUSE_EVIDENCE = {
+    'Daybreak.acf_c7cfda72b09a4d8273163aebceabe2e4': ('der_resource_limits', 'der_embedded_budget'),
+    'Daybreak.acf_69f5661c16d250ae2ea735495e86ed2a': ('crl_signer_key_scope', 'crl_delegated_path'),
+
     '5.ContentInfo': ('single_field', 'framing'),
     '6.1.CertificateRevocationLists': ('metadata', 'crl_next_update', 'x509_algorithms'),
     '6.3.DigestAlgorithmIdentifier': ('single_field', 'digest_set', 'envelope_parameters'),
@@ -340,6 +344,72 @@ class SignedDataAcceptance(SignedDataFixtures):
                 with self.subTest(delta=delta, entry_point=entry_point.__name__), self.assertRaisesRegex(ValueError, error):
                     entry_point(changed)
         COMPLETED_WITNESSES.add('version_octet')
+
+    def test_public_entry_points_check_der_resource_limits(self):
+        envelope = signed_data(self.signatures['direct'], attached=MESSAGE)
+        budget = verifier._DERBudget()
+        nodes = sum(1 for _ in verifier._walk_der(envelope, budget=budget))
+        limits = (
+            ('_MAX_ENVELOPE_BYTES', len(envelope), 'envelope byte'),
+            ('_MAX_DER_NODES', nodes, 'DER element'),
+            ('_MAX_DER_DEPTH', None, 'DER nesting'),
+            ('_MAX_DER_WORK_BYTES', budget.work, 'DER aggregate byte'),
+        )
+        for check in (validate_signed_data_format, self.verify_attached, self.apply_adapter):
+            for constant, inclusive, detail in limits:
+                with self.subTest(entry_point=check.__name__, limit=constant):
+                    if inclusive is not None:
+                        with patch.object(verifier, constant, inclusive):
+                            check(envelope)
+                    with patch.object(verifier, constant, inclusive - 1 if inclusive else 1), \
+                            patch.object(verifier, 'verify_digest') as general_verify, \
+                            patch.object(verifier, 'verify') as wallet_verify:
+                        with self.assertRaisesRegex(verifier.SignedDataLimitsExceeded, detail):
+                            check(envelope)
+                    general_verify.assert_not_called()
+                    wallet_verify.assert_not_called()
+
+        def note(identifier, *values):
+            return der(0x30, der(0x06, bytes((0x2a, identifier))) + der(0x31, b''.join(
+                der(0x16, value) for value in values
+            )))
+
+        comments = (note(3, b'A', b'B'), note(4, b'C'))
+        optional = signed_data(self.signatures['direct'], attached=MESSAGE,
+                               unsigned_attrs=der(0xa1, b''.join(sorted(comments))))
+        for check in (validate_signed_data_format, self.verify_attached, self.apply_adapter):
+            with self.subTest(entry_point=check.__name__, field='unsignedAttrs'):
+                with patch.object(verifier, '_MAX_ATTRIBUTE_VALUES', 2):
+                    check(optional)
+                for constant in ('_MAX_ATTRIBUTES', '_MAX_ATTRIBUTE_VALUES'):
+                    with patch.object(verifier, constant, 1):
+                        with self.assertRaisesRegex(verifier.SignedDataLimitsExceeded, 'attribute collection'):
+                            check(optional)
+        attrs = der(0xa0, b''.join(sorted((self.attribute, comments[0]))))
+        signed = signed_data(self.external_signature(attrs), signed_attrs=attrs)
+        with patch.object(verifier, '_MAX_ATTRIBUTES', 1), patch.object(verifier, 'sm3') as digest:
+            with self.assertRaisesRegex(verifier.SignedDataLimitsExceeded, 'attribute collection'):
+                verify_signed_data(signed, self.trusted_signers, detached_content=MESSAGE)
+        digest.assert_not_called()
+        with patch.object(verifier, '_MAX_DETACHED_BYTES', len(MESSAGE) - 1):
+            with self.assertRaisesRegex(verifier.SignedDataLimitsExceeded, 'detached content byte'):
+                verify_signed_data(signed, self.trusted_signers, detached_content=MESSAGE)
+        COMPLETED_WITNESSES.add('der_resource_limits')
+
+    def test_envelope_der_budget_also_counts_embedded_extension_values(self):
+        certificate = self.openssl('req', '-new', '-x509', '-key', 'signer.pem', '-sm3',
+                                   '-subj', '/CN=Budget fixture', '-set_serial', '1', '-days', '1',
+                                   '-addext', 'basicConstraints=critical,CA:FALSE',
+                                   '-addext', 'keyUsage=critical,digitalSignature', '-outform', 'DER')
+        envelope = signed_data(self.signatures['direct'], attached=MESSAGE, metadata=der(0xa0, certificate))
+        outside_extensions = sum(1 for _ in verifier._walk_der(envelope))
+        for check in (validate_signed_data_format, self.verify_attached, self.apply_adapter):
+            with self.subTest(entry_point=check.__name__):
+                check(envelope)
+                with patch.object(verifier, '_MAX_DER_NODES', outside_extensions):
+                    with self.assertRaisesRegex(verifier.SignedDataLimitsExceeded, 'DER element'):
+                        check(envelope)
+        COMPLETED_WITNESSES.add('der_embedded_budget')
 
     def test_format_only_signer_cardinality_and_independent_signature_checks(self):
         signature = self.signatures['direct']
@@ -2089,9 +2159,12 @@ class SignedDataReview(SignedDataFixtures):
         target = certificate(points=[point]).public_bytes(serialization.Encoding.DER)
         limited_target = certificate(points=[limited_point]).public_bytes(serialization.Encoding.DER)
         split_target = certificate(points=[limited_point, complementary_point]).public_bytes(serialization.Encoding.DER)
+        other_url = [x509.UniformResourceIdentifier('http://example.invalid/leaf-other.crl')]
+        located_target = certificate(points=[limited_point, x509.DistributionPoint(other_url, None, other_half, None)]
+                                     ).public_bytes(serialization.Encoding.DER)
 
-        def distribution(reasons):
-            return x509.IssuingDistributionPoint(url, None, False, False, reasons, False, False)
+        def distribution(reasons, location=url):
+            return x509.IssuingDistributionPoint(location, None, False, False, reasons, False, False)
 
         first = issue(distribution=distribution(half))
         second = issue(distribution=distribution(other_half))
@@ -2100,6 +2173,10 @@ class SignedDataReview(SignedDataFixtures):
         unspecified = issue(distribution=distribution(half), reason=ReasonFlags.unspecified)
         unrelated_reason = issue(distribution=distribution(other_half), reason=ReasonFlags.affiliation_changed)
         inconsistent_entry = issue(distribution=distribution(half), reason=ReasonFlags.affiliation_changed)
+        # The CRL itself is unpartitioned, so its listing applies even though
+        # the reason lies outside the certificate's distribution-point mask.
+        listed_outside_point = issue(distribution=distribution(None), reason=ReasonFlags.affiliation_changed)
+        clean_other_location = issue(distribution=distribution(None, other_url))
         cases = (
             (target, (), 'undetermined', frozenset(), None),
             (target, (first,), 'undetermined', half, None),
@@ -2111,6 +2188,10 @@ class SignedDataReview(SignedDataFixtures):
             (target, (inconsistent_entry, second), 'undetermined', other_half, None),
             (target, (revoked,), 'revoked', half, hold),
             (target, (unspecified,), 'revoked', half, ReasonFlags.unspecified),
+            (located_target, (clean_other_location,), 'undetermined', other_half, None),
+            (located_target, (listed_outside_point,), 'revoked', half, ReasonFlags.affiliation_changed),
+            (located_target, (listed_outside_point, clean_other_location), 'revoked', all_reasons,
+             ReasonFlags.affiliation_changed),
         )
         for index, (encoded, snapshots, status, reasons, reason) in enumerate(cases):
             with self.subTest(case=index):
@@ -2118,6 +2199,42 @@ class SignedDataReview(SignedDataFixtures):
                 self.assertEqual((result.status, result.covered_reasons), (status, reasons))
                 self.assertEqual(result.revocation.reason if result.revocation is not None else None, reason)
         COMPLETED_WITNESSES.add('crl_assessment_reasons')
+
+    def test_crl_scope_uses_authenticated_signer_key_identity(self):
+        make_target, _, issue, authority, _, _, when, _ = self.crl_assessment_fixture()
+        _, _, other_issue, other_authority, _, _, _, _ = self.crl_assessment_fixture()
+        self.assertEqual(authority, other_authority)
+        current, other = issue(), other_issue()
+        self.assertNotEqual(current._signer_key_id, other._signer_key_id)
+        for snapshots in (current, other), (other, current):
+            with self.subTest(order=snapshots[0]._signer_key_id.hex()):
+                selected = tuple(verifier._latest_crl_scopes(snapshots, when))
+                self.assertCountEqual([item._signer_key_id for item in selected],
+                                      [current._signer_key_id, other._signer_key_id])
+                target = make_target()
+                point = x509.DistributionPoint([x509.DirectoryName(authority)], None, None, None)
+                scopes = verifier._crl_scope_reasons(
+                    target, selected, (point,), is_ca=False, issuer_key_id=current._signer_key_id,
+                    delegated_signers=None,
+                )
+                self.assertEqual([selected[index]._signer_key_id for index in scopes], [current._signer_key_id])
+        encoded_target = make_target().public_bytes(serialization.Encoding.DER)
+        with patch.object(certificate_path, '_openssl', wraps=certificate_path._openssl) as openssl:
+            self.assertEqual(assess_certificate_revocation(
+                encoded_target, [current], validation_time=when, trust_anchor=current._issuer_certificate,
+            ).status, 'unrevoked')
+        self.assertTrue(all('-show_chain' in call.args[0] for call in openssl.call_args_list))
+        COMPLETED_WITNESSES.add('crl_signer_key_scope')
+
+    def test_delegated_crl_authority_must_be_on_the_target_path(self):
+        paths = {
+            'delegate-from-parent': ('delegate-from-parent', 'parent', 'anchor'),
+            'delegate-from-anchor': ('delegate-from-anchor', 'anchor'),
+            'delegate-from-sibling': ('delegate-from-sibling', 'sibling', 'anchor'),
+        }
+        actual = verifier._delegated_signers_for_path(('target', 'parent', 'anchor'), paths, paths)
+        self.assertEqual(actual, {'delegate-from-parent', 'delegate-from-anchor'})
+        COMPLETED_WITNESSES.add('crl_delegated_path')
 
     def test_crl_assessment_matches_direct_indirect_and_relative_scope(self):
         certificate, _, issue, authority, delegated, _, check_time, _ = self.crl_assessment_fixture()
@@ -2159,6 +2276,71 @@ class SignedDataReview(SignedDataFixtures):
                 target = certificate(points=points, is_ca=is_ca).public_bytes(serialization.Encoding.DER)
                 self.assertEqual(assess_certificate_revocation(target, [snapshot], validation_time=check_time).status, expected)
         COMPLETED_WITNESSES.add('crl_assessment_scope')
+
+    def test_revocation_rejects_undecodable_certificates_with_value_error(self):
+        certificate, issue_crl, issue, _, _, _, check_time, _ = self.crl_assessment_fixture()
+        encoded_der = serialization.Encoding.DER
+
+        def version_2(cert):
+            encoded = ASN1Certificate.load(cert.public_bytes(encoded_der))
+            encoded['tbs_certificate']['version'] = 'v2'
+            encoded['tbs_certificate']['extensions'] = None
+            return encoded.dump()
+
+        def duplicate_extension(cert):
+            encoded = ASN1Certificate.load(cert.public_bytes(encoded_der))
+            extensions = encoded['tbs_certificate']['extensions']
+            extensions.append(extensions[-1].copy())
+            return encoded.dump()
+
+        def unsupported_general_name(cert):
+            encoded = ASN1Certificate.load(cert.public_bytes(encoded_der))
+            edi_party = der(0xa5, der(0xa1, der(0x0c, b'Test-only EDI party')))
+            names = der(0x30, edi_party)
+            oid = ObjectIdentifier(x509.ExtensionOID.SUBJECT_ALTERNATIVE_NAME.dotted_string).dump()
+            extension = ASN1Extension.load(der(0x30, oid + der(0x04, names)), strict=True)
+            encoded['tbs_certificate']['extensions'].append(extension)
+            return encoded.dump()
+
+        target, issuer = certificate(), certificate(ca_cert=True)
+        crl = issue_crl().public_bytes(encoded_der)
+        target_der = target.public_bytes(encoded_der)
+        anchor = issuer.public_bytes(encoded_der)
+        snapshot = issue()
+
+        def assess(encoded, **options):
+            return assess_certificate_revocation(encoded, [snapshot], validation_time=check_time, **options)
+
+        cases = (
+            ('v2 target', lambda: assess(version_2(target)), 'unsupported target certificate version'),
+            ('duplicate target extension', lambda: assess(duplicate_extension(target)),
+             'invalid target certificate extension'),
+            ('unsupported target GeneralName', lambda: assess(unsupported_general_name(target)),
+             'invalid target certificate extension'),
+            ('v2 CRL issuer', lambda: load_crl_snapshot(crl, version_2(issuer)),
+             'unsupported CRL issuer certificate version'),
+            ('duplicate CRL issuer extension', lambda: load_crl_snapshot(crl, duplicate_extension(issuer)),
+             'invalid CRL issuer certificate extension'),
+            ('unsupported CRL issuer GeneralName', lambda: load_crl_snapshot(crl, unsupported_general_name(issuer)),
+             'invalid CRL issuer certificate extension'),
+            ('v2 trust anchor', lambda: assess(target_der, trust_anchor=version_2(issuer)),
+             'unsupported trust anchor certificate version'),
+            ('v2 intermediate', lambda: assess(target_der, trust_anchor=anchor, intermediates=[version_2(target)]),
+             'unsupported intermediate certificate version'),
+            ('v2 target with pinned issuer', lambda: assess(version_2(target), issuer_certificate=anchor),
+             'unsupported target certificate version'),
+            ('unsupported target GeneralName with pinned issuer',
+             lambda: assess(unsupported_general_name(target), issuer_certificate=anchor),
+             'invalid target certificate extension'),
+            ('v2 pinned issuer', lambda: assess(target_der, issuer_certificate=version_2(issuer)),
+             'unsupported target issuer certificate version'),
+            ('invalid pinned issuer DER', lambda: assess(target_der, issuer_certificate=b'\x30\x00'),
+             'invalid DER target issuer certificate'),
+        )
+        for name, call, message in cases:
+            with self.subTest(name):
+                with self.assertRaisesRegex(ValueError, message):
+                    call()
 
     def test_issuer_default_cannot_supply_coverage_for_an_explicit_distribution_point(self):
         certificate, _, issue, authority, delegated, _, when, _ = self.crl_assessment_fixture()

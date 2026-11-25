@@ -178,7 +178,7 @@ def signing_vector(*, compiled_curve):
     sig = fixture_signature(key, auth.digest())
     unlocking = current_input_unlock(auth, pub, sig)
     signed = child([funding], [900], {0: unlocking})
-    vector = dict(type="41", input_index=0, previous_amount_sats=1000,
+    vector = dict(test_only=True, type="41", input_index=0, previous_amount_sats=1000,
                   parent_txid=funding.id(), unsigned_tx_hex=unsigned.serialize().hex(),
                   owner_hash160=owner.hex(), public_key_x963=pub.hex(), preimage_hex=auth.preimage.hex(),
                   digest_hex=auth.digest().hex(), signature_hex=sig.hex(),
