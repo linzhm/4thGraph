@@ -1,5 +1,6 @@
 """Authorize a prepared BSV input with an external one-time WOTS+ signer."""
 from dataclasses import dataclass
+from functools import cache
 
 from script import COMPANION_CODE, ORDINARY_CODE, locking_script
 from shared.pushtx import N, R
@@ -8,7 +9,7 @@ from shared.transaction import (
     CHRONICLE, FORKID, SIGHASH_ALL, SIGHASH_SINGLE, SIGHASH_TYPES,
     Input, Transaction, amount, hash256, preimage_forkid, preimage_otda,
 )
-from wots import verify_digest
+from wots import KEY_BYTES, verify_digest
 
 DEFAULT_SIGHASH = FORKID | SIGHASH_ALL
 
@@ -50,6 +51,17 @@ def current_input_unlock(auth, public_key, signature):
     return push(auth.preimage) + push(signature) + number(int(auth.companion))
 
 
+@cache
+def _layout_sizes():
+    return {(transaction, profile): len(locking_script(bytes(KEY_BYTES), transaction=transaction,
+                                                      cached_constants=profile))
+            for transaction in (True, False) for profile in (False, True, 'steps')}
+
+
+def _layouts_for_sizes(sizes):
+    return (layout for layout, size in _layout_sizes().items() if size in sizes)
+
+
 def sign_spend(tx, index, funding_raw, public_key, signer, *, sighash=DEFAULT_SIGHASH):
     """Check the input, call signer(digest32) once, and install its witness.
 
@@ -69,13 +81,14 @@ def sign_spend(tx, index, funding_raw, public_key, signer, *, sighash=DEFAULT_SI
         raise ValueError('payment requires outputs')
     tx.serialize()
     previous = funding.outputs[current.vout]
-    canonical = locking_script(public_key)
-    cached = locking_script(public_key, cached_constants=True)
-    if previous.script not in (canonical, cached):
+    if not any(previous.script == locking_script(public_key, cached_constants=profile)
+               for transaction, profile in _layouts_for_sizes({len(previous.script)}) if transaction):
         raise ValueError('funding output does not match public key and canonical template')
-    own_scripts = (canonical, cached, locking_script(public_key, transaction=False),
-                   locking_script(public_key, transaction=False, cached_constants=True))
-    if any(output.script in own_scripts for output in tx.outputs):
+    # Filter expensive generation by the known layout lengths for each profile.
+    sizes = {len(output.script) for output in tx.outputs}
+    own_scripts = (locking_script(public_key, transaction=transaction, cached_constants=profile)
+                   for transaction, profile in _layouts_for_sizes(sizes))
+    if any(output.script == script for script in own_scripts for output in tx.outputs):
         raise ValueError('change must use a fresh WOTS+ key')
     auth = authorization(tx, index, previous.value, sighash)
     signature = signer(_checked_digest(auth))

@@ -36,13 +36,21 @@ test("reject altered code, framing, malformed public keys and owner width", () =
   assert.throws(() => lockForKey(base, offCurve));
 });
 
-test("ordinary payment reproduces the native-verified signed transaction", async () => {
+for (const [templateName, vectorName] of [
+  ["template.hex", "spend-all.json"],
+  ["candidates/compiled.hex", "candidates/spend-all.json"],
+]) test(`ordinary payment from ${templateName} reproduces the signed transaction`, async () => {
   const { signPayment } = await import("./payment.ts");
-  const v = JSON.parse(fixture("spend-all.json"));
+  const v = JSON.parse(fixture(vectorName));
+  const template = Buffer.from(fixture(templateName).replace(/\s/g, ""), "hex");
   const q = Buffer.from(v.public_key_x963, "hex");
   const p = { txid: Buffer.from(v.parent_txid, "hex"), vout: 0,
-    inputSatoshis: 1000n, inputScript: lockForKey(base, q),
+    inputSatoshis: 1000n, inputScript: lockForKey(template, q),
     outputs: [{satoshis: 900n, script: Buffer.from([0x51])}], fee: 100n };
+  assert.deepEqual(recognize(p.inputScript), Buffer.from(v.owner_hash160, "hex"));
+  const changed = Buffer.from(p.inputScript);
+  changed[228] ^= 1;
+  assert.equal(recognize(changed), null);
   const signed = await signPayment(p, q, digest => {
     assert.equal(digest.toString("hex"), v.digest_hex);
     return Buffer.from(v.signature_hex, "hex");

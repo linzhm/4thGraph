@@ -7,12 +7,14 @@ import unittest
 
 from tx_engine import Script, Tx, TxIn, TxOut
 
-from fixed_templates import TEMPLATE_DIRECTORY, compiled_template
+from fixed_templates import TEMPLATE_DIRECTORY, compiled_template, otda_reconstruction
 from generate_templates import build_artifacts
 from p2pkh_r1 import locking_script_from_owner_hash, recognize
 from shared.evaluate import evaluate
 from shared.transaction import Transaction, preimage_otda
-from test_payment import check, fixture_signature, parent, signer
+from test_payment import check, child, fixture_signature, parent, signer
+from signature import UNIVERSAL_FLAGS, authorization, current_input_unlock
+from specialize import specialized_lock
 from wallet import sign_spend
 
 
@@ -96,6 +98,57 @@ class FixedTemplateTests(unittest.TestCase):
                 for i in range(len(prev)):
                     check(signed, prev, i, valid=False)
 
+    def test_shared_kernel_program_preserves_signature_and_exact_preimage(self):
+        keys, locks, funding = self.funding()
+        inputs = [TxIn(parent.id(), 0, Script()) for parent in funding[:2]]
+        template = compiled_template()
+        _, program = otda_reconstruction(shared_kernels=True)
+        _, original = otda_reconstruction()
+        self.assertEqual(len(program), 3921)
+        self.assertEqual(evaluate(program), (
+            [template.script[:template.owner_start], template.script[template.owner_end:]], [],
+        ))
+        for flag, outputs in ((0x61, [locks[3], locks[4]]), (0xe1, [P2PKH, locks[4]])):
+            with self.subTest(flag=hex(flag)):
+                tx = Tx(2, inputs, [TxOut(750, lock) for lock in outputs], 0)
+                legacy = self.sign(tx, funding[:2], keys[:2], flag, compress=True)
+                compact = self.sign(tx, funding[:2], keys[:2], flag, compress="shared-kernels")
+                self.check_chronicle(compact, funding[:2])
+                self.assertEqual(len(legacy.serialize()) - len(compact.serialize()),
+                                 len(inputs) * (len(original) - len(program)))
+                for old, new in zip(legacy.tx_ins, compact.tx_ins, strict=True):
+                    self.assertEqual(evaluate(old.script_sig.raw_serialize()),
+                                     evaluate(new.script_sig.raw_serialize()))
+
+    def test_mode_specific_size_experiments_preserve_their_declared_modes(self):
+        key, public, owner = signer(3)
+        # The existing check verifies the selected input. A trivial sponsor
+        # keeps the complete chain-gang transaction independent of this lock.
+        sponsor = parent(Script.parse_string("OP_1"), 100, "22")
+        for family in ("forkid", "otda"):
+            raw = specialized_lock(owner, family)
+            self.assertLess(len(raw), len(compiled_template().script))
+            funding = parent(script(raw), 1000, "33")
+            previous = [sponsor, funding]
+            for paired in (False, True):
+                flags = UNIVERSAL_FLAGS if paired else (0x43, 0xc3, 0x63, 0xe3)
+                for flag in flags:
+                    with self.subTest(family=family, paired=paired, sighash=hex(flag)):
+                        outputs = [300, 700] if paired else [1000]
+                        unsigned = child(previous, outputs)
+                        auth = authorization(unsigned, 1, 1000, flag)
+                        witness = current_input_unlock(auth, public, fixture_signature(key, auth.digest()))
+                        signed = child(previous, outputs, {1: witness})
+                        expected = bool(flag & 0x20) == (family == "otda")
+                        check(signed, previous, 1, valid=expected)
+                        check(signed, previous, 1, valid=expected and family == "forkid",
+                              chronicle=False, funding_height=1)
+                        if expected:
+                            signed.validate(previous)
+                        else:
+                            with self.assertRaises((ValueError, RuntimeError)):
+                                signed.validate(previous)
+
     def test_original_unlock_fallback(self):
         keys, locks, funding = self.funding()
         for flag, version, outputs in (
@@ -110,9 +163,10 @@ class FixedTemplateTests(unittest.TestCase):
                 unsigned = Tx(version, [TxIn(p.id(), 0, Script()) for p in prev],
                               [TxOut(900, x) for x in outputs], 0)
                 literal = self.sign(unsigned, prev, keys[:2], flag, compress=False)
-                optional = self.sign(unsigned, prev, keys[:2], flag, compress=True)
-                self.assertEqual(optional.serialize(), literal.serialize())
-                self.check_chronicle(optional, prev, push_only=version == 1)
+                for profile in (True, "shared-kernels"):
+                    optional = self.sign(unsigned, prev, keys[:2], flag, compress=profile)
+                    self.assertEqual(optional.serialize(), literal.serialize())
+                    self.check_chronicle(optional, prev, push_only=version == 1)
 
     @staticmethod
     def funding():

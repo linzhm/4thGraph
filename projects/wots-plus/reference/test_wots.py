@@ -135,9 +135,16 @@ class WotsTests(unittest.TestCase):
             (0, [Output(9_900, locking_script(key, transaction=False))]),
             (0, [Output(9_900, locking_script(key, cached_constants=True))]),
             (0, [Output(9_900, locking_script(key, transaction=False, cached_constants=True))]),
+            (0, [Output(9_900, locking_script(key, cached_constants="steps"))]),
+            (0, [Output(9_900, locking_script(key, transaction=False, cached_constants="steps"))]),
         ):
-            with self.assertRaises(ValueError):
-                sign_payment(parent.serialize(), vout, outputs, 100, key, wrong_signature)
+            with self.subTest(vout=vout, output_bytes=len(outputs[0].script)):
+                with self.assertRaises(ValueError):
+                    sign_payment(parent.serialize(), vout, outputs, 100, key, wrong_signature)
+        committed_steps = funding_transaction(key, cached_constants="steps")
+        with self.assertRaisesRegex(ValueError, "fresh WOTS\\+ key"):
+            sign_payment(committed_steps.serialize(), 0, [Output(9_900, locking_script(key))],
+                         100, key, wrong_signature)
         self.assertEqual(calls, [])
         with self.assertRaises(ValueError):
             sign_payment(parent.serialize(), 0, [Output(9_900, b"\x51")], 100, key, wrong_signature)

@@ -67,6 +67,22 @@ path adds a WOTS+ two-input, two-output payment in between.
 Exit costs the same in both formats because the exit outputs are ordinary
 P2PKH and the WOTS+ signature and witness format are identical.
 
+### Step table candidate
+
+`locking_script(key, cached_constants="steps")` builds a 33,956-byte lock.
+It adds fifteen four-byte step indices to the existing stack cache. The
+steps feed exactly the same addresses into SHA-256. The ordinary signature
+and 2,310-byte ForkID witness keep their existing encodings. The two-in,
+two-out ForkID ALL example saves 4,654 bytes compared with the
+36,283-byte cache. Chronicle OTDA ALL saves 13,962 bytes.
+
+The development evaluator measured a main stack peak of 28 items, up from
+13 with the previous cache, with 67 altstack items in both. The same 1,230
+payment cases and 67 signature-chain mutations run against both engines.
+Use a fresh key across all formats.
+The [benchmark guide](../../shared/benchmark.md) describes the optional
+durable signer wrapper used for the synthetic keys.
+
 ### Lean conformance
 
 Build the [bsv-script-lean evaluator](https://github.com/Calhooon/bsv-script-lean#try-it)

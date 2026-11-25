@@ -129,3 +129,8 @@ Use each project's reference guide for node setup and validation scope. GitHub A
 ## Repository layout
 
 Each project lives under `projects/<name>/` with its own specifications, reference implementation and vectors. P2PKH-R1 also provides TypeScript, Rust and Go SDKs. Script encoding, transaction serialization and the node launcher are in [`shared/`](shared/README.md).
+
+## Cross-project benchmark
+
+Compare signed transaction sizes, marginal input and output costs, and full
+payment lifecycles across all seven projects. [Run the benchmark](shared/benchmark.md)

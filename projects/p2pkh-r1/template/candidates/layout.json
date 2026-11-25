@@ -30,7 +30,12 @@
     ],
     "program_file": "otda-all-reconstruct.hex",
     "program_bytes": 5825,
-    "program_sha256": "0f029119b1d5da18fc3b9a5237c000d3b0512729594a7b5e54bf165b736dacd9"
+    "program_sha256": "0f029119b1d5da18fc3b9a5237c000d3b0512729594a7b5e54bf165b736dacd9",
+    "shared_kernels": {
+      "program_file": "otda-all-shared-kernels.hex",
+      "program_bytes": 3921,
+      "program_sha256": "4fa3317bbb5e5c0ec1cdbc74aa42269b9693f155e8a9a18c004183d4593397f8"
+    }
   },
   "owner_vectors": [
     {

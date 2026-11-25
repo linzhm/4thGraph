@@ -5,15 +5,15 @@ use ripemd::Ripemd160;
 use sha2::{Digest, Sha256};
 use std::sync::OnceLock;
 
-const SIZE: usize = 59_582;
 const START: usize = 208;
 const END: usize = 228;
-const FINGERPRINT: &str = "2129d374594069d08a9b2127555f48ea21c75fb06d1ad5e77c68ad251e97f784";
 
 pub fn recognize(script: &[u8]) -> Option<[u8; 20]> {
-    if script.len() != SIZE {
-        return None;
-    }
+    let fingerprint = match script.len() {
+        59_582 => "2129d374594069d08a9b2127555f48ea21c75fb06d1ad5e77c68ad251e97f784",
+        47_510 => "2c514b452c30fe908bfb59a5b630ec4402c5f356717c1235ffa75c0c1df8e208",
+        _ => return None,
+    };
     static HEADER: OnceLock<Regex> = OnceLock::new();
     let pattern = HEADER.get_or_init(|| {
         Regex::new(r"^760052a569766b7c8201[0-9a-f]{396}([0-9a-f]{40})$").unwrap()
@@ -23,7 +23,7 @@ pub fn recognize(script: &[u8]) -> Option<[u8; 20]> {
     let mut hash = Sha256::new();
     hash.update(&script[..START]);
     hash.update(&script[END..]);
-    if hex::encode(hash.finalize()) != FINGERPRINT {
+    if hex::encode(hash.finalize()) != fingerprint {
         return None;
     }
     let mut owner = [0u8; 20];

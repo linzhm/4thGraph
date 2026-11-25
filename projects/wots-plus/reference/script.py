@@ -43,7 +43,10 @@ def _chain(index, *, cached_constants):
     # eight bytes of ADRS encode the step and keyAndMask in big-endian order.
     for step in range(W - 1):
         code += asm('OP_DUP') + number(step) + asm('OP_GREATERTHAN OP_NOTIF OP_SWAP')
-        code += asm('OP_2 OP_PICK') + push(step.to_bytes(4, 'big')) + asm('OP_CAT OP_DUP')
+        # There are eleven live items above the step table at this access.
+        step_bytes = (number(11 + W - 2 - step) + asm('OP_PICK') if cached_constants == 'steps'
+                      else push(step.to_bytes(4, 'big')))
+        code += asm('OP_2 OP_PICK') + step_bytes + asm('OP_CAT OP_DUP')
         code += mask_zero + asm('OP_CAT OP_SHA256 OP_SWAP')
         code += mask_one + asm('OP_CAT OP_SHA256 OP_ROT OP_XOR OP_CAT')
         code += function_prefix + asm('OP_SWAP OP_CAT OP_SHA256 OP_SWAP OP_ENDIF')
@@ -58,9 +61,15 @@ def verifier(key, *, cached_constants=False):
         raise ValueError('WOTS+ public key must be 64 bytes')
     public_seed, commitment = key[:N], key[N:]
     prf_prefix = (3).to_bytes(N, 'big') + public_seed + bytes(20)
+    if type(cached_constants) is not bool and cached_constants != 'steps':
+        raise ValueError('unknown WOTS+ constant cache profile')
     if cached_constants:
-        code = bytearray(push(bytes(N)) + push(bytes(4)) + push(b'\0\0\0\1'))
-        code += push(prf_prefix) + asm('OP_5 OP_ROLL OP_5 OP_ROLL')
+        code = bytearray()
+        if cached_constants == 'steps':
+            code += b''.join(push(step.to_bytes(4, 'big')) for step in range(W - 1))
+        code += push(bytes(N)) + push(bytes(4)) + push(b'\0\0\0\1')
+        depth = 5 + (W - 1 if cached_constants == 'steps' else 0)
+        code += push(prf_prefix) + (number(depth) + asm('OP_ROLL')) * 2
     else:
         code = bytearray(push(prf_prefix) + asm('OP_ROT OP_ROT'))
     code += _message_digits() + asm('OP_SWAP OP_0 OP_SWAP')
@@ -75,6 +84,8 @@ def verifier(key, *, cached_constants=False):
     code += asm('OP_EQUALVERIFY OP_2DROP')
     if cached_constants:
         code += asm('OP_2DROP OP_DROP')
+        if cached_constants == 'steps':
+            code += asm('OP_2DROP') * ((W - 1) // 2) + asm('OP_DROP')
     return bytes(code)
 
 

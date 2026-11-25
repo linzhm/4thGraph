@@ -47,8 +47,8 @@ def authorization(tx, index, amount, requested_type):
     return SpendAuthorization(requested_type, pre, companion)
 
 
-def _compressed_otda_preimage(tx, preimage):
-    version, program = otda_reconstruction()
+def _compressed_otda_preimage(tx, preimage, *, shared_kernels):
+    version, program = otda_reconstruction(shared_kernels=shared_kernels)
     if tx.version != version:
         return None
     template = compiled_template()
@@ -86,7 +86,7 @@ def _compressed_otda_preimage(tx, preimage):
     return out
 
 
-def current_input_unlock(auth, pubkey, signature, *, compress_otda_for=None):
+def current_input_unlock(auth, pubkey, signature, *, compress_otda_for=None, shared_kernels=False):
     """Serialize the four stack values and the derived companion selector."""
     if len(pubkey) != 65 or pubkey[0] != 4 or len(signature) != 64:
         raise ValueError("expected X9.63 public key and raw R1 signature")
@@ -97,7 +97,9 @@ def current_input_unlock(auth, pubkey, signature, *, compress_otda_for=None):
     out = Script()
     out.append_pushdata(auth.preimage)
     if compress_otda_for is not None and auth.requested_type in COMPRESSIBLE_OTDA_TYPES:
-        compressed = _compressed_otda_preimage(compress_otda_for, auth.preimage)
+        compressed = _compressed_otda_preimage(
+            compress_otda_for, auth.preimage, shared_kernels=shared_kernels,
+        )
         if compressed is not None and len(compressed.raw_serialize()) < len(out.raw_serialize()):
             out = compressed
     for data in (pubkey, signature):

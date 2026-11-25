@@ -61,7 +61,8 @@ def compiled_owner(raw):
 
 
 @cache
-def otda_reconstruction():
+def otda_reconstruction(*, shared_kernels=False):
     layout = _layout()["compressed_preimage"]
-    program = _load_bytes(layout["program_file"], layout["program_bytes"], layout["program_sha256"])
+    artifact = layout["shared_kernels"] if shared_kernels else layout
+    program = _load_bytes(artifact["program_file"], artifact["program_bytes"], artifact["program_sha256"])
     return layout["spend_transaction_version"], program

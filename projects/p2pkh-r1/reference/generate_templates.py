@@ -7,6 +7,7 @@ from tx_engine import Script
 
 from assemble import assemble
 from fixed_templates import TEMPLATE_DIRECTORY
+from reconstruct import shared_kernel_program
 from signature import COMPRESSIBLE_OTDA_TYPES, ORDINARY_CODE, UNIVERSAL_FLAGS
 
 
@@ -37,6 +38,7 @@ def build_artifacts():
     zero_owner = bytes(20)
     raw = prefix + zero_owner + suffix
     program = reconstruction(prefix, suffix)
+    compact = shared_kernel_program(prefix, suffix)
     layout = {
         "script_file": "compiled.hex",
         "script_bytes": len(raw),
@@ -51,6 +53,11 @@ def build_artifacts():
             "program_file": "otda-all-reconstruct.hex",
             "program_bytes": len(program),
             "program_sha256": sha256(program).hexdigest(),
+            "shared_kernels": {
+                "program_file": "otda-all-shared-kernels.hex",
+                "program_bytes": len(compact),
+                "program_sha256": sha256(compact).hexdigest(),
+            },
         },
         "owner_vectors": [
             {"owner_hash160": owner.hex(), "script_sha256": sha256(prefix + owner + suffix).hexdigest()}
@@ -60,6 +67,7 @@ def build_artifacts():
     return {
         layout["script_file"]: raw.hex() + "\n",
         layout["compressed_preimage"]["program_file"]: program.hex() + "\n",
+        layout["compressed_preimage"]["shared_kernels"]["program_file"]: compact.hex() + "\n",
         "layout.json": json.dumps(layout, indent=2) + "\n",
     }
 

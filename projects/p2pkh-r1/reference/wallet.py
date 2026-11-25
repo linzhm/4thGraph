@@ -26,7 +26,9 @@ def sign_spend(tx, index, parent, requested_type, pubkey, sign_digest, history_p
 
     Use one persistent history per wallet across restarts and signing processes.
     The callback must keep its output private until this function returns.
-    Set compress_otda only when Chronicle functional unlocking is available.
+    Set compress_otda to True or "shared-kernels" only when Chronicle
+    functional unlocking is available. The string selects the smaller
+    experimental prebuilt reconstruction program.
     """
     if not 0 <= index < len(tx.tx_ins):
         raise ValueError("input index out of range")
@@ -37,6 +39,8 @@ def sign_spend(tx, index, parent, requested_type, pubkey, sign_digest, history_p
     owner = recognize(output.script_pubkey.raw_serialize())
     if owner is None or requested_type not in UNIVERSAL_FLAGS:
         raise ValueError("unrecognized template or sighash type")
+    if type(compress_otda) is not bool and compress_otda != "shared-kernels":
+        raise ValueError("unknown OTDA compression profile")
     if len(pubkey) != 65 or pubkey[0] != 4:
         raise ValueError("expected uncompressed X9.63 P-256 key")
     key = ec.EllipticCurvePublicKey.from_encoded_point(ec.SECP256R1(), pubkey)
@@ -70,7 +74,10 @@ def sign_spend(tx, index, parent, requested_type, pubkey, sign_digest, history_p
                 db.execute("INSERT INTO seen_r VALUES (?,?,?)", (pubkey, signature[:32], digest))
         if conflict:
             raise SigningKeyBlocked("same P-256 r observed on different digests; signature withheld")
-    return current_input_unlock(auth, pubkey, signature, compress_otda_for=tx if compress_otda else None)
+    return current_input_unlock(
+        auth, pubkey, signature, compress_otda_for=tx if compress_otda else None,
+        shared_kernels=compress_otda == "shared-kernels",
+    )
 
 
 def sign_payment(parent, vout, outputs, fee_sats, pubkey, sign_digest, history_path):

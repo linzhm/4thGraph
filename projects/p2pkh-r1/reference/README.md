@@ -102,3 +102,33 @@ encodings. Other sighash types and version 1 use literal preimages.
 The test runner verifies complete payments with BSV Node 1.2.3 and
 chain-gang. Candidate support across the other SDKs and miner relay policy
 require separate validation.
+
+### Shared-kernel reconstruction candidate
+
+Use `compress_otda="shared-kernels"` to select the prebuilt 3,921-byte
+reconstruction program. It caches point addition and doubling byte sequences
+on the stack before assembling the fixed output script. The resulting preimage
+and raw P-256 signature are identical to those from the 5,825-byte reconstruction.
+The transaction still uses the 47,510-byte full-mode output template.
+
+| Chronicle OTDA ALL with 2 R1 inputs and 2 R1 outputs | Previous | Shared kernels |
+| --- | ---: | ---: |
+| Unlock per input | 6,176 B | 4,272 B |
+| Full transaction | 107,490 B | 103,682 B |
+| Extra R1 input | 6,342 B | 4,438 B |
+| Extra R1 output | 47,601 B | 47,601 B |
+
+The reference checks byte-for-byte stack equality, two independent engines
+and the version 1 and other-mode fallbacks. The TypeScript, Rust and Go SDKs
+recognize the compiled lock and replay its deterministic ForkID ALL vector
+with the existing signer callback. The Python reference provides the complete
+sighash and reconstruction experiments.
+
+### Signature-mode sizing experiment
+
+The compiled universal lock measures 47,510 bytes. With the same curve
+arithmetic, the ForkID-only experiment measures 47,262 bytes and the
+OTDA-only experiment 47,480 bytes. The savings are 248 and 30 bytes per
+output, respectively. The fixture checks each family's allowed modes
+and the other family's rejection, including unpaired SINGLE. These figures
+support keeping the full-mode template for the SDK candidate.

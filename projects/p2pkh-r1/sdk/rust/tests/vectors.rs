@@ -34,16 +34,27 @@ fn public_vectors() {
 
 #[test]
 fn ordinary_payment() {
+    assert_payment(include_str!("../../../template/template.hex"),
+                   include_str!("../../../template/spend-all.json"));
+    assert_payment(include_str!("../../../template/candidates/compiled.hex"),
+                   include_str!("../../../template/candidates/spend-all.json"));
+}
+
+fn assert_payment(template: &str, vector: &str) {
     use p2pkh_r1::payment::{sign_payment, Output, Payment};
-    let v: Value = serde_json::from_str(include_str!("../../../template/spend-all.json")).unwrap();
+    let v: Value = serde_json::from_str(vector).unwrap();
     let dec = |name: &str| hex::decode(v[name].as_str().unwrap()).unwrap();
-    let base = hex::decode(include_str!("../../../template/template.hex").split_whitespace().collect::<String>()).unwrap();
+    let base = hex::decode(template.split_whitespace().collect::<String>()).unwrap();
     let key = dec("public_key_x963");
     let mut payment = Payment {
         txid: dec("parent_txid").try_into().unwrap(), vout: 0, input_satoshis: 1000,
         input_script: lock_for_key(&base, &key).unwrap(),
         outputs: vec![Output { satoshis: 900, script: vec![0x51] }], fee: 100,
     };
+    assert_eq!(recognize(&payment.input_script), Some(dec("owner_hash160").try_into().unwrap()));
+    let mut changed = payment.input_script.clone();
+    changed[228] ^= 1;
+    assert_eq!(recognize(&changed), None);
     let tx = sign_payment(&payment, &key, |digest| {
         assert_eq!(digest.as_slice(), dec("digest_hex"));
         Ok(dec("signature_hex").try_into().unwrap())

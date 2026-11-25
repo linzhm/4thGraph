@@ -10,7 +10,7 @@ from .script import OPS, decode_num, encode_num
 class ScriptError(ValueError): pass
 
 
-def evaluate(raw, stack=None, checksig=None):
+def evaluate(raw, stack=None, checksig=None, *, observe_stack=None):
     stack=list(stack or []); alt=[]; cond=[]; i=0
     names={v:k[3:] for k,v in OPS.items()}
     def pop():
@@ -21,6 +21,7 @@ def evaluate(raw, stack=None, checksig=None):
     def truth(b): return decode_num(b)!=0
     try:
         while i<len(raw):
+            if observe_stack is not None: observe_stack(stack, alt)
             at=i; op=raw[i]; i+=1; data=None
             if op<=78:
                 n=op
@@ -98,7 +99,7 @@ def evaluate(raw, stack=None, checksig=None):
             elif name in ('SHA256','HASH256','HASH160'):
                 v=sha256(pop()).digest()
                 stack.append(sha256(v).digest() if name=='HASH256' else new('ripemd160',v).digest() if name=='HASH160' else v)
-            elif name=='CODESEPARATOR': pass
+            elif name in ('CODESEPARATOR', 'NOP'): pass
             elif name in ('CHECKSIG','CHECKSIGVERIFY'):
                 key=pop(); sig=pop()
                 if checksig is None: raise ScriptError('native checksig callback required')
@@ -107,6 +108,7 @@ def evaluate(raw, stack=None, checksig=None):
                     if not ok: raise ScriptError('CHECKSIGVERIFY')
                 else: put(int(ok))
             else: raise ScriptError('unsupported opcode '+str(name))
+        if observe_stack is not None: observe_stack(stack, alt)
         if cond: raise ScriptError('unterminated conditional')
         return stack,alt
     except (IndexError,ZeroDivisionError,ValueError) as e:

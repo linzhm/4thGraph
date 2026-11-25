@@ -72,6 +72,9 @@ class AcceptanceTests(unittest.TestCase):
     def test_cached_constants_complete_payment_domain(self):
         self.check_payment_domain(cached_constants=True)
 
+    def test_cached_steps_complete_payment_domain(self):
+        self.check_payment_domain(cached_constants="steps")
+
     def check_payment_domain(self, *, cached_constants):
         expected = base_verdicts()
         self.assertEqual(len(expected), 123)
@@ -121,7 +124,7 @@ class AcceptanceTests(unittest.TestCase):
         print(f"{engines}: {len(visited)} WOTS+ rows, {len(accepted)} accepted, cached={cached_constants}")
 
     def test_every_signature_chain_in_a_complete_input(self):
-        for cached_constants in (False, True):
+        for cached_constants in (False, True, "steps"):
             with self.subTest(cached_constants=cached_constants):
                 self.check_signature_chains(cached_constants=cached_constants)
 
