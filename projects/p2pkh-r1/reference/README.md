@@ -134,3 +134,33 @@ OTDA-only experiment 47,480 bytes. The savings are 248 and 30 bytes per
 output, respectively. The fixture checks each family's allowed modes
 and the other family's rejection, including unpaired SINGLE. These figures
 support keeping the full-mode template for the SDK candidate.
+
+### Scheduled full-mode candidate
+
+Pass `--scheduled-curve` to `generate_lock.py` or use
+`compiled_curve="scheduled"` with the Python lock constructors.
+The [scheduled layout](../template/candidates/scheduled-layout.json) fixes
+the 46,302-byte template and its 3,913-byte reconstruction program.
+The owner HASH160 occupies the same 20-byte field. The Python, TypeScript,
+Rust and Go SDKs recognize the prebuilt template. The three non-Python
+SDKs replay its [ForkID ALL payment vector](../template/candidates/scheduled-spend-all.json)
+with their ordinary signer callbacks.
+
+In the Python reference wallet, `sign_spend(..., compress_otda="paired")`
+enables reconstruction with version 2 Chronicle OTDA ALL and with paired
+OTDA SINGLE (`0x63` and `0xe3`). SINGLE reconstructs the same-index output
+and preserves the preceding null outputs in the preimage. Version 1,
+unpaired SINGLE, and unrecognized outputs use their existing encodings.
+The wallet passes the original digest to the signer and includes the returned
+signature bytes in the witness. For a mix of recognized templates it chooses
+the smallest encoding and copies the other outputs literally.
+
+| 2 R1 inputs and 2 R1 outputs | Transaction | Extra R1 input | Extra R1 output |
+| --- | ---: | ---: | ---: |
+| OTDA ALL | 101,250 B | 4,430 B | 46,393 B |
+| OTDA SINGLE | 101,179 B | 455 B | 46,313 B |
+
+The extra SINGLE input in the comparison has no same-index output. The
+acceptance tests verify individual output binding, full replays with both
+engines, byte-for-byte witness stack equivalence, and the existing 1,296-case
+authorization matrix for the scheduled lock.

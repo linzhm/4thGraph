@@ -96,6 +96,14 @@ def locking_script(key, *, transaction=True, cached_constants=False):
         shape += number(N) + asm('OP_NUMEQUALVERIFY OP_DROP OP_SIZE')
         shape += number(SIGNATURE_BYTES) + asm('OP_NUMEQUALVERIFY OP_SWAP')
         return shape + verifier(key, cached_constants=cached_constants) + asm('OP_1')
+    if cached_constants == 'steps':
+        from fixed_template import lock_for_key
+
+        return lock_for_key(key)
+    return _payment_script(key, cached_constants=cached_constants)
+
+
+def _payment_script(key, *, cached_constants):
     shape = authorization_checks(ORDINARY_CODE, COMPANION_CODE)
     shape += asm('OP_SIZE') + number(SIGNATURE_BYTES) + asm('OP_NUMEQUALVERIFY')
     shape += asm('OP_SWAP OP_HASH256 OP_DUP OP_TOALTSTACK')

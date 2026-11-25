@@ -38,6 +38,8 @@ fn ordinary_payment() {
                    include_str!("../../../template/spend-all.json"));
     assert_payment(include_str!("../../../template/candidates/compiled.hex"),
                    include_str!("../../../template/candidates/spend-all.json"));
+    assert_payment(include_str!("../../../template/candidates/scheduled.hex"),
+                   include_str!("../../../template/candidates/scheduled-spend-all.json"));
 }
 
 fn assert_payment(template: &str, vector: &str) {

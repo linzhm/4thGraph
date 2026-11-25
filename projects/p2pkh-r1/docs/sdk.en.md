@@ -40,3 +40,20 @@ Start with the signature supplied in [spend-all.json](../template/spend-all.json
 ```
 
 The three test suites check the A/B/C constructor vectors, curve-point validation, fixed-byte changes, truncation, appended bytes, ordinary signed payments, incorrect signatures and fee mismatches. These tests require no device, node or signing secret. Installing dependencies initially requires network access. See the [reference guide](../reference/README.md) for node-level verification.
+
+## Scheduled candidate
+
+The Python constructor accepts `compiled_curve="scheduled"` for the
+46,302-byte full-mode lock. The CLI option is `--scheduled-curve`.
+The wallet fills the 20-byte owner HASH160 in a fixed template.
+TypeScript, Rust and Go recognize the template and use their existing
+signer callbacks for ordinary ForkID ALL payments.
+[Template layout](../template/candidates/scheduled-layout.json)
+· [Payment vector](../template/candidates/scheduled-spend-all.json)
+
+In the Python reference, `sign_spend(..., compress_otda="paired")` enables
+output reconstruction in version 2 Chronicle OTDA transactions using ALL
+or paired SINGLE. SINGLE reconstructs its same-index output and retains
+the null placeholders that precede it in the preimage. Version 1, unpaired
+SINGLE, and unknown output formats use their existing encodings. The
+signer receives the original digest, and its signature goes into the witness.

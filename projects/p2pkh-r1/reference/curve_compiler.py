@@ -168,12 +168,24 @@ def _kernel(inputs, assignments, *, signed_residues):
     return stack.code
 
 
+# Dependency order selected by the arithmetic and full-input benchmark.
+_ADD_ORDER = ('yy', 'zz', 'azz', 'xx', 't', 'yz', 'xy', 'xz', 'h', 'plus', 'minus', 'k', 'X', 'Y', 'Z')
+_DOUBLE_ORDER = ('s', 'Z', 'r', 'b', 'w', 'h', 'Y', 'X')
+
+
+def _ordered(assignments, order):
+    expressions = dict(assignments)
+    return tuple((name, expressions[name]) for name in order)
+
+
 @cache
-def curve_blocks(*, signed_residues=True):
+def curve_blocks(*, signed_residues=True, scheduled=False):
+    addition = _ordered(ADD, _ADD_ORDER) if scheduled else ADD
+    doubling = _ordered(DOUBLE, _DOUBLE_ORDER) if scheduled else DOUBLE
     code = {
-        'ADD_POINTS': _kernel(ADD_INPUTS, ADD, signed_residues=signed_residues),
+        'ADD_POINTS': _kernel(ADD_INPUTS, addition, signed_residues=signed_residues),
         'DOUBLE_POINT': (_emit('OP_DUP OP_0NOTEQUAL OP_IF')
-                         + _kernel(DOUBLE_INPUTS, DOUBLE, signed_residues=signed_residues)
+                         + _kernel(DOUBLE_INPUTS, doubling, signed_residues=signed_residues)
                          + _emit('OP_ENDIF')),
     }
     if signed_residues:

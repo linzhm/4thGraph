@@ -40,3 +40,17 @@
 ```
 
 三个包的测试覆盖 A/B/C 模板向量、公开点验证、固定字节变动、截断、追加以及普通付款签名回放、错误签名和错误手续费。测试不需要设备、网络节点或私钥。初次安装工具或依赖需要网络。完整节点差异测试见 [reference](../reference/README.md)。
+
+## 调度优化候选
+
+Python 可通过 `compiled_curve="scheduled"` 构造 46,302 字节的全模式锁，
+命令行选项为 `--scheduled-curve`。钱包只填充固定模板中的 20 字节
+收款公钥哈希。TypeScript、Rust 和 Go 可以识别该模板，并用原有签名器回调
+生成普通 ForkID ALL 付款。[模板布局](../template/candidates/scheduled-layout.json)
+· [付款向量](../template/candidates/scheduled-spend-all.json)
+
+Python 的 `sign_spend(..., compress_otda="paired")` 在支持 Chronicle
+功能解锁的版本 2 交易中重建 OTDA ALL 输出和有配对输出的 OTDA SINGLE。
+`SINGLE` 重建同索引输出，并保留预映像中此前的空输出占位。
+交易版本 1、无配对 `SINGLE` 和未知输出格式走原有编码。签名器收到原预映像的
+摘要，返回的签名直接写入解锁脚本。

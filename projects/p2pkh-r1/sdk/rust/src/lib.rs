@@ -12,6 +12,7 @@ pub fn recognize(script: &[u8]) -> Option<[u8; 20]> {
     let fingerprint = match script.len() {
         59_582 => "2129d374594069d08a9b2127555f48ea21c75fb06d1ad5e77c68ad251e97f784",
         47_510 => "2c514b452c30fe908bfb59a5b630ec4402c5f356717c1235ffa75c0c1df8e208",
+        46_302 => "52a1d9eb9e236403c66e845e18cf31d9c3a5f4c2e0ed7ca0270a60ba4e867ca6",
         _ => return None,
     };
     static HEADER: OnceLock<Regex> = OnceLock::new();

@@ -39,6 +39,7 @@ test("reject altered code, framing, malformed public keys and owner width", () =
 for (const [templateName, vectorName] of [
   ["template.hex", "spend-all.json"],
   ["candidates/compiled.hex", "candidates/spend-all.json"],
+  ["candidates/scheduled.hex", "candidates/scheduled-spend-all.json"],
 ]) test(`ordinary payment from ${templateName} reproduces the signed transaction`, async () => {
   const { signPayment } = await import("./payment.ts");
   const v = JSON.parse(fixture(vectorName));

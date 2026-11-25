@@ -35,6 +35,9 @@ TEMPLATES = {
     "compiled-shared-kernels": Template(
         lambda label, value: r1_coin(label, value, compiled=True, compress="shared-kernels"),
     ),
+    "scheduled-paired": Template(
+        lambda label, value: r1_coin(label, value, compiled="scheduled", compress="paired"),
+    ),
 }
 
 

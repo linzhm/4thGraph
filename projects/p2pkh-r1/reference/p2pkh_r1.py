@@ -41,7 +41,7 @@ def locking_script_from_owner_hash(owner_hash160: bytes, *, compiled_curve=False
     if not isinstance(owner_hash160, bytes) or len(owner_hash160) != 20:
         raise ValueError("expected a 20-byte owner hash")
     if compiled_curve:
-        return compiled_template().lock(owner_hash160)
+        return compiled_template(scheduled=compiled_curve == "scheduled").lock(owner_hash160)
     raw = _base_program()
     return raw[:OWNER_START] + owner_hash160 + raw[OWNER_END:]
 

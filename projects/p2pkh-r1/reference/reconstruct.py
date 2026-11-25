@@ -5,9 +5,9 @@ from assemble import assemble
 from shared.script import number, push
 
 
-def shared_kernel_program(prefix, suffix):
+def shared_kernel_program(prefix, suffix, *, injected=None):
     def block(name):
-        return assemble(bytes(20), compiled_curve=True, entry=name)
+        return assemble(bytes(20), compiled_curve=True, entry=name, injected=injected)
 
     kernels = (block("DOUBLE_POINT"), block("ADD_POINTS"))
     fragments = re.compile(b"|".join(re.escape(kernel) for kernel in reversed(kernels)))

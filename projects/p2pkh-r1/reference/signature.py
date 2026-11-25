@@ -4,7 +4,9 @@ from hashlib import sha256
 
 from tx_engine import Script, sig_hash_preimage
 
-from fixed_templates import compiled_template, otda_reconstruction
+from fixed_templates import otda_pattern
+from shared.script import push
+from shared.transaction import Output
 
 GROUP_ORDER_R1 = 0xffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc632551
 UNIVERSAL_FLAGS = frozenset({base | mode for base in (0x41, 0x42, 0x43)
@@ -14,6 +16,7 @@ UNIVERSAL_FLAGS = frozenset({base | mode for base in (0x41, 0x42, 0x43)
 ORDINARY_CODE = bytes.fromhex("68ac")
 COMPANION_CODE = bytes.fromhex("63ad67ab68ac")
 COMPRESSIBLE_OTDA_TYPES = (0x61, 0xe1)
+PAIRED_OTDA_SINGLE_TYPES = (0x63, 0xe3)
 
 
 @dataclass(frozen=True)
@@ -47,46 +50,23 @@ def authorization(tx, index, amount, requested_type):
     return SpendAuthorization(requested_type, pre, companion)
 
 
-def _compressed_otda_preimage(tx, preimage, *, shared_kernels):
-    version, program = otda_reconstruction(shared_kernels=shared_kernels)
-    if tx.version != version:
+def _compressed_otda_preimage(tx, preimage, *, selected_index, shared_kernels):
+    if tx.version != 2:
         return None
-    template = compiled_template()
-    outputs = []
-    has_template_output = False
-    for output in tx.tx_outs:
-        script = output.script_pubkey
-        owner = template.owner(script.raw_serialize())
-        has_template_output |= owner is not None
-        raw = output.amount.to_bytes(8, "little", signed=True) + script.serialize()
-        outputs.append((raw, owner))
-    if not has_template_output:
-        return None
-
-    # The last eight bytes are locktime and sighash type. Verify the
-    # serialized output block before replacing it with reconstruction code.
-    serialized = b"".join(raw for raw, _ in outputs)
-    if not preimage.endswith(serialized, 0, len(preimage) - 8):
-        raise ValueError("OTDA outputs differ from the signing preimage")
-    out = Script()
-    out.append_data(program)
-    out.append_pushdata(preimage[:-len(serialized) - 8])
-    # main: fixed prefix, fixed suffix, reconstructed preimage so far.
-    for raw, owner in outputs:
-        if owner is None:
-            out.append_pushdata(raw)
-            out.append_data(b"\x7e")  # OP_CAT
-        else:
-            out.append_pushdata(raw[:-len(template.script)])
-            out.append_data(bytes.fromhex("7e52797e"))  # OP_CAT OP_2 OP_PICK OP_CAT
-            out.append_pushdata(owner)
-            out.append_data(bytes.fromhex("7e787e"))  # OP_CAT OP_OVER OP_CAT
-    out.append_pushdata(preimage[-8:])
-    out.append_data(bytes.fromhex("7e7b757c75"))  # OP_CAT OP_ROT OP_DROP OP_SWAP OP_DROP
-    return out
+    engine_outputs = tx.tx_outs if selected_index is None else (tx.tx_outs[selected_index],)
+    outputs = tuple(Output(item.amount, item.script_pubkey.raw_serialize()) for item in engine_outputs)
+    best = None
+    for scheduled in (False, True):
+        version, pattern = otda_pattern(shared_kernels=shared_kernels, scheduled=scheduled)
+        if tx.version == version:
+            program = pattern.build(preimage, outputs)
+            if program is not None and (best is None or len(program) < len(best)):
+                best = program
+    return best
 
 
-def current_input_unlock(auth, pubkey, signature, *, compress_otda_for=None, shared_kernels=False):
+def current_input_unlock(auth, pubkey, signature, *, compress_otda_for=None, shared_kernels=False,
+                         paired_single_index=None):
     """Serialize the four stack values and the derived companion selector."""
     if len(pubkey) != 65 or pubkey[0] != 4 or len(signature) != 64:
         raise ValueError("expected X9.63 public key and raw R1 signature")
@@ -94,14 +74,20 @@ def current_input_unlock(auth, pubkey, signature, *, compress_otda_for=None, sha
     if not 0 < s < GROUP_ORDER_R1:
         raise ValueError("invalid P-256 signature scalar")
     inverse = pow(s, -1, GROUP_ORDER_R1).to_bytes(32, "little")
+    raw = push(auth.preimage)
+    if compress_otda_for is not None and not auth.companion:
+        selected = auth.requested_type in PAIRED_OTDA_SINGLE_TYPES and paired_single_index is not None
+        if selected and not 0 <= paired_single_index < len(compress_otda_for.tx_outs):
+            raise ValueError("paired OTDA SINGLE requires an output at the input index")
+        if auth.requested_type in COMPRESSIBLE_OTDA_TYPES or selected:
+            program = _compressed_otda_preimage(
+                compress_otda_for, auth.preimage,
+                selected_index=paired_single_index if selected else None, shared_kernels=shared_kernels,
+            )
+            if program is not None and len(program) < len(raw):
+                raw = program
     out = Script()
-    out.append_pushdata(auth.preimage)
-    if compress_otda_for is not None and auth.requested_type in COMPRESSIBLE_OTDA_TYPES:
-        compressed = _compressed_otda_preimage(
-            compress_otda_for, auth.preimage, shared_kernels=shared_kernels,
-        )
-        if compressed is not None and len(compressed.raw_serialize()) < len(out.raw_serialize()):
-            out = compressed
+    out.append_data(raw)
     for data in (pubkey, signature):
         out.append_pushdata(data)
     out.append_pushdata(inverse)

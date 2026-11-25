@@ -13,6 +13,9 @@ import (
 func TestSignPayment(t *testing.T) {
 	t.Run("canonical", func(t *testing.T) { assertPayment(t, "template.hex", "spend-all.json") })
 	t.Run("compiled", func(t *testing.T) { assertPayment(t, "candidates/compiled.hex", "candidates/spend-all.json") })
+	t.Run("scheduled", func(t *testing.T) {
+		assertPayment(t, "candidates/scheduled.hex", "candidates/scheduled-spend-all.json")
+	})
 }
 
 func assertPayment(t *testing.T, templateName, vectorName string) {

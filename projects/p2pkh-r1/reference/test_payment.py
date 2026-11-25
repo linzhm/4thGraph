@@ -161,7 +161,11 @@ class CurrentInputTests(unittest.TestCase):
                         check(child(different, amounts, {1: witness}), different, 1, False)
 
     def test_signing_vector(self):
-        for compiled, file in ((False, "spend-all.json"), (True, "candidates/spend-all.json")):
+        for compiled, file in (
+            (False, "spend-all.json"),
+            (True, "candidates/spend-all.json"),
+            ("scheduled", "candidates/scheduled-spend-all.json"),
+        ):
             with self.subTest(compiled=compiled):
                 funding, signed, vector = signing_vector(compiled_curve=compiled)
                 check(signed, [funding], 0)
