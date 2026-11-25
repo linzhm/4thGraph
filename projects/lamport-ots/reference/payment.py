@@ -67,13 +67,15 @@ def current_input_unlock(auth, public_key, signature, *, committed=False):
     return witness + number(int(auth.companion))
 
 
-def sign_spend(tx, index, funding_raw, public_key, signer, *, sighash=DEFAULT_SIGHASH):
+def sign_spend(tx, index, funding_raw, public_key, signer, *, sighash=DEFAULT_SIGHASH,
+               allow_unpaired_single=False):
     """Authorize a prepared input. signer(digest32) returns a packed 8192-byte signature.
 
     The caller authenticates the funding outpoint and verifies the required
     confirmation depth before approving the transaction and requested mode.
     The external signer persists one-time key consumption before disclosure.
-    The callback is invoked once after preflight.
+    The callback is invoked once after preflight. An unpaired SINGLE input
+    commits to no outputs and requires allow_unpaired_single=True.
     """
     if not 0 <= index < len(tx.inputs):
         raise ValueError('input index out of range')
@@ -96,6 +98,9 @@ def sign_spend(tx, index, funding_raw, public_key, signer, *, sighash=DEFAULT_SI
     if any(output.script in own_scripts for output in tx.outputs):
         raise ValueError('change must use a fresh Lamport key')
     auth = authorization(tx, index, previous.value, sighash, legacy=previous.script == legacy)
+    if (auth.requested_type & 31 == SIGHASH_SINGLE and index >= len(tx.outputs)
+            and allow_unpaired_single is not True):
+        raise ValueError('unpaired SINGLE commits to no outputs; explicit opt-in required')
     signature = signer(_checked_digest(auth))
     witness = current_input_unlock(auth, public_key, signature, committed=previous.script == committed)
     return tx.with_script(index, witness)

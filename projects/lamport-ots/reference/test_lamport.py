@@ -114,6 +114,27 @@ class LamportTests(unittest.TestCase):
             sign_spend(tx,0,parent.serialize(),key,bad_callback)
         self.assertEqual(len(calls),2)
 
+    def test_unpaired_single_requires_opt_in_before_signing(self):
+        for flag in (0x43, 0x63, 0xc3, 0xe3):
+            with self.subTest(sighash=hex(flag)):
+                secret = test_secret(b'unpaired-single-consent/' + bytes([flag]))
+                key = public_key(secret)
+                parent = Transaction((Input(b'\x11' * 32, 0),), (Output(1000, locking_script(key)),))
+                tx = Transaction((Input(b'\x22' * 32, 0), Input(parent.txid_wire(), 0)), (Output(900, b'\x51'),))
+                calls = []
+
+                def sign(digest):
+                    calls.append(digest)
+                    return sign_digest(secret, digest)
+
+                with self.assertRaisesRegex(ValueError, 'explicit opt-in'):
+                    sign_spend(tx, 1, parent.serialize(), key, sign, sighash=flag)
+                self.assertEqual(calls, [])
+
+                signed = sign_spend(tx, 1, parent.serialize(), key, sign, sighash=flag, allow_unpaired_single=True)
+                self.assertEqual(calls, [authorization(tx, 1, 1000, flag).digest()])
+                self.assertTrue(development_valid(signed, parent, 1))
+
     def test_binding_der_edges(self):
         # Exercise small/large/minimal DER s and modulo n boundaries without trying
         # to find transaction preimages with those astronomically rare digests.

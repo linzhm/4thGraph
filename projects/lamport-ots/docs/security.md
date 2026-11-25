@@ -61,6 +61,11 @@ hashOutputs. The final native check enforces that binding, including the
 current outpoint and amount. Distinct scriptCode separates the ordinary
 and companion modes even where their BIP143 type bytes coincide.
 
+The prepared-input wallet API rejects unpaired SINGLE before calling the
+external signer unless the caller passes `allow_unpaired_single=True`.
+An unpaired ForkID or Chronicle SINGLE input commits to no outputs.
+Review that scope before approving the one-time signature.
+
 ## Unconfirmed parent txids
 
 The txid of a BSV funding transaction includes the serialized unlocking scripts
