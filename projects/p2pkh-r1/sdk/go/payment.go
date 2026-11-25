@@ -28,6 +28,8 @@ type Output struct {
 	Script   []byte
 }
 
+const maxAmount int64 = 2_100_000_000_000_000
+
 func hash256(b []byte) [32]byte {
 	first := sha256.Sum256(b)
 	return sha256.Sum256(first[:])
@@ -53,6 +55,9 @@ func SignPayment(p Payment, publicKey []byte, signDigest func([32]byte) ([]byte,
 	x, y := elliptic.Unmarshal(curve, q)
 	if x == nil {
 		return nil, errors.New("expected uncompressed P-256 public key")
+	}
+	if p.InputSatoshis > maxAmount {
+		return nil, errors.New("invalid input amount")
 	}
 	owner, ok := Recognize(p.InputScript)
 	keyHash := sha256.Sum256(q)

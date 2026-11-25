@@ -69,4 +69,10 @@ fn assert_payment(template: &str, vector: &str) {
     assert!(sign_payment(&payment, &key, |_| Ok([0; 64])).is_err());
     payment.fee -= 1;
     assert!(sign_payment(&payment, &key, |_| panic!("unexpected signer")).is_err());
+    payment.input_satoshis = 2_100_000_000_000_000;
+    payment.outputs[0].satoshis = payment.input_satoshis - payment.fee;
+    assert_eq!(sign_payment(&payment, &key, |_| Err("reached signer".into())).unwrap_err(), "reached signer");
+    payment.input_satoshis += 1;
+    payment.fee += 1;
+    assert!(sign_payment(&payment, &key, |_| panic!("unexpected signer")).is_err());
 }

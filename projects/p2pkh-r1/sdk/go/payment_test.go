@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"os"
 	"slices"
 	"strings"
@@ -82,5 +83,16 @@ func assertPayment(t *testing.T, templateName, vectorName string) {
 	p.Fee--
 	if _, err = SignPayment(p, q, func([32]byte) ([]byte, error) { t.Fatal("unexpected signer"); return nil, nil }); err == nil {
 		t.Fatal("accepted wrong fee")
+	}
+	p.InputSatoshis = 2_100_000_000_000_000
+	p.Outputs[0].Satoshis = p.InputSatoshis - p.Fee
+	reachedSigner := errors.New("reached signer")
+	if _, err = SignPayment(p, q, func([32]byte) ([]byte, error) { return nil, reachedSigner }); !errors.Is(err, reachedSigner) {
+		t.Fatalf("maximum amount failed preflight: %v", err)
+	}
+	p.InputSatoshis++
+	p.Fee++
+	if _, err = SignPayment(p, q, func([32]byte) ([]byte, error) { t.Fatal("unexpected signer"); return nil, nil }); err == nil {
+		t.Fatal("accepted amount above maximum")
 	}
 }
