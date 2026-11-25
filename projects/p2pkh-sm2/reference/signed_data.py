@@ -21,7 +21,8 @@ from certificate_path import _load_certificate, verify_revocation_paths
 from sm2 import N, USER_ID, be32, message_digest, parse_public, sm3, verify, verify_digest
 
 
-_DATA = bytes.fromhex('2a811ccf550601040201')
+DATA_CONTENT_TYPE = '1.2.156.10197.6.1.4.2.1'
+_DATA = ObjectIdentifier(DATA_CONTENT_TYPE).contents
 _SIGNED_DATA = bytes.fromhex('2a811ccf550601040202')
 _SM3 = bytes.fromhex('2a811ccf55018311')
 _SM3_UNKEYED = bytes.fromhex('2a811ccf5501831101')
@@ -40,6 +41,7 @@ _CURVE_SM2 = bytes.fromhex('2a811ccf5501822d')
 _SM2_X509_SIGNATURE_OIDS = frozenset(ObjectIdentifier(contents=oid).dotted
                                       for oid in (_SM2_SIGNATURE, _SM2_WITH_SM3))
 _MESSAGE_DIGEST = ObjectIdentifier('1.2.840.113549.1.9.4').contents  # PKCS #9 messageDigest
+_CONTENT_TYPE = ObjectIdentifier('1.2.840.113549.1.9.3').contents  # PKCS #9 contentType
 _DIRECTORY_STRING_TAGS = frozenset((0x0c, 0x13, 0x14, 0x1c, 0x1e))
 # Naming attribute types and character bounds from RFC 5280 Appendix A.1.
 _DIRECTORY_NAME_TYPES = {
@@ -204,15 +206,17 @@ class AmbiguousCertificateIssuer(ValueError):
 
 def _algorithm(fields, allowed_parameters):
     algorithm = _DER(fields.take(0x30))
-    parameters = allowed_parameters.get(algorithm.take(0x06))
+    oid = algorithm.take(0x06)
+    parameters = allowed_parameters.get(oid)
     if parameters is None:
         raise ValueError('unexpected SignedData algorithm')
     if algorithm.data[algorithm.position:] not in parameters:
         raise ValueError('unsupported SignedData algorithm parameters encoding')
+    return oid
 
 
 def _digest_algorithm(fields):
-    _algorithm(fields, _DIGEST_ALGORITHM_PARAMETERS)
+    return _algorithm(fields, _DIGEST_ALGORITHM_PARAMETERS)
 
 
 def _minimal_integer(value):
@@ -385,11 +389,24 @@ def _message_digest_octets(encoded):
     return digest
 
 
+def _content_type_value(encoded):
+    value = _DER(encoded)
+    oid = value.take(0x06)
+    value.done()
+    _check_oid(oid, 'contentType OID')
+    return oid
+
+
 def _check_attribute_schema(oid, values, schemas):
     if oid == _MESSAGE_DIGEST:
         if len(values) != 1:
             raise ValueError('messageDigest must have one OCTET STRING value')
         _message_digest_octets(values[0])
+        return
+    if oid == _CONTENT_TYPE:
+        if len(values) != 1:
+            raise ValueError('contentType must have one OBJECT IDENTIFIER value')
+        _content_type_value(values[0])
         return
 
     identifier = ObjectIdentifier(contents=oid).dotted
@@ -1482,15 +1499,26 @@ def _direct_signature(envelope, message, signer_identifier):
     return _signer_signature(signer)
 
 
-def _check_signed_attributes(encoded, attribute_schemas):
+def _check_signed_attributes(encoded, attribute_schemas, content_type, *, require_signed_content_type):
     members = _DER(encoded).take(0xa0)
     digests = []
+    content_types = []
     for member in _set_members(members, 0x30, limit=_MAX_ATTRIBUTES):
         oid, values = _attribute(member, attribute_schemas)
         if oid == _MESSAGE_DIGEST:
             digests.append(values)
+        elif oid == _CONTENT_TYPE:
+            if len(values) != 1:
+                raise ValueError('contentType must have one OBJECT IDENTIFIER value')
+            content_types.append(_content_type_value(values[0]))
     if len(digests) != 1 or len(digests[0]) != 1:
         raise ValueError('signedAttrs requires exactly one messageDigest with one value')
+    if require_signed_content_type and not content_types:
+        raise ValueError('SignedData signer requires a signed contentType')
+    if len(content_types) > 1:
+        raise ValueError('signedAttrs has duplicate contentType attributes')
+    if content_types and content_types[0] != content_type:
+        raise ValueError('signed contentType differs from eContentType')
     return _message_digest_octets(digests[0][0])
 
 
@@ -1498,19 +1526,22 @@ def _general_fields(envelope, *, require_signer=False, x509_profile=False, exten
     if not isinstance(envelope, bytes):
         raise ValueError('expected a DER SignedData envelope')
     fields = _signed_data(envelope)
-    algorithms = fields.take(0x31)
-    for algorithm in _set_members(algorithms, 0x30):
-        _digest_algorithm(_DER(algorithm))
-    _, content = _content(fields)
+    algorithms = set()
+    for algorithm in _set_members(fields.take(0x31), 0x30):
+        oid = _digest_algorithm(_DER(algorithm))
+        if oid in algorithms:
+            raise ValueError('duplicate digestAlgorithms OID')
+        algorithms.add(oid)
+    content_type, content = _content(fields)
     signers = _signer_infos(fields, x509_profile=x509_profile, extension_schemas=extension_schemas)
     if require_signer and not signers:
         raise ValueError('SignedData requires at least one signer')
     if signers and not algorithms:
         raise ValueError('expected SM3 in digestAlgorithms')
-    return content, signers
+    return content_type, content, algorithms, signers
 
 
-def _decode_signers(signers, attribute_schemas):
+def _decode_signers(signers, attribute_schemas, content_type, algorithms, *, require_signed_content_type=False):
     previous = None
     for encoded in _set_members(signers, 0x30):
         if encoded == previous:
@@ -1519,12 +1550,17 @@ def _decode_signers(signers, attribute_schemas):
         signer = _DER(_DER(encoded).take(0x30))
         identifier = _signer_identifier(signer)
         _check_issuer_and_serial_number(identifier)
-        _digest_algorithm(signer)
+        if _digest_algorithm(signer) not in algorithms:
+            raise ValueError('SignerInfo digestAlgorithm is missing from digestAlgorithms')
         attributes = None
         attribute_digest = None
         if signer.next_is(0xa0):
             attributes = signer.take_encoded(0xa0)
-            attribute_digest = _check_signed_attributes(attributes, attribute_schemas)
+            attribute_digest = _check_signed_attributes(
+                attributes, attribute_schemas, content_type, require_signed_content_type=require_signed_content_type,
+            )
+        elif require_signed_content_type:
+            raise ValueError('SignedData signer requires a signed contentType')
         yield identifier, attributes, attribute_digest, _signer_signature(signer, attribute_schemas)
 
 
@@ -1536,14 +1572,16 @@ def validate_signed_data_format(envelope, *, require_signer=False, attribute_sch
     Pass extension_schemas to check declared extension types by dotted OID
     and to report a missing schema for any unrecognized extension value.
     """
-    _, signers = _general_fields(envelope, require_signer=require_signer, x509_profile=True,
-                                  extension_schemas=extension_schemas)
-    for _ in _decode_signers(signers, attribute_schemas):
+    content_type, _, algorithms, signers = _general_fields(
+        envelope, require_signer=require_signer, x509_profile=True, extension_schemas=extension_schemas,
+    )
+    for _ in _decode_signers(signers, attribute_schemas, content_type, algorithms):
         pass
 
 
 def verify_signed_data(envelope, trusted_signers, *, detached_content=None, attribute_schemas=None,
-                       signed_attrs_encoding='context-field'):
+                       signed_attrs_encoding='context-field', expected_content_type=DATA_CONTENT_TYPE,
+                       require_signed_content_type=False):
     """Verify one or more v2 signers and return the signed content octets.
 
     trusted_signers maps DER IssuerAndSerialNumber to (SM2 public key, user ID).
@@ -1551,7 +1589,10 @@ def verify_signed_data(envelope, trusted_signers, *, detached_content=None, attr
     decisions belong to the caller. Raises ValueError on a rejected envelope.
     Supply attribute_schemas as a mapping from dotted attribute OIDs to
     asn1crypto ASN.1 classes for schema-aware DER checks. Missing types in
-    this mode raise MissingAttributeSchema. messageDigest has a built-in type.
+    this mode raise MissingAttributeSchema. messageDigest and contentType
+    have built-in types. The expected eContentType defaults to the SM2 data
+    OID. Use a trusted application OID when verifying another content type.
+    Set require_signed_content_type to bind that OID in every signer's signature.
     Chapter 8 signs the DER encoding of the signedAttrs [0] field. Select
     cms-set explicitly to verify a CMS-style signature over the universal
     SET encoding. A verification call uses a single encoding.
@@ -1564,7 +1605,13 @@ def verify_signed_data(envelope, trusted_signers, *, detached_content=None, attr
     if signed_attrs_encoding not in ('cms-set', 'context-field'):
         raise ValueError('expected cms-set or context-field for signedAttrs encoding')
 
-    content, signers = _general_fields(envelope, require_signer=True)
+    if not isinstance(expected_content_type, str):
+        raise ValueError('expected_content_type must be a dotted OID')
+    expected_oid = ObjectIdentifier(expected_content_type).contents
+    _check_oid(expected_oid, 'expected content type OID')
+    content_type, content, algorithms, signers = _general_fields(envelope, require_signer=True)
+    if content_type != expected_oid:
+        raise ValueError('SignedData eContentType differs from expected content type')
     if content is None:
         if detached_content is None:
             raise ValueError('SignedData requires detached content')
@@ -1575,7 +1622,9 @@ def verify_signed_data(envelope, trusted_signers, *, detached_content=None, attr
     content_digest = None
     direct_digests = {}
     verified = set()
-    for identifier, attributes, attribute_digest, signature in _decode_signers(signers, attribute_schemas):
+    decoded = _decode_signers(signers, attribute_schemas, content_type, algorithms,
+                              require_signed_content_type=require_signed_content_type)
+    for identifier, attributes, attribute_digest, signature in decoded:
         if attribute_digest is not None:
             if content_digest is None:
                 content_digest = sm3(content)

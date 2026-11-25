@@ -146,12 +146,27 @@ direct signatures over the content octets and signatures over the DER
 sole `messageDigest` value matches SM3 of the content octets. The caller
 establishes signer trust and any certificate path or revocation policy.
 
+The general verifier expects the SM2 data content type by default. Supply
+`expected_content_type` as a trusted dotted OID for other application types.
+The expected type is a caller policy. A direct signature covers content
+octets. To authenticate the type with the signature, set
+`require_signed_content_type=True`. Each signer must then include one
+signed `contentType` attribute matching `eContentType`. The verifier also
+checks this match whenever the attribute is present.
+
 The envelope accepts SM3 OIDs `1.2.156.10197.1.401` and
 `1.2.156.10197.1.401.1` in digest fields, and SM2-1 OID
 `1.2.156.10197.1.301.1` in the signature algorithm field. Each accepts
 absent parameters or the exact DER NULL `05 00`. The required digest in
 `signedAttrs` uses PKCS #9 OID `1.2.840.113549.1.9.4` and carries one DER
 OCTET STRING of 32 bytes. [Profile evidence](signed-data-acceptance.md#signed-attributes-and-algorithm-parameters)
+
+The general verifier and format checker require each signer's digest OID
+in `digestAlgorithms` and reject duplicate OIDs in that collection. Absent
+parameters and DER NULL identify the same OID. Other DER SET OF collections
+retain their field-specific rules. For example, verification deduplicates
+identical signer records. The direct payment adapter retains its existing
+single-SM3-identifier compatibility.
 
 The general signature verifier uses the original DER `[0]` field bytes
 for GB/T 35275-2026 `signedAttrs`. Select `signed_attrs_encoding='cms-set'`

@@ -776,8 +776,10 @@ class SignedDataAcceptance(SignedDataFixtures):
                     envelope = signed_data(direct, attached=attached, content_oid=content_type,
                                            extra_signers=extra)
                     detached = message if attached is None else None
-                    self.assertEqual(verify_signed_data(envelope, self.trusted_signers,
-                                                        detached_content=detached), message)
+                    with self.assertRaisesRegex(ValueError, 'differs from expected content type'):
+                        verify_signed_data(envelope, self.trusted_signers, detached_content=detached)
+                    self.assertEqual(verify_signed_data(envelope, self.trusted_signers, detached_content=detached,
+                                                        expected_content_type='1.2.3.4'), message)
 
         digest = self.openssl('dgst', '-sm3', '-binary', data=message)
         attribute = der(0x30, MESSAGE_DIGEST_OID + der(0x31, der(0x04, digest)))
@@ -820,6 +822,35 @@ class SignedDataAcceptance(SignedDataFixtures):
             verify_signed_data(signed_data(direct, attached=message), self.trusted_signers,
                                detached_content=OTHER_MESSAGE)
         COMPLETED_WITNESSES.add('verify_all_signers')
+
+    def test_general_verifier_can_require_signed_content_type(self):
+        content_type = ObjectIdentifier('1.2.3.4').dump()
+        type_oid = ObjectIdentifier('1.2.840.113549.1.9.3').dump()
+        type_attribute = der(0x30, type_oid + der(0x31, content_type))
+        attrs = der(0xa0, b''.join(sorted((self.attribute, type_attribute))))
+        signature = self.external_signature(attrs)
+        envelope = signed_data(signature, attached=MESSAGE, signed_attrs=attrs, content_oid=content_type)
+        self.assertEqual(verify_signed_data(envelope, self.trusted_signers, expected_content_type='1.2.3.4',
+                                            require_signed_content_type=True, attribute_schemas={}), MESSAGE)
+        with self.assertRaisesRegex(ValueError, 'requires a signed contentType'):
+            direct = signed_data(self.signatures['direct'], attached=MESSAGE)
+            verify_signed_data(direct, self.trusted_signers, require_signed_content_type=True)
+        with self.assertRaisesRegex(ValueError, 'signed contentType differs from eContentType'):
+            verify_signed_data(signed_data(signature, attached=MESSAGE, signed_attrs=attrs), self.trusted_signers)
+
+        repeated = b''.join(sorted((self.attribute, type_attribute, type_attribute)))
+        with self.assertRaisesRegex(ValueError, 'duplicate contentType'):
+            validate_signed_data_format(signed_data(signature, attached=MESSAGE, signed_attrs=der(0xa0, repeated),
+                                                     content_oid=content_type))
+
+    def test_general_digest_set_rejects_duplicate_oids(self):
+        for forms in ((SM3, SM3), (SM3, bytes.fromhex('300a06082a811ccf55018311'))):
+            envelope = signed_data(self.signatures['direct'], attached=MESSAGE,
+                                   digest_algorithms=b''.join(sorted(forms)))
+            with self.assertRaisesRegex(ValueError, 'duplicate digestAlgorithms'):
+                validate_signed_data_format(envelope)
+            with self.assertRaisesRegex(ValueError, 'duplicate digestAlgorithms'):
+                verify_signed_data(envelope, self.trusted_signers)
 
     def test_repeated_signature_is_verified_once_per_authenticated_payload(self):
         message = b'Repeated SignerInfo entries committing to one payload.'
@@ -2988,17 +3019,25 @@ class SignedDataReview(SignedDataFixtures):
     def test_envelope_algorithm_parameter_interoperability_domain(self):
         digest_oids = (bytes.fromhex('06082a811ccf55018311'), bytes.fromhex('06092a811ccf5501831101'))
         signature_oid = bytes.fromhex('06092a811ccf5501822d01')
-        digest_identifiers = tuple(der(0x30, oid + params) for oid, params in product(digest_oids, (b'', NULL)))
+        digest_identifiers = tuple((oid, der(0x30, oid + params))
+                                   for oid, params in product(digest_oids, (b'', NULL)))
         signature_identifiers = tuple(der(0x30, signature_oid + params) for params in (b'', NULL))
         cases = tuple(product(digest_identifiers, digest_identifiers, signature_identifiers, (None, MESSAGE)))
         self.assertEqual(len(set(cases)), 64)
-        for outer, inner, signer_algorithm, attached in cases:
+        for (outer_oid, outer), (inner_oid, inner), signer_algorithm, attached in cases:
             with self.subTest(outer=outer.hex(), inner=inner.hex(), signature=signer_algorithm.hex(), attached=attached is not None):
                 envelope = signed_data(self.signatures['direct'], attached=attached, digest_algorithms=outer,
                                        signer_digest=inner, algorithm=signer_algorithm)
-                validate_signed_data_format(envelope, require_signer=True)
-                self.assertEqual(verify_signed_data(envelope, self.trusted_signers,
-                                                    detached_content=MESSAGE if attached is None else None), MESSAGE)
+                detached = MESSAGE if attached is None else None
+                if outer_oid == inner_oid:
+                    validate_signed_data_format(envelope, require_signer=True)
+                    self.assertEqual(verify_signed_data(envelope, self.trusted_signers, detached_content=detached),
+                                     MESSAGE)
+                else:
+                    with self.assertRaisesRegex(ValueError, 'missing from digestAlgorithms'):
+                        validate_signed_data_format(envelope, require_signer=True)
+                    with self.assertRaisesRegex(ValueError, 'missing from digestAlgorithms'):
+                        verify_signed_data(envelope, self.trusted_signers, detached_content=detached)
                 self.assertEqual(self.apply_adapter(envelope), self.raw_direct)
         fields = (('digest_algorithms', digest_oids), ('signer_digest', digest_oids), ('algorithm', (signature_oid,)))
         invalid_parameters = (der(0x05, b'\x01'), der(0x04, b''), der(0x02, b'\x01'),
