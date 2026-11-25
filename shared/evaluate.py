@@ -2,6 +2,9 @@
 
 Independent node/chain-gang conformance is required; this harness is for fast
 local generator tests and does not model policy, activation or resource limits.
+OP_CODESEPARATOR is a no-op here. CHECKSIG callbacks select their own
+scriptCode. Branching ignores the UTXO creation era, including the
+post-Genesis restriction on repeated OP_ELSE.
 """
 from hashlib import new, sha256
 from .script import OPS, decode_num, encode_num
@@ -13,6 +16,9 @@ class ScriptError(ValueError): pass
 def evaluate(raw, stack=None, checksig=None):
     stack=list(stack or []); alt=[]; cond=[]; i=0
     names={v:k[3:] for k,v in OPS.items()}
+    def require_stack(depth):
+        if len(stack) < depth:
+            raise ScriptError('stack underflow')
     def pop():
         if not stack: raise ScriptError('stack underflow')
         return stack.pop()
@@ -44,13 +50,23 @@ def evaluate(raw, stack=None, checksig=None):
             elif name=='DROP': pop()
             elif name=='2DROP': pop(); pop()
             elif name=='DUP': stack.append(stack[-1])
-            elif name=='2DUP': stack.extend(stack[-2:])
-            elif name=='3DUP': stack.extend(stack[-3:])
+            elif name=='2DUP':
+                require_stack(2)
+                stack.extend(stack[-2:])
+            elif name=='3DUP':
+                require_stack(3)
+                stack.extend(stack[-3:])
             elif name=='OVER': stack.append(stack[-2])
-            elif name=='2SWAP': stack[-4:]=stack[-2:]+stack[-4:-2]
-            elif name=='SWAP': stack[-2:]=stack[-2:][::-1]
+            elif name=='2SWAP':
+                require_stack(4)
+                stack[-4:] = stack[-2:] + stack[-4:-2]
+            elif name=='SWAP':
+                require_stack(2)
+                stack[-2:] = stack[-2:][::-1]
             elif name=='ROT': stack.append(stack.pop(-3))
-            elif name=='TUCK': stack.insert(len(stack)-2,stack[-1])
+            elif name=='TUCK':
+                require_stack(2)
+                stack.insert(len(stack) - 2, stack[-1])
             elif name=='NIP': stack.pop(-2)
             elif name in ('PICK','ROLL'):
                 n=num()
