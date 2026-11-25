@@ -28,7 +28,7 @@ def save(path, data):
 
 class ParentProver:
     def __init__(self, binary, params, manifest, out):
-        self.command = (str(binary.resolve()), "-mode", "session", "-profile", "parent-openings-2x2",
+        self.command = (str(binary.resolve()), "-mode", "session", "-profile", manifest["profile"],
                         "-dir", str(params.resolve()))
         self.manifest = manifest
         self.out = out
@@ -55,7 +55,7 @@ class ParentProver:
             self.process.wait()
         self.process.stdout.close()
 
-    def prove(self, label, funding, parents, policy):
+    def prove(self, label, funding, parents, policy, *, expect_rejection=False):
         statement = policy.statement(funding.txid_wire(), parents)
         native = bytearray()
         stark = bytearray(funding.txid_wire())
@@ -65,13 +65,19 @@ class ParentProver:
             native.extend(layout + raw)
             stark.extend(layout + vout.to_bytes(4, "little") + raw)
         path = (self.out / f"{label}-proof.json").resolve()
-        (self.out / f"{label}-stark-input.bin").write_bytes(stark)
+        if not policy.prove_provenance:
+            (self.out / f"{label}-stark-input.bin").write_bytes(stark)
         request = dict(id=label, statement=statement.hex(), parent=native.hex(), out=str(path))
         started = perf_counter()
         self.process.stdin.write(json.dumps(request) + "\n")
         self.process.stdin.flush()
         reply = json.loads(self.process.stdout.readline())
         elapsed = perf_counter() - started
+        if expect_rejection:
+            if (reply.get("id") != label or reply.get("ok") or path.exists()
+                    or "constraint" not in reply.get("error", "")):
+                raise ValueError(f"wanted a rejected provenance witness: {reply}")
+            return None, {"wall_seconds": elapsed, "rejection": reply["error"]}
         if reply.get("id") != label or not reply.get("ok"):
             raise ValueError(f"native opening failed: {reply}")
         data = json.loads(path.read_text())
@@ -186,12 +192,14 @@ def run(node, prover, manifest, key, stage):
     issuer_lock = push(issuer) + asm("OP_CHECKSIG")
     root = node.include("issuance-root", Transaction((Input(setup.txid_wire(), 0),),
                         (Output(1_000_000, issuer_lock),) * 3, version=1), (setup,))
-    policy = Policy(root.txid_wire(), key)
+    policy = Policy(root.txid_wire(), key, manifest["profile"] == "parent-provenance-2x2")
     funding = node.include("verifier-funding", Transaction((Input(setup.txid_wire(), 1),),
                            (Output(200_000, policy.lock),) * 2, version=1), (setup,))
     pins = {"issuance_root": root.txid(), "verifier_funding": funding.txid(),
             "verifier_lock_sha256": sha256(policy.lock).hexdigest(),
             "verifying_key_sha256": manifest["verifying_key_sha256"], "pin_height": rpc.call("getblockcount")}
+    if policy.prove_provenance:
+        pins["provenance_in_proof"] = True
     save(stage / "recipient-policy.json", pins)
 
     alice, sign_alice = test_signer(21)
@@ -217,11 +225,20 @@ def run(node, prover, manifest, key, stage):
     inflated = replace(first, outputs=(token_output(funding.txid_wire(), 276, bob), first.outputs[1]))
     rejected["inflated_signed_outputs"] = node.reject(_signed(inflated, policy, funding, alice_inputs, first_proof, sign_alice))
     fake_inputs = ((copy, 0), alice_inputs[1])
-    fake_proof, fake_record = prover.prove("valid-opening-for-unauthorized-source", funding, fake_inputs, policy)
-    fake_spend = _payment(funding, 0, fake_inputs, alice_payouts)
-    rejected["copied_token_with_valid_opening"] = {
-        **fake_record, "rejection": node.reject(_signed(fake_spend, policy, funding, fake_inputs, fake_proof, sign_alice)),
-    }
+    fake_label = "unauthorized-source" if policy.prove_provenance else "valid-opening-for-unauthorized-source"
+    fake_proof, fake_record = prover.prove(fake_label, funding, fake_inputs, policy,
+                                          expect_rejection=policy.prove_provenance)
+    if policy.prove_provenance:
+        rejected["copied_token_provenance_witness"] = fake_record
+        wrong_source = _payment(funding, 0, fake_inputs, alice_payouts)
+        rejected["copied_token_with_reused_proof"] = node.reject(
+            _signed(wrong_source, policy, funding, fake_inputs, first_proof, sign_alice))
+    else:
+        fake_spend = _payment(funding, 0, fake_inputs, alice_payouts)
+        rejected["copied_token_with_valid_opening"] = {
+            **fake_record, "rejection": node.reject(
+                _signed(fake_spend, policy, funding, fake_inputs, fake_proof, sign_alice)),
+        }
     first = node.include("alice-to-bob", _signed(first, policy, funding, alice_inputs, first_proof, sign_alice),
                          (funding, *(p for p, _ in alice_inputs)))
     first_from_chain, bob_receipt = wallet(first.txid(), bob, 275)
@@ -276,8 +293,9 @@ def main():
     parser.add_argument("--out", type=Path, required=True)
     args = parser.parse_args()
     manifest = json.loads((args.parameters / "manifest.json").read_text())
-    if manifest.get("profile") != "parent-openings-2x2" or manifest.get("test_only") is not True:
-        raise ValueError("expected test-only 2→2 parent opening parameters")
+    if (manifest.get("profile") not in ("parent-openings-2x2", "parent-provenance-2x2")
+            or manifest.get("test_only") is not True):
+        raise ValueError("expected test-only 2→2 parent opening or provenance parameters")
     key, _ = read_key(json.loads((args.parameters / "key.json").read_text()), "plain")
     args.out.mkdir()
     node = Regtest(args.node_url, args.cookie)

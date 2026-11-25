@@ -5,7 +5,6 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 	"encoding/hex"
-	"math/big"
 	"strings"
 	"testing"
 
@@ -70,10 +69,6 @@ func TestBacktraceProvenanceSeparatesOpeningAndSourceAuthorization(t *testing.T)
 	wire = append(wire, secondClaims[0]...)
 	raw := append(append([]byte{1}, first...), 0)
 	raw = append(raw, second...)
-	_, opening, err := BacktraceAssignment(wire, raw)
-	if err != nil {
-		t.Fatal(err)
-	}
 	field := ecc.BLS12_381.ScalarField()
 	ccs, err := frontend.Compile(field, r1cs.NewBuilder, &BacktraceProvenance{})
 	if err != nil {
@@ -87,15 +82,11 @@ func TestBacktraceProvenanceSeparatesOpeningAndSourceAuthorization(t *testing.T)
 		}
 		statement := append([]byte(BacktraceProvenanceDomain), issuer...)
 		statement = append(statement, wire[len(BacktraceDomain):]...)
-		digest := double(statement)
-		candidate := BacktraceProvenance{Openings: *opening}
-		candidate.Openings.Public = [2]frontend.Variable{
-			new(big.Int).SetBytes(digest[:16]), new(big.Int).SetBytes(digest[16:]),
+		parsed, candidate, err := BacktraceProvenanceAssignment(statement, raw)
+		if err != nil || parsed.Digest() != double(statement) {
+			t.Fatalf("provenance assignment differed from the wire statement: %v", err)
 		}
-		for i, value := range issuer {
-			candidate.Root[i] = value
-		}
-		witness, err := frontend.NewWitness(&candidate, field)
+		witness, err := frontend.NewWitness(candidate, field)
 		if err != nil {
 			t.Fatal(err)
 		}

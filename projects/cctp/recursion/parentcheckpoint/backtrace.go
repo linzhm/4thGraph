@@ -16,6 +16,7 @@ import (
 const BacktraceDomain = "BSV/CCTP/parent-openings/v1\x00"
 const BacktraceProvenanceDomain = "BSV/CCTP/parent-openings-and-provenance/v1\x00"
 const BacktraceStatementSize = len(BacktraceDomain) + 32 + 72 + 2*78
+const BacktraceProvenanceStatementSize = len(BacktraceProvenanceDomain) + 32 + 32 + 72 + 2*78
 const BacktraceParentBytes = 4075
 const BacktraceMintBytes = 903
 
@@ -35,6 +36,7 @@ var backtraceLayouts = []ParentOutputLayout{
 }
 
 type BacktraceStatement [BacktraceStatementSize]byte
+type BacktraceProvenanceStatement [BacktraceProvenanceStatementSize]byte
 
 func (s BacktraceStatement) Encode() []byte { return s[:] }
 
@@ -46,6 +48,39 @@ func (s BacktraceStatement) Digest() [32]byte {
 func (s BacktraceStatement) Limbs() [2]*big.Int {
 	digest := s.Digest()
 	return [2]*big.Int{new(big.Int).SetBytes(digest[:16]), new(big.Int).SetBytes(digest[16:])}
+}
+
+func (s BacktraceProvenanceStatement) Encode() []byte { return s[:] }
+
+func (s BacktraceProvenanceStatement) Digest() [32]byte {
+	hash := sha256.Sum256(s[:])
+	return sha256.Sum256(hash[:])
+}
+
+func (s BacktraceProvenanceStatement) Limbs() [2]*big.Int {
+	digest := s.Digest()
+	return [2]*big.Int{new(big.Int).SetBytes(digest[:16]), new(big.Int).SetBytes(digest[16:])}
+}
+
+func BacktraceProvenanceAssignment(wire, raw []byte) (BacktraceProvenanceStatement, *BacktraceProvenance, error) {
+	var statement BacktraceProvenanceStatement
+	if len(wire) != len(statement) || !bytes.HasPrefix(wire, []byte(BacktraceProvenanceDomain)) {
+		return statement, nil, fmt.Errorf("invalid backtrace provenance statement encoding")
+	}
+	copy(statement[:], wire)
+	root := wire[len(BacktraceProvenanceDomain):][:32]
+	baseWire := append([]byte(BacktraceDomain), wire[len(BacktraceProvenanceDomain)+32:]...)
+	_, opening, err := BacktraceAssignment(baseWire, raw)
+	if err != nil {
+		return statement, nil, err
+	}
+	limbs := statement.Limbs()
+	opening.Public = [2]frontend.Variable{limbs[0], limbs[1]}
+	circuit := &BacktraceProvenance{Openings: *opening}
+	for i, value := range root {
+		circuit.Root[i] = value
+	}
+	return statement, circuit, nil
 }
 
 type BacktraceOpenings struct {

@@ -13,6 +13,7 @@ from verifier import VerificationKey, locking_script, unlocking_fields
 
 
 DOMAIN = b"BSV/CCTP/parent-openings/v1\0"
+PROVENANCE_DOMAIN = b"BSV/CCTP/parent-openings-and-provenance/v1\0"
 ISSUANCE_AMOUNTS = (300, 200, 150)
 TOKEN_SATS = 1_000
 PROOF_FIELDS = 22
@@ -130,8 +131,11 @@ def _build_output():
     )
 
 
-def guard_script(root_txid):
+def guard_script(root_txid, *, prove_provenance=False):
     """Bind actual ordered slots, enforce backtrace and conservation, leave proof limbs."""
+    domain = PROVENANCE_DOMAIN + root_txid if prove_provenance else DOMAIN
+    quantity = (_slice(37, 8) + _positive_quantity() if prove_provenance
+                else _require_source(root_txid))
     return (
         _current_prevouts()
         # This executing verifier must be actual vin0. It exposes the funding txid
@@ -140,8 +144,8 @@ def guard_script(root_txid):
         + _slice(152, 32) + asm("OP_TOALTSTACK") + _slice(68, 32) + asm("OP_TOALTSTACK")
         # [successors, claims, prevouts] -> [proof digest, successors, claims].
         + _slice(36, 72) + asm("OP_OVER OP_CAT OP_FROMALTSTACK OP_DUP OP_TOALTSTACK OP_SWAP OP_CAT")
-        + push(DOMAIN) + asm("OP_SWAP OP_CAT OP_HASH256 OP_ROT OP_ROT")
-        + _split(78) + _require_source(root_txid) + asm("OP_SWAP") + _require_source(root_txid)
+        + push(domain) + asm("OP_SWAP OP_CAT OP_HASH256 OP_ROT OP_ROT")
+        + _split(78) + quantity + asm("OP_SWAP") + quantity
         + asm("OP_ADD OP_SWAP") + _split(41) + asm("OP_2DUP") + _slice(0, 8) + _positive_quantity()
         + asm("OP_SWAP") + _slice(0, 8) + _positive_quantity()
         + asm("OP_ADD OP_3 OP_ROLL OP_NUMEQUALVERIFY")
@@ -164,12 +168,14 @@ def _fixed_proof_script():
 class Policy:
     root_txid: bytes
     key: VerificationKey
+    prove_provenance: bool = False
 
     @cached_property
     def lock(self):
         verification = locking_script(self.key, None, projective_g1=True, projective_g2=True,
                                       reuse_constants=True)[0]
-        return guard_script(self.root_txid) + _fixed_proof_script() + verification + compact_verifier_binding()
+        return (guard_script(self.root_txid, prove_provenance=self.prove_provenance)
+                + _fixed_proof_script() + verification + compact_verifier_binding())
 
     def claim(self, parent, vout, funding_txid):
         mode = parent_layout(parent.serialize())
@@ -180,11 +186,12 @@ class Policy:
     def statement(self, funding_txid, parents):
         points = b"".join(parent.txid_wire() + vout.to_bytes(4, "little") for parent, vout in parents)
         claims = b"".join(self.claim(parent, vout, funding_txid) for parent, vout in parents)
-        return DOMAIN + funding_txid + points + claims
+        domain = PROVENANCE_DOMAIN + self.root_txid if self.prove_provenance else DOMAIN
+        return domain + funding_txid + points + claims
 
     def material(self, tx, funding, parents):
         statement = self.statement(funding.txid_wire(), parents)
-        if statement[len(DOMAIN) + 32:len(DOMAIN) + 104] != _prevouts(tx)[36:]:
+        if statement[-228:-156] != _prevouts(tx)[36:]:
             raise ValueError("opening outpoints differ from the actual token inputs")
         previous = funding.outputs[tx.inputs[0].vout]
         states = b"".join(_state_bytes(o, funding.txid_wire()) for o in tx.outputs)

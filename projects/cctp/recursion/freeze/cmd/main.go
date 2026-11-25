@@ -40,11 +40,13 @@ const (
 	parentCheckpointProfile     = "parent-checkpoint"
 	tokenCheckpointProfile      = "parent-checkpoint-token"
 	backtraceProfile            = "parent-openings-2x2"
+	backtraceProvenanceProfile  = "parent-provenance-2x2"
 	parameterFormat             = "CCTP freeze test parameters v1"
 	conservationParameterFormat = "CCTP conservation test parameters v1"
 	parentCheckpointFormat      = "CCTP parent checkpoint test parameters v1"
 	tokenCheckpointFormat       = "CCTP token parent checkpoint test parameters v1"
 	backtraceFormat             = "CCTP two parent openings test parameters v1"
+	backtraceProvenanceFormat   = "CCTP two parent provenance test parameters v1"
 	manifestName                = "manifest.json"
 	verifyingKeyName            = "verifying.key"
 	provingKeyName              = "proving.key"
@@ -96,6 +98,10 @@ func compileFreeze(profile string) (constraint.ConstraintSystem, manifest, error
 		circuit = &parentcheckpoint.BacktraceOpenings{}
 		m.Format, m.StatementBytes = backtraceFormat, parentcheckpoint.BacktraceStatementSize
 		privateBytes = 32 + 72 + 2 + 2*parentcheckpoint.BacktraceParentBytes
+	case backtraceProvenanceProfile:
+		circuit = &parentcheckpoint.BacktraceProvenance{}
+		m.Format, m.StatementBytes = backtraceProvenanceFormat, parentcheckpoint.BacktraceProvenanceStatementSize
+		privateBytes = 64 + 72 + 2 + 2*parentcheckpoint.BacktraceParentBytes
 	default:
 		return nil, m, fmt.Errorf("unknown circuit profile %q", profile)
 	}
@@ -182,7 +188,7 @@ func setup(directory, profile string) error {
 		profile = plainProfile
 	}
 	switch profile {
-	case originProfile, inventoryProfile, plainProfile, bsb22Profile, conservationProfile, parentCheckpointProfile, tokenCheckpointProfile, backtraceProfile:
+	case originProfile, inventoryProfile, plainProfile, bsb22Profile, conservationProfile, parentCheckpointProfile, tokenCheckpointProfile, backtraceProfile, backtraceProvenanceProfile:
 	default:
 		return fmt.Errorf("unknown circuit profile %q", profile)
 	}
@@ -246,6 +252,8 @@ func loadManifest(directory string) (manifest, error) {
 		expectedFormat, expectedBytes = tokenCheckpointFormat, parentcheckpoint.EncodedSize
 	case backtraceProfile:
 		expectedFormat, expectedBytes = backtraceFormat, parentcheckpoint.BacktraceStatementSize
+	case backtraceProvenanceProfile:
+		expectedFormat, expectedBytes = backtraceProvenanceFormat, parentcheckpoint.BacktraceProvenanceStatementSize
 	}
 	if m.Format != expectedFormat || !m.TestOnly || m.StatementBytes != expectedBytes {
 		return m, fmt.Errorf("expected completed test-only CCTP parameters")
@@ -282,7 +290,7 @@ func assignmentFor(profile, wire, parent string) (proofStatement, frontend.Circu
 	if profile == parentCheckpointProfile || profile == tokenCheckpointProfile {
 		return checkpointAssignment(profile, wire, parent)
 	}
-	if profile == backtraceProfile {
+	if profile == backtraceProfile || profile == backtraceProvenanceProfile {
 		statement, err := hex.DecodeString(wire)
 		if err != nil {
 			return nil, nil, err
@@ -290,6 +298,9 @@ func assignmentFor(profile, wire, parent string) (proofStatement, frontend.Circu
 		raw, err := hex.DecodeString(parent)
 		if err != nil {
 			return nil, nil, err
+		}
+		if profile == backtraceProvenanceProfile {
+			return parentcheckpoint.BacktraceProvenanceAssignment(statement, raw)
 		}
 		return parentcheckpoint.BacktraceAssignment(statement, raw)
 	}

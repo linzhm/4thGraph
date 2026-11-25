@@ -1,0 +1,237 @@
+{
+  "scope": "Bounded regtest proof-verifier funding with two one-time outputs and three exact anchor allowances.",
+  "startup_seconds": 216.0540388749214,
+  "parameters": {
+    "format": "CCTP two parent provenance test parameters v1",
+    "profile": "parent-provenance-2x2",
+    "test_only": true,
+    "constraints": 4845242,
+    "commitments": 0,
+    "statement_bytes": 335,
+    "circuit_sha256": "b85d4ec193531cb8f034e34eccb1a44ea7585784bd55a25c7d2ec6e25ac2ad04",
+    "verifying_key_sha256": "e0eaa50d2aaa24c8012c091bac26693c525cb1f900ab870177d90debbf118e9d",
+    "proving_key_sha256": "6131bbb1d2aebabcd56947a6c4bbeed3d2dd23e8a3ea6f40a97c7db6206129f4"
+  },
+  "payments": {
+    "alice-to-bob": {
+      "wall_seconds": 14.836049709003419,
+      "prove_seconds": 14.821823917,
+      "native_verify_seconds": 0.001236084,
+      "statement_digest": "8960b7218d94510db5af815cbbedafc926ca9fcb85348d832b9e1aaa0f7b2ff2",
+      "proof_artifact_sha256": "1fca97f95cd4b62547b180947e6a40c5e575e9298b80a336984c3dbffe08952c",
+      "txid": "3278a56fef5fc860a3f1cdf64f35ed3ec8f573e04b811d5071519aba82ef7b80",
+      "direct_token_parents": [
+        "26ee4e92fe42d0a582e45b633c1a58cb810612b1ee08cc452be8f71aef275cf8:0",
+        "be19f32b2ba5753aeb056d57bdf3eff4b3cd0922c139cd1426c7395adcc7a72b:0"
+      ],
+      "direct_parent_bytes_private": [
+        903,
+        903
+      ],
+      "parent_raw_bytes_in_scripts": 0,
+      "input_witness_bytes": [
+        1624,
+        376,
+        376
+      ],
+      "tx_bytes": 4075,
+      "proof_witness_bytes": 1078
+    },
+    "bob-to-carol": {
+      "wall_seconds": 17.38852983294055,
+      "prove_seconds": 17.362096125,
+      "native_verify_seconds": 0.001384916,
+      "statement_digest": "8d6429ba20654e4b9a96370ae99ae23a024920f192d0956e316cf8bbdfb51978",
+      "proof_artifact_sha256": "091d773bb7f7b73681a09588001c91361c57d197942cd5374231ba96f793a662",
+      "txid": "d4a87e3374f75ef72585315f1048e87c95aac80d5698509760716af1c1d4a2b7",
+      "direct_token_parents": [
+        "3278a56fef5fc860a3f1cdf64f35ed3ec8f573e04b811d5071519aba82ef7b80:0",
+        "0cb4dd3fc7b85e1d113fdf28af638fc55322c897624cf6dbc91899fead9a00e0:0"
+      ],
+      "direct_parent_bytes_private": [
+        4075,
+        903
+      ],
+      "parent_raw_bytes_in_scripts": 0,
+      "input_witness_bytes": [
+        1624,
+        376,
+        376
+      ],
+      "tx_bytes": 4075,
+      "proof_witness_bytes": 1078
+    }
+  },
+  "shared_verifier_funding_bytes": 904965,
+  "shared_verifier_lock_bytes": 452444,
+  "total_funding_and_both_payments_bytes": 913115,
+  "payment_byte_delta": 0,
+  "receipts": {
+    "bob": {
+      "txid": "3278a56fef5fc860a3f1cdf64f35ed3ec8f573e04b811d5071519aba82ef7b80",
+      "vout": 0,
+      "units": 275,
+      "owner": "03421f5fc9a21065445c96fdb91c0c1e2f2431741c72713b4b99ddcb316f31e9fc",
+      "confirmations": 1,
+      "blockhash": "3eaa61e96c1dfc7ba3100c7e6d05880bfe68f9a3f5127f8870544d159bc0b950",
+      "height": 110,
+      "merkle_index": 1,
+      "merkle_header_hex": "000000201c7af42b1efb060875f79302ba077d92e18fa23bc9b4f0fabdf23cc8e2d3f24f1adfaaf6229931951f677ee1b97f9c3f0b7a73ae8dfaff454613f5fc98ffd084dc6a066bffff7f2001000000",
+      "merkle_siblings_wire": [
+        "c90537f32041ef03b8428077c55260c7244b4761f3da9209a7703daccf9a38eb"
+      ]
+    },
+    "bob_old": {
+      "txid": "0cb4dd3fc7b85e1d113fdf28af638fc55322c897624cf6dbc91899fead9a00e0",
+      "vout": 0,
+      "units": 150,
+      "owner": "03421f5fc9a21065445c96fdb91c0c1e2f2431741c72713b4b99ddcb316f31e9fc",
+      "confirmations": 4,
+      "blockhash": "40805a85f921738c6c85dbba6f675e7979345bf4d5144cdecddcf9a940ce36d5",
+      "height": 107,
+      "merkle_index": 1,
+      "merkle_header_hex": "0000002028ee01c9f7d247d0e967584001bc0da02d15d6b157d2131b8976ef885fae90039ca404acfcdbc5f98a4c69426f7ccad077ce5cd9e32c3d381f0c095efe29ce83db6a066bffff7f2001000000",
+      "merkle_siblings_wire": [
+        "9447e10ee1d3289e009a2f900ac39d7972c399c339049f749adce821f2a54fce"
+      ]
+    },
+    "carol": {
+      "txid": "d4a87e3374f75ef72585315f1048e87c95aac80d5698509760716af1c1d4a2b7",
+      "vout": 0,
+      "units": 350,
+      "owner": "032fa2104d6b38d11b0230010559879124e42ab8dfeff5ff29dc9cdadd4ecacc3f",
+      "confirmations": 1,
+      "blockhash": "5d43deb8022c5080a9aaac013374f63f7aeeadcae40dfa6aa9f5d1dbd05e0366",
+      "height": 111,
+      "merkle_index": 1,
+      "merkle_header_hex": "0000002050b9c09b154d5470887f12f5a3f968fe0b88056d7e0c10a37bfc1d6ce961aa3ecfbe229413e2431421cc1448dcc24d82dd56b37b4a921467b52b68e3ad3e2f3fee6a066bffff7f2002000000",
+      "merkle_siblings_wire": [
+        "52dd2c555a04618054d21c873b69b67d72127026fff6e4043a8d2af27e218276"
+      ]
+    }
+  },
+  "rejections": {
+    "inflated_signed_outputs": "sendrawtransaction: {'code': -26, 'message': '16: mandatory-script-verify-flag-failed (Script failed an OP_NUMEQUALVERIFY operation)'}",
+    "copied_token_provenance_witness": {
+      "wall_seconds": 0.013373749912716448,
+      "rejection": "parent-provenance-2x2 witness does not prove: constraint #4606456 is not satisfied: 170 \u22c5 1 != 148"
+    },
+    "copied_token_with_reused_proof": "sendrawtransaction: {'code': -26, 'message': '16: mandatory-script-verify-flag-failed (Script failed an OP_NUMEQUALVERIFY operation)'}",
+    "already_spent_bob_receipt": "receipt output is spent or unavailable"
+  },
+  "confirmation_timings": {
+    "setup": {
+      "chain_gang_seconds": 0.0001991249155253172,
+      "node_submission_seconds": 0.030626125051639974,
+      "node_mining_and_confirmation_seconds": 0.013366000028327107
+    },
+    "issuance-root": {
+      "chain_gang_seconds": 4.895799793303013e-05,
+      "node_submission_seconds": 0.0018249590648338199,
+      "node_mining_and_confirmation_seconds": 0.005398915964178741
+    },
+    "verifier-funding": {
+      "chain_gang_seconds": 0.0009993750136345625,
+      "node_submission_seconds": 0.06921391596551985,
+      "node_mining_and_confirmation_seconds": 0.023311124998144805
+    },
+    "alice-mint-1": {
+      "chain_gang_seconds": 0.0001296249683946371,
+      "node_submission_seconds": 0.0018323329277336597,
+      "node_mining_and_confirmation_seconds": 0.0044050420401617885
+    },
+    "alice-mint-2": {
+      "chain_gang_seconds": 0.0001194169744849205,
+      "node_submission_seconds": 0.0014477079967036843,
+      "node_mining_and_confirmation_seconds": 0.004110417095944285
+    },
+    "bob-mint": {
+      "chain_gang_seconds": 0.0001336249988526106,
+      "node_submission_seconds": 0.0017931250622496009,
+      "node_mining_and_confirmation_seconds": 0.003971374942921102
+    },
+    "foreign-root": {
+      "chain_gang_seconds": 3.487500362098217e-05,
+      "node_submission_seconds": 0.0010911659337580204,
+      "node_mining_and_confirmation_seconds": 0.003226374974474311
+    },
+    "copied-token": {
+      "chain_gang_seconds": 0.00011541706044226885,
+      "node_submission_seconds": 0.0015859579434618354,
+      "node_mining_and_confirmation_seconds": 0.0039478749968111515
+    },
+    "alice-to-bob": {
+      "chain_gang_seconds": 0.08808174997102469,
+      "node_submission_seconds": 0.34992362500634044,
+      "node_mining_and_confirmation_seconds": 0.01010279101319611
+    },
+    "bob-to-carol": {
+      "chain_gang_seconds": 0.04379433300346136,
+      "node_submission_seconds": 0.33387979201506823,
+      "node_mining_and_confirmation_seconds": 0.008553916006349027
+    }
+  },
+  "node": "/Bitcoin SV:1.2.3/",
+  "transactions": {
+    "setup": {
+      "txid": "baf00ff8947465923fc7ede5858a688395d258cc22e9d5ed338848a174efb95b",
+      "blockhash": "26ff4200c7325c0e5056233bd10e045ffdcfbe2b5092c879882c1b3f6d2a1dfb",
+      "height": 102,
+      "bytes": 240
+    },
+    "issuance-root": {
+      "txid": "32d974cb7432f2d79df4e00b9be16e174fd03a0057c390c29817356a22d1e194",
+      "blockhash": "6f4431c94ec11fd85aa37ec87a1a732ec44965b69f708574acf28220e8f6babd",
+      "height": 103,
+      "bytes": 183
+    },
+    "verifier-funding": {
+      "txid": "bf79baf4854e5c381556edde2dd0140a9bb913682e83b53d7cd3d1a619fb18be",
+      "blockhash": "6d5bdf29d2fec806183f054252a6afce698eb80f0384e8e87b8c1f43e8d0fd7d",
+      "height": 104,
+      "bytes": 904965
+    },
+    "alice-mint-1": {
+      "txid": "26ee4e92fe42d0a582e45b633c1a58cb810612b1ee08cc452be8f71aef275cf8",
+      "blockhash": "39b0a61757d5b0ec4e3d58f80f249c932efdba93a3e75a8f9533afa6f19be592",
+      "height": 105,
+      "bytes": 903
+    },
+    "alice-mint-2": {
+      "txid": "be19f32b2ba5753aeb056d57bdf3eff4b3cd0922c139cd1426c7395adcc7a72b",
+      "blockhash": "0390ae5f88ef76891b13d257b1d6152da00dbc01405867e9d047d2f7c901ee28",
+      "height": 106,
+      "bytes": 903
+    },
+    "bob-mint": {
+      "txid": "0cb4dd3fc7b85e1d113fdf28af638fc55322c897624cf6dbc91899fead9a00e0",
+      "blockhash": "40805a85f921738c6c85dbba6f675e7979345bf4d5144cdecddcf9a940ce36d5",
+      "height": 107,
+      "bytes": 903
+    },
+    "foreign-root": {
+      "txid": "1ead8df39677fd16e8ef2aab2c0fcf2ca79852ce8a4925316f3aa60d32111caa",
+      "blockhash": "55b228083c63346d2e8cb6e9e60e70c1d57d92d5417ec4312b35ec61dcc40071",
+      "height": 108,
+      "bytes": 95
+    },
+    "copied-token": {
+      "txid": "e2ee061ccc24e3f2fe4a1f9e6a1c646952e47e221c2a3f400075a3a852624c3b",
+      "blockhash": "4ff2d3e2c83cf2bdfaf0b4c93ba28fe1927d07ba0293f7750806fb1e2bf47a1c",
+      "height": 109,
+      "bytes": 903
+    },
+    "alice-to-bob": {
+      "txid": "3278a56fef5fc860a3f1cdf64f35ed3ec8f573e04b811d5071519aba82ef7b80",
+      "blockhash": "3eaa61e96c1dfc7ba3100c7e6d05880bfe68f9a3f5127f8870544d159bc0b950",
+      "height": 110,
+      "bytes": 4075
+    },
+    "bob-to-carol": {
+      "txid": "d4a87e3374f75ef72585315f1048e87c95aac80d5698509760716af1c1d4a2b7",
+      "blockhash": "5d43deb8022c5080a9aaac013374f63f7aeeadcae40dfa6aa9f5d1dbd05e0366",
+      "height": 111,
+      "bytes": 4075
+    }
+  }
+}

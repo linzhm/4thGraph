@@ -1,0 +1,196 @@
+{
+  "scope": "Funding authentication component with a real fixed-statement Groth16 proof. No token lineage.",
+  "verifier_lock_sha256": "a0d5caaf704bb2996871c8cc299a099cd9c977934d83ae146733a36a626dde88",
+  "verifier_lock_bytes": 449774,
+  "guard_lock_bytes": 712,
+  "confirmations": [
+    {
+      "payer": "02352bbf4a4cdd12564f93fa332ce333301d9ad40271f8107181340aef25be59d5",
+      "txid": "4ca77ee9085b525b36743ec2536071196fc8b4ec6d05588dfe3536ec6cc7c9ef",
+      "verifier_outpoint": "a701b70ffed7d53f2b5dcff6b699501f27958fbebcc1175336ecea53972113e5:0",
+      "guard_outpoint": "1fd72e39912289728324d2dbc16bf2582b46c8f75d2fac3492b00724dd012d15:0",
+      "payment_bytes": 456237,
+      "verifier_funding_bytes": 449910,
+      "guard_funding_bytes": 846,
+      "payment_and_funding_bytes": 906993,
+      "input_witness_bytes": [
+        1078,
+        450935,
+        1976,
+        1976
+      ],
+      "funding_transaction_bytes_in_guard_witness": 449910
+    },
+    {
+      "payer": "03421f5fc9a21065445c96fdb91c0c1e2f2431741c72713b4b99ddcb316f31e9fc",
+      "txid": "ec679aacc2e97e04a573c713611f5f393b35eec8a7f8246d8d7c31f3d3a2cfed",
+      "verifier_outpoint": "dd51f666fc1d408b1126e57c8ece4a9d938516ecc7525113758b95dd7692e878:0",
+      "guard_outpoint": "bd705fc620dc33ba0cb8617196828ca9b9160c9b24ab06571c1cea8bc14e6868:0",
+      "payment_bytes": 456237,
+      "verifier_funding_bytes": 449910,
+      "guard_funding_bytes": 846,
+      "payment_and_funding_bytes": 906993,
+      "input_witness_bytes": [
+        1078,
+        450935,
+        1976,
+        1976
+      ],
+      "funding_transaction_bytes_in_guard_witness": 449910
+    }
+  ],
+  "rejections": {
+    "different_verifier": "sendrawtransaction: {'code': -26, 'message': '16: mandatory-script-verify-flag-failed (Script failed an OP_EQUALVERIFY operation)'}",
+    "different_guard": "sendrawtransaction: {'code': -26, 'message': '16: mandatory-script-verify-flag-failed (Script failed an OP_EQUALVERIFY operation)'}",
+    "different_holder": "sendrawtransaction: {'code': -26, 'message': '16: mandatory-script-verify-flag-failed (Script evaluated without error but finished with a false/empty top stack element)'}",
+    "different_proof": "sendrawtransaction: {'code': -26, 'message': '16: mandatory-script-verify-flag-failed (Script failed an OP_NUMEQUALVERIFY operation)'}"
+  },
+  "confirmation_timings": {
+    "setup": {
+      "chain_gang_seconds": 0.00015358300879597664,
+      "node_submission_seconds": 0.03194295894354582,
+      "node_mining_and_confirmation_seconds": 0.013949832995422184
+    },
+    "wallet-coins": {
+      "chain_gang_seconds": 5.233404226601124e-05,
+      "node_submission_seconds": 0.0016257909592241049,
+      "node_mining_and_confirmation_seconds": 0.005594459013082087
+    },
+    "alice-verifier": {
+      "chain_gang_seconds": 0.0006750000175088644,
+      "node_submission_seconds": 0.019739459035918117,
+      "node_mining_and_confirmation_seconds": 0.016657875035889447
+    },
+    "alice-guard": {
+      "chain_gang_seconds": 0.00013874995056539774,
+      "node_submission_seconds": 0.0026755830040201545,
+      "node_mining_and_confirmation_seconds": 0.005651833955198526
+    },
+    "alice-holder-2": {
+      "chain_gang_seconds": 0.00016445794608443975,
+      "node_submission_seconds": 0.0019020420731976628,
+      "node_mining_and_confirmation_seconds": 0.0051096659153699875
+    },
+    "alice-holder-3": {
+      "chain_gang_seconds": 0.00013237493112683296,
+      "node_submission_seconds": 0.001708833035081625,
+      "node_mining_and_confirmation_seconds": 0.004094542004168034
+    },
+    "different-verifier": {
+      "chain_gang_seconds": 4.1499966755509377e-05,
+      "node_submission_seconds": 0.001423959038220346,
+      "node_mining_and_confirmation_seconds": 0.004218332935124636
+    },
+    "alice-probe": {
+      "chain_gang_seconds": 0.044025540933944285,
+      "node_submission_seconds": 0.3600328339962289,
+      "node_mining_and_confirmation_seconds": 0.017177124973386526
+    },
+    "bob-verifier": {
+      "chain_gang_seconds": 0.0010881670750677586,
+      "node_submission_seconds": 0.01843841595109552,
+      "node_mining_and_confirmation_seconds": 0.013583249994553626
+    },
+    "bob-guard": {
+      "chain_gang_seconds": 0.00013358297292143106,
+      "node_submission_seconds": 0.001413959078490734,
+      "node_mining_and_confirmation_seconds": 0.0043152079451829195
+    },
+    "bob-holder-2": {
+      "chain_gang_seconds": 0.00014320795889943838,
+      "node_submission_seconds": 0.002324625034816563,
+      "node_mining_and_confirmation_seconds": 0.004291584016755223
+    },
+    "bob-holder-3": {
+      "chain_gang_seconds": 0.00012941693421453238,
+      "node_submission_seconds": 0.0018856250680983067,
+      "node_mining_and_confirmation_seconds": 0.004600249929353595
+    },
+    "bob-probe": {
+      "chain_gang_seconds": 0.0449927500449121,
+      "node_submission_seconds": 0.3507279169280082,
+      "node_mining_and_confirmation_seconds": 0.015055333031341434
+    }
+  },
+  "node": "/Bitcoin SV:1.2.3/",
+  "transactions": {
+    "setup": {
+      "txid": "23c228689d7c8b5e2bc3df94208976062bd218b0a17b946ef3a8407bf2689e91",
+      "blockhash": "64444468d291f0a11620ce16b75eb7235f50f76887cf35a8c2f2336da6e5eef5",
+      "height": 102,
+      "bytes": 223
+    },
+    "wallet-coins": {
+      "txid": "f9a7e49c595c75ad4a970d01278d6de7ca1ccc58e3ff5bda34849a5a3b028185",
+      "blockhash": "5af64f3b30f2f3f45de30f21c9095ba379dbe38f70449bd94719ca46e99e6721",
+      "height": 103,
+      "bytes": 403
+    },
+    "alice-verifier": {
+      "txid": "a701b70ffed7d53f2b5dcff6b699501f27958fbebcc1175336ecea53972113e5",
+      "blockhash": "2ad7424fee103ac1f956d931cbfd177814defe026ac042562172587809cbad0e",
+      "height": 104,
+      "bytes": 449910
+    },
+    "alice-guard": {
+      "txid": "1fd72e39912289728324d2dbc16bf2582b46c8f75d2fac3492b00724dd012d15",
+      "blockhash": "175e2822fcd325110ab063a99622e258fb924d75998f9206ea34655956f388ab",
+      "height": 105,
+      "bytes": 846
+    },
+    "alice-holder-2": {
+      "txid": "c7df63de32328488d7e8906f724390991ce7057bb5b9044b6d71d8a8796f5301",
+      "blockhash": "56aefad090ab890e7e204d52994227a45263d295fd08d4eb164c90672f5ce213",
+      "height": 106,
+      "bytes": 881
+    },
+    "alice-holder-3": {
+      "txid": "8f6b7e6fdda9a3a7992dafc1e8e2ac511ef053e261d0c4226713a180a7211886",
+      "blockhash": "1e5f10de81f0b6767e579ea509ad5b014089b32b29c11a51d28d2628135f7d9a",
+      "height": 107,
+      "bytes": 881
+    },
+    "different-verifier": {
+      "txid": "a47422a571b9927d5570156212b8102955e5d7865852806e924c183a86d68052",
+      "blockhash": "7d904726f6c497789e3876ef04ef3f3b1f5f0013daf213bf2a898a841d912a57",
+      "height": 108,
+      "bytes": 61
+    },
+    "alice-probe": {
+      "txid": "4ca77ee9085b525b36743ec2536071196fc8b4ec6d05588dfe3536ec6cc7c9ef",
+      "blockhash": "3fb5015c596a32ff8a17e177a937846a325fc93bc1b8b29fafc439dcdb6fecf4",
+      "height": 109,
+      "bytes": 456237
+    },
+    "bob-verifier": {
+      "txid": "dd51f666fc1d408b1126e57c8ece4a9d938516ecc7525113758b95dd7692e878",
+      "blockhash": "7206cb179fcec16f726b50e00c2f98f06cceeee7c8bb2267ee39a0d29035cdc6",
+      "height": 110,
+      "bytes": 449910
+    },
+    "bob-guard": {
+      "txid": "bd705fc620dc33ba0cb8617196828ca9b9160c9b24ab06571c1cea8bc14e6868",
+      "blockhash": "7e5bf6d32034b793d5a3c71cd7a73c5d99d96646d926b37269cea60c3914f64d",
+      "height": 111,
+      "bytes": 846
+    },
+    "bob-holder-2": {
+      "txid": "2c7f135a744e35972e821712ccffaa189c889e9652872d969e183980611d11da",
+      "blockhash": "7b74b561b02a5a2ce4dd8a6e789992b859a509114e2bde4472dd007cca8b2ec2",
+      "height": 112,
+      "bytes": 881
+    },
+    "bob-holder-3": {
+      "txid": "024ad0900418d065671b4c4510f2bca47542c7d69fc9a902658aaee1de44faf2",
+      "blockhash": "55e69eb0c4e6ff227ca2d1d60372632c9059b86b16cca9a018e6ff8acf836e5e",
+      "height": 113,
+      "bytes": 881
+    },
+    "bob-probe": {
+      "txid": "ec679aacc2e97e04a573c713611f5f393b35eec8a7f8246d8d7c31f3d3a2cfed",
+      "blockhash": "6ed76187fee70b86cae28fda89e09776c7f7240c2308478af4662d952eb1331f",
+      "height": 114,
+      "bytes": 456237
+    }
+  }
+}

@@ -42,7 +42,33 @@ Groth16 的测试 setup 耗时 357.82 秒，电路 4,811,853 条约束。在首�
 
 STARK 计时包含程序执行、证明生成和写出宿主收据。两种编码都由固定 guest 身份与已入块 Groth16 的同一公开摘要独立验真。用唯一输出的铸造父提交 `vout 1` 时，guest 拒绝出证。替换大小使用实际推入和 CompactSize 开销，当前还没有该 STARK 的 BSV 验证器锁和资金交易，所以这两列的字节只衡量付款见证。 [STARK 实测](../fixtures/covenant-backtrace-2x2-stark.json)
 
-将溯源移入电路的配置编译到 **4,845,242** 条约束，比开口电路多 **33,389**。对两笔已入块的实际付款父数据，该配置均可求解。将锁和金额相同的伪来源放入相同槽位时，开口仍成立，增加源身份约束的电路拒绝求解。此次对照覆盖约束求解，消费锁接线、证明参数和节点花费分别验收。
+## 将溯源移入 Groth16
+
+`parent-provenance-2x2` 使用独立的声明域和测试密钥。Groth16 认证实际父 `txid:vout`、规范代币锁和数量，并检查铸造是否消费指定发行锚的正确槽位、转账父是否消费批准的验证器。历史连续性依赖这些已确认前序交易实际执行了锁。电路只认证直接父及其来源，未在电路内验证前序 Groth16。当前 Script 认证交易，验持有人签名，做守恒并重建两个实际后继输出。 [电路](../recursion/parentcheckpoint/backtrace.go) · [Script](../recursion/covenant_backtrace.py)
+
+| BSV Node 1.2.3，两笔异父 `2→2` | Script 溯源基线 | Groth16 溯源 |
+|---|---:|---:|
+| R1CS 约束 | 4,811,853 | 4,845,242 |
+| 热会话出证，Alice → Bob | 11.46 s | 14.82 s |
+| 热会话出证，Bob → Carol | 12.57 s | 17.36 s |
+| 两代付款原文 | 4,075 / 4,075 B | 4,075 / 4,075 B |
+| 共用的专用验证器资金交易 | 905,397 B | 904,965 B |
+| 两笔付款及专用资金总和 | 913,547 B | 913,115 B |
+
+新版 setup 总耗时 318.55 秒，按标准加载和校验参数的会话首次启动耗时 216.05 秒。两组热会话计时来自分别运行的样本。两代见证均为 `[1624, 376, 376]` 字节，证明推入均为 1,078 字节，直接父和祖先原文占用均为零。Node 在高度 110 和 111 入块。Bob 从节点验证收到的 275 个最小单位，再和另一笔铸造合并转付。第二台节点复核 Bob 和 Carol 的指定收款输出，接纳 Bob 的再支付，拒绝用 Carol 的密钥签名 Bob 的输入。假铸造复制真实锁仍无法出证，复用真证明也被节点拒绝。超发一单位并重签的交易被 Script 拒绝。此路径仍使用两个预确认的验证器输出。 [实测摘要](../fixtures/covenant-provenance-2x2-summary.json) · [独立重放](../fixtures/covenant-provenance-2x2-replay.json) · [交易与区块](../fixtures/covenant-provenance-2x2-regtest.json.xz)
+
+## 开放验证器续补组件
+
+Alice 与 Bob 各自从普通 BSV 钱包输入创建验证器资金及伴随资金，使用同一个公开批准锁模板，无需发行方签名或预登记资金 outpoint。两个持有人输入各自认证实际 `vin 1` 的伴随输出。伴随 Script 从其已认证的交易预像取得实际 `vin 0`，重算披露的资金 txid 并认证所花的 Groth16 锁。节点确认两次真实 Groth16 验证，并拒绝替换验证器、替换伴随输出、错签和改证明。组件使用已归档证明及其固定公开声明，属于资金认证测试。 [组件代码](../recursion/run_open_verifier_funding_regtest.py) · [入块记录](../fixtures/covenant-open-funding-summary.json) · [交易与区块](../fixtures/covenant-open-funding-regtest.json.xz)
+
+| 续补组件 | Alice | Bob |
+|---|---:|---:|
+| 验证器资金 | 449,910 B | 449,910 B |
+| 伴随资金 | 846 B | 846 B |
+| 花费原文 | 456,237 B | 456,237 B |
+| 花费与两笔专用资金合计 | 906,993 B | 906,993 B |
+
+验证器资金原文还在每笔花费的伴随输入里出现一次。若把同样的披露接进代币付款，后继 Groth16 必须对约 456 KB 的实际父交易重算 txid。以实测组件和当前 4,075 字节付款相比，多约 7,065 个 SHA-256 块。按[既有分块探针](../recursion/parentbinding/README.md)的斜率，单个这样的父交易就约增加 2.49 亿条约束。这是规模外推。现有 4,075 字节布局无法使用这类父交易。开放续补与代币溯源的联合两代验收仍待完成，续补组件两个等长样本也没有发生代币继承。
 
 ## 复现
 
@@ -58,3 +84,12 @@ GOMAXPROCS=8 python3 projects/cctp/recursion/run_covenant_backtrace_regtest.py \
 ```
 
 用 [独立重放](../recursion/replay_covenant_backtrace_regtest.py) 的 `--summary`、`--policy`、`--key` 参数指定这一组输出和公开参数，并提供源节点与全新重放节点。STARK 使用与[单父基准](../recursion/parentbinding/risczero/benchmark/README.md)相同的 RISC Zero 3.1.0 工具链，将 guest 构建目标换成 `--bin backtrace-guest`，用 `checkpoint-image` 封装。用 [STARK 比较驱动](../recursion/compare_backtrace_stark.py) 对归档中的实际父交易出证并独立校验与 Groth16 相同的摘要。
+
+复跑电路溯源时，将 setup 的 `-profile` 换为 `parent-provenance-2x2`，并使用新的参数目录和全新节点。开放续补组件另用全新节点，交易版本设为 2，继续用 `0x41` 做交易绑定和原生验签。该试验的伴随锁复用签名预像解析构件，依赖 Chronicle 后版本 2 的推入规则。
+
+```sh
+python3 projects/cctp/recursion/run_open_verifier_funding_regtest.py \
+  --node-url "$cctp_funding_rpc" --cookie "$cctp_funding_cookie" \
+  --proof projects/cctp/fixtures/covenant-provenance-alice-proof.json \
+  --out "$cctp_run/open-funding.json"
+```

@@ -1,0 +1,35 @@
+{
+  "node": "/Bitcoin SV:1.2.3/",
+  "bob": {
+    "txid": "3278a56fef5fc860a3f1cdf64f35ed3ec8f573e04b811d5071519aba82ef7b80",
+    "vout": 0,
+    "units": 275,
+    "owner": "03421f5fc9a21065445c96fdb91c0c1e2f2431741c72713b4b99ddcb316f31e9fc",
+    "confirmations": 1,
+    "blockhash": "3eaa61e96c1dfc7ba3100c7e6d05880bfe68f9a3f5127f8870544d159bc0b950",
+    "height": 110,
+    "merkle_index": 1,
+    "merkle_header_hex": "000000201c7af42b1efb060875f79302ba077d92e18fa23bc9b4f0fabdf23cc8e2d3f24f1adfaaf6229931951f677ee1b97f9c3f0b7a73ae8dfaff454613f5fc98ffd084dc6a066bffff7f2001000000",
+    "merkle_siblings_wire": [
+      "c90537f32041ef03b8428077c55260c7244b4761f3da9209a7703daccf9a38eb"
+    ]
+  },
+  "carol": {
+    "txid": "d4a87e3374f75ef72585315f1048e87c95aac80d5698509760716af1c1d4a2b7",
+    "vout": 0,
+    "units": 350,
+    "owner": "032fa2104d6b38d11b0230010559879124e42ab8dfeff5ff29dc9cdadd4ecacc3f",
+    "confirmations": 1,
+    "blockhash": "5d43deb8022c5080a9aaac013374f63f7aeeadcae40dfa6aa9f5d1dbd05e0366",
+    "height": 111,
+    "merkle_index": 1,
+    "merkle_header_hex": "0000002050b9c09b154d5470887f12f5a3f968fe0b88056d7e0c10a37bfc1d6ce961aa3ecfbe229413e2431421cc1448dcc24d82dd56b37b4a921467b52b68e3ad3e2f3fee6a066bffff7f2002000000",
+    "merkle_siblings_wire": [
+      "52dd2c555a04618054d21c873b69b67d72127026fff6e4043a8d2af27e218276"
+    ]
+  },
+  "bob_respend_accepted_on_clone": "d4a87e3374f75ef72585315f1048e87c95aac80d5698509760716af1c1d4a2b7",
+  "mempool_excludes_bob_output": true,
+  "wrong_receipt_vout_rejection": "wrong receipt outpoint or order",
+  "wrong_holder_rejection": "sendrawtransaction: {'code': -26, 'message': '16: mandatory-script-verify-flag-failed (Signature must be zero for failed CHECK(MULTI)SIG operation)'}"
+}

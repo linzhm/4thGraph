@@ -5,11 +5,13 @@ from hashlib import sha256
 import json
 from pathlib import Path
 
-from covenant_backtrace import Policy
-from regtest_mint import Node
+from covenant_backtrace import Policy, holder_witness
+from regtest_mint import Node, RpcFailure
 from run_covenant_backtrace_regtest import receive, save
 from run_freeze_probe_regtest import read_key
+from run_inventory_wide_regtest import test_signer
 from run_secure_receipt_replay import BOB, CAROL, adopt_through
+from shared.transaction import Transaction
 
 
 def replay(source, clone, records, pinned, key_artifact):
@@ -18,14 +20,26 @@ def replay(source, clone, records, pinned, key_artifact):
     if clone.call("getblockcount") != 0 or clone.call("getblockhash", 0) != source.call("getblockhash", 0):
         raise ValueError("use a fresh clone of the same regtest network")
     key, _ = read_key(key_artifact, "plain")
-    policy = Policy(bytes.fromhex(pinned["issuance_root"])[::-1], key)
+    policy = Policy(bytes.fromhex(pinned["issuance_root"])[::-1], key, pinned.get("provenance_in_proof", False))
     if (sha256(policy.lock).hexdigest() != pinned["verifier_lock_sha256"]
             or key_artifact["verifying_key_sha256"] != pinned["verifying_key_sha256"]):
         raise ValueError("verifier key differs from recipient deployment pins")
     first, second = records["alice-to-bob"], records["bob-to-carol"]
     adopt_through(source, clone, first["height"])
-    _, bob = receive(clone, pinned, policy, first["txid"], 0, BOB, 275)
-    if clone.call("sendrawtransaction", source.call("getrawtransaction", second["txid"], False), True) != second["txid"]:
+    received, bob = receive(clone, pinned, policy, first["txid"], 0, BOB, 275)
+    raw_second = source.call("getrawtransaction", second["txid"], False)
+    payment = Transaction.parse(bytes.fromhex(raw_second))
+    _, wrong_signer = test_signer(23)
+    wrong_holder = payment.with_script(1, holder_witness(payment, 1, received.outputs[0], wrong_signer))
+    try:
+        clone.call("sendrawtransaction", wrong_holder.serialize().hex(), True)
+    except RpcFailure as error:
+        if error.code != -26 or "mandatory-script-verify-flag-failed" not in str(error):
+            raise
+        wrong_holder_rejection = str(error)
+    else:
+        raise ValueError("clone accepted respend with a signature from the wrong holder")
+    if clone.call("sendrawtransaction", raw_second, True) != second["txid"]:
         raise ValueError("clone did not accept Bob's exact respend")
     if (clone.call("gettxout", first["txid"], 0, False) is None
             or clone.call("gettxout", first["txid"], 0, True) is not None):
@@ -42,7 +56,7 @@ def replay(source, clone, records, pinned, key_artifact):
         raise ValueError("wallet accepted Bob's change as Carol's receipt")
     return {"node": clone.call("getnetworkinfo")["subversion"], "bob": bob, "carol": carol,
             "bob_respend_accepted_on_clone": second["txid"], "mempool_excludes_bob_output": True,
-            "wrong_receipt_vout_rejection": wrong_output}
+            "wrong_receipt_vout_rejection": wrong_output, "wrong_holder_rejection": wrong_holder_rejection}
 
 
 def main():
