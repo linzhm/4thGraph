@@ -4,6 +4,7 @@ from datetime import datetime, timedelta, timezone
 from hashlib import sha256
 from itertools import permutations, product
 from math import prod
+import os
 from pathlib import Path
 import subprocess
 from tempfile import TemporaryDirectory
@@ -2702,6 +2703,26 @@ class SignedDataReview(SignedDataFixtures):
                 certificate_path.verify_revocation_paths(leaf, (), intermediates=(), validation_time=now,
                                                          trust_anchor=options['trust_anchor'], identify=True)
         run.assert_not_called()
+
+    def test_revocation_paths_use_an_absolute_openssl_and_isolated_environment(self):
+        root, _, _, _, now, *_ = self.revocation_path_fixture()
+        anchor = root()
+        executable = certificate_path._openssl_executable(None)
+        environment = {'PATH': '/unused', 'OPENSSL_CONF': '/unused/openssl.cnf',
+                       'OPENSSL_MODULES': '/unused/modules'}
+        with patch.dict(os.environ, environment):
+            with patch.object(certificate_path.subprocess, 'run', wraps=subprocess.run) as run:
+                for path in (None, executable):
+                    self.assertEqual(assess_certificate_revocation(
+                        anchor, (), validation_time=now, trust_anchor=anchor, openssl_path=path,
+                    ).status, 'undetermined')
+                with self.assertRaisesRegex(ValueError, 'absolute executable path'):
+                    assess_certificate_revocation(anchor, (), validation_time=now,
+                                                  trust_anchor=anchor, openssl_path='openssl')
+            self.assertEqual(run.call_count, 2)
+            for call in run.call_args_list:
+                self.assertEqual(call.args[0][0], executable)
+                self.assertEqual(call.kwargs['env'], {'LC_ALL': 'C', 'OPENSSL_CONF': os.devnull})
 
     def test_openssl_issued_sm2_certificate_and_crl_share_trust_anchor(self):
         marker = datetime.now(timezone.utc)

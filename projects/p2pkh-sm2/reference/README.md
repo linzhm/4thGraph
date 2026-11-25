@@ -229,9 +229,12 @@ the supplied timezone-aware time, the assessment returns `revoked`,
 when coverage is insufficient. The caller supplies the available CRLs and
 can pass `trust_anchor` and `intermediates` to the assessment to validate
 the target and CRL signer paths under one explicitly trusted DER
-certificate. This mode uses the local OpenSSL verifier with the supplied
-validation time. The certificate signature uses OpenSSL's configured
-algorithm behavior. `sm2_user_id` configures the separate CRL signature
+certificate. This mode uses OpenSSL with the supplied validation time and
+an isolated process environment. It selects the binary from conventional
+system install directories. Pass an absolute `openssl_path` to pin a
+trusted installation. The verifier uses the selected build's default
+providers, with ambient OpenSSL configuration and module overrides excluded.
+`sm2_user_id` configures the separate CRL signature
 check. Direct CRLs must use the public key of the target's selected issuer.
 Freshness and conflict checking use the issuer name, public key and CRL
 scope. An indirect CRL must match a distribution point signed by the

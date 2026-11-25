@@ -1,7 +1,9 @@
 """OpenSSL path validation against a caller-selected trust anchor."""
 
+import os
 from pathlib import Path
 import re
+from shutil import which
 import subprocess
 from tempfile import TemporaryDirectory
 from time import monotonic
@@ -9,6 +11,20 @@ from time import monotonic
 from asn1crypto.x509 import Name
 from cryptography.hazmat.primitives.serialization import Encoding
 from cryptography.x509 import InvalidVersion, load_der_x509_certificate
+
+
+_OPENSSL_INSTALL_DIRECTORIES = ('/opt/homebrew/bin', '/usr/local/bin', '/usr/bin', '/bin')
+
+
+def _openssl_executable(path):
+    if path is None:
+        path = which('openssl', path=os.pathsep.join(_OPENSSL_INSTALL_DIRECTORIES))
+        if path is None:
+            raise ValueError('OpenSSL not found in system install directories; supply openssl_path')
+    executable = Path(path)
+    if not executable.is_absolute():
+        raise ValueError('openssl_path must be an absolute executable path')
+    return executable
 
 
 def _load_certificate(encoded, role):
@@ -43,7 +59,8 @@ def _openssl(command, workspace, *, deadline):
     if timeout <= 0:
         raise ValueError('OpenSSL certificate path validation timed out')
     try:
-        return subprocess.run(command, cwd=workspace, capture_output=True, timeout=timeout)
+        env = {'LC_ALL': 'C', 'OPENSSL_CONF': os.devnull}
+        return subprocess.run(command, cwd=workspace, env=env, capture_output=True, timeout=timeout)
     except (OSError, subprocess.TimeoutExpired) as error:
         raise ValueError('OpenSSL certificate path validation could not run') from error
 
@@ -88,7 +105,8 @@ def _selected_path(stdout, candidate, trust_anchor, subjects, intermediate_subje
     return (*chain, trust_anchor)
 
 
-def verify_revocation_paths(target, signers, *, trust_anchor, intermediates, validation_time, identify=False):
+def verify_revocation_paths(target, signers, *, trust_anchor, intermediates, validation_time,
+                            identify=False, openssl_path=None):
     """Validate paths under one anchor and optionally return the selected DER chains."""
     deadline = monotonic() + 15
     anchor = _load_certificate(trust_anchor, 'trust anchor')
@@ -117,7 +135,7 @@ def verify_revocation_paths(target, signers, *, trust_anchor, intermediates, val
         # an intermediate requires an explicit policy later in the path.
         # Every supplied path candidate is time-checked here with inclusive
         # endpoints. OpenSSL's -attime would exclude the notAfter instant.
-        command = ['openssl', 'verify', '-no-CAfile', '-no-CApath', '-no-CAstore',
+        command = [_openssl_executable(openssl_path), 'verify', '-no-CAfile', '-no-CApath', '-no-CAstore',
                    '-trusted', 'anchor.pem', '-partial_chain', '-x509_strict', '-policy_check',
                    '-policy', '2.5.29.32.0', '-no_check_time']
         if untrusted_pem:

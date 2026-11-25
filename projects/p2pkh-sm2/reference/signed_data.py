@@ -1250,11 +1250,12 @@ def _delegated_signers_for_path(target_path, signers, paths):
 
 
 def assess_certificate_revocation(certificate, snapshots, *, validation_time, trust_anchor=None, intermediates=(),
-                                  require_chain_revocation=False, issuer_certificate=None):
+                                  require_chain_revocation=False, issuer_certificate=None, openssl_path=None):
     """Assess a DER certificate against caller-supplied authenticated CRL snapshots.
 
     Supply a DER trust_anchor and any untrusted DER intermediates to verify
-    the target and snapshot signer paths under that anchor. Set
+    the target and snapshot signer paths under that anchor. Pass an absolute
+    openssl_path to select a trusted OpenSSL executable explicitly. Set
     require_chain_revocation to require unrevoked status for every used
     intermediate and CRL signer except the anchor. Each certificate's
     evidence comes from its validated parent. With no trust anchor, an
@@ -1282,7 +1283,7 @@ def assess_certificate_revocation(certificate, snapshots, *, validation_time, tr
         signers = dict.fromkeys(signers)
         paths = verify_revocation_paths(certificate, signers, trust_anchor=trust_anchor,
                                        intermediates=intermediates, validation_time=validation_time,
-                                       identify=True)
+                                       identify=True, openssl_path=openssl_path)
         target_path = paths[certificate]
         issuer_key_id = _certificate_key_id(target_path[1] if len(target_path) > 1 else trust_anchor)
         delegated_signers = _delegated_signers_for_path(target_path, signers, paths)
@@ -1292,6 +1293,8 @@ def assess_certificate_revocation(certificate, snapshots, *, validation_time, tr
         raise ValueError('certificate path revocation requires an explicit trust anchor')
     elif intermediates:
         raise ValueError('certificate path intermediates require an explicit trust anchor')
+    elif openssl_path is not None:
+        raise ValueError('openssl_path requires an explicit trust anchor')
     target = _revocation_certificate(certificate, 'target')
     if issuer_certificate is not None:
         issuer = _load_certificate(issuer_certificate, 'target issuer')
