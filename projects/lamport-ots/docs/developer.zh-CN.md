@@ -34,6 +34,8 @@
 
 ## SDK 与参考接口
 
+[TypeScript、Rust、Go 和 Python 源码 SDK](../sdk/README.zh-CN.md)
+
 使用 Python 参考实现。用 `locking_script` 或 `committed_locking_script` 生成付款输出，认证入金后调用 `sign_payment` 或 `sign_spend`。外部签名器接收 32 字节摘要并返回 8,192 字节原始签名。密钥持久化、付款策略和广播由接入方提供。
 
 [参考使用说明（英文）](../reference/README.md) · [付款接口](../reference/payment.py) · [原始入金和花费向量](../template/vector.json)

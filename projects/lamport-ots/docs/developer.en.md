@@ -34,6 +34,8 @@ Install the pinned [requirements](../reference/requirements.txt) and run `bash p
 
 ## SDK and reference interfaces
 
+[TypeScript, Rust, Go and Python source SDKs](../sdk/README.md)
+
 Integrate through the Python reference. Create a payment lock with `locking_script` or `committed_locking_script`, then call `sign_payment` or `sign_spend` with the authenticated funding and an external callback. The callback receives a 32-byte digest and returns the 8,192-byte raw signature. Integrators supply durable key storage, the spend policy and broadcasting.
 
 [Reference developer workflow](../reference/README.md) · [Payment source](../reference/payment.py) · [Original funding and spend vector](../template/vector.json)
