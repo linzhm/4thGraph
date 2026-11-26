@@ -22,6 +22,8 @@ BSV Script Lab 提供钱包可识别的锁定模板、可接入外部签名器�
 
 先用原生 P2PKH 跑通第一笔付款。七个项目在 TypeScript、Rust、Go 和 Python 中使用同一套钱包调用，各项目指南说明签名器参数、模板选项和本地依赖。 [钱包 SDK 快速接入](shared/sdk/README.zh-CN.md)
 
+Forth 原型可从同一份源码生成一次脚本执行或可独立提交的 UTXO 分支。 [Regtest 复放](projects/forth-multi-tx/README.md)
+
 <a name="transaction-costs"></a>
 
 ## 比较交易成本
