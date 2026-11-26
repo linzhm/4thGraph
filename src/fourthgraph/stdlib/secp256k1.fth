@@ -97,9 +97,10 @@ REQUIRE stdlib/script-fragments.fth
     op-4 op-roll op-rot op-mul op-3 op-roll op-add secp256k1-reduce
 ;
 
-: secp256k1-double ( script -- script )
+: secp256k1-double-x ( script -- script )
     ( Specialize complete addition using X^3 = Y^2*Z - 7*Z^3. )
     ( Infinity stays valid because X=Z=0 and Y is nonzero. )
+    ( Emit X' above the intermediate terms needed for Y' and Z'. )
     ( Keep yz = Y*Z, yy = Y^2, t = 21*Z^2 and q = 3*t. )
     op-2dup op-mul op-over op-rot op-mul 2 script-pick-depth op-dup op-mul
     21 bsv-num op-rot op-mul op-3 op-over op-mul
@@ -107,11 +108,23 @@ REQUIRE stdlib/script-fragments.fth
     ( Save yy+2*q for Y'. Use yy-q as the second factor of X'. )
     op-dup op-over op-add 3 script-pick-depth op-add
     3 script-pick-depth 2 script-pick-depth op-sub
-    op-7 op-roll op-7 op-roll op-mul op-2 op-mul op-mul secp256k1-reduce
+    op-7 op-roll op-7 op-roll op-mul op-2 op-mul op-mul
+;
 
+: secp256k1-double-yz ( script -- script )
     ( Y' is yy times the saved sum minus q*t. )
     4 script-pick-depth op-rot op-mul op-2swap op-mul op-sub secp256k1-reduce
 
     ( Z' = 8*Y^3*Z. )
     op-2swap op-mul op-8 op-mul secp256k1-reduce
+;
+
+: secp256k1-double ( script -- script )
+    secp256k1-double-x secp256k1-reduce secp256k1-double-yz
+;
+
+: secp256k1-double-pair ( script -- script )
+    ( The second doubling uses X' only as a linear factor. Reduce it once, after both doublings. )
+    ( Starting with reduced coordinates, both doublings keep X within 226 ScriptNum bytes. )
+    secp256k1-double-x secp256k1-double-yz secp256k1-double
 ;
