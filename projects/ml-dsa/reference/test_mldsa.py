@@ -6,7 +6,7 @@ from pathlib import Path
 import random
 import unittest
 
-from fips204 import PUBLIC_KEY_BYTES, _use_hint, verification_equation, verify
+from fips204 import PUBLIC_KEY_BYTES, _GAMMA2, _use_hint, verification_equation, verify
 from hint_script import apply_hints_script
 from mldsa import authorize_digest, test_only_vector as deterministic_test_vector, verify_openssl
 from ntt_script import ring_product_script, transform_script, verification_equation_script
@@ -37,9 +37,17 @@ def equation_fixture():
 
 def hint_fixture():
     random_source = random.Random(206)
-    values = [0, 1, 95_231, 95_232, 95_233, 8_380_415, 8_380_416]
+    boundaries = sorted({
+        boundary + delta
+        for center in range(0, MODULUS, 2 * _GAMMA2)
+        for boundary in (center, center + _GAMMA2)
+        for delta in (-1, 0, 1)
+        if 0 <= boundary + delta < MODULUS
+    })
+    values = [value for boundary in boundaries for value in (boundary, boundary)]
     values.extend(random_source.randrange(MODULUS) for _ in range(4 * DEGREE - len(values)))
-    hint_indices = frozenset(range(0, 4 * DEGREE, 3))
+    boundary_count = 2 * len(boundaries)
+    hint_indices = frozenset((*range(1, boundary_count, 2), *range(boundary_count, 4 * DEGREE, 3)))
     hints = bytes(sum(1 << bit for bit in range(8) if offset + bit in hint_indices)
                   for offset in range(0, 4 * DEGREE, 8))
     high = [_use_hint(value, index in hint_indices) for index, value in enumerate(values)]
@@ -83,10 +91,12 @@ class ArithmeticTests(unittest.TestCase):
 
     def test_fixed_key_verification_equation(self):
         key, witness, expected = equation_fixture()
-        kernel = verification_equation_script(key)
-        self.assertEqual(evaluate(kernel, [witness]), ([expected], []))
-        with self.assertRaises(ScriptError):
-            evaluate(kernel, [witness[:-1]])
+        for compact in (False, True):
+            with self.subTest(compact=compact):
+                kernel = verification_equation_script(key, compact=compact)
+                self.assertEqual(evaluate(kernel, [witness]), ([expected], []))
+                with self.assertRaises(ScriptError):
+                    evaluate(kernel, [witness[:-1]])
 
     def test_forward_and_inverse_ntt(self):
         batch = ([0] * DEGREE, [0] * (DEGREE - 1) + [MODULUS - 1], *synthetic_polynomials())
@@ -111,9 +121,10 @@ class ArithmeticTests(unittest.TestCase):
         for malformed in (bytes(length - 1), bytes(length + 1),
                           MODULUS.to_bytes(3, "little") + bytes(length - 3),
                           bytes.fromhex("000080") + bytes(length - 3)):
-            with self.subTest(prefix=malformed[:3].hex(), length=len(malformed)):
-                with self.assertRaises(ScriptError):
-                    evaluate(transform_script(), [malformed])
+            for compact in (False, True):
+                with self.subTest(prefix=malformed[:3].hex(), length=len(malformed), compact=compact):
+                    with self.assertRaises(ScriptError):
+                        evaluate(transform_script(compact=compact), [malformed])
 
 
 class FipsTests(unittest.TestCase):

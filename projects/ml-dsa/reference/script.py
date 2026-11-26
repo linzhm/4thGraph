@@ -19,7 +19,7 @@ ORDINARY_CODE = _TAG + asm("OP_ENDIF OP_CHECKSIG")
 COMPANION_CODE = _TAG + asm("OP_IF OP_CHECKSIGVERIFY OP_ELSE OP_CODESEPARATOR") + ORDINARY_CODE
 
 
-def verify_message_script(public_key, message_bytes, *, context=b""):
+def verify_message_script(public_key, message_bytes, *, context=b"", legacy=False):
     """Compile a verifier that consumes the message and signature from the stack."""
     if not isinstance(public_key, bytes) or len(public_key) != PUBLIC_KEY_BYTES:
         raise ValueError("ML-DSA-44 public key must be 1,312 bytes")
@@ -29,25 +29,31 @@ def verify_message_script(public_key, message_bytes, *, context=b""):
         raise ValueError("ML-DSA message length must be a nonnegative integer")
 
     code = bytearray(asm("OP_OVER OP_SIZE") + number(message_bytes) + asm("OP_NUMEQUALVERIFY OP_DROP"))
-    code += signature_decode_script()
+    compact = not legacy
+    code += signature_decode_script(compact=compact)
     # [message, c_tilde, z, hints] -> [message, c_tilde, c || z].
-    code += asm("OP_TOALTSTACK OP_OVER") + sample_in_ball_script()
-    code += asm("OP_SWAP OP_CAT") + verification_equation_script(public_key)
-    code += asm("OP_FROMALTSTACK") + apply_hints_script()
+    code += asm("OP_TOALTSTACK OP_OVER") + sample_in_ball_script(compact=compact)
+    code += asm("OP_SWAP OP_CAT") + verification_equation_script(public_key, compact=compact)
+    code += asm("OP_FROMALTSTACK") + apply_hints_script(compact=compact)
 
     # Compute mu from the approved message and append the reconstructed w1.
     prefix = shake_256(public_key).digest(64) + bytes((0, len(context))) + context
     code += asm("OP_TOALTSTACK OP_TOALTSTACK") + push(prefix) + asm("OP_SWAP OP_CAT")
-    code += shake256_script(len(prefix) + message_bytes, 64)
+    code += shake256_script(len(prefix) + message_bytes, 64, compact=compact)
     code += asm("OP_FROMALTSTACK OP_SWAP OP_FROMALTSTACK OP_CAT")
-    code += shake256_script(64 + 768, CHALLENGE_BYTES)
+    code += shake256_script(64 + 768, CHALLENGE_BYTES, compact=compact)
     return bytes(code) + asm("OP_EQUAL")
 
 
-def locking_script(public_key):
+def locking_script(public_key, *, legacy=False):
     """Bind the Pure ML-DSA-44 verifier to the current transaction input."""
-    verifier = verify_message_script(public_key, DIGEST_BYTES)
+    verifier = verify_message_script(public_key, DIGEST_BYTES, legacy=legacy)
     code = authorization_checks(ORDINARY_CODE, COMPANION_CODE)
     code += asm("OP_SWAP OP_HASH256 OP_DUP OP_TOALTSTACK OP_SWAP")
     code += verifier + asm("OP_VERIFY OP_FROMALTSTACK")
     return code + check_binding(COMPANION_CODE)
+
+
+def matches_lock(script, public_key):
+    """Match either generation of the fixed-key payment template."""
+    return script == locking_script(public_key) or script == locking_script(public_key, legacy=True)

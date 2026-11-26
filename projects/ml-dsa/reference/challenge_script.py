@@ -49,6 +49,6 @@ def sample_from_stream_script():
 
 
 @cache
-def sample_in_ball_script():
+def sample_in_ball_script(*, compact=True):
     """Replace c-tilde32 with c packed as 256 three-byte LE residues."""
-    return shake256_script(CHALLENGE_BYTES, SAMPLE_IN_BALL_BYTES) + sample_from_stream_script()
+    return shake256_script(CHALLENGE_BYTES, SAMPLE_IN_BALL_BYTES, compact=compact) + sample_from_stream_script()

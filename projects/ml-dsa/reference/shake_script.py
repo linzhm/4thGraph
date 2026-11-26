@@ -37,6 +37,8 @@ _ROUND_CONSTANTS = (
     0x8000000000008080, 0x0000000080000001, 0x8000000080008008,
 )
 _PI_SOURCES = {(y, (2 * x + 3 * y) % 5): (x, y) for x, y in _POSITIONS}
+_PICK_TOP = (asm('OP_DUP'), asm('OP_OVER'))
+_ROLL_TOP = (b'', asm('OP_SWAP'), asm('OP_ROT'))
 _REVERSE_LANE = (
     asm('OP_1 OP_SPLIT OP_SWAP OP_TOALTSTACK') * (_LANE_BYTES - 1)
     + asm('OP_FROMALTSTACK OP_CAT') * (_LANE_BYTES - 1)
@@ -55,21 +57,30 @@ def _rotate_left(bits):
 class _Round:
     """Resolve named lanes to stack offsets while emitting one round."""
 
-    def __init__(self):
+    def __init__(self, *, compact):
         self.code = bytearray()
         self.lanes = [('a', x, y) for x, y in _POSITIONS]
-
-    def pick(self, lane):
-        depth = len(self.lanes) - 1 - self.lanes.index(lane)
-        self.code += number(depth) + asm('OP_PICK')
-        self.lanes.append(None)
+        self.compact = compact
 
     def roll(self, lane):
         position = self.lanes.index(lane)
         depth = len(self.lanes) - 1 - position
-        if depth:
+        if self.compact and depth < len(_ROLL_TOP):
+            self.code += _ROLL_TOP[depth]
+        elif depth:
             self.code += number(depth) + asm('OP_ROLL')
         self.lanes.append(self.lanes.pop(position))
+
+    def pick(self, lane, *, last_use=False):
+        if self.compact and last_use:
+            self.roll(lane)
+            return
+        depth = len(self.lanes) - 1 - self.lanes.index(lane)
+        if self.compact and depth < len(_PICK_TOP):
+            self.code += _PICK_TOP[depth]
+        else:
+            self.code += number(depth) + asm('OP_PICK')
+        self.lanes.append(None)
 
     def drop(self, lane):
         self.roll(lane)
@@ -92,43 +103,52 @@ class _Round:
                 self.binary('OP_XOR')
             self.name(('c', x))
         for x in range(5):
-            self.pick(('c', (x - 1) % 5))
-            self.pick(('c', (x + 1) % 5))
+            previous, following = (x - 1) % 5, (x + 1) % 5
+            self.pick(('c', previous), last_use=x > (x - 2) % 5)
+            self.pick(('c', following), last_use=x > (x + 2) % 5)
             self.code += _rotate_left(1)
             self.binary('OP_XOR')
             self.name(('d', x))
-        for x in range(5):
-            self.drop(('c', x))
+        if not self.compact:
+            for x in range(5):
+                self.drop(('c', x))
 
     def move_and_rotate(self):
+        uses_left = [5] * 5
         for x, y in _POSITIONS:
             source_x, source_y = _PI_SOURCES[x, y]
             self.roll(('a', source_x, source_y))
-            self.pick(('d', source_x))
+            uses_left[source_x] -= 1
+            self.pick(('d', source_x), last_use=uses_left[source_x] == 0)
             self.binary('OP_XOR')
             self.code += _rotate_left(_ROTATION[source_x][source_y])
             self.name(('b', x, y))
-        for x in range(5):
-            self.drop(('d', x))
+        if not self.compact:
+            for x in range(5):
+                self.drop(('d', x))
 
     def mix_rows(self, round_constant):
+        # b[x] is used by output columns x, x-1 and x-2 within the row.
+        last_use = [max(x, (x - 1) % 5, (x - 2) % 5) for x in range(5)]
         for y in range(5):
             for x in range(5):
-                self.pick(('b', (x + 1) % 5, y))
+                following, second = (x + 1) % 5, (x + 2) % 5
+                self.pick(('b', following, y), last_use=last_use[following] == x)
                 self.code += asm('OP_INVERT')
-                self.pick(('b', (x + 2) % 5, y))
+                self.pick(('b', second, y), last_use=last_use[second] == x)
                 self.binary('OP_AND')
-                self.pick(('b', x, y))
+                self.pick(('b', x, y), last_use=last_use[x] == x)
                 self.binary('OP_XOR')
                 if x == y == 0:
                     self.code += push(round_constant.to_bytes(_LANE_BYTES, 'big')) + asm('OP_XOR')
                 self.name(('a', x, y))
-            for x in range(5):
-                self.drop(('b', x, y))
+            if not self.compact:
+                for x in range(5):
+                    self.drop(('b', x, y))
 
 
 @cache
-def keccak_f1600_script():
+def keccak_f1600_script(*, compact=True):
     """Replace a 200-byte packed Keccak state with the permuted state.
 
     Lanes are packed little-endian in x+5y order. They are reversed before
@@ -139,7 +159,7 @@ def keccak_f1600_script():
     split_lane = number(_LANE_BYTES) + asm('OP_SPLIT OP_SWAP') + _REVERSE_LANE + asm('OP_SWAP')
     code += split_lane * 24 + _REVERSE_LANE
     for constant in _ROUND_CONSTANTS:
-        round_code = _Round()
+        round_code = _Round(compact=compact)
         round_code.columns()
         round_code.move_and_rotate()
         round_code.mix_rows(constant)
@@ -150,7 +170,7 @@ def keccak_f1600_script():
     return bytes(code)
 
 
-def _shake_script(message_bytes, output_bytes, rate):
+def _shake_script(message_bytes, output_bytes, rate, *, compact=True):
     if type(message_bytes) is not int or message_bytes < 0:
         raise ValueError('message length must be a nonnegative integer')
     if type(output_bytes) is not int or output_bytes < 1:
@@ -164,7 +184,7 @@ def _shake_script(message_bytes, output_bytes, rate):
 
     code = bytearray(asm('OP_SIZE') + number(message_bytes) + asm('OP_NUMEQUALVERIFY'))
     code += push(padding) + asm('OP_CAT') + push(bytes(_STATE_BYTES))
-    permutation = keccak_f1600_script()
+    permutation = keccak_f1600_script(compact=compact)
     absorb = (
         asm('OP_SWAP') + number(rate) + asm('OP_SPLIT OP_TOALTSTACK')
         + push(bytes(_STATE_BYTES - rate)) + asm('OP_CAT OP_XOR')
@@ -190,6 +210,6 @@ def shake128_script(message_bytes, output_bytes):
     return _shake_script(message_bytes, output_bytes, rate=168)
 
 
-def shake256_script(message_bytes, output_bytes):
+def shake256_script(message_bytes, output_bytes, *, compact=True):
     """Replace a byte vector of the specified length with a SHAKE256 XOF."""
-    return _shake_script(message_bytes, output_bytes, rate=136)
+    return _shake_script(message_bytes, output_bytes, rate=136, compact=compact)

@@ -29,17 +29,35 @@ TEMPLATES = {"pure-ml-dsa-44": Template(coin)}
 
 
 def components(_samples):
+    from challenge_script import sample_in_ball_script
+    from hint_script import apply_hints_script
     from ntt_script import transform_script, verification_equation_script
     from shake_script import shake256_script
+    from signature_script import signature_decode_script
     from test_mldsa import equation_fixture
+    from test_payment import TEST_SEED
 
     key, _, _ = equation_fixture()
+    payment_key, _ = test_only_vector(TEST_SEED, bytes(32), openssl=os.environ.get("ML_DSA_OPENSSL", "openssl"))
     return {
         "arithmetic_script_bytes": {
-            label: {"ntt": len(transform_script(signed_residues=enabled)),
-                    "inverse_ntt": len(transform_script(inverse=True, signed_residues=enabled)),
-                    "fixed_key_equation": len(verification_equation_script(key, signed_residues=enabled))}
-            for label, enabled in (("canonical", False), ("signed_residues", True))
+            label: {
+                "ntt": len(transform_script(**options)),
+                "inverse_ntt": len(transform_script(inverse=True, **options)),
+                "fixed_key_equation": len(verification_equation_script(key, **options)),
+            }
+            for label, options in (("canonical", {}), ("signed_residues", {"signed_residues": True}),
+                                   ("compact", {"compact": True}))
         },
         "shake256_832_to_32_script_bytes": len(shake256_script(832, 32)),
+        "payment_script_bytes": {
+            label: {
+                "signature_decode": len(signature_decode_script(compact=compact)),
+                "sample_in_ball": len(sample_in_ball_script(compact=compact)),
+                "apply_hints": len(apply_hints_script(compact=compact)),
+                "shake256_832_to_32": len(shake256_script(832, 32, compact=compact)),
+                "payment_lock": len(locking_script(payment_key, legacy=not compact)),
+            }
+            for label, compact in (("legacy", False), ("compact", True))
+        },
     }

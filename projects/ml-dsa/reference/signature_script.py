@@ -50,10 +50,13 @@ def response_decode_script():
 
 
 @cache
-def hint_decode_script():
+def hint_decode_script(*, compact=True):
     """Replace HintBitPack bytes with four 32-byte bitmaps, LSB-first per byte."""
     code = bytearray(asm('OP_SIZE') + number(HINT_PACKED_BYTES) + asm('OP_NUMEQUALVERIFY'))
-    code += number(HINT_WEIGHT_LIMIT) + asm('OP_SPLIT OP_0')
+    code += number(HINT_WEIGHT_LIMIT) + asm('OP_SPLIT')
+    if compact:
+        return bytes(code) + _compact_hint_decode()
+    code += asm('OP_0')
 
     # [remaining indices, remaining endpoints, previous endpoint] enters each
     # row. Validate the next endpoint and split off the indices it covers.
@@ -86,13 +89,43 @@ def hint_decode_script():
     return bytes(code)
 
 
+def _compact_hint_decode():
+    # Check the four unsigned endpoints and the unused tail of the index array.
+    endpoint = asm('OP_1 OP_SPLIT OP_SWAP') + _UNSIGNED + asm('OP_SWAP')
+    code = endpoint * (HINT_ROWS - 1) + _UNSIGNED
+    code += asm('OP_DUP') + number(HINT_WEIGHT_LIMIT) + asm('OP_LESSTHANOREQUAL OP_VERIFY')
+    code += asm('OP_3 OP_PICK OP_3 OP_PICK OP_LESSTHANOREQUAL OP_VERIFY '
+                'OP_2 OP_PICK OP_2 OP_PICK OP_LESSTHANOREQUAL OP_VERIFY '
+                'OP_2DUP OP_LESSTHANOREQUAL OP_VERIFY OP_4 OP_ROLL OP_SWAP OP_SPLIT')
+    code += asm('OP_SIZE OP_0 OP_SWAP OP_NUM2BIN OP_EQUALVERIFY OP_TOALTSTACK')
+
+    # [end0, end1, end2, msb, cursor, bitmap, previous index, remaining bytes].
+    # Compute the global index across all rows so a single strict-order check
+    # covers all four, including transitions over empty rows.
+    bitmap_bytes = HINT_ROWS * DEGREE // 8
+    code += push(b'\x80' + bytes(bitmap_bytes - 1))
+    code += asm('OP_0 OP_0') + number(bitmap_bytes) + asm('OP_NUM2BIN OP_1NEGATE OP_FROMALTSTACK')
+    index = asm('OP_SIZE OP_0NOTEQUAL OP_IF OP_1 OP_SPLIT OP_SWAP') + _UNSIGNED
+    index += asm('OP_4 OP_PICK OP_7 OP_PICK OP_GREATERTHANOREQUAL '
+                 'OP_5 OP_PICK OP_9 OP_PICK OP_GREATERTHANOREQUAL OP_ADD '
+                 'OP_5 OP_PICK OP_10 OP_PICK OP_GREATERTHANOREQUAL OP_ADD')
+    index += number(DEGREE) + asm('OP_MUL OP_ADD OP_DUP OP_3 OP_PICK OP_GREATERTHAN OP_VERIFY OP_ROT OP_DROP')
+    # Convert the global index to a big-endian shift count for a LSB-first bitmap.
+    index += asm('OP_DUP OP_2 OP_NUM2BIN') + push(b'\x07\x00') + asm('OP_XOR OP_BIN2NUM')
+    index += asm('OP_5 OP_PICK OP_SWAP OP_RSHIFT OP_3 OP_ROLL OP_OR OP_ROT OP_ROT OP_SWAP')
+    index += asm('OP_TOALTSTACK OP_TOALTSTACK OP_SWAP OP_1ADD OP_SWAP '
+                 'OP_FROMALTSTACK OP_FROMALTSTACK OP_ENDIF')
+    code += index * HINT_WEIGHT_LIMIT
+    return code + asm('OP_2DROP OP_TOALTSTACK OP_2DROP OP_2DROP OP_DROP OP_FROMALTSTACK')
+
+
 @cache
-def signature_decode_script():
+def signature_decode_script(*, compact=True):
     """Replace a signature with [c-tilde, z residues, hint bitmaps]."""
     code = asm('OP_SIZE') + number(SIGNATURE_BYTES) + asm('OP_NUMEQUALVERIFY')
     code += number(CHALLENGE_BYTES) + asm('OP_SPLIT')
     code += number(RESPONSE_PACKED_BYTES) + asm('OP_SPLIT')
     return (
-        code + hint_decode_script() + asm('OP_TOALTSTACK')
+        code + hint_decode_script(compact=compact) + asm('OP_TOALTSTACK')
         + response_decode_script() + asm('OP_FROMALTSTACK')
     )

@@ -61,41 +61,41 @@ class ChronicleArithmeticTests(unittest.TestCase):
                         with self.assertRaisesRegex(ValueError, "Top of stack is false"):
                             _validate(parent, spend, version, creation_height, spending_height)
 
-    def test_signed_ntt_kernel_matches_independent_canonical_results(self):
+    def test_reduced_ntt_kernels_match_independent_canonical_results(self):
         node = None
         if cookie := os.environ.get("REGTEST_COOKIE"):
             node = Node(os.environ.get("REGTEST_URL", "http://127.0.0.1:18443"), cookie)
         left, _ = synthetic_polynomials()
         extremes = tuple((MODULUS - 1) * (index % 2) for index in range(DEGREE))
-        forward = transform_script(signed_residues=True)
-        inverse = transform_script(inverse=True, signed_residues=True)
-        self.assertLess(len(forward), len(transform_script()))
-        self.assertLess(len(inverse), len(transform_script(inverse=True)))
-        for label, coefficients in (("fixture", left), ("alternating extremes", extremes),
-                                    ("zeros", (0,) * DEGREE)):
-            expected = pack(direct_evaluation(coefficients))
-            for direction, kernel, source, target in (
-                    ("forward", forward, pack(coefficients), expected),
-                    ("inverse", inverse, expected, pack(coefficients))):
-                with self.subTest(polynomial=label, direction=direction):
-                    parent, spend = _case(kernel, (source,), target)
-                    _validate(parent, spend, 2, 3, 4)
-                    if node:
-                        self.assertEqual(node.verdicts(spend, (parent,)), [True])
         key, equation_input, expected = equation_fixture()
-        kernel = verification_equation_script(key, signed_residues=True)
-        self.assertLess(len(kernel), len(verification_equation_script(key)))
-        for label, target in (("original", expected), ("changed", bytes([expected[0] ^ 1]) + expected[1:])):
-            with self.subTest(equation=label):
-                parent, spend = _case(kernel, (equation_input,), target)
-                valid = label == "original"
-                if valid:
-                    _validate(parent, spend, 2, 3, 4)
-                else:
-                    with self.assertRaisesRegex(ValueError, "Top of stack is false"):
+        for options in ({"signed_residues": True}, {"compact": True}):
+            forward = transform_script(**options)
+            inverse = transform_script(inverse=True, **options)
+            self.assertLess(len(forward), len(transform_script()))
+            self.assertLess(len(inverse), len(transform_script(inverse=True)))
+            for label, coefficients in (("fixture", left), ("alternating extremes", extremes),
+                                        ("zeros", (0,) * DEGREE)):
+                transformed = pack(direct_evaluation(coefficients))
+                for direction, kernel, source, target in (
+                        ("forward", forward, pack(coefficients), transformed),
+                        ("inverse", inverse, transformed, pack(coefficients))):
+                    with self.subTest(polynomial=label, direction=direction, **options):
+                        parent, spend = _case(kernel, (source,), target)
                         _validate(parent, spend, 2, 3, 4)
-                if node:
-                    self.assertEqual(node.verdicts(spend, (parent,)), [valid])
+                        if node:
+                            self.assertEqual(node.verdicts(spend, (parent,)), [True])
+            equation = verification_equation_script(key, **options)
+            self.assertLess(len(equation), len(verification_equation_script(key)))
+            for valid, target in ((True, expected), (False, bytes([expected[0] ^ 1]) + expected[1:])):
+                with self.subTest(valid=valid, **options):
+                    parent, spend = _case(equation, (equation_input,), target)
+                    if valid:
+                        _validate(parent, spend, 2, 3, 4)
+                    else:
+                        with self.assertRaisesRegex(ValueError, "Top of stack is false"):
+                            _validate(parent, spend, 2, 3, 4)
+                    if node:
+                        self.assertEqual(node.verdicts(spend, (parent,)), [valid])
 
     def test_generic_verifier_authenticates_context_for_empty_message(self):
         message = b""

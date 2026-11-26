@@ -26,7 +26,7 @@ The large lock warrants explicit admission-policy verification in the intended e
 
 ## Validation and measurements
 
-The payment acceptance domain has 640 rows. Cross-checks include 80 Wycheproof cases and 15 external NIST ACVP pure-mode vectors. The deterministic lock fixture is 926,403 bytes, while compiled sizes vary slightly by public key. A distinct two-input, two-output OTDA ALL payment sample measures 5,563,725 bytes. The development evaluator's ML-DSA stack figures are unavailable at its current opcode coverage.
+The payment acceptance domain has 640 rows. Cross-checks include 80 Wycheproof cases and 15 external NIST ACVP pure-mode vectors. The deterministic compact lock is 663,284 bytes, and compiled sizes vary slightly by public key. A two-input, two-output OTDA ALL payment measures 3,985,011 bytes. The development evaluator lacks the comparison opcodes needed for ML-DSA stack measurements. [Script and transaction sizes](../README.md#script-sizes)
 
 Use Python 3.12 and OpenSSL 3.5 or later. See the [project replay commands](../README.md#reproduce-the-checks), [deterministic fixture](../template/deterministic.json), and [payment matrix](../reference/payment-acceptance.md).
 

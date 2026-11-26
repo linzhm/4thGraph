@@ -26,8 +26,25 @@ def _decompose():
     return code + number(_LOW_MODULUS) + asm("OP_DIV OP_ENDIF")
 
 
+def _hint_is_clear(index):
+    return (_read_bytes(4, index // 8, 1) + push(bytes((1 << (index % 8),)))
+            + asm("OP_AND") + push(b"\0") + asm("OP_EQUAL"))
+
+
+def _compact_use_hint(index):
+    # Compute the unreduced high part in [0, 44] and whether the centered
+    # low part is positive. At high == 44 the low part is negative, including
+    # q-1, and reducing the high part modulo 44 gives the FIPS 204 wrap.
+    code = asm("OP_DUP") + number(_GAMMA2 - 1) + asm("OP_ADD")
+    code += number(_LOW_MODULUS) + asm("OP_DIV OP_TUCK")
+    code += number(_LOW_MODULUS) + asm("OP_MUL OP_GREATERTHAN")
+    code += _hint_is_clear(index)
+    code += asm("OP_NOTIF OP_IF OP_1ADD OP_ELSE OP_1SUB OP_ENDIF OP_ELSE OP_DROP OP_ENDIF")
+    return code + number(_HIGH_MODULUS) + asm("OP_ADD") + number(_HIGH_MODULUS) + asm("OP_MOD")
+
+
 @cache
-def apply_hints_script():
+def apply_hints_script(*, compact=True):
     """Consume the packed four canonical residue rows and the 128-byte hint bitset.
 
     The hint bitset uses one LSB-first bit per coefficient, in row order. The
@@ -42,12 +59,14 @@ def apply_hints_script():
         for digit in range(4):
             index = first + digit
             code += _read_bytes(3, index * COEFFICIENT_BYTES, COEFFICIENT_BYTES)
-            code += asm("OP_BIN2NUM") + decompose
-            code += _read_bytes(4, index // 8, 1) + push(bytes((1 << (index % 8),)))
-            code += asm("OP_AND") + push(b"\0") + asm("OP_EQUAL OP_NOTIF")
-            code += asm("OP_SWAP OP_0 OP_GREATERTHAN OP_IF OP_1ADD OP_ELSE OP_1SUB OP_ENDIF")
-            code += number(_HIGH_MODULUS) + asm("OP_ADD") + number(_HIGH_MODULUS) + asm("OP_MOD")
-            code += asm("OP_ELSE OP_NIP OP_ENDIF")
+            code += asm("OP_BIN2NUM")
+            if compact:
+                code += _compact_use_hint(index)
+            else:
+                code += decompose + _hint_is_clear(index) + asm("OP_NOTIF")
+                code += asm("OP_SWAP OP_0 OP_GREATERTHAN OP_IF OP_1ADD OP_ELSE OP_1SUB OP_ENDIF")
+                code += number(_HIGH_MODULUS) + asm("OP_ADD") + number(_HIGH_MODULUS) + asm("OP_MOD")
+                code += asm("OP_ELSE OP_NIP OP_ENDIF")
             if digit:
                 code += number(1 << (6 * digit)) + asm("OP_MUL")
             code += asm("OP_ADD")

@@ -66,9 +66,15 @@ explicit synthetic prevouts through `verifyscript` on a peerless regtest.
 
 ## Recorded replay
 
-The 640 rows matched on Linux x86-64 with the
+The 640 rows matched for the baseline lock on Linux x86-64 with the
 [pinned chain-gang build](../../../tools/requirements-chronicle.txt),
 BSV Node 1.2.3 (`101020300`), and Lean `bsvs` from revision
 `1c051eaef1077cc95e5d1618686d5efacc4aa097`. OpenSSL 3.5.7 generated the test signatures.
 The pinned corpora also matched 15/15 ACVP cases in Python and Script and
 80/80 Wycheproof cases in Python.
+
+The compact lock matched all 640 rows with the same chain-gang pin and BSV
+Node 1.2.3. The isolated node used `-maxstdtxvalidationduration=5000` and
+`-maxnonstdtxvalidationduration=7000`. The suite also reproduced the
+PR #68 legacy lock's SHA-256 and spent it in BIP143 ALL, OTDA ALL and
+unpaired OTDA SINGLE on both engines.
