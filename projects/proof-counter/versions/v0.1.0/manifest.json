@@ -1,0 +1,14 @@
+{
+  "version": "0.1.0",
+  "previous": null,
+  "artifacts": [],
+  "fixtures": [
+    "bls12381-counter.json"
+  ],
+  "evidence": [
+    "measurements.json"
+  ],
+  "integration": "reference/fixed-statement/README.md#\u590d\u73b0",
+  "build": "PYTHONPATH=src:. python -m fourthgraph.verification.circuit_backend projects/proof-counter/verify-state.fth --output /tmp/counter.circom",
+  "verify": "PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- python -m fourthgraph.replay.groth16_bls12381 --output /tmp/proof-counter-replay.json"
+}

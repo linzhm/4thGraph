@@ -1,12 +1,12 @@
 """Byte-level P2PKH-R1 wallet operations. The input to recognition is one raw scriptPubKey."""
 from functools import cache
 from hashlib import new, sha256
-from pathlib import Path
 import re
 
 from cryptography.hazmat.primitives.asymmetric import ec
 
-from fixed_templates import LEGACY_TEMPLATE_VERSION, TEMPLATE_VERSION, compiled_owner, compiled_template
+from fixed_templates import LEGACY_TEMPLATE_VERSION, TEMPLATE_VERSION, VERSIONS_DIRECTORY
+from fixed_templates import compiled_owner, compiled_template
 
 
 SCRIPT_SIZE = 59582
@@ -30,7 +30,7 @@ def public_key_hash160(public_key: bytes) -> bytes:
 
 @cache
 def _base_program() -> bytes:
-    path = Path(__file__).resolve().parents[1] / "template/template.hex"
+    path = VERSIONS_DIRECTORY / f"v{LEGACY_TEMPLATE_VERSION}" / "template.hex"
     raw = bytes.fromhex(path.read_text(encoding="ascii"))
     if len(raw) != SCRIPT_SIZE or sha256(raw).digest() != _BASE_HASH:
         raise ValueError("canonical P2PKH-R1 fixture mismatch")

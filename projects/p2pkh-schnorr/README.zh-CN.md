@@ -1,6 +1,6 @@
 # P2PKH-Schnorr v0.6.0
 
-[English](README.md) · [4thGraph](../../README.zh-CN.md) · [项目目录](../README.zh-CN.md)
+[English](README.md) · [4thGraph](../../README.zh-CN.md) · [项目目录](../README.zh-CN.md) · [版本](versions/index.json)
 
 **实验付款模板。** 在 BSV 上向 BIP340 x-only 公钥的哈希付款。钱包只需在固定锁定脚本中填入 20 字节的所有者哈希，外部签名器返回标准 64 字节 BIP340 签名。
 
@@ -44,7 +44,7 @@ bash tools/verify_node.sh -- bash sdk/verify_wallet.sh p2pkh-schnorr
 | BIP143 ALL | 30,398 | 329 | 61,572 | 372 | 30,409 | 61,798 | 123,369 | 3,325 |
 | Chronicle OTDA ALL | 30,398 | 61,087 | 183,088 | 61,253 | 91,235 | 61,811 | 244,899 | 122,006 |
 
-单位均为字节。栈载荷取开发求值器测得的第一个输入的主栈和备用栈合计峰值。完整输入在 BSV Node 1.2.3 和 chain-gang 上用显式提供的上一输出验证。OTDA ALL 的每份预映像都包含完整输出字节。[模板布局及指纹](template/layout.json) · [基准口径](../../docs/benchmark.zh-CN.md)
+单位均为字节。栈载荷取开发求值器测得的第一个输入的主栈和备用栈合计峰值。完整输入在 BSV Node 1.2.3 和 chain-gang 上用显式提供的上一输出验证。OTDA ALL 的每份预映像都包含完整输出字节。[模板布局及指纹](versions/v0.6.0/layout.json) · [基准口径](../../docs/benchmark.zh-CN.md)
 
 ```sh
 bash tools/verify_node.sh -- "$SCRIPT_LAB_SDK_PYTHON" -m fourthgraph.benchmark.run \

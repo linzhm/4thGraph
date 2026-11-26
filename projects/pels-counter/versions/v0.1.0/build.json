@@ -1,0 +1,294 @@
+{
+  "counter": 0,
+  "satoshis": 1020000,
+  "advance_hex": "8b05000000000197",
+  "script_bytes": 538,
+  "script_hex": "050000000000ab74529d7c7602a4007f77017c7f757c0274017f7b7c7e7e0247027f82549d04410000007e6b768254947f77aa6b547f01247f6b76aa7b7c7e6c6c7b7c7e7b7e03fd13027e787e6b0213027f587f758102e803947600a06958807c03fd1a027b7c7e557e7b818b0500000000019755807e01ab7e7c7eaa6c7c7e6c7eaa517f517f517f517f517f517f517f517f517f517f517f517f517f517f517f517f517f517f517f517f517f517f517f517f517f517f517f517f517f517f517f7c7e7c7e7c7e7c7e7c7e7c7e7c7e7c7e7c7e7c7e7c7e7c7e7c7e7c7e7c7e7c7e7c7e7c7e7c7e7c7e7c7e7c7e7c7e7c7e7c7e7c7e7c7e7c7e7c7e7c7e7c7e01007e81209817f8165b81f259d928ce2ddbfc9b02070b87ce9562a055acbbdcf97e66be799321414136d08c5ed2bf3ba048afe6dcaebafeffffffffffffffffffffffffffffff007d9776697d94a3826b012080517f517f517f517f517f517f517f517f517f517f517f517f517f517f517f517f517f517f517f517f517f517f517f517f517f517f517f517f517f517f517f7c7e7c7e7c7e7c7e7c7e7c7e7c7e7c7e7c7e7c7e7c7e7c7e7c7e7c7e7c7e7c7e7c7e7c7e7c7e7c7e7c7e7c7e7c7e7c7e7c7e7c7e7c7e7c7e7c7e7c7e7c7e01206c947f77827d6b7e23022079be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798027c7e6c01249301307c7e7c7e76547f7701207f75527c7e7c01417e7cac",
+  "optimization": {
+    "objective": "path-bytes",
+    "scope": "serialized_deployment_lock_field_plus_first_spend",
+    "template": {
+      "inputs": 1,
+      "outputs": [
+        "counter"
+      ],
+      "sighash": "41",
+      "successor_assertions": {
+        "counter": "advance",
+        "preserve_script_code": true,
+        "fee_satoshis": {
+          "minimum": 1000,
+          "maximum": 1000,
+          "from_witness": false
+        }
+      }
+    },
+    "advance": {
+      "script_bytes": 8,
+      "rewrites": [
+        {
+          "rule": "add-one-instruction",
+          "line": 2,
+          "column": 37,
+          "inputs": [
+            {
+              "kind": "u32",
+              "bounds": [
+                0,
+                4294967295
+              ]
+            },
+            {
+              "kind": "u32",
+              "bounds": [
+                1,
+                1
+              ]
+            }
+          ],
+          "script_bytes": null,
+          "module": "std/u32"
+        }
+      ]
+    },
+    "selected_candidate": 11,
+    "candidates": [
+      {
+        "pushtx": "baseline",
+        "witness": "full-preimage",
+        "reconstructed_fields": [],
+        "rewrites": [],
+        "lock_bytes": 705,
+        "witness_bytes": 860,
+        "spend_bytes": 1629,
+        "path_bytes": 2337
+      },
+      {
+        "pushtx": "baseline",
+        "witness": "reconstructed",
+        "reconstructed_fields": [
+          "hashPrevouts",
+          "hashSequence",
+          "hashOutputs",
+          "sighash"
+        ],
+        "rewrites": [
+          "reconstruct-bip143-all"
+        ],
+        "lock_bytes": 698,
+        "witness_bytes": 753,
+        "spend_bytes": 1515,
+        "path_bytes": 2216
+      },
+      {
+        "pushtx": "baseline",
+        "witness": "linked-script-size",
+        "reconstructed_fields": [
+          "hashPrevouts",
+          "hashSequence",
+          "hashOutputs",
+          "sighash",
+          "scriptCodeLength"
+        ],
+        "rewrites": [
+          "reconstruct-bip143-all",
+          "link-script-code-size"
+        ],
+        "lock_bytes": 698,
+        "witness_bytes": 750,
+        "spend_bytes": 1512,
+        "path_bytes": 2213
+      },
+      {
+        "pushtx": "baseline",
+        "witness": "reused-script-fragment",
+        "reconstructed_fields": [
+          "hashPrevouts",
+          "hashSequence",
+          "hashOutputs",
+          "sighash",
+          "scriptCodeLength"
+        ],
+        "rewrites": [
+          "reconstruct-bip143-all",
+          "link-script-code-size",
+          "reuse-self-script-fragment"
+        ],
+        "lock_bytes": 718,
+        "witness_bytes": 584,
+        "spend_bytes": 1366,
+        "path_bytes": 2087,
+        "script_code_reuse": {
+          "source": 125,
+          "repeated": 429,
+          "size": 186
+        }
+      },
+      {
+        "pushtx": "compact",
+        "witness": "full-preimage",
+        "reconstructed_fields": [],
+        "rewrites": [
+          "fixed-width-byte-reversal",
+          "reuse-secp256k1-order"
+        ],
+        "lock_bytes": 547,
+        "witness_bytes": 702,
+        "spend_bytes": 1313,
+        "path_bytes": 1863
+      },
+      {
+        "pushtx": "compact",
+        "witness": "reconstructed",
+        "reconstructed_fields": [
+          "hashPrevouts",
+          "hashSequence",
+          "hashOutputs",
+          "sighash"
+        ],
+        "rewrites": [
+          "fixed-width-byte-reversal",
+          "reuse-secp256k1-order",
+          "reconstruct-bip143-all"
+        ],
+        "lock_bytes": 540,
+        "witness_bytes": 595,
+        "spend_bytes": 1199,
+        "path_bytes": 1742
+      },
+      {
+        "pushtx": "compact",
+        "witness": "linked-script-size",
+        "reconstructed_fields": [
+          "hashPrevouts",
+          "hashSequence",
+          "hashOutputs",
+          "sighash",
+          "scriptCodeLength"
+        ],
+        "rewrites": [
+          "fixed-width-byte-reversal",
+          "reuse-secp256k1-order",
+          "reconstruct-bip143-all",
+          "link-script-code-size"
+        ],
+        "lock_bytes": 540,
+        "witness_bytes": 592,
+        "spend_bytes": 1196,
+        "path_bytes": 1739
+      },
+      {
+        "pushtx": "compact",
+        "witness": "reused-script-fragment",
+        "reconstructed_fields": [
+          "hashPrevouts",
+          "hashSequence",
+          "hashOutputs",
+          "sighash",
+          "scriptCodeLength"
+        ],
+        "rewrites": [
+          "fixed-width-byte-reversal",
+          "reuse-secp256k1-order",
+          "reconstruct-bip143-all",
+          "link-script-code-size",
+          "reuse-self-script-fragment"
+        ],
+        "lock_bytes": 559,
+        "witness_bytes": 487,
+        "spend_bytes": 1110,
+        "path_bytes": 1672,
+        "script_code_reuse": {
+          "source": 124,
+          "repeated": 332,
+          "size": 124
+        }
+      },
+      {
+        "pushtx": "compact-reuse-r",
+        "witness": "full-preimage",
+        "reconstructed_fields": [],
+        "rewrites": [
+          "fixed-width-byte-reversal",
+          "reuse-secp256k1-order",
+          "reuse-fixed-der-r-in-public-key"
+        ],
+        "lock_bytes": 526,
+        "witness_bytes": 681,
+        "spend_bytes": 1271,
+        "path_bytes": 1800
+      },
+      {
+        "pushtx": "compact-reuse-r",
+        "witness": "reconstructed",
+        "reconstructed_fields": [
+          "hashPrevouts",
+          "hashSequence",
+          "hashOutputs",
+          "sighash"
+        ],
+        "rewrites": [
+          "fixed-width-byte-reversal",
+          "reuse-secp256k1-order",
+          "reuse-fixed-der-r-in-public-key",
+          "reconstruct-bip143-all"
+        ],
+        "lock_bytes": 519,
+        "witness_bytes": 574,
+        "spend_bytes": 1157,
+        "path_bytes": 1679
+      },
+      {
+        "pushtx": "compact-reuse-r",
+        "witness": "linked-script-size",
+        "reconstructed_fields": [
+          "hashPrevouts",
+          "hashSequence",
+          "hashOutputs",
+          "sighash",
+          "scriptCodeLength"
+        ],
+        "rewrites": [
+          "fixed-width-byte-reversal",
+          "reuse-secp256k1-order",
+          "reuse-fixed-der-r-in-public-key",
+          "reconstruct-bip143-all",
+          "link-script-code-size"
+        ],
+        "lock_bytes": 519,
+        "witness_bytes": 571,
+        "spend_bytes": 1154,
+        "path_bytes": 1676
+      },
+      {
+        "pushtx": "compact-reuse-r",
+        "witness": "reused-script-fragment",
+        "reconstructed_fields": [
+          "hashPrevouts",
+          "hashSequence",
+          "hashOutputs",
+          "sighash",
+          "scriptCodeLength"
+        ],
+        "rewrites": [
+          "fixed-width-byte-reversal",
+          "reuse-secp256k1-order",
+          "reuse-fixed-der-r-in-public-key",
+          "reconstruct-bip143-all",
+          "link-script-code-size",
+          "reuse-self-script-fragment"
+        ],
+        "lock_bytes": 538,
+        "witness_bytes": 466,
+        "spend_bytes": 1068,
+        "path_bytes": 1609,
+        "script_code_reuse": {
+          "source": 124,
+          "repeated": 332,
+          "size": 124
+        }
+      }
+    ]
+  },
+  "fee_satoshis": 1000
+}

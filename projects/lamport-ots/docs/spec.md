@@ -89,7 +89,7 @@ never broadcasts or mines the transactions. This demonstrates Script acceptance
 under those settings, not mainnet relay policy, fee acceptance, UTXO existence,
 or network-wide consensus testing. Node tests also cross-check pinned chain-gang.
 
-Static opcode counts in `measurement.json` exclude payload bytes; both branches
+Static opcode counts in `measurements.json` exclude payload bytes; both branches
 are counted in the encoded instruction totals, although only one public-key push
 per bit executes. The universal script has 256 SHA256 instructions, one HASH256 and two native
 signature instructions. Both signature checks execute only in the companion branch.

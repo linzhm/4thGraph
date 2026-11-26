@@ -128,7 +128,7 @@ lock: values-match ( left:bytes right:bytes )
 
 ### 3.2 原生 Script 指令
 
-仓库中以 BSV Script 为目标的源码在开头用 `REQUIRE BSV` 声明后端词汇。它加载受支持的 Genesis 和 Chronicle 共有原生 `OP_*` 词，以及 `verify`。这些词使用同一套静态类型检查。`OP_CAT` 的栈效果为 `bytes bytes -- bytes`，`OP_ADD` 的栈效果为 `script-int script-int -- script-int`。`OP_EQUAL` 和 `OP_CHECKSIG` 正常返回时产生 `1` 或 `0`。标准 Forth 比较词 `=` 产生 `-1` 或 `0`。`OP_EQUALVERIFY` 在字节不等时中止，`OP_CHECKSIG` 根据花费交易验证签名。支持的指令见 `4thgraph --capabilities` 输出的 `bsv.native_opcodes`。
+在 BSV Script 源码开头使用 `REQUIRE BSV` 加载受支持的 Genesis 和 Chronicle 共有原生 `OP_*` 词，以及 `verify`。这些词使用同一套静态类型检查。`OP_CAT` 的栈效果为 `bytes bytes -- bytes`，`OP_ADD` 的栈效果为 `script-int script-int -- script-int`。`OP_EQUAL` 和 `OP_CHECKSIG` 正常返回时产生 `1` 或 `0`。标准 Forth 比较词 `=` 产生 `-1` 或 `0`。`OP_EQUALVERIFY` 在字节不等时中止，`OP_CHECKSIG` 根据花费交易验证签名。支持的指令见 `4thgraph --capabilities` 输出的 `bsv.native_opcodes`。
 
 ## 4. 公开导出
 

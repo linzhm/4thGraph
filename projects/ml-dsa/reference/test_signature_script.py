@@ -47,7 +47,7 @@ def _stack_items(stack):
 class SignatureScriptTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        vector_path = Path(__file__).resolve().parents[1] / 'template' / 'deterministic.json'
+        vector_path = Path(__file__).resolve().parents[1] / 'versions/v0.1.0' / 'deterministic.json'
         vector = json.loads(vector_path.read_text())
         _, cls.signature = test_only_vector(
             bytes.fromhex(vector['seed_test_only']), bytes.fromhex(vector['message']),

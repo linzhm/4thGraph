@@ -132,7 +132,7 @@ lock: values-match ( left:bytes right:bytes )
 
 ### 3.2 Native Script opcodes
 
-Repository sources targeting BSV Script begin with `REQUIRE BSV`. It loads `verify` and the supported subset of native `OP_*` words common to Genesis and Chronicle. These words use the compiler's static type checking. `OP_CAT` has stack effect `bytes bytes -- bytes`, and `OP_ADD` has stack effect `script-int script-int -- script-int`. When `OP_EQUAL` or `OP_CHECKSIG` returns normally, it produces `1` or `0`. The standard Forth comparison `=` produces `-1` or `0`. `OP_EQUALVERIFY` aborts if the byte strings differ, and `OP_CHECKSIG` checks the signature against the spending transaction. The `bsv.native_opcodes` field in `4thgraph --capabilities` lists the supported opcodes.
+Use `REQUIRE BSV` at the top of a Script source to load `verify` and the supported subset of native `OP_*` words common to Genesis and Chronicle. These words use the compiler's static type checking. `OP_CAT` has stack effect `bytes bytes -- bytes`, and `OP_ADD` has stack effect `script-int script-int -- script-int`. When `OP_EQUAL` or `OP_CHECKSIG` returns normally, it produces `1` or `0`. The standard Forth comparison `=` produces `-1` or `0`. `OP_EQUALVERIFY` aborts if the byte strings differ, and `OP_CHECKSIG` checks the signature against the spending transaction. The `bsv.native_opcodes` field in `4thgraph --capabilities` lists the supported opcodes.
 
 ## 4. Public exports
 

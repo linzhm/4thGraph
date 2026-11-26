@@ -51,6 +51,10 @@ def evaluate(raw, stack=None, checksig=None, *, observe_stack=None):
             elif name=='DROP': pop()
             elif name=='2DROP': pop(); pop()
             elif name=='DUP': stack.append(stack[-1])
+            elif name=='IFDUP':
+                require_stack(1)
+                if truth(stack[-1]):
+                    stack.append(stack[-1])
             elif name=='2DUP':
                 require_stack(2)
                 stack.extend(stack[-2:])

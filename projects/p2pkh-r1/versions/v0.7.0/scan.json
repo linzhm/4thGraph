@@ -1,0 +1,142 @@
+{
+  "source_sha256": "654e8130d49704c4a99961b2763216eebcd1c76e880ad65e284033491128a94f",
+  "dependencies": {
+    "r1.fth": "8acaf9f81bc367c98f9a42d561e302c6f27cc376ad3f3f8c8d49f5176cbaa7d9"
+  },
+  "intrinsic": "P256.mul2(u,G,v,Q)",
+  "source": {
+    "file": "msm.fth",
+    "line": 21,
+    "column": 5
+  },
+  "candidate": "split-5x4-affine-g",
+  "scalar_bits": 256,
+  "ranges_inclusive": {
+    "msm-scalar": [
+      "0",
+      "115792089210356248762697446949407573529996955224135760342422259061068512044368"
+    ],
+    "msm-affine": [
+      "0",
+      "115792089210356248762697446949407573530086143415290314195533631308867097853950"
+    ],
+    "msm-projective": [
+      "-115792089210356248762697446949407573530086143415290314195533631308867097853950",
+      "115792089210356248762697446949407573530086143415290314195533631308867097853950"
+    ]
+  },
+  "runtime_point_check": {
+    "file": "r1.fth",
+    "line": 111,
+    "column": 3
+  },
+  "runtime_scalar_derivation": {
+    "file": "r1.fth",
+    "line": 425,
+    "column": 3
+  },
+  "digit_ranges_inclusive": {
+    "G": [
+      0,
+      31
+    ],
+    "Q": [
+      0,
+      15
+    ]
+  },
+  "table_points": 48,
+  "unexpanded_counts": {
+    "g_lookups": 52,
+    "q_lookups": 64,
+    "joint_lookups": 0,
+    "g_adds": 51,
+    "loop_adds": 115,
+    "loop_doubles": 255,
+    "digit_rounds": 103,
+    "setup_adds": 7,
+    "setup_doubles": 7
+  },
+  "opportunities": [
+    {
+      "id": "affine-g",
+      "source": {
+        "file": "msm.fth",
+        "line": 21,
+        "column": 5
+      },
+      "calls": 51,
+      "proven": [
+        "0 <= digit < 2^width",
+        "G has order n and 2^width < n",
+        "G[0] is infinity; every nonzero G entry is emitted with Z=1"
+      ],
+      "requirements": [
+        "use only the separate G table",
+        "guard digit zero before substituting Z=1"
+      ],
+      "missing": [],
+      "equivalence": "the finite result represents the same group point and infinity is preserved",
+      "estimated": {
+        "multiplications_removed": 153,
+        "branch_opcode_bytes_added": 255,
+        "lookup_opcode_bytes_removed": 153
+      },
+      "try": "split-5x4-affine-g",
+      "priority": 153
+    },
+    {
+      "id": "joint-table",
+      "source": {
+        "file": "msm.fth",
+        "line": 21,
+        "column": 5
+      },
+      "calls": 103,
+      "proven": [
+        "joint index is u_digit * radix + v_digit",
+        "each table entry represents u_digit*G + v_digit*Q"
+      ],
+      "requirements": [
+        "same digit width for G and Q",
+        "joint table fits the backend budget"
+      ],
+      "missing": [
+        "common digit width for a direct table replacement"
+      ],
+      "equivalence": "same group result for every u,v in the declared scalar range",
+      "estimated": {
+        "joint_2_setup_adds_delta": 3,
+        "joint_2_loop_adds_delta": 12,
+        "joint_2_loop_doubles_delta": -1
+      },
+      "try": "joint-2",
+      "priority": 103
+    },
+    {
+      "id": "affine-g-ifdup",
+      "source": {
+        "file": "msm.fth",
+        "line": 21,
+        "column": 5
+      },
+      "calls": 51,
+      "proven": [
+        "the digit is a bounded nonnegative Script number",
+        "the nonzero branch consumes its digit in the lookup",
+        "the zero branch only discards the digit"
+      ],
+      "requirements": [
+        "preserve the accumulator for zero",
+        "retain one digit for nonzero"
+      ],
+      "missing": [],
+      "equivalence": "both guards leave the same stack at lookup entry or after skipping zero",
+      "estimated": {
+        "window_loop_bytes_saved": 102
+      },
+      "try": "split-5x4-affine-g-ifdup",
+      "priority": 102
+    }
+  ]
+}

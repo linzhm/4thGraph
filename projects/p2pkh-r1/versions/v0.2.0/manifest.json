@@ -1,0 +1,19 @@
+{
+  "version": "0.2.0",
+  "previous": "0.1.0",
+  "artifacts": [
+    "layout.json",
+    "template.hex",
+    "otda-reconstruct.hex"
+  ],
+  "fixtures": [
+    "spend-all.json",
+    "payment-fixture.json"
+  ],
+  "evidence": [
+    "measurements.json"
+  ],
+  "integration": "docs/sdk.en.md",
+  "build": "PYTHONPATH=src:.:projects/p2pkh-r1/reference python projects/p2pkh-r1/reference/generate_lock.py --version 0.2.0 --owner-hash160 0000000000000000000000000000000000000000",
+  "verify": "bash projects/p2pkh-r1/reference/verify.sh"
+}

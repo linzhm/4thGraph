@@ -1,0 +1,19 @@
+{
+  "version": "0.1.0",
+  "previous": null,
+  "artifacts": [
+    "layout.json",
+    "template.hex"
+  ],
+  "fixtures": [
+    "activation-single.json",
+    "sighash-modes.json"
+  ],
+  "evidence": [],
+  "integration": "docs/sdk.en.md",
+  "build": "PYTHONPATH=src:.:projects/p2pkh-r1/reference python projects/p2pkh-r1-deferred/reference/generate_vectors.py",
+  "verify": "bash projects/p2pkh-r1-deferred/reference/verify.sh",
+  "requires": {
+    "p2pkh-r1": "0.1.0"
+  }
+}

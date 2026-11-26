@@ -12,7 +12,7 @@
 
 P2PK 把压缩公钥写在锁里，花费时提供签名。P2PKH 在锁里放公钥的 20 字节 HASH160，花费时提供签名和能匹配哈希的公钥。签名携带签名类型字节。项目向量给出了完整父交易、花费交易以及锁定和解锁脚本。
 
-[线格式示例与用例约定（英文）](../README.md#fixture-contract) · [可重放向量](../template/baseline.json) · [签名覆盖规则（英文）](../reference/acceptance.md)
+[线格式示例与用例约定（英文）](../README.md#fixture-contract) · [可重放向量](../versions/v0.1.0/baseline.json) · [签名覆盖规则（英文）](../reference/acceptance.md)
 
 <a name="security"></a>
 
@@ -36,6 +36,6 @@ P2PK 把压缩公钥写在锁里，花费时提供签名。P2PKH 在锁里放公
 
 从[统一 P2PKH 接入示例](sdk.zh-CN.md)开始，创建锁定脚本、识别入金输出，再将 secp256k1 签名器接入 `signPayment`。在同一客户端切换到 P2PK 模板即可运行另一组原生对照。
 
-[Python 夹具源码](../reference/script_lab.py)提供序列化和验签示例。实际集成使用原有钱包签名接口。[向量 JSON](../template/baseline.json)可用来逐项校验生成的父交易、花费交易和脚本。
+[Python 夹具源码](../reference/script_lab.py)提供序列化和验签示例。实际集成使用原有钱包签名接口。[向量 JSON](../versions/v0.1.0/baseline.json)可用来逐项校验生成的父交易、花费交易和脚本。
 
 [复现命令](../README.zh-CN.md#复现与验收) · [统一依赖与运行口径](../../../docs/benchmark.zh-CN.md)
