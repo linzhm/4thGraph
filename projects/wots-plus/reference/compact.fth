@@ -133,9 +133,21 @@ REQUIRE BSV
     op-fromaltstack 32 bsv-num op-split op-fromaltstack op-swap op-toaltstack
 ;
 
-: compact-v6-chain-end ( script -- script )
+: compact-buffer-append ( script -- script )
     ( Append the endpoint behind the remaining signature and previous endpoints. )
     op-fromaltstack op-swap op-cat op-toaltstack
+;
+
+: compact-address-increment ( script -- script )
     ( Increment the final byte of the PRF base while preserving the other bytes. )
-    op-swap op-bin2num op-3 op-pick op-add op-swap
+    op-3 op-pick op-add op-swap
+;
+
+: compact-v6-chain-end ( script -- script )
+    compact-buffer-append op-swap op-bin2num compact-address-increment
+;
+
+: compact-v7-chain-end ( script -- script )
+    ( The first chain inserts BIN2NUM before the increment. )
+    compact-buffer-append op-swap compact-address-increment
 ;

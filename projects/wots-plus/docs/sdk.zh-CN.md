@@ -2,7 +2,7 @@
 
 [English](sdk.en.md) · [开发指南](developer.zh-CN.md#sdk) · [统一钱包接入](../../../sdk/README.zh-CN.md)
 
-可选 `canonical`（默认）、`cached-constants`、`cached-steps`、`compact`、`compact-v2`、`compact-v3`、`compact-v4`、`compact-v5` 或 `compact-v6`。识别收款脚本时提供预期的 64 字节公钥。签名器接收 32 字节摘要，返回 2,144 字节签名。释放签名前持久记录密钥已使用，找零用新密钥，重试时保留已签交易。Chronicle 已激活时，可用 `compressOtda: true` 为符合条件的版本 2 交易选择更短的解锁编码。
+可选 `canonical`（默认）、`cached-constants`、`cached-steps`、`compact`、`compact-v2`、`compact-v3`、`compact-v4`、`compact-v5`、`compact-v6` 或 `compact-v7`。识别收款脚本时提供预期的 64 字节公钥。签名器接收 32 字节摘要，返回 2,144 字节签名。释放签名前持久记录密钥已使用，找零用新密钥，重试时保留已签交易。Chronicle 已激活时，可用 `compressOtda: true` 为符合条件的版本 2 交易选择更短的解锁编码。
 
 <a name="quickstart"></a>
 
@@ -21,7 +21,7 @@ python3.12 -m venv projects/wots-plus/workspace/venv
 ```ts
 import { WalletClient } from "./sdk/typescript/index.ts";
 
-const wallet = new WalletClient("wots-plus", { ...config, template: "compact-v6" });
+const wallet = new WalletClient("wots-plus", { ...config, template: "compact-v7" });
 const receiveScript = wallet.createLock({ publicKey: receiveKeyHex });
 const prevout = wallet.prevoutFromFunding(fundingTxHex, fundingVout);
 const recognized = wallet.recognize({ script: prevout.script, publicKey: spendKeyHex });

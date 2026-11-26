@@ -8,7 +8,10 @@ import unittest
 
 from fixtures import fixture_seeds, funding_transaction, mode_fixture, vector_document
 from payment import sign_payment
-from script import CACHE_PROFILES, COMPACT_PROFILES, COMPANION_CODE, ORDINARY_CODE, locking_script
+from script import (
+    CACHE_PROFILES, COMPACT_PROFILES, COMPANION_CODE, MESSAGE_NIBBLE_SUFFIX, ORDINARY_CODE, _message_digits,
+    locking_script,
+)
 from fourthgraph.bsv.evaluate import ScriptError, evaluate
 from fourthgraph.bsv.pushtx import N as CURVE_ORDER, R as BINDING_R, authorization_checks, binding_der, check_binding
 from fourthgraph.bsv.script import asm, number, push
@@ -72,6 +75,14 @@ class WotsTests(unittest.TestCase):
                     lock = locking_script(key, transaction=False, cached_constants=profile)
                     self.assertEqual(evaluate(lock, [digest, signature]), ([b"\x01"], []), profile)
 
+    def test_bitwise_digest_decoder_matches_for_every_byte(self):
+        reference = _message_digits(step_counts=True)
+        bitwise = _message_digits(step_counts=True, byte_suffix=MESSAGE_NIBBLE_SUFFIX)
+        for value in range(256):
+            with self.subTest(value=value):
+                stack = [b"fixture signature", bytes([value]) * N]
+                self.assertEqual(evaluate(bitwise, stack), evaluate(reference, stack))
+
     def test_compact_authorization_for_every_flag_byte(self):
         _, _, spend = mode_fixture(0x41)
         (preimage, signature, selector), _ = evaluate(spend.inputs[1].script)
@@ -87,6 +98,27 @@ class WotsTests(unittest.TestCase):
                     with self.assertRaises(ScriptError):
                         evaluate(code, [candidate, signature, selector])
 
+    def test_compact_companion_shape_checks_flags_and_zero_output_hash(self):
+        _, _, spend = mode_fixture(0x63, paired=False)
+        (preimage, signature, selector), _ = evaluate(spend.inputs[1].script)
+        code = authorization_checks(ORDINARY_CODE, COMPANION_CODE, compact=True, compact_shape=True)
+        for flag in range(256):
+            with self.subTest(flag=flag):
+                flag_byte = bytes([flag])
+                candidate = preimage[:-4] + flag_byte + bytes(3)
+                if flag in (0x43, 0xc3):
+                    self.assertEqual(evaluate(code, [candidate, signature, selector]),
+                                     ([candidate, signature], [selector, flag_byte]))
+                else:
+                    with self.assertRaises(ScriptError):
+                        evaluate(code, [candidate, signature, selector])
+        start = 117 + len(COMPANION_CODE)
+        for offset in range(start, start + N):
+            with self.subTest(offset=offset):
+                mutated = preimage[:offset] + b"\x80" + preimage[offset + 1:]
+                with self.assertRaises(ScriptError):
+                    evaluate(code, [mutated, signature, selector])
+
     def test_compact_der_matches_at_modular_boundaries(self):
         for scalar in (0, CURVE_ORDER // 2 - BINDING_R, CURVE_ORDER // 2 - BINDING_R + 1,
                        CURVE_ORDER - BINDING_R - 1, CURVE_ORDER - BINDING_R + 1, 2**256 - 1):
@@ -96,14 +128,17 @@ class WotsTests(unittest.TestCase):
         with self.assertRaises(ScriptError):
             evaluate(binding_der(compact=True), [zero])
 
-    def test_compact_v6_carries_the_address_with_boundary_seeds(self):
+    def test_compact_address_increment_with_boundary_seeds(self):
         secret, _ = fixture_seeds(b"buffered-address")
         for seed in (bytes(N), b"\xff" * N, b"\x00\x80" * (N // 2)):
             with self.subTest(seed=seed):
-                lock = locking_script(public_key(secret, seed), transaction=False, cached_constants="compact-v6")
+                key = public_key(secret, seed)
+                locks = [locking_script(key, transaction=False, cached_constants=profile)
+                         for profile in ("compact-v6", "compact-v7")]
                 for digest in (bytes(N), b"\xff" * N, bytes(range(N))):
                     signature = sign_digest(secret, seed, digest)
-                    self.assertEqual(evaluate(lock, [digest, signature]), ([b"\x01"], []))
+                    for lock in locks:
+                        self.assertEqual(evaluate(lock, [digest, signature]), ([b"\x01"], []))
 
     def test_binding_key_and_der_reuse_pass_the_same_checksigs(self):
         digest = sha256(b"binding key reuse fixture").digest()

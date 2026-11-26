@@ -71,7 +71,7 @@ def _check_bip143_shape(script_code):
             asm('OP_SPLIT OP_DROP') + push(bytes([len(script_code)])+script_code) + asm('OP_EQUALVERIFY'))
 
 
-def authorization_checks(ordinary_code, companion_code, *, compact=False):
+def authorization_checks(ordinary_code, companion_code, *, compact=False, compact_shape=False):
     """Check the signed preimage shape and preserve its mode and type on altstack."""
     # Entry P S mode; alt: mode, then actual base binding's one-byte type.
     code = asm('OP_DEPTH OP_3 OP_NUMEQUALVERIFY OP_DUP OP_0 OP_EQUAL OP_OVER OP_1 OP_EQUAL OP_BOOLOR OP_VERIFY')
@@ -92,11 +92,16 @@ def authorization_checks(ordinary_code, companion_code, *, compact=False):
                 code += asm('OP_BOOLOR')
     code += asm('OP_VERIFY OP_TOALTSTACK OP_IF')
     # Reuse the authenticated type via altstack; only 0x43/c3 may take the companion branch.
-    code += asm('OP_FROMALTSTACK OP_DUP OP_TOALTSTACK OP_DUP') + push(b'\x43') + asm('OP_EQUAL OP_SWAP')
-    code += push(b'\xc3') + asm('OP_EQUAL OP_BOOLOR OP_VERIFY')
+    code += asm('OP_FROMALTSTACK OP_DUP OP_TOALTSTACK')
+    if compact_shape:
+        code += asm('0x7f OP_AND 0x43 OP_EQUALVERIFY')
+    else:
+        code += asm('OP_DUP') + push(b'\x43') + asm('OP_EQUAL OP_SWAP')
+        code += push(b'\xc3') + asm('OP_EQUAL OP_BOOLOR OP_VERIFY')
     code += _check_bip143_shape(companion_code)
     code += asm('OP_OVER') + number(117 + len(companion_code)) + asm('OP_SPLIT OP_NIP') + number(32) + asm('OP_SPLIT OP_DROP')
-    code += push(bytes(32)) + asm('OP_EQUALVERIFY OP_ELSE')
+    code += asm('OP_0 32 OP_NUM2BIN') if compact_shape else push(bytes(32))
+    code += asm('OP_EQUALVERIFY OP_ELSE')
     code += asm('OP_FROMALTSTACK OP_DUP OP_TOALTSTACK') + push(b'\x20') + asm('OP_AND')
     code += push(b'\x20') + asm('OP_EQUAL OP_NOTIF') + _check_bip143_shape(ordinary_code)
     return code + asm('OP_ENDIF OP_ENDIF')

@@ -95,6 +95,22 @@ using all seven dictionaries. Lean `spec@1c051ea` matched all 125 fixtures.
 Python, TypeScript, Go and Rust wallet replays passed, along with 24
 Lamport regression tests. [Measurements and replay commands](../README.md#compact-profile)
 
+## Compact v7 profile
+
+Compiler revision `6699658` builds a 21,774-byte lock and a 957-byte
+reconstruction program. Focused tests compare both digest decoders across
+all 256 byte values and check all 256 companion flags, mutations in each
+byte of the companion zero hash, and addresses with zero and high-bit
+public seeds. The compatibility comparison matched 57 existing artifact
+fingerprints and 20 existing transaction fingerprints.
+
+BSV Node 1.2.3 and chain-gang at `74676b9` matched all 1,230 payment
+outcomes and rejected all 67 signature-chain mutations. Both engines
+validated the measured transaction sizes and mixed OTDA ALL outputs
+using all eight dictionaries. Lean `spec@1c051ea` matched all 125 fixtures.
+Python, TypeScript, Go and Rust wallet replays passed, along with 24
+Lamport regression tests. [Measurements and replay commands](../README.md#compact-profile)
+
 ## Bounded coverage of complete payments
 
 The [acceptance fixture](../reference/test_acceptance.py) builds the expected key
