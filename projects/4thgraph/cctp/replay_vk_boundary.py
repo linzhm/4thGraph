@@ -20,7 +20,7 @@ from shared.chain_gang import validate_at_heights
 from shared.evaluate import ScriptError, evaluate
 from shared.script import asm, push
 from shared.transaction import Input, Output, Transaction
-from vk_boundary import Layouts, SOURCE, TERMINAL_VALUE, Witness, preimage, terminal
+from vk_boundary import Layouts, SOURCE, frontend, TERMINAL_VALUE, Witness, preimage, terminal
 
 MODES = ("fused", "atomic", "serial")
 UPSTREAM = ("zkscript-affine", "zkscript-projective")
@@ -219,7 +219,7 @@ def main():
         raise ValueError("the comparison requires a fresh peerless regtest")
     activation = int(os.environ["SCRIPT_LAB_CHRONICLE_HEIGHT"])
     key, proofs, paths = load_cases(args.archive)
-    layouts = Layouts.compile(args.archive / "4thgraph-source", key)
+    layouts = Layouts.compile(key)
     witnesses = tuple(Witness.from_proof(key, signals, proof) for signals, proof in proofs)
     wrong = Witness.from_proof(key, proofs[1][0], proofs[0][1])
     modes = MODES + (UPSTREAM if args.zkscript else ())
@@ -302,7 +302,8 @@ def main():
         "bsv_node": node.version, "chain_gang": engine, "samples_per_stage": SAMPLES,
         "activation_height": activation, "profile": os.environ["SCRIPT_LAB_REGTEST_PROFILE"],
         "source_sha256": sha256(SOURCE.read_bytes()).hexdigest(),
-        "forth_frontend_revision": (args.archive / "4thgraph-source/REVISION").read_text().strip(),
+        "forth_frontend_version": frontend.PROJECT_VERSION,
+        "forth_frontend_sha256": sha256(Path(frontend.__file__).read_bytes()).hexdigest(),
         "proof_sha256": [sha256(path.read_bytes()).hexdigest() for path in paths],
         "certificate_block": first_block, "settlement_block": last_block,
         "zkscript": {**upstream.revisions, "modulo_threshold": 1, "max_multiplier": str(1 << 128), "extractable_inputs": 0}
