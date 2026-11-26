@@ -87,7 +87,12 @@ class InstallTests(unittest.TestCase):
             self.assertEqual(local_build["script_hex"], "57")
             self.assertEqual(local_build["libraries"][0]["name"], "recipient.fth")
 
-            source.write_text((PROJECT / "examples" / "verify-state.fth").read_text())
+            source = workspace / "examples" / "verify-state.fth"
+            source.parent.mkdir()
+            source.write_bytes((PROJECT / "examples" / source.name).read_bytes())
+            rules = workspace / "proof" / "counter.fth"
+            rules.parent.mkdir()
+            rules.write_bytes((PROJECT / "proof" / rules.name).read_bytes())
             circom = workspace / "statement.circom"
             run("4thgraph-circuit", str(source), "--output", str(circom))
             keys = workspace / "keys.json"

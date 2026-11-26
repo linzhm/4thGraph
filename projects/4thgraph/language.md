@@ -112,7 +112,7 @@ relation: <transition-word> <route-word> ;
 
 ## 电路入口
 
-`circuit_backend.py` 根据阶段依赖选取一个 `u32 -- u32` 转换词和一个 `u32 -- route` 路由词。仅有词定义的文件可传 `--entries TRANSITION ROUTE`，默认取 `advance` 和 `decide`。带工作流声明的文件以声明为准。本入口编译计算和路由，交易签名与独立提交仍由交易规划器处理。
+`circuit_backend.py` 根据阶段依赖选取一个 `u32 -- u32` 转换词和一个 `u32 -- route` 路由词。仅有词定义的文件须通过 `--entries TRANSITION ROUTE` 指定入口。带工作流声明的文件以声明为准。本入口编译计算和路由，交易签名与独立提交仍由交易规划器处理。
 
 当前 Circom 后端支持整数字面量、栈重排、字面量的 `cell>u32`、`u32+`、`u32<`，以及由字面量或受支持比较结果驱动的 `IF`。用户定义的词展开后使用同一规则，无法生成约束的操作报告源码行列。电路限制为 128 个展开操作和 256 个估算线数。 [示例与复放命令](README.md#从-forth-生成约束)
 

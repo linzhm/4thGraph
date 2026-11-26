@@ -10,9 +10,9 @@ import secrets
 from tempfile import TemporaryDirectory
 from time import perf_counter
 
-from circuit_backend import emit_circuit, select_circuit
+from circuit_backend import emit_circuit, parse_circuit
 from circuit_tools import CircuitFixture, SNARKJS_PACKAGE
-from compiler import SourceCompiler, evaluate
+from compiler import evaluate
 from groth16_script import BASE_FIELD, ScriptVerifier, build_adapter, public_signals, runar_proof
 from protocol import FLAG, Outpoint, SignRequest
 from replay import TestKeys
@@ -114,7 +114,7 @@ def main():
     args = cli.parse_args()
     try:
         source = args.source.read_bytes()
-        program = select_circuit(SourceCompiler(source.decode(), source_path=args.source), args.entries)
+        program = parse_circuit(source, entries=args.entries, source_path=args.source)
         circuit_source = emit_circuit(program)
     except (OSError, ValueError) as error:
         cli.error(f"{args.source}: {error}")

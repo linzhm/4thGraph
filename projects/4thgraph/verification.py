@@ -7,8 +7,8 @@ import json
 import os
 from pathlib import Path
 from shutil import copyfile
-from tempfile import TemporaryDirectory, mkdtemp
 from zipimport import zipimporter
+from tempfile import TemporaryDirectory, mkdtemp
 
 from circuit_backend import emit_circuit, select_circuit
 from circuit_tools import CircuitBuild, CircuitFixture, SNARKJS_PACKAGE
@@ -29,8 +29,9 @@ BLS_LAYOUTS = ("projective", "affine-inline", "affine-witness")
 
 
 class DirectContract(StateContract):
-    def __init__(self, source, current, keys, *, target, terminal_value, program, max_expansion):
-        super().__init__(source, current, keys, target=target, terminal_value=terminal_value, program=program)
+    def __init__(self, program, current, keys, *, target, terminal_value, max_expansion):
+        self.circuit = program
+        super().__init__(program.route, current, keys, target=target, terminal_value=terminal_value)
         advance = compile_word(self.circuit.transition, "stack", max_expansion=max_expansion).script
         route = compile_word(self.route, "stack", max_expansion=max_expansion).script
         lock = (begin(self.versions) + single_input() + number(current) + advance + asm("OP_DUP") + route
@@ -42,8 +43,9 @@ class DirectContract(StateContract):
 
 
 class Groth16Contract(StateContract):
-    def __init__(self, source, current, keys, verifier, sources, artifact, *, target, terminal_value, program):
-        super().__init__(source, current, keys, target=target, terminal_value=terminal_value, program=program)
+    def __init__(self, program, current, keys, verifier, sources, artifact, *, target, terminal_value):
+        self.circuit = program
+        super().__init__(program.route, current, keys, target=target, terminal_value=terminal_value)
         self.verifier, self.sources, self.verifier_artifact = verifier, sources, artifact
         predicate = bytes.fromhex(artifact["script_hex"])
         # Shared verifier packet: next (4), route (1), preimage hash (32).
@@ -124,15 +126,14 @@ class Candidate:
             row["circuit_build"] = self.circuit_build.describe()
         if isinstance(self.contract, Groth16Contract):
             artifact = self.contract.verifier_artifact
-            row["verifier_entry"] = artifact["forth_entry"]
             row["verifier_artifact_sha256"] = artifact["artifact_sha256"]
-            row["verifier_libraries"] = artifact["libraries"]
         return row
 
 
 def compile_solutions(source, keys, current, scratch, *, target=DEFAULT_TARGET, policy="allow-direct",
                       objective="path-bytes", r1cs=False, groth16=None, spend_fee=SPEND_FEE,
                       max_lock_bytes=None, max_expansion=MAX_EXPANSION, source_path=None):
+    frontend = source if isinstance(source, SourceCompiler) else SourceCompiler(source.decode(), source_path=source_path)
     if policy not in POLICIES or objective not in OBJECTIVES:
         raise ValueError("unknown verification policy or objective")
     if type(spend_fee) is not int or not 0 < spend_fee < ROOT_VALUE:
@@ -141,9 +142,9 @@ def compile_solutions(source, keys, current, scratch, *, target=DEFAULT_TARGET, 
         raise ValueError("max expanded operations must be positive")
     if max_lock_bytes is not None and (type(max_lock_bytes) is not int or max_lock_bytes <= 0):
         raise ValueError("max lock bytes must be positive")
-    frontend = SourceCompiler(source.decode(), source_path=source_path)
     if not frontend.relation:
         raise CompileError("expected relation: TRANSITION ROUTE ; with REQUIRE stdlib/verify.fth")
+    source = frontend.source.encode()
     program = select_circuit(frontend)
     expansion = bounded_expansion(program.transition.body, program.route.body, limit=max_expansion)
     if expansion > max_expansion:
@@ -155,9 +156,9 @@ def compile_solutions(source, keys, current, scratch, *, target=DEFAULT_TARGET, 
         "groth16-bn254": "the fixed-statement adapter requires owner authorization and lacks this spend binding",
     }
     base_witness = len(push(bytes(158)))
-    parameters = {"target": target, "terminal_value": ROOT_VALUE - spend_fee, "program": program}
+    parameters = {"target": target, "terminal_value": ROOT_VALUE - spend_fee}
     try:
-        direct = DirectContract(source, current, keys, max_expansion=max_expansion, **parameters)
+        direct = DirectContract(program, current, keys, max_expansion=max_expansion, **parameters)
         script_build = {"status": "built", "script_hex": direct.root.script.hex(),
                         "script_bytes": len(direct.root.script)}
         if policy == "allow-direct":
@@ -175,13 +176,13 @@ def compile_solutions(source, keys, current, scratch, *, target=DEFAULT_TARGET, 
 
     if policy == "require-groth16":
         rejected["r1cs"] = "the policy requires Groth16"
-    elif not r1cs or circuit_error:
+    elif circuit_error or (not r1cs and policy != "require-proof"):
         rejected["r1cs"] = circuit_error or "R1CS proving was not enabled"
     else:
         try:
             directory = mkdtemp(prefix="r1cs-", dir=scratch)
             circuit = CircuitFixture(circom, directory, has_route=True)
-            contract = ProofContract(source, circuit.key, current, keys, optimization="stack",
+            contract = ProofContract(program, circuit, current, keys, optimization="stack",
                                      max_expansion=max_expansion, **parameters)
             candidates["r1cs"] = Candidate(contract, base_witness + 33 * (circuit.key.signals - 1), circuit)
         except (OSError, ValueError) as error:
@@ -198,7 +199,7 @@ def compile_solutions(source, keys, current, scratch, *, target=DEFAULT_TARGET, 
             setup = Groth16Setup(circom, directory, *groth16)
             sources = (Dynamic(32), Dynamic(1), current, Dynamic(128), Dynamic(128))
             for item in layout_candidates(setup.key, BLS_SOURCE, sources):
-                contract = Groth16Contract(source, current, keys, item.verifier, sources, item.artifact, **parameters)
+                contract = Groth16Contract(program, current, keys, item.verifier, sources, item.artifact, **parameters)
                 name = "groth16-bls12-381/" + item.verifier.witness_layout
                 candidates[name] = Candidate(contract, base_witness + item.cost["witness_bytes"], setup)
         except (ImportError, OSError, ValueError) as error:
@@ -307,12 +308,13 @@ def main():
         cli.error("funded replay requires verification.py from the repository checkout")
     try:
         source = args.source.read_bytes()
+        frontend = SourceCompiler(source.decode(), source_path=args.source)
         keys = {role: bytes.fromhex(key) for role, key in json.loads(args.keys.read_bytes()).items()}
         with TemporaryDirectory(prefix="4thgraph-verification-") as scratch:
             candidate, report = compile_solutions(
-                source, keys, args.current, scratch, target=args.target, policy=args.policy, objective=args.objective,
+                frontend, keys, args.current, scratch, target=args.target, policy=args.policy, objective=args.objective,
                 r1cs=args.r1cs, groth16=args.groth16, spend_fee=args.spend_fee,
-                max_lock_bytes=args.max_lock_bytes, max_expansion=args.max_expanded_ops, source_path=args.source,
+                max_lock_bytes=args.max_lock_bytes, max_expansion=args.max_expanded_ops,
             )
             if args.replay:
                 report = {"build": report, "replay": funded_replay(candidate, args.target)}

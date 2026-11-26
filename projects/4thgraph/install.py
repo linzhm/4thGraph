@@ -11,7 +11,7 @@ from stdlib import LIBRARIES, library_resource
 
 PROJECT = Path(__file__).resolve().parent
 COMPILER_MODULES = ("compiler", "wordsets", "ranges", "lowering", "stack_schedule", "protocol", "decision_report",
-                    "stdlib", "transaction_graph", "workflow_contract", "circuit_backend", "circuit_tools", "proof_contract",
+                    "stdlib", "cpn", "r1cs", "transaction_graph", "workflow_contract", "circuit_backend", "circuit_tools", "proof_contract",
                     "verification", "groth16_bls12381", "forkid_lowering")
 BLS_MODULES = ("build_verifier.py", "bls12381/__init__.py", "bls12381/verifier.py", "bls12381/field.py",
                "bls12381/affine_witness.py")

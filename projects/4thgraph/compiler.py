@@ -3,6 +3,7 @@
 from bisect import bisect_right
 from dataclasses import InitVar, dataclass, field
 from hashlib import sha256
+from os.path import relpath
 from pathlib import Path
 import re
 
@@ -385,6 +386,7 @@ def check_word(words, at, takes, gives):
 
 class SourceCompiler:
     def __init__(self, source, *, vocabulary=None, stack_types=TYPES, backend=None, source_path=None):
+        self.source = source
         self.tokens = None
         self.words = dict(vocabulary or {})
         self.definitions = {}
@@ -458,7 +460,7 @@ class SourceCompiler:
         # Diagnostics use catalog names for bundled files and source paths for other files.
         if name is None:
             base = self.root_source.parent if self.root_source is not None else Path.cwd()
-            name = path.relative_to(base).as_posix() if path.is_relative_to(base) else str(path)
+            name = Path(relpath(path, base)).as_posix()
         backend_words = ({word: primitive for word, primitive in p256_vocabulary().items() if word not in self.words}
                          if name == "std/p256" else {})
         self.words.update(backend_words)
@@ -647,9 +649,12 @@ class SourceCompiler:
             case _:
                 raise unavailable(token)
 
-    def program(self):
+    def require_workflow_declarations(self):
         if self.relation:
-            raise self.relation[0].error("relation: requires the verification planner")
+            raise self.relation[0].error("use the relation compiler for a relation: declaration")
+
+    def program(self):
+        self.require_workflow_declarations()
         if self.workflow_input is not None or self.stages:
             raise CompileError("stage workflows require the workflow planner")
         if len(self.work) != 2 or self.join is None or self.operator is None:
@@ -675,8 +680,7 @@ class SourceCompiler:
                        self.gate, self.recovery, self.library_imports)
 
     def workflow(self):
-        if self.relation:
-            raise self.relation[0].error("relation: requires the verification planner")
+        self.require_workflow_declarations()
         if self.workflow_input is None:
             if self.stages:
                 raise self.stages[0][0].error("staged workflow needs a workflow-input: declaration")

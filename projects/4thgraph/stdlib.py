@@ -9,6 +9,7 @@ from zipimport import zipimporter
 ROOT = Path(__file__).parent
 GROTH16_ENTRY = "groth16-bls12-381-verify"
 LEGACY_GROTH16_ENTRY = "groth16-verify"
+WALLET_BACKEND = "wallet-construction"
 
 
 def p256_vocabulary():
@@ -86,6 +87,15 @@ def p256_export(name, inputs):
                   "Invalid numeric operations, including division by zero, abort evaluation.")
 
 
+def wallet_library(module, entries, *, accumulator="bytes", parameters=()):
+    exports = tuple(Export(entry, (accumulator,), (accumulator,), (WALLET_BACKEND,),
+                           (Parameter("prefix", accumulator, "Serialized Script to extend"),),
+                           "Invalid build inputs or missing Script fragments abort construction.",
+                           tuple(Parameter(name, "build-input", description) for name, description in parameters))
+                    for entry in entries)
+    return Library(ROOT / library_resource(f"std/wallet/{module}"), exports, WALLET_BACKEND)
+
+
 def library_resource(name):
     if name == "std/groth16-bls12-381":
         return Path("groth16-bls12-381/verifier.fth")
@@ -124,6 +134,28 @@ LIBRARIES = {
     )),
     "std/groth16-bls12-381": Library(ROOT / "groth16-bls12-381/verifier.fth", (GROTH16_VERIFY,), "groth16-bls12-381"),
     "std/verify": Library(ROOT / "stdlib/verify.fth", declarations=("relation:",)),
+    "std/wallet/r1": wallet_library("r1", ("r1-lock",), accumulator="script", parameters=(
+        ("owner-hash", "20-byte P-256 public-key hash"), ("optimize", "Select the R1 doubling rewrite"),
+    )),
+    "std/wallet/p2pkh-r1-deferred": wallet_library("p2pkh-r1-deferred", ("deferred-lock",), parameters=(
+        ("owner-and-value", "Owner hash and satoshi amount"),
+        ("target-and-binding", "Computed R1 output commitments and R1 binding blocks"),
+    )),
+    "std/wallet/p2pkh-sm2": wallet_library("p2pkh-sm2", ("sm2-lock",), parameters=(
+        ("owner-hash", "20-byte SM2 public-key hash"), ("sm3", "ZA prefix and SM3 Script fragments"),
+    )),
+    "std/wallet/lamport-ots": wallet_library("lamport-ots", ("lamport-full-key", "lamport-committed-key"), parameters=(
+        ("key", "Lamport public-key commitment or full-key verifier fragment"),
+        ("binding", "Transaction authorization and input-binding fragments"),
+    )),
+    "std/wallet/wots-plus": wallet_library("wots-plus", ("wots-plus-lock",), parameters=(
+        ("verifier", "WOTS+ Script for the selected public key and cache profile"),
+        ("binding", "Transaction authorization and input-binding fragments"),
+    )),
+    "std/wallet/ml-dsa": wallet_library("ml-dsa", ("ml-dsa-lock",), parameters=(
+        ("verifier", "Pure ML-DSA-44 arithmetic and SHAKE fragments for the selected public key"),
+        ("binding", "Transaction authorization and input-binding fragments"),
+    )),
 }
 
 

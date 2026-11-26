@@ -7,7 +7,7 @@ import json
 import os
 from pathlib import Path
 
-from circuit_backend import circuit_words, compile_circuit
+from circuit_backend import emit_circuit, parse_circuit
 from compiler import evaluate
 from groth16_replay import LOCK_VALUE, SOURCE, SPEND_FEE, fund, sign_spend, verify_spend
 from protocol import FLAG, UTXO
@@ -68,7 +68,8 @@ def main():
         raise ValueError("Groth16 replay requires an empty peerless regtest")
     activation = int(os.environ["SCRIPT_LAB_CHRONICLE_HEIGHT"])
     source = SOURCE.read_bytes()
-    advance, decide = circuit_words(source)
+    program = parse_circuit(source, source_path=SOURCE)
+    advance, decide = program.transition, program.route
     verifier, ((signals, proof), (other_signals, other_proof)) = load_fixture()
     for next_state, route, current, *_ in (signals, other_signals):
         if evaluate(advance, current) != (next_state,) or evaluate(decide, next_state) != (route,):
@@ -100,8 +101,8 @@ def main():
     report = {
         "setup": "local-test-only", "bsv_node_version": node.version, "chain_gang": engine,
         "activation_height": activation, "regtest_profile": os.environ.get("SCRIPT_LAB_REGTEST_PROFILE"),
-        "transaction_version": args.tx_version, "forth_source_sha256": sha256(source).hexdigest(),
-        "circom_source_sha256": sha256(compile_circuit(source)).hexdigest(), "circom_prime": "bls12381",
+        "transaction_version": args.tx_version, "forth_source_sha256": sha256(source).hexdigest(), "relation": program.describe(),
+        "circom_source_sha256": sha256(emit_circuit(program)).hexdigest(), "circom_prime": "bls12381",
         "fixture_sha256": sha256(FIXTURE.read_bytes()).hexdigest(),
         "artifact": verifier.artifact(signals, owner, lock), "witness_bytes": len(witness),
         "bootstrap_raw": bootstrap.serialize().hex(), "deployment_raw": deployment.serialize().hex(),

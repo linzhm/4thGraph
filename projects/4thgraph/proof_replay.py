@@ -7,9 +7,9 @@ import os
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from circuit_backend import emit_circuit, select_circuit
+from circuit_backend import emit_circuit, parse_circuit
 from circuit_tools import CircuitFixture
-from compiler import PROJECT_NAME, PROJECT_VERSION, SourceCompiler, evaluate
+from compiler import PROJECT_NAME, PROJECT_VERSION, evaluate
 from lowering import BASELINE, compile_word
 from proof_contract import FIELD, NEXT, ROUTE, ProofContract
 from protocol import DEFAULT_TARGET, TARGETS, UTXO, build_artifact
@@ -47,8 +47,8 @@ def compare_circuit(circuit, advance, decide, currents):
 
 
 def run_case(replay, circuit, source, bootstrap, slot, *, current, next_state, optimization, program=None):
-    contract = ProofContract(source, circuit.key, current, replay.keys.public, target=replay.target,
-                             optimization=optimization, program=program)
+    contract = ProofContract(program or source, circuit, current, replay.keys.public, target=replay.target,
+                             optimization=optimization)
     parent, deploy = replay.deploy(contract, bootstrap, slot)
     other_parent, other_deploy = replay.deploy(contract, bootstrap, slot + 1)
     previous, foreign = (UTXO(parent, 0),), (UTXO(other_parent, 0),)
@@ -114,7 +114,7 @@ def main():
     source_path = args.source or FIXTURE / ("workflow.fth" if args.generated else "counter.fth")
     try:
         source = source_path.read_bytes()
-        program = select_circuit(SourceCompiler(source.decode(), source_path=source_path), args.entries) if args.generated else None
+        program = parse_circuit(source, entries=args.entries, source_path=source_path) if args.generated else None
         circuit_source = emit_circuit(program) if program else (FIXTURE / "counter.circom").read_bytes()
     except (OSError, ValueError) as error:
         parser.error(f"{source_path}: {error}")

@@ -6,7 +6,7 @@ from pathlib import Path
 import subprocess
 from tempfile import TemporaryDirectory
 
-from proof_contract import VerificationKey
+from r1cs import VerificationKey
 
 CIRCOM_PACKAGE, SNARKJS_PACKAGE = "circom2@0.2.22", "snarkjs@0.7.5"
 PUBLIC_WIRES = ("main.next", "main.current", "main.bindLo", "main.bindHi")
@@ -17,6 +17,7 @@ class CircuitBuild:
         self.directory = Path(directory).resolve()
         self.prime = prime
         self.source = self.directory / "counter.circom"
+        self.source_sha256 = sha256(source).hexdigest()
         self.source.write_bytes(source)
         self.run(CIRCOM_PACKAGE, "circom2", self.source.name, "--r1cs", "--sym", "--wasm", "--O1", "--prime", prime)
         self.public_wires = ("main.next", "main.route", *PUBLIC_WIRES[1:]) if has_route else PUBLIC_WIRES
@@ -33,7 +34,7 @@ class CircuitBuild:
 
     def describe(self):
         return {"circom": CIRCOM_PACKAGE, "snarkjs": SNARKJS_PACKAGE, "prime": self.prime,
-                "public_wires": self.public_wires, "source_sha256": sha256(self.source.read_bytes()).hexdigest(),
+                "public_wires": self.public_wires, "source_sha256": self.source_sha256,
                 "r1cs_sha256": sha256((self.directory / "counter.r1cs").read_bytes()).hexdigest()}
 
 

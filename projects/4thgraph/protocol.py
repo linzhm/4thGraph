@@ -6,6 +6,8 @@ from dataclasses import asdict, dataclass, replace
 from hashlib import sha256
 import json
 from pathlib import Path
+from tempfile import TemporaryDirectory
+import sys
 from types import MappingProxyType
 
 from shared.pushtx import PUBLIC, binding_der
@@ -20,7 +22,8 @@ from compiler import (
 from lowering import BASELINE, OPTIMIZATIONS, compile_word
 from stack_schedule import Graph
 from stdlib import capabilities as library_capabilities, describe_export
-from transaction_graph import TransactionGraph, mermaid
+from transaction_graph import TransactionGraph
+from cpn import from_build as transaction_plan, mermaid as plan_mermaid
 from wordsets import U32, capabilities, push_value
 
 DEFAULT_TARGET = "chronicle-v2"
@@ -788,7 +791,20 @@ def artifact_digest(document):
 
 def build_artifact(document, source_bytes):
     artifact = {**document, "source_sha256": sha256(source_bytes).hexdigest()}
+    if "transaction_graph" in artifact:
+        artifact["plan_sha256"] = transaction_plan(artifact).digest
     return {**artifact, "artifact_sha256": artifact_digest(artifact)}
+
+
+def display_build(document, args):
+    if args.cpn or args.cpn_plan:
+        plan = transaction_plan(document)
+        if args.cpn:
+            print(plan_mermaid(plan))
+        else:
+            sys.stdout.buffer.write(plan.encode())
+    else:
+        print(json.dumps(document, indent=2, sort_keys=True))
 
 
 def candidate_rank(cost, order=RANK_ORDER):
@@ -984,6 +1000,7 @@ def main():
     action.add_argument("--capabilities", action="store_true", help="list the supported Forth and BSV words")
     action.add_argument("--entry", help="compile one annotated Forth word to Script without a transaction plan")
     action.add_argument("--cpn", action="store_true", help="render the selected transaction graph as Mermaid")
+    action.add_argument("--cpn-plan", action="store_true", help="emit the selected canonical transaction plan")
     cli.add_argument("--version", action="version", version=f"%(prog)s {PROJECT_VERSION}")
     cli.add_argument("--assume-input-ranges", action="store_true",
                      help="for --entry, rely on the caller to validate declared input ranges and encodings")
@@ -1027,8 +1044,6 @@ def main():
         return
     if args.source is None:
         cli.error("a Forth source file is required")
-    if args.entry is None and args.keys is None:
-        cli.error("transaction builds require --keys")
     try:
         source_bytes = args.source.read_bytes()
         source = SourceCompiler(source_bytes.decode(), source_path=args.source)
@@ -1052,12 +1067,27 @@ def main():
                 if any(item.name in word.takes for item in word.ranges):
                     result["input_range_checks"] = "assumed" if args.assume_input_ranges else "emitted"
         else:
+            if args.keys is None:
+                cli.error("transaction builds require --keys")
             raw_keys = json.loads(args.keys.read_text())
             if not isinstance(raw_keys, dict) or any(not isinstance(key, str) for key in raw_keys.values()):
                 raise ValueError("keys must be a JSON object mapping roles to public key hex strings")
             keys = {name: bytes.fromhex(key) for name, key in raw_keys.items()}
             if source.relation:
-                cli.error("use verification.py to build a relation: declaration")
+                from verification import compile_solutions
+
+                if args.current is None:
+                    cli.error("relation: requires --current")
+                if (args.mode != "auto" or args.cpn or args.cpn_plan or args.search or args.task_id is not None
+                        or args.join_witness or args.gate_boundary != "auto" or args.sighash_family != "forkid"
+                        or args.available_data is not None or args.available_authorizers is not None
+                        or args.optimize != BASELINE):
+                    cli.error("workflow layout options do not apply to relation: builds. "
+                              "Use verification.py to select a proof backend or cost objective")
+                with TemporaryDirectory(prefix="4thgraph-verification-") as scratch:
+                    _, report = compile_solutions(source, keys, args.current, scratch, target=args.target)
+                print(json.dumps(report, indent=2, sort_keys=True))
+                return
             if source.workflow_input is not None or source.stages:
                 if args.current is None:
                     cli.error("staged workflows require --current")
@@ -1074,7 +1104,7 @@ def main():
                 )
                 if args.explain:
                     result = build_artifact({**result, "schedule_explanation": report}, source_bytes)
-                print(mermaid(result["transaction_graph"]) if args.cpn else json.dumps(result, indent=2, sort_keys=True))
+                display_build(result, args)
                 return
             if args.task_id is None or args.current is not None:
                 cli.error("parallel builds require --task-id and take their u32 values at spend time")
@@ -1102,7 +1132,7 @@ def main():
         cli.error(f"{args.source}: {error}")
     except (OSError, ValueError) as error:
         cli.error(str(error))
-    print(mermaid(result["transaction_graph"]) if args.cpn else json.dumps(result, indent=2, sort_keys=True))
+    display_build(result, args)
 
 
 if __name__ == "__main__":

@@ -6,11 +6,11 @@ import json
 import os
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from types import SimpleNamespace
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from circuit_backend import compile_circuit
+from circuit_tools import CircuitFixture
 from compiler import CompileError, SourceCompiler, evaluate, schedule
 from lowering import compile_word
 from proof_contract import FIELD, ProofContract, VerificationKey
@@ -27,7 +27,8 @@ from wordsets import U32
 
 EXAMPLES = Path(__file__).with_name("examples")
 COMPOSITION = (EXAMPLES / "library-composition.fth").read_text()
-VERIFICATION = (EXAMPLES / "verify-state.fth").read_bytes()
+VERIFICATION_PATH = EXAMPLES / "verify-state.fth"
+VERIFICATION = VERIFICATION_PATH.read_bytes()
 OWNER = bytes.fromhex("751e76e8199196d454941c45d1b3a323f1433bd6")
 COMPRESSED = bytes.fromhex("0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798")
 NATIVE_LOCK = bytes.fromhex("76a914") + OWNER + bytes.fromhex("88ac")
@@ -120,7 +121,7 @@ class LibraryTests(unittest.TestCase):
         legacy = SourceCompiler(implicit + "\nrecovery: 145 review\nqualify independent-submit").program()
         self.assertEqual(canonical.recovery, legacy.recovery)
         self.assertEqual(schedule(canonical).templates, schedule(legacy).templates)
-        self.assertEqual(compile_circuit(VERIFICATION), compile_circuit(VERIFICATION.replace(b"relation:", b"verify:")))
+        self.assertEqual(compile_circuit(VERIFICATION, source_path=VERIFICATION_PATH), compile_circuit(VERIFICATION.replace(b"relation:", b"verify:"), source_path=VERIFICATION_PATH))
         for clause in ("independent-submit: qualify", "relation: u32-inc decide"):
             with self.subTest(clause=clause), self.assertRaisesRegex(CompileError, "expected ';'"):
                 SourceCompiler("REQUIRE stdlib/verify.fth\n" + clause)
@@ -140,41 +141,43 @@ class LibraryTests(unittest.TestCase):
 
     def test_verification_policy_filters_before_ranking(self):
         keys = TestKeys().public
+        frontend = SourceCompiler(VERIFICATION.decode(), source_path=VERIFICATION_PATH)
         with TemporaryDirectory() as directory:
-            candidate, report = compile_solutions(VERIFICATION, keys, 19, directory, target="both")
+            candidate, report = compile_solutions(frontend, keys, 19, directory, target="both")
             self.assertEqual(report["selected"], "script")
-            self.assertEqual(report["statement"]["entries"]["transition"]["module"], "std/u32")
+            self.assertEqual(report["statement"]["entries"]["transition"]["module"], "../proof/counter.fth")
             self.assertIn("no matching external setup", report["candidates"]["groth16-bls12-381/projective"]["reason"])
             self.assertEqual(evaluate(candidate.contract.circuit.transition, 19), (20,))
             self.assertEqual(report["compilations"]["script"]["script_hex"], candidate.contract.root.script.hex())
-            self.assertEqual(report["compilations"]["circuit"]["source"].encode(), compile_circuit(VERIFICATION))
+            self.assertEqual(report["compilations"]["circuit"]["source"].encode(), compile_circuit(VERIFICATION, source_path=VERIFICATION_PATH))
             with self.assertRaisesRegex(CompileError, "lock exceeds the 1-byte budget"):
-                compile_solutions(VERIFICATION, keys, 19, directory, max_lock_bytes=1)
-            with self.assertRaisesRegex(CompileError, "no verification path is eligible.*policy requires a proof"):
-                compile_solutions(VERIFICATION, keys, 19, directory, policy="require-proof")
+                compile_solutions(frontend, keys, 19, directory, max_lock_bytes=1)
+            with (patch("verification.CircuitFixture", side_effect=ValueError("prover unavailable")),
+                  self.assertRaisesRegex(CompileError, "prover unavailable")):
+                compile_solutions(frontend, keys, 19, directory, policy="require-proof")
             script_only = VERIFICATION.replace(
-                b"relation: u32-inc decide ;",
+                b"relation: advance decide ;",
                 b"bsv-effect: increment u32 -- u32 ;\n: increment u32>cell 1 + cell>u32 ;\n"
                 b"relation: increment decide ;",
             )
-            _, script_report = compile_solutions(script_only, keys, 19, directory, r1cs=True)
+            _, script_report = compile_solutions(script_only, keys, 19, directory, source_path=VERIFICATION_PATH, r1cs=True)
             self.assertEqual(script_report["selected"], "script")
             self.assertIn("'u32>cell' is outside", script_report["candidates"]["r1cs"]["reason"])
-            repeated = "bsv-effect: w0 u32 -- u32 ;\n: w0 u32-inc ;\n"
+            repeated = "bsv-effect: w0 u32 -- u32 ;\n: w0 advance ;\n"
             repeated += "".join(f"bsv-effect: w{i} u32 -- u32 ;\n: w{i} w{i - 1} w{i - 1} ;\n"
                                 for i in range(1, 25))
-            source = VERIFICATION.replace(b"relation: u32-inc decide ;",
+            source = VERIFICATION.replace(b"relation: advance decide ;",
                                           (repeated + "relation: w24 decide ;").encode())
             with self.assertRaisesRegex(CompileError, r"line \d+, column \d+: .*budget before lowering"):
-                compile_solutions(source, keys, 19, directory)
+                compile_solutions(source, keys, 19, directory, source_path=VERIFICATION_PATH)
             with self.assertRaisesRegex(CompileError, r"circuit exceeds .* budget before lowering"):
-                compile_circuit(source)
-            word = SourceCompiler(source.decode()).words["w24"]
+                compile_circuit(source, source_path=VERIFICATION_PATH)
+            word = SourceCompiler(source.decode(), source_path=VERIFICATION_PATH).words["w24"]
             for optimization in ("baseline", "stack"):
                 with self.subTest(optimization=optimization), self.assertRaisesRegex(CompileError, "budget before lowering"):
                     compile_word(word, optimization)
-        original = Path(__file__).with_name("proof").joinpath("workflow.fth").read_bytes()
-        self.assertEqual(compile_circuit(VERIFICATION), compile_circuit(original))
+        original = Path(__file__).with_name("proof").joinpath("workflow.fth")
+        self.assertEqual(compile_circuit(VERIFICATION, source_path=VERIFICATION_PATH), compile_circuit(original.read_bytes(), source_path=original))
 
     def test_reusing_scratch_preserves_proof_candidates_and_resolved_words(self):
         document = {"prime": str(FIELD), "useCustomGates": False, "nVars": 6, "nOutputs": 2,
@@ -183,17 +186,20 @@ class LibraryTests(unittest.TestCase):
         key = VerificationKey.load(json.dumps(document).encode())
         keys = TestKeys().public
         builds = []
+        frontend = SourceCompiler(VERIFICATION.decode(), source_path=VERIFICATION_PATH)
 
         def build_circuit(source, directory, *, has_route):
             builds.append(Path(directory))
-            return SimpleNamespace(key=key, describe=lambda: {"test": True})
+            fixture = Mock(spec=CircuitFixture, key=key, source_sha256=sha256(source).hexdigest())
+            fixture.describe.return_value = {"test": True}
+            return fixture
 
-        with self.assertRaisesRegex(ValueError, "relation: requires a generated circuit"):
-            ProofContract(VERIFICATION, key, 19, keys)
+        with self.assertRaisesRegex(ValueError, "must expose both next state and route"):
+            ProofContract(VERIFICATION, replace(key, outputs=1), 19, keys, source_path=VERIFICATION_PATH)
         with (TemporaryDirectory() as directory, patch("verification.CircuitFixture", side_effect=build_circuit),
               patch("proof_contract.SourceCompiler", side_effect=AssertionError("resolved program reparsed"))):
-            _, first = compile_solutions(VERIFICATION, keys, 19, directory, policy="require-proof", r1cs=True)
-            _, second = compile_solutions(VERIFICATION, keys, 19, directory, policy="require-proof", r1cs=True)
+            _, first = compile_solutions(frontend, keys, 19, directory, policy="require-proof", r1cs=True)
+            _, second = compile_solutions(frontend, keys, 19, directory, policy="require-proof", r1cs=True)
             self.assertEqual(first, second)
             self.assertEqual(first["selected"], "r1cs")
             self.assertEqual(len(set(builds)), 2)

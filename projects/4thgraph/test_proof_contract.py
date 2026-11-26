@@ -4,8 +4,10 @@ from dataclasses import replace
 import json
 from pathlib import Path
 import unittest
+from unittest.mock import patch
 
 from proof_contract import FIELD, ProofContract, VerificationKey
+from circuit_tools import CircuitFixture
 from replay import TestKeys
 from shared.benchmark_validation import chain_verdict
 from shared.transaction import Input, Transaction
@@ -16,11 +18,30 @@ SOURCE = b"""bsv-effect: decide u32 -- route ;
 
 
 class ProofContractTests(unittest.TestCase):
+    def test_external_r1cs_must_match_the_declared_constraints(self):
+        source = SOURCE + b"REQUIRE stdlib/verify.fth\n: advance ( u32 -- u32 ) ;\nrelation: advance decide ;\n"
+        generated = VerificationKey(6, (((), (), ((1, 1), (3, FIELD - 1))),), "generated", 2)
+        foreign = replace(generated, constraints=(((), (), ((1, 1), (3, 1))),))
+
+        def compile_fixture(fixture, circom, directory, *, has_route):
+            self.assertTrue(has_route)
+            self.assertIn(b"next <== current;", circom)
+            fixture.key = generated
+
+        with patch.object(CircuitFixture, "__init__", compile_fixture):
+            with self.assertRaisesRegex(ValueError, "supplied R1CS does not match"):
+                ProofContract(source, foreign, 19, TestKeys().public)
+            contract = ProofContract(source, replace(generated, sha256="different-json"), 19, TestKeys().public)
+            self.assertEqual(contract.key.constraints, generated.constraints)
+
     def test_specialization_keeps_public_binding_and_exact_equation(self):
         source = {"prime": str(FIELD), "useCustomGates": False, "nVars": 5, "nOutputs": 1,
                   "nPubInputs": 3, "nPrvInputs": 0, "nConstraints": 1,
                   "constraints": [[{}, {}, {"1": "1", "2": str(FIELD - 1), "0": str(FIELD - 1)}]]}
         key = VerificationKey.load(json.dumps(source).encode())
+        declared = SOURCE + b"REQUIRE stdlib/verify.fth\n: advance ( u32 -- u32 ) ;\nrelation: advance decide ;\n"
+        with self.assertRaisesRegex(ValueError, "must expose both next state and route"):
+            ProofContract(declared, key, 19, TestKeys().public)
         sizes = []
         for mode in ("baseline", "stack"):
             contract = ProofContract(SOURCE, key, 19, TestKeys().public, target="both", optimization=mode)

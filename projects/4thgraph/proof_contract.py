@@ -1,12 +1,13 @@
 """Compile a transparent R1CS assignment verifier and its Forth successor policy."""
 
 import argparse
-from dataclasses import dataclass
 from hashlib import sha256
 import json
 from pathlib import Path
+from tempfile import TemporaryDirectory
 
-from circuit_backend import select_circuit
+from circuit_backend import CircuitProgram, emit_circuit, select_circuit
+from circuit_tools import CircuitFixture
 from compiler import MAX_EXPANSION, PROJECT_NAME, PROJECT_VERSION, SourceCompiler, evaluate
 from lowering import BASELINE, OPTIMIZATIONS, compile_word
 from protocol import (
@@ -14,75 +15,15 @@ from protocol import (
     begin, build_artifact, check_field, copy_preimage, finish, is_compressed_public_key, p2pk,
     single_input, validate_u32,
 )
+from r1cs import FIELD, VerificationKey
 from shared.script import asm, number, push
 from shared.transaction import Input, Output, Transaction, hash256, preimage_forkid
 from wordsets import U32
 
-FIELD = 21888242871839275222246405745257275088548364400416034343698204186575808495617
 NEXT, ROUTE = 1, 2
 LIMB_BYTES = 16
 STATE_WIDTH = 5
 STATE_PREFIX = asm("OP_0 OP_RETURN") + bytes([STATE_WIDTH])
-
-
-def scalar(value):
-    if type(value) is int:
-        return value
-    if isinstance(value, str) and value.isascii() and value.isdecimal() and len(value) <= 77:
-        return int(value)
-    raise ValueError("expected an integer field element")
-
-
-@dataclass(frozen=True)
-class VerificationKey:
-    signals: int
-    constraints: tuple
-    sha256: str
-    outputs: int
-
-    @property
-    def current_wire(self):
-        return self.outputs + 1
-
-    @property
-    def binding_wires(self):
-        return self.current_wire + 1, self.current_wire + 2
-
-    @classmethod
-    def load(cls, raw):
-        document = json.loads(raw)
-        signals = document["nVars"]
-        outputs = document["nOutputs"]
-        if (document["prime"] != str(FIELD) or document["useCustomGates"]
-                or type(outputs) is not int or outputs not in (1, 2)
-                or (document["nPubInputs"], document["nPrvInputs"]) != (3, 0)
-                or type(signals) is not int or not outputs + 4 <= signals <= 256):
-            raise ValueError("expected a bounded BN254 R1CS with one or two outputs and three public inputs")
-        constraints = document["constraints"]
-        if not 1 <= len(constraints) <= 256 or len(constraints) != document["nConstraints"]:
-            raise ValueError("invalid R1CS constraint count")
-
-        def terms(linear):
-            combined = []
-            for wire, value in linear.items():
-                index, coefficient = scalar(wire), scalar(value)
-                if not 0 <= index < signals or str(index) != wire or not 0 <= coefficient < FIELD:
-                    raise ValueError("invalid wire or coefficient in verification data")
-                if coefficient:
-                    combined.append((index, coefficient))
-            return tuple(sorted(combined))
-
-        normalized = []
-        for constraint in constraints:
-            left, right, result = constraint
-            normalized.append((terms(left), terms(right), terms(result)))
-        return cls(signals, tuple(normalized), sha256(raw).hexdigest(), outputs)
-
-    def assignment(self, raw):
-        values = tuple(map(scalar, json.loads(raw)))
-        if len(values) != self.signals or values[0] != 1 or any(not 0 <= value < FIELD for value in values):
-            raise ValueError("assignment must have canonical field values with wire zero equal to one")
-        return values
 
 
 def pick(depth):
@@ -149,8 +90,7 @@ class AssignmentScript:
 
 
 class StateContract:
-    def __init__(self, source, current, keys, *, target=DEFAULT_TARGET, entries=None, terminal_value=TERMINAL_VALUE,
-                 program=None, source_path=None):
+    def __init__(self, route, current, keys, *, target, terminal_value):
         if type(current) is not int or not 0 <= current < U32:
             raise ValueError("committed current state must be u32")
         if any(not is_compressed_public_key(keys.get(role)) for role in ("review", "settle")):
@@ -159,19 +99,6 @@ class StateContract:
             raise ValueError("terminal scripts must be distinct")
         if type(terminal_value) is not int or not 0 < terminal_value < ROOT_VALUE:
             raise ValueError("terminal amount must be positive and leave a spend fee")
-        if program is None:
-            frontend = SourceCompiler(source.decode(), source_path=source_path)
-            if frontend.relation:
-                raise ValueError("relation: requires a generated circuit and the verification planner")
-            if entries is not None or frontend.workflow_input is not None or frontend.stages:
-                program = select_circuit(frontend, entries)
-            else:
-                route = frontend.words.get("decide")
-        elif entries is not None:
-            raise ValueError("circuit entries were already resolved")
-        self.circuit = program
-        if program is not None:
-            route = program.route
         if route is None or (route.takes, route.gives) != (("u32",), ("route",)):
             raise ValueError("proof policy requires 'decide' with effect u32 -- route")
         self.target = target
@@ -209,10 +136,32 @@ class StateContract:
 
 class ProofContract(StateContract):
     def __init__(self, source, key, current, keys, *, target=DEFAULT_TARGET, optimization=BASELINE, entries=None,
-                 terminal_value=TERMINAL_VALUE, program=None, max_expansion=MAX_EXPANSION, source_path=None):
-        super().__init__(source, current, keys, target=target, entries=entries, terminal_value=terminal_value,
-                         program=program, source_path=source_path)
-        self.key = key
+                 terminal_value=TERMINAL_VALUE, max_expansion=MAX_EXPANSION, source_path=None):
+        if isinstance(source, CircuitProgram):
+            if entries is not None:
+                raise ValueError("circuit entries were already resolved")
+            self.circuit = source
+            route = source.route
+        else:
+            frontend = SourceCompiler(source.decode(), source_path=source_path)
+            self.circuit = None
+            if frontend.relation or frontend.stages or frontend.workflow_input or entries is not None:
+                self.circuit = select_circuit(frontend, entries)
+            route = self.circuit.route if self.circuit else frontend.words.get("decide")
+        if self.circuit:
+            circom = emit_circuit(self.circuit, max_expansion=max_expansion)
+            if isinstance(key, CircuitFixture):
+                if key.source_sha256 != sha256(circom).hexdigest():
+                    raise ValueError("compiled R1CS does not match the declared relation")
+            else:
+                if key.outputs != 2:
+                    raise ValueError("supplied R1CS must expose both next state and route for the declared relation")
+                with TemporaryDirectory(prefix="4thgraph-r1cs-") as directory:
+                    expected = CircuitFixture(circom, directory, has_route=True).key
+                if key.signals != expected.signals or key.constraints != expected.constraints:
+                    raise ValueError("supplied R1CS does not match the declared relation")
+        super().__init__(route, current, keys, target=target, terminal_value=terminal_value)
+        self.key = key.key if isinstance(key, CircuitFixture) else key
         word = compile_word(self.route, optimization, max_expansion=max_expansion)
         plain = self.compile(word.script, compact=False)
         compact = self.compile(word.script, compact=True) if optimization == "stack" else plain
