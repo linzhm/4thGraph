@@ -64,6 +64,19 @@ class R1MSMTests(unittest.TestCase):
         self.assertEqual(release["estimated"], report["estimated"])
         self.assertEqual((len(lock.script), len(pattern.program), lock.owner_start), (41364, 5658, 208))
 
+    def test_scan_proposes_the_smaller_affine_guard(self):
+        compiler = R1MSMCompiler()
+        (baseline, _), release = frozen_build()
+        scan = compiler.scan(compiler.plan(release["construction"]))
+        opportunity = next(row for row in scan["opportunities"] if row["id"] == "affine-g-ifdup")
+        self.assertEqual(opportunity["calls"], 51)
+        self.assertEqual(opportunity["missing"], [])
+        plan = compiler.plan(opportunity["try"])
+        (lock, _), report = local_build(compiler, plan, 32)
+        self.assertEqual(report["point_vectors"], 32)
+        self.assertEqual(len(baseline.script) - len(lock.script), 102)
+        self.assertEqual(opportunity["estimated"]["window_loop_bytes_saved"], 102)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -98,6 +98,7 @@ class R1MSMCompiler:
         opportunities = []
         if counts["g_adds"]:
             sites = counts["g_adds"]
+            guard_bytes = 3 if strategy.affine_guard_ifdup else 5
             opportunities.append({
                 "id": "affine-g", "source": self.location, "calls": sites,
                 "proven": [
@@ -107,11 +108,23 @@ class R1MSMCompiler:
                 "requirements": ["use only the separate G table", "guard digit zero before substituting Z=1"],
                 "missing": [] if strategy.affine_g else ["guard and five-input affine lowering in the current candidate"],
                 "equivalence": "the finite result represents the same group point and infinity is preserved",
-                "estimated": {"multiplications_removed": 3 * sites, "branch_opcode_bytes_added": 5 * sites,
+                "estimated": {"multiplications_removed": 3 * sites, "branch_opcode_bytes_added": guard_bytes * sites,
                               "lookup_opcode_bytes_removed": 3 * sites},
                 "try": strategy.name if strategy.affine_g else strategy.name + "-affine-g",
                 "priority": 3 * sites,
             })
+            if strategy.affine_g and not strategy.affine_guard_ifdup:
+                opportunities.append({
+                    "id": "affine-g-ifdup", "source": self.location, "calls": sites,
+                    "proven": ["the digit is a bounded nonnegative Script number",
+                               "the nonzero branch consumes its digit in the lookup",
+                               "the zero branch only discards the digit"],
+                    "requirements": ["preserve the accumulator for zero", "retain one digit for nonzero"],
+                    "missing": [],
+                    "equivalence": "both guards leave the same stack at lookup entry or after skipping zero",
+                    "estimated": {"window_loop_bytes_saved": 2 * sites},
+                    "try": strategy.name + "-ifdup", "priority": 2 * sites,
+                })
         else:
             opportunities.append({
                 "id": "affine-g", "source": self.location, "calls": 0,
@@ -189,10 +202,11 @@ class R1MSMCompiler:
         if plan.strategy.affine_g:
             affine, report = self.affine
             calls = plan.counts()["g_adds"]
+            guard_bytes = 3 if plan.strategy.affine_guard_ifdup else 5
             costs["affine_g"] = {
                 "calls": calls, "generic_kernel_bytes": len(add), "affine_kernel_bytes": len(affine),
                 "kernel_bytes_saved": (len(add) - len(affine)) * calls,
-                "lookup_bytes_saved": 3 * calls, "guard_bytes_added": 5 * calls,
+                "lookup_bytes_saved": 3 * calls, "guard_bytes_added": guard_bytes * calls,
                 "multiplications_removed_on_nonzero_path": (opcode_count(add, "OP_MUL") -
                                                            opcode_count(affine, "OP_MUL")) * calls,
                 "formula": report,

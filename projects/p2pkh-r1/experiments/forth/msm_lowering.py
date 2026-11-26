@@ -24,20 +24,23 @@ class Strategy:
     joint: bool = False
     q_width: int | None = None
     affine_g: bool = False
+    affine_guard_ifdup: bool = False
 
     @property
     def name(self):
         mode = "joint" if self.joint else "split"
         widths = str(self.width) if self.q_width is None else f"{self.width}x{self.q_width}"
-        return f"{mode}-{widths}" + ("-affine-g" if self.affine_g else "")
+        affine = "-affine-g" if self.affine_g else ""
+        guard = "-ifdup" if self.affine_guard_ifdup else ""
+        return f"{mode}-{widths}{affine}{guard}"
 
     @classmethod
     def parse(cls, text):
-        match = re.fullmatch(r"(split|joint)-([1-9][0-9]?)(?:x([1-9][0-9]?))?(-affine-g)?", text)
+        match = re.fullmatch(r"(split|joint)-([1-9][0-9]?)(?:x([1-9][0-9]?))?(?:(-affine-g)(-ifdup)?)?", text)
         if not match:
-            raise ValueError("expected split-N, split-NxM or joint-N, optionally followed by -affine-g")
-        layout, width, q_width, affine_g = match.groups()
-        return cls(int(width), layout == "joint", int(q_width) if q_width else None, bool(affine_g))
+            raise ValueError("expected split-N, split-NxM or joint-N, optionally followed by -affine-g or -affine-g-ifdup")
+        layout, width, q_width, affine_g, ifdup = match.groups()
+        return cls(int(width), layout == "joint", int(q_width) if q_width else None, bool(affine_g), bool(ifdup))
 
 
 @dataclass(frozen=True)
@@ -178,12 +181,14 @@ def lookup(zero_depth, *, affine=False):
     return head + (asm("OP_1SUB OP_PICK") if affine else asm("OP_DUP OP_PICK OP_SWAP OP_1SUB OP_PICK"))
 
 
-def selected(zero_depth, add, *, accumulate, affine=None):
+def selected(zero_depth, add, *, accumulate, affine=None, affine_guard_ifdup=False):
     take_digit = asm("OP_FROMALTSTACK")
     if accumulate and affine is not None:
-        # G[0] is infinity. Leave the accumulator alone instead of passing Z=0 to the affine kernel.
-        return (take_digit + asm("OP_DUP OP_IF") + lookup(zero_depth, affine=True) + affine
-                + asm("OP_ELSE OP_DROP OP_ENDIF"))
+        body = lookup(zero_depth, affine=True) + affine
+        # G[0] is infinity. OP_IF consumes zero or one of the two copies of a nonzero digit.
+        if affine_guard_ifdup:
+            return take_digit + asm("OP_IFDUP OP_IF") + body + asm("OP_ENDIF")
+        return take_digit + asm("OP_DUP OP_IF") + body + asm("OP_ELSE OP_DROP OP_ENDIF")
     return take_digit + lookup(zero_depth) + (add if accumulate else b"")
 
 
@@ -203,7 +208,8 @@ def window_program(plan, add, double, affine=None):
         first = selected(3 * points - 1, add, accumulate=False)
         add_window = selected(3 * points + 2, add, accumulate=True)
     else:
-        g_add = selected(6 * radix + 2, add, accumulate=True, affine=affine)
+        g_add = selected(6 * radix + 2, add, accumulate=True, affine=affine,
+                         affine_guard_ifdup=strategy.affine_guard_ifdup)
         first = selected(3 * radix - 1, add, accumulate=False) + g_add
         add_window = selected(3 * radix + 2, add, accumulate=True) + g_add
     digit_bytes = sum(len(code) * count for code, count in pieces[1:])
@@ -261,7 +267,8 @@ def mixed_program(plan, add, double, affine):
         for width, table_end, kernel in ((strategy.q_width, q_points, None), (strategy.width, points, affine)):
             if offset % width == 0:
                 depth = 3 * table_end - 1 + 3 * accumulate
-                code += selected(depth, add, accumulate=accumulate, affine=kernel)
+                code += selected(depth, add, accumulate=accumulate, affine=kernel,
+                                 affine_guard_ifdup=strategy.affine_guard_ifdup)
                 accumulate = True
         steps.append(code)
         previous = offset
