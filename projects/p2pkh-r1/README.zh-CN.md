@@ -30,7 +30,7 @@ P2PKH-R1 用未压缩的 secp256r1（P-256）公钥的 HASH160 锁定 BSV 输出
 
 ## Forth 探索版
 
-Forth 源码 `r1.fth` 逐字节复现完整的 v0.2.0 锁。v0.3.0 在 263 处内部倍点各省 2 B，整锁共省 526 B。锁在见证进入曲线点运算前校验输入。用同一节点复放时，v0.2.0 基线、v0.3.0 和 66,265 B 的 sCrypt 同算法内核版都完成了 ForkID ALL、OTDA ALL 和配对 OTDA SINGLE 付款。[Forth 源码与复跑](https://github.com/linzhm/4thGraph/blob/f6f2c66e8476b29975b43be76850229ee38b47ea/projects/p2pkh-r1/experiments/forth/README.md)
+Forth 源码 `r1.fth` 逐字节复现完整的 v0.2.0 锁。v0.3.0 在 263 处内部倍点各省 2 B，整锁共省 526 B。锁在见证进入曲线点运算前校验输入。用同一节点复放时，v0.2.0 基线、v0.3.0 和 66,265 B 的 sCrypt 同算法内核版都完成了 ForkID ALL、OTDA ALL 和配对 OTDA SINGLE 付款。[Forth 源码与复跑](experiments/forth/README.md)
 
 ## 钱包接入
 

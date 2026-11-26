@@ -8,7 +8,7 @@
 
 ## Try 4thG
 
-**[PELS Counter](#pels-counter)** · [P2PKH](#p2pkh-example) · [P2PK](#p2pk-example) · [Install the CLI](https://github.com/linzhm/4thGraph/blob/feat/4thgraph/projects/4thgraph/INSTALL.md)
+**[PELS Counter](#pels-counter)** · [P2PKH](#p2pkh-example) · [P2PK](#p2pk-example) · [Install the CLI](projects/4thgraph/INSTALL.md)
 
 <a name="pels-counter"></a>
 
@@ -19,13 +19,13 @@ Start at `0`. Every spend increments the counter and puts the same rules in the 
 **1. Get the source.** Use Git and Python 3.11 or later.
 
 ```sh
-git clone --branch feat/4thgraph https://github.com/linzhm/4thGraph.git
+git clone https://github.com/linzhm/4thGraph.git
 cd 4thGraph
 export PYTHONPATH=.:projects/4thgraph
 counter=projects/4thgraph/examples/pels_counter.py
 ```
 
-**2. Compile the lock.** 4thG compiles the Forth transition below. The example adds the checks that bind it to the next transaction output. [Forth source](https://github.com/linzhm/4thGraph/blob/feat/4thgraph/projects/4thgraph/examples/pels-counter.fth)
+**2. Compile the lock.** 4thG compiles the Forth transition below. The example adds the checks that bind it to the next transaction output. [Forth source](projects/4thgraph/examples/pels-counter.fth)
 
 ```forth
 bsv-effect: advance u32 -- u32 ;
@@ -49,7 +49,7 @@ bash shared/verify_node.sh --profile default -- python "$counter" replay \
   --output projects/4thgraph/build/pels-counter.json
 ```
 
-The replay funds `0` and mines `0 → 1 → 2`, deducting **1,000 sat per spend**. Open the JSON report to see both engines' verdicts and the mined blocks. To construct an individual spend, use `spend --parent` with the raw parent transaction. [Spend and verification guide](https://github.com/linzhm/4thGraph/blob/feat/4thgraph/projects/4thgraph/examples/README.md#spend-and-verify-on-regtest)
+The replay funds `0` and mines `0 → 1 → 2`, deducting **1,000 sat per spend**. Open the JSON report to see both engines' verdicts and the mined blocks. To construct an individual spend, use `spend --parent` with the raw parent transaction. [Spend and verification guide](projects/4thgraph/examples/README.md#spend-and-verify-on-regtest)
 
 <a name="p2pkh-example"></a>
 
@@ -60,7 +60,7 @@ The replay funds `0` and mines `0 → 1 → 2`, deducting **1,000 sat per spend*
 python3 projects/4thgraph/examples/payments.py --hash160 751e76e8199196d454941c45d1b3a323f1433bd6
 ```
 
-The lock commits to a public-key hash. To spend, push the signature and public key. [Forth source](https://github.com/linzhm/4thGraph/blob/feat/4thgraph/projects/4thgraph/examples/payments.fth) · [Signed transaction examples](projects/p2pk-p2pkh-baseline/README.md)
+The lock commits to a public-key hash. To spend, push the signature and public key. [Forth source](projects/4thgraph/examples/payments.fth) · [Signed transaction examples](projects/p2pk-p2pkh-baseline/README.md)
 
 </details>
 
@@ -73,11 +73,11 @@ The lock commits to a public-key hash. To spend, push the signature and public k
 python3 projects/4thgraph/examples/payments.py --public-key 0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798
 ```
 
-The lock contains the compressed public key. To spend, push the signature. [Forth source](https://github.com/linzhm/4thGraph/blob/feat/4thgraph/projects/4thgraph/examples/payments.fth) · [Signed transaction examples](projects/p2pk-p2pkh-baseline/README.md)
+The lock contains the compressed public key. To spend, push the signature. [Forth source](projects/4thgraph/examples/payments.fth) · [Signed transaction examples](projects/p2pk-p2pkh-baseline/README.md)
 
 </details>
 
-4thG also supports stack optimization, candidate search across transaction boundaries, decision reports, and Circom generation for supported words. [Toolchain guide](https://github.com/linzhm/4thGraph/tree/feat/4thgraph/projects/4thgraph) · [Forth language reference](https://github.com/linzhm/4thGraph/blob/feat/4thgraph/projects/4thgraph/language.md)
+4thG also supports stack optimization, candidate search across transaction boundaries, decision reports, and Circom generation for supported words. [Toolchain guide](projects/4thgraph) · [Forth language reference](projects/4thgraph/language.md)
 
 <a name="4thg-comparisons"></a>
 
@@ -85,7 +85,7 @@ The lock contains the compressed public key. To spend, push the signature. [Fort
 
 | Project | What the comparison shows |
 | --- | --- |
-| P2PKH-R1 Forth v0.3.0 experiment | The Forth baseline reproduces the v0.2.0 lock byte for byte. The optimized lock goes from 46,302 to **45,776 B**, and the two-input, two-output ForkID ALL payment goes from 93,374 to **92,322 B**. The replay also covers OTDA and a build that uses sCrypt-compiled curve kernels. [Experiment and replay](https://github.com/linzhm/4thGraph/tree/feat/4thgraph/projects/p2pkh-r1/experiments/forth) |
+| P2PKH-R1 Forth v0.3.0 experiment | The Forth baseline reproduces the v0.2.0 lock byte for byte. The optimized lock goes from 46,302 to **45,776 B**, and the two-input, two-output ForkID ALL payment goes from 93,374 to **92,322 B**. The replay also covers OTDA and a build that uses sCrypt-compiled curve kernels. [Experiment and replay](projects/p2pkh-r1/experiments/forth) |
 | BLS12-381 Groth16 verifier (in development) | Forth defines the verification stages for off-chain proofs with fixed, mixed, or spend-time public inputs. The comparison with nChain matches the public-input domain and the placement of precomputed pairing data. |
 | CCTP transaction layouts (in development) | Compares the same Groth16 verification workload in a fused spend, an atomic two-input spend, and two serial spends. The comparison measures total transaction bytes and the slowest spend’s validation time. |
 
