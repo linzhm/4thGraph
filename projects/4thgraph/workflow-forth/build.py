@@ -16,6 +16,7 @@ from shared.transaction import (
     ANYONECANPAY, CHRONICLE, SIGHASH_NONE, SIGHASH_SINGLE, SIGHASH_TYPES,
 )
 from protocol import TARGETS
+from wordsets import Literal, cell_literal
 from workflow_contract import WorkflowContracts
 
 
@@ -246,12 +247,13 @@ def parse_plan(text):
 
 
 class SourceTrace:
-    """The lines Gforth read and the dictionary words it bound at each source position."""
+    """Source lines, word bindings and single-cell literals observed in Gforth."""
 
     def __init__(self, records, directory):
         self.lines = defaultdict(dict)
         self.definitions = {}
         self.calls = {}
+        self.literals = {}
         self.bindings = {}
 
         paths = {}
@@ -272,13 +274,14 @@ class SourceTrace:
                 line = bytes.fromhex("".join(content))
                 if self.lines[path].setdefault(int(number), line) != line:
                     raise CompileError(f"source changed during Forth execution: {path}")
-            elif tag in ("definition", "call"):
-                *caller, xt, column, number, filename = fields
+            elif tag in ("definition", "call", "literal"):
+                *caller, value, column, number, filename = fields
                 position = (trace_path(filename), int(number), int(column))
                 if tag == "definition":
-                    self.definitions[int(xt)] = position
+                    self.definitions[int(value)] = position
                 else:
-                    self.calls[int(caller[0]), position] = int(xt)
+                    table = self.calls if tag == "call" else self.literals
+                    table[int(caller[0]), position] = int(value)
             else:
                 raise CompileError(f"unexpected Gforth trace record {tag!r}")
 
@@ -328,6 +331,13 @@ class BoundRules(SourceCompiler):
                 elif isinstance(instruction, Word):
                     site = self.position(origin[0], item.source)
                     pending.append((instruction, self.trace.calls.get((xt, site))))
+                elif isinstance(instruction, Literal) and cell_literal(item.source.text) is not None:
+                    site = self.position(origin[0], item.source)
+                    actual = self.trace.literals.get((xt, site))
+                    if actual != instruction.value:
+                        observed = "no single-cell literal" if actual is None else str(actual)
+                        raise item.source.error(f"literal {item.source.text!r}: Gforth compiled {observed}, "
+                                                f"4thGraph compiled {instruction.value}")
 
 
 def load_plan(source, *, forth=None):

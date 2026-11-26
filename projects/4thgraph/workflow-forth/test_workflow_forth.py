@@ -4,6 +4,7 @@ from dataclasses import replace
 import os
 from pathlib import Path
 import shutil
+import subprocess
 from tempfile import TemporaryDirectory
 import unittest
 
@@ -173,6 +174,34 @@ class ForthWorkflowTests(unittest.TestCase):
                                          ": helper ( u32 -- u32 ) 3 cell>u32 u32+ ;\nREQUIRE rules.fth"))
             with self.assertRaisesRegex(CompileError, "different definition of 'helper'"):
                 lower_serial(load_plan(workflow), rules, TestKeys().public, 18)
+
+    def test_shared_literals_match_gforth_at_the_route_boundary(self):
+        keys = TestKeys().public
+        reference = lower_serial(load_plan(COUNTER), RULES, keys, 19)
+        with TemporaryDirectory() as temp:
+            rules = Path(temp) / "rules.fth"
+            workflow = Path(temp) / "counter.fth"
+            workflow.write_text(COUNTER.read_text().replace("REQUIRE workflow.fth", f"REQUIRE {HERE / 'workflow.fth'}")
+                                .replace("REQUIRE counter-rules.fth", "HEX REQUIRE rules.fth DECIMAL"))
+            for numeral, expected in (("20", "0 0 0"), ("#20", "0 1 1"), ("$14", "0 1 1")):
+                with self.subTest(numeral=numeral):
+                    rules.write_text(RULES.read_text().replace("20 cell>u32", numeral + " cell>u32"))
+                    result = subprocess.check_output([FORTH, str(workflow), "-e",
+                                                      "cr 19 decide . 20 decide . 21 decide . bye"], text=True)
+                    self.assertEqual(result.splitlines()[-1].strip(), expected)
+                    net = load_plan(workflow)
+                    if numeral == "20":
+                        with self.assertRaisesRegex(CompileError, "literal '20': Gforth compiled 32, 4thGraph compiled 20"):
+                            lower_serial(net, rules, keys, 19)
+                    else:
+                        contract = lower_serial(net, rules, keys, 19)
+                        self.assertEqual(contract.deployment_outputs, reference.deployment_outputs)
+                        self.assertEqual(contract.state_codes, reference.state_codes)
+
+    def test_host_dictionary_lookup_precedes_numeric_conversion(self):
+        net = self.load_variant(**{f"REQUIRE {RULES}": f"32 CONSTANT 20\nREQUIRE {RULES}"})
+        with self.assertRaisesRegex(CompileError, "literal '20': Gforth compiled no single-cell literal"):
+            lower_serial(net, RULES, TestKeys().public, 19)
 
     def test_forth_plan_reproduces_serial_locks_and_validates_real_input_scripts(self):
         keys = TestKeys()

@@ -25,11 +25,18 @@ file-refill-slot @ CONSTANT original-file-refill
 : trace-definition ( colon-sys -- colon-sys )
   DEFERS :-hook ['] .definition trace-file outfile-execute ;
 : .call ( nt -- ) ." call " latestxt trace-number name>int trace-number trace-position ;
+: .cell ( n -- ) ." literal " latestxt trace-number trace-number trace-position ;
+: trace-token ( addr u -- )
+  DUP 0= IF 2DROP EXIT THEN
+  2DUP find-name ?DUP IF NIP NIP ['] .call trace-file outfile-execute EXIT THEN
+  \ Use the same single-cell number conversion as Gforth's compiler.
+  dpl @ >R snumber? R> dpl !
+  DUP 0< IF DROP ['] .cell trace-file outfile-execute
+  ELSE 0> IF 2DROP THEN THEN ;
 : trace-word ( -- )
   DEFERS before-word
   STATE @ IF
-    >IN @ >R PARSE-NAME find-name R> >IN !
-    ?DUP IF ['] .call trace-file outfile-execute THEN
+    >IN @ >R PARSE-NAME R> >IN ! trace-token
   THEN ;
 ' trace-definition IS :-hook
 ' trace-word IS before-word

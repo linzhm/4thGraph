@@ -44,6 +44,8 @@
 
 构建锁时，`--rules` 及其依赖的源码行必须与本次 Gforth 实际读取的内容一致。构建器按 `relation-ref` 保存的执行令牌核对定义位置，并核对关系调用的用户定义词。在阶段声明后重新定义同名词，原阶段仍绑定原定义。宿主提供的基础词须实现对应的 4thGraph 语义。
 
+构建器还会逐处核对 Gforth 与 4thGraph 编译的单 cell 字面量。若在 `HEX` 下加载共享规则，`20` 在 Gforth 中为十进制 32，在 4thGraph 中为十进制 20，构建会报告所在行、列和两个值。要在两边都表示二十，可写 `#20` 或 `$14`。
+
 ```sh
 project=projects/4thgraph
 PYTHONPATH=.:$project python "$project/workflow-forth/build.py" \
