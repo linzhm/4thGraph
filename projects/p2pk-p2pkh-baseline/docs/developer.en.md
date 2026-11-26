@@ -12,7 +12,7 @@ Reference fixtures for standard Script payments and native signature behavior ac
 
 P2PK embeds the compressed public key and spends with a signature. P2PKH embeds its 20-byte HASH160 and spends with a signature and the matching public key. The signature carries the sighash selector. These native locks are the baseline for cost and compatibility comparisons against the other projects.
 
-[Wire examples and fixture contract](../README.md#fixture-contract) · [Signed fixtures](../template/baseline.json) · [Coverage rules](../reference/acceptance.md)
+[Wire examples and fixture contract](../README.md#fixture-contract) · [Signed fixtures](../versions/v0.1.0/baseline.json) · [Coverage rules](../reference/acceptance.md)
 
 <a name="security"></a>
 
@@ -36,6 +36,6 @@ Run the [offline reproduction command](../README.md#run) or use the [unified ben
 
 Start with the [unified P2PKH quickstart](sdk.en.md). Create a lock, recognize the funded output, and use `signPayment` with a secp256k1 signer. Select the P2PK template in the same client for the second native control.
 
-Use the [Python fixture generator](../reference/script_lab.py) as a serialization and verification example. An application uses its own wallet and native signing stack for real transactions. The [fixture JSON](../template/baseline.json) gives complete parent and spend bytes, scripts and expected results for comparing application output.
+Use the [Python fixture generator](../reference/script_lab.py) as a serialization and verification example. An application uses its own wallet and native signing stack for real transactions. The [fixture JSON](../versions/v0.1.0/baseline.json) gives complete parent and spend bytes, scripts and expected results for comparing application output.
 
 [Project run guide](../README.md#run) · [Pinned dependency guidance](../../../docs/benchmark.md)

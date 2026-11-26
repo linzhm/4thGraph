@@ -12,7 +12,7 @@ For example, an ordinary P2PKH payment can create an R1 output for Alice. When A
 
 1. Validate the uncompressed 65-byte X9.63 encoding `04 || X_BE32 || Y_BE32` on secp256r1. Compute HASH160 of those 65 bytes. A wallet with the recipient's 20-byte hash may use it directly.
 2. Copy the v0.2.0 lock and write the recipient hash at the zero-based interval `[208, 228)`. The script has **46,302 bytes**.
-3. Check the length and the fixed-byte fingerprint before returning the owner hash. Compute `SHA256(raw[:208] || raw[228:])` from the first opcode. The v0.2.0 fingerprint is `52a1d9eb9e236403c66e845e18cf31d9c3a5f4c2e0ed7ca0270a60ba4e867ca6`. For v0.1.0 prevouts, use their original length and fingerprint. [v0.2.0](../template/v0.2.0/layout.json) · [v0.1.0](../template/layout.json)
+3. Check the length and the fixed-byte fingerprint before returning the owner hash. Compute `SHA256(raw[:208] || raw[228:])` from the first opcode. The v0.2.0 fingerprint is `52a1d9eb9e236403c66e845e18cf31d9c3a5f4c2e0ed7ca0270a60ba4e867ca6`. For v0.1.0 prevouts, use their original length and fingerprint. [v0.2.0](../versions/v0.2.0/layout.json) · [v0.1.0](../versions/v0.1.0/layout.json)
 
 Set `R1_OWNER_HASH160` to the recipient’s 20-byte HASH160 in hex.
 
@@ -77,7 +77,7 @@ version || hashPrevouts || hashSequence || outpoint || 02 68 ac ||
 amount || sequence || hashOutputs || locktime || typeLE32
 ```
 
-The ordinary preimage has 159 bytes. The companion replaces `02 68 ac` with `06 63 ad 67 ab 68 ac`. BIP143 hashSequence is zero for NONE, SINGLE and ANYONECANPAY. An unpaired SINGLE has no placeholder output in the transaction. For paired OTDA SINGLE, the node's signing serialization uses null outputs at earlier indices; these placeholders exist only in that serialization. Use the node rules for the active network and spend context. The built-in payment SDKs serialize version 2, final sequence and zero locktime. [Payment vector](../template/spend-all.json) · [Reference builder](../reference/signature.py)
+The ordinary preimage has 159 bytes. The companion replaces `02 68 ac` with `06 63 ad 67 ab 68 ac`. BIP143 hashSequence is zero for NONE, SINGLE and ANYONECANPAY. An unpaired SINGLE has no placeholder output in the transaction. For paired OTDA SINGLE, the node's signing serialization uses null outputs at earlier indices; these placeholders exist only in that serialization. Use the node rules for the active network and spend context. The built-in payment SDKs serialize version 2, final sequence and zero locktime. [Payment vector](../versions/v0.1.0/spend-all.json) · [Reference builder](../reference/signature.py)
 
 ## Security and interoperability
 

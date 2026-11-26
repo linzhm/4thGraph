@@ -8,7 +8,7 @@ from fourthgraph.compiler.lowering import compile_word
 from fourthgraph.bsv.evaluate import ScriptError, evaluate as evaluate_script
 from fourthgraph.bsv.script import decode_num, encode_num
 
-EXAMPLE = Path(__file__).resolve().parents[1] / "projects/p2pkh-r1/experiments/forth" / "window-ranges.fth"
+EXAMPLE = Path(__file__).resolve().parents[1] / "projects/p2pkh-r1/forth" / "window-ranges.fth"
 SOURCE = EXAMPLE.read_text()
 
 

@@ -224,8 +224,8 @@ if __name__ == '__main__':
     parser.add_argument('--committed-costs', action='store_true')
     args=parser.parse_args()
     if args.write_vector:
-        (ROOT/'template/vector.json').write_text(json.dumps(vector(),indent=2)+'\n')
-        (ROOT/'template/universal-vectors.json').write_text(json.dumps(universal_vector(),indent=2)+'\n')
+        (ROOT/'versions/v0.1.0/vector.json').write_text(json.dumps(vector(),indent=2)+'\n')
+        (ROOT/'versions/v0.1.0/universal-vectors.json').write_text(json.dumps(universal_vector(),indent=2)+'\n')
     if args.committed_costs:
         report = committed_costs()
     else:

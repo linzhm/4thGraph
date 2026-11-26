@@ -1,6 +1,6 @@
 # Reference implementation
 
-The reference assembler builds the exact [v0.2.0 short lock](../template/v0.2.0/template.hex) from [lock.asm](asm/lock.asm) and the existing R1 PUSHTX blocks. The short lock's activation preimage is built from the authenticated funding transaction and an already arranged transaction. New short locks commit to R1 v0.2.0. Recognition returns the committed R1 version for either existing v0.1.0 or v0.2.0 outputs.
+The reference assembler builds the exact [v0.2.0 short lock](../versions/v0.2.0/template.hex) from [lock.asm](asm/lock.asm) and the existing R1 PUSHTX blocks. The short lock's activation preimage is built from the authenticated funding transaction and an already arranged transaction. New short locks commit to R1 v0.2.0. Recognition returns the committed R1 version for either existing v0.1.0 or v0.2.0 outputs.
 
 From the repository root, use Python 3.12 with Git and Rust for the pinned chain-gang dependency.
 

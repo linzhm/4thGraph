@@ -60,17 +60,17 @@ SCRIPT_LAB_SDK_PYTHON="$PWD/projects/p2pkh-r1/workspace/venv/bin/python" \
 ^760052a569766b7c8201[0-9a-f]{396}([0-9a-f]{40})$
 ```
 
-3. Hash the raw bytes `SHA256(script[0:208] || script[228:])`. Require `52a1d9eb9e236403c66e845e18cf31d9c3a5f4c2e0ed7ca0270a60ba4e867ca6` before returning the capture. Changing a single fixed suffix byte fails recognition. To replace an owner, overwrite `[208,228)` in a verified copy. [Layout](../template/v0.2.0/layout.json)
+3. Hash the raw bytes `SHA256(script[0:208] || script[228:])`. Require `52a1d9eb9e236403c66e845e18cf31d9c3a5f4c2e0ed7ca0270a60ba4e867ca6` before returning the capture. Changing a single fixed suffix byte fails recognition. To replace an owner, overwrite `[208,228)` in a verified copy. [Layout](../versions/v0.2.0/layout.json)
 
 ## Device signers and prepared inputs
 
 A digest signer receives `SHA256d(P)`. Set `signMessage: true` for a device that takes `SHA256(P)` and applies SHA-256 itself. Both paths return 64 raw bytes, with `r` and `s` each padded to 32 bytes in big-endian order. TypeScript clients can use `signPaymentAsync` and `signInputAsync` for asynchronous devices.
 
-Use `signInput` for mixed inputs and explicit sighash modes. The wallet assembles the intended transaction and verifies the previous output and fee before collecting signatures. If a different parent txid confirms, reconcile the outpoint and rebuild the child. [R1 signature and digest vector](../template/v0.2.0/spend-all.json) · [Recover a child payment](chronicle.md#recovering-a-child-payment)
+Use `signInput` for mixed inputs and explicit sighash modes. The wallet assembles the intended transaction and verifies the previous output and fee before collecting signatures. If a different parent txid confirms, reconcile the outpoint and rebuild the child. [R1 signature and digest vector](../versions/v0.2.0/spend-all.json) · [Recover a child payment](chronicle.md#recovering-a-child-payment)
 
 ## Current development version
 
-Use v0.2.0 for new outputs. Python uses it by default. For older UTXOs, use the original v0.1.0 layout. The shared client recognizes both versions and supports ordinary BIP143 ALL payments. [v0.1.0 layout](../template/layout.json)
+Use v0.2.0 for new outputs. Python uses it by default. For older UTXOs, use the original v0.1.0 layout. The shared client recognizes both versions and supports ordinary BIP143 ALL payments. [v0.1.0 layout](../versions/v0.1.0/layout.json)
 
 In the Python reference, `sign_spend(..., compress_otda="paired")` enables
 output reconstruction in version 2 Chronicle OTDA transactions using ALL

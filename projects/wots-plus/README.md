@@ -1,6 +1,6 @@
 # WOTS+ (SHA-256)
 
-[简体中文](README.zh-CN.md) · [4thGraph](../../README.md) · [Project index](../README.md)
+[简体中文](README.zh-CN.md) · [4thGraph](../../README.md) · [Project index](../README.md) · [Versions](versions/index.json)
 
 ## Developer resources
 
@@ -10,7 +10,7 @@ Choose a receive template and connect a durable one-time signer. The cached-step
 
 [Protocol](docs/developer.en.md#protocol) · [Security](docs/developer.en.md#security) · [Verify](#run-the-checks) · [Transaction costs](#complete-transactions-and-stack-measurements)
 
-**Status** · v0.1 development baseline.
+**Status** · v0.1.0 development baseline.
 
 This experiment verifies a WOTS+ one-time signature in Bitcoin Script and binds
 it to the current BSV transaction input. It uses the RFC 8391
@@ -53,7 +53,7 @@ test exercises a one-bit mutation in each of the 67 signature chains.
 
 See the [validation record](docs/validation.md) for completed checks, test
 limits and the script-size comparison with Lamport OTS. The 16 reproducible
-payment vectors are in [template/vectors.json](template/vectors.json).
+payment vectors are in [vectors.json](versions/v0.1.0/vectors.json).
 
 ### Cached-constants candidate
 
@@ -103,7 +103,7 @@ durable signer wrapper used for the synthetic keys.
 
 Use `compress_otda=True` with `sign_spend` or `sign_payment` only when
 Chronicle functional unlocking is available. Version 2 OTDA ALL and paired
-OTDA SINGLE use the [prebuilt reconstruction program](template/cached-steps-layout.json)
+OTDA SINGLE use the [prebuilt reconstruction program](versions/v0.1.0/cached-steps-layout.json)
 to recreate cached-steps outputs. SINGLE covers only its same-index output.
 Earlier null outputs stay in the signed prefix, and unpaired SINGLE
 uses the existing companion authorization. Mixed transactions copy

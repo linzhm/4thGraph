@@ -12,7 +12,7 @@ A SHA-256 one-time signature bound to a BSV transaction input, with optional sta
 
 The verifier uses the RFC 8391 `WOTSP-SHA2_256` chains with a BSV-specific 64-byte public key and 2,144-byte signature. The transaction-bound lock checks both the hash-chain proof and the selected input's authorization. It supports the twelve BIP143 and Chronicle OTDA modes. Cached-step outputs can be reconstructed inside an eligible version 2 OTDA ALL or paired SINGLE witness.
 
-[Wire and Script specification](spec.md) · [RFC 8391](https://www.rfc-editor.org/rfc/rfc8391) · [Cached-step artifact layout](../template/cached-steps-layout.json)
+[Wire and Script specification](spec.md) · [RFC 8391](https://www.rfc-editor.org/rfc/rfc8391) · [Cached-step artifact layout](../versions/v0.1.0/cached-steps-layout.json)
 
 <a name="security"></a>
 
@@ -28,7 +28,7 @@ Verify the funding outpoint and intended outputs before authorizing a signing mo
 
 The payment suite defines 1,230 rows per measured layout and checks all 67 signature-chain positions in complete inputs. The cached-step lock is 33,956 bytes. The OTDA ALL 2×2 example falls from 208,406 to 79,090 bytes with reconstruction. Paired SINGLE falls from 140,473 to 78,921 bytes while its measured two-stack payload peak stays at 70,280 bytes.
 
-Install the pinned [requirements](../reference/requirements.txt) and run `bash projects/wots-plus/reference/verify.sh`. The [validation record](validation.md) includes BSV Node, chain-gang and the separate Lean checks. [Payment vectors](../template/vectors.json) · [Project cost analysis](../README.md)
+Install the pinned [requirements](../reference/requirements.txt) and run `bash projects/wots-plus/reference/verify.sh`. The [validation record](validation.md) includes BSV Node, chain-gang and the separate Lean checks. [Payment vectors](../versions/v0.1.0/vectors.json) · [Project cost analysis](../README.md)
 
 <a name="sdk"></a>
 
