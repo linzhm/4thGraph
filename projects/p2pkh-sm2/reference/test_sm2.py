@@ -10,7 +10,8 @@ import subprocess
 import sys
 import tempfile
 import unittest
-from assemble import SIGNED_RESIDUE_TEMPLATE_VERSION, TEMPLATE_VERSION, TEMPLATE_VERSIONS
+from assemble import PACKED_SM3_TEMPLATE_VERSION, SIGNED_RESIDUE_TEMPLATE_VERSION
+from assemble import TEMPLATE_VERSION, TEMPLATE_VERSIONS
 from assemble import assemble, forth_compiler, sm3_blocks
 from p2pkh_sm2 import *
 from sm2 import *
@@ -20,7 +21,7 @@ from fourthgraph.bsv.script import push,number,assemble as assemble_blocks
 from fourthgraph.bsv.transaction import *
 
 ROOT=Path(__file__).resolve().parents[1]
-SM3_PROFILES = ({}, {'optimized': True}, {'compact': True}, {'scheduled': True})
+SM3_PROFILES = ({}, {'optimized': True}, {'compact': True}, {'scheduled': True}, {'packed': True})
 
 
 def der(tag,raw):
@@ -112,7 +113,7 @@ class SM2Tests(unittest.TestCase):
 
     def test_compact_sm3_preserves_lower_stack_and_checks_input_length(self):
         lower=[(1 << 32).to_bytes(5,'little'), b'\x80', b'lower']
-        for profile in ({'compact': True}, {'scheduled': True}):
+        for profile in ({'compact': True}, {'scheduled': True}, {'packed': True}):
             script=hash_script(64,**profile)
             for data in (bytes(64), b'\xff'*64, b'\x80\x01'*32):
                 with self.subTest(profile=profile, word=data[:2].hex()):
@@ -163,7 +164,7 @@ class SM2Tests(unittest.TestCase):
             with self.subTest(version=version):
                 lock = locking_script_from_owner_hash(owner, version=version)
                 self.assertEqual(lock, assemble(owner, version))
-                if version != SIGNED_RESIDUE_TEMPLATE_VERSION:
+                if version < SIGNED_RESIDUE_TEMPLATE_VERSION:
                     self.assertEqual(lock, assemble_blocks(ROOT/'reference/asm', owner, sm3_blocks(version=version)))
                 self.assertEqual(identify(lock), (version, owner))
                 self.assertIsNone(identify(lock[:-1]))
@@ -172,7 +173,7 @@ class SM2Tests(unittest.TestCase):
         self.assertEqual(sizes, sorted(set(sizes), reverse=True))
 
     def test_full_script_random_keys(self):
-        for version in (TEMPLATE_VERSION, SIGNED_RESIDUE_TEMPLATE_VERSION):
+        for version in (TEMPLATE_VERSION, SIGNED_RESIDUE_TEMPLATE_VERSION, PACKED_SM3_TEMPLATE_VERSION):
             for d,k in ((1,2),(7,19),(19,7),(N-2,N-1),(12345,67890)):
                 key,lock,parent,tx,pre,sig=fixture(d,k,template_version=version)
                 with self.subTest(version=version,d=d): self.assertTrue(valid_script(lock,[pre,key,sig],tx))
@@ -269,7 +270,7 @@ class SM2Tests(unittest.TestCase):
         for version in TEMPLATE_VERSIONS[1:]:
             candidate = assemble(base_owner, version)
             self.assertEqual(subprocess.check_output([*cli, '--version', str(version), '--format', 'raw']), candidate)
-        for version in (0, 4, 5):
+        for version in (0, 5, 6):
             with self.subTest(version=version):
                 for construct in (assemble, locking_script_from_owner_hash):
                     with self.assertRaisesRegex(ValueError, 'unsupported P2PKH-SM2 template'):

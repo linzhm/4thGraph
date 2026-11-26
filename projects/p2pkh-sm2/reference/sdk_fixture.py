@@ -1,4 +1,5 @@
-from assemble import SCHEDULED_TEMPLATE_VERSION, SIGNED_RESIDUE_TEMPLATE_VERSION, TEMPLATE_PROFILES
+from assemble import PACKED_SM3_TEMPLATE_VERSION, SCHEDULED_TEMPLATE_VERSION
+from assemble import SIGNED_RESIDUE_TEMPLATE_VERSION, TEMPLATE_PROFILES
 from p2pkh_sm2 import locking_script_from_public_key
 from sm2 import USER_ID, encode_public, fixture_sign, mul
 
@@ -35,7 +36,11 @@ def cases():
     yield dict(public_key=encode_public(mul(2)), signer=raw_signer(2), profile="v1.0.0",
                bytes=144925, sighash=0x61, compress_otda=False, destination=destination, reconstructed=False)
 
-    for version, size in ((SCHEDULED_TEMPLATE_VERSION, 131565), (SIGNED_RESIDUE_TEMPLATE_VERSION, 125616)):
+    for version, size in (
+        (SCHEDULED_TEMPLATE_VERSION, 131565),
+        (SIGNED_RESIDUE_TEMPLATE_VERSION, 125616),
+        (PACKED_SM3_TEMPLATE_VERSION, 121847),
+    ):
         destination = locking_script_from_public_key(encode_public(mul(9)), version=version)
         profile = TEMPLATE_PROFILES[version]
         yield dict(public_key=encode_public(mul(2)), signer=raw_signer(2), profile=profile,

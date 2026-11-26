@@ -4,7 +4,7 @@ import os
 from pathlib import Path
 import unittest
 import requests
-from assemble import SCHEDULED_TEMPLATE_VERSION, SIGNED_RESIDUE_TEMPLATE_VERSION, TEMPLATE_VERSION, TEMPLATE_VERSIONS
+from assemble import PACKED_SM3_TEMPLATE_VERSION, SIGNED_RESIDUE_TEMPLATE_VERSION, TEMPLATE_VERSION, TEMPLATE_VERSIONS
 from test_sm2 import fixture
 from test_sighash import chain_check, mode_cases, activation_cases
 from p2pkh_sm2 import *
@@ -51,8 +51,10 @@ class NodeTests(unittest.TestCase):
         qa=encode_public(mul(1)); qb=encode_public(mul(7))
         start=locking_script_from_public_key(qa)
         parent=Transaction((Input(b'\x22'*32,0),),(Output(10000,start),))
-        versions = (SCHEDULED_TEMPLATE_VERSION, SIGNED_RESIDUE_TEMPLATE_VERSION, TEMPLATE_VERSION)
-        for hop,(d,q,destination,version) in enumerate(zip((1,7,1),(qa,qb,qa),(qb,qa,qb),versions,strict=True)):
+        versions = (*TEMPLATE_VERSIONS[1:], TEMPLATE_VERSION)
+        participants = ((1, qa, qb), (7, qb, qa))
+        for hop, version in enumerate(versions):
+            d, q, destination = participants[hop % len(participants)]
             dest=locking_script_from_public_key(destination, version=version)
             signed=sign_payment(parent.serialize(),0,[Output(parent.outputs[0].value-100,dest)],100,q,lambda m,uid: fixture_sign(d,m,hop+2,uid))
             check(signed,[parent],0)
@@ -88,7 +90,7 @@ class NodeTests(unittest.TestCase):
                     check(signed, parents, index)
 
     def test_rejects_mutations(self):
-        for version in (TEMPLATE_VERSION, SIGNED_RESIDUE_TEMPLATE_VERSION):
+        for version in (TEMPLATE_VERSION, SIGNED_RESIDUE_TEMPLATE_VERSION, PACKED_SM3_TEMPLATE_VERSION):
             with self.subTest(version=version):
                 self.check_mutations(version)
 

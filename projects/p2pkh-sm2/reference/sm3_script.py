@@ -45,6 +45,10 @@ def perm(x,a,b): return xor(xor(x,rot(x,a)),rot(x,b))
 
 
 REVERSE4=asm(' '.join(['OP_1 OP_SPLIT OP_SWAP OP_TOALTSTACK']*3+['OP_FROMALTSTACK OP_CAT']*3))
+# Reverse the two halves independently, then concatenate them in reverse order.
+REVERSE4_PAIRS = asm(
+    'OP_2 OP_SPLIT OP_1 OP_SPLIT OP_SWAP OP_CAT OP_SWAP OP_1 OP_SPLIT OP_SWAP OP_CAT OP_CAT'
+)
 # The larger powers used by rotations and reduction modulo 2**32 cost more
 # to push as literals than to copy from a cached stack slot.
 ROTATION_CONSTANTS = tuple(1 << exponent for exponent in (15, 17, 19, 20, 23, 25, 32))
@@ -53,12 +57,15 @@ SHALLOW_ROLLS = ('', 'OP_SWAP', 'OP_ROT')
 
 
 class Builder:
-    def __init__(self, optimized, compact, scheduled):
+    def __init__(self, optimized, compact, scheduled, packed):
         self.code=bytearray()
         self.stack=['data']
         self.optimized=optimized
         self.compact = compact
         self.scheduled = scheduled
+        self.packed = packed
+        self.packed_words = set()
+        self.reverse4 = REVERSE4_PAIRS if packed else REVERSE4
         self.constants = {value: f'constant_{value}' for value in ROTATION_CONSTANTS} if compact else {}
 
     def cache_constants(self):
@@ -67,6 +74,29 @@ class Builder:
             self.stack.append(name)
 
     def raw(self,s): self.code.extend(asm(s))
+
+    def reference(self, name, *, binary, take=False):
+        index = self.stack.index(name)
+        depth = len(self.stack) - 1 - index
+        was_binary = name in self.packed_words
+        if take:
+            if depth < len(SHALLOW_ROLLS):
+                self.raw(SHALLOW_ROLLS[depth])
+            else:
+                self.code.extend(number(depth) + asm('OP_ROLL'))
+            self.stack.pop(index)
+            self.packed_words.discard(name)
+        elif self.compact and depth < 2:
+            self.raw(('OP_DUP', 'OP_OVER')[depth])
+        else:
+            self.code.extend(number(depth) + asm('OP_PICK'))
+
+        if binary and not was_binary:
+            self.raw('5 OP_NUM2BIN')
+        elif was_binary and not binary:
+            self.raw('OP_BIN2NUM')
+        self.stack.append(None)
+
     def expr(self,e,*,binary=False):
         # A five-byte word keeps the Script sign bit clear and gives all
         # SM3 bitwise operands the same width. Only arithmetic needs decoding.
@@ -74,21 +104,17 @@ class Builder:
             if e in self.constants:
                 self.expr(self.constants[e], binary=binary)
                 return
+            if self.packed and binary:
+                self.code.extend(push(e.to_bytes(5, 'little')))
+                self.stack.append(None)
+                return
             self.code.extend(number(e))
         elif isinstance(e, str):
-            depth = len(self.stack) - 1 - self.stack.index(e)
-            if self.compact and depth < 2:
-                self.raw(('OP_DUP', 'OP_OVER')[depth])
-            else:
-                self.code.extend(number(depth) + asm('OP_PICK'))
+            self.reference(e, binary=binary)
+            return
         elif e[0] == 'TAKE':
-            index = self.stack.index(e[1])
-            depth = len(self.stack) - 1 - index
-            if depth < len(SHALLOW_ROLLS):
-                self.raw(SHALLOW_ROLLS[depth])
-            else:
-                self.code.extend(number(depth) + asm('OP_ROLL'))
-            self.stack.pop(index)
+            self.reference(e[1], binary=binary, take=True)
+            return
         elif e[0]=='ROT':
             _, word, count = e
             self.expr(word)
@@ -134,18 +160,22 @@ class Builder:
             return
 
         self.assign('next_c', rot(self.last('b'), 9))
-        self.assign('next_g', rot(self.last('f'), 19))
-        self.assign('next_e', xor(xor('tt2', rot('tt2', 9)), rot(self.last('tt2'), 17)))
+        self.assign('next_g', rot(self.last('f'), 19), binary=self.packed)
+        self.assign('next_e', xor(xor('tt2', rot('tt2', 9)), rot(self.last('tt2'), 17)),
+                    binary=self.packed)
         # The other five words already occupy unique slots. Update their
         # compile-time names without moving or copying the runtime values.
         names = {'tt1': 'a', 'a': 'b', 'next_c': 'c', 'c': 'd',
                  'next_e': 'e', 'e': 'f', 'next_g': 'g', 'g': 'h'}
         self.stack = [names.get(name, name) for name in self.stack]
+        self.packed_words = {names.get(name, name) for name in self.packed_words}
 
-    def assign(self,name,e):
-        self.expr(e)
+    def assign(self,name,e,*,binary=False):
+        self.expr(e,binary=binary)
         if name in self.stack: self.drop(name)
         self.stack[-1]=name
+        if binary:
+            self.packed_words.add(name)
     def drop(self,name):
         index=self.stack.index(name); depth=len(self.stack)-1-index
         if self.compact and depth < len(SHALLOW_DROPS):
@@ -153,38 +183,47 @@ class Builder:
         else:
             self.code.extend(number(depth)+asm('OP_ROLL OP_DROP'))
         self.stack.pop(index)
+        self.packed_words.discard(name)
     def word(self,name,offset):
         self.expr('data')
-        self.code.extend(number(offset)+asm('OP_SPLIT OP_NIP')+number(4)+asm('OP_SPLIT OP_DROP')+REVERSE4+push(b'\0')+asm('OP_CAT OP_BIN2NUM'))
+        self.code.extend(number(offset) + asm('OP_SPLIT OP_NIP 4 OP_SPLIT OP_DROP')
+                         + self.reverse4 + push(b'\0') + asm('OP_CAT'))
+        if self.packed:
+            self.packed_words.add(name)
+        else:
+            self.raw('OP_BIN2NUM')
         self.stack[-1]=name
 
 
 @cache
-def hash_script(length, state=IV, processed=0, *, optimized=False, compact=False, scheduled=False):
+def hash_script(length, state=IV, processed=0, *, optimized=False, compact=False, scheduled=False, packed=False):
     """Top item is exactly length bytes. Replace it with SM3, preserving lower stack.
 
     state is a known fixed-prefix midstate; processed must be whole blocks.
     The default uses the baseline SM3 generator. optimized uses a static
     schedule for padding-only blocks. compact also enables constant, stack,
     and Boolean optimizations. scheduled also consumes last uses and
-    renames surviving state slots across rounds.
+    renames surviving state slots across rounds. packed keeps bitwise-heavy
+    words in five-byte form between operations.
     """
-    return compile_hash(length, state, processed, optimized=optimized, compact=compact, scheduled=scheduled)
+    return compile_hash(length, state, processed, optimized=optimized, compact=compact,
+                        scheduled=scheduled, packed=packed)
 
 
 def compile_hash(length, state=IV, processed=0, *, optimized=False, compact=False, scheduled=False,
-                 fragments=None):
+                 packed=False, fragments=None):
     """Emit SM3 Script and optionally collect named instruction ranges for construction."""
     if processed%64: raise ValueError('midstate must start on a block boundary')
+    scheduled = scheduled or packed
     compact = compact or scheduled
     optimized = optimized or compact
-    b=Builder(optimized, compact, scheduled)
+    b=Builder(optimized, compact, scheduled, packed)
     b.code.extend(asm('OP_SIZE')+number(length)+asm('OP_NUMEQUALVERIFY'))
     total=processed+length
     padding=b'\x80'+bytes((55-total)%64)+(total*8).to_bytes(8,'big')
     b.code.extend(push(padding)+asm('OP_CAT'))
     b.cache_constants()
-    for i,v in enumerate(state): b.assign('h'+str(i),v)
+    for i,v in enumerate(state): b.assign('h'+str(i),v,binary=packed)
     for offset in range(0,length+len(padding),64):
         static_padding=optimized and offset>=length
         if static_padding:
@@ -199,15 +238,16 @@ def compile_hash(length, state=IV, processed=0, *, optimized=False, compact=Fals
                 start = len(b.code)
                 x=xor(xor(words[j-16],words[j-9]),rot(words[j-3],15))
                 if optimized:
-                    b.assign('expansion_mix',x)
+                    b.assign('expansion_mix',x,binary=packed)
                     x='expansion_mix'
                 expanded = (xor(xor(x, rot(x, 15)), rot(b.last(x), 23))
                             if scheduled else perm(x, 15, 23))
-                b.assign(words[j],xor(xor(expanded,rot(words[j-13],7)),words[j-6]))
+                b.assign(words[j],xor(xor(expanded,rot(words[j-13],7)),words[j-6]),binary=packed)
                 if optimized and not scheduled: b.drop('expansion_mix')
                 if fragments is not None:
                     fragments.setdefault('message_expansion', []).append(bytes(b.code[start:]))
-        for i,c in enumerate('abcdefgh'): b.assign(c,'h'+str(i))
+        # Start the Boolean round inputs in packed form when the profile uses it.
+        for i,c in enumerate('abcdefgh'): b.assign(c,'h'+str(i),binary=packed and c in 'abefg')
         for j in range(64):
             start = len(b.code)
             a_rot12=rot('a',12)
@@ -227,7 +267,7 @@ def compile_hash(length, state=IV, processed=0, *, optimized=False, compact=Fals
                 ff = bor(bor(band('a', 'b'), band('a', 'c')), band('b', 'c'))
                 gg = bor(band('e', 'f'), band(xor('e', MASK), 'g'))
             cross_word=words[j]^words[j+4] if static_padding else xor(words[j],words[j+4])
-            b.assign('tt1',plus(ff,b.last('d'),b.last('ss2'),cross_word))
+            b.assign('tt1',plus(ff,b.last('d'),b.last('ss2'),cross_word),binary=packed)
             b.assign('tt2',plus(gg,b.last('h'),b.last('ss1'),words[j]))
             b.advance_round()
             if fragments is not None:
@@ -236,7 +276,7 @@ def compile_hash(length, state=IV, processed=0, *, optimized=False, compact=Fals
                 fragments.setdefault(f'{kind}_round_{phase}', []).append(bytes(b.code[start:]))
         for i,c in enumerate('abcdefgh'):
             name = 'h' + str(i)
-            b.assign(name, xor(b.last(name), b.last(c)))
+            b.assign(name, xor(b.last(name), b.last(c)), binary=packed)
         if not static_padding:
             for name in words: b.drop(name)
         if not scheduled:
@@ -245,12 +285,15 @@ def compile_hash(length, state=IV, processed=0, *, optimized=False, compact=Fals
     for name in b.constants.values():
         b.drop(name)
     for i in range(8):
-        b.expr(b.last('h'+str(i)))
-        b.code.extend(asm('5 OP_NUM2BIN 4 OP_SPLIT OP_DROP')+REVERSE4)
+        b.expr(b.last('h'+str(i)), binary=packed)
+        if not packed:
+            b.raw('5 OP_NUM2BIN')
+        b.code.extend(asm('4 OP_SPLIT OP_DROP')+b.reverse4)
         b.stack[-1]='out'+str(i)
     for _ in range(7): b.raw('OP_CAT'); b.stack.pop()
     b.stack[-1]='digest'
     if not scheduled:
         for i in range(8): b.drop('h'+str(i))
     assert b.stack==['digest']
+    assert not b.packed_words
     return bytes(b.code)

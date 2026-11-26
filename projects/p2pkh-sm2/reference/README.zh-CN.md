@@ -65,7 +65,7 @@ OTDA，包括混用签名模式的输入、全 SM2 的两进两出付款、由�
 
 ## 复现 OTDA 构造器
 
-钱包加载固定构造器，并按布局清单核对字节数和 SHA-256。离线生成器先使用 SM3 的具名片段和点运算块。为模板 `2` 和 `3` 生成构造器时，它评估复制片段的缓存收益，尝试按使用频率排列缓存，并选择序列化后最短的编码。在仓库根目录生成并比对文件。
+钱包加载固定构造器，并按布局清单核对字节数和 SHA-256。离线生成器先使用 SM3 的具名片段和点运算块。为模板 `2` 至 `4` 生成构造器时，它评估复制片段的缓存收益，尝试按使用频率排列缓存，并选择序列化后最短的编码。在仓库根目录生成并比对文件。
 
 ```sh
 python projects/p2pkh-sm2/reference/generate_otda_constructor.py /tmp/sm2-otda.hex
@@ -74,6 +74,8 @@ python projects/p2pkh-sm2/reference/generate_otda_constructor.py --version 2 /tm
 cmp /tmp/sm2-otda-v2.hex projects/p2pkh-sm2/versions/v1.2.0/otda-constructor.hex
 python projects/p2pkh-sm2/reference/generate_otda_constructor.py --version 3 /tmp/sm2-otda-v3.hex
 cmp /tmp/sm2-otda-v3.hex projects/p2pkh-sm2/versions/v1.3.0/otda-constructor.hex
+python projects/p2pkh-sm2/reference/generate_otda_constructor.py --version 4 /tmp/sm2-otda-v4.hex
+cmp /tmp/sm2-otda-v4.hex projects/p2pkh-sm2/versions/v1.4.0/otda-constructor.hex
 ```
 
 构造器测试逐字节比对预映像、公钥和签名三项栈值，并由 BSV Node 和 chain-gang 验证完整花费。[布局与指纹](../versions/v1.1.0/layout.json) · [钱包接入](../docs/sdk.zh-CN.md)
