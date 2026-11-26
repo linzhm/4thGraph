@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path[:0] = [str(ROOT / "src"), str(ROOT)]
 from fourthgraph.benchmark.validation import Node, chain_verdict
 from sdk.python.bridge import PROJECTS, adapter_for
-from sdk.python.client import Client
+from sdk.python.client import Client, WalletClient
 from fourthgraph.bsv.transaction import Input, Output, Transaction
 
 
@@ -70,7 +70,9 @@ def generate(project, node):
         recognized = adapter.recognize(lock, key)
         assert client.recognize(lock, public_key=key) == recognized
         if owner := recognized.get("ownerHash160"):
-            assert client.lock_for_owner(bytes.fromhex(owner)) == lock
+            owner = bytes.fromhex(owner)
+            assert WalletClient(project, template=profile).create_lock(owner_hash160=owner) == lock
+            assert client.lock_for_owner(owner) == adapter.lock_owner(owner)
         assert client.sign_spend(tx.serialize(), funding.serialize(), 0, key, replay_signer,
                                  **callback_options) == signed.serialize()
         assert client.sign_payment(funding.serialize(), 0, [(out.value, out.script) for out in outputs],
