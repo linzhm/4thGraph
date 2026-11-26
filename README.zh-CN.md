@@ -22,7 +22,7 @@ BSV Script Lab 提供钱包可识别的锁定模板、可接入外部签名器�
 
 先用原生 P2PKH 跑通第一笔付款。七个项目在 TypeScript、Rust、Go 和 Python 中使用同一套钱包调用，各项目指南说明签名器参数、模板选项和本地依赖。 [钱包 SDK 快速接入](shared/sdk/README.zh-CN.md)
 
-4thGraph 是面向 BSV Script 和多交易工作流的 Forth 编译器。 [4thGraph 与 regtest 复放](projects/4thgraph/README.md)
+4thGraph 是面向 BSV Script 和多交易工作流的 Forth 编译器。 [4thGraph 与 regtest 复放](projects/4thgraph/README.md) · [安装 CLI 与 Agent Skill](projects/4thgraph/INSTALL.md)
 
 <a name="transaction-costs"></a>
 
