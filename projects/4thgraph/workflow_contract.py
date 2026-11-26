@@ -7,7 +7,7 @@ from compiler import (
     PROJECT_NAME, PROJECT_VERSION, WORKFLOW_MODES, CompileError, ParentOutput, Template,
     evaluate, plan_workflow, workflow_blockers, workflow_layout,
 )
-from forkid_lowering import LINKED_OUTPOINT_OFFSET, LinkedContext
+from forkid_lowering import COPY_LINKED_SIGHASH, LINKED_OUTPOINT_OFFSET, DualLinkedContext, LinkedContext
 from lowering import BASELINE, compile_word
 from protocol import (
     BINDING_CODE, CURRENT_OUTPOINT, DEFAULT_TARGET, FLAG, OBJECTIVES, OUTPUTS_HASH, PREVOUTS_HASH, REFUND_SEQUENCE,
@@ -110,7 +110,8 @@ class WorkflowContracts:
         self.versions, self.era = TARGETS[target]
         check_sighash_target(sighash_family, target)
         self.sighash_family = sighash_family
-        self.sighash = SIGHASH_FAMILIES[sighash_family]
+        self.dual_sighash = sighash_family == "both"
+        self.sighash = FLAG if self.dual_sighash else SIGHASH_FAMILIES[sighash_family]
         if sighash_family == "chronicle":
             self.era = "chronicle"
         blocker = sighash_blocker(workflow, self.plan.mode, sighash_family)
@@ -139,6 +140,10 @@ class WorkflowContracts:
             # These predicates read the outpoint and state, and construct output amounts directly.
             context = LinkedContext.for_template(template, self.sighash, BINDING_CODE, outputs,
                                                  requires_previous_amount=False)
+            if self.dual_sighash and context is not None:
+                chronicle = LinkedContext.for_template(template, SIGHASH_FAMILIES["chronicle"], BINDING_CODE, outputs,
+                                                       requires_previous_amount=False)
+                context = DualLinkedContext(context, chronicle) if chronicle is not None else None
             if context is not None:
                 linked[template.name] = context
         layouts = {"full": {}} if sighash_family == "forkid" else {}
@@ -214,10 +219,10 @@ class WorkflowContracts:
         return asm("OP_DEPTH") + number(depth) + asm("OP_NUMEQUALVERIFY")
 
     def authorize(self, public):
-        return authorize(public, self.sighash)
+        return authorize(public, self.sighash, flag_script=COPY_LINKED_SIGHASH if self.dual_sighash else None)
 
     def finish(self):
-        return finish(self.sighash)
+        return finish(self.sighash, flag_script=asm("OP_FROMALTSTACK") if self.dual_sighash else None)
 
     def context_entry(self, template):
         context = self.contexts.get(template.name)
@@ -307,7 +312,8 @@ class WorkflowContracts:
         version = self.spend_version(version)
         sighash = self.sighash
         if sighash_family is not None:
-            if sighash_family != self.sighash_family:
+            if (sighash_family not in SIGHASH_FAMILIES
+                    or not (self.dual_sighash or sighash_family == self.sighash_family)):
                 raise ValueError(f"sighash family {sighash_family!r} is unavailable for this spend")
             sighash = SIGHASH_FAMILIES[sighash_family]
         reference = template.inputs[0]
@@ -418,7 +424,16 @@ class WorkflowContracts:
             "word_builds": {name: word.describe() for name, word in self.words.items()},
             "estimated_cost": estimate_cost(self),
         }
-        spec["sighash"] = f"{self.sighash:02x}"
+        if self.dual_sighash:
+            context = self.contexts[self.plan.templates[0].name]
+            spec["sighash_families"] = {
+                name: {"flag": f"{flag:02x}", "packed_context_bytes": getattr(context, name).packed_bytes}
+                for name, flag in SIGHASH_FAMILIES.items()
+            }
+            spec["default_sighash_family"] = "forkid"
+            spec["estimated_cost"]["assumptions"]["sighash_family"] = "forkid"
+        else:
+            spec["sighash"] = f"{self.sighash:02x}"
         if workflow.libraries:
             spec["libraries"] = tuple(map(asdict, workflow.libraries))
         if self.plan.mode == "serial":

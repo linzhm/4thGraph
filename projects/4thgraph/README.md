@@ -284,8 +284,13 @@ Forth 的 `advance` 和 `decide` 决定状态和路由。后端用这些值构�
 | 完整 ForkID ALL 对照 | 校验传入的原像和输出哈希 | 158 B | 1,508 B | 4,682 B |
 | `--sighash-family forkid` | 重建两个输入哈希、输出哈希和链接的 `scriptCode` | 56 B | 1,399 B | 4,349 B |
 | `--sighash-family chronicle` | 重建输入计数、链接的 `scriptCode`、有序输出序列化与输出计数 | 48 B | 1,375 B | 4,270 B |
+| `--sighash-family both` | 每笔花费选择原像格式 | 56 B 或 48 B | 1,452–1,463 B | 4,575–4,581 B（两步混用） |
 
 路径包含部署和全部花费。默认是 ForkID，编译器按序列化成本比较完整与重建见证。`--explain` 展示 `preimage_candidates` 和各自的估算，`preimage_layout` 记录每一步实际编码。双输入布局继续使用完整 ForkID。Chronicle 使用 OTDA ALL（`0x61`），要求激活后的链规则，支持 `--target both` 和 `--target chronicle-v2` 的单输入工作流。OTDA 原像没有前输出金额，因此只有确认断言无需读取该金额时才使用此重建策略。当前 OTDA 构建会拒绝双输入和带退款分支的工作流。此例要求绑定完整输入与输出，使用 ALL。
+
+`--sighash-family both` 为符合相同条件的融合或串行工作流生成双模式锁。每笔花费可使用 ForkID ALL（`0x41`）或 Chronicle OTDA ALL（`0x61`）。两条路径共用 Forth 状态计算、前序 UTXO 检查和有序输出构造。Script 根据原像字段长度选定模式，并检查该输入的每个授权签名都使用同一个 sighash。串行流程的相邻花费可以各选一种模式。阈值样本的双模式融合锁为 980 B，ForkID 和 OTDA 单模式锁分别为 917 B 和 902 B。
+
+使用 Python 运行接口时，在 `prepare(..., sighash_family="chronicle")` 选择 OTDA，省略该参数则使用 ForkID。构建清单列出两种见证长度，成本估算使用 56 B 的 ForkID 格式。切换模式时应重新请求签名。
 
 追加 `recovery: 145 review ;` 可让 `review` 在到期后逐个花费剩余状态或部署输出。复放覆盖第二个签名者缺席、提前退款、正常后继赢得竞争，以及退款赢得竞争后清退另一份同级 UTXO。提前退款的脚本有效，BSV Node 将其放入非最终池并拒绝提前入块。竞争后，chain-gang 可以使用完整父交易重验脚本，Node 根据当前 UTXO 集拒绝已经花费的 outpoint。报告分别记录这些判定。
 
@@ -297,6 +302,9 @@ PYTHONPATH=. bash shared/verify_node.sh --profile raised -- \
 PYTHONPATH=. bash shared/verify_node.sh --profile raised -- \
   python "$project/workflow_replay.py" --target both --sighash-family chronicle \
   --output "$project/build/workflow-pels-chronicle.json"
+REGTEST_CHRONICLE_HEIGHT=155 PYTHONPATH=. bash shared/verify_node.sh --profile raised -- \
+  python "$project/workflow_replay.py" --target both --sighash-family both \
+  --output "$project/build/workflow-pels-dual-sighash.json"
 jq '.fixture_public_keys' "$project/build/workflow-pels-optimization.json" > "$project/build/workflow-test-keys.json"
 for layout in fused serial atomic; do
   PYTHONPATH=. python "$project/protocol.py" "$project/proof/workflow.fth" \
@@ -306,9 +314,13 @@ done
 PYTHONPATH=. python "$project/protocol.py" "$project/proof/workflow.fth" \
   --keys "$project/build/workflow-test-keys.json" --current 19 --target both --optimize stack \
   --search --objective peak-validation --max-tx-bytes 1053 --explain
+PYTHONPATH=. python "$project/protocol.py" "$project/proof/workflow.fth" \
+  --keys "$project/build/workflow-test-keys.json" --current 19 --target both --optimize stack \
+  --sighash-family both --search --explain
 ```
 
 ForkID 复放可用 `REGTEST_CHRONICLE_HEIGHT=1000` 验证激活前花费。双版本目标包含串行阶段混用 v1、v2 的交易。单版本构建也可通过同一入口复放。
+双模式复放在激活前部署同一锁，比较两种花费的判定，并用激活前创建的 UTXO 完成激活后的 OTDA 花费。
 
 ## Groth16 链上验证器
 

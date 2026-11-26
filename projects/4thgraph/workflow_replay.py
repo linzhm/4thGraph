@@ -8,7 +8,7 @@ from pathlib import Path
 
 from compiler import PROJECT_NAME, PROJECT_VERSION, WORKFLOW_MODES, ParentOutput, SourceCompiler, evaluate
 from lowering import OPTIMIZATIONS
-from protocol import BINDING_CODE, DEFAULT_TARGET, FLAG, SIGHASH_FAMILY_OPTIONS, TARGETS, UTXO, invalidated
+from protocol import BINDING_CODE, DEFAULT_TARGET, FLAG, SIGHASH_FAMILIES, SIGHASH_FAMILY_OPTIONS, TARGETS, UTXO, invalidated
 from recovery_replay import early_refund, refund_controls, snapshot, valid_with_live_inputs
 from replay import SOURCE as FUNDING_COIN, Replay
 from shared.benchmark_validation import CONTEXT_PIN, Node, chain_metadata
@@ -335,6 +335,84 @@ def decision_evidence(replay, program, source, current, paths, sighash_family):
     return reports
 
 
+def replay_dual_sighashes(replay, program, source):
+    families = tuple(SIGHASH_FAMILIES)
+    versions = replay.versions
+    fused, serial = (WorkflowContracts(program, replay.keys.public, 19, mode=mode,
+                                       target=replay.target, optimization=replay.optimization, sighash_family="both")
+                     for mode in ("fused", "serial"))
+    artifacts = {contract.plan.mode: contract.artifact(source) for contract in (fused, serial)}
+    sponsor_slot = 2 * len(versions) + 3
+    bootstrap = replay.fund(sponsor_slot + 1)
+    activation = replay.activation_height
+    before = None
+    held = None
+    if replay.node.call("getblockcount", []) + 3 < activation:
+        root, deployment = replay.deploy(fused, bootstrap, 0)
+        held = root, deployment
+        rejected = {}
+        for version in versions:
+            draft = fused.prepare("fused", {"deploy": root}, version=version, sighash_family="chronicle")
+            rejected[version] = replay.record(replay.sign(draft), draft.previous, expected=False)
+        early_root, early_deployment = replay.deploy(fused, bootstrap, sponsor_slot - 1)
+        draft = fused.prepare("fused", {"deploy": early_root}, version=versions[0], sighash_family="forkid")
+        before = {"held_deployment": deployment, "chronicle_rejections": rejected,
+                  "forkid_deployment": early_deployment, "forkid_spend": replay.record_step(draft, replay.sign(draft))}
+        replay.node.call("generate", [activation - replay.node.call("getblockcount", [])])
+
+    paths = {}
+    first, second = program.stages
+    value, = evaluate(first.word, 19)
+    route, = evaluate(second.word, value)
+
+    def record_path(contract, root, rows, spend):
+        if spend.outputs != (contract.terminals[route], contract.receipt(root.txid_wire(), value)):
+            raise ValueError("dual sighash replay changed the verified outputs")
+        artifact = artifacts[contract.plan.mode]
+        return {"artifact_sha256": artifact["artifact_sha256"], "transactions": rows, **metrics(tuple(rows.values()), artifact)}
+
+    # Reserve slot zero for the first Chronicle spend, so it can reuse the pre-activation deployment.
+    cases = [(family, version) for family in reversed(families) for version in versions]
+    for slot, (family, version) in enumerate(cases):
+        root, deployment = held if slot == 0 and held else replay.deploy(fused, bootstrap, slot)
+        drafts = {name: fused.prepare("fused", {"deploy": root}, version=version, sighash_family=name)
+                  for name in families}
+        signed = {name: replay.sign(draft) for name, draft in drafts.items()}
+        verdicts = {
+            name: {"txid": tx.txid(), "raw": tx.serialize().hex(),
+                   **valid_with_live_inputs(replay, drafts[name], tx)}
+            for name, tx in signed.items()
+        }
+        draft = drafts[family]
+        controls = {}
+        if version == versions[0]:
+            other = drafts[next(name for name in families if name != family)]
+            alternate = other.context_encoder(other.preimage(0, BINDING_CODE))
+            crossed = replace(draft, context_encoder=lambda _: alternate)
+            controls = context_controls(replay, draft, bootstrap, sponsor_slot)
+            controls["wrong_context_for_signatures"] = replay.record(replay.sign(crossed), draft.previous, expected=False)
+        spend = signed[family]
+        if slot == 0 and before is not None and spend.txid() != before["chronicle_rejections"][version]["txid"]:
+            raise ValueError("the post-activation replay did not reuse the early Chronicle spend")
+        rows = {"deploy": deployment, "fused": replay.record_step(draft, spend)}
+        paths[f"fused/{family}/v{version}"] = {
+            **record_path(fused, root, rows, spend), "both_valid_on_same_outpoint": verdicts, "rejections": controls,
+        }
+
+    for offset, stage_families in enumerate((families, families[::-1]), len(cases)):
+        root, deployment = replay.deploy(serial, bootstrap, offset)
+        done, rows = {"deploy": root}, {"deploy": deployment}
+        for stage, family, version in zip((first, second), stage_families, (versions[0], versions[-1]), strict=True):
+            draft = serial.prepare(stage.name, done, version=version, sighash_family=family)
+            spend = replay.sign_work(draft)
+            done[stage.name] = spend
+            rows[stage.name] = {**replay.record_step(draft, spend), "sighash_family": family}
+        paths["serial/" + "-".join(stage_families)] = record_path(serial, root, rows, spend)
+
+    return {"bootstrap_raw": bootstrap.serialize().hex(), "artifacts": artifacts,
+            "paths": paths, "before_activation": before}
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source", type=Path, default=SOURCE)
@@ -364,6 +442,20 @@ def main():
         parser.error("--source must permit all layouts so the replay can compare them before adding independent-submit")
     if chronicle and program.recovery:
         parser.error("Chronicle replay currently requires a workflow without recovery")
+    if args.sighash_family == "both":
+        if len(program.stages) != 2:
+            parser.error("dual sighash replay requires a two-stage workflow")
+        report = {
+            "project": PROJECT_NAME, "compiler_version": PROJECT_VERSION, "schema_version": 1,
+            "source": source.decode(), "target": args.target, "sighash_family": args.sighash_family,
+            "sample_count": args.samples, "bsv_node_version": node.version, "chain_gang": engine,
+            "activation_height": activation, "regtest_profile": os.environ["SCRIPT_LAB_REGTEST_PROFILE"],
+            "fixture_public_keys": {role: key.hex() for role, key in replay.keys.public.items()},
+            **replay_dual_sighashes(replay, program, source),
+        }
+        args.output.parent.mkdir(parents=True, exist_ok=True)
+        args.output.write_text(json.dumps(report, indent=2) + "\n")
+        return
     modes = ("fused", "serial") if chronicle else WORKFLOW_MODES
     foreign_slot = len(modes) * len(CASES)
     independent_slot = foreign_slot + 2

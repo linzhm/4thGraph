@@ -65,6 +65,54 @@ class WorkflowTests(unittest.TestCase):
             with self.assertRaises((RuntimeError, ValueError)):
                 validate_at_heights(spend, (root,), spend_height=4, activation_height=10, utxo_heights=(3,))
 
+    def test_dual_lock_binds_authorizations_to_the_selected_preimage(self):
+        source = SOURCE.read_bytes()
+        program = SourceCompiler(source.decode()).workflow()
+        keys = TestKeys()
+        options = dict(target="both", sighash_family="both")
+        contract = WorkflowContracts(program, keys.public, 19, mode="fused", **options)
+        artifact, report = compile_workflow(program, keys.public, 19, source_bytes=source, search=True, **options)
+        self.assertEqual(artifact, contract.artifact(source))
+        self.assertEqual(artifact["sighash_families"], {
+            "forkid": {"flag": "41", "packed_context_bytes": 56},
+            "chronicle": {"flag": "61", "packed_context_bytes": 48},
+        })
+        self.assertEqual(report["candidates"]["atomic"]["exclusions"][0]["code"], "unsupported_sighash_context")
+        with self.assertRaisesRegex(CompileError, "requires a Chronicle spend target"):
+            WorkflowContracts(program, keys.public, 19, target="forkid-v1", sighash_family="both")
+        with self.assertRaisesRegex(CompileError, "recovery branch is unavailable"):
+            with_recovery = SourceCompiler(source.decode() + "\nrecovery: 145 review ;\n").workflow()
+            WorkflowContracts(with_recovery, keys.public, 19, **options)
+        root = Transaction((Input(bytes(32), 0),), contract.deployment_outputs)
+        done = {"deploy": root}
+        self.assertEqual(contract.prepare("fused", done).sighash, FLAG)
+        with self.assertRaisesRegex(ValueError, "unavailable for this spend"):
+            contract.prepare("fused", done, sighash_family="both")
+
+        def validate(spend, activation=10):
+            validate_at_heights(spend, (root,), spend_height=12, activation_height=activation, utxo_heights=(5,))
+
+        for version in (1, 2):
+            forkid, chronicle = (contract.prepare("fused", done, version=version, sighash_family=family)
+                                 for family in ("forkid", "chronicle"))
+            self.assertEqual(forkid.tx, chronicle.tx)
+            self.assertEqual(tuple(item.sighash for item in forkid.signing_requests()), (FLAG, FLAG))
+            self.assertEqual(tuple(item.sighash for item in chronicle.signing_requests()), (OTDA_ALL, OTDA_ALL))
+            validate(forkid.seal(keys.sign))
+            validate(chronicle.seal(keys.sign))
+            validate(forkid.seal(keys.sign), activation=20)
+            with self.assertRaises((RuntimeError, ValueError)):
+                validate(chronicle.seal(keys.sign), activation=20)
+            for draft, other in ((forkid, chronicle), (chronicle, forkid)):
+                with self.subTest(version=version, sighash=draft.sighash):
+                    alternate = other.context_encoder(other.preimage(0, BINDING_CODE))
+                    crossed = replace(draft, context_encoder=lambda _: alternate)
+                    malformed = replace(draft, context_encoder=lambda data: draft.context_encoder(data) + b"\0")
+                    reordered = replace(draft, tx=replace(draft.tx, outputs=draft.tx.outputs[::-1]))
+                    for rejected in (crossed, malformed, reordered):
+                        with self.assertRaises((RuntimeError, ValueError)):
+                            validate(rejected.seal(keys.sign))
+
     def test_dependency_diagnostics_point_to_the_consumer(self):
         source = SOURCE.read_text()
         cases = (

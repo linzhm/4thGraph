@@ -28,7 +28,7 @@ TARGETS = {"forkid-v1": ((1,), "genesis"), DEFAULT_TARGET: ((2,), "chronicle"),
            "both": ((1, 2), "genesis")}
 FLAG = FORKID | SIGHASH_ALL
 SIGHASH_FAMILIES = {"forkid": FLAG, "chronicle": FLAG | CHRONICLE}
-SIGHASH_FAMILY_OPTIONS = tuple(SIGHASH_FAMILIES)
+SIGHASH_FAMILY_OPTIONS = (*SIGHASH_FAMILIES, "both")
 FLAG_BYTES = FLAG.to_bytes(4, "little")
 BINDING_CODE = asm("OP_CHECKSIG")
 ZERO_INDEX = bytes(4)
@@ -85,19 +85,20 @@ def single_input():
     return copy_preimage() + field(CURRENT_OUTPOINT, 36) + asm("OP_HASH256") + check_field(PREVOUTS_HASH)
 
 
-def finish(flag=FLAG):
-    return (asm("OP_FROMALTSTACK OP_HASH256") + binding_der() + push(bytes([flag])) + asm("OP_CAT")
+def finish(flag=FLAG, *, flag_script=None):
+    suffix = push(bytes([flag])) if flag_script is None else flag_script
+    return (asm("OP_FROMALTSTACK OP_HASH256") + binding_der() + suffix + asm("OP_CAT")
             + push(PUBLIC) + asm("OP_CODESEPARATOR") + BINDING_CODE)
 
 
-def authorize(public, flag=FLAG):
+def authorize(public, flag=FLAG, *, flag_script=None):
     # Check the signature's actual sighash before passing it to native CHECKSIG.
     split = asm("OP_SIZE OP_1SUB OP_SPLIT")
-    if flag == FLAG:
+    if flag == FLAG and flag_script is None:
         expected = push(bytes([FLAG]))
         check = expected + asm("OP_EQUALVERIFY") + expected
     else:
-        expected = push(bytes([flag]))
+        expected = push(bytes([flag])) if flag_script is None else flag_script
         check = asm("OP_DUP") + expected + asm("OP_EQUALVERIFY")
     return split + check + asm("OP_CAT") + push(public) + asm("OP_CHECKSIGVERIFY")
 
@@ -1017,7 +1018,8 @@ def main():
                           **capabilities(), "libraries": library_capabilities(),
                           "optimizations": OPTIMIZATIONS, "join_witnesses": JOIN_WITNESSES,
                           "topologies": ("parallel", "gated-parallel", "workflow"), "workflow_modes": WORKFLOW_MODES,
-                          "workflow_sighash_families": {name: f"{flag:02x}" for name, flag in SIGHASH_FAMILIES.items()},
+                          "workflow_sighash_families": {**{name: f"{flag:02x}" for name, flag in SIGHASH_FAMILIES.items()},
+                                                       "both": [f"{flag:02x}" for flag in SIGHASH_FAMILIES.values()]},
                           "search_objectives": OBJECTIVES,
                           "gate_boundaries": GATE_BOUNDARIES, "targets": {
             name: {"transaction_versions": versions, "era": era} for name, (versions, era) in TARGETS.items()

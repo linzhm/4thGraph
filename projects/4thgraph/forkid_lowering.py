@@ -17,6 +17,8 @@ RECONSTRUCTED_FIELDS = ("hashPrevouts", "hashSequence", "hashOutputs", "sighash"
 PACKED_SCRIPT_OFFSET = 4 + SCRIPT_CODE_OFFSET - OUTPOINT_OFFSET
 LINKED_OUTPOINT_OFFSET = 4
 LINKED_CONTEXT_BYTES = 56  # Version, outpoint, previous amount, sequence, locktime.
+# Dual mode keeps the selected one-byte sighash below the context on the alt stack.
+COPY_LINKED_SIGHASH = asm("OP_FROMALTSTACK OP_FROMALTSTACK OP_DUP OP_TOALTSTACK OP_SWAP OP_TOALTSTACK")
 
 
 @dataclass(frozen=True)
@@ -82,6 +84,27 @@ class LinkedContext:
         count = number(self.output_count) if self.output_count <= 16 else push(compact(self.output_count))
         return (prefix + count + asm("OP_CAT OP_SWAP OP_CAT OP_FROMALTSTACK OP_CAT")
                 + push(OTDA_ALL.to_bytes(4, "little")) + asm("OP_CAT OP_TOALTSTACK"))
+
+
+@dataclass(frozen=True)
+class DualLinkedContext:
+    forkid: LinkedContext
+    chronicle: LinkedContext
+
+    def check_size(self):
+        # Both packed layouts place the version and outpoint at the same offsets.
+        return (asm("OP_SIZE") + number(self.chronicle.packed_bytes) + asm("OP_NUMEQUAL OP_IF")
+                + push(bytes([OTDA_ALL])) + asm("OP_ELSE") + self.forkid.check_size()
+                + push(bytes([ALL])) + asm("OP_ENDIF OP_TOALTSTACK"))
+
+    def pack(self, preimage):
+        context = self.chronicle if preimage.endswith(OTDA_ALL.to_bytes(4, "little")) else self.forkid
+        return context.pack(preimage)
+
+    def bind_outputs(self):
+        # Both branches consume the shared output vector and replace the packed context with the preimage.
+        return (COPY_LINKED_SIGHASH + push(bytes([OTDA_ALL])) + asm("OP_EQUAL OP_IF")
+                + self.chronicle.bind_outputs() + asm("OP_ELSE") + self.forkid.bind_outputs() + asm("OP_ENDIF"))
 
 
 @dataclass(frozen=True)
