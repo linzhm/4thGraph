@@ -16,12 +16,14 @@ SCHEDULED_TEMPLATE_VERSION = 2
 SIGNED_RESIDUE_TEMPLATE_VERSION = 3
 PACKED_SM3_TEMPLATE_VERSION = 4
 COMPILED_POINT_TEMPLATE_VERSION = 5
+SPLIT_ROTATION_TEMPLATE_VERSION = 6
 TEMPLATE_PROFILES = {
     TEMPLATE_VERSION: "v1.0.0",
     SCHEDULED_TEMPLATE_VERSION: "v1.2.0",
     SIGNED_RESIDUE_TEMPLATE_VERSION: "v1.3.0",
     PACKED_SM3_TEMPLATE_VERSION: "v1.4.0",
     COMPILED_POINT_TEMPLATE_VERSION: "v1.5.0",
+    SPLIT_ROTATION_TEMPLATE_VERSION: "v1.6.0",
 }
 TEMPLATE_VERSIONS = tuple(TEMPLATE_PROFILES)
 FORTH_LIBRARY = "std/wallet/p2pkh-sm2"
@@ -36,7 +38,7 @@ def forth_compiler(owner, version=TEMPLATE_VERSION):
     if len(owner) != 20:
         raise ValueError("expected a 20-byte owner hash")
     blocks = sm3_blocks(version=version)
-    compiled_points = version == COMPILED_POINT_TEMPLATE_VERSION
+    compiled_points = version >= COMPILED_POINT_TEMPLATE_VERSION
     vocabulary = {
         "owner-hash": build_word("", "bytes", lambda: owner),
         "signed-residues?": build_word("", "cell", lambda: -int(version >= SIGNED_RESIDUE_TEMPLATE_VERSION)),
@@ -56,11 +58,14 @@ def sm3_blocks(*, version=TEMPLATE_VERSION, fragments=None):
         raise ValueError("unsupported P2PKH-SM2 template version")
     scheduled = version != TEMPLATE_VERSION
     packed = version >= PACKED_SM3_TEMPLATE_VERSION
+    split_rotations = version >= SPLIT_ROTATION_TEMPLATE_VERSION
     prefix=(8*len(USER_ID)).to_bytes(2,'big')+USER_ID+be32(A)+be32(B)+be32(G[0])+be32(G[1])
     state=compress(compress(IV,prefix[:64]),prefix[64:128])
     emit_hash = hash_script if fragments is None else partial(compile_hash, fragments=fragments)
     return {
         'ZA_TAIL':push(prefix[128:]),
-        'SM3_ZA':emit_hash(82,state,128,compact=True,scheduled=scheduled,packed=packed),
-        'SM3_MESSAGE':emit_hash(64,compact=True,scheduled=scheduled,packed=packed),
+        'SM3_ZA':emit_hash(82,state,128,compact=True,scheduled=scheduled,packed=packed,
+                          split_rotations=split_rotations),
+        'SM3_MESSAGE':emit_hash(64,compact=True,scheduled=scheduled,packed=packed,
+                               split_rotations=split_rotations),
     }

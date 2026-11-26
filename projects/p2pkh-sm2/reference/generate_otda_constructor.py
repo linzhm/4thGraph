@@ -4,6 +4,7 @@ from collections import Counter, defaultdict
 from pathlib import Path
 
 from assemble import TEMPLATE_VERSION, TEMPLATE_VERSIONS, forth_compiler, sm3_blocks
+from assemble import SPLIT_ROTATION_TEMPLATE_VERSION
 from p2pkh_sm2 import _canonical
 from fourthgraph.bsv.evaluate import evaluate
 from fourthgraph.bsv.script import asm, number, push
@@ -23,14 +24,17 @@ SM3_FRAGMENTS = (
 
 
 def function_library(version=TEMPLATE_VERSION):
-    fragments = {}
-    sm3_blocks(version=version, fragments=fragments)
     library = []
-    for name, instance, offset, width in SM3_FRAGMENTS:
-        fragment = fragments[name][instance][offset:offset + width]
-        if len(fragment) != width:
-            raise ValueError(f"SM3 constructor fragment changed: {name}")
-        library.append(fragment)
+    # The split-rotation profile discovers reusable SM3 spans from its bytes.
+    # Keep the original seed offsets for the historical constructors.
+    if version < SPLIT_ROTATION_TEMPLATE_VERSION:
+        fragments = {}
+        sm3_blocks(version=version, fragments=fragments)
+        for name, instance, offset, width in SM3_FRAGMENTS:
+            fragment = fragments[name][instance][offset:offset + width]
+            if len(fragment) != width:
+                raise ValueError(f"SM3 constructor fragment changed: {name}")
+            library.append(fragment)
     compiler = forth_compiler(bytes(20), version)
     for name in ("sm2-double-point", "sm2-add-points"):
         library.append(compiler.emit(name, b""))

@@ -1,5 +1,5 @@
 from assemble import COMPILED_POINT_TEMPLATE_VERSION, PACKED_SM3_TEMPLATE_VERSION, SCHEDULED_TEMPLATE_VERSION
-from assemble import SIGNED_RESIDUE_TEMPLATE_VERSION, TEMPLATE_PROFILES
+from assemble import SIGNED_RESIDUE_TEMPLATE_VERSION, SPLIT_ROTATION_TEMPLATE_VERSION, TEMPLATE_PROFILES
 from p2pkh_sm2 import locking_script_from_public_key
 from sm2 import USER_ID, encode_public, fixture_sign, mul
 
@@ -41,6 +41,7 @@ def cases():
         (SIGNED_RESIDUE_TEMPLATE_VERSION, 125616),
         (PACKED_SM3_TEMPLATE_VERSION, 121847),
         (COMPILED_POINT_TEMPLATE_VERSION, 110747),
+        (SPLIT_ROTATION_TEMPLATE_VERSION, 100663),
     ):
         destination = locking_script_from_public_key(encode_public(mul(9)), version=version)
         profile = TEMPLATE_PROFILES[version]

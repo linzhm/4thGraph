@@ -52,21 +52,25 @@ REVERSE4_PAIRS = asm(
 # The larger powers used by rotations and reduction modulo 2**32 cost more
 # to push as literals than to copy from a cached stack slot.
 ROTATION_CONSTANTS = tuple(1 << exponent for exponent in (15, 17, 19, 20, 23, 25, 32))
+SPLIT_ROTATION_CONSTANTS = tuple(1 << exponent for exponent in (15, 17, 19, 23, 32))
+SPLIT_ROTATION_WRAP = asm('OP_MUL 8 OP_NUM2BIN 4 OP_SPLIT OP_OR') + push(b'\0') + asm('OP_CAT')
 SHALLOW_DROPS = ('OP_DROP', 'OP_NIP', 'OP_ROT OP_DROP')
 SHALLOW_ROLLS = ('', 'OP_SWAP', 'OP_ROT')
 
 
 class Builder:
-    def __init__(self, optimized, compact, scheduled, packed):
+    def __init__(self, optimized, compact, scheduled, packed, split_rotations):
         self.code=bytearray()
         self.stack=['data']
         self.optimized=optimized
         self.compact = compact
         self.scheduled = scheduled
         self.packed = packed
+        self.split_rotations = split_rotations
         self.packed_words = set()
         self.reverse4 = REVERSE4_PAIRS if packed else REVERSE4
-        self.constants = {value: f'constant_{value}' for value in ROTATION_CONSTANTS} if compact else {}
+        constants = SPLIT_ROTATION_CONSTANTS if split_rotations else ROTATION_CONSTANTS
+        self.constants = {value: f'constant_{value}' for value in constants} if compact else {}
 
     def cache_constants(self):
         for value, name in self.constants.items():
@@ -118,6 +122,15 @@ class Builder:
         elif e[0]=='ROT':
             _, word, count = e
             self.expr(word)
+            if self.split_rotations:
+                self.expr(1 << count)
+                # The product fits a positive eight-byte ScriptNum. Split
+                # at bit 32 and OR the shifted and wrapped halves together.
+                self.code.extend(SPLIT_ROTATION_WRAP)
+                self.stack.pop()
+                if not binary:
+                    self.raw('OP_BIN2NUM')
+                return
             self.raw('OP_DUP')
             self.stack.append(None)
             # Track the temporary operands so cached constants can be picked
@@ -159,7 +172,7 @@ class Builder:
                 self.assign(name, expression)
             return
 
-        self.assign('next_c', rot(self.last('b'), 9))
+        self.assign('next_c', rot(self.last('b'), 9), binary=self.split_rotations)
         self.assign('next_g', rot(self.last('f'), 19), binary=self.packed)
         self.assign('next_e', xor(xor('tt2', rot('tt2', 9)), rot(self.last('tt2'), 17)),
                     binary=self.packed)
@@ -196,7 +209,8 @@ class Builder:
 
 
 @cache
-def hash_script(length, state=IV, processed=0, *, optimized=False, compact=False, scheduled=False, packed=False):
+def hash_script(length, state=IV, processed=0, *, optimized=False, compact=False, scheduled=False,
+                packed=False, split_rotations=False):
     """Top item is exactly length bytes. Replace it with SM3, preserving lower stack.
 
     state is a known fixed-prefix midstate; processed must be whole blocks.
@@ -204,20 +218,22 @@ def hash_script(length, state=IV, processed=0, *, optimized=False, compact=False
     schedule for padding-only blocks. compact also enables constant, stack,
     and Boolean optimizations. scheduled also consumes last uses and
     renames surviving state slots across rounds. packed keeps bitwise-heavy
-    words in five-byte form between operations.
+    words in five-byte form between operations. split_rotations splits the
+    left-shifted product into its high and low 32-bit parts before wrapping.
     """
     return compile_hash(length, state, processed, optimized=optimized, compact=compact,
-                        scheduled=scheduled, packed=packed)
+                        scheduled=scheduled, packed=packed, split_rotations=split_rotations)
 
 
 def compile_hash(length, state=IV, processed=0, *, optimized=False, compact=False, scheduled=False,
-                 packed=False, fragments=None):
+                 packed=False, split_rotations=False, fragments=None):
     """Emit SM3 Script and optionally collect named instruction ranges for construction."""
     if processed%64: raise ValueError('midstate must start on a block boundary')
+    packed = packed or split_rotations
     scheduled = scheduled or packed
     compact = compact or scheduled
     optimized = optimized or compact
-    b=Builder(optimized, compact, scheduled, packed)
+    b=Builder(optimized, compact, scheduled, packed, split_rotations)
     b.code.extend(asm('OP_SIZE')+number(length)+asm('OP_NUMEQUALVERIFY'))
     total=processed+length
     padding=b'\x80'+bytes((55-total)%64)+(total*8).to_bytes(8,'big')
@@ -252,9 +268,10 @@ def compile_hash(length, state=IV, processed=0, *, optimized=False, compact=Fals
             start = len(b.code)
             a_rot12=rot('a',12)
             if optimized:
-                b.assign('a_rot12',a_rot12)
+                b.assign('a_rot12',a_rot12,binary=split_rotations)
                 a_rot12='a_rot12'
-            b.assign('ss1',rot(plus(a_rot12,'e',rol(0x79cc4519 if j<16 else 0x7a879d8a,j)),7))
+            b.assign('ss1',rot(plus(a_rot12,'e',rol(0x79cc4519 if j<16 else 0x7a879d8a,j)),7),
+                     binary=split_rotations)
             b.assign('ss2',xor('ss1',b.last(a_rot12)))
             if optimized and not scheduled: b.drop('a_rot12')
             if j < 16:

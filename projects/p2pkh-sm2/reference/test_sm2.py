@@ -22,7 +22,8 @@ from fourthgraph.bsv.script import push,number,assemble as assemble_blocks
 from fourthgraph.bsv.transaction import *
 
 ROOT=Path(__file__).resolve().parents[1]
-SM3_PROFILES = ({}, {'optimized': True}, {'compact': True}, {'scheduled': True}, {'packed': True})
+SM3_PROFILES = ({}, {'optimized': True}, {'compact': True}, {'scheduled': True}, {'packed': True},
+                {'split_rotations': True})
 
 
 def der(tag,raw):
@@ -114,7 +115,7 @@ class SM2Tests(unittest.TestCase):
 
     def test_compact_sm3_preserves_lower_stack_and_checks_input_length(self):
         lower=[(1 << 32).to_bytes(5,'little'), b'\x80', b'lower']
-        for profile in ({'compact': True}, {'scheduled': True}, {'packed': True}):
+        for profile in SM3_PROFILES[2:]:
             script=hash_script(64,**profile)
             for data in (bytes(64), b'\xff'*64, b'\x80\x01'*32):
                 with self.subTest(profile=profile, word=data[:2].hex()):
@@ -296,7 +297,7 @@ class SM2Tests(unittest.TestCase):
         for version in TEMPLATE_VERSIONS[1:]:
             candidate = assemble(base_owner, version)
             self.assertEqual(subprocess.check_output([*cli, '--version', str(version), '--format', 'raw']), candidate)
-        for version in (0, 6, 7):
+        for version in (0, 7, 8):
             with self.subTest(version=version):
                 for construct in (assemble, locking_script_from_owner_hash):
                     with self.assertRaisesRegex(ValueError, 'unsupported P2PKH-SM2 template'):
