@@ -2,9 +2,9 @@
 
 [简体中文](spec.zh-CN.md) · [Project overview](../README.md)
 
-The owner field is HASH160 of the 32-byte BIP340 x-only public key. The rest of the file is fixed. Fill the owner slot identified in the manifest when creating a receive output. When recognizing an output, compare its length and all fixed bytes before taking the owner hash. [Frozen template](../versions/v0.12.0/template.hex) · [Layout](../versions/v0.12.0/layout.json)
+The owner field is HASH160 of the 32-byte BIP340 x-only public key. The rest of the file is fixed. Fill the owner slot identified in the manifest when creating a receive output. When recognizing an output, compare its length and all fixed bytes before taking the owner hash. [Frozen template](../versions/v0.13.0/template.hex) · [Layout](../versions/v0.13.0/layout.json)
 
-Versions 0.6.0 through 0.12.0 use the same `scriptCode` fragments for the current-input binding and the same witness encoding. A wallet can spend outputs from different versions in one transaction. [Version catalog](../versions/index.json)
+Versions 0.6.0 through 0.13.0 use the same `scriptCode` fragments for the current-input binding and the same witness encoding. A wallet can spend outputs from different versions in one transaction. [Version catalog](../versions/index.json)
 
 The wallet builds the BSV sighash preimage for the current input. The external signer receives SHA256d of that preimage as the 32-byte BIP340 message and returns the standard signature bytes. The lock verifies the signature and binds the same message to the current input with PUSHTX. BIP143 ALL is the wallet default. A wallet must supply trusted Chronicle activation context for OTDA and a same-index output for SINGLE. [Forth contract](../reference/schnorr.fth)
 
@@ -16,7 +16,7 @@ The wallet builds the BSV sighash preimage for the current input. The external s
 
 The wallet derives both extra ordinates from public data after signing. They are unsigned, big-endian field elements. Script checks the field bounds, even parity, and public-point equation. The checker calculates the tagged challenge over r, public x, and the message. It evaluates sG − eP, rejects infinity, and compares both projective coordinates with the finite even nonce point using field congruences. This verifies the nonce coordinates without executing a square root or field inversion inside Script. [BIP340 verification](https://github.com/bitcoin/bips/blob/master/bip-0340.mediawiki) · [Complete addition formulas](https://eprint.iacr.org/2015/1060)
 
-The 32-byte conversion splits individual bytes onto the main stack and concatenates them in reverse. Input checks keep one copy of the field prime on the alternate stack for the coordinate bounds and curve equation. Challenge reduction reuses the group order when computing `n − e`. [Byte reversal](../../../src/fourthgraph/stdlib/script-fragments.fth) · [Challenge preparation](../../../src/fourthgraph/stdlib/bip340.fth)
+After checking the witness lengths, the verifier hashes the original `r`, public x and message with the BIP340 tag. It joins the four coordinates, signature scalar and challenge hash into six 32-byte fields. Five masked swaps exchange adjacent blocks of 1, 2, 4, 8 and 16 bytes. The mask repeats within each 32-byte field, so each field reverses in place. The verifier reads the reversed fields as unsigned integers, checks the coordinate bounds and curve equation against the field prime, and uses one copy of the group order to check the signature scalar and compute `n − e`. [Challenge preparation](../../../src/fourthgraph/stdlib/bip340.fth)
 
 The detached verifier consumes message, public x, public y, signature, and nonce y. Use it for conformance tests. Use the fixed payment template to lock a UTXO. The copied official CSV fixture is pinned to the Bitcoin BIPs commit below. [Official test vectors](https://github.com/bitcoin/bips/blob/200f9b26fe0a2f235a2af8b30c4be9f12f6bc9cb/bip-0340/test-vectors.csv)
 

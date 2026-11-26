@@ -253,7 +253,7 @@ class SchnorrTests(unittest.TestCase):
         self.assertEqual(raw, reference[:offset] + owner + reference[offset + 20:])
         self.assertEqual(compiled_template(owner), (raw, offset))
         self.assertEqual(recognize_template(raw), (TEMPLATE_VERSION, owner))
-        self.assertLess(len(raw), len(lock_for_owner(bytes(20), version="v0.11.0")))
+        self.assertLess(len(raw), len(lock_for_owner(bytes(20), version="v0.12.0")))
 
     def test_mixed_template_spend(self):
         public = self.public_keys[0]
@@ -266,6 +266,7 @@ class SchnorrTests(unittest.TestCase):
             "v0.9.0": "8c58eb80a5adb4aaf1256db2f12e0f4bbc551885e919200350621481a45de0a3",
             "v0.10.0": "48411a610a80dbeba846332ef28f78c7ee3dedeaa131e82faa89f6cd24b88f83",
             "v0.11.0": "88b7b3a46548ca376a29fe04bb0deb11f2a503d9cf5de92e89604aa490660fdc",
+            "v0.12.0": "0c867581a116fd86be8aaa6f3c700742d265df4473e77ba9f2344c13122841e2",
         }
         for version, checksum in versions.items():
             raw = lock_for_public_key(public, version=version)
@@ -293,11 +294,18 @@ class SchnorrTests(unittest.TestCase):
                                      auth.witness(b"".join(witness)))
 
     def test_fixed_width_byte_reversal(self):
-        reverse = _contract().emit("script-reverse32", b"")
+        contract = _contract()
+        reverse = contract.emit("script-reverse32", b"")
         setup = push(b"saved") + asm("OP_TOALTSTACK")
         for value in (bytes(range(32)), bytes(32), b"\xff" + bytes(31)):
             self.assertEqual(evaluate(setup + reverse, [b"prefix", value]),
                              ([b"prefix", value[::-1]], [b"saved"]))
+
+        reverse_fields = contract.emit("bip340-reverse-challenge-fields", b"")
+        data = bytes(range(192))
+        expected = b"".join(data[start:start + 32][::-1] for start in range(0, 192, 32))
+        self.assertEqual(evaluate(setup + reverse_fields, [b"prefix", data]),
+                         ([b"prefix", expected], [b"saved"]))
 
     def test_forth_lock_accepts_unpaired_otda_companion(self):
         unsigned = replace(self.unsigned, outputs=self.unsigned.outputs[:1])

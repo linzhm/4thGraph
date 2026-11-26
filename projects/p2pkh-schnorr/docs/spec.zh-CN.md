@@ -2,9 +2,9 @@
 
 [English](spec.en.md) · [项目首页](../README.zh-CN.md)
 
-所有者字段是 32 字节 BIP340 x-only 公钥的 HASH160。其余脚本字节固定。创建收款输出时按布局清单填入所有者字段。识别输出时先比对脚本长度和全部固定字节，再读取所有者哈希。[固定模板](../versions/v0.12.0/template.hex) · [布局清单](../versions/v0.12.0/layout.json)
+所有者字段是 32 字节 BIP340 x-only 公钥的 HASH160。其余脚本字节固定。创建收款输出时按布局清单填入所有者字段。识别输出时先比对脚本长度和全部固定字节，再读取所有者哈希。[固定模板](../versions/v0.13.0/template.hex) · [布局清单](../versions/v0.13.0/layout.json)
 
-v0.6.0 至 v0.12.0 的当前输入绑定使用相同的 `scriptCode` 片段和解锁见证编码，钱包可以在同一笔交易中花费不同版本的输出。[版本目录](../versions/index.json)
+v0.6.0 至 v0.13.0 的当前输入绑定使用相同的 `scriptCode` 片段和解锁见证编码，钱包可以在同一笔交易中花费不同版本的输出。[版本目录](../versions/index.json)
 
 钱包按所选 sighash 为当前输入构造 BSV 签名预映像。外部签名器收到其 SHA256d 作为 32 字节 BIP340 消息，返回标准签名字节。锁验证 Schnorr 签名，并通过 PUSHTX 将同一消息绑定到当前输入。钱包默认用 BIP143 ALL。使用 OTDA 时应从可信链视图取得 Chronicle 激活状态，使用 SINGLE 时要提供同索引输出。[Forth 合约](../reference/schnorr.fth)
 
@@ -16,7 +16,7 @@ v0.6.0 至 v0.12.0 的当前输入绑定使用相同的 `scriptCode` 片段和�
 
 签名完成后，钱包根据公开数据推导两个额外的 y 坐标，按无符号大端域元素编码。脚本检查坐标范围、偶数条件和公钥点曲线方程，计算包含 r、公钥 x 和消息的标签哈希挑战。脚本求 sG − eP，排除无穷远点，再用域上的同余关系与有限偶数签名点比对两个射影坐标。这样可以在脚本内验证坐标，无需执行开方或求逆。[BIP340 验签](https://github.com/bitcoin/bips/blob/master/bip-0340.mediawiki) · [完备点加公式](https://eprint.iacr.org/2015/1060)
 
-转换 32 字节序列时，脚本在主栈拆分字节，再从末尾向前拼接。输入校验将域素数存入备用栈，在坐标范围检查和曲线方程检查中复用。挑战取模后复用群阶计算 `n − e`。[字节反转](../../../src/fourthgraph/stdlib/script-fragments.fth) · [挑战计算](../../../src/fourthgraph/stdlib/bip340.fth)
+验签器检查见证长度后，用原始 `r`、公钥横坐标和消息计算 BIP340 带标签哈希。它将四个坐标、签名标量和挑战哈希拼为六个 32 字节字段。五次带掩码的操作分别交换相邻的 1、2、4、8 和 16 字节块。掩码按 32 字节重复，使每个字段各自反转。验签器将反转后的字段读成无符号整数，用域素数检查坐标范围和曲线方程，并复用同一个群阶检查签名标量和计算 `n − e`。[挑战计算](../../../src/fourthgraph/stdlib/bip340.fth)
 
 独立验签器接收消息、公钥 x、公钥 y、签名和签名点 y，供合规向量测试使用。锁定 UTXO 时使用固定付款模板。仓库中的 CSV 来自下列固定提交。[官方测试向量](https://github.com/bitcoin/bips/blob/200f9b26fe0a2f235a2af8b30c4be9f12f6bc9cb/bip-0340/test-vectors.csv)
 

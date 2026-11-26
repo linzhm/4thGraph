@@ -4,6 +4,32 @@ REQUIRE BSV
 REQUIRE stdlib/script-fragments.fth
 REQUIRE stdlib/secp256k1.fth
 
+: bip340-repeat-mask ( bytes cell -- script )
+    ( Each emitted DUP CAT doubles the number of copies of the seed. )
+    bsv-empty rot bsv-push bsv-empty op-dup op-cat rot script-append-repeated
+;
+
+: bip340-swap-bit-groups ( script cell script -- script )
+    ( A mask selects the lower bits of each pair of groups. XOR the differences into both groups. )
+    swap rot op-dup over bsv-num op-rshift op-over op-xor
+    rot bsv-cat-code op-and op-tuck op-xor op-swap swap bsv-num op-lshift op-xor
+;
+
+: bip340-six-field-mask ( bytes cell -- script )
+    ( Extend a 32-byte mask to all six fields. )
+    bip340-repeat-mask op-dup op-cat op-dup op-dup op-cat op-cat
+;
+
+: bip340-reverse-challenge-fields ( script -- script )
+    ( Reverse the bytes within each 32-byte field while preserving field order. )
+    8 bytes-hex 00ff 4 bip340-six-field-mask bip340-swap-bit-groups
+    16 bytes-hex 0000ffff 3 bip340-six-field-mask bip340-swap-bit-groups
+    32 bytes-hex 00000000ffffffff 2 bip340-six-field-mask bip340-swap-bit-groups
+    64 bytes-hex 0000000000000000ffffffffffffffff 1 bip340-six-field-mask bip340-swap-bit-groups
+    128 bytes-hex 00000000000000000000000000000000ffffffffffffffffffffffffffffffff
+    0 bip340-six-field-mask bip340-swap-bit-groups
+;
+
 : bip340-challenge-tag ( script -- script )
     ( SHA256 of BIP0340/challenge, repeated twice. )
     bytes-hex 7bb52d7a9fef58323eb1bf7a407db382d2f3f2d81bb1224f49fe518f6d48d37c bsv-push op-dup op-cat
@@ -12,37 +38,37 @@ REQUIRE stdlib/secp256k1.fth
 : bip340-half-radix ( script -- script )
     bytes-hex 0100000000000000000000000000000000 bsv-num-be
 ;
-: bip340-check-size ( script cell -- script ) swap op-size swap bsv-num op-numequalverify op-drop ;
-: bip340-copy-challenge-field ( script -- script ) op-fromaltstack op-dup op-toaltstack ;
+: bip340-check-size ( script cell -- script ) swap op-size swap bsv-num op-numequalverify ;
 : bip340-check-field-coordinate ( script -- script )
-    script-uint256be 0 script-pick-depth bip340-copy-challenge-field op-lessthan op-verify
+    op-dup op-depth op-1sub op-pick op-lessthan op-verify
 ;
 : bip340-check-even ( script cell -- script ) script-pick-depth op-2 op-mod op-0 op-numequalverify ;
 
 : bip340-prepare-challenge ( script -- script )
     ( Input: message pxBytes pyBytes signature ryBytes. )
-    secp256k1-field op-toaltstack
-    3 script-pick-depth 32 bip340-check-size 2 script-pick-depth 32 bip340-check-size
-    1 script-pick-depth 64 bip340-check-size 0 script-pick-depth 32 bip340-check-size
-    1 script-pick-depth 32 bsv-num op-split ( rBytes sBytes )
-    5 script-pick-depth bip340-check-field-coordinate ( px )
-    5 script-pick-depth bip340-check-field-coordinate ( py )
-    3 script-pick-depth bip340-check-field-coordinate ( r )
-    5 script-pick-depth bip340-check-field-coordinate ( ry )
-    4 script-pick-depth script-uint256be 0 script-pick-depth secp256k1-order op-lessthan op-verify ( s )
+    3 script-pick-depth 32 bip340-check-size op-drop 2 script-pick-depth 32 bip340-check-size op-drop
+    1 script-pick-depth 64 bip340-check-size op-drop 32 bip340-check-size
+    op-swap 32 bsv-num op-split ( message pxBytes pyBytes ryBytes rBytes sBytes )
+
+    ( Hash the original big-endian encodings, consuming the message. )
+    bip340-challenge-tag 2 script-pick-depth op-cat 5 script-pick-depth op-cat
+    op-6 op-roll op-cat op-sha256
+    ( Join px, py, r, ry, s and the hash, then reverse each field. )
+    op-cat op-rot op-swap op-cat op-cat op-cat op-cat bip340-reverse-challenge-fields
+    secp256k1-field op-swap
+    bsv-empty 32 bsv-num op-split op-swap script-le-unsigned bip340-check-field-coordinate op-swap
+    4 script-append-repeated ( px py r ry scalarBytes )
+
     3 bip340-check-even 1 bip340-check-even ( py and ry are even. )
     ( Check that P is on the curve. The endpoint comparison will check R. )
-    3 script-pick-depth 4 script-pick-depth op-mul ( py^2 )
-    5 script-pick-depth 6 script-pick-depth op-mul 0 script-pick-depth 7 script-pick-depth op-mul ( px^3 )
-    0 script-pick-depth op-7 op-add 3 script-pick-depth 1 script-pick-depth op-sub
-    0 script-pick-depth bip340-copy-challenge-field op-mod op-0 op-numequalverify
-    ( e = SHA256 of tag || rBytes || pxBytes || message, reduced mod n. )
-    bip340-challenge-tag 0 script-pick-depth 13 script-pick-depth op-cat
-    0 script-pick-depth 18 script-pick-depth op-cat 0 script-pick-depth 20 script-pick-depth op-cat
-    op-sha256 script-uint256be 0 script-pick-depth secp256k1-order op-dup op-toaltstack op-mod
-    op-fromaltstack 1 script-pick-depth op-sub op-fromaltstack ( k = n-e. Restore the field prime. )
-    1 script-save-depth 12 script-save-depth 15 script-save-depth 16 script-save-depth 13 script-save-depth 14 script-save-depth 0 script-save-depth
-    12 script-drop-pairs 7 script-restore-items ( field r ry px py s k )
+    3 script-pick-depth op-dup op-mul
+    5 script-pick-depth op-dup op-dup op-mul op-mul op-7 op-add op-sub
+    secp256k1-reduce op-0 op-numequalverify
+
+    ( Check s < n and use the same n for k = n - hash mod n. )
+    32 bsv-num op-split op-swap script-le-unsigned secp256k1-order op-2dup op-lessthan op-verify
+    op-rot script-le-unsigned op-over op-mod op-sub
+    op-2rot op-2swap ( field r ry px py s k )
 ;
 
 : bip340-copy-point ( script cell -- script )
@@ -159,35 +185,24 @@ REQUIRE stdlib/secp256k1.fth
     17 bsv-num op-num2bin op-16 op-split op-drop
 ;
 
-: bip340-repeat-mask ( bytes cell -- script )
-    ( Each emitted DUP CAT doubles the number of copies of the seed. )
-    bsv-empty rot bsv-push bsv-empty op-dup op-cat rot script-append-repeated
-;
-
-: bip340-swap-window-digits ( script cell script -- script )
-    ( A mask selects the lower position of each digit pair. XOR the differences into both positions. )
-    swap rot op-dup over bsv-num op-rshift op-over op-xor
-    rot bsv-cat-code op-and op-tuck op-xor op-swap swap bsv-num op-lshift op-xor
-;
-
 : bip340-pack-windows ( script -- script )
     ( s0 s1 abs-k1 abs-k2 -> 64 bytes with one fixed and one variable index per window. )
     bip340-uint128le bsv-empty op-swap bip340-uint128le op-cat 3 script-append-repeated
     ( Digit positions are numbered from the low end of the 512-bit string. )
     ( Transpose lane and digit bits. The first four swaps also reverse little-endian byte order. )
     ( Swap position bits 4 and 6, complementing both. )
-    160 bytes-hex 0000000000000000000000000000000000000000ffffffff00000000ffffffff 1 bip340-repeat-mask bip340-swap-window-digits
+    160 bytes-hex 0000000000000000000000000000000000000000ffffffff00000000ffffffff 1 bip340-repeat-mask bip340-swap-bit-groups
     ( Swap position bits 5 and 7, complementing both. )
     320 bsv-empty op-0 40 bsv-num op-num2bin
-    bytes-hex ffffffffffffffff0000000000000000ffffffffffffffff bsv-push op-cat bip340-swap-window-digits
+    bytes-hex ffffffffffffffff0000000000000000ffffffffffffffff bsv-push op-cat bip340-swap-bit-groups
     ( Swap position bits 2 and 4, complementing both. )
-    40 bytes-hex 0000000000ff00ff 3 bip340-repeat-mask bip340-swap-window-digits
+    40 bytes-hex 0000000000ff00ff 3 bip340-repeat-mask bip340-swap-bit-groups
     ( Swap position bits 3 and 5, complementing both. )
-    80 bytes-hex 00000000000000000000ffff0000ffff 2 bip340-repeat-mask bip340-swap-window-digits
+    80 bytes-hex 00000000000000000000ffff0000ffff 2 bip340-repeat-mask bip340-swap-bit-groups
     ( Swap position bits 0 and 2. )
-    6 bytes-hex 00cc 5 bip340-repeat-mask bip340-swap-window-digits
+    6 bytes-hex 00cc 5 bip340-repeat-mask bip340-swap-bit-groups
     ( Swap position bits 1 and 3. )
-    12 bytes-hex 0000f0f0 4 bip340-repeat-mask bip340-swap-window-digits
+    12 bytes-hex 0000f0f0 4 bip340-repeat-mask bip340-swap-bit-groups
 ;
 
 : bip340-nonzero-window-digits ( script -- script )

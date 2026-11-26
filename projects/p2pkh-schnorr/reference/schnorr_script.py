@@ -8,10 +8,10 @@ from pathlib import Path
 from fourthgraph.compiler.script_builder import ScriptBuilder
 SOURCE = Path(__file__).with_name("schnorr.fth")
 VERSIONS_DIR = SOURCE.resolve().parents[1] / "versions"
-TEMPLATE_VERSION = "v0.12.0"
+TEMPLATE_VERSION = "v0.13.0"
 TEMPLATE_DIRS = {
     version: VERSIONS_DIR / version
-    for version in (TEMPLATE_VERSION, "v0.11.0", "v0.10.0", "v0.9.0", "v0.8.0", "v0.7.0", "v0.6.0")
+    for version in (TEMPLATE_VERSION, "v0.12.0", "v0.11.0", "v0.10.0", "v0.9.0", "v0.8.0", "v0.7.0", "v0.6.0")
 }
 TEMPLATE_DIR = TEMPLATE_DIRS[TEMPLATE_VERSION]
 
