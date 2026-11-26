@@ -9,8 +9,8 @@ from pathlib import Path
 from compiler import PROJECT_NAME, PROJECT_VERSION, SourceCompiler, evaluate
 from lowering import BASELINE, OPTIMIZATIONS, compile_word
 from protocol import (
-    BINDING_CODE, CURRENT_OUTPOINT, DEFAULT_TARGET, FLAG, OUTPUTS_HASH, ROOT_VALUE, TARGETS, TERMINAL_VALUE,
-    begin, build_artifact, check_field, copy_preimage, field, finish, is_compressed_public_key, output_hash, p2pk,
+    BINDING_CODE, DEFAULT_TARGET, FLAG, OUTPUTS_HASH, ROOT_VALUE, TARGETS, TERMINAL_VALUE,
+    begin, build_artifact, check_field, copy_preimage, finish, is_compressed_public_key, p2pk,
     single_input, validate_u32,
 )
 from shared.script import asm, number, push
@@ -18,7 +18,7 @@ from shared.transaction import Input, Output, Transaction, hash256, preimage_for
 from wordsets import U32
 
 FIELD = 21888242871839275222246405745257275088548364400416034343698204186575808495617
-NEXT, CURRENT, BINDING_LO, BINDING_HI = 1, 2, 3, 4
+NEXT, ROUTE = 1, 2
 LIMB_BYTES = 16
 STATE_WIDTH = 5
 STATE_PREFIX = asm("OP_0 OP_RETURN") + bytes([STATE_WIDTH])
@@ -37,15 +37,26 @@ class VerificationKey:
     signals: int
     constraints: tuple
     sha256: str
+    outputs: int
+
+    @property
+    def current_wire(self):
+        return self.outputs + 1
+
+    @property
+    def binding_wires(self):
+        return self.current_wire + 1, self.current_wire + 2
 
     @classmethod
     def load(cls, raw):
         document = json.loads(raw)
         signals = document["nVars"]
+        outputs = document["nOutputs"]
         if (document["prime"] != str(FIELD) or document["useCustomGates"]
-                or (document["nOutputs"], document["nPubInputs"], document["nPrvInputs"]) != (1, 3, 0)
-                or type(signals) is not int or not 5 <= signals <= 256):
-            raise ValueError("expected a bounded BN254 R1CS with one output and three public inputs")
+                or type(outputs) is not int or outputs not in (1, 2)
+                or (document["nPubInputs"], document["nPrvInputs"]) != (3, 0)
+                or type(signals) is not int or not outputs + 4 <= signals <= 256):
+            raise ValueError("expected a bounded BN254 R1CS with one or two outputs and three public inputs")
         constraints = document["constraints"]
         if not 1 <= len(constraints) <= 256 or len(constraints) != document["nConstraints"]:
             raise ValueError("invalid R1CS constraint count")
@@ -64,7 +75,7 @@ class VerificationKey:
         for constraint in constraints:
             left, right, result = constraint
             normalized.append((terms(left), terms(right), terms(result)))
-        return cls(signals, tuple(normalized), sha256(raw).hexdigest())
+        return cls(signals, tuple(normalized), sha256(raw).hexdigest(), outputs)
 
     def assignment(self, raw):
         values = tuple(map(scalar, json.loads(raw)))
@@ -83,6 +94,7 @@ class AssignmentScript:
     """Wire zero is implicit. Other wires stay under a shared field modulus."""
 
     def __init__(self, key, *, compact):
+        self.key = key
         self.size = key.signals - 1
         self.compact = compact
 
@@ -123,10 +135,8 @@ class AssignmentScript:
         return code + asm("OP_OVER OP_MOD OP_0 OP_NUMEQUALVERIFY")
 
     def binding(self):
-        code = (copy_preimage() + asm("OP_DUP") + field(CURRENT_OUTPOINT, 36)
-                + asm("OP_SWAP") + field(OUTPUTS_HASH, 32) + asm("OP_CAT OP_HASH256")
-                + number(LIMB_BYTES) + asm("OP_SPLIT"))
-        for index, extra in ((BINDING_HI, 2), (BINDING_LO, 1)):
+        code = copy_preimage() + asm("OP_HASH256") + number(LIMB_BYTES) + asm("OP_SPLIT")
+        for index, extra in zip(reversed(self.key.binding_wires), (2, 1), strict=True):
             code += (self.wire(index, extra) + number(LIMB_BYTES + 1) + asm("OP_NUM2BIN")
                      + number(LIMB_BYTES) + asm("OP_SPLIT") + push(b"\0")
                      + asm("OP_EQUALVERIFY OP_EQUALVERIFY"))
@@ -166,12 +176,14 @@ class ProofContract:
     def compile(self, route, *, compact):
         layout = AssignmentScript(self.key, compact=compact)
         code = bytearray(begin(self.versions) + single_input() + layout.validate())
-        code.extend(layout.wire(CURRENT) + number(self.current) + asm("OP_NUMEQUALVERIFY"))
+        code.extend(layout.wire(self.key.current_wire) + number(self.current) + asm("OP_NUMEQUALVERIFY"))
         code.extend(layout.binding())
         for terms in self.key.constraints:
             code.extend(layout.constraint(*terms))
         state_prefix = Output(0, STATE_PREFIX + bytes(STATE_WIDTH)).serialize()[:-STATE_WIDTH]
         code.extend(layout.wire(NEXT) + validate_u32() + asm("OP_DUP") + route)
+        if self.key.outputs == 2:
+            code.extend(layout.wire(ROUTE, 2) + asm("OP_OVER OP_NUMEQUALVERIFY"))
         code.extend(asm("OP_IF") + push(self.terminals[1].serialize()) + asm("OP_ELSE")
                     + push(self.terminals[0].serialize()) + asm("OP_ENDIF OP_SWAP"))
         code.extend(number(STATE_WIDTH) + asm("OP_NUM2BIN") + push(state_prefix)
@@ -182,7 +194,9 @@ class ProofContract:
     def describe(self):
         return {"project": PROJECT_NAME, "compiler_version": PROJECT_VERSION, "schema_version": 1,
                 "proof": "transparent-r1cs-assignment", "verification_key_sha256": self.key.sha256,
+                "binding": "HASH256 of the authenticated ForkID ALL preimage",
                 "signals": self.key.signals, "constraints": len(self.key.constraints), "current": self.current,
+                "public_outputs": ("next", "route") if self.key.outputs == 2 else ("next",),
                 "target": self.target, "optimization": self.optimization, "rewrites": self.rewrites,
                 "deploy_output": {"satoshis": ROOT_VALUE, "script_hex": self.root.script.hex()}}
 
@@ -197,8 +211,11 @@ class ProofContract:
         return Transaction((Input(parent.txid_wire(), 0),), (self.terminals[route], state), version=version)
 
     @staticmethod
-    def public_binding(tx):
-        digest = hash256(tx.inputs[0].outpoint() + output_hash(tx.outputs))
+    def binding_preimage(tx):
+        return preimage_forkid(tx, 0, ROOT_VALUE, BINDING_CODE, FLAG)
+
+    def public_binding(self, tx):
+        digest = hash256(self.binding_preimage(tx))
         return tuple(int.from_bytes(digest[start:start + LIMB_BYTES], "little") for start in (0, LIMB_BYTES))
 
     def seal(self, tx, assignment):
@@ -207,7 +224,7 @@ class ProofContract:
         ):
             raise ValueError("invalid transparent proof assignment")
         proof = b"".join(map(number, assignment[1:]))
-        return tx.with_script(0, proof + push(preimage_forkid(tx, 0, self.root.value, BINDING_CODE, FLAG)))
+        return tx.with_script(0, proof + push(self.binding_preimage(tx)))
 
 
 def main():

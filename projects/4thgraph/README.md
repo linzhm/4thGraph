@@ -2,7 +2,7 @@
 
 A Forth compiler for BSV Script and multi-transaction workflows.
 
-当前构建版本为 **v0.1.5**。项目位于 BSV Script Lab 仓库内，编译与复放产物可写入 `projects/4thgraph/build/`。
+当前构建版本为 **v0.2.0**。项目位于 BSV Script Lab 仓库内，编译与复放产物可写入 `projects/4thgraph/build/`。
 
 同一份 Forth 源码可以生成融合版和拆分版。示例计算 `a = 2x`、`b = y + 1`，两支结果和汇合的和都按 `u32` 表示。回绕后的和小于 20 时走复核，其余走结算。两种后继各锁给一个配置的公钥。编译器以 Forth 2012 Core 为语义基线，`+` 使用 64 位 cell，`u32+` 固定按 32 位回绕。 [示例源码](example.fth) · [语言与 BSV 扩展规范](language.md)
 
@@ -201,7 +201,7 @@ PYTHONPATH=. bash shared/verify_node.sh --profile default -- \
 
 `proof/counter.circom` 定义 32 位计数器。Circom 2.2.2 生成固定的 BN254 R1CS 和 WASM，snarkjs 0.7.5 生成并独立检查每条赋值证明。验证数据是导出的 R1CS 及其摘要。证明公开完整赋值，采用透明验证，无需可信设置。
 
-4thGraph 把 R1CS 约束和 `proof/counter.fth` 中的后继选择一起编译进锁。锁验证当前值与部署承诺一致，验证新值写入实际后继输出，并用认证的 ForkID 原像计算 `HASH256(outpoint || hashOutputs)`。给另一笔花费生成的原证明携带不同的公开绑定。优化版复用域模数，并简化零乘积、单位系数和可居中表示的系数。
+4thGraph 把 R1CS 约束和 `proof/counter.fth` 中的后继选择一起编译进锁。锁验证当前值与部署承诺一致，并要求新值写入实际后继输出。公开绑定是完整、经认证的 ForkID ALL 原像的 `HASH256`，其中包含版本、outpoint、序列、后继输出和锁定时间。另一笔花费或改动锁定时间后，原证明中的公开绑定会失配。优化版复用域模数，并简化零乘积、单位系数和可居中表示的系数。
 
 ```sh
 PYTHONPATH=. bash shared/verify_node.sh --profile default -- \
@@ -210,6 +210,21 @@ PYTHONPATH=. bash shared/verify_node.sh --profile default -- \
 ```
 
 报告含基线与优化版的脚本、正向完整交易、两栈峰值、验证耗时，以及改动赋值、错误当前值、错误后继和跨花费重用的判定。复放会调用固定版本的 npm 工具生成验证数据。已有 snarkjs 的 R1CS JSON 时，也可用 `proof_contract.py --verification-key` 单独构建。
+
+### 从 Forth 生成约束
+
+`proof/workflow.fth` 的 `advance` 和 `decide` 同时用于宿主求值、Script 和 Circom。后端把 32 位回绕显式编码为进位和范围约束，用 33 位分解确定无符号比较结果。复放继续用固定版本的 snarkjs 计算并检查赋值。锁还校验电路公布的路由与 Forth 生成的后继选择一致。
+
+该示例生成 107 条约束。Chronicle 激活后的双版本样本中，完整验证锁从 9,196 B 降到 4,481 B。复放对照覆盖普通输入、18 和 19 跨越分支阈值，以及 4,294,967,295 回绕到 0。
+
+```sh
+project=projects/4thgraph
+PYTHONPATH=. python "$project/circuit_backend.py" "$project/proof/workflow.fth" \
+  --output "$project/build/workflow.circom"
+PYTHONPATH=. bash shared/verify_node.sh --profile default -- \
+  python "$project/proof_replay.py" --generated --compare-domains --target both \
+  --output "$project/build/v0.2.0-circuit-both-2.json"
+```
 
 ## 链上编译器里程碑
 

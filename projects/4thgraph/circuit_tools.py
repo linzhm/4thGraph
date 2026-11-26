@@ -12,13 +12,15 @@ PUBLIC_WIRES = ("main.next", "main.current", "main.bindLo", "main.bindHi")
 
 
 class CircuitFixture:
-    def __init__(self, source, directory):
+    def __init__(self, source, directory, *, has_route=False):
         self.directory = Path(directory)
         self.source = self.directory / "counter.circom"
         self.source.write_bytes(source)
         self.run(CIRCOM_PACKAGE, "circom2", self.source.name, "--r1cs", "--sym", "--wasm", "--O1")
-        public = tuple(line.split(",")[-1] for line in (self.directory / "counter.sym").read_text().splitlines()[:4])
-        if public != PUBLIC_WIRES:
+        self.public_wires = ("main.next", "main.route", *PUBLIC_WIRES[1:]) if has_route else PUBLIC_WIRES
+        rows = [line.split(",") for line in (self.directory / "counter.sym").read_text().splitlines()]
+        public = tuple((int(row[1]), row[3]) for row in rows[:len(self.public_wires)])
+        if public != tuple(enumerate(self.public_wires, 1)):
             raise ValueError(f"unexpected circuit public wire order {public}")
         self.run(SNARKJS_PACKAGE, "snarkjs", "r1cs", "export", "json", "counter.r1cs", "key.json")
         self.key = VerificationKey.load((self.directory / "key.json").read_bytes())
@@ -38,7 +40,7 @@ class CircuitFixture:
         return self.key.assignment((self.directory / "proof.json").read_bytes())
 
     def describe(self):
-        return {"circom": CIRCOM_PACKAGE, "snarkjs": SNARKJS_PACKAGE, "public_wires": PUBLIC_WIRES,
+        return {"circom": CIRCOM_PACKAGE, "snarkjs": SNARKJS_PACKAGE, "public_wires": self.public_wires,
                 "source_sha256": sha256(self.source.read_bytes()).hexdigest(),
                 "r1cs_sha256": sha256((self.directory / "counter.r1cs").read_bytes()).hexdigest(),
                 "verification_key_sha256": self.key.sha256}

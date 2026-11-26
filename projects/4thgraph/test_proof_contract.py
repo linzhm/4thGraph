@@ -1,5 +1,6 @@
 """Check verifier specialization with an independent small constraint fixture."""
 
+from dataclasses import replace
 import json
 import unittest
 
@@ -29,6 +30,7 @@ class ProofContractTests(unittest.TestCase):
             assignment = (1, 20, 19, *binding)
             self.assertTrue(chain_verdict(contract.seal(correct, assignment), (parent,)))
             self.assertFalse(chain_verdict(contract.seal(correct, (1, 21, 19, *binding)), (parent,)))
+            self.assertFalse(chain_verdict(contract.seal(replace(correct, locktime=1), assignment), (parent,)))
             other = Transaction((Input(b"\x01" * 32, 0),), (contract.root,))
             self.assertFalse(chain_verdict(contract.seal(contract.unsigned(other, 20), assignment), (other,)))
         self.assertLess(sizes[-1], sizes[0])

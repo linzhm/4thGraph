@@ -82,3 +82,9 @@ PYTHONPATH=. python projects/4thgraph/protocol.py projects/4thgraph/example.fth 
 ```
 
 版本目标与词集、运算语义和调度分别配置。 `--target both` 让同一份锁接受版本 1 和 2，选 `Contracts.prepare(..., version=1)` 或 `version=2` 在实例化每步时决定实际版本。锁验证当前交易和每份结果父交易自身的版本及来源。版本进入签名摘要，改动父交易版本后须重新绑定其后继。
+
+## 电路后端
+
+电路源码声明 `advance ( u32 -- u32 )` 和 `decide ( u32 -- route )` 两个带 `bsv-effect:` 的定义。后端支持整数字面值、字面 `cell>u32`、现有栈排列、`u32+`、`u32<`、路由字面值和以字面值或 `u32<` 标志驱动的 `IF`。`u32<` 的 Forth 真值为 `-1`，电路在选择分支时用相应的布尔位。生成超出操作或线宽预算的电路，以及无法生成约束的词，都会报告源码行列。
+
+生成的约束将 `next` 与 `route` 作为公开输出。交易绑定还使用 `current`、`bindLo` 和 `bindHi`。Circom 和 snarkjs 负责生成 R1CS 以及计算和检查完整赋值，4thGraph 把透明验证器和后继锁编译为 Script。详见 [重跑命令](README.md#从-forth-生成约束)。
