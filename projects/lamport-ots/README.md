@@ -19,6 +19,12 @@ one-use signing guard, complete transaction construction, and independent engine
 `OneTimeSigner` only prevents reuse of the same object in one process. It does not
 protect copied keys, process restarts, backups, rollback, or duplicate funding.
 
+## Use cases and trade-offs
+
+Use Lamport when comparing how a SHA-256 one-time signature affects the cost of funding and spending. The full-key template puts the ordered public key in the lock. The committed template saves 15,034 bytes per output and adds 8,192 bytes to an ordinary ForkID unlock. An output-heavy allocation and an input-heavy consolidation can therefore favor different templates. [Measured trade-offs](#committed-key-candidate)
+
+Fund each new output, including change, with a fresh Lamport key. Keep the ordered public key and a durable record of key consumption. For a delayed or rejected broadcast, retain the signed bytes for rebroadcast. Treat uncertain signing state after a restore as a consumed key. [Wallet integration](docs/sdk.en.md)
+
 ## Two explicitly different verifiers
 
 - `locking_script(key, transaction=False)` checks a supplied 32-byte digest only.

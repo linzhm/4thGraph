@@ -6,7 +6,7 @@
 
 原文的源码链接目前指向 `legacy` 分支。本次固定的提交在脚本内通过仿射点运算和求模逆来检查 `sG = R + eP`，分别计算固定基点和可变基点的点乘。挑战值为无标签的 `SHA256(r || P || m)` 对群阶取模，其中 `P` 是 65 字节的 SEC1 非压缩公钥。见证提供 `R` 的横纵坐标。[固定版本合约](https://github.com/sCrypt-Inc/boilerplate/blob/7b2cd79d005b2fcdc3c992d039efd619fb47abf7/contracts/schnorr.scrypt) · [点运算实现](https://github.com/sCrypt-Inc/boilerplate/blob/7b2cd79d005b2fcdc3c992d039efd619fb47abf7/contracts/ec.scrypt#L80-L153)
 
-Script Lab 使用 BIP340 带标签的挑战哈希和 32 字节的公钥横坐标。脚本检查两个纵坐标见证对应的点是否在曲线上，以及纵坐标的奇偶性。`sG − eP` 采用联合点乘，两项共用倍点步骤。计算使用齐次射影坐标，最后与 `R` 比较时也无需求模逆。[BIP340](https://github.com/bitcoin/bips/blob/master/bip-0340.mediawiki) · [脚本生成器](../reference/schnorr_script.py)
+Script Lab 使用 BIP340 带标签的挑战哈希和 32 字节的公钥横坐标。脚本检查两个纵坐标见证对应的点是否在曲线上，以及纵坐标的奇偶性。`sG − eP` 采用两位窗口联合点乘，两项共用倍点步骤。计算使用齐次射影坐标，最后与 `R` 比较时也无需求模逆。[BIP340](https://github.com/bitcoin/bips/blob/master/bip-0340.mediawiki) · [脚本生成器](../reference/schnorr_script.py)
 
 ## 独立验签器复放
 
@@ -14,13 +14,13 @@ Script Lab 使用 BIP340 带标签的挑战哈希和 32 字节的公钥横坐标
 
 | 验签器 | 锁定脚本字节 | 见证脚本字节 | 脚本合计字节 | chain-gang 中位耗时 | BSV Node RPC 中位耗时 |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| sCrypt `legacy` 默认构建 | 2,248,962 | 231 | 2,249,193 | 167.3 ms | 574.2 ms |
-| sCrypt `legacy`，`scryptc --asm -O` | 2,178,125 | 231 | 2,178,356 | 167.8 ms | 555.2 ms |
-| Script Lab BIP340 | 125,035 | 197 | 125,232 | 7.3 ms | 35.0 ms |
+| sCrypt `legacy` 默认构建 | 2,248,962 | 231 | 2,249,193 | 195.2 ms | 731.3 ms |
+| sCrypt `legacy`，`scryptc --asm -O` | 2,178,125 | 231 | 2,178,356 | 200.5 ms | 699.7 ms |
+| Script Lab BIP340 | 29,415 | 197 | 29,612 | 3.1 ms | 13.2 ms |
 
-耗时在 AMD EPYC 9V74 Linux 主机上测得。每套引擎先预热一次，再取 15 次复放的中位数。耗时包含输入准备和验证，BSV Node 的数据还包含本机 RPC 开销。
+耗时在 Intel Xeon Platinum 8370C Linux 主机上测得。每套引擎先预热一次，再取 15 次复放的中位数。耗时包含输入准备和验证，BSV Node 的数据还包含本机 RPC 开销。
 
-这个夹具下，Script Lab 的脚本总尺寸比开启优化的版本小 **94.3%**。两种验签器采用各自的签名规则，完整付款采用单独的测量口径。P2PKH-Schnorr 的付款锁为 126,018 字节，包含所有者和交易预映像校验。sCrypt 示例从见证取消息和公钥。比较交易全生命周期以及 MuSig2 与原生 2-of-2 时，需要统一各自的花费策略。[付款实测](../README.zh-CN.md#交易实测) · [付款协议](spec.zh-CN.md)
+这个夹具下，Script Lab 的脚本总尺寸比优化后的 `legacy` 版本小 **98.6%**。两种验签器各自使用自己的签名格式。30,398 字节的 P2PKH-Schnorr 付款锁还检查所有者，并将预映像绑定到当前输入。[付款实测](../README.zh-CN.md#交易实测) · [付款协议](spec.zh-CN.md)
 
 ## 编译器优化与字节下界
 
@@ -28,25 +28,25 @@ Script Lab 使用 BIP340 带标签的挑战哈希和 32 字节的公钥横坐标
 
 两种 sCrypt 构建产物都有 769 段互不重叠的 `modInverseBranchlessP` 指令，每段从操作码边界开始，占 2,544 字节，合计 **1,956,336 字节**，约为优化后锁定脚本的 89.8%。只要编译产物保留这 769 段指令及其编码，即使其余脚本全部消除，锁定脚本也至少有 1,956,336 字节。[固定版本的求逆实现](https://github.com/sCrypt-Inc/boilerplate/blob/7b2cd79d005b2fcdc3c992d039efd619fb47abf7/contracts/ec.scrypt#L61-L66) · [字节统计实现](../reference/comparison/scrypt_legacy.cjs)
 
-即使允许改写求逆例程，只要仍保留 769 个互不重叠的内联求逆，要把总大小压到 Script Lab 的 125,035 字节以内，每段求逆的平均预算也不到 163 字节，还未计入其他指令。把联合射影点乘移植到 sCrypt 后，这个下界的前提就消失了。下面是同算法实测。
+即使允许改写求逆例程，只要仍保留 769 个互不重叠的内联求逆，要把总大小压到 Script Lab 的 29,415 字节以内，每段求逆的平均预算也不到 39 字节，还未计入其他指令。把联合射影点乘移植到 sCrypt 后，这个下界的前提就消失了。
 
-## 同算法 BIP340 对照
+## 同见证格式的 BIP340 对照
 
-用高级 sCrypt 表达与 Script Lab 验签器相同的完备齐次坐标点加、联合点乘、带标签的挑战哈希和 x-only 公钥规则。两份实现使用相同的五个见证字段。sCrypt 版把域模数保留在栈上，供循环里的点运算复用，并在汇编时补上相同的三字节栈深度检查。[sCrypt 源码](../reference/comparison/bip340.scrypt) · [对照程序](../reference/compare_bip340.py)
+两种实现使用 BIP340 带标签的挑战哈希、x-only 公钥规则和相同的五个见证字段。高级 sCrypt 版采用单比特联合点乘和完备齐次坐标点加，Script Lab 使用自同态分解和 64 个两位窗口。复放程序给两份 sCrypt 产物补上相同的三字节栈深度检查。[sCrypt 源码](../reference/comparison/bip340.scrypt) · [对照程序](../reference/compare_bip340.py)
 
 | BIP340 验签器 | 锁定脚本字节 | 见证字节 | 栈载荷峰值 | chain-gang 中位耗时 | BSV Node RPC 中位耗时 |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| 高级 sCrypt 默认构建 | 131,479 | 197 | 2,235 B | 7.0 ms | 34.8 ms |
-| 高级 sCrypt `--asm -O` | 122,710 | 197 | 2,235 B | 7.2 ms | 35.1 ms |
-| Script Lab | 125,035 | 197 | 3,310 B | 7.4 ms | 35.4 ms |
+| 高级 sCrypt 默认构建 | 131,479 | 197 | 2,235 B | 9.0 ms | 53.0 ms |
+| 高级 sCrypt `--asm -O` | 122,710 | 197 | 2,235 B | 8.7 ms | 56.2 ms |
+| Script Lab | 29,415 | 197 | 3,290 B | 3.2 ms | 13.0 ms |
 
 三份产物在两套引擎上均接受 9 条有效 BIP340 向量，拒绝 10 条无效 BIP340 向量和 8 条错误见证。本地测试还逐字节复算了 8 条附有私钥的官方签名。栈载荷取官方第 0 条向量在开发求值器中的主栈与备用栈数据总量峰值。耗时在同一主机预热一次后取 15 次复放的中位数。
 
-同算法下，优化后的 sCrypt 锁小 2,325 字节，栈载荷也更低，两种引擎的实测耗时接近。上面对 `legacy` 的大幅缩减对应不同的点运算和签名格式。完整付款和双方签名成本见另一份实测。[MuSig2 和原生 CHECKMULTISIG](threshold-comparison.zh-CN.md)
+这个夹具中，Forth 验签器比优化后的 sCrypt 版少 93,295 字节，窗口表增加了栈载荷峰值。完整付款和双方签名成本见另一份实测。[MuSig2 和原生 CHECKMULTISIG](threshold-comparison.zh-CN.md)
 
 ## 复现
 
-按[项目验收说明](../README.zh-CN.md#复现验收)准备 Python 环境，然后在仓库根目录运行。本次使用 Node.js 24 运行复放程序。编译器和 BSV Node 使用 Linux x86-64 发行包。复放程序校验上游源码提交和编译器的 SHA-256。
+按[项目验收说明](../README.zh-CN.md#复现验收)准备 Python 环境，然后在仓库根目录运行。本次使用 Node.js 22 运行复放程序。编译器和 BSV Node 使用 Linux x86-64 发行包。复放程序校验上游源码提交和编译器的 SHA-256。
 
 ```sh
 scratch=$(mktemp -d)

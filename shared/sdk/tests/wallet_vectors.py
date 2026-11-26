@@ -1,4 +1,5 @@
 """Replay the unified wallet API against public reference vectors."""
+from dataclasses import replace
 from hashlib import sha256
 import json
 from pathlib import Path
@@ -58,7 +59,14 @@ def r1_layout_vectors(project, directory, node, adapter, private, public_key, pr
     # Put the lock at vout 1 and spend it at input 0.
     funding = Transaction((Input(b"\xf1" * 32, 0),), (Output(1, b"\x51"), Output(value, lock)))
     vout = 1
-    modes = ((0x43, False), (0x63, False)) if deferred else ((0x41, False), (0x41, True), (0x61, False))
+    if deferred:
+        # Keep the v0.2.0 acceptance domain independent of the production flag set.
+        flags = (0x41, 0x42, 0x43, 0x61, 0x62, 0x63, 0xc1, 0xc2, 0xc3, 0xe1, 0xe2, 0xe3)
+        if existing_output:
+            flags = (0x43, 0x63)
+        modes = [(flag, False) for flag in flags]
+    else:
+        modes = ((0x41, False), (0x41, True), (0x61, False))
     for sighash, sign_message in modes:
         compress = sighash == 0x61
         if deferred:
@@ -131,6 +139,17 @@ def replay(project, rows):
         if project == "p2pkh-r1-deferred":
             assert client.activate(tx, request["inputIndex"], prevout, sighash=request["sighash"],
                                    chronicle_active=request["chronicleActive"]).hex() == row["signed"]
+            if request["sighash"] == 0x43:
+                assert client.recognize(lock, public_key=key, value_sats=prevout.value_sats + 1) is None
+                prepared = Transaction.parse(tx)
+                target = prepared.outputs[0]
+                changed_target = replace(prepared, outputs=(replace(target, value=target.value - 1),))
+                try:
+                    client.activate(changed_target.serialize(), request["inputIndex"], prevout)
+                except ValueError as error:
+                    assert "does not match the committed value and R1 script" in str(error)
+                else:
+                    raise AssertionError("Deferred activation accepted a different target amount")
             continue
         algorithm, kind, fmt = CALLBACKS[project]
         if request.get("signMessage"):

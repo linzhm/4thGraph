@@ -17,6 +17,12 @@ uses SM3 to compute the SM2 identity digest ZA and the message digest. It
 verifies the SM2 signature and binds the authorization to the spending
 transaction through PUSHTX and native `OP_CHECKSIG`.
 
+## Use cases and trade-offs
+
+Evaluate P2PKH-SM2 when a wallet already uses an SM2 signing service. A provider that exposes a raw SM2 API returns the signature directly. A GB/T 35275-2026 provider can return a direct single-signer SignedData envelope under the wallet's trusted signer configuration. The SDK checks that off-chain envelope and writes the extracted 64-byte signature into the transaction. Track which provider operation the wallet uses and validate the exact message and user ID at integration time. [Signing contract](docs/sdk.en.md)
+
+For payments that create other SM2 outputs, compare ForkID and OTDA using the same input and output counts. On eligible Chronicle spends, the v1.1.0 candidate shortens the OTDA unlock by reconstructing the signed preimage. The cost of creating a new SM2 output still includes the 144,925-byte lock. [Reconstruction measurements](#otda-constructor)
+
 ## Project version and locking template
 
 The v1.1.0 candidate adds default OTDA reconstruction to the unlocking script. The generator and wallet use the same 144,925-byte locking template `1` as the first public release, v1.0.0.

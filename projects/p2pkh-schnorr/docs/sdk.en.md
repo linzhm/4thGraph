@@ -6,16 +6,16 @@
 
 ## Receive and spend
 
-Select project `p2pkh-schnorr` and template `v0.1.0` in the unified SDK. Supply a 32-byte x-only public key or its 20-byte HASH160 to create a receive script. The client loads the frozen template and fills the owner slot. For recognition, supply the actual output script and optionally the expected public key.
+Select project `p2pkh-schnorr` in the unified SDK. The client uses template `v0.6.0` by default. Supply a 32-byte x-only public key or its 20-byte HASH160. The client fills the owner slot in the frozen Forth build and checks all fixed script bytes when recognizing an output. You can also supply the expected public key.
 
-The signing request identifies the algorithm as `schnorr-secp256k1`, the payload kind as `message`, and the signature format as `bip340`. Give the 32-byte payload to the BIP340 signer as the message. Return the signer's original 64 bytes. The SDK verifies the signature and derives the public witness coordinates.
+The signing request identifies the algorithm as `schnorr-secp256k1`, the payload kind as `message`, and the signature format as `bip340`. Give the 32-byte payload to the BIP340 signer as the message. Return the signer's original 64 bytes. The SDK verifies the signature, derives the public witness coordinates, and runs the Forth `schnorr-unlock` word to generate the input script. [Forth source](../reference/schnorr.fth)
 
 The TypeScript call below uses approved wallet data and the bridge configuration from the shared quickstart. Point the bridge at the Python interpreter in `.venv/p2pkh-schnorr` when using the project environment. The wallet authenticates the funding outpoint and approves payment outputs and fee before this call. [Bridge setup](../../../shared/sdk/README.md#quickstart)
 
 ```ts
 import { WalletClient } from "./shared/sdk/typescript/index.ts";
 
-const wallet = new WalletClient("p2pkh-schnorr", { ...config, template: "v0.1.0" });
+const wallet = new WalletClient("p2pkh-schnorr", config);
 const receiveScript = wallet.createLock({ publicKey: receiveKeyHex });
 const prevout = wallet.prevoutFromFunding(fundingTxHex, fundingVout);
 if (!wallet.recognize({ script: prevout.script, publicKey: spendKeyHex })) {

@@ -36,6 +36,14 @@ const signedHex = wallet.signPayment({
 
 已构造的交易用 `signInput`，传入交易、本次输入索引和对应的 prevout。Rust、Go、Python 的等价入口在[调用表](../../../shared/sdk/README.zh-CN.md#调用与数据)。
 
+## 核对签名器和模板
+
+- 先跑原生 P2PKH 离线示例。在钱包的复放中，先比较锁和签名请求，再比较最终的交易字节。
+- 用接收预先计算摘要的 secp256k1 接口签署这 32 字节。如果设备返回定长的 `r ∥ s`，先转换为低 S 的 DER 编码，再交回 SDK。sighash 字节由客户端添加。
+- 回归测试可分别覆盖按所有者哈希生成的 P2PKH 输出，以及按完整压缩公钥生成的 P2PK 输出。确认两类输出用不同的花费公钥都会识别失败。
+
+[离线上手](../../../shared/sdk/README.zh-CN.md#quickstart)
+
 ## 复放向量
 
 ```sh

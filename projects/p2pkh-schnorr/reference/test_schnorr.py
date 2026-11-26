@@ -5,21 +5,27 @@ from dataclasses import replace
 from hashlib import sha256
 import os
 from pathlib import Path
+from random import Random
 import unittest
 
 from coincurve import PrivateKey, PublicKeyXOnly
 from coincurve._libsecp256k1 import ffi, lib
 from coincurve.context import GLOBAL_CONTEXT
 
-from bip340 import FIELD, lift_x, to_bytes, verify
+from bip340 import FIELD, ORDER, lift_x, to_bytes, verify
 from payment import lock_for_public_key, sign_payment, sign_spend
-from schnorr_script import compiled_template, lock_for_owner, owner_hash, recognize, verifier
+from schnorr_script import (
+    _contract, authorization_codes, compile_unlock, compiled_template, lock_for_owner, owner_hash, recognize, verifier,
+)
 from shared.benchmark_validation import Node, chain_verdict
 from shared.evaluate import ScriptError, evaluate
-from shared.script import push
+from shared.script import decode_num, encode_num, number, push
+from shared.spend_authorization import SpendAuthorization, prepare_authorization
 from shared.transaction import CHRONICLE, Input, Output, Transaction
 
 VECTORS = Path(__file__).resolve().parents[1] / "template" / "bip340-vectors.csv"
+HALF_RADIX = 1 << 128
+LAMBDA = 0x5363AD4CC05C30E0A5261C028812645A122E22EA20816678DF02967C1B23BD72
 MODES = (0x41, 0x42, 0x43, 0x61, 0x62, 0x63, 0xC1, 0xC2, 0xC3, 0xE1, 0xE2, 0xE3)
 
 
@@ -30,6 +36,11 @@ def official_vectors():
             or [int(row["index"]) for row in vectors] != list(range(19))):
         raise ValueError("expected all 19 pinned official BIP340 vectors")
     return vectors
+
+
+def affine_generator_multiple(scalar):
+    public = PrivateKey.from_int(scalar % ORDER).public_key.format(compressed=False)
+    return int.from_bytes(public[1:33], "big"), int.from_bytes(public[33:], "big")
 
 
 def detached_unlock(message, public_key, signature, *, y=None, nonce_y=None):
@@ -195,7 +206,158 @@ class SchnorrTests(unittest.TestCase):
         owner = bytes(range(20))
         raw = lock_for_owner(owner)
         self.assertEqual(raw, reference[:offset] + owner + reference[offset + 20:])
+        self.assertEqual(compiled_template(owner), (raw, offset))
         self.assertEqual(recognize(raw), owner)
+
+    def test_forth_unlock_preserves_witness_encoding(self):
+        witness = (b"x" * 32, b"y" * 32, b"s" * 64, b"r" * 32)
+        for size in (75, 76, 255, 256, 65535, 65536):
+            for companion in (False, True):
+                with self.subTest(preimage_bytes=size, companion=companion):
+                    preimage = bytes(size)
+                    auth = SpendAuthorization(0x63 if companion else 0x41, preimage, companion)
+                    self.assertEqual(compile_unlock(preimage, companion, *witness),
+                                     auth.witness(b"".join(witness)))
+
+    def test_forth_lock_accepts_unpaired_otda_companion(self):
+        unsigned = replace(self.unsigned, outputs=self.unsigned.outputs[:1])
+        tx = sign_spend(unsigned, 0, self.parents[0].serialize(), self.public_keys[0],
+                        lambda message: self.keys[0].sign_schnorr(message, aux_randomness=bytes(32)))
+        ordinary_code, companion_code = authorization_codes()
+        public = self.public_keys[1]
+        for sighash in (0x63, 0xE3):
+            with self.subTest(sighash=hex(sighash)):
+                auth = prepare_authorization(tx, 1, self.parents[1].outputs[1].value, sighash,
+                                             ordinary_code=ordinary_code, companion_code=companion_code)
+                self.assertTrue(auth.companion)
+                signature = self.keys[1].sign_schnorr(auth.checked_digest(), aux_randomness=bytes(32))
+                witness = (public, to_bytes(lift_x(public)[1]), signature, to_bytes(lift_x(signature[:32])[1]))
+                unlock = compile_unlock(auth.preimage, True, *witness)
+                self.check_spend(tx.with_script(1, unlock), self.parents, [True, True])
+                wrong_mode = compile_unlock(auth.preimage, False, *witness)
+                self.check_spend(tx.with_script(1, wrong_mode), self.parents, [True, False])
+
+    def test_doubling_agrees_with_complete_addition(self):
+        contract = _contract()
+        double = contract.emit("secp256k1-double", b"")
+        add = contract.emit("secp256k1-add", b"")
+        points = [(0, 1, 0)]
+        for scalar in range(1, 17):
+            x, y = affine_generator_multiple(scalar)
+            for z in (1, -17, FIELD - 1):
+                points.append((x * z % FIELD, y * z % FIELD, z))
+
+        for point in points:
+            with self.subTest(point=point):
+                encoded = b"".join(map(number, point))
+                old, old_alt = evaluate(number(FIELD) + encoded * 2 + add)
+                new, new_alt = evaluate(number(FIELD) + encoded + double)
+                self.assertEqual((old_alt, new_alt), ([], []))
+                self.assertEqual(len(new), 4)
+                self.assertEqual(decode_num(new[0]), FIELD)
+                self.assertEqual([decode_num(item) % FIELD for item in old[1:]],
+                                 [decode_num(item) % FIELD for item in new[1:]])
+
+    def test_lambda_scalar_split(self):
+        split = _contract().emit("secp256k1-lambda-split", b"")
+        rng = Random(340)
+        scalars = (0, 1, HALF_RADIX - 1, HALF_RADIX, ORDER // 2, ORDER - 2, ORDER - 1, ORDER)
+        signs = set()
+        for k in (*scalars, *(rng.randrange(ORDER) for _ in range(64))):
+            with self.subTest(k=k):
+                stack, alt = evaluate(split, [b"outer", encode_num(k)])
+                self.assertEqual(alt, [])
+                self.assertEqual(stack[:1], [b"outer"])
+                k1, k2 = map(decode_num, stack[1:])
+                self.assertLess(abs(k1), HALF_RADIX)
+                self.assertLess(abs(k2), HALF_RADIX)
+                self.assertEqual((k1 + LAMBDA * k2) % ORDER, k % ORDER)
+                if k1 and k2:
+                    signs.add((k1 < 0, k2 < 0))
+        self.assertEqual(len(signs), 4)
+
+    def test_affine_add_matches_complete_addition(self):
+        full = _contract().emit("secp256k1-add", b"")
+        mixed = _contract().emit("secp256k1-add-affine", b"")
+        for a in (0, 1, -1, 7):
+            for b in (1, -1, 7):
+                with self.subTest(a=a, b=b):
+                    bx, by = affine_generator_multiple(b)
+                    if a:
+                        ax, ay = affine_generator_multiple(a)
+                        z = -17
+                        left = (ax * z % FIELD, ay * z % FIELD, z)
+                    else:
+                        left = (0, 1, 0)
+                    stack = [encode_num(FIELD), b"outer", *map(encode_num, (*left, bx, by))]
+                    self.assertEqual(evaluate(mixed, stack), evaluate(full, [*stack, encode_num(1)]))
+
+    def test_joint_window_table_and_selectors(self):
+        contract = _contract()
+        split = contract.emit("secp256k1-lambda-split", b"")
+        table = contract.emit("bip340-joint-window-table", b"")
+        step = contract.emit("bip340-joint-window-step", b"")
+
+        def check_point(coordinates, scalar):
+            x, y, z = (decode_num(item) % FIELD for item in coordinates)
+            if scalar % ORDER == 0:
+                self.assertEqual((x, z), (0, 0))
+                self.assertNotEqual(y, 0)
+            else:
+                inverse = pow(z, -1, FIELD)
+                self.assertEqual((x * inverse % FIELD, y * inverse % FIELD), affine_generator_multiple(scalar))
+
+        for public_multiple, s, k in ((1, ORDER - 1, 13), (-1, HALF_RADIX, ORDER),
+                                      (2, 0, ORDER // 2), (11, HALF_RADIX + 17, ORDER // 3)):
+            px, py = affine_generator_multiple(public_multiple)
+            original = [FIELD, 123, 456, px, py, s, k]
+            scalars, _ = evaluate(split, [encode_num(k)])
+            k1, k2 = map(decode_num, scalars)
+            p = -public_multiple if k1 < 0 else public_multiple
+            q = LAMBDA * (-public_multiple if k2 < 0 else public_multiple)
+            built, alt = evaluate(table, list(map(encode_num, original)))
+            self.assertEqual(alt, [])
+            self.assertEqual(len(built), 86)
+            self.assertEqual(list(map(decode_num, built[:3])), original[:3])
+            self.assertEqual(list(map(decode_num, built[-8:])),
+                             [s % HALF_RADIX, s // HALF_RADIX, abs(k1), abs(k2), 1 << 126, 0, 1, 0])
+            for index in range(1, 16):
+                with self.subTest(public_multiple=public_multiple, table_index=index):
+                    high, low = divmod(index, 4)
+                    check_point(built[3 * index:3 * index + 3], high * q + low * p)
+                    start = 48 + 2 * (index - 1)
+                    self.assertEqual(tuple(map(decode_num, built[start:start + 2])),
+                                     affine_generator_multiple(high * HALF_RADIX + low))
+
+            selectors = {(i, 0) for i in range(16)} | {(0, i) for i in range(16)} | {(i, 15 - i) for i in range(16)}
+            for fixed, variable in sorted(selectors):
+                with self.subTest(public_multiple=public_multiple, fixed=fixed, variable=variable):
+                    high, low = divmod(fixed, 4)
+                    vhigh, vlow = divmod(variable, 4)
+                    digits = [low, high, vlow, vhigh]
+                    initial = [*digits, 1, 0, 1, 0]
+                    selected, alt = evaluate(step, built[:-8] + list(map(encode_num, initial)))
+                    self.assertEqual(alt, [])
+                    self.assertEqual(selected[:-8], built[:-8])
+                    self.assertEqual(list(map(decode_num, selected[-8:-3])), [*digits, 0])
+                    check_point(selected[-3:], high * HALF_RADIX + low + vhigh * q + vlow * p)
+
+    def test_joint_multiplication_scalar_edges(self):
+        multiply = _contract().emit("bip340-joint-multiply", b"")
+        px, py = affine_generator_multiple(1)
+        cases = ((0, ORDER), (0, ORDER - 1), (1, ORDER), (1, ORDER - 1),
+                 (HALF_RADIX - 1, 1), (HALF_RADIX, ORDER - HALF_RADIX),
+                 (ORDER - 1, ORDER - 1))
+        for s, k in cases:
+            with self.subTest(s=s, k=k):
+                multiple = (s + k) % ORDER
+                r, ry = affine_generator_multiple(multiple) if multiple else (0, 0)
+                stack = list(map(encode_num, (FIELD, r, ry, px, py, s, k)))
+                if multiple:
+                    self.assertEqual(evaluate(multiply, stack), ([b"\x01"], []))
+                else:
+                    with self.assertRaises(ScriptError):
+                        evaluate(multiply, stack)
 
 
 if __name__ == "__main__":

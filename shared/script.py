@@ -2,8 +2,11 @@
 from functools import cache
 from pathlib import Path
 
+SECP256K1_FIELD = (1 << 256) - (1 << 32) - 977
+
 _NAMES = '''0 1NEGATE RESERVED 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 NOP VER IF NOTIF VERIF VERNOTIF ELSE ENDIF VERIFY RETURN TOALTSTACK FROMALTSTACK 2DROP 2DUP 3DUP 2OVER 2ROT 2SWAP IFDUP DEPTH DROP DUP NIP OVER PICK ROLL ROT SWAP TUCK CAT SPLIT NUM2BIN BIN2NUM SIZE INVERT AND OR XOR EQUAL EQUALVERIFY RESERVED1 RESERVED2 1ADD 1SUB 2MUL 2DIV NEGATE ABS NOT 0NOTEQUAL ADD SUB MUL DIV MOD LSHIFT RSHIFT BOOLAND BOOLOR NUMEQUAL NUMEQUALVERIFY NUMNOTEQUAL LESSTHAN GREATERTHAN LESSTHANOREQUAL GREATERTHANOREQUAL MIN MAX WITHIN RIPEMD160 SHA1 SHA256 HASH160 HASH256 CODESEPARATOR CHECKSIG CHECKSIGVERIFY CHECKMULTISIG CHECKMULTISIGVERIFY'''.split()
 OPS = {'OP_0': 0, **{'OP_'+n: i+0x4f for i,n in enumerate(_NAMES[1:])}}
+OPS.update(OP_SUBSTR=0xb3, OP_LEFT=0xb4)
 
 
 def encode_num(n):
@@ -38,6 +41,44 @@ def token(t):
 
 def asm(text):
     return b''.join(token(t) for t in text.split())
+
+
+def without_codeseparators(script):
+    """Remove CODESEPARATOR opcodes outside pushed data for OTDA scriptCode."""
+    separators = OPS['OP_CODESEPARATOR']
+    clean = bytearray()
+    cursor = 0
+    while cursor < len(script):
+        start = cursor
+        opcode = script[cursor]
+        cursor += 1
+        if opcode == separators:
+            continue
+        if opcode <= 75:
+            cursor += opcode
+        elif opcode <= 78:
+            width = (1, 2, 4)[opcode - 76]
+            end = cursor + width
+            if end > len(script):
+                raise ValueError('truncated Script push length')
+            cursor = end + int.from_bytes(script[cursor:end], 'little')
+        if cursor > len(script):
+            raise ValueError('truncated Script push payload')
+        clean.extend(script[start:cursor])
+    return bytes(clean)
+
+
+def is_compressed_public_key(encoded):
+    if not isinstance(encoded, bytes) or len(encoded) != 33 or encoded[0] not in (2, 3):
+        return False
+    x = int.from_bytes(encoded[1:], "big")
+    if x >= SECP256K1_FIELD:
+        return False
+    # A nonzero quadratic residue has one root of each parity.
+    square = (pow(x, 3, SECP256K1_FIELD) + 7) % SECP256K1_FIELD
+    if square == 0:
+        return encoded[0] == 2
+    return pow(square, (SECP256K1_FIELD - 1) // 2, SECP256K1_FIELD) == 1
 
 
 def assemble(directory, owner, injected=None, entry="LOCK"):

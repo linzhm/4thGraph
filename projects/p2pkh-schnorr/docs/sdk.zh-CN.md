@@ -6,16 +6,16 @@
 
 ## 收款和花费
 
-在统一 SDK 中选择项目 `p2pkh-schnorr` 和模板 `v0.1.0`。创建收款脚本时传入 32 字节 x-only 公钥，或其 20 字节 HASH160。客户端读取固定模板并填入所有者哈希。识别时提供实际的输出脚本，也可以一起提供预期公钥。
+在统一 SDK 中选择项目 `p2pkh-schnorr`，默认使用 `v0.6.0` 模板。创建收款脚本时传入 32 字节 x-only 公钥或其 20 字节 HASH160。客户端在 Forth 编译产物中填入所有者哈希，识别时核对实际脚本的全部固定字节。识别时也可以提供预期公钥。
 
-签名请求的算法为 `schnorr-secp256k1`，数据类型为 `message`，签名格式为 `bip340`。把 32 字节载荷作为消息交给 BIP340 签名器，直接返回签名器给出的 64 字节。SDK 验证签名并推导见证所需的公开坐标。
+签名请求的算法为 `schnorr-secp256k1`，数据类型为 `message`，签名格式为 `bip340`。把 32 字节载荷作为消息交给 BIP340 签名器，直接返回签名器给出的 64 字节。SDK 验证签名并推导见证所需的公开坐标，再调用 Forth 的 `schnorr-unlock` 生成解锁脚本。[Forth 源码](../reference/schnorr.fth)
 
 下面的 TypeScript 调用使用钱包已审批的数据和统一快速入门中的桥接配置。使用项目环境时，将配置指向 `.venv/p2pkh-schnorr` 中的 Python 解释器。调用前，钱包先核验入金 outpoint，再审批输出和手续费。[桥接配置](../../../shared/sdk/README.zh-CN.md#quickstart)
 
 ```ts
 import { WalletClient } from "./shared/sdk/typescript/index.ts";
 
-const wallet = new WalletClient("p2pkh-schnorr", { ...config, template: "v0.1.0" });
+const wallet = new WalletClient("p2pkh-schnorr", config);
 const receiveScript = wallet.createLock({ publicKey: receiveKeyHex });
 const prevout = wallet.prevoutFromFunding(fundingTxHex, fundingVout);
 if (!wallet.recognize({ script: prevout.script, publicKey: spendKeyHex })) {

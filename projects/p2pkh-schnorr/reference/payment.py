@@ -1,7 +1,7 @@
 """Build and authorize Schnorr spends with an external BIP340 signer."""
 
 from bip340 import lift_x, to_bytes, verify
-from schnorr_script import COMPANION_CODE, ORDINARY_CODE, lock_for_owner, owner_hash
+from schnorr_script import authorization_codes, compile_unlock, lock_for_owner, owner_hash, recognize
 from shared.spend_authorization import DEFAULT_SIGHASH, prepare_authorization
 from shared.transaction import CHRONICLE, SIGHASH_SINGLE, SIGHASH_TYPES, Input, Transaction, amount
 
@@ -38,20 +38,22 @@ def sign_previous(tx, index, previous, public_key, signer, *, sighash=DEFAULT_SI
         raise ValueError("Schnorr wallet SINGLE requires a same-index output")
 
     point = lift_x(public_key)
-    if point is None or previous.script != lock_for_owner(owner_hash(public_key)):
+    if point is None or recognize(previous.script) != owner_hash(public_key):
         raise ValueError("funding output does not match the BIP340 key and template")
     tx.serialize()
 
+    ordinary_code, companion_code = authorization_codes()
     auth = prepare_authorization(tx, index, previous.value, sighash,
-                                 ordinary_code=ORDINARY_CODE, companion_code=COMPANION_CODE)
+                                 ordinary_code=ordinary_code, companion_code=companion_code)
     message = auth.checked_digest()
     signature = signer(message)
     if not verify(public_key, message, signature):
         raise ValueError("invalid BIP340 signature from external signer")
 
     nonce_point = lift_x(signature[:32])
-    packed = public_key + to_bytes(point[1]) + signature + to_bytes(nonce_point[1])
-    return tx.with_script(index, auth.witness(packed))
+    unlock = compile_unlock(auth.preimage, auth.companion, public_key, to_bytes(point[1]),
+                            signature, to_bytes(nonce_point[1]))
+    return tx.with_script(index, unlock)
 
 
 def sign_payment(funding_raw, vout, outputs, fee, public_key, signer):

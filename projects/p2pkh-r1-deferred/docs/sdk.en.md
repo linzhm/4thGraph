@@ -49,4 +49,10 @@ SCRIPT_LAB_SDK_PYTHON="$PWD/.venv/bin/python" \
 3. Call `activate` with the prepared transaction, input index and authenticated prevout. The default is ForkID SINGLE (`0x43`). Other modes use the same-index target plus the parameters in the protocol specification. Sign the sponsor input separately.
 4. Track the activated R1 outpoint and use the [R1 wallet integration](../../p2pkh-r1/docs/sdk.en.md) for later payments.
 
+## Track the deposit and the activated outpoint
+
+Store the short-lock outpoint, value, owner and `targetTemplate` with the invoice. When building a batch, freeze the mapping from each activation input to its same-index R1 output before assembling any unlock. The output preserves the complete deposit amount, so a separate input supplies the fee. The sponsor approves the transaction and signs its own input.
+
+After confirmation, record the final activation txid and output index as the new R1 outpoint. If broadcast is delayed or a reorganization changes the parent, reconcile the short-lock and activated outpoints in the wallet's chain view before creating a child payment. [R1 spending workflow](../../p2pkh-r1/docs/sdk.en.md#quickstart)
+
 [Activation specification](spec.en.md) · [Twelve-mode vectors](../template/v0.2.0/sighash-modes.json) · [Reference transaction construction](../reference/README.md)

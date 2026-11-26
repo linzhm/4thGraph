@@ -6,7 +6,7 @@ The 2021 article illustrates a witness-assisted approach. Its archived contract 
 
 The article's link now points to `legacy`. At the pinned revision, the contract computes `sG = R + eP` using affine point arithmetic and modular inversions. It has separate generator and variable-base multipliers. The challenge is untagged `SHA256(r || P || m)` reduced modulo the group order, with `P` encoded as a 65-byte uncompressed SEC1 key. The witness supplies both coordinates of `R`. [Pinned contract](https://github.com/sCrypt-Inc/boilerplate/blob/7b2cd79d005b2fcdc3c992d039efd619fb47abf7/contracts/schnorr.scrypt) · [Point arithmetic](https://github.com/sCrypt-Inc/boilerplate/blob/7b2cd79d005b2fcdc3c992d039efd619fb47abf7/contracts/ec.scrypt#L80-L153)
 
-Script Lab uses the BIP340 tagged challenge, a 32-byte x-only public key, and two y-coordinate witnesses whose curve membership and parity the script checks. It computes `sG − eP` as a joint multiplication with shared doubling steps. It uses homogeneous projective coordinates and checks the result against `R` without a field inversion. [BIP340](https://github.com/bitcoin/bips/blob/master/bip-0340.mediawiki) · [Script generator](../reference/schnorr_script.py)
+Script Lab uses the BIP340 tagged challenge, a 32-byte x-only public key, and two y-coordinate witnesses whose curve membership and parity the script checks. It computes `sG − eP` as a two-bit joint multiplication with shared doubling steps. It uses homogeneous projective coordinates and checks the result against `R` without a field inversion. [BIP340](https://github.com/bitcoin/bips/blob/master/bip-0340.mediawiki) · [Script generator](../reference/schnorr_script.py)
 
 ## Standalone verifier replay
 
@@ -14,13 +14,13 @@ Each verifier receives a signature in its own format over the 32-byte message an
 
 | Verifier | Lock bytes | Witness bytes | Combined script bytes | chain-gang median | BSV Node RPC median |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| sCrypt `legacy`, default build | 2,248,962 | 231 | 2,249,193 | 167.3 ms | 574.2 ms |
-| sCrypt `legacy`, `scryptc --asm -O` | 2,178,125 | 231 | 2,178,356 | 167.8 ms | 555.2 ms |
-| Script Lab BIP340 | 125,035 | 197 | 125,232 | 7.3 ms | 35.0 ms |
+| sCrypt `legacy`, default build | 2,248,962 | 231 | 2,249,193 | 195.2 ms | 731.3 ms |
+| sCrypt `legacy`, `scryptc --asm -O` | 2,178,125 | 231 | 2,178,356 | 200.5 ms | 699.7 ms |
+| Script Lab BIP340 | 29,415 | 197 | 29,612 | 3.1 ms | 13.2 ms |
 
-Timings are medians from 15 replays per engine after one warmup on an AMD EPYC 9V74 Linux host. They include input preparation and verification. The BSV Node measurements also include loopback RPC.
+Timings are medians from 15 replays per engine after one warmup on an Intel Xeon Platinum 8370C Linux host. They include input preparation and verification. The BSV Node measurements also include loopback RPC.
 
-The Script Lab verifier uses 94.3% fewer combined script bytes than the optimized build in this fixture. The replay measures the two verifier implementations with their respective signature rules. Payment measurements have a separate baseline. The P2PKH-Schnorr payment lock is 126,018 bytes and adds owner and transaction-preimage commitments, while the sCrypt demo takes the message and key from the witness. Transaction lifecycle and MuSig2 versus native 2-of-2 measurements require matched spend policies. [Payment measurements](../README.md#measured-sizes) · [Payment specification](spec.en.md)
+The Script Lab verifier uses 98.6% fewer combined script bytes than the optimized legacy build in this fixture. Each verifier uses its own signature format. The 30,398-byte P2PKH-Schnorr payment lock also checks ownership and binds the preimage to the current input. [Payment measurements](../README.md#measured-sizes) · [Payment specification](spec.en.md)
 
 ## Compiler optimization and byte bound
 
@@ -28,25 +28,25 @@ The pinned compiler's `-O` applies to its ASM output. The runner assembles that 
 
 Both sCrypt builds contain 769 nonoverlapping copies of the 2,544-byte `modInverseBranchlessP` body, starting at opcode boundaries. That accounts for **1,956,336 bytes**, or about 89.8% of the optimized lock. Any binary retaining those 769 intact copies has a lower bound of 1,956,336 bytes for its lock. This bound allows arbitrary improvements to the rest of the script. It applies only while the count and encoding of those copies are preserved. [Pinned inversion routine](https://github.com/sCrypt-Inc/boilerplate/blob/7b2cd79d005b2fcdc3c992d039efd619fb47abf7/contracts/ec.scrypt#L61-L66) · [Byte count implementation](../reference/comparison/scrypt_legacy.cjs)
 
-Even if a rewrite uses a different inversion routine, retaining 769 disjoint inline inversions leaves an average budget of less than 163 bytes per inversion to fit in the Script Lab verifier's 125,035 bytes, before accounting for everything else. Porting joint projective multiplication to sCrypt removes that assumption, as the comparison below shows.
+Even if a rewrite uses a different inversion routine, retaining 769 disjoint inline inversions leaves an average budget of less than 39 bytes per inversion to fit in the Script Lab verifier's 29,415 bytes, before accounting for everything else. Porting joint projective multiplication to sCrypt removes that assumption, as the comparison below shows.
 
-## Matched BIP340 verifier
+## BIP340 with a common witness
 
-The high-level sCrypt port uses the same complete homogeneous point addition, joint multiplication, tagged hash, x-only key rules, and five witness fields as the Script Lab verifier. The port keeps the field modulus on the stack across the arithmetic loop. The assembly driver gives the sCrypt outputs the same three-byte guard against surplus stack items. [sCrypt source](../reference/comparison/bip340.scrypt) · [Matched runner](../reference/compare_bip340.py)
+Both implementations use BIP340 tagged hashing, x-only key rules, and the same five witness fields. The high-level sCrypt port uses a one-bit joint loop and complete homogeneous point addition. Script Lab uses an endomorphism split and 64 two-bit windows. The runner gives both sCrypt builds the common three-byte stack-depth guard. [sCrypt source](../reference/comparison/bip340.scrypt) · [Matched runner](../reference/compare_bip340.py)
 
 | BIP340 verifier | Lock bytes | Witness bytes | Peak stack payload | chain-gang median | BSV Node RPC median |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| High-level sCrypt, default | 131,479 | 197 | 2,235 B | 7.0 ms | 34.8 ms |
-| High-level sCrypt, `--asm -O` | 122,710 | 197 | 2,235 B | 7.2 ms | 35.1 ms |
-| Script Lab | 125,035 | 197 | 3,310 B | 7.4 ms | 35.4 ms |
+| High-level sCrypt, default | 131,479 | 197 | 2,235 B | 9.0 ms | 53.0 ms |
+| High-level sCrypt, `--asm -O` | 122,710 | 197 | 2,235 B | 8.7 ms | 56.2 ms |
+| Script Lab | 29,415 | 197 | 3,290 B | 3.2 ms | 13.0 ms |
 
 All three builds accept the same nine valid BIP340 vectors and reject all ten invalid vectors plus eight malformed witness cases on both engines. The local tests also regenerate the eight published signatures that include private keys. The stack figures are development evaluator peaks for the same official vector 0, counting the data payload on both stacks. Timing uses 15 replays after one warmup on the same host as the legacy comparison.
 
-The optimized sCrypt port is 2,325 bytes smaller and shows a lower stack payload in this matched fixture. The timings are close on both engines. The much larger byte gap against `legacy` measures a different arithmetic and signature format. For on-chain payment and two-party costs, see the measured comparison with native multisig. [MuSig2 and native CHECKMULTISIG](threshold-comparison.en.md)
+The Forth verifier uses 93,295 fewer bytes than the optimized sCrypt port in this fixture. Its point table contributes to a higher peak stack payload. For on-chain payment and two-party costs, see the measured comparison with native multisig. [MuSig2 and native CHECKMULTISIG](threshold-comparison.en.md)
 
 ## Reproduce
 
-Run from the repository root after setting up the [project Python environment](../README.md#validate-the-baseline). The replay was tested with Node.js 24. The compiler and BSV Node binaries are for Linux x86-64. The runner checks the upstream source revision and compiler SHA-256.
+Run from the repository root after setting up the [project Python environment](../README.md#validate-the-baseline). The replay was tested with Node.js 22. The compiler and BSV Node binaries are for Linux x86-64. The runner checks the upstream source revision and compiler SHA-256.
 
 ```sh
 scratch=$(mktemp -d)

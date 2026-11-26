@@ -1,4 +1,4 @@
-"""Compare equivalent BIP340 algorithms compiled by scryptc and Script Lab."""
+"""Compare BIP340 verifiers with a common witness layout."""
 
 import argparse
 from hashlib import sha256

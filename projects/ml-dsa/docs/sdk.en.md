@@ -31,6 +31,12 @@ const signedHex = wallet.signPayment({
 
 Use `signInput` for a prepared transaction. Supply the transaction, its input index and the corresponding prevout. See the [call table](../../../shared/sdk/README.md#calls-and-data) for the matching Rust, Go, and Python interfaces.
 
+## Verify a signer before funding
+
+Use the raw 1,312-byte ML-DSA-44 public key from your signer when creating and recognizing the lock. Pass the 32-byte SDK payload as the message to Pure ML-DSA-44 with an empty context. Confirm that the provider returns the raw 2,420-byte signature. A deliberately changed payload should fail the integration test.
+
+Start with the offline example to check message handling. Then replay the payment through both engines and verify a funded spend separately under the target script-size and validation policy. Lock size depends on the public-key fixture, so measure with the actual receive key. [Funded regtest guide](../../../shared/benchmark.md#funded-regtest-measurements)
+
 ## Replay vectors
 
 ```sh
