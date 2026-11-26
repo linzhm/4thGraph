@@ -20,7 +20,7 @@ For acceptance, use the actual transaction checker on a complete spend. Preserve
 Treat an unconfirmed parent txid as provisional for both the canonical and
 optimized R1 templates. The txid hashes the entire serialized transaction,
 including each unlocking script.
-The ForkID and OTDA signing digests bind the selected transaction fields.
+The BIP143 and OTDA signing digests bind the selected transaction fields.
 Where the rules accept an alternate witness encoding, a third party can change
 the txid while preserving the input references, ordered outputs, and payment
 authorization. Any replacement that confirms with a different txid has the
@@ -36,7 +36,7 @@ chain view determines which version confirmed.
 [BSV Node conflict detection](https://github.com/bitcoin-sv/bitcoin-sv/blob/v1.2.3/src/validation.cpp#L1380-L1389)
 · [ARC transaction statuses](https://github.com/bitcoin-sv/arc#metamorph-transaction-statuses)
 
-The ordinary SDK produces version-2 ForkID transactions. With Chronicle active,
+The ordinary SDK produces version-2 BIP143 transactions. With Chronicle active,
 the native encoding restrictions depend on the transaction version and the
 applicable flags. Native LOW_S checks apply to the secp256k1 binder. The R1
 owner signature is checked separately by the template's P-256 arithmetic.
@@ -79,7 +79,7 @@ Recheck the outpoint in the trusted chain view after a reorganization.
 
 对于已发布的 R1 模板和优化模板，未确认的父交易 txid 都应视为暂定值。
 计算 txid 时会哈希完整交易的序列化结果，其中包含解锁脚本的原始字节。
-ForkID 和 OTDA 摘要约束的是所选签名类型承诺的交易字段。
+BIP143 和 OTDA 摘要约束的是所选签名类型承诺的交易字段。
 如果规则接受另一种解锁编码，第三方可以在保留这些字段授权的情况下改变 txid。
 纯解锁脚本变体保留输入引用和有序输出。任何以不同 txid 确认的替代交易，
 都会使原先子交易引用的 `txid:vout` 失效。若替代交易还改动了交易内容，
@@ -93,7 +93,7 @@ ForkID 和 OTDA 摘要约束的是所选签名类型承诺的交易字段。
 带非 push 指令的解锁脚本会被拒绝。Chronicle 生效后，BSV Node 1.2.3 在设置该
 标志的情况下仅对版本不高于 1 的交易执行这项检查。
 
-普通 SDK 生成版本 2 的 ForkID 交易。Chronicle 生效后的原生编码约束取决于交易版本
+普通 SDK 生成版本 2 的 BIP143 交易。Chronicle 生效后的原生编码约束取决于交易版本
 和适用的 flags。原生 LOW_S 检查作用于 secp256k1 绑定签名，R1 持有人的签名由
 模板内的 P-256 算术另行验证。若新增 P-256 low-S 和分支字段字节约束，应另发
 带独立指纹的新模板，并为其创建新输出。整笔交易的 txid 稳定性还取决于每个输入

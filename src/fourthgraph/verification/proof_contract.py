@@ -11,6 +11,7 @@ from fourthgraph.verification.circuit_tools import CircuitFixture
 from fourthgraph.compiler.source import MAX_EXPANSION, PROJECT_NAME, PROJECT_VERSION, SourceCompiler, evaluate
 from fourthgraph.compiler.lowering import BASELINE, OPTIMIZATIONS, compile_word
 from fourthgraph.workflow.protocol import (
+    normalize_target,
     BINDING_CODE, DEFAULT_TARGET, FLAG, OUTPUTS_HASH, ROOT_VALUE, TARGETS, TERMINAL_VALUE,
     begin, build_artifact, check_field, copy_preimage, finish, is_compressed_public_key, p2pk,
     single_input, validate_u32,
@@ -101,6 +102,7 @@ class StateContract:
             raise ValueError("terminal amount must be positive and leave a spend fee")
         if route is None or (route.takes, route.gives) != (("u32",), ("route",)):
             raise ValueError("proof policy requires 'decide' with effect u32 -- route")
+        target = normalize_target(target)
         self.target = target
         self.versions, _ = TARGETS[target]
         self.version = self.versions[-1]
@@ -190,7 +192,7 @@ class ProofContract(StateContract):
         spec = {
             "project": PROJECT_NAME, "compiler_version": PROJECT_VERSION, "schema_version": 1,
             "proof": "transparent-r1cs-assignment", "verification_key_sha256": self.key.sha256,
-            "binding": "HASH256 of the authenticated ForkID ALL preimage",
+            "binding": "HASH256 of the authenticated BIP143 ALL preimage",
             "signals": self.key.signals, "constraints": len(self.key.constraints), "current": self.current,
             "public_outputs": ("next", "route") if self.key.outputs == 2 else ("next",),
             "target": self.target, "optimization": self.optimization, "rewrites": self.rewrites,
@@ -216,7 +218,7 @@ def main():
     cli.add_argument("--verification-key", type=Path, required=True)
     cli.add_argument("--keys", type=Path, required=True, help="role-to-compressed-public-key hex JSON")
     cli.add_argument("--current", type=int, required=True)
-    cli.add_argument("--target", choices=TARGETS, default=DEFAULT_TARGET)
+    cli.add_argument("--target", type=normalize_target, choices=TARGETS, default=DEFAULT_TARGET)
     cli.add_argument("--optimize", choices=OPTIMIZATIONS, default=BASELINE)
     args = cli.parse_args()
     try:

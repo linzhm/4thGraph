@@ -53,14 +53,14 @@ The zero-owner script is 144,925 bytes. Its SHA-256 is
 `196dfcb8244e863521447c7069297d31938fbd80a83d5976af618cf7fbcf9462`.
 The generator and Python constructors emit template version `1` by default.
 The [layout manifest](../template/layout.json) pins the canonical bytecode,
-and the [payment vector](../template/spend-all.json) pins a complete ForkID
+and the [payment vector](../template/spend-all.json) pins a complete BIP143
 payment. [16 deterministic preimages](../template/sighash-modes.json)
 cover all paired modes and each unpaired SINGLE variant.
 
 The script executes all SM3 compression rounds. It reuses powers of two
 during rotations and reductions, uses shorter stack operations for nearby
 operands, and simplifies the Boolean functions in the last 48 rounds.
-The complete-input cases cover ForkID and Chronicle OTDA, including mixed
+The complete-input cases cover BIP143 and Chronicle OTDA, including mixed
 inputs, fully SM2 two-input/two-output payments, malformed preimages signed
 by the correct SM2 test key, and spends across the Chronicle activation
 boundary. The activation cases use transaction version 1 on both sides to
@@ -128,7 +128,7 @@ The [Rust signer](interop/rust-signer/README.md) uses RustCrypto `sm2` and
 `der`. The [Python signer](interop/python-signer/README.md) uses OpenSSL
 for the signature and `asn1crypto` for the envelope. Both provide the same
 CLI and JSON fields. `verify.sh` builds the Rust signer with Cargo and
-replays attached ForkID and detached Chronicle OTDA payments from both
+replays attached BIP143 and detached Chronicle OTDA payments from both
 signers through BSV Node and chain-gang. The suite also verifies emitted
 signatures in OpenSSL, rejects invalid envelopes and checks byte-for-byte
 witness equivalence with the raw-signature path.

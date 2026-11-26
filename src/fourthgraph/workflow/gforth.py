@@ -15,7 +15,7 @@ from fourthgraph.compiler.source import CompileError, Conditional, SourceCompile
 from fourthgraph.bsv.transaction import (
     ANYONECANPAY, CHRONICLE, SIGHASH_NONE, SIGHASH_SINGLE, SIGHASH_TYPES,
 )
-from fourthgraph.workflow.protocol import TARGETS
+from fourthgraph.workflow.protocol import TARGETS, normalize_target
 from fourthgraph.compiler.wordsets import CORE_EXT_SCRIPT, CORE_SCRIPT, NAMED_LITERALS, Literal, cell_literal
 from fourthgraph.workflow.workflow_contract import WorkflowContracts
 
@@ -23,7 +23,7 @@ from fourthgraph.workflow.workflow_contract import WorkflowContracts
 SELECTORS = ("ordered", "range", "current", "paired", "unselected")
 POLICIES = ("direct-script", "proof-required", "groth16-required")
 AMOUNTS = ("none", "signed", "parent")
-SERIAL_MODES = {(0x41,): "forkid", (0x61,): "chronicle", (0x41, 0x61): "both"}
+SERIAL_MODES = {(0x41,): "bip143", (0x61,): "otda", (0x41, 0x61): "both"}
 SYMBOL = re.compile(r"[a-z][a-z0-9_-]*")
 U32_LIMIT = 1 << 32
 RULE_SYNTAX = {"if", "else", "then", ";", "(", "\\"}
@@ -396,7 +396,7 @@ def lower_serial(plan, rules, keys, current, *, target="both", source_bytes=None
     root = Token(f"resource-{previous[0]}", 1, 1, "Forth network plan")
     flags = plan.stages[0].sighashes
     if flags not in SERIAL_MODES:
-        raise CompileError("the serial Script backend requires ForkID ALL or Chronicle OTDA ALL")
+        raise CompileError("the serial Script backend requires BIP143 ALL or Chronicle OTDA ALL")
     for index, record in enumerate(plan.stages, 1):
         final = index == len(plan.stages)
         if record.policy != "direct-script":
@@ -429,7 +429,7 @@ def main():
     parser.add_argument("--rules", type=Path)
     parser.add_argument("--keys", type=Path)
     parser.add_argument("--current", type=int)
-    parser.add_argument("--target", default="both", choices=TARGETS)
+    parser.add_argument("--target", default="both", type=normalize_target, choices=TARGETS)
     args = parser.parse_args()
     contract_options = (args.rules, args.keys, args.current)
     if any(option is not None for option in contract_options) and None in contract_options:

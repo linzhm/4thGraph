@@ -16,6 +16,7 @@ from fourthgraph.workflow.protocol import (
     field, finish, input_value, is_compressed_public_key, p2pk, recoverable_lock, refund_output,
     single_input, validate_u32,
 )
+from fourthgraph.workflow.protocol import normalize_sighash_family, normalize_target
 from fourthgraph.bsv.script import asm, encode_num, number, push
 from fourthgraph.bsv.transaction import Input, Output, Transaction
 
@@ -86,7 +87,7 @@ def open_ancestry(depth, outpoint_offset):
 
 
 def sighash_blocker(workflow, mode, family):
-    if family != "forkid" and (mode == "atomic" or workflow.recovery):
+    if family != "bip143" and (mode == "atomic" or workflow.recovery):
         message = ("Chronicle OTDA requires a single-input workflow" if mode == "atomic"
                    else "Chronicle OTDA with a recovery branch is unavailable")
         return {"code": "unsupported_sighash_context", "message": message}
@@ -96,14 +97,16 @@ def sighash_blocker(workflow, mode, family):
 def check_sighash_target(family, target):
     if family not in SIGHASH_FAMILY_OPTIONS:
         raise CompileError(f"unknown workflow sighash family {family!r}")
-    if family != "forkid" and target == "forkid-v1":
+    if family != "bip143" and target == "bip143-v1":
         raise CompileError("Chronicle OTDA requires a Chronicle spend target")
 
 
 class WorkflowContracts:
     def __init__(self, workflow, keys, current, *, mode="auto", target=DEFAULT_TARGET, optimization=BASELINE,
                  available_authorizers=None, context_layout=None, objective="path-bytes", max_tx_bytes=None,
-                 sighash_family="forkid"):
+                 sighash_family="bip143"):
+        target = normalize_target(target)
+        sighash_family = normalize_sighash_family(sighash_family)
         self.plan = plan_workflow(workflow, mode, available_authorizers=available_authorizers)
         self.current = input_value({workflow.input.name: current}, workflow.input.name)
         self.target, self.optimization = target, optimization
@@ -112,7 +115,7 @@ class WorkflowContracts:
         self.sighash_family = sighash_family
         self.dual_sighash = sighash_family == "both"
         self.sighash = FLAG if self.dual_sighash else SIGHASH_FAMILIES[sighash_family]
-        if sighash_family == "chronicle":
+        if sighash_family == "otda":
             self.era = "chronicle"
         blocker = sighash_blocker(workflow, self.plan.mode, sighash_family)
         if blocker:
@@ -141,13 +144,13 @@ class WorkflowContracts:
             context = LinkedContext.for_template(template, self.sighash, BINDING_CODE, outputs,
                                                  requires_previous_amount=False)
             if self.dual_sighash and context is not None:
-                chronicle = LinkedContext.for_template(template, SIGHASH_FAMILIES["chronicle"], BINDING_CODE, outputs,
+                chronicle = LinkedContext.for_template(template, SIGHASH_FAMILIES["otda"], BINDING_CODE, outputs,
                                                        requires_previous_amount=False)
                 context = DualLinkedContext(context, chronicle) if chronicle is not None else None
             if context is not None:
                 linked[template.name] = context
-        layouts = {"full": {}} if sighash_family == "forkid" else {}
-        if sighash_family != "forkid" and len(linked) != len(self.plan.templates):
+        layouts = {"full": {}} if sighash_family == "bip143" else {}
+        if sighash_family != "bip143" and len(linked) != len(self.plan.templates):
             raise CompileError("Chronicle OTDA requires known input and output commitments for every step")
         if linked:
             layouts["reconstructed"] = linked
@@ -312,6 +315,7 @@ class WorkflowContracts:
         version = self.spend_version(version)
         sighash = self.sighash
         if sighash_family is not None:
+            sighash_family = normalize_sighash_family(sighash_family)
             if (sighash_family not in SIGHASH_FAMILIES
                     or not (self.dual_sighash or sighash_family == self.sighash_family)):
                 raise ValueError(f"sighash family {sighash_family!r} is unavailable for this spend")
@@ -430,8 +434,8 @@ class WorkflowContracts:
                 name: {"flag": f"{flag:02x}", "packed_context_bytes": getattr(context, name).packed_bytes}
                 for name, flag in SIGHASH_FAMILIES.items()
             }
-            spec["default_sighash_family"] = "forkid"
-            spec["estimated_cost"]["assumptions"]["sighash_family"] = "forkid"
+            spec["default_sighash_family"] = "bip143"
+            spec["estimated_cost"]["assumptions"]["sighash_family"] = "bip143"
         else:
             spec["sighash"] = f"{self.sighash:02x}"
         if workflow.libraries:
@@ -453,7 +457,9 @@ class WorkflowContracts:
 
 def compile_workflow(workflow, keys, current, *, source_bytes, mode="auto", target=DEFAULT_TARGET,
                      optimization=BASELINE, available_authorizers=None, search=False, objective="path-bytes",
-                     max_tx_bytes=None, sighash_family="forkid"):
+                     max_tx_bytes=None, sighash_family="bip143"):
+    target = normalize_target(target)
+    sighash_family = normalize_sighash_family(sighash_family)
     if mode not in ("auto", *WORKFLOW_MODES):
         raise CompileError("workflow mode must be fused, serial or atomic")
     if max_tx_bytes is not None and (not search or type(max_tx_bytes) is not int or max_tx_bytes <= 0):

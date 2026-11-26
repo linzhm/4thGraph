@@ -25,14 +25,14 @@ The locking script is **1,435 bytes** and its complete `TxOut` is **1,446 bytes*
 
 ## Spending the short lock
 
-Activation input `i` creates the committed equal-value output at index `i`. Both paths use a PUSHTX signature constructed inside the lock and native signature verification to bind a BIP143 ForkID SINGLE preimage. The lock checks the input value and `hashOutputs` and rejects the zero hash for a missing paired output.
+Activation input `i` creates the committed equal-value output at index `i`. Both paths use a PUSHTX signature constructed inside the lock and native signature verification to bind a BIP143 SINGLE preimage. The lock checks the input value and `hashOutputs` and rejects the zero hash for a missing paired output.
 
 | Selected mode | Unlocking script | Verification |
 |---|---|---|
-| ForkID SINGLE `0x43`, `0xc3` | Push the 158-byte preimage for **160 bytes** total | Serialized scriptCode `01 ac` |
-| Ten other modes | Push `typeByte || HASH256(selectedPreimage)`, then the 161-byte ForkID SINGLE preimage for **197 bytes** total | Check the output under serialized scriptCode `04 ad 68 ab ac`, then check the selected digest with `01 ac`. The `ANYONECANPAY` bits must agree |
+| BIP143 SINGLE `0x43`, `0xc3` | Push the 158-byte preimage for **160 bytes** total | Serialized scriptCode `01 ac` |
+| Ten other modes | Push `typeByte || HASH256(selectedPreimage)`, then the 161-byte BIP143 SINGLE preimage for **197 bytes** total | Check the output under serialized scriptCode `04 ad 68 ab ac`, then check the selected digest with `01 ac`. The `ANYONECANPAY` bits must agree |
 
-Genesis supports the six ForkID modes. Chronicle enables six additional OTDA modes on the same locking template. An output at the input index is mandatory in every mode, including OTDA SINGLE `0x63` and `0xe3`. [Activation vectors](../template/v0.2.0/sighash-modes.json) · [Lock assembly](../reference/asm/lock.asm)
+Genesis supports the six BIP143 modes. Chronicle enables six additional OTDA modes on the same locking template. An output at the input index is mandatory in every mode, including OTDA SINGLE `0x63` and `0xe3`. [Activation vectors](../template/v0.2.0/sighash-modes.json) · [Lock assembly](../reference/asm/lock.asm)
 
 Arrange each activation input at the index of its corresponding output, append fee inputs and change, and construct preimages after finalizing the transaction. Any party can fund and activate an output. The wallet tracks the confirmed activation outpoint. The recipient then uses the existing external R1 signer for the ordinary R1 spend. [P2PKH-R1 specification](../../p2pkh-r1/docs/spec.en.md)
 

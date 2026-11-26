@@ -26,7 +26,7 @@ WOTS+ 是 v0.1 开发基线，按 RFC 8391 的 `WOTSP-SHA2_256` 哈希链验证�
 | `cached_constants=True` | 36,283 字节 | 在栈上保存复用的常量 |
 | `cached_constants="steps"` | 33,956 字节 | 再缓存 15 个四字节步骤索引 |
 
-三种锁的普通 ForkID 解锁都为 2,310 字节。启用 Chronicle 并采用版本 2 交易时，可为缓存步骤输出显式启用 `compress_otda=True`。OTDA ALL 重建签名原文里的相关输出，配对 SINGLE 只重建同索引输出。未知输出原样处理，无配对 SINGLE 采用伴随验签。仅验证给定摘要的 `transaction=False` 模板用于算法测试。
+三种锁的普通 BIP143 解锁都为 2,310 字节。启用 Chronicle 并采用版本 2 交易时，可为缓存步骤输出显式启用 `compress_otda=True`。OTDA ALL 重建签名原文里的相关输出，配对 SINGLE 只重建同索引输出。未知输出原样处理，无配对 SINGLE 采用伴随验签。仅验证给定摘要的 `transaction=False` 模板用于算法测试。
 
 ## 开发和钱包接入
 

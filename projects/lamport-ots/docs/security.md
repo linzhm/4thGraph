@@ -51,7 +51,7 @@ branches also enforce the exact preimage length and scriptCode. The native
 signature checks apply the selected digest algorithm and its coverage rules.
 The binding protects fields committed by the chosen mode. In particular,
 NONE lets outputs change, and SINGLE leaves outputs other than the paired one
-mutable. ANYONECANPAY lets other inputs change. The default is ForkID ALL.
+mutable. ANYONECANPAY lets other inputs change. The default is BIP143 ALL.
 
 For unpaired Chronicle SINGLE, the first native check uses a fixed public
 signature to detect the OTDA constant, subject to the same small digest
@@ -63,7 +63,7 @@ and companion modes even where their BIP143 type bytes coincide.
 
 The prepared-input wallet API rejects unpaired SINGLE before calling the
 external signer unless the caller passes `allow_unpaired_single=True`.
-An unpaired ForkID or Chronicle SINGLE input commits to no outputs.
+An unpaired BIP143 or Chronicle SINGLE input commits to no outputs.
 Review that scope before approving the one-time signature.
 
 ## Unconfirmed parent txids

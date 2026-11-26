@@ -24,8 +24,8 @@
   "universal_sizes": {
     "locking_script_bytes_including_key": 22780,
     "locking_non_key_bytes_including_push_headers": 6396,
-    "forkid_ordinary_unlocking_script_bytes": 8357,
-    "forkid_ordinary_total_lock_and_unlock_bytes": 31137,
+    "bip143_ordinary_unlocking_script_bytes": 8357,
+    "bip143_ordinary_total_lock_and_unlock_bytes": 31137,
     "unpaired_otda_single_unlocking_script_bytes": 8361,
     "locking_instructions_including_pushes_and_both_branches": 5762,
     "sha256_opcodes": 256,

@@ -12,11 +12,11 @@ BSV Node 1.2.3 在临时隔离的回归网络上用显式上一输出与规则�
 
 ## 比较交易成本
 
-P2PKH-R1 的两进两出 ForkID ALL 付款在 v0.1.0 为 **119,934 B**，在 v0.2.0 为 **93,374 B**，在 Forth v0.3.0 探索版为 **92,322 B**。Deferred 的入金锁为 **1,435 B**，启用时生成 **46,302 B** 的 R1 v0.2.0 锁。[R1 测量](../projects/p2pkh-r1/README.zh-CN.md#完整交易与栈测量) · [Deferred 测量](../projects/p2pkh-r1-deferred/README.zh-CN.md)
+P2PKH-R1 的两进两出 BIP143 ALL 付款在 v0.1.0 为 **119,934 B**，在 v0.2.0 为 **93,374 B**，在 Forth v0.3.0 探索版为 **92,322 B**。Deferred 的入金锁为 **1,435 B**，启用时生成 **46,302 B** 的 R1 v0.2.0 锁。[R1 测量](../projects/p2pkh-r1/README.zh-CN.md#完整交易与栈测量) · [Deferred 测量](../projects/p2pkh-r1-deferred/README.zh-CN.md)
 
 统一基准在提交 `beeb4dd` 测量了七个项目、32 种模板与签名模式组合，共 **260 笔完整交易**。混合输出和配对 `SINGLE` 另测 11 种组合，共 88 笔交易。Deferred v0.2.0 行采用提交 `9c5603d` 的重测结果。R1 Forth v0.3.0 行来自该实验有资金的 regtest 对照。 [R1 Forth 复放](../projects/p2pkh-r1/README.zh-CN.md#forth-探索版)
 
-| 项目和实测版本 | 输入 × 输出 | 上一输出锁 | ForkID ALL 解锁 | ForkID ALL 整笔 | OTDA ALL 整笔 | ForkID ALL 两栈载荷峰值 |
+| 项目和实测版本 | 输入 × 输出 | 上一输出锁 | BIP143 ALL 解锁 | BIP143 ALL 整笔 | OTDA ALL 整笔 | BIP143 ALL 两栈载荷峰值 |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
 | 原生 P2PKH | 2 × 2 | 25 | 107 | 374 | 374 | 145 |
 | P2PKH-R1 v0.2.0 | 2 × 2 | 46,302 | 326 | 93,374 | 101,250 | 3,479 |
@@ -27,7 +27,7 @@ P2PKH-R1 的两进两出 ForkID ALL 付款在 v0.1.0 为 **119,934 B**，在 v0.
 | WOTS+ 缓存步骤及重建模板 | 2 × 2 | 33,956 | 2,310 | 72,650 | 79,090 | 2,701 |
 | 纯模式 ML-DSA-44 | 2 × 2 | 926,412 | 2,588 | 1,858,122 | 5,563,725 | — |
 
-单位均为字节。锁定、解锁和栈开销取 ForkID ALL 的第一个输入。栈峰值由本地求值器测得，统计主栈与备用栈的合计数据载荷。Deferred 启用交易包含一条手续费赞助输入。ML‑DSA‑44 暂无栈数据。各项目 README 列有逐输入、逐输出的大小、增量成本和生命周期总量。
+单位均为字节。锁定、解锁和栈开销取 BIP143 ALL 的第一个输入。栈峰值由本地求值器测得，统计主栈与备用栈的合计数据载荷。Deferred 启用交易包含一条手续费赞助输入。ML‑DSA‑44 暂无栈数据。各项目 README 列有逐输入、逐输出的大小、增量成本和生命周期总量。
 
 R1 v0.2.0 和 WOTS+ 缓存步骤模板的 OTDA ALL 数据取自显式启用重建的实测。
 
@@ -59,7 +59,7 @@ python -m unittest tests.test_benchmark tests.test_layout tests.test_verify_node
 
 ## 指标说明
 
-ForkID ALL 与 Chronicle OTDA ALL 均运行两进两出、三进两出和两进三出的
+BIP143 ALL 与 Chronicle OTDA ALL 均运行两进两出、三进两出和两进三出的
 完整交易。Deferred R1 的每个激活输入都必须有同索引输出。其输入边际是
 增加一对激活输入和目标输出，输出边际是由赞助输入额外支付一个输出。
 生命周期包括原生 P2PKH 入金、直接退出和加入一次周转的方案。

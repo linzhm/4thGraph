@@ -10,7 +10,7 @@ A SHA-256 one-time signature bound to a BSV transaction input, with optional sta
 
 ## Protocol specification
 
-The verifier uses the RFC 8391 `WOTSP-SHA2_256` chains with a BSV-specific 64-byte public key and 2,144-byte signature. The transaction-bound lock checks both the hash-chain proof and the selected input's authorization. It supports the twelve ForkID and Chronicle OTDA modes. Cached-step outputs can be reconstructed inside an eligible version 2 OTDA ALL or paired SINGLE witness.
+The verifier uses the RFC 8391 `WOTSP-SHA2_256` chains with a BSV-specific 64-byte public key and 2,144-byte signature. The transaction-bound lock checks both the hash-chain proof and the selected input's authorization. It supports the twelve BIP143 and Chronicle OTDA modes. Cached-step outputs can be reconstructed inside an eligible version 2 OTDA ALL or paired SINGLE witness.
 
 [Wire and Script specification](spec.md) · [RFC 8391](https://www.rfc-editor.org/rfc/rfc8391) · [Cached-step artifact layout](../template/cached-steps-layout.json)
 

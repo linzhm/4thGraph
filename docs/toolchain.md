@@ -24,11 +24,11 @@ PYTHONPATH=src:. bash tools/verify_node.sh --profile default -- \
   python -m fourthgraph.replay.workflow --output workspace/replay.json --samples 21
 ```
 
-编译和复放都用 `--target` 选目标。三个目标均使用原始 ForkID ALL（`0x41`）。
+编译和复放都用 `--target` 选目标。三个目标默认使用 BIP143 ALL（`0x41`）。命令行与新报告使用 `bip143` 和 `otda`。旧拼写 `forkid-v1`、`forkid` 和 `chronicle` 仍分别可用作 `bip143-v1`、`bip143` 和 `otda` 的输入别名。
 
 | 目标 | 合约锁接受的版本 | 实例化默认版本 |
 | --- | --- | --- |
-| `forkid-v1` | v1 | v1 |
+| `bip143-v1` | v1 | v1 |
 | `chronicle-v2`（默认） | v2 | v2 |
 | `both` | v1、v2 | v2 |
 
@@ -38,7 +38,7 @@ PYTHONPATH=src:. bash tools/verify_node.sh --profile default -- \
 
 ```sh
 REGTEST_CHRONICLE_HEIGHT=1000 PYTHONPATH=src:. bash tools/verify_node.sh --profile default -- \
-  python -m fourthgraph.replay.workflow --target forkid-v1 --output workspace/replay-v1.json --samples 21
+  python -m fourthgraph.replay.workflow --target bip143-v1 --output workspace/replay-v1.json --samples 21
 
 PYTHONPATH=src:. bash tools/verify_node.sh --profile default -- \
   python -m fourthgraph.replay.workflow --target both --output workspace/replay-both.json --samples 21
@@ -123,7 +123,7 @@ PYTHONPATH=src:. python -m fourthgraph.reporting "workspace/search-replay.json" 
 - `work: a x double alice ;` 将输入、计算和签名角色连到工作步骤。 `join: route a b decide ;` 按指定顺序声明汇合依赖。 `split-authority: operator ;` 声明启动拆分的签名角色。当前调度器识别一对并行分支和一个汇合。选择交易边界后，后端再内联、折叠字面量和选择 Script 指令。
 - 若把第二支改为 `work: b x inc bob ;`，两支都使用同一个 `x`。融合版只需提供一次。拆分版在创建工作输出时锁定 `x`，Alice 和 Bob 之后可各自提交，其签名请求绑定包含该值的实际前输出。若独立的门也使用 `x`，提供它的时点提前到门交易。共享值以明文进入相应的锁脚本。
 - 词库声明执行位置和验证依据。Script 词由链上执行。宿主词通过 `Host` 的注入接口查询 UTXO、请求签名和提交交易，并可从 UTXO 取得脚本和 outpoint。测试签名器使用公开可复现的私钥，仅供 regtest。
-- `Contracts.prepare` 把符号引用如 `split:0` 解析为已封装父交易的真实 outpoint，核对前输出、已提供的父交易关系，以及汇合结果的槽位、同次拆分来源和编码。含门条件的步骤会先在宿主检查条件。 `Draft.signing_requests` 给外部签名器提供角色、前输出、待签交易、见证输入及 ForkID ALL 摘要。 `Draft.seal` 校验草稿绑定并装配签名和当前交易原像。实际可花费性仍由 UTXO 集和链上脚本验证。父 txid 改变时，`invalidated` 沿依赖图列出需重新绑定的交易和需更新的授权。
+- `Contracts.prepare` 把符号引用如 `split:0` 解析为已封装父交易的真实 outpoint，核对前输出、已提供的父交易关系，以及汇合结果的槽位、同次拆分来源和编码。含门条件的步骤会先在宿主检查条件。 `Draft.signing_requests` 给外部签名器提供角色、前输出、待签交易、见证输入及 BIP143 ALL 摘要。 `Draft.seal` 校验草稿绑定并装配签名和当前交易原像。实际可花费性仍由 UTXO 集和链上脚本验证。父 txid 改变时，`invalidated` 沿依赖图列出需重新绑定的交易和需更新的授权。
 
 ## Schnorr 基础库
 
@@ -171,7 +171,7 @@ flowchart LR
 
 **汇合。** 两个输入的锁都接收完整的两笔结果父交易。各自检查它们花费了同一笔拆分的输出 0 和 1，再将两笔父交易的哈希和结果 vout 0 拼成有序的 outpoint 向量，与真实交易原像的 `hashPrevouts` 核对。两个锁都从已核验的交易字节取结果，并检查有且仅有一个正确后继输出。任务 ID 只标识结果数据。活动 UTXO 集决定实际可花费的结果。
 
-各锁通过固定 `OP_CODESEPARATOR` 后缀的 PUSHTX 验证 ForkID ALL 原像。绑定依赖哈希抗碰撞和原像抗性。脚本读取经过认证的交易版本四字节，v1 对应 `01000000`，v2 对应 `02000000`。原型使用普通压栈见证和单值成功栈。签名覆盖交易效果，见证里的原始 `x/y` 可由导出同一已签效果的等价输入替换。拆分后任一方可以独立提交自己的分支，正常汇合要等两支结果。
+各锁通过固定 `OP_CODESEPARATOR` 后缀的 PUSHTX 验证 BIP143 ALL 原像。绑定依赖哈希抗碰撞和原像抗性。脚本读取经过认证的交易版本四字节，v1 对应 `01000000`，v2 对应 `02000000`。原型使用普通压栈见证和单值成功栈。签名覆盖交易效果，见证里的原始 `x/y` 可由导出同一已签效果的等价输入替换。拆分后任一方可以独立提交自己的分支，正常汇合要等两支结果。
 
 ### 超时退出
 
@@ -240,7 +240,7 @@ PYTHONPATH=src:. bash tools/verify_node.sh --profile default -- \
 
 `projects/proof-counter/counter.circom` 定义 32 位计数器。Circom 2.2.2 生成固定的 BN254 R1CS 和 WASM，snarkjs 0.7.5 生成并独立检查每条赋值证明。验证数据是导出的 R1CS 及其摘要。证明公开完整赋值，采用透明验证，无需可信设置。
 
-4thGraph 把 R1CS 约束和 `projects/proof-counter/counter.fth` 中的后继选择一起编译进锁。锁验证当前值与部署承诺一致，并要求新值写入实际后继输出。公开绑定是完整、经认证的 ForkID ALL 原像的 `HASH256`，其中包含版本、outpoint、序列、后继输出和锁定时间。另一笔花费或改动锁定时间后，原证明中的公开绑定会失配。优化版复用域模数，并简化零乘积、单位系数和可居中表示的系数。
+4thGraph 把 R1CS 约束和 `projects/proof-counter/counter.fth` 中的后继选择一起编译进锁。锁验证当前值与部署承诺一致，并要求新值写入实际后继输出。公开绑定是完整、经认证的 BIP143 ALL 原像的 `HASH256`，其中包含版本、outpoint、序列、后继输出和锁定时间。另一笔花费或改动锁定时间后，原证明中的公开绑定会失配。优化版复用域模数，并简化零乘积、单位系数和可居中表示的系数。
 
 ```sh
 PYTHONPATH=src:. bash tools/verify_node.sh --profile default -- \
@@ -304,9 +304,9 @@ Forth 声明先生成阶段 DAG，记录值的生产者、消费者、类型及�
 | --- | --- |
 | `fused` | 在一笔交易的一个输入内运行两词。两个签名角色同时可用，`next` 留在栈上。 |
 | `serial` | 第一笔创建经验证的状态 UTXO。第二笔核对实际前输出、父交易原始字节和父交易花费的部署 outpoint。第二个签名角色可以晚到。 |
-| `atomic` | 一笔花费的两个输入分别运行各自的阶段。部署创建两个同级 UTXO，两个输入的 ForkID 原像都验证同一部署的有序 outpoint 向量和同一输出向量。第一个输入验证 `next`，第二个输入用同一个值验证路由。运行器在请求签名之前核对部署的两个预定输出。 |
+| `atomic` | 一笔花费的两个输入分别运行各自的阶段。部署创建两个同级 UTXO，两个输入的 BIP143 原像都验证同一部署的有序 outpoint 向量和同一输出向量。第一个输入验证 `next`，第二个输入用同一个值验证路由。运行器在请求签名之前核对部署的两个预定输出。 |
 
-普通 `--mode auto` 按布局顺序优先选融合。指定 `--search --explain` 可比较三个布局。加入 `independent-submit: advance ;`，融合和双输入都会在排序前排除，并报告源码行。传入 `--available-authorizers operator` 表示首笔花费时仅有第一个签名者，也会选择串行。两个角色都可用时，`path-bytes` 选融合，`peak-validation` 以最大单笔原生签名检查数为首要指标，选串行。对 `19 → 20` 使用 `--max-tx-bytes 1053` 会将 ForkID 的峰值目标切回融合。字节预算按一个部署资金输入和 72 B DER 签名估算，包含部署交易。
+普通 `--mode auto` 按布局顺序优先选融合。指定 `--search --explain` 可比较三个布局。加入 `independent-submit: advance ;`，融合和双输入都会在排序前排除，并报告源码行。传入 `--available-authorizers operator` 表示首笔花费时仅有第一个签名者，也会选择串行。两个角色都可用时，`path-bytes` 选融合，`peak-validation` 以最大单笔原生签名检查数为首要指标，选串行。对 `19 → 20` 使用 `--max-tx-bytes 1053` 会将 BIP143 的峰值目标切回融合。字节预算按一个部署资金输入和 72 B DER 签名估算，包含部署交易。
 
 复放覆盖普通值、阈值两侧和 `2^32−1` 回绕。报告用构建摘要关联结算与复核的实测，并分别记录静态资格、脚本判定和入块结果。报告另列最大单笔字节、各引擎验证耗时、主栈与 Alt 栈载荷、部署 UTXO 数、额外中间 UTXO 数和依赖深度。负例覆盖缺少输入、同值异根、错误见证、两个输入的状态不一致、错误后继和错误签名。
 
@@ -316,25 +316,25 @@ Forth 的 `advance` 和 `decide` 决定状态和路由。后端用这些值构�
 
 | 签名配置 | 编译器生成的承诺 | 单输入见证中的原像字段 | 阈值结算融合路径 | 阈值结算串行路径 |
 | --- | --- | ---: | ---: | ---: |
-| 完整 ForkID ALL 对照 | 校验传入的原像和输出哈希 | 158 B | 1,508 B | 4,682 B |
-| `--sighash-family forkid` | 重建两个输入哈希、输出哈希和链接的 `scriptCode` | 56 B | 1,399 B | 4,349 B |
-| `--sighash-family chronicle` | 重建输入计数、链接的 `scriptCode`、有序输出序列化与输出计数 | 48 B | 1,375 B | 4,270 B |
+| 完整 BIP143 ALL 对照 | 校验传入的原像和输出哈希 | 158 B | 1,508 B | 4,682 B |
+| `--sighash-family bip143` | 重建两个输入哈希、输出哈希和链接的 `scriptCode` | 56 B | 1,399 B | 4,349 B |
+| `--sighash-family otda` | 重建输入计数、链接的 `scriptCode`、有序输出序列化与输出计数 | 48 B | 1,375 B | 4,270 B |
 | `--sighash-family both` | 每笔花费选择原像格式 | 56 B 或 48 B | 1,452–1,463 B | 4,575–4,581 B（两步混用） |
 
-路径包含部署和全部花费。默认是 ForkID，编译器按序列化成本比较完整与重建见证。`--explain` 展示 `preimage_candidates` 和各自的估算，`preimage_layout` 记录每一步实际编码。双输入布局继续使用完整 ForkID。Chronicle 使用 OTDA ALL（`0x61`），要求激活后的链规则，支持 `--target both` 和 `--target chronicle-v2` 的单输入工作流。OTDA 原像没有前输出金额，因此只有确认断言无需读取该金额时才使用此重建策略。当前 OTDA 构建会拒绝双输入和带退款分支的工作流。此例要求绑定完整输入与输出，使用 ALL。
+路径包含部署和全部花费。默认是 BIP143，编译器按序列化成本比较完整与重建见证。`--explain` 展示 `preimage_candidates` 和各自的估算，`preimage_layout` 记录每一步实际编码。双输入布局继续使用完整 BIP143。Chronicle 使用 OTDA ALL（`0x61`），要求激活后的链规则，支持 `--target both` 和 `--target chronicle-v2` 的单输入工作流。OTDA 原像没有前输出金额，因此只有确认断言无需读取该金额时才使用此重建策略。当前 OTDA 构建会拒绝双输入和带退款分支的工作流。此例要求绑定完整输入与输出，使用 ALL。
 
-`--sighash-family both` 为符合相同条件的融合或串行工作流生成双模式锁。每笔花费可使用 ForkID ALL（`0x41`）或 Chronicle OTDA ALL（`0x61`）。两条路径共用 Forth 状态计算、前序 UTXO 检查和有序输出构造。Script 根据原像字段长度选定模式，并检查该输入的每个授权签名都使用同一个 sighash。串行流程的相邻花费可以各选一种模式。阈值样本的双模式融合锁为 980 B，ForkID 和 OTDA 单模式锁分别为 917 B 和 902 B。
+`--sighash-family both` 为符合相同条件的融合或串行工作流生成双模式锁。每笔花费可使用 BIP143 ALL（`0x41`）或 Chronicle OTDA ALL（`0x61`）。两条路径共用 Forth 状态计算、前序 UTXO 检查和有序输出构造。Script 根据原像字段长度选定模式，并检查该输入的每个授权签名都使用同一个 sighash。串行流程的相邻花费可以各选一种模式。阈值样本的双模式融合锁为 980 B，BIP143 和 OTDA 单模式锁分别为 917 B 和 902 B。
 
-使用 Python 运行接口时，在 `prepare(..., sighash_family="chronicle")` 选择 OTDA，省略该参数则使用 ForkID。构建清单列出两种见证长度，成本估算使用 56 B 的 ForkID 格式。切换模式时应重新请求签名。
+使用 Python 运行接口时，在 `prepare(..., sighash_family="otda")` 选择 OTDA，省略该参数则使用 BIP143。构建清单列出两种见证长度，成本估算使用 56 B 的 BIP143 格式。切换模式时应重新请求签名。
 
 追加 `recovery: 145 review ;` 可让 `review` 在到期后逐个花费剩余状态或部署输出。复放覆盖第二个签名者缺席、提前退款、正常后继赢得竞争，以及退款赢得竞争后清退另一份同级 UTXO。提前退款的脚本有效，BSV Node 将其放入非最终池并拒绝提前入块。竞争后，chain-gang 可以使用完整父交易重验脚本，Node 根据当前 UTXO 集拒绝已经花费的 outpoint。报告分别记录这些判定。
 
 ```sh
 PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
-  python -m fourthgraph.replay.typed_workflow --target both --compare-forkid-context \
+  python -m fourthgraph.replay.typed_workflow --target both --compare-bip143-context \
   --output "workspace/workflow-pels-optimization.json"
 PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
-  python -m fourthgraph.replay.typed_workflow --target both --sighash-family chronicle \
+  python -m fourthgraph.replay.typed_workflow --target both --sighash-family otda \
   --output "workspace/workflow-pels-chronicle.json"
 REGTEST_CHRONICLE_HEIGHT=155 PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
   python -m fourthgraph.replay.typed_workflow --target both --sighash-family both \
@@ -353,7 +353,7 @@ PYTHONPATH=src:. python -m fourthgraph.workflow.protocol "projects/proof-counter
   --sighash-family both --search --explain
 ```
 
-ForkID 复放可用 `REGTEST_CHRONICLE_HEIGHT=1000` 验证激活前花费。双版本目标包含串行阶段混用 v1、v2 的交易。单版本构建也可通过同一入口复放。
+BIP143 复放可用 `REGTEST_CHRONICLE_HEIGHT=1000` 验证激活前花费。双版本目标包含串行阶段混用 v1、v2 的交易。单版本构建也可通过同一入口复放。
 双模式复放在激活前部署同一锁，比较两种花费的判定，并用激活前创建的 UTXO 完成激活后的 OTDA 花费。
 
 ## Groth16 链上验证器
@@ -370,7 +370,7 @@ Script 检查坐标范围、曲线方程、素数阶子群和配对关系。默�
 
 射影布局的动态和混合路径在证明包末尾追加 96 B 的 MSM 声明，接着单独 push 一个公开输入包。公开输入包按验证密钥槽顺序编码花费时提供的标量，每项按所声明位宽向上取整到整字节，用无符号小端数。无穷远 MSM 点用两个零坐标表示。两种仿射布局由见证提供斜率。[见证布局](groth16-bls12-381.md#见证布局)
 
-原始验证锁可直接组合应用检查。示例 `bind_public_output` 用 ForkID ALL 原像验证真实后继输出的金额和状态字节，再把同一个公开输入包交给证明谓词。选择 `--owner` 时，在见证后追加对完整锁签出的 DER 签名和 `0x41`，由该签名授权交易。
+原始验证锁可直接组合应用检查。示例 `bind_public_output` 用 BIP143 ALL 原像验证真实后继输出的金额和状态字节，再把同一个公开输入包交给证明谓词。选择 `--owner` 时，在见证后追加对完整锁签出的 DER 签名和 `0x41`，由该签名授权交易。
 
 同一份字节码支持 Genesis 和 Chronicle 下的 v1、v2 交易。用 BLS12-381 格式的 snarkjs 文件构建锁和见证。
 
@@ -398,7 +398,7 @@ PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
 
 ### BN254 参考
 
-`groth16_script.py` 把 BN254 的 snarkjs 验证密钥和五个预期公开信号编译成一个 BSV 锁。锁中固定验证密钥和公开信号。Rúnar 的配对验证使用随证明提供的辅助算术见证，Script 核验这些见证及 Groth16 配对关系。锁还要求所有者提供 ForkID ALL 签名，由该签名覆盖真实交易的输入和输出。Forth 示例的信号顺序为 `next`、`route`、`current`、`bindLo`、`bindHi`。
+`groth16_script.py` 把 BN254 的 snarkjs 验证密钥和五个预期公开信号编译成一个 BSV 锁。锁中固定验证密钥和公开信号。Rúnar 的配对验证使用随证明提供的辅助算术见证，Script 核验这些见证及 Groth16 配对关系。锁还要求所有者提供 BIP143 ALL 签名，由该签名覆盖真实交易的输入和输出。Forth 示例的信号顺序为 `next`、`route`、`current`、`bindLo`、`bindHi`。
 
 此验证器使用 Chronicle 操作码。部署锁约 1.52 MB，算术见证约 31 KB。下面的本地复放使用 `raised` 节点配置和独立的钱包资金。要观察激活前的拒绝，可设置 `REGTEST_CHRONICLE_HEIGHT=1000`。
 

@@ -29,7 +29,7 @@ def authorization(tx, index, previous_amount, sighash=DEFAULT_SIGHASH, *, legacy
     if type(sighash) is not int or sighash not in SIGHASH_TYPES or not 0 <= index < len(tx.inputs):
         raise ValueError('unsupported sighash or input index')
     if legacy and sighash != DEFAULT_SIGHASH:
-        raise ValueError('legacy output supports only ForkID ALL')
+        raise ValueError('legacy output supports only BIP143 ALL')
     amount(previous_amount)
     companion = bool(sighash & CHRONICLE) and sighash & 31 == SIGHASH_SINGLE and index >= len(tx.outputs)
     code = b'\xac' if legacy else COMPANION_CODE if companion else ORDINARY_CODE

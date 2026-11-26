@@ -41,7 +41,7 @@ Replacing it with `n - s` can invalidate the signature.
 
 ## Transaction scope and bytes
 
-Each input selects a base mode, optional ANYONECANPAY (ACP), and digest algorithm. The table lists the hexadecimal type byte used by native transaction signing. The preimage carries the type as a four-byte little-endian value with the upper 24 bits set to zero. All twelve types set the ForkID bit. Chronicle permits the additional OTDA bit `0x20` at spend time, including when the spent output predates Chronicle.
+Each input selects a base mode, optional ANYONECANPAY (ACP), and digest algorithm. The table lists the hexadecimal type byte used by native transaction signing. The preimage carries the type as a four-byte little-endian value with the upper 24 bits set to zero. All twelve types set the `SIGHASH_FORKID` bit (`0x40`). Chronicle permits the additional OTDA bit `0x20` at spend time, including when the spent output predates Chronicle.
 
 | Output coverage | BIP143 | BIP143 + ACP | Chronicle OTDA | OTDA + ACP |
 |---|---|---|---|---|

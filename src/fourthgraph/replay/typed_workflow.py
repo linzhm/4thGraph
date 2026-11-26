@@ -10,7 +10,10 @@ from fourthgraph._paths import CHECKOUT
 
 from fourthgraph.compiler.source import PROJECT_NAME, PROJECT_VERSION, WORKFLOW_MODES, ParentOutput, SourceCompiler, evaluate
 from fourthgraph.compiler.lowering import OPTIMIZATIONS
-from fourthgraph.workflow.protocol import BINDING_CODE, DEFAULT_TARGET, FLAG, SIGHASH_FAMILIES, SIGHASH_FAMILY_OPTIONS, TARGETS, UTXO, invalidated
+from fourthgraph.workflow.protocol import (
+    BINDING_CODE, DEFAULT_TARGET, FLAG, SIGHASH_FAMILIES, SIGHASH_FAMILY_OPTIONS, TARGETS, UTXO,
+    invalidated, normalize_sighash_family, normalize_target,
+)
 from fourthgraph.replay.recovery import early_refund, refund_controls, snapshot, valid_with_live_inputs
 from fourthgraph.replay.workflow import SOURCE as FUNDING_COIN, Replay
 from fourthgraph.benchmark.validation import CONTEXT_PIN, Node, chain_metadata
@@ -167,7 +170,7 @@ def context_controls(replay, draft, bootstrap, funding_slot):
 
 
 def run_path(replay, program, source, mode, current, bootstrap, slot, *, foreign_slot=None,
-             context_layout=None, context_control_slot=None, sighash_family="forkid"):
+             context_layout=None, context_control_slot=None, sighash_family="bip143"):
     contracts = WorkflowContracts(program, replay.keys.public, current, mode=mode,
                                   target=replay.target, optimization=replay.optimization,
                                   context_layout=context_layout, sighash_family=sighash_family)
@@ -354,12 +357,12 @@ def replay_dual_sighashes(replay, program, source):
         held = root, deployment
         rejected = {}
         for version in versions:
-            draft = fused.prepare("fused", {"deploy": root}, version=version, sighash_family="chronicle")
+            draft = fused.prepare("fused", {"deploy": root}, version=version, sighash_family="otda")
             rejected[version] = replay.record(replay.sign(draft), draft.previous, expected=False)
         early_root, early_deployment = replay.deploy(fused, bootstrap, sponsor_slot - 1)
-        draft = fused.prepare("fused", {"deploy": early_root}, version=versions[0], sighash_family="forkid")
-        before = {"held_deployment": deployment, "chronicle_rejections": rejected,
-                  "forkid_deployment": early_deployment, "forkid_spend": replay.record_step(draft, replay.sign(draft))}
+        draft = fused.prepare("fused", {"deploy": early_root}, version=versions[0], sighash_family="bip143")
+        before = {"held_deployment": deployment, "otda_rejections": rejected,
+                  "bip143_deployment": early_deployment, "bip143_spend": replay.record_step(draft, replay.sign(draft))}
         replay.node.call("generate", [activation - replay.node.call("getblockcount", [])])
 
     paths = {}
@@ -373,7 +376,7 @@ def replay_dual_sighashes(replay, program, source):
         artifact = artifacts[contract.plan.mode]
         return {"artifact_sha256": artifact["artifact_sha256"], "transactions": rows, **metrics(tuple(rows.values()), artifact)}
 
-    # Reserve slot zero for the first Chronicle spend, so it can reuse the pre-activation deployment.
+    # Reserve slot zero for the first OTDA spend, so it can reuse the pre-activation deployment.
     cases = [(family, version) for family in reversed(families) for version in versions]
     for slot, (family, version) in enumerate(cases):
         root, deployment = held if slot == 0 and held else replay.deploy(fused, bootstrap, slot)
@@ -394,8 +397,8 @@ def replay_dual_sighashes(replay, program, source):
             controls = context_controls(replay, draft, bootstrap, sponsor_slot)
             controls["wrong_context_for_signatures"] = replay.record(replay.sign(crossed), draft.previous, expected=False)
         spend = signed[family]
-        if slot == 0 and before is not None and spend.txid() != before["chronicle_rejections"][version]["txid"]:
-            raise ValueError("the post-activation replay did not reuse the early Chronicle spend")
+        if slot == 0 and before is not None and spend.txid() != before["otda_rejections"][version]["txid"]:
+            raise ValueError("the post-activation replay did not reuse the early OTDA spend")
         rows = {"deploy": deployment, "fused": replay.record_step(draft, spend)}
         paths[f"fused/{family}/v{version}"] = {
             **record_path(fused, root, rows, spend), "both_valid_on_same_outpoint": verdicts, "rejections": controls,
@@ -418,18 +421,21 @@ def replay_dual_sighashes(replay, program, source):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source", type=Path, default=SOURCE)
-    parser.add_argument("--target", choices=TARGETS, default=DEFAULT_TARGET)
-    parser.add_argument("--sighash-family", choices=SIGHASH_FAMILY_OPTIONS, default="forkid")
+    parser.add_argument("--target", type=normalize_target, choices=TARGETS, default=DEFAULT_TARGET)
+    parser.add_argument("--sighash-family", type=normalize_sighash_family, choices=SIGHASH_FAMILY_OPTIONS,
+                        default="bip143")
     parser.add_argument("--optimize", choices=OPTIMIZATIONS, default="stack")
     parser.add_argument("--samples", type=int, default=7)
-    parser.add_argument("--compare-forkid-context", action="store_true", help="also replay full-context baselines")
+    parser.add_argument("--compare-bip143-context", action="store_true", help="also replay full BIP143 preimage baselines")
+    parser.add_argument("--compare-forkid-context", dest="compare_bip143_context",
+                        action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     if args.samples < 1:
         parser.error("--samples must be positive")
-    chronicle = args.sighash_family != "forkid"
-    if chronicle and (args.compare_forkid_context or args.target == "forkid-v1"):
-        parser.error("Chronicle replay requires a Chronicle spend target and has no full ForkID context")
+    chronicle = args.sighash_family != "bip143"
+    if chronicle and (args.compare_bip143_context or args.target == "bip143-v1"):
+        parser.error("OTDA replay requires a Chronicle spend target and has no full BIP143 context")
     engine = chain_metadata()
     if engine["commit"] != CONTEXT_PIN:
         raise ValueError("use the Chronicle-aware chain-gang pin")
@@ -464,7 +470,7 @@ def main():
     recovery_slots = range(independent_slot + 1, independent_slot + 5)
     sponsor_slot = recovery_slots.stop
     baseline_cases = tuple((name, current, mode) for name, current in CASES for mode in ("fused", "serial"))
-    bootstrap = replay.fund(sponsor_slot + 1 + (len(baseline_cases) if args.compare_forkid_context else 0))
+    bootstrap = replay.fund(sponsor_slot + 1 + (len(baseline_cases) if args.compare_bip143_context else 0))
     builds, paths = {}, {}
     for index, (name, current) in enumerate(CASES):
         for offset, mode in enumerate(modes):
@@ -497,13 +503,13 @@ def main():
                                                       declared_recovery=program.recovery, source_path=args.source)
         builds.update((item["artifact_sha256"], item) for item in recovery_artifacts.values())
     baselines = {}
-    if args.compare_forkid_context:
+    if args.compare_bip143_context:
         for index, (name, current, mode) in enumerate(baseline_cases, sponsor_slot + 1):
             artifact, path = run_path(replay, program, source, mode, current, bootstrap, index, context_layout="full")
             builds[artifact["artifact_sha256"]] = artifact
             chosen = paths[f"{name}/{mode}"]
             if (path["next"], path["route"]) != (chosen["next"], chosen["route"]):
-                raise ValueError("ForkID layouts disagree on the verified result")
+                raise ValueError("BIP143 layouts disagree on the verified result")
             baselines[f"{name}/{mode}"] = {
                 "baseline": path, "selected_artifact_sha256": chosen["artifact_sha256"],
                 "path_bytes_saved": path["whole_path_bytes"] - chosen["whole_path_bytes"],
@@ -518,8 +524,8 @@ def main():
         "artifacts": builds, "paths": paths, "decisions": decisions,
         "independent_submit": constrained_report, "recovery": recovery,
     }
-    if args.compare_forkid_context:
-        report["forkid_context_baselines"] = baselines
+    if args.compare_bip143_context:
+        report["bip143_context_baselines"] = baselines
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(report, indent=2) + "\n")
 

@@ -33,7 +33,7 @@ PYTHONPATH="$PWD:$PWD/projects/p2pkh-schnorr/reference" \
 bash tools/verify_node.sh -- bash sdk/verify_wallet.sh p2pkh-schnorr
 ```
 
-The acceptance suite checks all 19 official BIP340 verification vectors, including empty and variable-length messages, through libsecp256k1 and both Script engines. It also regenerates the eight official signing vectors with test keys and auxiliary randomness. The payment matrix covers all 12 paired ForkID and Chronicle OTDA modes for transaction versions 1 and 2. It rejects locktime changes and checks the expected output commitments for ALL, NONE, and SINGLE. Separate cases cover malformed coordinates, key ownership, fee balance, inactive Chronicle, and both lookup tables, scalar decomposition, and results at infinity.
+The acceptance suite checks all 19 official BIP340 verification vectors, including empty and variable-length messages, through libsecp256k1 and both Script engines. It also regenerates the eight official signing vectors with test keys and auxiliary randomness. The payment matrix covers all 12 paired BIP143 and Chronicle OTDA modes for transaction versions 1 and 2. It rejects locktime changes and checks the expected output commitments for ALL, NONE, and SINGLE. Separate cases cover malformed coordinates, key ownership, fee balance, inactive Chronicle, and both lookup tables, scalar decomposition, and results at infinity.
 
 ## Measured sizes
 
@@ -41,7 +41,7 @@ The fixed lock is **30,398 bytes**. Its owner field starts at byte offset **238*
 
 | Mode | Each output lock | Each input unlock | Complete transaction | Extra input | Extra output | Fund and exit | One turnover | Peak stack payload |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| ForkID ALL | 30,398 | 329 | 61,572 | 372 | 30,409 | 61,798 | 123,369 | 3,325 |
+| BIP143 ALL | 30,398 | 329 | 61,572 | 372 | 30,409 | 61,798 | 123,369 | 3,325 |
 | Chronicle OTDA ALL | 30,398 | 61,087 | 183,088 | 61,253 | 91,235 | 61,811 | 244,899 | 122,006 |
 
 All sizes are in bytes. Stack payload is the approximate combined main and alternate stack payload for the first input from the development evaluator. BSV Node 1.2.3 and chain-gang verify each complete input with supplied prevouts. OTDA ALL includes the literal signed outputs in each preimage. [Layout and fingerprint](template/layout.json) · [Benchmark method](../../docs/benchmark.md)
@@ -51,7 +51,7 @@ bash tools/verify_node.sh -- "$SCRIPT_LAB_SDK_PYTHON" -m fourthgraph.benchmark.r
   --project p2pkh-schnorr --venvs-dir projects/p2pkh-schnorr/workspace --output projects/p2pkh-schnorr/workspace/build/benchmark
 ```
 
-Under BSV Node 1.2.3's default regtest policy, funding and exit transactions entered the mempool and were mined in both ForkID ALL and OTDA ALL runs.
+Under BSV Node 1.2.3's default regtest policy, funding and exit transactions entered the mempool and were mined in both BIP143 ALL and OTDA ALL runs.
 
 ```sh
 bash tools/verify_node.sh --profile default -- "$SCRIPT_LAB_SDK_PYTHON" -m fourthgraph.benchmark.admission \

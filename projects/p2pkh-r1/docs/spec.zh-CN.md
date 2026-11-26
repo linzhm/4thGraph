@@ -39,7 +39,7 @@ python generate_lock.py --owner-hash160 "${R1_OWNER_HASH160:?请设置收款公�
 
 钱包识别收款时，应同时核对完整模板指纹和预期的收款公钥哈希。付款方可以构造任意输出脚本。如果额外要求收款人只能用 NONE，固定程序的字节就发生改变，模板检查会失败。付款方自己的签名类型只控制它所签的输入。收款人以后花费这个输出时，可以自行选择模板支持的签名类型。
 
-锁核对 HASH160(Q)，验证 R1 签名，再通过 PUSHTX 的公开构造与原生 `OP_CHECKSIG` 将该授权绑定到节点正在验证的交易上下文。栈内既不含父交易原文，也不含前序签名。普通 ForkID ALL 的 P 为 159 字节，其中序列化的 scriptCode 为 `02 68 ac`。五项编码合计 **326 字节**（161 + 66 + 65 + 33 + 1）。[锁定脚本汇编](../reference/asm/lock.asm) · [绑定检查](../reference/asm/binding.asm) · [nChain WP1605](https://nchain.com/wp-content/uploads/2022/03/WP1605_PUSHTX-and-its-Building-Blocks.pdf) · [BRC-21](https://github.com/bsv-blockchain/BRCs/blob/master/scripts/0021.md)
+锁核对 HASH160(Q)，验证 R1 签名，再通过 PUSHTX 的公开构造与原生 `OP_CHECKSIG` 将该授权绑定到节点正在验证的交易上下文。栈内既不含父交易原文，也不含前序签名。普通 BIP143 ALL 的 P 为 159 字节，其中序列化的 scriptCode 为 `02 68 ac`。五项编码合计 **326 字节**（161 + 66 + 65 + 33 + 1）。[锁定脚本汇编](../reference/asm/lock.asm) · [绑定检查](../reference/asm/binding.asm) · [nChain WP1605](https://nchain.com/wp-content/uploads/2022/03/WP1605_PUSHTX-and-its-Building-Blocks.pdf) · [BRC-21](https://github.com/bsv-blockchain/BRCs/blob/master/scripts/0021.md)
 
 钱包先从实际交易和签名类型构造 P，再计算摘要，由所有者用 R1 私钥签一次。R1 验签证明所有者授权。随后 secp256k1 PUSHTX 复用这个摘要，按公开参数构造原生签名，节点用它核对自己正在验证的交易上下文。花费者只需持有 R1 私钥。两项检查共同绑定的是所选 SIGHASH 承诺的字段。[nChain PUSHTX 实现](https://github.com/nchain-innovation/zkscript_package/blob/fc20fb743edbc5bc5aba9d16625d50d1f50a3ef4/src/zkscript/transaction_introspection/transaction_introspection.py)
 
@@ -53,7 +53,7 @@ outpoint。允许不同解锁编码的规则可能导致未确认父交易的 tx
 
 ## 签名覆盖范围
 
-每个输入独立选择类型。支持 ForkID 的 BIP143 与 Chronicle OTDA 两种算法，每种支持 ALL、NONE、SINGLE，各自可加 ANYONECANPAY。普通付款接口固定使用 `0x41`。Chronicle 的 `0x20` 位与节点激活规则共同决定 OTDA 路径。此选择位于签名类型中。[Chronicle](https://docs.bsvblockchain.org/network-topology/nodes/sv-node/chronicle-release) · [节点序列化与摘要](https://github.com/bitcoin-sv/bitcoin-sv/blob/6504a3aff65ba97c0f6c80962b033e35ecbfed4b/src/script/interpreter.cpp#L1894-L2124)
+每个输入独立选择类型。支持 BIP143 与 Chronicle OTDA 两种算法，每种支持 ALL、NONE、SINGLE，各自可加 ANYONECANPAY。普通付款接口固定使用 `0x41`。Chronicle 的 `0x20` 位与节点激活规则共同决定 OTDA 路径。此选择位于签名类型中。[Chronicle](https://docs.bsvblockchain.org/network-topology/nodes/sv-node/chronicle-release) · [节点序列化与摘要](https://github.com/bitcoin-sv/bitcoin-sv/blob/6504a3aff65ba97c0f6c80962b033e35ecbfed4b/src/script/interpreter.cpp#L1894-L2124)
 
 | 要求 | 交易摘要的承诺 |
 |---|---|

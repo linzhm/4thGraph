@@ -51,7 +51,7 @@ def _committed_verifier(key):
 
 
 def _v1_script(key, *, transaction=True):
-    """Witness: [158-byte ForkID ALL preimage OR 32-byte digest, 8192-byte signature]."""
+    """Witness: [158-byte BIP143 ALL preimage OR 32-byte digest, 8192-byte signature]."""
     code = asm('OP_DEPTH OP_2 OP_NUMEQUALVERIFY OP_OVER OP_SIZE')
     code += number(158 if transaction else 32) + asm('OP_NUMEQUALVERIFY OP_DROP OP_SIZE')
     code += number(8192) + asm('OP_NUMEQUALVERIFY')
@@ -65,7 +65,7 @@ def _v1_script(key, *, transaction=True):
 
 
 def legacy_locking_script(key):
-    """The original two-push ForkID ALL template, preserved byte-for-byte."""
+    """The original two-push BIP143 ALL template, preserved byte-for-byte."""
     return _v1_script(key)
 
 

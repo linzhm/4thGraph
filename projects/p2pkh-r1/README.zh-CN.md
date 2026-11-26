@@ -14,21 +14,21 @@ P2PKH-R1 让 BSV 钱包接入已有的 P‑256 签名器。输出锁定到收款
 
 ### 最新一轮
 
-**`split-5x4-affine-g`** 是本轮通过验收的实验模板。相比上一轮，完整锁缩短 **357 B**，两进两出 ForkID ALL 付款缩短 **714 B**。 [构建与复放](experiments/forth/README.md)
+**`split-5x4-affine-g`** 是本轮通过验收的实验模板。相比上一轮，完整锁缩短 **357 B**，两进两出 BIP143 ALL 付款缩短 **714 B**。 [构建与复放](experiments/forth/README.md)
 
-| 轮次 | 模板 | 完整锁 | ForkID ALL 付款 | OTDA ALL 付款 |
+| 轮次 | 模板 | 完整锁 | BIP143 ALL 付款 | OTDA ALL 付款 |
 | --- | --- | ---: | ---: | ---: |
 | 上一轮 | `split-5x4` | 41,721 B | 84,212 B | 95,282 B |
 | 本轮 | `split-5x4-affine-g` | **41,364 B** | **83,498 B** | **94,864 B** |
 
-同一份高阶 Forth 仍调用 `P256.mul2(u,G,v,Q)`。编译器识别固定生成元表的非零项满足 `Z=1`，将 51 处点加编译为少一个坐标输入的内核，并单独处理零下标。新模板通过 BSV Node 和 chain-gang 对 ForkID ALL、OTDA ALL 和配对 OTDA SINGLE 的复放与验收。 [高阶源码](experiments/forth/msm.fth) · [验收矩阵](reference/acceptance.md)
+同一份高阶 Forth 仍调用 `P256.mul2(u,G,v,Q)`。编译器识别固定生成元表的非零项满足 `Z=1`，将 51 处点加编译为少一个坐标输入的内核，并单独处理零下标。新模板通过 BSV Node 和 chain-gang 对 BIP143 ALL、OTDA ALL 和配对 OTDA SINGLE 的复放与验收。 [高阶源码](experiments/forth/msm.fth) · [验收矩阵](reference/acceptance.md)
 
 <details>
 <summary>展开此前的版本迭代</summary>
 
 每行是该轮验收后选定的一个模板。付款均为两进两出。Forth 窗口实验沿用可复现的模板名。
 
-| 上一轮基线 | 本轮选定模板 | 主要改进 | 完整锁 | ForkID ALL | OTDA ALL |
+| 上一轮基线 | 本轮选定模板 | 主要改进 | 完整锁 | BIP143 ALL | OTDA ALL |
 | --- | --- | --- | ---: | ---: | ---: |
 | — | v0.1.0 | 初版固定锁，OTDA 直接携带原像 | 59,582 B | 119,934 B | 358,194 B |
 | v0.1.0 | v0.2.0 | 重排 P‑256 点运算，OTDA 共用曲线内核重建原像 | 46,302 B | 93,374 B | 101,250 B |
@@ -36,7 +36,7 @@ P2PKH-R1 让 BSV 钱包接入已有的 P‑256 签名器。输出锁定到收款
 | Forth v0.3.0 | Forth v0.4.0 | 用带范围的公式表达点运算，编译器做等价改写与栈调度 | 42,536 B | 85,842 B | 93,664 B |
 | Forth v0.4.0 | `split-5x4` | 把双标量乘法留给编译器，用 5 位固定表和 4 位公钥表减少循环点加 | 41,721 B | 84,212 B | 95,282 B |
 
-主线以锁和 ForkID 付款字节数选版。以 OTDA 付款为首要目标时，沿用窗口迭代选出的 `joint-2`，两进两出 OTDA ALL 为 91,692 B。 [窗口复放数据](experiments/forth/results.json)
+主线以锁和 BIP143 付款字节数选版。以 OTDA 付款为首要目标时，沿用窗口迭代选出的 `joint-2`，两进两出 OTDA ALL 为 91,692 B。 [窗口复放数据](experiments/forth/results.json)
 
 v0.4.0 的 Forth 用命名值写公式，例如先算 `xx = x1*x2` 和 `yy = y1*y2`，再写交叉项。代数上可展开为两个交叉乘积：
 

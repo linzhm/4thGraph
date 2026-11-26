@@ -89,10 +89,12 @@ If regtest is available, demonstrate 0 → 1 → 2, then try jumping directly fr
 
 ## Measured on real transactions
 
-- **What does optimizing a lock save on a payment?** The P2PKH-R1 Forth experiment reduced the two-input, two-output ForkID ALL payment from 93,374 B to **83,846 B**. Its smallest OTDA ALL payment measured **91,692 B**. [P2PKH-R1 results](projects/p2pkh-r1/README.md#measured-results)
+- **What does optimizing a lock save on a payment?** The P2PKH-R1 Forth experiment reduced the two-input, two-output BIP143 ALL payment from 93,374 B to **83,846 B**. Its smallest OTDA ALL payment measured **91,692 B**. [P2PKH-R1 results](projects/p2pkh-r1/README.md#measured-results)
 - **What does it cost to verify a proof on-chain?** For the same BLS12-381 Groth16 proof and fixed public inputs, deployment plus one spend totaled **280,731 bytes** with 4thGraph and **393,553 bytes** with the tested nChain configuration. Both spends were mined on BSV regtest. [Experiment, raw results, and transaction IDs](projects/proof-counter/experiments/fixed-statement/README.md)
 
 [All project results](showcase/README.md) · [Detailed wallet transaction costs](docs/benchmark.md#transaction-costs)
+
+In these comparisons, **BIP143 / OTDA** names the two BSV signature digest formats. Both set `SIGHASH_FORKID` (`0x40`). The BSV BIP143 format uses hashed transaction components, while Chronicle OTDA adds the `0x20` bit and uses the original transaction digest algorithm. [BIP143](https://github.com/bitcoin/bips/blob/master/bip-0143.mediawiki) · [Chronicle](https://docs.bsvblockchain.org/network-topology/nodes/sv-node/chronicle-release)
 
 <a name="architecture"></a><a name="toolchain"></a>
 

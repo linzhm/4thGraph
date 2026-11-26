@@ -45,7 +45,7 @@ digest is `SHA256d(preimage)` in both cases. The fixed-r PUSHTX construction
 uses native `OP_CHECKSIG` to bind the preimage to the current input. The WOTS+
 signature supplies the owner's authorization.
 
-| Output coverage | ForkID | ForkID + ANYONECANPAY | Chronicle OTDA | OTDA + ANYONECANPAY |
+| Output coverage | BIP143 | BIP143 + ANYONECANPAY | Chronicle OTDA | OTDA + ANYONECANPAY |
 |---|---|---|---|---|
 | `ALL` | `41` | `c1` | `61` | `e1` |
 | `NONE` | `42` | `c2` | `62` | `e2` |
@@ -63,7 +63,7 @@ output commitments follow the selected BIP143 or OTDA serialization.
 If an OTDA `SINGLE` input has no output with the same index, the node returns a
 constant for that mode. The script checks for the native constant using the
 requested `63` or `e3` and binds the owner authorization to a companion
-ForkID `SINGLE` preimage with type `43` or `c3`, respectively. The companion
+BIP143 `SINGLE` preimage with type `43` or `c3`, respectively. The companion
 uses a separate `scriptCode`, binds the current outpoint and amount, and
 requires zero `hashOutputs`. The owner's WOTS+ signature always authorizes the
 companion digest in this case. See the [Lamport transaction-binding analysis](../../lamport-ots/docs/security.md)

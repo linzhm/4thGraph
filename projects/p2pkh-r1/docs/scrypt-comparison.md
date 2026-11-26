@@ -10,7 +10,7 @@ A funding output carries the complete locking script. The table measures seriali
 |---|---:|---:|
 | Upstream sCrypt R1 test, eight public methods | 4,485,650 | 168 |
 | sCrypt R1 control, only `verifySig` | 2,248,716 | 166 |
-| P2PKH-R1 payment, ForkID ALL vector | 59,582 | 326 |
+| P2PKH-R1 payment, BIP143 ALL vector | 59,582 | 326 |
 
 For the single-method comparison, each P2PKH-R1 output carries **2,189,134 fewer locking-script bytes (97.35%)**. The payment vector supplies 160 more bytes at spend time. Counts exclude transaction framing such as CompactSize script lengths.
 
@@ -20,7 +20,7 @@ For the single-method comparison, each P2PKH-R1 output carries **2,189,134 fewer
 
 - **Upstream test contract.** An unchanged checkout of sCrypt's eight-method `SECP256R1Test` exposes point arithmetic, modular inversion and signature verification. We call `verifySig(digest, signature, point, true)`. [Upstream source](https://github.com/sCrypt-Inc/scrypt-ts-lib/blob/fc71404fb82bc513dba3908bf47fc231a169787c/tests/contracts/heavy/secp256r1.ts)
 - **Verify-only control.** Our wrapper exposes one method that asserts the result of the same upstream verifier. Both harnesses receive a digest and a point supplied by the caller. The caller selects the key and digest for these standalone verification tests. [Wrapper](https://github.com/linzhm/bsv-script-lab/blob/f278c5c64d6de94a3dd3300c858f4747576d31c7/research/scrypt-compare/verifyOnly.ts)
-- **P2PKH-R1.** The wallet supplies the input signing preimage, key, raw signature, inverse and derived selector. The lock checks the owner hash, verifies R1 and binds the authorization to the actual input. The selected spend uses ForkID ALL. [Wire specification](spec.en.md)
+- **P2PKH-R1.** The wallet supplies the input signing preimage, key, raw signature, inverse and derived selector. The lock checks the owner hash, verifies R1 and binds the authorization to the actual input. The selected spend uses BIP143 ALL. [Wire specification](spec.en.md)
 
 上游原版含八个公开测试方法。单方法对照由本项目编写，只保留一次上游 R1 验签调用。两个 sCrypt 调用都直接接收摘要。P2PKH-R1 还执行所有者检查和交易绑定，因此解锁数据也包含原像等字段。
 

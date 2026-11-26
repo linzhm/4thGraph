@@ -64,7 +64,7 @@ def covenant(advance, *, authentication="baseline", context=None, decoder=b"", a
     tail = (asm("OP_SIZE") + number(52) + asm("OP_SUB OP_SPLIT OP_DUP") + field(48, 4)
             + push(FLAG_BYTES) + asm("OP_EQUALVERIFY OP_DUP") + field(12, 32) + asm("OP_TOALTSTACK")
             + field(0, 8))
-    # Strip the ForkID header and the CompactSize from the authenticated scriptCode.
+    # Strip the BIP143 header and the CompactSize from the authenticated scriptCode.
     script_code = asm("OP_SWAP") + number(104) + asm("OP_SPLIT OP_NIP OP_3 OP_SPLIT OP_NIP")
     return (start + one_input + tail + amount_rule.lower_amount() + script_code + successor_hash(advance)
             + asm("OP_FROMALTSTACK OP_EQUALVERIFY OP_FROMALTSTACK") + authenticate)
@@ -115,7 +115,7 @@ class CounterBuild:
         if self.authentication == "compact-reuse-r":
             rewrites.append("reuse-fixed-der-r-in-public-key")
         if self.witness != FULL_PREIMAGE:
-            rewrites.append("reconstruct-forkid-all")
+            rewrites.append("reconstruct-bip143-all")
             omitted = RECONSTRUCTED_FIELDS
         if self.witness in (LINKED, REUSED):
             rewrites.append("link-script-code-size")

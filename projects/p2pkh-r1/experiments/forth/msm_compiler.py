@@ -19,7 +19,7 @@ SOURCE = Path(__file__).with_name("msm.fth")
 OWNER = bytes(range(20))
 CALIBRATION = ("split-4", "joint-2", "split-5x4")
 # Serialized size of the shared two-input, two-output fixture minus its locks.
-FORKID_FRAMING = 770
+BIP143_FRAMING = 770
 OTDA_FRAMING = {"otda-all": 50, "otda-single": -21}
 
 
@@ -28,8 +28,8 @@ def site(token):
 
 
 def payment_estimates(lock_bytes, otda_bytes):
-    forkid = 2 * lock_bytes + FORKID_FRAMING
-    return {"forkid-all": forkid, **{mode: forkid + 2 * otda_bytes + framing
+    bip143 = 2 * lock_bytes + BIP143_FRAMING
+    return {"bip143-all": bip143, **{mode: bip143 + 2 * otda_bytes + framing
                                     for mode, framing in OTDA_FRAMING.items()}}
 
 

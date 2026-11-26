@@ -7,7 +7,7 @@ from pathlib import Path
 
 from fourthgraph.workflow.protocol import (
     CANDIDATE_ORDER, OBJECTIVES, PROJECT_NAME, RANK_ORDER, artifact_digest, candidate_rank, search_selection,
-    select_candidate,
+    normalize_target, select_candidate,
 )
 from fourthgraph.bsv.transaction import Transaction
 
@@ -28,7 +28,9 @@ def read_replay(path):
 
 
 def context(replay):
-    return {name: replay[name] for name in CONTEXT_FIELDS}
+    fields = {name: replay[name] for name in CONTEXT_FIELDS}
+    fields["target"] = normalize_target(fields["target"])
+    return fields
 
 
 def output_matches(output, expected):

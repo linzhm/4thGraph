@@ -9,6 +9,8 @@
 | [`replay_verifier.py`](../src/fourthgraph/replay/bls12381_verifier.py)、[`fixtures/`](../projects/proof-counter/fixtures/) 与 [`tests/`](../tests/bls12381/) | 双引擎复放、测试证明和回归 |
 | [`benchmarks/`](../projects/proof-counter/experiments/) | 固定声明的 nChain 对照 |
 
+既有的 CCTP 复放使用当时的目录和外部基线附件。复现这些测量时，请检出链接所固定的提交并按原说明运行。 [CCTP 交易边界与复放](https://github.com/linzhm/4thGraph/blob/8af1e1c33f8b90327e1ee02e00542d307495f038/projects/4thgraph/cctp/README.md) · [公开输入来源对照](https://github.com/linzhm/4thGraph/blob/8af1e1c33f8b90327e1ee02e00542d307495f038/projects/4thgraph/groth16-bls12-381/benchmarks/public-inputs/README.md)
+
 ## Forth 词
 
 | BSV 词 | 编译内容 |

@@ -575,7 +575,7 @@ class ScriptVerifier:
                      for source in signals)
 
     def compile(self, signals=None, owner=None, *, compact=True):
-        """Build the proof predicate, with optional ForkID ALL owner authorization."""
+        """Build the proof predicate, with optional BIP143 ALL owner authorization."""
         if owner is not None and not is_compressed_public_key(owner):
             raise ValueError("owner must be a valid compressed secp256k1 public key")
         script = self.lower(self.sources(signals), compact=compact)
@@ -631,7 +631,7 @@ def public_output(value, packet):
 def bind_public_output(verifier_script, sources, value, versions=(1, 2)):
     """Authenticate a sole successor output built from the verifier's same public packet.
 
-    Stack on entry: proof packet, public packet, 158-byte ForkID ALL preimage.
+    Stack on entry: proof packet, public packet, 158-byte BIP143 ALL preimage.
     The verifier is the signature-free proof predicate from ScriptVerifier.compile.
     """
     width = sum(source.width for _, source in dynamic_slots(sources))
