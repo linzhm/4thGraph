@@ -20,6 +20,9 @@ class ProofContractTests(unittest.TestCase):
                   "nPubInputs": 3, "nPrvInputs": 0, "nConstraints": 1,
                   "constraints": [[{}, {}, {"1": "1", "2": str(FIELD - 1), "0": str(FIELD - 1)}]]}
         key = VerificationKey.load(json.dumps(source).encode())
+        declared = SOURCE + b"REQUIRE stdlib/verify.fth\n: advance ( u32 -- u32 ) ;\nrelation: advance decide ;\n"
+        with self.assertRaisesRegex(ValueError, "relation: is parse-only"):
+            ProofContract(declared, key, 19, TestKeys().public)
         sizes = []
         for mode in ("baseline", "stack"):
             contract = ProofContract(SOURCE, key, 19, TestKeys().public, target="both", optimization=mode)

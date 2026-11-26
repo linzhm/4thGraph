@@ -50,6 +50,8 @@ PYTHONPATH=. python projects/4thgraph/protocol.py projects/4thgraph/example.fth 
 PYTHONPATH=. python projects/4thgraph/protocol.py --capabilities
 ```
 
+本分支支持解析 `relation:` 及其旧拼写 `verify:`。在 `REQUIRE stdlib/verify.fth` 后写下 `relation: advance decide ;`，可分别用 `protocol.py SOURCE --entry advance` 和 `--entry decide` 生成两个词的 Script。整条声明的交易验证器构建尚未接入，`--capabilities` 在 `bsv.source_syntax.parse_only_declarations` 中列出这类声明。
+
 `--mode auto` 在所有输入和分支授权都可同时取得时选融合。可用 `--available-data x` 或 `--available-authorizers alice` 模拟另一支晚到。往示例末尾加上 `independent-submit a` 后，`auto` 选择拆分，`--mode fused` 报告约束的源文件行号。可显式请求拆分，在两种调度都合法时做同源对照。
 
 ## 编译决策报告

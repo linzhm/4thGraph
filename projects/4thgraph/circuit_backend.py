@@ -129,7 +129,9 @@ class CircuitBuilder:
 
 
 def circuit_words(source):
-    words = SourceCompiler(source.decode()).words
+    frontend = SourceCompiler(source.decode())
+    frontend.reject_relation_build()
+    words = frontend.words
     signatures = {"advance": (("u32",), ("u32",)), "decide": (("u32",), ("route",))}
     for name, effect in signatures.items():
         if name not in words or (words[name].takes, words[name].gives) != effect:

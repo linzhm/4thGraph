@@ -1043,8 +1043,6 @@ def main():
         return
     if args.source is None:
         cli.error("a Forth source file is required")
-    if args.entry is None and args.keys is None:
-        cli.error("transaction builds require --keys")
     try:
         source_bytes = args.source.read_bytes()
         source = SourceCompiler(source_bytes.decode(), source_path=args.source)
@@ -1068,12 +1066,13 @@ def main():
                 if any(item.name in word.takes for item in word.ranges):
                     result["input_range_checks"] = "assumed" if args.assume_input_ranges else "emitted"
         else:
+            source.reject_relation_build()
+            if args.keys is None:
+                cli.error("transaction builds require --keys")
             raw_keys = json.loads(args.keys.read_text())
             if not isinstance(raw_keys, dict) or any(not isinstance(key, str) for key in raw_keys.values()):
                 raise ValueError("keys must be a JSON object mapping roles to public key hex strings")
             keys = {name: bytes.fromhex(key) for name, key in raw_keys.items()}
-            if source.relation:
-                cli.error("use verification.py to build a relation: declaration")
             if source.workflow_input is not None or source.stages:
                 if args.current is None:
                     cli.error("staged workflows require --current")

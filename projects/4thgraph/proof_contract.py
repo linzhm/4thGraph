@@ -155,7 +155,9 @@ class ProofContract:
             raise ValueError("proof contract requires review and settle public keys")
         if keys["review"] == keys["settle"]:
             raise ValueError("terminal scripts must be distinct")
-        route = SourceCompiler(source.decode()).words.get("decide")
+        frontend = SourceCompiler(source.decode())
+        frontend.reject_relation_build()
+        route = frontend.words.get("decide")
         if route is None or (route.takes, route.gives) != (("u32",), ("route",)):
             raise ValueError("proof policy requires 'decide' with effect u32 -- route")
         self.target = target
