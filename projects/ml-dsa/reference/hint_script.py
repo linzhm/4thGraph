@@ -4,7 +4,7 @@ from functools import cache
 
 from ntt_script import COEFFICIENT_BYTES, POLYNOMIAL_BYTES
 from polynomial import DEGREE, MODULUS
-from shared.script import asm, number, push
+from fourthgraph.bsv.script import asm, number, push
 
 _ROWS = 4
 _HIGH_MODULUS = 44

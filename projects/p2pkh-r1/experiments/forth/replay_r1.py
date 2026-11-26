@@ -14,12 +14,12 @@ from tx_engine import Script, Tx
 from compile_r1 import BASELINE_VERSION, SOURCE, VERSION, compile_source
 from fixed_templates import compiled_template, otda_pattern
 from reconstruct import shared_kernel_program
-from replay import Replay, SOURCE as FUNDING_COIN
-from protocol import FLAG, UTXO
-from shared.benchmark_validation import CONTEXT_PIN, Node, chain_metadata
-from shared.otda_reconstruction import Reconstruction
-from shared.script import push
-from shared.transaction import Input, Output, Transaction
+from fourthgraph.replay.workflow import Replay, SOURCE as FUNDING_COIN
+from fourthgraph.workflow.protocol import FLAG, UTXO
+from fourthgraph.benchmark.validation import CONTEXT_PIN, Node, chain_metadata
+from fourthgraph.bsv.otda_reconstruction import Reconstruction
+from fourthgraph.bsv.script import push
+from fourthgraph.bsv.transaction import Input, Output, Transaction
 from signature import authorization, current_input_unlock
 from test_payment import fixture_signature, signer
 import test_payment_acceptance as acceptance

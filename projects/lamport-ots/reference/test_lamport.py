@@ -8,9 +8,9 @@ from script import locking_script, binding, N, R
 from payment import authorization, sign_payment, sign_spend
 from fixtures import INVALID_PREVOUT_CASES, fixture, test_secret, cases, mode_cases
 from engines import development_valid, chain_valid
-from shared.evaluate import evaluate, ScriptError
-from shared.script import push
-from shared.transaction import Output, Transaction, Input
+from fourthgraph.bsv.evaluate import evaluate, ScriptError
+from fourthgraph.bsv.script import push
+from fourthgraph.bsv.transaction import Output, Transaction, Input
 
 ROOT = Path(__file__).resolve().parents[1]
 

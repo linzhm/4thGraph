@@ -27,7 +27,7 @@ authorization. Any replacement that confirms with a different txid has the
 same effect on a child referencing the original `txid:vout`. If the replacement
 also changes transaction contents, verify that it still makes the intended
 payment before treating any of its outputs as the wallet's funding.
-[Transaction serialization](../../../shared/transaction.py)
+[Transaction serialization](../../../src/fourthgraph/bsv/transaction.py)
 
 Versions that spend the same inputs compete for those UTXOs. First-seen handling
 and double-spend notifications are useful while monitoring pending payments.

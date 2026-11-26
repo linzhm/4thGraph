@@ -15,7 +15,7 @@
 | MuSig2 | Chronicle OTDA | 30,398 | 61,087 / 61,087 | 183,088 | 61,253 | 91,235 | 61,811 | 244,899 | 122,006 |
 | 原生 2-of-2 | Chronicle OTDA | 71 | 145 / 146 | 543 | 187 | 81 | 769 | 1,314 | 210 |
 
-以上均以字节计。统一费率为 1 聪/字节时，整笔交易或生命周期的字节数也就是对应的手续费聪数。原生 ECDSA 签名的 DER 长度随签名变化，所以实测边际可能包含几个见证字节的变化。栈载荷是主栈与备用栈的元素数据总量，原生方案在执行 `CHECKMULTISIG` 前达到峰值。MuSig2 的栈载荷来自开发求值器。两者均省略引擎内部的内存开销。[测量实现](../reference/compare_threshold.py) · [统一测量口径](../../../shared/benchmark.zh-CN.md)
+以上均以字节计。统一费率为 1 聪/字节时，整笔交易或生命周期的字节数也就是对应的手续费聪数。原生 ECDSA 签名的 DER 长度随签名变化，所以实测边际可能包含几个见证字节的变化。栈载荷是主栈与备用栈的元素数据总量，原生方案在执行 `CHECKMULTISIG` 前达到峰值。MuSig2 的栈载荷来自开发求值器。两者均省略引擎内部的内存开销。[测量实现](../reference/compare_threshold.py) · [统一测量口径](../../../docs/benchmark.zh-CN.md)
 
 在两进两出的夹具中，chain-gang 中位耗时在 ForkID 下为 MuSig2 **6.7 ms**、原生多签 **0.39 ms**，在 OTDA 下分别为 **7.3 ms** 和 **0.40 ms**。BSV Node 本地 RPC 的中位耗时在 ForkID 下分别为 **32.2 ms** 和 **0.88 ms**，在 OTDA 下分别为 **40.0 ms** 和 **0.90 ms**。每组预热一次后测量 15 次，耗时包含输入准备和验证。Node 测量还包含本地 RPC 开销。
 
@@ -32,10 +32,10 @@ MuSig2 每个输入需要两轮依赖的签名消息。两方各生成 66 字节
 按[项目验收说明](../README.zh-CN.md#复现验收)安装依赖后，从仓库根目录运行。
 
 ```sh
-PYTHONPATH=. bash shared/verify_node.sh -- \
-  .venv/p2pkh-schnorr/bin/python projects/p2pkh-schnorr/reference/compare_threshold.py \
+PYTHONPATH=src:. bash tools/verify_node.sh -- \
+  projects/p2pkh-schnorr/workspace/p2pkh-schnorr/bin/python projects/p2pkh-schnorr/reference/compare_threshold.py \
   --output /tmp/p2pkh-schnorr-threshold.json
-PYTHONPATH=. bash shared/verify_node.sh --profile default -- \
-  .venv/p2pkh-schnorr/bin/python projects/p2pkh-schnorr/reference/compare_threshold.py \
+PYTHONPATH=src:. bash tools/verify_node.sh --profile default -- \
+  projects/p2pkh-schnorr/workspace/p2pkh-schnorr/bin/python projects/p2pkh-schnorr/reference/compare_threshold.py \
   --admission --output /tmp/p2pkh-schnorr-threshold-admission.json
 ```

@@ -1,7 +1,7 @@
 # Reference implementation
 
 Python 3.12+; production primitive code uses only the standard library. Script
-serialization and transaction helpers are under the repository's `shared/` folder.
+serialization and transaction helpers are under the repository's `src/fourthgraph/bsv/` package.
 Independent tests use the pinned chain-gang commit and BSV Node 1.2.3.
 Install tx-engine from requirements.txt so the test adapter can verify its
 Git revision. Negative cases require a known script rejection or the expected
@@ -22,12 +22,13 @@ Run commands are in the [project README](../README.md). To export exact script
 bytes for your **public test key**, from repository root:
 
 ```sh
-.venv/bin/python - <<'PY'
+bash tools/setup-workspaces.sh
+PYTHONPATH=src:. projects/lamport-ots/workspace/venv/bin/python - <<'PY'
 import sys
 from pathlib import Path
 sys.path.insert(0, 'projects/lamport-ots/reference')
 from fixtures import fixture
-Path('/tmp/lamport-test-lock.bin').write_bytes(fixture()[2])
+Path('projects/lamport-ots/workspace/build/test-lock.bin').write_bytes(fixture()[2])
 PY
 ```
 

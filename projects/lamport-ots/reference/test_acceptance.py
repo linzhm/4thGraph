@@ -10,9 +10,9 @@ from fixtures import INVALID_PREVOUT_CASES, cases, mode_fixture, test_secret
 from lamport import OneTimeSigner, public_key, sign_digest, verify_digest
 from payment import sign_spend
 from script import committed_locking_script, locking_script
-from shared.evaluate import evaluate, ScriptError
-from shared.script import number, push
-from shared.transaction import Input, Output, Transaction
+from fourthgraph.bsv.evaluate import evaluate, ScriptError
+from fourthgraph.bsv.script import number, push
+from fourthgraph.bsv.transaction import Input, Output, Transaction
 from test_node import node_check
 
 

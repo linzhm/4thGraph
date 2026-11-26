@@ -5,8 +5,8 @@ import os
 import unittest
 
 from fixtures import malformed_cases, mode_cases, mode_fixture
-from shared.evaluate import evaluate
-from shared.script import push
+from fourthgraph.bsv.evaluate import evaluate
+from fourthgraph.bsv.script import push
 from test_node import engine_transaction, node_check
 
 

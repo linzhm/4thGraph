@@ -9,14 +9,14 @@
 用 `createLock` 生成指定金额的短锁。识别时同时传入原始脚本和输出金额。已经存在的短锁按原承诺的 R1 版本启用。先从仓库根目录安装参考环境。
 
 ```sh
-python3.12 -m venv .venv
-.venv/bin/python -m pip install -r projects/p2pkh-r1-deferred/reference/requirements.txt
+python3.12 -m venv projects/p2pkh-r1-deferred/workspace/venv
+projects/p2pkh-r1-deferred/workspace/venv/bin/python -m pip install -r projects/p2pkh-r1-deferred/reference/requirements.txt
 ```
 
-使用[统一接入指南](../../../shared/sdk/README.zh-CN.md)里的 `config` 和已核验的交易数据。
+以下示例使用已核验的交易数据。将桥接配置中的 `python` 指向 `projects/p2pkh-r1-deferred/workspace/venv/bin/python`，`bridge` 指向当前检出的 `sdk/python/bridge.py`。[共享接入示例](../../../sdk/docs/integration.zh-CN.md#first-payment)
 
 ```ts
-import { WalletClient } from "./shared/sdk/typescript/index.ts";
+import { WalletClient } from "./sdk/typescript/index.ts";
 
 const deferred = new WalletClient("p2pkh-r1-deferred", { ...config, template: "v0.2.0" });
 const shortLock = deferred.createLock({ publicKey: receiveKeyHex, valueSats });
@@ -38,8 +38,8 @@ const activatedHex = deferred.activate({ transaction: preparedHex, inputIndex, p
 从仓库根目录复放四语言向量。
 
 ```sh
-SCRIPT_LAB_SDK_PYTHON="$PWD/.venv/bin/python" \
-  bash shared/verify_node.sh -- bash shared/sdk/verify_wallet.sh p2pkh-r1-deferred
+SCRIPT_LAB_SDK_PYTHON="$PWD/projects/p2pkh-r1-deferred/workspace/venv/bin/python" \
+  bash tools/verify_node.sh -- bash sdk/verify_wallet.sh p2pkh-r1-deferred
 ```
 
 ## 组装启用交易

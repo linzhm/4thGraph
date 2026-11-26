@@ -12,8 +12,8 @@ from signature_script import (
     RESPONSE_NORM_LIMIT, RESPONSE_PACKED_BYTES, hint_decode_script,
     response_decode_script, signature_decode_script,
 )
-from shared.script import asm, push
-from shared.transaction import Input, Output, Transaction, hash256
+from fourthgraph.bsv.script import asm, push
+from fourthgraph.bsv.transaction import Input, Output, Transaction, hash256
 from tx_engine import Context, Script, Tx
 
 

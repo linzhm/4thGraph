@@ -8,11 +8,11 @@ from hint_script import apply_hints_script
 from mldsa import test_only_vector as make_test_vector
 from ntt_script import ring_product_script, transform_script, verification_equation_script
 from script import verify_message_script
-from shared.benchmark_validation import Node
-from shared.chain_gang import validate_at_heights
+from fourthgraph.benchmark.validation import Node
+from fourthgraph.bsv.chain_gang import validate_at_heights
 from polynomial import DEGREE, MODULUS
-from shared.script import asm, push
-from shared.transaction import Input, Output, Transaction
+from fourthgraph.bsv.script import asm, push
+from fourthgraph.bsv.transaction import Input, Output, Transaction
 from test_mldsa import (
     direct_evaluation, equation_fixture, hint_fixture, negacyclic_product, pack, synthetic_polynomials,
 )

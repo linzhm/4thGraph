@@ -1,0 +1,11 @@
+# 4thGraph results
+
+| Result | Evidence and reproduction |
+| --- | --- |
+| **Native payments** | [P2PK and P2PKH measurements](../projects/p2pk-p2pkh-baseline/README.md) and [Forth builds](../projects/p2pk-p2pkh-baseline/forth/README.md) |
+| **P-256 lock optimization** | [P2PKH-R1 Forth experiment](../projects/p2pkh-r1/experiments/forth/README.md) records the byte-identical 46,302 B baseline and the 45,776 B optimized lock |
+| **PELS Counter** | [Build and replay](../projects/pels-counter/README.md) covers the funded `0 → 1 → 2` sequence and rejected mutations |
+| **BIP340** | [Schnorr locks and signing](../projects/p2pkh-schnorr/README.md) and [fixed BIP340 vectors](../projects/p2pkh-schnorr/template/bip340-vectors.csv) |
+| **BLS12-381 Groth16** | [Fixed-statement comparison](../projects/proof-counter/experiments/fixed-statement/README.md) and [recorded benchmark](../projects/proof-counter/experiments/fixed-statement/result.json) |
+
+The [wallet benchmark](../docs/benchmark.md) specifies transaction shapes, measurement and engine pins for cross-project comparisons.

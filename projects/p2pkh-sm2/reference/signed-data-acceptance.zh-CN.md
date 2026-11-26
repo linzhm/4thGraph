@@ -27,7 +27,7 @@
 支持 SM2、SM3 的 OpenSSL 运行。夹具生成专用测试密钥，并用 OpenSSL 核验签名。
 
 ```sh
-PYTHONPATH=.:projects/p2pkh-sm2/reference python -m unittest -v test_signed_data_acceptance
+PYTHONPATH=src:.:projects/p2pkh-sm2/reference python -m unittest -v test_signed_data_acceptance
 ```
 
 运行 `bash projects/p2pkh-sm2/reference/verify.sh` 可在 BSV Node 1.2.3 和

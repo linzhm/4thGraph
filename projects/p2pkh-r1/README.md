@@ -1,10 +1,10 @@
 # P2PKH-R1
 
-[简体中文](README.zh-CN.md) · [BSV Script Lab](../../README.md)
+[简体中文](README.zh-CN.md) · [4thGraph](../../README.md) · [Project index](../README.md)
 
 ## Developer resources
 
-**[Wallet SDK quickstart](docs/sdk.en.md#quickstart)** · [Unified wallet SDK](../../shared/sdk/README.md#quickstart)
+**[Wallet SDK quickstart](docs/sdk.en.md#quickstart)** · [Unified wallet SDK](../../sdk/README.md#quickstart)
 
 Create a P-256 receive script and sign an approved payment. The unified client supports prepared inputs and Chronicle OTDA.
 
@@ -98,4 +98,4 @@ Each marginal cell shows the **change in total bytes (output locks / input unloc
 | `v0.2.0` · `0x63` · after | 3×2 | 455 (0 / 412 / 43) | 2×3 | 46,313 (46,302 / 0 / 11) | 93,555 | 194,733 |
 | `v0.2.0` · `0xe3` · after | 3×2 | 373 (0 / 330 / 43) | 2×3 | 46,313 (46,302 / 0 / 11) | 93,472 | 194,567 |
 
-[Unified benchmark and reproduction](../../shared/benchmark.md) · [Matched sCrypt comparison](docs/scrypt-matched.en.md)
+[Unified benchmark and reproduction](../../docs/benchmark.md) · [Matched sCrypt comparison](docs/scrypt-matched.en.md)

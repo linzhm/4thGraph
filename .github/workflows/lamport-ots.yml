@@ -3,6 +3,9 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+env:
+  PYTHONPATH: ${{ github.workspace }}/src:${{ github.workspace }}
+
 jobs:
   verify:
     runs-on: ubuntu-24.04
@@ -18,10 +21,10 @@ jobs:
         run: |
           python -m pip install -r projects/lamport-ots/reference/requirements.txt
           python - <<'PY'
-          from shared.differential import require_chain_gang_pin
+          from fourthgraph.bsv.differential import require_chain_gang_pin
           print('Verified chain-gang commit', require_chain_gang_pin('projects/lamport-ots/reference/requirements.txt'))
           PY
-          python -m unittest shared.test_differential -v
+          python -m unittest tests.test_differential -v
       - name: Cryptography, generated Script, adversarial payments and vectors
         run: python -m unittest discover -s projects/lamport-ots/reference -p test_lamport.py -v
       - name: Complete transactions in BSV Node and chain-gang

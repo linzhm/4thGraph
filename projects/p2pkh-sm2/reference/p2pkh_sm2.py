@@ -6,9 +6,9 @@ from pathlib import Path
 from assemble import TEMPLATE_VERSION, assemble
 from sighash import authorization
 from sm2 import USER_ID,hash256,public_key_hash160,verify
-from shared.otda_reconstruction import Reconstruction
-from shared.script import push
-from shared.transaction import Transaction,Input,Output,preimage_all,amount
+from fourthgraph.bsv.otda_reconstruction import Reconstruction
+from fourthgraph.bsv.script import push
+from fourthgraph.bsv.transaction import Transaction,Input,Output,preimage_all,amount
 
 MANIFEST=Path(__file__).resolve().parents[1]/'template/layout.json'
 RECONSTRUCT_ALL = frozenset((0x61, 0xe1))

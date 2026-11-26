@@ -36,4 +36,4 @@ Install the pinned [requirements](../reference/requirements.txt) and run `bash p
 
 Follow the [unified WOTS+ wallet guide](sdk.en.md) to choose an output template and connect an external one-time signer. The callback returns a 2,144-byte signature over the requested digest. Use `compressOtda` for eligible compact unlocks and persist key consumption in the signing service.
 
-[Payment source](../reference/payment.py) · [One-time signer interface](../reference/wots.py) · [Durable benchmark signer](../../../shared/one_time_signer.py)
+[Payment source](../reference/payment.py) · [One-time signer interface](../reference/wots.py) · [Durable benchmark signer](../../../src/fourthgraph/bsv/one_time_signer.py)

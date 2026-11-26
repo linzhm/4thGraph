@@ -17,11 +17,11 @@ from payment import lock_for_public_key, sign_payment, sign_spend
 from schnorr_script import (
     _contract, authorization_codes, compile_unlock, compiled_template, lock_for_owner, owner_hash, recognize, verifier,
 )
-from shared.benchmark_validation import Node, chain_verdict
-from shared.evaluate import ScriptError, evaluate
-from shared.script import decode_num, encode_num, number, push
-from shared.spend_authorization import SpendAuthorization, prepare_authorization
-from shared.transaction import CHRONICLE, Input, Output, Transaction
+from fourthgraph.benchmark.validation import Node, chain_verdict
+from fourthgraph.bsv.evaluate import ScriptError, evaluate
+from fourthgraph.bsv.script import decode_num, encode_num, number, push
+from fourthgraph.bsv.spend_authorization import SpendAuthorization, prepare_authorization
+from fourthgraph.bsv.transaction import CHRONICLE, Input, Output, Transaction
 
 VECTORS = Path(__file__).resolve().parents[1] / "template" / "bip340-vectors.csv"
 HALF_RADIX = 1 << 128

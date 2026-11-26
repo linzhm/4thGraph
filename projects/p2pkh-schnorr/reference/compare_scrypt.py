@@ -10,9 +10,9 @@ import subprocess
 
 from bip340 import lift_x, to_bytes
 from schnorr_script import TEMPLATE_DIR, verifier
-from shared.benchmark_validation import CONTEXT_PIN, Node, chain_metadata, chain_verdict, timed
-from shared.script import push
-from shared.transaction import Input, Output, Transaction
+from fourthgraph.benchmark.validation import CONTEXT_PIN, Node, chain_metadata, chain_verdict, timed
+from fourthgraph.bsv.script import push
+from fourthgraph.bsv.transaction import Input, Output, Transaction
 
 
 def measure(lock, unlock, node, samples):
@@ -46,7 +46,7 @@ def main():
     if chain_metadata()["commit"] != CONTEXT_PIN:
         parser.error("install the pinned chain-gang revision from the project requirements")
     if not os.environ.get("REGTEST_URL") or not os.environ.get("REGTEST_COOKIE"):
-        parser.error("run through shared/verify_node.sh")
+        parser.error("run through tools/verify_node.sh")
     node = Node(os.environ["REGTEST_URL"], os.environ["REGTEST_COOKIE"])
     probe = Path(__file__).with_name("comparison") / "scrypt_legacy.cjs"
     command = ["node", "--max-old-space-size=8192", str(probe), str(args.upstream_checkout)]

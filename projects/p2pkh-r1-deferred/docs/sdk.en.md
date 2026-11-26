@@ -9,14 +9,14 @@
 Use `createLock` with the amount to build a short lock. Pass the output amount and raw script to recognition. Existing locks activate to their committed R1 version. Install the reference environment from the repository root.
 
 ```sh
-python3.12 -m venv .venv
-.venv/bin/python -m pip install -r projects/p2pkh-r1-deferred/reference/requirements.txt
+python3.12 -m venv projects/p2pkh-r1-deferred/workspace/venv
+projects/p2pkh-r1-deferred/workspace/venv/bin/python -m pip install -r projects/p2pkh-r1-deferred/reference/requirements.txt
 ```
 
-Use `config` from the [wallet quickstart](../../../shared/sdk/README.md) and authenticated wallet data.
+Use authenticated transaction data. Set `config.python` to the absolute path of `projects/p2pkh-r1-deferred/workspace/venv/bin/python` and `config.bridge` to this checkout’s `sdk/python/bridge.py`. [Shared integration example](../../../sdk/docs/integration.md#first-payment)
 
 ```ts
-import { WalletClient } from "./shared/sdk/typescript/index.ts";
+import { WalletClient } from "./sdk/typescript/index.ts";
 
 const deferred = new WalletClient("p2pkh-r1-deferred", { ...config, template: "v0.2.0" });
 const shortLock = deferred.createLock({ publicKey: receiveKeyHex, valueSats });
@@ -38,8 +38,8 @@ const activatedHex = deferred.activate({ transaction: preparedHex, inputIndex, p
 Replay the vector in all four languages from the repository root.
 
 ```sh
-SCRIPT_LAB_SDK_PYTHON="$PWD/.venv/bin/python" \
-  bash shared/verify_node.sh -- bash shared/sdk/verify_wallet.sh p2pkh-r1-deferred
+SCRIPT_LAB_SDK_PYTHON="$PWD/projects/p2pkh-r1-deferred/workspace/venv/bin/python" \
+  bash tools/verify_node.sh -- bash sdk/verify_wallet.sh p2pkh-r1-deferred
 ```
 
 ## Build the activation transaction

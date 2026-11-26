@@ -5,8 +5,8 @@ from lamport import bits, verify_digest
 from script import (
     COMPANION_CODE, ORDINARY_CODE, N, R, committed_locking_script, legacy_locking_script, locking_script,
 )
-from shared.script import number, push
-from shared.transaction import (
+from fourthgraph.bsv.script import number, push
+from fourthgraph.bsv.transaction import (
     CHRONICLE, FORKID, SIGHASH_ALL, SIGHASH_SINGLE, SIGHASH_TYPES,
     Input, Transaction, amount, hash256, preimage_forkid, preimage_otda,
 )

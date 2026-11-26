@@ -3,8 +3,8 @@ from hashlib import sha256
 from dataclasses import replace
 from lamport import public_key, sign_digest
 from script import legacy_locking_script
-from shared.transaction import Transaction, Input, Output, preimage_all, hash256
-from shared.script import push
+from fourthgraph.bsv.transaction import Transaction, Input, Output, preimage_all, hash256
+from fourthgraph.bsv.script import push
 
 
 INVALID_PREVOUT_CASES = frozenset({'outpoint_index', 'outpoint_hash', 'other_outpoint'})
@@ -85,8 +85,8 @@ def mode_fixture(flag, *, paired=True, version=2, lock_factory=None):
 def mode_cases():
     from payment import authorization
     from script import COMPANION_CODE
-    from shared.script import number
-    from shared.transaction import ANYONECANPAY, CHRONICLE, SIGHASH_TYPES, preimage_forkid
+    from fourthgraph.bsv.script import number
+    from fourthgraph.bsv.transaction import ANYONECANPAY, CHRONICLE, SIGHASH_TYPES, preimage_forkid
 
     for flag in sorted(SIGHASH_TYPES):
         secret, parents, signed = mode_fixture(flag)

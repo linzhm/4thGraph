@@ -1,10 +1,10 @@
 # WOTS+ (SHA-256)
 
-[简体中文](README.zh-CN.md) · [BSV Script Lab](../../README.md)
+[简体中文](README.zh-CN.md) · [4thGraph](../../README.md) · [Project index](../README.md)
 
 ## Developer resources
 
-**[Wallet SDK quickstart](docs/sdk.en.md#quickstart)** · [Unified wallet SDK](../../shared/sdk/README.md#quickstart)
+**[Wallet SDK quickstart](docs/sdk.en.md#quickstart)** · [Unified wallet SDK](../../sdk/README.md#quickstart)
 
 Choose a receive template and connect a durable one-time signer. The cached-step profile supports eligible OTDA reconstruction.
 
@@ -96,7 +96,7 @@ The development evaluator measured a main stack peak of 28 items, up from
 13 with the previous cache, with 67 altstack items in both. The same 1,230
 payment cases and 67 signature-chain mutations run against both engines.
 Use a fresh key across all formats.
-The [benchmark guide](../../shared/benchmark.md) describes the optional
+The [benchmark guide](../../docs/benchmark.md) describes the optional
 durable signer wrapper used for the synthetic keys.
 
 ### OTDA output reconstruction
@@ -197,4 +197,4 @@ Each marginal cell shows the **change in total bytes (output locks / input unloc
 | `cached-steps-reconstructed` · `0xe3` · after | 3×2 | 2,358 (0 / 2,315 / 43) | 2×3 | 33,967 (33,956 / 0 / 11) | 72,749 | 151,585 |
 | `cached-steps-reconstructed` · `0xe1` · after | 3×2 | 5,531 (0 / 5,488 / 43) | 2×3 | 34,145 (33,956 / 178 / 11) | 72,808 | 151,814 |
 
-[Unified benchmark and reproduction](../../shared/benchmark.md)
+[Unified benchmark and reproduction](../../docs/benchmark.md)

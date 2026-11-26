@@ -15,7 +15,7 @@ Both schemes require both signatures. The fixtures use the same transaction shap
 | MuSig2 | Chronicle OTDA | 30,398 | 61,087 / 61,087 | 183,088 | 61,253 | 91,235 | 61,811 | 244,899 | 122,006 |
 | Native 2-of-2 | Chronicle OTDA | 71 | 145 / 146 | 543 | 187 | 81 | 769 | 1,314 | 210 |
 
-All sizes are in bytes. At a common rate of one satoshi per byte, the transaction and lifecycle byte counts also give their fee in satoshis. Native ECDSA DER lengths vary with the signature, so the observed marginals include small witness changes. Stack payload counts main and alternate stack data. The native peak occurs immediately before `CHECKMULTISIG`. The MuSig2 stack figures come from the development evaluator. Internal engine allocations are outside this measurement. [Runner](../reference/compare_threshold.py) · [Benchmark method](../../../shared/benchmark.md)
+All sizes are in bytes. At a common rate of one satoshi per byte, the transaction and lifecycle byte counts also give their fee in satoshis. Native ECDSA DER lengths vary with the signature, so the observed marginals include small witness changes. Stack payload counts main and alternate stack data. The native peak occurs immediately before `CHECKMULTISIG`. The MuSig2 stack figures come from the development evaluator. Internal engine allocations are outside this measurement. [Runner](../reference/compare_threshold.py) · [Benchmark method](../../../docs/benchmark.md)
 
 For the 2×2 fixtures, median chain-gang verification was **6.7 ms** for MuSig2 and **0.39 ms** for native ForkID, and **7.3 ms** and **0.40 ms** for OTDA. BSV Node loopback RPC medians were **32.2 ms** and **0.88 ms** for ForkID, and **40.0 ms** and **0.90 ms** for OTDA. These host-specific medians use 15 measurements after one warmup and include input preparation and verification. Node timings include local RPC overhead.
 
@@ -32,10 +32,10 @@ Acceptance covers two official BIP327 signature aggregation vectors. Session cas
 Set up the [project environment](../README.md#validate-the-baseline) and run from the repository root.
 
 ```sh
-PYTHONPATH=. bash shared/verify_node.sh -- \
-  .venv/p2pkh-schnorr/bin/python projects/p2pkh-schnorr/reference/compare_threshold.py \
+PYTHONPATH=src:. bash tools/verify_node.sh -- \
+  projects/p2pkh-schnorr/workspace/p2pkh-schnorr/bin/python projects/p2pkh-schnorr/reference/compare_threshold.py \
   --output /tmp/p2pkh-schnorr-threshold.json
-PYTHONPATH=. bash shared/verify_node.sh --profile default -- \
-  .venv/p2pkh-schnorr/bin/python projects/p2pkh-schnorr/reference/compare_threshold.py \
+PYTHONPATH=src:. bash tools/verify_node.sh --profile default -- \
+  projects/p2pkh-schnorr/workspace/p2pkh-schnorr/bin/python projects/p2pkh-schnorr/reference/compare_threshold.py \
   --admission --output /tmp/p2pkh-schnorr-threshold-admission.json
 ```

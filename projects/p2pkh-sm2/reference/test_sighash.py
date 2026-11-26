@@ -8,9 +8,9 @@ from tx_engine import Script, Tx, sig_hash_preimage
 from p2pkh_sm2 import authorization, current_input_unlock, locking_script_from_public_key, sign_input
 from sighash import ANYONECANPAY, CHRONICLE, COMPANION_CODE, SINGLE, SUPPORTED_TYPES
 from sm2 import encode_public, fixture_sign, mul
-from shared.differential import chain_gang_valid, require_chain_gang_pin
-from shared.script import push
-from shared.transaction import Input, Output, Transaction, hash256
+from fourthgraph.bsv.differential import chain_gang_valid, require_chain_gang_pin
+from fourthgraph.bsv.script import push
+from fourthgraph.bsv.transaction import Input, Output, Transaction, hash256
 
 require_chain_gang_pin(Path(__file__).with_name('requirements.txt'))
 DIRECTORY = Path(__file__).resolve().parents[1] / 'template'

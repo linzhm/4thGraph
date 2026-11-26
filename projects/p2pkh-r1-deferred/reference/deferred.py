@@ -5,8 +5,8 @@ from hashlib import sha256
 from pathlib import Path
 import sys
 
-from shared.script import OPS, assemble, push
-from shared.transaction import (
+from fourthgraph.bsv.script import OPS, assemble, push
+from fourthgraph.bsv.transaction import (
     ANYONECANPAY, CHRONICLE, FORKID, SIGHASH_SINGLE, SIGHASH_TYPES,
     Output, Transaction, amount, hash256, preimage_forkid, preimage_otda,
 )

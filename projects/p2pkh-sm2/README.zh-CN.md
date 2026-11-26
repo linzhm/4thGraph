@@ -1,10 +1,10 @@
 # P2PKH-SM2 v1.1.0 候选版
 
-[English](README.md) · [BSV Script Lab](../../README.zh-CN.md)
+[English](README.md) · [4thGraph](../../README.zh-CN.md) · [项目目录](../README.zh-CN.md)
 
 ## 开发入口
 
-**[钱包 SDK 快速上手](docs/sdk.zh-CN.md#quickstart)** · [统一钱包 SDK](../../shared/sdk/README.zh-CN.md#quickstart)
+**[钱包 SDK 快速上手](docs/sdk.zh-CN.md#quickstart)** · [统一钱包 SDK](../../sdk/README.zh-CN.md#quickstart)
 
 选择原始 SM2 签名器或 SignedData 签名器。符合条件的付款会自动选择更短的 OTDA 解锁编码。
 
@@ -98,7 +98,7 @@ bash verify.sh
 | `v1.0.0` · `0x41` | 3×2 | 334 (0 / 291 / 43) | 2×3 | 144,938 (144,925 / 0 / 13) | 290,780 | 581,334 |
 | `v1.0.0` · `0x61` | 3×2 | 290,277 (0 / 290,232 / 45) | 2×3 | 434,814 (144,925 / 289,876 / 13) | 290,794 | 1,160,988 |
 
-[统一测量入口与复现口径](../../shared/benchmark.zh-CN.md)
+[统一测量入口与复现口径](../../docs/benchmark.zh-CN.md)
 
 <a name="otda-constructor"></a>
 

@@ -5,8 +5,8 @@ from coincurve import PrivateKey
 from bip340 import ORDER
 from payment import lock_for_public_key, sign_spend
 from schnorr_script import TEMPLATE_VERSION
-from shared.benchmark_cases import Coin, Template, seed
-from shared.transaction import CHRONICLE, Output
+from fourthgraph.benchmark.cases import Coin, Template, seed
+from fourthgraph.bsv.transaction import CHRONICLE, Output
 
 
 def schnorr_coin(label, value):

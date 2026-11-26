@@ -22,14 +22,14 @@ from reconstruct import shared_kernel_program
 from signature import (COMPRESSIBLE_OTDA_TYPES, GROUP_ORDER_R1, PAIRED_OTDA_SINGLE_TYPES, UNIVERSAL_FLAGS,
                        authorization, current_input_unlock)
 from test_payment import fixture_signature, signer
-from shared.benchmark import collect, dump_json
-from shared.benchmark_admission import admission_case
-from shared.benchmark_cases import Coin, Template, seed, synthetic_parent
-from shared.benchmark_validation import CORE_PIN, Node, chain_metadata, chain_verdict
-from shared.evaluate import evaluate
-from shared.otda_reconstruction import Reconstruction
-from shared.script import asm, decode_num, encode_num, push
-from shared.transaction import Input, Output, Transaction
+from fourthgraph.benchmark.run import collect, dump_json
+from fourthgraph.benchmark.admission import admission_case
+from fourthgraph.benchmark.cases import Coin, Template, seed, synthetic_parent
+from fourthgraph.benchmark.validation import CORE_PIN, Node, chain_metadata, chain_verdict
+from fourthgraph.bsv.evaluate import evaluate
+from fourthgraph.bsv.otda_reconstruction import Reconstruction
+from fourthgraph.bsv.script import asm, decode_num, encode_num, push
+from fourthgraph.bsv.transaction import Input, Output, Transaction
 
 COMPILER_SHA256 = "e5e8fa95f0bf4a3ea809dd74b7dcac5b4dbb3a0edb458b469ec1a7dfbb04c4fa"
 MARKER = "5b92be8a562533373534b153118deadf"
@@ -209,7 +209,7 @@ def main():
         parser.error("install the pinned chain-gang revision from the project requirements")
     profile = os.environ.get("SCRIPT_LAB_REGTEST_PROFILE")
     if args.admission and profile != "default":
-        parser.error("use shared/verify_node.sh --profile default for admission")
+        parser.error("use tools/verify_node.sh --profile default for admission")
     node = Node(os.environ["REGTEST_URL"], os.environ["REGTEST_COOKIE"])
     with TemporaryDirectory(prefix="r1-scrypt-") as temp:
         scratch = Path(temp)

@@ -12,8 +12,8 @@ from coincurve import PublicKeyXOnly
 
 from compare_scrypt import measure
 from schnorr_script import verifier
-from shared.benchmark_validation import CONTEXT_PIN, Node, chain_metadata, stack_profile
-from shared.script import asm, push
+from fourthgraph.benchmark.validation import CONTEXT_PIN, Node, chain_metadata, stack_profile
+from fourthgraph.bsv.script import asm, push
 from test_schnorr import detached_unlock, malformed_witnesses, official_vectors
 
 COMPILER_SHA256 = "889b8797ed04412e2ea6c0cc56ef5bfcdfb54451c162bcfbc12a6dd43325777b"

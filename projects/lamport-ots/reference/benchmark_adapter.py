@@ -3,9 +3,9 @@ from fixtures import test_secret
 from lamport import OneTimeSigner
 from payment import sign_spend
 from script import committed_locking_script, locking_script
-from shared.benchmark_cases import Coin, Template
-from shared.transaction import Output
-from shared.one_time_signer import durable_signer
+from fourthgraph.benchmark.cases import Coin, Template
+from fourthgraph.bsv.transaction import Output
+from fourthgraph.bsv.one_time_signer import durable_signer
 
 
 def coin(label, value, *, committed=False):

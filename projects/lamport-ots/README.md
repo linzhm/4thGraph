@@ -1,10 +1,10 @@
 # Lamport OTS (SHA-256)
 
-[简体中文](README.zh-CN.md) · [BSV Script Lab](../../README.md)
+[简体中文](README.zh-CN.md) · [4thGraph](../../README.md) · [Project index](../README.md)
 
 ## Developer resources
 
-**[Wallet SDK quickstart](docs/sdk.en.md#quickstart)** · [Unified wallet SDK](../../shared/sdk/README.md#quickstart)
+**[Wallet SDK quickstart](docs/sdk.en.md#quickstart)** · [Unified wallet SDK](../../sdk/README.md#quickstart)
 
 Choose a full-key or committed-key output and connect a signer that records one-time key consumption before releasing a signature.
 
@@ -62,8 +62,8 @@ varies with the serialized transaction. Full measurements are in
 From repository root:
 
 ```sh
-python3 -m venv .venv
-. .venv/bin/activate
+python3 -m venv projects/lamport-ots/workspace/venv
+. projects/lamport-ots/workspace/venv/bin/activate
 python -m pip install -r projects/lamport-ots/reference/requirements.txt
 python -m unittest discover -s projects/lamport-ots/reference -p test_lamport.py -v
 python -m unittest discover -s projects/lamport-ots/reference -p test_acceptance.py -v
@@ -170,4 +170,4 @@ Each marginal cell shows the **change in total bytes (output locks / input unloc
 | `committed-key` · `0x41` | 3×2 | 16,592 (0 / 16,549 / 43) | 2×3 | 7,757 (7,746 / 0 / 11) | 48,933 | 97,641 |
 | `committed-key` · `0x61` | 3×2 | 32,169 (0 / 32,126 / 43) | 2×3 | 23,271 (7,746 / 15,514 / 11) | 48,948 | 128,564 |
 
-[Unified benchmark and reproduction](../../shared/benchmark.md)
+[Unified benchmark and reproduction](../../docs/benchmark.md)

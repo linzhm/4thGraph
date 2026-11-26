@@ -13,16 +13,16 @@ BSV Node 1.2.3 can replay the target input with the same previous output via
 From the repository root:
 
 ```sh
-uv run --no-project --with-requirements projects/p2pk-p2pkh-baseline/reference/requirements-acceptance.txt \
+PYTHONPATH=src:. uv run --no-project --with-requirements projects/p2pk-p2pkh-baseline/reference/requirements-acceptance.txt \
   python -m unittest discover -s projects/p2pk-p2pkh-baseline/reference -p test_acceptance.py -v
 ```
 
 For a peerless Linux x86-64 regtest using the shared launcher:
 
 ```sh
-PYTHONPATH=.:projects/p2pk-p2pkh-baseline/reference \
+PYTHONPATH=src:.:projects/p2pk-p2pkh-baseline/reference \
   uv run --no-project --with-requirements projects/p2pk-p2pkh-baseline/reference/requirements-acceptance.txt \
-  bash shared/verify_node.sh test_acceptance
+  bash tools/verify_node.sh test_acceptance
 ```
 
 The same test accepts `REGTEST_COOKIE` and an optional `REGTEST_URL` for an

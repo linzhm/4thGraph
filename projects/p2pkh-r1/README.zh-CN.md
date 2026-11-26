@@ -1,10 +1,10 @@
 # P2PKH-R1
 
-[English](README.md) · [BSV Script Lab](../../README.zh-CN.md)
+[English](README.md) · [4thGraph](../../README.zh-CN.md) · [项目目录](../README.zh-CN.md)
 
 ## 开发入口
 
-**[钱包 SDK 快速上手](docs/sdk.zh-CN.md#quickstart)** · [统一钱包 SDK](../../shared/sdk/README.zh-CN.md#quickstart)
+**[钱包 SDK 快速上手](docs/sdk.zh-CN.md#quickstart)** · [统一钱包 SDK](../../sdk/README.zh-CN.md#quickstart)
 
 生成 P-256 收款脚本并签署已审批的付款。统一客户端支持逐输入签名和 Chronicle OTDA。
 
@@ -100,4 +100,4 @@ v0.1.0 和 v0.2.0 数据来自提交 `beeb4dd` 的确定性夹具。Forth v0.3.0
 | `v0.2.0` · `0x63` · 优化后 | 3×2 | 455 (0 / 412 / 43) | 2×3 | 46,313 (46,302 / 0 / 11) | 93,555 | 194,733 |
 | `v0.2.0` · `0xe3` · 优化后 | 3×2 | 373 (0 / 330 / 43) | 2×3 | 46,313 (46,302 / 0 / 11) | 93,472 | 194,567 |
 
-[统一测量入口与复现口径](../../shared/benchmark.zh-CN.md) · [与 sCrypt 同算法对照](docs/scrypt-matched.zh-CN.md)
+[统一测量入口与复现口径](../../docs/benchmark.zh-CN.md) · [与 sCrypt 同算法对照](docs/scrypt-matched.zh-CN.md)

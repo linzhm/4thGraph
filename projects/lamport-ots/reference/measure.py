@@ -11,8 +11,8 @@ from fixtures import fixture, mode_fixture, test_secret
 from script import committed_locking_script, locking_script, binding
 from payment import authorization, sign_spend
 from engines import chain_valid, development_valid
-from shared.script import push
-from shared.transaction import Input, Output, SIGHASH_TYPES, Transaction, hash256
+from fourthgraph.bsv.script import push
+from fourthgraph.bsv.transaction import Input, Output, SIGHASH_TYPES, Transaction, hash256
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -167,7 +167,7 @@ def stack_profile():
     # Observe the development interpreter's actual stack for the public vector.
     # This is payload accounting, not the node's allocator/resource accounting.
     import sys
-    from shared.evaluate import evaluate
+    from fourthgraph.bsv.evaluate import evaluate
     from engines import native_checker
     _,_,lock,_,tx,pre,sig = fixture()
     peaks = dict(main_items=0, alt_items=0, combined_items=0, combined_payload_bytes=0)

@@ -5,9 +5,9 @@ from ecdsa import VerifyingKey, SECP256k1, BadSignatureError
 from ecdsa.util import sigdecode_der
 from tx_engine import Script, Tx, TxIn, TxOut
 from script import COMPANION_CODE, ORDINARY_CODE
-from shared.transaction import CHRONICLE, SIGHASH_SINGLE, SIGHASH_TYPES, hash256, preimage_forkid, preimage_otda
-from shared.evaluate import evaluate, ScriptError
-from shared.differential import chain_gang_valid, require_chain_gang_pin
+from fourthgraph.bsv.transaction import CHRONICLE, SIGHASH_SINGLE, SIGHASH_TYPES, hash256, preimage_forkid, preimage_otda
+from fourthgraph.bsv.evaluate import evaluate, ScriptError
+from fourthgraph.bsv.differential import chain_gang_valid, require_chain_gang_pin
 
 
 require_chain_gang_pin(Path(__file__).with_name('requirements.txt'))

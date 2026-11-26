@@ -7,7 +7,7 @@ from tx_engine import Script, Tx, TxIn
 
 from assemble import assemble
 from p2pkh_r1 import locking_script_from_owner_hash
-from shared.script import OPS, asm, push
+from fourthgraph.bsv.script import OPS, asm, push
 from signature import authorization, current_input_unlock
 from test_payment import TRUE, check, child, fixture_signature, locking_script, parent, signer
 

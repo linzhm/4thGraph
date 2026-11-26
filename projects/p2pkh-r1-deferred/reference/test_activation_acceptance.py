@@ -6,8 +6,8 @@ import unittest
 
 from deferred import activation_preimages, activate_input, funding_output, target_output
 from fixed_templates import TEMPLATE_VERSIONS
-from shared.script import asm, push
-from shared.transaction import Input, Output, Transaction
+from fourthgraph.bsv.script import asm, push
+from fourthgraph.bsv.transaction import Input, Output, Transaction
 from test_deferred import engine_tx, fixture_key
 from test_payment import check
 from test_payment_acceptance import CONTEXTS, SIGHASH_TYPES, VERSIONS

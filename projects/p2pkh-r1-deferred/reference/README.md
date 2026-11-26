@@ -6,11 +6,11 @@ From the repository root, use Python 3.12 with Git and Rust for the pinned chain
 
 ```sh
 python -m pip install -r projects/p2pkh-r1-deferred/reference/requirements.txt
-PYTHONPATH=. python projects/p2pkh-r1-deferred/reference/generate_vectors.py
-python -m unittest discover -s projects/p2pkh-r1-deferred/reference -p test_deferred.py -v
+PYTHONPATH=src:. python projects/p2pkh-r1-deferred/reference/generate_vectors.py
+PYTHONPATH=src:. python -m unittest discover -s projects/p2pkh-r1-deferred/reference -p test_deferred.py -v
 ```
 
-Add `--write` to `generate_vectors.py` to regenerate the template, layout and direct and universal activation vectors. All vector keys are public test keys. To generate a lock with `generate_lock.py`, set `PYTHONPATH=.` and supply `--owner-hash160 HEX --value SATOSHIS`. `--public-key HEX` derives the same key hash from a full public key. Use `--format raw` for the raw lock. Supply `--script-file RAW_SCRIPT --value SATOSHIS` to recognize either funding format.
+Add `--write` to `generate_vectors.py` to regenerate the template, layout and direct and universal activation vectors. All vector keys are public test keys. To generate a lock with `generate_lock.py`, set `PYTHONPATH=src:.` and supply `--owner-hash160 HEX --value SATOSHIS`. `--public-key HEX` derives the same key hash from a full public key. Use `--format raw` for the raw lock. Supply `--script-file RAW_SCRIPT --value SATOSHIS` to recognize either funding format.
 
 Call `funding_output_from_owner_hash` or `funding_output` when creating the short output and `recognize` when accepting it. Call `activate_input(tx, index, funding_raw, sighash=0x43)` for each input of a fully built activation transaction. Select a ForkID or an available Chronicle OTDA mode per input. Keep any sponsor's signing and the recipient's later R1 signing in the applicable wallet or external signer.
 

@@ -1,6 +1,6 @@
 # Lamport OTS wallet SDK
 
-[简体中文](sdk.zh-CN.md) · [Developer guide](developer.en.md#sdk) · [Wallet quickstart](../../../shared/sdk/README.md)
+[简体中文](sdk.zh-CN.md) · [Developer guide](developer.en.md#sdk) · [Wallet quickstart](../../../sdk/README.md)
 
 Choose `full-key` (default) or `committed-key` for receiving and pass the complete ordered public key to recognition. The SDK can also recognize legacy outputs, whose spending mode is ForkID ALL. The signer receives a 32-byte digest and returns an 8,192-byte signature. Have the signer durably consume the key before releasing a signature. Use a fresh key for change and keep the signed transaction for retries.
 
@@ -10,10 +10,16 @@ Choose `full-key` (default) or `committed-key` for receiving and pass the comple
 
 The runtime uses the Python 3.12 standard library. The replay needs the test dependencies below.
 
-Use the quickstart's bridge configuration and approved wallet data. Create a receiving script and prepare a payment with the same client.
+Create the Python environment for the bridge from the repository root.
+
+```sh
+python3.12 -m venv projects/lamport-ots/workspace/venv
+```
+
+Use authenticated transaction data. Set `config.python` to the absolute path of `projects/lamport-ots/workspace/venv/bin/python` and `config.bridge` to this checkout’s `sdk/python/bridge.py`. [Shared integration example](../../../sdk/docs/integration.md#first-payment)
 
 ```ts
-import { WalletClient } from "./shared/sdk/typescript/index.ts";
+import { WalletClient } from "./sdk/typescript/index.ts";
 
 const wallet = new WalletClient("lamport-ots", { ...config, template: "full-key" });
 const receiveScript = wallet.createLock({ publicKey: receiveKeyHex });
@@ -29,18 +35,18 @@ const signedHex = wallet.signPayment({
 }, ({ payload }) => signer.signLamportOnce(keyId, payload));
 ```
 
-Use `signInput` for a prepared transaction. Supply the transaction, its input index and the corresponding prevout. See the [call table](../../../shared/sdk/README.md#calls-and-data) for the matching Rust, Go, and Python interfaces.
+Use `signInput` for a prepared transaction. Supply the transaction, its input index and the corresponding prevout. See the [call table](../../../sdk/docs/reference.md#calls-and-data) for the matching Rust, Go, and Python interfaces.
 
 ## Keep key state with the invoice
 
 Record whether the invoice uses `full-key` or `committed-key` and retain the ordered public key for both. Its 16,384 bytes have a fixed order. The committed template uses those bytes to assemble the spending proof. Recover the public key and the key-consumption record together.
 
-Reserve the key before the signer releases the 8,192-byte signature. A timeout after requesting a signature can leave the key consumed. Recover and rebroadcast the same signed transaction when available, and use fresh keys on new outputs. [One-time signing in the shared SDK](../../../shared/sdk/README.md#one-time-signing)
+Reserve the key before the signer releases the 8,192-byte signature. A timeout after requesting a signature can leave the key consumed. Recover and rebroadcast the same signed transaction when available, and use fresh keys on new outputs. [One-time signing in the shared SDK](../../../sdk/docs/reference.md#one-time-signing)
 
 ## Replay vectors
 
 ```sh
-.venv/bin/python -m pip install -r projects/lamport-ots/reference/requirements.txt
-SCRIPT_LAB_SDK_PYTHON="$PWD/.venv/bin/python" \
-  bash shared/verify_node.sh -- bash shared/sdk/verify_wallet.sh lamport-ots
+projects/lamport-ots/workspace/venv/bin/python -m pip install -r projects/lamport-ots/reference/requirements.txt
+SCRIPT_LAB_SDK_PYTHON="$PWD/projects/lamport-ots/workspace/venv/bin/python" \
+  bash tools/verify_node.sh -- bash sdk/verify_wallet.sh lamport-ots
 ```

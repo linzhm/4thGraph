@@ -5,9 +5,9 @@ import unittest
 from challenge_script import sample_from_stream_script, sample_in_ball_script
 from fips204 import CHALLENGE_WEIGHT, SAMPLE_IN_BALL_BYTES, sample_challenge
 from polynomial import MODULUS
-from shared.chain_gang import validate_at_heights
-from shared.script import asm, push
-from shared.transaction import Input, Output, Transaction
+from fourthgraph.bsv.chain_gang import validate_at_heights
+from fourthgraph.bsv.script import asm, push
+from fourthgraph.bsv.transaction import Input, Output, Transaction
 
 
 def pack(polynomial):

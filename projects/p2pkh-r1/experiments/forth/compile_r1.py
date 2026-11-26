@@ -5,9 +5,9 @@ from hashlib import sha256
 import json
 from pathlib import Path
 
-from compiler import CompileError, SourceCompiler, evaluate
-from shared.script import OPS, number, push
-from wordsets import script_word
+from fourthgraph.compiler.source import CompileError, SourceCompiler, evaluate
+from fourthgraph.bsv.script import OPS, number, push
+from fourthgraph.compiler.wordsets import script_word
 
 VERSION = "0.3.0"
 BASELINE_VERSION = "0.2.0"

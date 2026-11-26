@@ -28,24 +28,24 @@ v0.3.0 是完整锁的 Forth 优化构建。编译器的 `--optimize` 选择 v0.
 
 ### 完整锁复跑
 
-从仓库根目录运行。复放使用装有 `ecdsa`、参考实现依赖和 [Chronicle chain-gang 固定版本](../../../../shared/requirements-chronicle.txt) 的 Python 环境。省略收款哈希时，编译器生成用于比较的零值收款模板。
+从仓库根目录运行。复放使用装有 `ecdsa`、参考实现依赖和 [Chronicle chain-gang 固定版本](../../../../tools/requirements-chronicle.txt) 的 Python 环境。省略收款哈希时，编译器生成用于比较的零值收款模板。
 
 ```sh
 project=projects/p2pkh-r1
 experiment="$project/experiments/forth"
-export PYTHONPATH=".:projects/4thgraph:$project/reference"
+export PYTHONPATH="src:.:$project/reference"
 
 python "$experiment/compile_r1.py" --version
 python "$experiment/compile_r1.py"
 python "$experiment/compile_r1.py" --optimize --owner-hash160 "$R1_OWNER_HASH160"
-bash shared/verify_node.sh --profile raised -- \
+bash tools/verify_node.sh --profile raised -- \
   python "$experiment/replay_r1.py" --matrix --output /tmp/r1-forth-comparison.json
 ```
 
 三版对照在同时包含本实验和 #45 夹具提交 `89d90e0` 的临时检出中运行。使用 #45 固定的 Linux x86-64 sCrypt 编译器。 [夹具提交](https://github.com/linzhm/bsv-script-lab/commit/89d90e0b6be95b9dbb34bb09475417f210c8da3a)
 
 ```sh
-GHCRTS=-N2 bash shared/verify_node.sh --profile raised -- \
+GHCRTS=-N2 bash tools/verify_node.sh --profile raised -- \
   python "$experiment/replay_r1.py" --matrix --scryptc "$SCRYPTC" \
   --output /tmp/r1-forth-v030-comparison.json
 ```
@@ -73,7 +73,7 @@ GHCRTS=-N2 bash shared/verify_node.sh --profile raised -- \
 python "$experiment/compile_p256.py" --version
 python "$experiment/compile_p256.py"
 python "$experiment/compare.py"
-bash shared/verify_node.sh --profile raised -- \
+bash tools/verify_node.sh --profile raised -- \
   python "$experiment/compare.py" --regtest --output /tmp/p256-forth-comparison.json
 ```
 

@@ -1,10 +1,10 @@
 # Lamport OTS（SHA-256）
 
-[English](README.md) · [BSV Script Lab](../../README.zh-CN.md)
+[English](README.md) · [4thGraph](../../README.zh-CN.md) · [项目目录](../README.zh-CN.md)
 
 ## 开发入口
 
-**[钱包 SDK 快速上手](docs/sdk.zh-CN.md#quickstart)** · [统一钱包 SDK](../../shared/sdk/README.zh-CN.md#quickstart)
+**[钱包 SDK 快速上手](docs/sdk.zh-CN.md#quickstart)** · [统一钱包 SDK](../../sdk/README.zh-CN.md#quickstart)
 
 选择完整公钥锁或公钥承诺锁，接入能在返回签名前持久化一次性密钥消费记录的签名器。
 
@@ -71,4 +71,4 @@ python projects/lamport-ots/reference/measure.py --committed-costs
 | `committed-key` · `0x41` | 3×2 | 16,592 (0 / 16,549 / 43) | 2×3 | 7,757 (7,746 / 0 / 11) | 48,933 | 97,641 |
 | `committed-key` · `0x61` | 3×2 | 32,169 (0 / 32,126 / 43) | 2×3 | 23,271 (7,746 / 15,514 / 11) | 48,948 | 128,564 |
 
-[统一测量入口与复现口径](../../shared/benchmark.zh-CN.md)
+[统一测量入口与复现口径](../../docs/benchmark.zh-CN.md)

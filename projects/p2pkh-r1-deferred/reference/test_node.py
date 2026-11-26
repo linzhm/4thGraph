@@ -13,8 +13,8 @@ from test_deferred import (
     activation_fixture, engine_script, engine_tx, fixture, fixture_signature, mode_activations,
     wrong_activations, zero_commitment_case,
 )
-from shared.script import asm
-from shared.transaction import CHRONICLE, Transaction
+from fourthgraph.bsv.script import asm
+from fourthgraph.bsv.transaction import CHRONICLE, Transaction
 from tx_engine import TxOut
 from wallet import sign_payment
 

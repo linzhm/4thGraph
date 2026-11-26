@@ -1,10 +1,10 @@
 # WOTS+（SHA-256）
 
-[English](README.md) · [BSV Script Lab](../../README.zh-CN.md)
+[English](README.md) · [4thGraph](../../README.zh-CN.md) · [项目目录](../README.zh-CN.md)
 
 ## 开发入口
 
-**[钱包 SDK 快速上手](docs/sdk.zh-CN.md#quickstart)** · [统一钱包 SDK](../../shared/sdk/README.zh-CN.md#quickstart)
+**[钱包 SDK 快速上手](docs/sdk.zh-CN.md#quickstart)** · [统一钱包 SDK](../../sdk/README.zh-CN.md#quickstart)
 
 选择收款模板并接入有持久化记录的一次性签名器。缓存步骤模板支持符合条件的 OTDA 重建。
 
@@ -95,4 +95,4 @@ python projects/wots-plus/reference/test_lean.py /path/to/bsv-script-lean/eval/b
 | `cached-steps-reconstructed` · `0xe3` · 优化后 | 3×2 | 2,358 (0 / 2,315 / 43) | 2×3 | 33,967 (33,956 / 0 / 11) | 72,749 | 151,585 |
 | `cached-steps-reconstructed` · `0xe1` · 优化后 | 3×2 | 5,531 (0 / 5,488 / 43) | 2×3 | 34,145 (33,956 / 178 / 11) | 72,808 | 151,814 |
 
-[统一测量入口与复现口径](../../shared/benchmark.zh-CN.md)
+[统一测量入口与复现口径](../../docs/benchmark.zh-CN.md)

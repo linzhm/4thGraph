@@ -28,7 +28,7 @@ P2PK 把压缩公钥写在锁里，花费时提供签名。P2PKH 在锁里放公
 
 验收域声明 2,880 种组合，另有 80 项无配对 SINGLE 变更以及 192 项激活边界测试。两进两出的 ForkID ALL 样本中，P2PK 为 326 字节，P2PKH 为 374 字节。P2PKH 每个输出锁少 10 字节，但每个输入多约 34 字节，实际值随 DER 签名长度变化。
 
-按[项目命令](../README.zh-CN.md#复现与验收)重放离线向量，或在[统一入口](../../../shared/benchmark.zh-CN.md)用 `--project p2pk-p2pkh-baseline`。离线生成器和验收测试使用仓库统一的 Chronicle 依赖。
+按[项目命令](../README.zh-CN.md#复现与验收)重放离线向量，或在[统一入口](../../../docs/benchmark.zh-CN.md)用 `--project p2pk-p2pkh-baseline`。离线生成器和验收测试使用仓库统一的 Chronicle 依赖。
 
 <a name="sdk"></a>
 
@@ -38,4 +38,4 @@ P2PK 把压缩公钥写在锁里，花费时提供签名。P2PKH 在锁里放公
 
 [Python 夹具源码](../reference/script_lab.py)提供序列化和验签示例。实际集成使用原有钱包签名接口。[向量 JSON](../template/baseline.json)可用来逐项校验生成的父交易、花费交易和脚本。
 
-[复现命令](../README.zh-CN.md#复现与验收) · [统一依赖与运行口径](../../../shared/benchmark.zh-CN.md)
+[复现命令](../README.zh-CN.md#复现与验收) · [统一依赖与运行口径](../../../docs/benchmark.zh-CN.md)

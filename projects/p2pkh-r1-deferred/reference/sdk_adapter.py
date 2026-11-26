@@ -1,7 +1,7 @@
 """Connect the shared wallet API to Deferred R1 funding and activation."""
 from deferred import activate_previous, funding_output, funding_output_from_owner_hash
 from deferred import recognize as recognize_output
-from shared.transaction import Output
+from fourthgraph.bsv.transaction import Output
 
 
 def _target(profile):

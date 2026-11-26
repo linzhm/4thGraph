@@ -14,8 +14,8 @@ from fixed_templates import LEGACY_TEMPLATE_VERSION, RELEASE_DIRECTORY, TEMPLATE
 from fixed_templates import compiled_template, otda_reconstruction
 from generate_templates import build_artifacts, scheduled_artifacts
 from p2pkh_r1 import locking_script_from_owner_hash, locking_script_from_public_key, recognize
-from shared.evaluate import evaluate
-from shared.transaction import Transaction, hash256, preimage_forkid, preimage_otda
+from fourthgraph.bsv.evaluate import evaluate
+from fourthgraph.bsv.transaction import Transaction, hash256, preimage_forkid, preimage_otda
 from test_payment import check, child, fixture_signature, parent, signer
 from signature import UNIVERSAL_FLAGS, authorization, current_input_unlock
 from specialize import specialized_lock

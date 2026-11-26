@@ -2,10 +2,10 @@
 from pathlib import Path
 import sys
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
+sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "src"))
 
-from shared.pushtx import authorization_checks, check_binding
-from shared.script import asm, number, push
+from fourthgraph.bsv.pushtx import authorization_checks, check_binding
+from fourthgraph.bsv.script import asm, number, push
 from wots import CHAINS, KEY_BYTES, N, SIGNATURE_BYTES, W
 
 # ScriptCode suffixes differ from Lamport; the extra OP_NOPs are domain tags.

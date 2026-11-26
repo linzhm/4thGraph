@@ -6,10 +6,10 @@ import json
 from operator import add, mul, sub
 from pathlib import Path
 
-import compiler
-from lowering import compile_word
-from shared.script import asm, number
-from wordsets import script_word
+from fourthgraph.compiler import source as compiler
+from fourthgraph.compiler.lowering import compile_word
+from fourthgraph.bsv.script import asm, number
+from fourthgraph.compiler.wordsets import script_word
 
 VERSION = "0.1.0-alpha.1"
 SOURCE = Path(__file__).with_name("p256.fth")

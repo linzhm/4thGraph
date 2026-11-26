@@ -6,9 +6,9 @@ from pathlib import Path
 
 from fips204 import verify
 from script import verify_message_script
-from shared.chain_gang import validate_at_heights
-from shared.script import asm, push
-from shared.transaction import Input, Output, Transaction
+from fourthgraph.bsv.chain_gang import validate_at_heights
+from fourthgraph.bsv.script import asm, push
+from fourthgraph.bsv.transaction import Input, Output, Transaction
 
 
 def script_verdict(key, message, context, signature):

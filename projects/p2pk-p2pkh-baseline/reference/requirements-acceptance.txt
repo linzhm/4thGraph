@@ -1,1 +1,1 @@
--r ../../../shared/requirements-chronicle.txt
+-r ../../../tools/requirements-chronicle.txt
