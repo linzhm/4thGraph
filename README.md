@@ -2,42 +2,79 @@
 
 **English** · [简体中文](README.zh-CN.md)
 
-4thGraph helps developers build, optimize, and verify BSV locking scripts and multi-transaction workflows from Forth source using a reproducible toolchain. It includes a Forth-based SDL, compiler, and standard library for generating Script, transaction plans, and Circom circuits for supported relations. The repository also offers runnable contract and wallet projects, regtest replays and benchmarks, a wallet SDK for TypeScript, Rust, Go, and Python, and a Codex skill for authoring Forth and reviewing build outputs.
+> **Build Bitcoin contracts on BSV, from Forth source to a verified spend.**
 
-[Why 4thGraph](#why-4thgraph) · [Architecture](#architecture) · [Quickstart](#4thg-quickstart) · [SDL documentation](docs/language/README.md) · [Projects](projects/README.md) · [Results](showcase/README.md) · [Wallet SDK quickstart](sdk/README.md#quickstart)
+4thGraph brings Script verification, UTXO state management, multi-transaction construction, and zero-knowledge proof workflows into one toolchain. Its Forth-based SDL describes what a spend must prove, which output carries the next state, and how transactions depend on one another. The repository includes a compiler, standard library, runnable projects, a multi-language wallet SDK, and a Codex skill.
+
+**[Start with AI](#start-with-ai)** · [Toolchain capabilities](#capabilities) · [Architecture](#architecture) · [Terminal quickstart](#4thg-quickstart) · [Projects](projects/README.md) · [Results](showcase/README.md)
+
+<a name="start-with-ai"></a>
+
+## Write your first Bitcoin program with AI
+
+With Python 3.11 or later available, open this checkout in Codex and paste the prompt below. Codex can read the skill directly from the repository and set up the compiler in the local workspace.
+
+```text
+Read skills/4thgraph/SKILL.md. Build a BSV counter using the PELS Counter
+project. Start at 0. Each spend must add one and create exactly one
+successor output that keeps the same counter rules.
+
+Put the Forth source and build JSON in projects/pels-counter/workspace/.
+Compile with 4thGraph, then use the PELS runner to build the full lock.
+Show me the source, a command I can rerun, and the lock size. If regtest is
+available, replay 0 → 1 → 2 and check that a wrong next value is rejected.
+Use the project's public test fixtures.
+```
+
+Review the Forth and build output first. For a full contract, look for the engine verdicts in the replay report, including the rejected wrong successor. [Counter project](projects/pels-counter/README.md) · [Install the Codex skill](docs/install.md#codex-agent-skill)
+
+---
+
+<a name="capabilities"></a>
+
+## What you can build with one toolchain
+
+| Capability | What 4thGraph does | Try it |
+| --- | --- | --- |
+| **Script construction and validation** | Compiles typed Forth into locking Script and constructs spend witnesses. Replay checks the unlocking data against the actual previous output's lock and verifies the transaction with BSV Node and chain-gang. | [Native payment locks](projects/p2pk-p2pkh-baseline/forth/README.md) |
+| **State management** | Carries contract state in a UTXO. A spend checks the transition and commits the next state and rules to the required successor output. | [PELS Counter](projects/pels-counter/README.md) |
+| **Contracts across transactions** | Plans dependencies and compares eligible fused, split, and serial layouts. The runtime binds actual parent outpoints and requests the signatures needed for each spend. | [Transaction workflows](projects/workflow-examples/README.md) |
+| **Zero-knowledge proof construction** | Emits Circom for supported relations. With matching setup artifacts and a witness, the Groth16 path produces a proof and builds a BSV verifier that binds the public signals to the spend. | [Proof counter](projects/proof-counter/README.md) · [Groth16 backend](docs/groth16-bls12-381.md) |
+| **Recursive proof construction** · Research | A recursive step would check proof of an authenticated prior state and the next transition in the same circuit. Repeated state updates through successor UTXOs already have a funded replay. | [Verification scope](docs/language/stdlib.md#验证路径) · [State replay](projects/pels-counter/README.md#spend-and-verify-on-regtest) |
 
 <a name="why-4thgraph"></a>
 
 ## Why 4thGraph?
 
-A BSV contract needs both rules for each spend and a plan for how spends depend on one another. If two branches can obtain their data and signatures together, they may fit in a single transaction. If each participant must submit independently, the plan needs intermediate UTXOs and a later spend to join their results. That choice changes the locks, witnesses, and cost of the complete path. 4thGraph puts computation and transaction constraints in the same source so developers can build and replay eligible layouts from the same rules. [Workflow examples](projects/workflow-examples/README.md)
+The same contract rule may fit one transaction when all data and signatures arrive together. When participants must submit independently, the workflow may need intermediate UTXOs and a later spend to join their results. Those choices change the locks, witnesses, and cost of the complete path. In 4thGraph, the Forth source declares the rule and those constraints together, so candidate layouts can be built and replayed against the same inputs. [Workflow examples](projects/workflow-examples/README.md)
 
-### What sets it apart
+Three design choices make this possible. Typed stack effects and numeric ranges give the compiler a basis for Script rewrites. Builds record which transaction layouts satisfy the declared constraints and what each costs. A supported `relation:` can use direct Script or a proof-backed path while retaining the same state and successor checks. [SDL specification](docs/language/specification.md) · [Build and replay guide](docs/toolchain.md)
 
-- **Typed Forth with inspectable optimizations.** Stack effects and numeric ranges let the compiler check definitions and justify Script rewrites. Build reports include the source locations, conditions, and byte changes behind those rewrites. [SDL specification](docs/language/specification.md)
-- **Transaction boundaries are a build decision.** For supported workflows, 4thGraph compares fused and split layouts against input and signer availability and independent submission requirements. It reports which candidates qualify, estimates their costs, and exports an ordered transaction graph. [Candidate search and transaction graphs](docs/toolchain.md)
-- **One state relation can use different verification paths.** A supported `relation:` can use direct Script or a proof-backed path, depending on policy and available proving inputs. The generated lock ties the chosen path to the actual spend and its successor outputs. [Verification paths](docs/language/stdlib.md#验证路径)
+<a name="architecture"></a>
 
 ## Architecture
 
 ```mermaid
 flowchart TD
-    source["Forth SDL and standard library"] --> frontend["Parse words and declarations, check stack types and ranges"]
+    source["Forth SDL and standard library"] --> frontend["Typed words and contract declarations"]
     frontend --> script["Optimize and emit BSV Script"]
-    frontend --> workflow["Plan transaction dependencies and layouts"]
-    frontend --> proof["Emit circuits and build proof-backed verifiers"]
-    script --> artifacts["Locks, transaction plans, and build reports"]
-    workflow --> artifacts
-    proof --> artifacts
-    artifacts --> runtime["Bind actual outpoints and request external signatures"]
-    runtime --> replay["Replay on BSV Node regtest and check with chain-gang"]
+    frontend --> graph["Plan UTXO state and transaction dependencies"]
+    frontend --> circuit["Generate Circom and prepare proof verification"]
+    circuit -.-> recursive["Recursive proof construction (research)"]
+    script --> build["Locks, transaction plans, and build reports"]
+    graph --> build
+    circuit --> build
+    build --> spend["Bind real outpoints, signatures, and witnesses"]
+    spend --> replay["Replay and verify spends with BSV Node and chain-gang"]
 ```
 
-The compiler and backends live in `src/fourthgraph/` with the bundled Forth standard library. The transaction runtime turns symbolic output references into actual outpoints before requesting signatures. Replay reports tie recorded transactions, engine verdicts, and block inclusion back to the selected build. The runnable projects provide the source, fixtures, and commands to reproduce those results. [Repository layout](docs/repository-layout.md) · [Build and replay guide](docs/toolchain.md) · [Results](showcase/README.md)
+The transaction runtime resolves symbolic output references before requesting signatures. A proof-backed spend also binds its public signals to the authenticated transaction. Replay reports connect the chosen build to the actual transactions, engine verdicts, and mined blocks. [Repository layout](docs/repository-layout.md) · [Replay and reporting](docs/toolchain.md) · [Results](showcase/README.md)
+
+---
 
 <a name="4thg-quickstart"></a>
 
-## Try 4thG
+## Run 4thGraph in a terminal
 
 Use Python 3.11 or later. From the root of a 4thGraph checkout, install the CLI into the local workspace and compile the PELS counter's increment word.
 
@@ -110,13 +147,15 @@ The lock contains the compressed public key. To spend, push the signature. [Fort
 
 </details>
 
+---
+
 <a name="toolchain"></a>
 
 ## Toolchain and SDL
 
-The compiler checks stack effects and numeric ranges, optimizes Script, and compares eligible transaction layouts. `4thgraph-circuit` emits Circom for supported relations, `4thgraph-verify` builds verification paths, and `4thgraph-report` summarizes compiler decisions and recorded replays. [Toolchain guide](docs/toolchain.md) · [Language specification](docs/language/specification.md) · [Standard library](docs/language/stdlib.md)
+The compiler checks stack effects and numeric ranges, optimizes Script, and compares eligible transaction layouts. `4thgraph-circuit` emits Circom for supported relations, `4thgraph-verify` builds verification paths, and `4thgraph-report` summarizes compiler decisions and recorded replays. [Toolchain guide](docs/toolchain.md) · [SDL documentation](docs/language/README.md) · [Standard library](docs/language/stdlib.md)
 
-Install the Codex skill to author Forth, compare compiler outputs, and review replay evidence. The repository layout shows where to find the toolchain, per-project workspaces, and results. [Codex skill](skills/4thgraph/SKILL.md) · [Skill installation](docs/install.md#codex-agent-skill) · [Repository layout](docs/repository-layout.md)
+Install the Codex skill to author Forth, compare compiler outputs, and review replay evidence. The wallet SDK supports TypeScript, Rust, Go, and Python. [Codex skill](skills/4thgraph/SKILL.md) · [Skill installation](docs/install.md#codex-agent-skill) · [Wallet SDK](sdk/README.md#quickstart)
 
 <a name="4thg-comparisons"></a>
 

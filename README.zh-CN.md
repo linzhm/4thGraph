@@ -2,21 +2,51 @@
 
 [English](README.md) · **简体中文**
 
-4thGraph 的目标是让开发者用一套可复现的工具，从 Forth 源码构建、优化和验证 BSV 锁定脚本与多笔交易工作流。项目提供基于 Forth 的 SDL、编译器和标准库，可以生成 Script、交易计划和受支持的 Circom 电路。仓库还提供可运行的合约和钱包项目、regtest 复放与基准、面向 TypeScript、Rust、Go 和 Python 的钱包 SDK，以及用于编写 Forth 和审查构建结果的 Codex skill。
+> **用 Forth 构建 BSV 上的比特币合约，从源码到可验证的花费。**
 
-[为何需要 4thGraph](#why-4thgraph) · [架构](#architecture) · [快速上手](#4thg-quickstart) · [SDL 语言文档](docs/language/README.md) · [项目](projects/README.md) · [成果](showcase/README.md) · [钱包 SDK 快速上手](sdk/README.zh-CN.md#quickstart)
+4thGraph 把脚本判定、UTXO 状态管理、跨交易合约构建和零知识证明流程放进一套工具链。基于 Forth 的 SDL 描述每笔花费必须证明什么、哪个输出承载下一状态，以及交易之间如何依赖。仓库提供编译器、标准库、可运行项目、多语言钱包 SDK 和 Codex skill。
+
+**[用 AI 开始](#start-with-ai)** · [工具链能力](#capabilities) · [架构](#architecture) · [终端快速上手](#4thg-quickstart) · [项目](projects/README.md) · [成果](showcase/README.md)
+
+<a name="start-with-ai"></a>
+
+## 用 AI 写第一个比特币程序
+
+准备好 Python 3.11 或更新版本，在 Codex 打开这个仓库并粘贴下面这段提示。Codex 可以直接读仓库里的 skill，并在本地工作空间安装编译器。
+
+```text
+阅读 skills/4thgraph/SKILL.md。用 PELS Counter 项目做一个 BSV 计数器。
+从 0 开始。每次花费必须加一，只创建一个后继输出，并保留同一套计数规则。
+
+把 Forth 源码和构建 JSON 放到 projects/pels-counter/workspace/。
+用 4thGraph 编译，再用 PELS 项目的运行器构建完整锁。给我源码、
+可复跑的命令和锁定脚本字节数。如果能运行 regtest，复放 0 → 1 → 2，
+再检查错误的下一状态会被拒绝。使用项目里的公开测试夹具。
+```
+
+先检查 Forth 和构建产物。验证完整合约时，再查看复放报告里的引擎判定，确认正确花费通过、错误的后继被拒绝。 [计数器项目](projects/pels-counter/README.md) · [安装 Codex skill](docs/install.md#codex-agent-skill)
+
+---
+
+<a name="capabilities"></a>
+
+## 一套工具链可以构建什么
+
+| 能力 | 4thGraph 做什么 | 运行示例 |
+| --- | --- | --- |
+| **锁定与解锁脚本判定** | 把带类型的 Forth 编译为锁定 Script，并构造花费见证。复放用实际前输出的锁校验解锁数据，以 BSV Node 和 chain-gang 核验交易。 | [原生付款锁](projects/p2pk-p2pkh-baseline/forth/README.md) |
+| **状态管理** | 用 UTXO 承载合约状态。每次花费验证状态转换，并把新状态和规则写入约定的后继输出。 | [PELS 计数器](projects/pels-counter/README.md) |
+| **跨交易合约** | 规划交易依赖，比较符合约束的融合、拆分和串行布局。运行时绑定实际父输出的 outpoint，并请求每笔花费所需的签名。 | [交易工作流](projects/workflow-examples/README.md) |
+| **零知识证明构建** | 把受支持的关系编译为 Circom。使用匹配的设置文件和见证生成 Groth16 证明，并构建将公开信号绑定到实际花费的 BSV 验证器。 | [证明计数器](projects/proof-counter/README.md) · [Groth16 后端](docs/groth16-bls12-381.md) |
+| **递归证明构建** · 研究方向 | 研究在同一个电路里核验已认证的前序状态证明和下一次转换。状态通过后继 UTXO 连续推进的过程已有带入金的复放。 | [验证范围](docs/language/stdlib.md#验证路径) · [状态复放](projects/pels-counter/README.md#spend-and-verify-on-regtest) |
 
 <a name="why-4thgraph"></a>
 
 ## 为什么需要 4thGraph？
 
-设计 BSV 合约时，既要定义每次花费的规则，也要决定各次花费如何依赖。两条分支的数据和签名如果能同时取得，可能一笔交易就能完成。如果参与者必须独立提交，就需要中间 UTXO 和后续交易来汇合结果。这个选择会影响锁定脚本、见证和整条路径的成本。4thGraph 将计算逻辑和交易约束写在同一份源码里，让开发者可以基于同一套规则编译并复放符合条件的布局。 [工作流示例](projects/workflow-examples/README.md)
+同一条合约规则在数据和签名能同时到齐时，可能一笔交易就能完成。参与者必须独立提交时，工作流可能需要中间 UTXO 和后续汇合交易。这些选择会改变锁定脚本、见证和整条路径的成本。4thGraph 将规则和交易约束写在同一份 Forth 源码里，让候选布局可以用同一组输入构建和复放。 [工作流示例](projects/workflow-examples/README.md)
 
-### 独特性
-
-- **带类型检查的 Forth，优化依据可查。** 编译器根据栈效果和数值范围检查词定义，并判断哪些 Script 改写适用。构建报告记录改写的源码位置、适用条件和字节变化。 [SDL 规范](docs/language/specification.md)
-- **交易边界由构建决定。** 对受支持的工作流，4thGraph 根据输入和签名角色的可用性、独立提交要求，比较融合和拆分布局。构建报告列出合格的候选和成本估算，并导出有序的交易图。 [候选搜索和交易图](docs/toolchain.md)
-- **同一状态关系可以选择不同验证路径。** 对受支持的 `relation:`，可根据策略和可用的证明材料选择直接 Script 或证明路径。生成的锁将选中的验证路径绑定到实际花费及其后继输出。 [验证路径](docs/language/stdlib.md#验证路径)
+4thGraph 用三项设计实现这一点。栈效果和数值范围为 Script 优化提供依据。构建报告列出符合约束的交易布局及各自的成本。受支持的 `relation:` 可以采用直接 Script 或证明路径，两条路径都检查状态和实际后继。 [SDL 规范](docs/language/specification.md) · [构建与复放手册](docs/toolchain.md)
 
 <a name="architecture"></a>
 
@@ -24,22 +54,25 @@
 
 ```mermaid
 flowchart TD
-    source["Forth SDL 和标准库"] --> frontend["解析词和声明，检查栈类型与范围"]
+    source["Forth SDL 和标准库"] --> frontend["带类型的词和合约声明"]
     frontend --> script["优化并生成 BSV Script"]
-    frontend --> workflow["规划交易依赖和布局"]
-    frontend --> proof["生成电路并构建证明验证器"]
-    script --> artifacts["锁定脚本、交易计划和构建报告"]
-    workflow --> artifacts
-    proof --> artifacts
-    artifacts --> runtime["绑定实际 outpoint，向外部签名器请求签名"]
-    runtime --> replay["在 BSV Node regtest 复放，并用 chain-gang 核验"]
+    frontend --> graph["规划 UTXO 状态和交易依赖"]
+    frontend --> circuit["生成 Circom 并准备证明验证"]
+    circuit -.-> recursive["递归证明构建（研究）"]
+    script --> build["锁定脚本、交易计划和构建报告"]
+    graph --> build
+    circuit --> build
+    build --> spend["绑定实际 outpoint、签名和见证"]
+    spend --> replay["使用 BSV Node 和 chain-gang 复放并验证花费"]
 ```
 
-编译器、后端和打包的 Forth 标准库都在 `src/fourthgraph/` 中。交易运行器先将符号输出引用解析为实际 outpoint，再请求签名。复放报告将实际交易、验证引擎的判定和入块记录关联到所选构建。各项目提供用于复现结果的源码、夹具和命令。 [完整目录](docs/repository-layout.md) · [构建与复放手册](docs/toolchain.md) · [成果](showcase/README.md)
+交易运行器先解析符号输出引用，再请求签名。采用证明路径时，公开信号也绑定到经过认证的交易。复放报告将所选构建与实际交易、引擎判定和入块记录关联起来。 [完整目录](docs/repository-layout.md) · [复放与报告](docs/toolchain.md) · [成果](showcase/README.md)
+
+---
 
 <a name="4thg-quickstart"></a>
 
-## 立即试用 4thG
+## 在终端运行 4thGraph
 
 使用 Python 3.11 或更新版本。从 4thGraph 检出的根目录运行以下命令，将 CLI 安装到本地工作空间，再编译 PELS 计数器的递增词。
 
@@ -112,13 +145,15 @@ python3 projects/p2pk-p2pkh-baseline/forth/payments.py --public-key 0279be667ef9
 
 </details>
 
+---
+
 <a name="toolchain"></a>
 
 ## 工具链与 SDL
 
-编译器检查栈效果和数值范围，优化 Script，并比较符合约束的交易布局。`4thgraph-circuit` 为受支持的关系生成 Circom，`4thgraph-verify` 构建验证路径，`4thgraph-report` 汇总编译决策和已记录的复放结果。 [工具链手册](docs/toolchain.md) · [语言规范](docs/language/specification.md) · [标准库](docs/language/stdlib.md)
+编译器检查栈效果和数值范围，优化 Script，并比较符合约束的交易布局。`4thgraph-circuit` 为受支持的关系生成 Circom，`4thgraph-verify` 构建验证路径，`4thgraph-report` 汇总编译决策和已记录的复放结果。 [工具链手册](docs/toolchain.md) · [SDL 语言文档](docs/language/README.md) · [标准库](docs/language/stdlib.md)
 
-安装 Codex skill 后，可以编写 Forth、比较编译产物并审查复放证据。仓库目录说明了工具链、各项目工作空间和成果的存放位置。 [Codex skill](skills/4thgraph/SKILL.md) · [安装 skill](docs/install.md#codex-agent-skill) · [完整目录](docs/repository-layout.md)
+安装 Codex skill 后，可以编写 Forth、比较编译产物并审查复放证据。钱包 SDK 支持 TypeScript、Rust、Go 和 Python。 [Codex skill](skills/4thgraph/SKILL.md) · [安装 skill](docs/install.md#codex-agent-skill) · [钱包 SDK](sdk/README.zh-CN.md#quickstart)
 
 <a name="4thg-comparisons"></a>
 
