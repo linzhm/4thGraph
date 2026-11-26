@@ -8,7 +8,7 @@ from pathlib import Path
 import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "src"))
-from fourthgraph.bsv.script import asm, number
+from fourthgraph.bsv.script import asm, number, push
 from fips204 import verification_key_rows
 from polynomial import DEGREE, MODULUS, twiddle
 
@@ -21,6 +21,7 @@ _REDUCE = _Q + asm("OP_MOD")
 _NORMALIZE = asm("OP_DUP OP_0 OP_LESSTHAN OP_IF") + _Q + asm("OP_ADD OP_ENDIF")
 _ROLL_TOP = (b"", asm("OP_SWAP"), asm("OP_ROT"))
 _SPLIT_COEFFICIENT = _COEFF + asm("OP_SPLIT OP_SWAP")
+_INVERSE_SCALE = pow(DEGREE, -1, MODULUS)
 
 
 def _take(order, index, *, above=0, compact=False):
@@ -88,10 +89,8 @@ def transform_script(*, inverse=False, signed_residues=False, compact=False):
     return _transform(inverse=inverse, signed_residues=signed_residues, compact=compact)
 
 
-@cache
-def _transform(*, inverse, signed_residues=False, compact=False, trusted=False):
-    code = bytearray(_unpack(trusted=trusted))
-    order = list(range(DEGREE))
+def _butterflies(order, *, inverse, signed_residues=False, compact=False):
+    code = bytearray()
     log_degree = DEGREE.bit_length() - 1
     if inverse:
         stages = range(log_degree)
@@ -114,8 +113,16 @@ def _transform(*, inverse, signed_residues=False, compact=False, trusted=False):
                 code += _take(order, left, compact=compact)
                 code += _take(order, right, above=1, compact=compact) + operations
                 order.extend((right, left))
+    return code
 
-    scale = number(pow(DEGREE, -1, MODULUS)) + asm("OP_MUL") + _REDUCE if inverse else b""
+
+@cache
+def _transform(*, inverse, signed_residues=False, compact=False, trusted=False):
+    code = bytearray(_unpack(trusted=trusted))
+    order = list(range(DEGREE))
+    code += _butterflies(order, inverse=inverse, signed_residues=signed_residues, compact=compact)
+
+    scale = number(_INVERSE_SCALE) + asm("OP_MUL") + _REDUCE if inverse else b""
     if compact:
         code += asm("OP_0")
         for index in range(DEGREE):
@@ -178,11 +185,23 @@ def verification_equation_script(public_key, *, signed_residues=False, compact=F
     return bytes(code)
 
 
-def _compact_equation(rows):
+def checked_equation_script(public_key):
+    """Reconstruct rows from the sampler and the range-checked signed response."""
+    # The inverse transform is linear. Fold its 1/256 factor into the public
+    # coefficients so each unpacked output lane needs only reduction mod q.
+    rows = [
+        [tuple(value * _INVERSE_SCALE % MODULUS for value in column) for column in row]
+        for row in verification_key_rows(public_key)
+    ]
+    return _compact_equation(rows, integrated=True)
+
+
+def _compact_equation(rows, *, integrated=False):
     input_count, row_count = len(rows[0]), len(rows)
     code = bytearray(asm("OP_SIZE") + number(input_count * POLYNOMIAL_BYTES) + asm("OP_NUMEQUALVERIFY"))
     split_polynomial = number(POLYNOMIAL_BYTES) + asm("OP_SPLIT OP_SWAP")
-    code += (split_polynomial + transform_script(compact=True) + asm("OP_TOALTSTACK")) * input_count
+    forward = _transform(inverse=False, compact=True, trusted=integrated)
+    code += (split_polynomial + forward + asm("OP_TOALTSTACK")) * input_count
     code += asm("OP_DROP") + asm("OP_FROMALTSTACK") * input_count + asm("OP_0") * row_count
 
     # The stack holds the five polynomial tails followed by the four row
@@ -207,7 +226,45 @@ def _compact_equation(rows):
             depth = (input_count if last_row else 2 * input_count) + 1
             code += number(depth) + asm("OP_ROLL OP_SWAP OP_CAT OP_TOALTSTACK")
         code += asm("OP_FROMALTSTACK") * row_count
+    drop_tails = asm("OP_2DROP") * (input_count // 2) + asm("OP_DROP") * (input_count % 2)
+    if integrated:
+        code += asm("OP_CAT") * (row_count - 1) + asm("OP_TOALTSTACK")
+        return bytes(code) + drop_tails + asm("OP_FROMALTSTACK") + _packed_inverse()
     inverse = _transform(inverse=True, compact=True, trusted=True)
-    code += (inverse + asm("OP_TOALTSTACK")) * row_count
-    code += asm("OP_2DROP") * (input_count // 2) + asm("OP_DROP") * (input_count % 2)
+    code += (inverse + asm("OP_TOALTSTACK")) * row_count + drop_tails
     return bytes(code) + asm("OP_FROMALTSTACK") + asm("OP_FROMALTSTACK OP_CAT") * (row_count - 1)
+
+
+@cache
+def _packed_inverse():
+    """Apply the inverse butterflies to all four already scaled rows together."""
+    lanes = 4
+    width = 26
+    base = 1 << (8 * width)
+    half = base // 2
+    # The centered twiddle has magnitude <= q/2. Each stage grows a lane by
+    # at most q, so starting below q the eight stages stay below q^9 < 2^207.
+    # Adding one half-base per lane converts signed lanes to unsigned chunks
+    # without a carry or borrow between chunks.
+    bias = half * sum(base ** index for index in range(lanes))
+    code = bytearray(asm("OP_TOALTSTACK") + number(bias) + number(half) + asm("OP_FROMALTSTACK"))
+    code += (number(POLYNOMIAL_BYTES) + asm("OP_SPLIT")) * (lanes - 1)
+    read = asm("OP_3 OP_ROLL") + _SPLIT_COEFFICIENT
+    read += asm("OP_BIN2NUM") + number(width) + asm("OP_NUM2BIN OP_TOALTSTACK")
+    pack = asm("OP_FROMALTSTACK") + asm("OP_FROMALTSTACK OP_SWAP OP_CAT") * (lanes - 1)
+    code += (read * lanes + pack + asm("OP_BIN2NUM OP_TOALTSTACK")) * DEGREE
+    code += asm("OP_2DROP OP_2DROP") + asm("OP_FROMALTSTACK") * DEGREE
+
+    order = list(reversed(range(DEGREE)))
+    code += _butterflies(order, inverse=True, compact=True)
+    code += asm("OP_0") * lanes
+    for index in range(DEGREE):
+        code += _take(order, index, above=lanes, compact=True)
+        # Below the remaining coefficients and row buffers are bias and half.
+        depth = number(len(order) + lanes + 2) + asm("OP_PICK")
+        code += depth + asm("OP_ADD") + number(width * lanes + 1) + asm("OP_NUM2BIN")
+        read = number(width) + asm("OP_SPLIT OP_SWAP") + push(b"\x00") + asm("OP_CAT OP_BIN2NUM")
+        residue = depth + asm("OP_SUB") + _REDUCE + _NORMALIZE + _COEFF + asm("OP_NUM2BIN")
+        append = asm("OP_5 OP_ROLL OP_SWAP OP_CAT OP_SWAP")
+        code += (read + residue + append) * lanes + asm("OP_DROP")
+    return bytes(code) + asm("OP_CAT OP_CAT OP_CAT OP_NIP OP_NIP")

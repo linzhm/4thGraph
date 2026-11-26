@@ -9,8 +9,9 @@ import unittest
 from fips204 import PUBLIC_KEY_BYTES, _GAMMA2, _use_hint, verification_equation, verify
 from hint_script import apply_hints_script
 from mldsa import authorize_digest, test_only_vector as deterministic_test_vector, verify_openssl
-from ntt_script import ring_product_script, transform_script, verification_equation_script
+from ntt_script import checked_equation_script, ring_product_script, transform_script, verification_equation_script
 from polynomial import DEGREE, MODULUS, ROOT_OF_UNITY, inverse_ntt, ntt
+from signature_script import RESPONSE_NORM_LIMIT
 from fourthgraph.bsv.evaluate import ScriptError, evaluate
 
 _FIXTURES = Path(__file__).resolve().parents[1] / "versions/v0.1.0"
@@ -97,6 +98,18 @@ class ArithmeticTests(unittest.TestCase):
                 self.assertEqual(evaluate(kernel, [witness]), ([expected], []))
                 with self.assertRaises(ScriptError):
                     evaluate(kernel, [witness[:-1]])
+
+    def test_checked_equation_with_signed_response_boundaries(self):
+        public_key, _, _ = equation_fixture()
+        limit = RESPONSE_NORM_LIMIT - 1
+        challenge = [-1, 1] + [0] * (DEGREE - 2)
+        response = ([limit] * DEGREE, [-limit] * DEGREE, [0] * DEGREE, [1, -1] * (DEGREE // 2))
+        witness = pack([value % MODULUS for value in challenge])
+        for row in response:
+            witness += pack([abs(value) | (0x800000 if value < 0 else 0) for value in row])
+        expected = b"".join(pack(row) for row in verification_equation(public_key, challenge, response))
+        kept = b"caller stack item"
+        self.assertEqual(evaluate(checked_equation_script(public_key), [kept, witness]), ([kept, expected], []))
 
     def test_forward_and_inverse_ntt(self):
         batch = ([0] * DEGREE, [0] * (DEGREE - 1) + [MODULUS - 1], *synthetic_polynomials())

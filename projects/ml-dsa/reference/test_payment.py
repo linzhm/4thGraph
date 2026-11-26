@@ -13,7 +13,7 @@ import unittest
 from fips204 import SIGNATURE_BYTES
 from mldsa import test_only_vector as make_test_vector
 from payment import authorization, sign_spend
-from script import locking_script
+from script import _historical_lock, locking_script
 from sdk_adapter import recognize
 from fourthgraph.bsv.chain_gang import validate_at_heights
 from fourthgraph.bsv.transaction import SIGHASH_TYPES, Input, Output, Transaction
@@ -165,22 +165,26 @@ class PaymentTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'invalid ML-DSA-44 signature'):
             sign_spend(unsigned, 1, self.funding_raw, self.public_key, lambda digest: b'')
 
-    def test_legacy_lock_remains_recognizable_and_spendable(self):
-        legacy = locking_script(self.public_key, legacy=True)
-        baseline_hash = '3905094cfb41cad09a939cfe8c8264400faf264a6db0cb30851c7dbdefd93295'
-        self.assertEqual(sha256(legacy).hexdigest(), baseline_hash)
-        self.assertLess(len(locking_script(self.public_key)), len(legacy))
-        self.assertEqual(recognize(legacy, self.public_key), {'template': 'pure-ml-dsa-44'})
-        funding = replace(self.parents[1], outputs=(Output(10_000, legacy),))
-        parents = self.parents[0], funding
-        inputs = tuple(Input(parent.txid_wire(), 0) for parent in parents)
-        tx = Transaction(inputs, (Output(10_900, b'\x51'),), version=2)
-        for flag in (0x41, 0x61, 0x63):
-            with self.subTest(sighash=hex(flag)):
-                spend = sign_spend(tx, 1, funding.serialize(), self.public_key, self.signer, sighash=flag)
-                validate_at_heights(spend, parents, spend_height=4, activation_height=3, utxo_heights=(1, 3))
-                if cookie_path := os.environ.get('REGTEST_COOKIE'):
-                    self.check_node(cookie_path, spend, parents, True, 4, (1, 3))
+    def test_historical_locks_remain_recognizable_and_spendable(self):
+        earlier = {
+            False: '3905094cfb41cad09a939cfe8c8264400faf264a6db0cb30851c7dbdefd93295',
+            True: '899fc5fd435d593e37fe00af3c834d814d57af4abcd63bf632d0e7870c7fc77f',
+        }
+        for compact, fingerprint in earlier.items():
+            previous_lock = _historical_lock(self.public_key, compact=compact)
+            self.assertEqual(sha256(previous_lock).hexdigest(), fingerprint)
+            self.assertLess(len(locking_script(self.public_key)), len(previous_lock))
+            self.assertEqual(recognize(previous_lock, self.public_key), {'template': 'pure-ml-dsa-44'})
+            funding = replace(self.parents[1], outputs=(Output(10_000, previous_lock),))
+            parents = self.parents[0], funding
+            inputs = tuple(Input(parent.txid_wire(), 0) for parent in parents)
+            tx = Transaction(inputs, (Output(10_900, b'\x51'),), version=2)
+            for flag in (0x41, 0x61, 0x63):
+                with self.subTest(compact=compact, sighash=hex(flag)):
+                    spend = sign_spend(tx, 1, funding.serialize(), self.public_key, self.signer, sighash=flag)
+                    validate_at_heights(spend, parents, spend_height=4, activation_height=3, utxo_heights=(1, 3))
+                    if cookie_path := os.environ.get('REGTEST_COOKIE'):
+                        self.check_node(cookie_path, spend, parents, True, 4, (1, 3))
 
     def test_unrecognized_lock_is_rejected_before_signing(self):
         funding = replace(self.parents[1], outputs=(Output(10_000, b'\x51'),))

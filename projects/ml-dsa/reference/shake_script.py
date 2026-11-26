@@ -54,13 +54,30 @@ def _rotate_left(bits):
     )
 
 
+def _reverse_bytes(width):
+    if width == 1:
+        return b''
+    half = width // 2
+    reverse_half = _reverse_bytes(half)
+    return (number(half) + asm('OP_SPLIT') + reverse_half + asm('OP_SWAP')
+            + reverse_half + asm('OP_CAT'))
+
+
+def _rotate_doubled_lane(bits):
+    if bits == 0:
+        return b''
+    # Shifting two copies fills the vacated bits of the first copy.
+    return asm('OP_DUP OP_CAT') + number(bits) + asm('OP_LSHIFT OP_8 OP_SPLIT OP_DROP')
+
+
 class _Round:
     """Resolve named lanes to stack offsets while emitting one round."""
 
-    def __init__(self, *, compact):
+    def __init__(self, *, compact, rotate):
         self.code = bytearray()
         self.lanes = [('a', x, y) for x, y in _POSITIONS]
         self.compact = compact
+        self.rotate = rotate
 
     def roll(self, lane):
         position = self.lanes.index(lane)
@@ -106,7 +123,7 @@ class _Round:
             previous, following = (x - 1) % 5, (x + 1) % 5
             self.pick(('c', previous), last_use=x > (x - 2) % 5)
             self.pick(('c', following), last_use=x > (x + 2) % 5)
-            self.code += _rotate_left(1)
+            self.code += self.rotate(1)
             self.binary('OP_XOR')
             self.name(('d', x))
         if not self.compact:
@@ -121,7 +138,7 @@ class _Round:
             uses_left[source_x] -= 1
             self.pick(('d', source_x), last_use=uses_left[source_x] == 0)
             self.binary('OP_XOR')
-            self.code += _rotate_left(_ROTATION[source_x][source_y])
+            self.code += self.rotate(_ROTATION[source_x][source_y])
             self.name(('b', x, y))
         if not self.compact:
             for x in range(5):
@@ -148,7 +165,7 @@ class _Round:
 
 
 @cache
-def keccak_f1600_script(*, compact=True):
+def keccak_f1600_script(*, compact=True, optimize=True):
     """Replace a 200-byte packed Keccak state with the permuted state.
 
     Lanes are packed little-endian in x+5y order. They are reversed before
@@ -156,21 +173,23 @@ def keccak_f1600_script(*, compact=True):
     The program preserves items below the state and entries on the altstack.
     """
     code = bytearray(asm('OP_SIZE') + number(_STATE_BYTES) + asm('OP_NUMEQUALVERIFY'))
-    split_lane = number(_LANE_BYTES) + asm('OP_SPLIT OP_SWAP') + _REVERSE_LANE + asm('OP_SWAP')
-    code += split_lane * 24 + _REVERSE_LANE
+    reverse = _reverse_bytes(_LANE_BYTES) if compact and optimize else _REVERSE_LANE
+    rotate = _rotate_doubled_lane if compact and optimize else _rotate_left
+    split_lane = number(_LANE_BYTES) + asm('OP_SPLIT OP_SWAP') + reverse + asm('OP_SWAP')
+    code += split_lane * 24 + reverse
     for constant in _ROUND_CONSTANTS:
-        round_code = _Round(compact=compact)
+        round_code = _Round(compact=compact, rotate=rotate)
         round_code.columns()
         round_code.move_and_rotate()
         round_code.mix_rows(constant)
         assert round_code.lanes == [('a', x, y) for x, y in _POSITIONS]
         code += round_code.code
-    concat_lane = asm('OP_SWAP') + _REVERSE_LANE + asm('OP_SWAP OP_CAT')
-    code += _REVERSE_LANE + concat_lane * 24
+    concat_lane = asm('OP_SWAP') + reverse + asm('OP_SWAP OP_CAT')
+    code += reverse + concat_lane * 24
     return bytes(code)
 
 
-def _shake_script(message_bytes, output_bytes, rate, *, compact=True):
+def _shake_script(message_bytes, output_bytes, rate, *, compact=True, optimize=True):
     if type(message_bytes) is not int or message_bytes < 0:
         raise ValueError('message length must be a nonnegative integer')
     if type(output_bytes) is not int or output_bytes < 1:
@@ -184,7 +203,7 @@ def _shake_script(message_bytes, output_bytes, rate, *, compact=True):
 
     code = bytearray(asm('OP_SIZE') + number(message_bytes) + asm('OP_NUMEQUALVERIFY'))
     code += push(padding) + asm('OP_CAT') + push(bytes(_STATE_BYTES))
-    permutation = keccak_f1600_script(compact=compact)
+    permutation = keccak_f1600_script(compact=compact, optimize=optimize)
     absorb = (
         asm('OP_SWAP') + number(rate) + asm('OP_SPLIT OP_TOALTSTACK')
         + push(bytes(_STATE_BYTES - rate)) + asm('OP_CAT OP_XOR')
@@ -210,6 +229,6 @@ def shake128_script(message_bytes, output_bytes):
     return _shake_script(message_bytes, output_bytes, rate=168)
 
 
-def shake256_script(message_bytes, output_bytes, *, compact=True):
+def shake256_script(message_bytes, output_bytes, *, compact=True, optimize=True):
     """Replace a byte vector of the specified length with a SHAKE256 XOF."""
-    return _shake_script(message_bytes, output_bytes, rate=136, compact=compact)
+    return _shake_script(message_bytes, output_bytes, rate=136, compact=compact, optimize=optimize)

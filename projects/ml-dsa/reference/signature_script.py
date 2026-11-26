@@ -31,8 +31,8 @@ _UNSIGNED = push(b'\x00') + asm('OP_CAT OP_BIN2NUM')
 
 
 @cache
-def response_decode_script():
-    """Replace packed z with four polynomials of three-byte LE residues."""
+def response_decode_script(*, signed=False):
+    """Replace packed z with four range-checked polynomials of three-byte coefficients."""
     code = bytearray(asm('OP_SIZE') + number(RESPONSE_PACKED_BYTES) + asm('OP_NUMEQUALVERIFY'))
     code += asm('OP_0 OP_TOALTSTACK')
 
@@ -41,7 +41,8 @@ def response_decode_script():
     begin_group = asm('OP_9 OP_SPLIT OP_SWAP') + _UNSIGNED
     residue = number(GAMMA1) + asm('OP_SWAP OP_SUB OP_DUP OP_ABS')
     residue += number(RESPONSE_NORM_LIMIT) + asm('OP_LESSTHAN OP_VERIFY')
-    residue += number(MODULUS) + asm('OP_ADD') + number(MODULUS) + asm('OP_MOD')
+    if not signed:
+        residue += number(MODULUS) + asm('OP_ADD') + number(MODULUS) + asm('OP_MOD')
     residue += number(COEFFICIENT_BYTES) + asm('OP_NUM2BIN')
     residue += asm('OP_FROMALTSTACK OP_SWAP OP_CAT OP_TOALTSTACK')
     coefficient = asm('OP_DUP') + radix + asm('OP_MOD') + residue + radix + asm('OP_DIV')
@@ -120,12 +121,12 @@ def _compact_hint_decode():
 
 
 @cache
-def signature_decode_script(*, compact=True):
+def signature_decode_script(*, compact=True, signed_response=False):
     """Replace a signature with [c-tilde, z residues, hint bitmaps]."""
     code = asm('OP_SIZE') + number(SIGNATURE_BYTES) + asm('OP_NUMEQUALVERIFY')
     code += number(CHALLENGE_BYTES) + asm('OP_SPLIT')
     code += number(RESPONSE_PACKED_BYTES) + asm('OP_SPLIT')
     return (
         code + hint_decode_script(compact=compact) + asm('OP_TOALTSTACK')
-        + response_decode_script() + asm('OP_FROMALTSTACK')
+        + response_decode_script(signed=signed_response) + asm('OP_FROMALTSTACK')
     )
