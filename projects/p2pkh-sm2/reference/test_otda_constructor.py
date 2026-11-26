@@ -42,6 +42,7 @@ class ConstructorTests(unittest.TestCase):
                     self.assertEqual(b''.join((pattern.fixed_parts[0], *fields, pattern.fixed_parts[1])), lock)
                     self.assertIsNone(pattern.match(lock[:-1]))
                     self.assertIsNone(pattern.match(lock[:-1] + b'\x51'))
+        self.assertLess(len(_otda_pattern(SCHEDULED_TEMPLATE_VERSION).program), len(_otda_pattern().program))
 
     def sign_modes(self, tx, flag, expected, *, funding=None):
         funding = self.funding if funding is None else funding
@@ -116,6 +117,8 @@ class ConstructorTests(unittest.TestCase):
             with self.subTest(flag=hex(flag)):
                 signed = self.sign_modes(tx, flag, (True, True), funding=funding)
                 self.assertLess(max(len(item.script) for item in signed.inputs), 30_000)
+                for index in range(len(inputs)):
+                    check_node(signed, funding, index, old_output=True)
                 changed = replace(signed, outputs=tuple(reversed(signed.outputs)))
                 check_node(changed, funding, 1, flag in (0x63, 0xe3))
                 if flag in (0x61, 0xe1):

@@ -51,8 +51,8 @@ The generator builds both templates from the Forth lock. Template `2` consumes S
 | --- | ---: | ---: | ---: |
 | Locking script | 144,925 | 131,565 | −9.2% |
 | BIP143 ALL, 2×2 transaction | 290,554 | 263,834 | −9.2% |
-| OTDA ALL, 2×2 transaction with reconstruction | 316,018 | 291,658 | −7.7% |
-| OTDA ALL, unlocking script per input in that transaction | 13,023 | 14,203 | +9.1% |
+| OTDA ALL, 2×2 transaction with reconstruction | 316,018 | 287,524 | −9.0% |
+| OTDA ALL, unlocking script per input in that transaction | 13,023 | 12,136 | −6.8% |
 
 BSV Node 1.2.3 and the pinned chain-gang build replayed the complete inputs with explicit prevouts. To opt in for new outputs, use `--version 2` or SDK `template: "v1.2.0"`. [Template fingerprint](versions/v1.2.0/layout.json) · [Recorded measurements](versions/v1.2.0/measurements.json) · [Forth lock](../../src/fourthgraph/stdlib/wallet/p2pkh-sm2.fth) · [Benchmark reproduction](../../docs/benchmark.md#run)
 
@@ -136,7 +136,7 @@ Each marginal cell shows the **change in total bytes (output locks / input unloc
 
 ## Reconstruct OTDA outputs
 
-The constructor is part of `scriptSig`. It uses 12,703 bytes for template `1` and 13,883 bytes for template `2`. It reuses SM3 round and message-expansion fragments, SM2 point addition and doubling, and repeated instruction runs to rebuild the same signing preimage. For each eligible output it fills the receiver's HASH160 slot. The signing callback receives the same message and SM2 user ID as the literal encoding. Use the final signed transaction ID to build a child.
+The constructor is part of `scriptSig`. It uses 12,703 bytes for template `1` and 11,816 bytes for template `2`. Template `2` selects reusable fragments from the copies used in the initial encoding and places frequently used fragments near the top of the stack. It reconstructs the exact signing preimage and fills each eligible output's HASH160 slot. The signing callback receives the same message and SM2 user ID as the literal encoding. Use the final signed transaction ID to build a child.
 
 After Chronicle activation, version-2 OTDA ALL can reconstruct matching outputs in their original order. Paired OTDA SINGLE can reconstruct the same-index output and preserve the preceding null outputs in the preimage. Both support `ANYONECANPAY`. Other output templates keep their literal bytes. BIP143, NONE, unpaired SINGLE, version 1 and non-smaller encodings continue with the literal unlocking script. [SDK options](docs/sdk.en.md) · [Constructor and generator](reference/README.md#otda-constructor)
 

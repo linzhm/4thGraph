@@ -73,7 +73,7 @@ isolate the effect of the activation flags.
 
 ## Reproduce the OTDA constructor
 
-The wallet loads the frozen program and checks its byte length and SHA-256 against the layout manifest. The offline generator collects named instruction ranges from the SM3 compiler, selects fixed fragments from those ranges, and combines them with the point arithmetic blocks. Rebuild the program from the repository root and compare it with the checked-in file.
+The wallet loads the frozen program and checks its byte length and SHA-256 against the layout manifest. The offline generator starts with named SM3 ranges and point arithmetic blocks. For template `2` it evaluates which copied fragments are worth caching, tries a dictionary ordered by reuse frequency and selects the smallest serialized encoding. Rebuild the program from the repository root and compare it with the checked-in file.
 
 ```sh
 python projects/p2pkh-sm2/reference/generate_otda_constructor.py /tmp/sm2-otda.hex

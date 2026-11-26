@@ -11,8 +11,8 @@
   "fixed_bytes_sha256": "8761e9f759e96f3ba4b75849da3838ff6f3c32bd230f961597e32da0fef0252d",
   "otda_constructor": {
     "file": "otda-constructor.hex",
-    "bytes": 13883,
-    "sha256": "41ab645458ce3557ba556e292a2ea3d61809e9e3511c4ed95adaf319a7158999",
+    "bytes": 11816,
+    "sha256": "fd1449dce0a8f53fbaa6bf235bed2e4668cf04983984514c4265f049c178ab2b",
     "generator": "../../reference/generate_otda_constructor.py"
   },
   "supported_sighash_types": [

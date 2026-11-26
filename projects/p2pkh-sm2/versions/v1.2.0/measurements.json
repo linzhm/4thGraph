@@ -4,7 +4,7 @@
     "outputs": 2
   },
   "lock_bytes": 131565,
-  "otda_program_bytes": 13883,
+  "otda_program_bytes": 11816,
   "baseline": "1.1.0",
   "bsv_node_version": "1.2.3",
   "chain_gang_commit": "8b60b71a12a69fdcb465d3e627dbf6f43d6ed081",
@@ -41,15 +41,16 @@
         "peak_stack_payload_bytes": 580080
       },
       "v1.2.0": {
-        "txid": "204b0d84e6329872d916d645fb749e3a405952c8b4197400472ca6e07870d2ec",
-        "transaction_bytes": 291658,
+        "txid": "d591c13b4436f21b7f022bb13d12efd416967a86563feac032ab178e942bf5ef",
+        "transaction_bytes": 287524,
         "unlock_bytes": [
-          14203,
-          14203
+          12136,
+          12136
         ],
         "peak_stack_payload_bytes": 526640
       }
     }
   },
-  "source": "README.md#v120"
+  "source": "README.md#v120",
+  "compiler_commit": "454456ffb125e1771fbc72241bf717a7814f2b88"
 }
