@@ -42,6 +42,8 @@
 
 从仓库根目录运行，环境须有 `gforth`。源码作为构建程序执行，只运行信任的 Forth 文件。锁生成使用现有 4thGraph 及其 Python 依赖。
 
+构建锁时，`--rules` 及其依赖的源码行必须与本次 Gforth 实际读取的内容一致。构建器按 `relation-ref` 保存的执行令牌核对定义位置，并核对关系调用的用户定义词。在阶段声明后重新定义同名词，原阶段仍绑定原定义。宿主提供的基础词须实现对应的 4thGraph 语义。
+
 ```sh
 project=projects/4thgraph
 PYTHONPATH=.:$project python "$project/workflow-forth/build.py" \

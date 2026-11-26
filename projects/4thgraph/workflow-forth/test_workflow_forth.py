@@ -127,6 +127,53 @@ class ForthWorkflowTests(unittest.TestCase):
             with self.subTest(message=message), self.assertRaisesRegex(CompileError, message):
                 lower_serial(self.load_variant(**updated), RULES, TestKeys().public, 19)
 
+    def test_lock_uses_the_stage_xt_even_if_another_rules_file_was_loaded(self):
+        with TemporaryDirectory() as temporary:
+            alternate = Path(temporary) / "other-rules.fth"
+            alternate.write_text(RULES.read_text().replace("1 cell>u32", "3 cell>u32"))
+            # Both files were loaded. The stage captured the first definition;
+            # loading a new one before emission does not change that binding.
+            net = self.load_variant(**{"root-resources emit-roots":
+                                       f"REQUIRE {alternate}\nroot-resources emit-roots"})
+            keys = TestKeys().public
+            expected = lower_serial(load_plan(COUNTER), RULES, keys, 18)
+            self.assertEqual(lower_serial(net, RULES, keys, 18).root, expected.root)
+            with self.assertRaisesRegex(CompileError, "different definition of 'advance'"):
+                lower_serial(net, alternate, keys, 18)
+            with self.assertRaisesRegex(CompileError, "rules differ"):
+                lower_serial(net, RULES, keys, 18, source_bytes=alternate.read_bytes())
+
+    def test_changed_transitive_rules_are_rejected_and_identical_helpers_build(self):
+        with TemporaryDirectory(prefix="rules with spaces ") as temporary:
+            folder = Path(temporary)
+            helpers = folder / "helpers.fth"
+            helpers.write_bytes("( two-line\r\n 注释 ) : helper ( u32 -- u32 ) 1 cell>u32 u32+ ;\r\n".encode())
+            rules = folder / "rules.fth"
+            rules.write_text("REQUIRE helpers.fth\n" + RULES.read_text().replace("1 cell>u32 u32+", "helper"))
+            workflow = folder / "counter.fth"
+            workflow.write_text(COUNTER.read_text().replace("REQUIRE workflow.fth", f"REQUIRE {HERE / 'workflow.fth'}")
+                                .replace("counter-rules.fth", "rules.fth"))
+            net = load_plan(workflow)
+            keys = TestKeys().public
+            self.assertEqual(lower_serial(net, rules, keys, 18).root,
+                             lower_serial(load_plan(COUNTER), RULES, keys, 18).root)
+            helpers.write_bytes(helpers.read_bytes().replace(b"1 cell>u32", b"3 cell>u32"))
+            with self.assertRaisesRegex(CompileError, "rules differ.*helpers"):
+                lower_serial(net, rules, keys, 18)
+
+    def test_helper_calls_use_the_same_definition_in_both_compilers(self):
+        with TemporaryDirectory() as temporary:
+            folder = Path(temporary)
+            (folder / "helpers.fth").write_text(": helper ( u32 -- u32 ) 1 cell>u32 u32+ ;\n")
+            rules = folder / "rules.fth"
+            rules.write_text("REQUIRE helpers.fth\n" + RULES.read_text().replace("1 cell>u32 u32+", "helper"))
+            workflow = folder / "counter.fth"
+            workflow.write_text(COUNTER.read_text().replace("REQUIRE workflow.fth", f"REQUIRE {HERE / 'workflow.fth'}")
+                                .replace("REQUIRE counter-rules.fth", "REQUIRE helpers.fth\n"
+                                         ": helper ( u32 -- u32 ) 3 cell>u32 u32+ ;\nREQUIRE rules.fth"))
+            with self.assertRaisesRegex(CompileError, "different definition of 'helper'"):
+                lower_serial(load_plan(workflow), rules, TestKeys().public, 18)
+
     def test_forth_plan_reproduces_serial_locks_and_validates_real_input_scripts(self):
         keys = TestKeys()
         net = load_plan(COUNTER, forth=FORTH)

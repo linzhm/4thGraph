@@ -2,15 +2,16 @@
 
 import argparse
 from collections import defaultdict
-from dataclasses import dataclass
+from dataclasses import dataclass, field as data_field, replace
 from graphlib import CycleError, TopologicalSorter
 import json
 import os
 from pathlib import Path
 import re
 import subprocess
+from tempfile import TemporaryDirectory
 
-from compiler import CompileError, SourceCompiler, Stage, Token, Workflow, require_script
+from compiler import CompileError, Conditional, SourceCompiler, Stage, Token, Word, Workflow, require_script
 from shared.transaction import (
     ANYONECANPAY, CHRONICLE, SIGHASH_NONE, SIGHASH_SINGLE, SIGHASH_TYPES,
 )
@@ -155,6 +156,7 @@ class Plan:
     stages: tuple[StageRecord, ...]
     sources: dict[int, tuple[str | None, int]]
     conflicts: tuple[tuple[int, tuple[str, ...]], ...]
+    trace: "SourceTrace | None" = data_field(default=None, repr=False, compare=False)
 
     @classmethod
     def build(cls, roots, stages):
@@ -243,13 +245,103 @@ def parse_plan(text):
     return Plan.build(roots, stages)
 
 
+class SourceTrace:
+    """The lines Gforth read and the dictionary words it bound at each source position."""
+
+    def __init__(self, records, directory):
+        self.lines = defaultdict(dict)
+        self.definitions = {}
+        self.calls = {}
+        self.bindings = {}
+
+        paths = {}
+
+        def trace_path(filename):
+            if filename not in paths:
+                paths[filename] = (directory / os.fsdecode(bytes.fromhex(filename))).resolve()
+            return paths[filename]
+
+        for row in records:
+            tag, *fields = row.split()
+            if tag == "binding":
+                xt, stage = fields
+                self.bindings[stage.casefold()] = int(xt)
+            elif tag == "line":
+                number, filename, *content = fields
+                path = trace_path(filename)
+                line = bytes.fromhex("".join(content))
+                if self.lines[path].setdefault(int(number), line) != line:
+                    raise CompileError(f"source changed during Forth execution: {path}")
+            elif tag in ("definition", "call"):
+                *caller, xt, column, number, filename = fields
+                position = (trace_path(filename), int(number), int(column))
+                if tag == "definition":
+                    self.definitions[int(xt)] = position
+                else:
+                    self.calls[int(caller[0]), position] = int(xt)
+            else:
+                raise CompileError(f"unexpected Gforth trace record {tag!r}")
+
+
+class BoundRules(SourceCompiler):
+    def __init__(self, source, path, trace):
+        self.trace = trace
+        self.positions = {}
+        super().__init__(source, source_path=path)
+
+    def read_source(self, source, path, label=None):
+        # REFILL removes the line terminator. Compare the actual bytes of every
+        # line, including those read by nested REQUIRE and multiline comments.
+        lines = source.replace("\r\n", "\n").removesuffix("\n").split("\n") if source else []
+        actual = self.trace.lines.get(path, {})
+        if len(actual) != len(lines) or any(actual.get(i) != line.encode() for i, line in enumerate(lines, 1)):
+            raise CompileError(f"rules differ from the source loaded by Gforth: {path}")
+        super().read_source(source, path, label)
+
+    def position(self, path, token):
+        line = self.trace.lines[path][token.line].decode()
+        return path, token.line, len(line[:token.column - 1].encode())
+
+    def define(self, at):
+        name = self.tokens.peek()
+        super().define(at)
+        self.positions[id(self.words[name.name])] = self.position(self.source_path, name)
+
+    def check_word(self, word, xt):
+        pending = [(word, xt)]
+        seen = set()
+        while pending:
+            word, xt = pending.pop()
+            origin = self.positions[id(word)]
+            if self.trace.definitions.get(xt) != origin:
+                raise CompileError(f"Gforth bound a different definition of {word.name!r}")
+            if (id(word), xt) in seen:
+                continue
+            seen.add((id(word), xt))
+            body = list(word.body)
+            while body:
+                item = body.pop()
+                instruction = item.instruction
+                if isinstance(instruction, Conditional):
+                    body.extend(instruction.yes)
+                    body.extend(instruction.no)
+                elif isinstance(instruction, Word):
+                    site = self.position(origin[0], item.source)
+                    pending.append((instruction, self.trace.calls.get((xt, site))))
+
+
 def load_plan(source, *, forth=None):
     source = Path(source).resolve(strict=True)
-    result = subprocess.run([forth or os.environ.get("GFORTH", "gforth"), str(source), "-e", "bye"],
-                            cwd=source.parent, capture_output=True, text=True, check=False)
-    if result.returncode:
-        raise ValueError(result.stderr.strip() or f"Forth exited with status {result.returncode}")
-    return parse_plan(result.stdout)
+    tracer = Path(__file__).with_name("source-trace.fs").resolve()
+    with TemporaryDirectory(prefix="4thgraph-gforth-") as temporary:
+        trace_file = Path(temporary) / "source.trace"
+        result = subprocess.run([forth or os.environ.get("GFORTH", "gforth"), str(tracer), str(source), "-e", "bye"],
+                                cwd=source.parent, env={**os.environ, "FOURTHGRAPH_SOURCE_TRACE": str(trace_file)},
+                                capture_output=True, text=True, check=False)
+        if result.returncode:
+            raise ValueError(result.stderr.strip() or f"Forth exited with status {result.returncode}")
+        with trace_file.open(encoding="utf-8") as records:
+            return replace(parse_plan(result.stdout), trace=SourceTrace(records, source.parent))
 
 
 def lower_serial(plan, rules, keys, current, *, target="both", source_bytes=None):
@@ -258,7 +350,9 @@ def lower_serial(plan, rules, keys, current, *, target="both", source_bytes=None
         raise CompileError("the Script backend requires a two-or-more-stage serial chain with one root")
     rules = Path(rules)
     source_bytes = rules.read_bytes() if source_bytes is None else source_bytes
-    frontend = SourceCompiler(source_bytes.decode("utf-8"), source_path=rules)
+    if plan.trace is None:
+        raise CompileError("lock generation requires the relation bindings from load_plan")
+    frontend = BoundRules(source_bytes.decode("utf-8"), rules.resolve(), plan.trace)
     stages, previous = [], plan.roots
     root = Token(f"resource-{previous[0]}", 1, 1, "Forth network plan")
     flags = plan.stages[0].sighashes
@@ -278,6 +372,7 @@ def lower_serial(plan, rules, keys, current, *, target="both", source_bytes=None
         word = frontend.words.get(record.relation)
         if word is None or (word.takes, word.gives) != (("u32",), ("route" if final else "u32",)):
             raise CompileError(f"{record.name}: invalid or missing relation word {record.relation!r}")
+        frontend.check_word(word, plan.trace.bindings.get(record.name))
         require_script(word)
         at = Token(record.name, index + 1, 1, "Forth network plan")
         source = Token(f"resource-{record.consumes[0]}", at.line, at.column, at.module)

@@ -44,6 +44,9 @@
 
 : emit-stage ( stage -- )
   BASE @ >R DECIMAL
+  [DEFINED] 4thgraph-trace-binding [IF]
+    DUP record-name 2 PICK record-data 3 slot@ relation-xt 4thgraph-trace-binding
+  [THEN]
   S" stage " TYPE DUP name. record-data
   DUP 3 slot@ CELL+ name. DUP 2 slot@ name.
   DUP @ . DUP 1 slot@ DUP @ . 1 slot@ list.
