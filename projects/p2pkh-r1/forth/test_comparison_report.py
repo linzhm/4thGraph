@@ -7,6 +7,8 @@ from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
+from fourthgraph.stdlib import read_library
+
 from comparison_report import SCHEMA_VERSION, read_report
 from msm_experiment import SOURCE, compare, guided_candidates, local_build, main
 from msm_compiler import R1MSMCompiler
@@ -103,6 +105,35 @@ class ComparisonReportTests(unittest.TestCase):
             current, _ = compare(SimpleNamespace(**options, reference=path))
             self.assertEqual(current["reference_sha256"], sha256(contents).hexdigest())
             self.assertEqual(current["candidates"], previous["candidates"])
+
+    def test_compare_detects_bundled_dependency_drift_with_a_same_named_local_file(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "msm.fth"
+            source.write_bytes(SOURCE.read_bytes() + b"\nREQUIRE std/bsv\n")
+            (root / "r1.fth").write_bytes(SOURCE.with_name("r1.fth").read_bytes())
+            local = root / "std/bsv"
+            local.parent.mkdir()
+            local.write_bytes(b"( local project dependency )\n")
+            bundled = read_library("std/bsv")
+            bundled_reads = iter((bundled, bundled + b"\n( changed after preflight )\n"))
+            args = SimpleNamespace(source=source, workflow="explicit", candidate=["split-4"],
+                                   budget=1, full_budget=1, vectors=12, samples=1, matrix=False, reference=None)
+
+            def read_dependency(name):
+                return next(bundled_reads) if name == "std/bsv" else read_library(name)
+
+            with patch("fourthgraph.compiler.source.read_library", side_effect=read_dependency), patch(
+                "msm_experiment.shortlist", return_value=()
+            ):
+                report, _ = compare(args)
+            row = report["candidates"]["split-4"]
+            self.assertEqual(row["status"], "local-rejected")
+            self.assertEqual(row["reason"], "required Forth dependencies changed after R1 preflight: std/bsv")
+            self.assertNotIn("build_source", row)
+            self.assertEqual(report["source_verification"]["status"], "unverified")
+            self.assertEqual(report["dependencies"]["std/bsv"], sha256(bundled).hexdigest())
+            self.assertEqual(report["dependencies"]["./std/bsv"], sha256(local.read_bytes()).hexdigest())
 
     def test_invalid_reports_identify_the_version_or_candidate(self):
         with TemporaryDirectory() as directory:
