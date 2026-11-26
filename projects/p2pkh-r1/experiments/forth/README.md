@@ -1,4 +1,4 @@
-# P2PKH-R1 Forth 探索版 0.1.0-alpha.2
+# P2PKH-R1 Forth v0.3.0 探索版
 
 [项目说明](../../README.zh-CN.md) · [原曲线生成器](../../reference/curve_compiler.py) · [原 v0.2.0 交易模板](../../template/v0.2.0/layout.json)
 
@@ -6,22 +6,25 @@
 
 4thGraph v0.2.0 读取 [r1.fth](r1.fth)。Forth 源码定义见证解析、输入授权、P‑256 验签和原生交易绑定。编译时执行的 `op-*` 词各发出一条 Script 指令，窗口循环由源码声明次数并展开。原 Python 生成器和汇编用于对照。
 
-| 产物 | v0.2.0 / Forth 基线 | Forth 优化 |
-| --- | ---: | ---: |
-| 完整零值收款模板 | 46,302 B | 45,776 B |
-| OTDA 重建程序 | 3,913 B | 3,910 B |
+v0.3.0 是完整锁的 Forth 优化构建。编译器的 `--optimize` 选择 v0.3.0，默认构建逐字节复现 v0.2.0 的锁和 OTDA 重建程序。构建 JSON 用 `lock_version` 标记实际选中的锁。
 
-关闭优化时，Forth 锁和 OTDA 重建程序逐字节复现原模板。开启优化后，倍点入口用 ScriptNum 坐标 `z` 直接驱动 `OP_IF`，并用 `OP_2DUP` 复制栈顶的 `y z`。在 BSV Node 和 chain-gang 所用规则下，零坐标与非零坐标的分支行为一致。每处倍点省两条指令，完整锁含 263 处，共省 **526 B**。探索版使用独立版本号，现有钱包按已登记的模板字节识别输出。
+开启优化后，倍点入口用计算产生的 ScriptNum 坐标 `z` 直接驱动 `OP_IF`，并用 `OP_2DUP` 复制栈顶的 `y z`。每处倍点省两条指令，完整锁含 263 处，共省 **526 B**。
 
-两版各复放三种两进两出付款。表中入金含两个 R1 锁，付款也创建两个 R1 锁。OTDA 使用各模板自己的重建程序。耗时为每笔付款七次验证的中位数，栈峰值为整笔各输入的两栈载荷最大值。
+### 同环境对照
 
-| 模式 | 付款字节，基线 / 优化 | 入金加付款字节，基线 / 优化 | 两栈峰值字节，基线 / 优化 | Node RPC ms，基线 / 优化 | chain-gang ms，基线 / 优化 |
+三版使用同一组测试密钥、金额、交易形状和 v2 交易。sCrypt 1.20.0 `-O` 版替换同算法的点加和倍点内核，沿用相同的四位窗口和交易绑定。OTDA 使用各模板自己的重建程序。表中付款均为两进两出。 [sCrypt 原始夹具](https://github.com/linzhm/bsv-script-lab/pull/45)
+
+| 构建 | 完整锁 | OTDA 重建程序 | ForkID ALL | OTDA ALL | 配对 OTDA SINGLE |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| ForkID ALL | 93,374 / 92,322 | 186,124 / 184,020 | 3,479 / 3,478 | 50.20 / 50.01 | 14.95 / 13.21 |
-| OTDA ALL | 101,250 / 100,192 | 194,000 / 191,889 | 185,614 / 183,510 | 51.26 / 56.54 | 13.39 / 14.40 |
-| OTDA SINGLE | 101,179 / 100,121 | 193,929 / 191,818 | 93,005 / 91,953 | 52.20 / 50.26 | 13.02 / 13.84 |
+| v0.2.0 基线 | 46,302 B | 3,913 B | 93,374 B | 101,250 B | 101,179 B |
+| Forth v0.3.0 | **45,776 B** | **3,910 B** | **92,322 B** | **100,192 B** | **100,121 B** |
+| sCrypt `-O` 内核 | 66,265 B | 4,022 B | 133,304 B | 141,406 B | 141,331 B |
 
-六笔入金和六笔付款均通过双引擎验证并入块。沿用签名修改锁定时间的六笔付款均被拒绝。优化锁还通过了 BSV Node 的 1,296 个现有付款判定、chain-gang 的 432 个付款判定和 24 个畸形见证反例。 [验收矩阵](../../reference/acceptance.md)
+在 BSV Node 1.2.3 `raised` 配置和固定 chain-gang `74676b9` 上，九笔入金和九笔付款均通过双引擎并入块。沿用签名修改锁定时间的九个对照均被拒绝。复放 JSON 记录原始交易、验证耗时中位数和两栈峰值。本轮耗时随模式和引擎变化。
+
+### 输入与内部范围
+
+锁在见证进入曲线点运算前检查栈形状、字段长度、授权类型、公钥、标量和逆元。窗口索引由检查后的标量推导。独立窗口词的 `--assume-input-ranges` 不参与完整锁构建。v0.3.0 的字节改动仅出现在 263 处倍点，完整锁每条成功路径仍经过所有授权检查。基线和 v0.3.0 在双引擎上通过 16 个正例和 216 个畸形输入对照，覆盖越界标量、异常逆元宽度、非法曲线点和见证栈形状。v0.3.0 另通过 Node 的 1,296 个付款判定、chain-gang 的 432 个付款判定和 24 个畸形见证反例。 [验收矩阵](../../reference/acceptance.md)
 
 ### 完整锁复跑
 
@@ -37,6 +40,14 @@ python "$experiment/compile_r1.py"
 python "$experiment/compile_r1.py" --optimize --owner-hash160 "$R1_OWNER_HASH160"
 bash shared/verify_node.sh --profile raised -- \
   python "$experiment/replay_r1.py" --matrix --output /tmp/r1-forth-comparison.json
+```
+
+三版对照在同时包含本实验和 #45 夹具提交 `89d90e0` 的临时检出中运行。使用 #45 固定的 Linux x86-64 sCrypt 编译器。 [夹具提交](https://github.com/linzhm/bsv-script-lab/commit/89d90e0b6be95b9dbb34bb09475417f210c8da3a)
+
+```sh
+GHCRTS=-N2 bash shared/verify_node.sh --profile raised -- \
+  python "$experiment/replay_r1.py" --matrix --scryptc "$SCRYPTC" \
+  --output /tmp/r1-forth-v030-comparison.json
 ```
 
 ## 点运算内核 0.1.0-alpha.1

@@ -20,7 +20,7 @@ v0.2.0 是当前开发版本。新建输出使用 [46,302 字节的固定锁](te
 
 ## Forth 探索版
 
-Forth 探索版 `0.1.0-alpha.2` 位于 `experiments/forth/`，直接从 `r1.fth` 构建完整的 v0.2.0 锁。基线逐字节复现已发布模板，同一份源码可启用字节优化。原生成器和付款夹具位于 `reference/`，此前的点运算实验也可单独复跑。 [Forth 源码与复跑说明](experiments/forth/README.md)
+Forth 探索版 v0.3.0 位于 `experiments/forth/`，从 `r1.fth` 编译完整 R1 锁。基线逐字节复现 v0.2.0。优化版和同算法 sCrypt 内核版使用同一套付款夹具比较。 [Forth 源码与对照结果](experiments/forth/README.md)
 
 ## 钱包接入
 
