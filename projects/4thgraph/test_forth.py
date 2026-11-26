@@ -1,0 +1,448 @@
+"""Regression tests for Forth lowering and the transaction binding invariants."""
+
+from dataclasses import replace
+from itertools import product
+from random import Random
+import unittest
+
+from shared.benchmark_validation import chain_verdict
+from shared.chain_gang import validate_at_heights
+from shared.evaluate import evaluate as evaluate_script
+from shared.script import decode_num, encode_num
+from shared.transaction import Input, Output, Transaction
+
+from compiler import CompileError, SourceCompiler, evaluate, lower, parse, schedule
+from lowering import compile_word
+from protocol import Contracts, OutputLayout, compile_candidates, invalidated, output_hash
+from replay import EXAMPLE, GATED_EXAMPLE, TASK_ID, TestKeys
+from wordsets import CELL_SIGN, U32, capabilities
+
+SOURCE = EXAMPLE.read_text()
+
+
+class CompilerTests(unittest.TestCase):
+    def test_stack_types_and_host_location(self):
+        with self.assertRaisesRegex(CompileError, "declared"):
+            parse(SOURCE.replace("DUP u32+", "DUP"))
+        with self.assertRaisesRegex(CompileError, "equal stack types"):
+            parse(SOURCE.replace("ELSE route-settle", "ELSE 1"))
+        source = "bsv-effect: fetch outpoint -- utxo ;\n: fetch bsv-lookup-utxo ;\n"
+        word = SourceCompiler(source).words["fetch"]
+        self.assertEqual(word.location, "host")
+        with self.assertRaisesRegex(CompileError, r"bsv-lookup-utxo \(line 2, column 9\)"):
+            lower(word)
+        with self.assertRaisesRegex(CompileError, "host-only.*bsv-lookup-utxo"):
+            parse(source + SOURCE.replace("x double alice", "x fetch alice"))
+
+    def test_arithmetic_and_literal_lowering(self):
+        source = "bsv-effect: wrap -- u32 ;\n: wrap 4294967295 cell>u32 1 cell>u32 u32+ ;\n" + SOURCE
+        words = parse(source).words
+        for name, values, expected in (
+            ("double", (U32 - 1,), U32 - 2),
+            ("inc", (U32 - 1,), 0),
+            ("wrap", (), 0),
+            ("decide", (15, 4), 0),
+            ("decide", (15, 5), 1),
+            ("decide", (U32 - 1, 1), 0),
+        ):
+            with self.subTest(word=name, values=values):
+                self.assertEqual(evaluate(words[name], *values), (expected,))
+                stack, alt = evaluate_script(lower(words[name]), [encode_num(v) for v in values])
+                self.assertEqual((list(map(decode_num, stack)), alt), ([expected], []))
+        self.assertEqual(lower(words["wrap"]), b"\x00")
+
+    def test_safe_lowering_ranges_and_comparison_result(self):
+        words = SourceCompiler(SOURCE + "\nbsv-effect: compare cell cell -- cell ;\n: compare < ;\n").words
+        self.assertEqual([len(compile_word(words["inc"], mode).script) for mode in ("baseline", "safe")], [70, 8])
+        optimized = compile_word(words["decide"], "safe")
+        self.assertEqual(len(optimized.script), 16)
+        change, = (item for item in optimized.rewrites if item.rule == "comparison-feeds-if")
+        self.assertEqual(SOURCE.splitlines()[change.line - 1][change.column - 1:][:2], "IF")
+        rng = Random(11704)
+        edges = (0, 1, 19, 20, 21, 1 << 31, U32 - 2, U32 - 1)
+        data = [(words["inc"], (x,)) for x in (*edges, *(rng.getrandbits(32) for _ in range(128)))]
+        data += [(words["decide"], (x, y)) for x, y in product(edges, repeat=2)]
+        data += [(words["compare"], (0, 1)), (words["compare"], (1, 0))]
+        for word, args in data:
+            expected = list(evaluate(word, *args))
+            for mode in ("baseline", "safe"):
+                stack, alt = evaluate_script(compile_word(word, mode).script, list(map(encode_num, args)))
+                self.assertEqual((list(map(decode_num, stack)), alt), (expected, []), (args, mode))
+
+    def test_stack_scheduling_shares_repeated_operands_and_preserves_branch_slots(self):
+        source = """
+bsv-effect: shared u32 u32 -- u32 ;
+: shared 2DUP u32+ ROT ROT u32+ u32+ ;
+bsv-effect: branch u32 u32 cell -- u32 ;
+: branch IF shared ELSE SWAP DROP THEN ;
+"""
+        words = SourceCompiler(source).words
+        shared = compile_word(words["shared"], "stack")
+        self.assertTrue(any(item.rule == "stack-last-use-and-sharing" for item in shared.rewrites))
+        self.assertLess(len(shared.script), len(compile_word(words["shared"], "safe").script))
+        cases = [(words["shared"], (a, b)) for a, b in product((0, 7, U32 - 1), repeat=2)]
+        cases += [(words["branch"], args) for args in product((0, U32 - 1), (3, 8), (0, -1))]
+        for word, args in cases:
+            stack, alt = evaluate_script(compile_word(word, "stack").script, list(map(encode_num, args)))
+            self.assertEqual((tuple(map(decode_num, stack)), alt), (evaluate(word, *args), []))
+
+    def test_local_operand_scheduling_keeps_subtraction_order_and_live_values(self):
+        source = """
+bsv-effect: direct u32 u32 -- u32 ;
+: direct SWAP SWAP u32+ ;
+bsv-effect: difference cell cell -- cell cell ;
+: difference OVER SWAP SWAP - ;
+bsv-effect: repeated cell -- cell cell ;
+: repeated DUP DUP - ;
+"""
+        words = SourceCompiler(source).words
+        compiled = compile_word(words["direct"], "stack")
+        rewrite, = [row for row in compiled.describe()["rewrites"]
+                    if row["rule"] == "stack-local-operand-scheduling"]
+        self.assertEqual(rewrite["script_bytes"], (10, 8))
+        self.assertIn("live-use counts", rewrite["basis"])
+        for name, args in (("direct", (U32 - 1, 4)), ("difference", (7, 3)), ("repeated", (11,))):
+            word = words[name]
+            stack, alt = evaluate_script(compile_word(word, "stack").script, list(map(encode_num, args)))
+            self.assertEqual((tuple(map(decode_num, stack)), alt), (evaluate(word, *args), []))
+
+    def test_long_helper_chain_uses_source_semantics_in_every_backend(self):
+        source = "bsv-effect: w0 cell -- cell ;\n: w0 1 + ;\n"
+        source += "".join(f"bsv-effect: w{i} cell -- cell ;\n: w{i} w{i - 1} ;\n" for i in range(1, 1200))
+        words = SourceCompiler(source).words
+        self.assertEqual(evaluate(words["w1199"], 6), (7,))
+        for mode in ("baseline", "safe", "stack"):
+            with self.subTest(mode=mode):
+                self.assertEqual(compile_word(words["w1199"], mode), compile_word(words["w0"], mode))
+        with self.assertRaisesRegex(ValueError, "argument is out of range for cell"):
+            evaluate(words["w1199"], CELL_SIGN)
+
+    def test_host_diagnostics_deduplicate_shared_helper_calls(self):
+        sources = ["bsv-effect: query outpoint -- outpoint ;\n: query bsv-lookup-utxo utxo>outpoint ;\n"]
+        previous = "query"
+        for i in range(100):
+            name = f"f{i}"
+            sources.append(f"bsv-effect: {name} outpoint -- outpoint ;\n: {name} {previous} {previous} ;\n")
+            previous = name
+        word = SourceCompiler("".join(sources)).words[previous]
+        self.assertEqual([token.text for token in word.host_uses], ["bsv-lookup-utxo", "utxo>outpoint"])
+
+    def test_core_cell_semantics(self):
+        source = """
+bsv-effect: sum cell cell -- cell ;
+: SUM ( an ordinary multiline
+  comment may contain unknown words ) + ;
+bsv-effect: signed-less cell cell -- cell ;
+: signed-less < ;
+bsv-effect: unsigned-less cell cell -- cell ;
+: unsigned-less U< ;
+bsv-effect: guard cell cell -- cell ;
+: guard IF 2 + THEN ;
+bsv-effect: numerals -- cell ;
+: numerals #-2 $10 + %10 + 'A' + ' ' + ;
+"""
+        words = SourceCompiler(source).words
+        for name, args, expected in (
+            ("sum", (U32 - 1, 1), U32),
+            ("sum", (CELL_SIGN - 1, 1), -CELL_SIGN),
+            ("sum", (-CELL_SIGN, -1), CELL_SIGN - 1),
+            ("signed-less", (-1, 0), -1),
+            ("unsigned-less", (-1, 0), 0),
+            ("unsigned-less", (0, -1), -1),
+            ("guard", (5, -7), 7),
+            ("guard", (5, 0), 5),
+            ("numerals", (), 113),
+        ):
+            with self.subTest(name=name, args=args):
+                word = words[name]
+                self.assertEqual(evaluate(word, *args), (expected,))
+                stack, alt = evaluate_script(lower(word), list(map(encode_num, args)))
+                self.assertEqual((list(map(decode_num, stack)), alt), ([expected], []))
+
+    def test_optional_words_and_build_diagnostics(self):
+        manifest = capabilities()
+        self.assertIn("+", manifest["wordsets"]["core"]["script"])
+        self.assertIn("execute", manifest["wordsets"]["core"]["unsupported"])
+        self.assertFalse(manifest["wordsets"]["core-ext"]["enabled_by_default"])
+        self.assertIn("true", manifest["wordsets"]["core-ext"]["script"])
+        source = "bsv-effect: flag -- cell ;\n: flag TRUE ;"
+        with self.assertRaisesRegex(CompileError, r"line 2, column 8: .*CORE EXT word 'TRUE' requires"):
+            SourceCompiler(source)
+        self.assertEqual(evaluate(SourceCompiler("bsv-use core-ext \\ enabled\n" + source).words["flag"]), (-1,))
+        with self.assertRaisesRegex(CompileError, r"line 2, column 8: .*CORE word 'EXECUTE' cannot compile"):
+            SourceCompiler(source.replace("TRUE", "EXECUTE"))
+        with self.assertRaisesRegex(CompileError, "unknown Forth word 'TYPO'"):
+            SourceCompiler(source.replace("TRUE", "TYPO"))
+        with self.assertRaisesRegex(CompileError, "optional Forth word set 'search' is unavailable"):
+            SourceCompiler("bsv-use search")
+        with self.assertRaisesRegex(CompileError, "preceding 'bsv-effect:"):
+            SourceCompiler(": ordinary ( cell -- cell ) 1 + ;")
+
+    def test_schedule_constraints(self):
+        program = parse(SOURCE)
+        self.assertEqual(schedule(program).mode, "fused")
+        plan = schedule(program, available_data=("x",), available_authorizers=("alice",))
+        self.assertEqual(plan.mode, "split")
+        self.assertIn("b: input y is unavailable at fusion", plan.fusion_blockers)
+        self.assertIn("b: authorizer bob is unavailable at fusion", plan.fusion_blockers)
+        constrained = parse(SOURCE + "\nindependent-submit a\n")
+        self.assertEqual(schedule(constrained).mode, "split")
+        with self.assertRaisesRegex(CompileError, rf"line {len(SOURCE.splitlines()) + 2}: independent-submit a"):
+            schedule(constrained, "fused")
+        self.assertEqual(schedule(parse(SOURCE + "\na independent-submit\n")).mode, "split")
+
+    def test_source_line_endings_and_core_right_bracket_diagnostic(self):
+        lines = ["bsv-use core-ext \\ enable comments", "bsv-effect: n -- cell ;", ": n 3 ;"]
+        for separator in ("\n", "\r", "\r\n"):
+            source = separator.join(lines)
+            self.assertEqual(evaluate(SourceCompiler(source).words["n"]), (3,))
+            with self.assertRaisesRegex(CompileError, r"line 4, column 1: Forth 2012 CORE word ']' cannot compile"):
+                SourceCompiler(source + separator + "]")
+
+
+class ProtocolTests(unittest.TestCase):
+    def setUp(self):
+        self.keys = TestKeys()
+        self.plan = schedule(parse(SOURCE), "split")
+        self.contracts = Contracts(self.plan, self.keys.public, TASK_ID)
+        deploy = Transaction((Input(bytes(32), 0),), (self.contracts.root,))
+        self.done = {"deploy": deploy}
+        self.split = self.contracts.prepare("split", self.done)
+        self.done["split"] = self.split.seal(self.keys.sign)
+
+    def test_rebind_after_split_txid_changes(self):
+        original = self.done["split"]
+        changed = replace(self.split, tx=replace(self.split.tx, locktime=1)).seal(self.keys.sign)
+        self.assertEqual(invalidated(self.plan, "split", original, changed),
+                         {"a": ("alice",), "b": ("bob",), "route": ()})
+        self.assertEqual(invalidated(self.plan, "split", original, original), {})
+        branch = self.contracts.prepare("a", self.done, {"x": 10})
+        signature = self.keys.sign(branch.signing_requests()[0])
+        rebound = self.contracts.prepare("a", {**self.done, "split": changed}, {"x": 10})
+        self.assertNotEqual(branch.signing_requests()[0].outpoint, rebound.signing_requests()[0].outpoint)
+        self.assertNotEqual(branch.signing_requests()[0].digest, rebound.signing_requests()[0].digest)
+        self.assertTrue(chain_verdict(rebound.seal(self.keys.sign), rebound.parents))
+        self.assertFalse(chain_verdict(rebound.seal(lambda _request: signature), rebound.parents))
+
+    def test_rejects_invalid_compressed_keys_before_building_outputs(self):
+        for payload in (bytes(32), b"\xff" * 32):
+            with self.subTest(payload=payload), self.assertRaisesRegex(ValueError, "settle requires a valid"):
+                Contracts(self.plan, {**self.keys.public, "settle": b"\x02" + payload}, TASK_ID)
+
+    def test_shared_external_input_follows_the_same_value_across_schedules(self):
+        source = GATED_EXAMPLE.read_text().replace("5 cell>u32 u32<", "u32>cell 0< 0=")
+        for right, gate in (("x", None), ("x", "z"), ("y", "x"), ("y", "y"), ("x", "x")):
+            text = (source if gate else SOURCE).replace("work: b y ", f"work: b {right} ")
+            if gate:
+                text = text.replace("gate: qualify z ", f"gate: qualify {gate} ")
+            for mode, separate in (("fused", False), ("split", False), ("split", True)):
+                if separate and not gate:
+                    continue
+                plan = schedule(parse(text + ("\nindependent-submit qualify" if separate else "")), mode)
+                contracts = Contracts(plan, self.keys.public, TASK_ID, target="both", optimization="stack",
+                                      join_witness="shared")
+                shared = plan.program.shared_input
+                artifact = contracts.describe()
+                self.assertEqual((artifact["schema_version"], artifact["shared_input"]), (2, shared))
+                for x in (0, 10, U32 - 1):
+                    with self.subTest(right=right, gate=gate, mode=mode, separate=separate, x=x):
+                        data = {"x": x, "y": 2, "z": 3}
+                        done = {"deploy": Transaction((Input(bytes(32), 0),), (contracts.root,))}
+                        reads = 0
+                        for i, step in enumerate(plan.templates):
+                            names = contracts.external_inputs(step)
+                            reads += names.count(shared)
+                            draft = contracts.prepare(step.name, done, {n: data[n] for n in names}, version=1 + i % 2)
+                            layout = contracts.output_layout(step.name)
+                            if layout is not None and layout.committed and x == 10:
+                                outputs = list(draft.tx.outputs)
+                                slot = layout.committed[-1]
+                                outputs[slot] = layout.bind(data[shared] ^ 1)[slot]
+                                changed = replace(draft, tx=replace(draft.tx, outputs=tuple(outputs)))
+                                self.assertFalse(chain_verdict(changed.seal(self.keys.sign), draft.parents))
+                            if step.name in {w.name for w in plan.program.work if w.input == shared}:
+                                self.assertEqual(draft.payload, ((),))
+                                with self.assertRaisesRegex(ValueError, "differs from the bound previous output"):
+                                    contracts.prepare(step.name, done, {shared: data[shared] ^ 1})
+                            done[step.name] = draft.seal(self.keys.sign)
+                            self.assertTrue(chain_verdict(done[step.name], draft.parents))
+                        self.assertEqual(reads, 1)
+                        settle = (2 * x + data[right] + 1) % U32 >= 20
+                        self.assertEqual(done[plan.templates[-1].name].outputs, (contracts.terminals[settle],))
+
+    def test_committed_output_hash_includes_lengths_and_every_copy(self):
+        for width in (246, 247, 65529, 65530):
+            base = (Output(2, bytes(width)), Output(3, b"\x51"), Output(5, b"\x52"))
+            layout = OutputLayout(base, (0, 2))
+            for value in (0, 128, U32 - 1):
+                outs = layout.bind(value)
+                stack, alt = evaluate_script(layout.hash_script(), [encode_num(value)])
+                self.assertEqual((stack, alt), ([output_hash(outs)], []))
+                self.assertTrue(layout.matches(outs))
+                self.assertFalse(layout.matches((outs[0], outs[1], layout.bind(value ^ 1)[2])))
+
+    def test_worker_checks_shared_input_against_supplied_gate(self):
+        source = GATED_EXAMPLE.read_text().replace("qualify z", "qualify x") + "\nindependent-submit qualify"
+        contracts = Contracts(schedule(parse(source)), self.keys.public, TASK_ID)
+        done = {"deploy": Transaction((Input(bytes(32), 0),), (contracts.root,))}
+        done["qualify"] = contracts.prepare("qualify", done, {"x": 2}).seal(self.keys.sign)
+        split = contracts.prepare("split", done)
+        done["split"] = replace(split.tx, outputs=contracts.work_layout.bind(3))
+        with self.assertRaisesRegex(ValueError, "split outputs do not match"):
+            contracts.prepare("a", done)
+
+    def test_rejects_inconsistent_inputs_before_calling_a_signer(self):
+        foreign = replace(self.done["deploy"], outputs=(replace(self.contracts.root, script=b"\x51"),))
+        with self.assertRaisesRegex(ValueError, "deployment output does not match"):
+            self.contracts.prepare("split", {"deploy": foreign})
+        with self.assertRaisesRegex(ValueError, "missing bound output deploy:0"):
+            self.contracts.prepare("split", {})
+        stale = replace(self.split, tx=replace(self.split.tx, inputs=(Input(b"\xff" * 32, 0),)))
+        calls = []
+        with self.assertRaisesRegex(ValueError, "input does not match"):
+            stale.seal(calls.append)
+        with self.assertRaisesRegex(ValueError, "must have the same length"):
+            replace(self.split, payload=()).seal(calls.append)
+        with self.assertRaisesRegex(ValueError, "witness fields must be bytes"):
+            replace(self.split, payload=(("not bytes",),)).seal(calls.append)
+        self.assertEqual(calls, [])
+
+    def test_join_checks_bound_slots_same_split_and_result_encoding(self):
+        a = self.contracts.prepare("a", self.done, {"x": 10}).seal(self.keys.sign)
+        b = self.contracts.prepare("b", self.done, {"y": 5}).seal(self.keys.sign)
+        foreign_split = replace(self.split, tx=replace(self.split.tx, locktime=1)).seal(self.keys.sign)
+        foreign_b = self.contracts.prepare("b", {**self.done, "split": foreign_split},
+                                           {"y": 5}).seal(self.keys.sign)
+        with self.assertRaisesRegex(ValueError, "b does not spend its bound split:1"):
+            self.contracts.prepare("route", {**self.done, "a": a, "b": foreign_b})
+        with self.assertRaisesRegex(ValueError, "join results must spend the same split"):
+            self.contracts.prepare("route", {"a": a, "b": foreign_b})
+        with self.assertRaisesRegex(ValueError, "a does not spend its bound split:0"):
+            self.contracts.prepare("route", {"a": b, "b": a})
+        data = replace(b.outputs[1], script=b.outputs[1].script[:-1] + b"\x80")
+        malformed_b = replace(b, outputs=(b.outputs[0], data))
+        with self.assertRaisesRegex(ValueError, "incorrect result data output"):
+            self.contracts.prepare("route", {"a": a, "b": malformed_b})
+
+    def test_branch_commitment_and_real_result_outpoints(self):
+        for name, data in (("a", {"x": 10}), ("b", {"y": 5})):
+            draft = self.contracts.prepare(name, self.done, data)
+            self.done[name] = draft.seal(self.keys.sign)
+            wrong_result = replace(draft, tx=replace(draft.tx, outputs=(draft.tx.outputs[0],
+                                                                        self.contracts.data_output(123))))
+            self.assertFalse(chain_verdict(wrong_result.seal(self.keys.sign), wrong_result.parents))
+        join = self.contracts.prepare("route", self.done)
+        self.assertTrue(chain_verdict(join.seal(self.keys.sign), join.parents))
+        # A byte change outside the proof header and trailer still changes the bound txid.
+        forged = replace(self.done["b"], locktime=1).serialize()
+        witness = (self.done["a"].serialize(), forged)
+        fake_proof = replace(join, payload=(witness, witness))
+        self.assertFalse(chain_verdict(fake_proof.seal(self.keys.sign), join.parents))
+
+    def test_shared_join_authenticates_the_reconstructed_transactions(self):
+        contracts = Contracts(self.plan, self.keys.public, TASK_ID, target="both", join_witness="shared")
+        deploy = Transaction((Input(bytes(32), 0),), (contracts.root,))
+        done = {"deploy": deploy}
+        done["split"] = contracts.prepare("split", done).seal(self.keys.sign)
+        for version, name, data in ((1, "a", {"x": 10}), (2, "b", {"y": 5})):
+            done[name] = contracts.prepare(name, done, data, version=version).seal(self.keys.sign)
+        join = contracts.prepare("route", done, version=1)
+        head_a, tail_a, head_b, tail_b, common = join.payload[0]
+        self.assertEqual(head_a + common + tail_a, done["a"].serialize())
+        self.assertEqual(head_b + common + tail_b, done["b"].serialize())
+        self.assertTrue(chain_verdict(join.seal(self.keys.sign), join.parents))
+        forged = (head_a, tail_a, head_b, tail_b, bytes([common[0] ^ 1]) + common[1:])
+        fake = replace(join, payload=(forged, forged))
+        self.assertFalse(chain_verdict(fake.seal(self.keys.sign), join.parents))
+
+    def test_cost_explanation_applies_constraints_before_candidate_comparison(self):
+        options = {"mode": "auto", "available_data": None, "available_authorizers": None, "target": "both"}
+        _, report = compile_candidates(self.plan.program, self.keys.public, TASK_ID, **options)
+        self.assertEqual(report["selected"], "fused")
+        self.assertLess(report["candidates"]["fused"]["cost"]["whole_path_bytes"],
+                        report["candidates"]["split"]["cost"]["whole_path_bytes"])
+        constrained = parse(SOURCE + "\nindependent-submit a\n")
+        _, report = compile_candidates(constrained, self.keys.public, TASK_ID, **options)
+        self.assertEqual(report["selected"], "split")
+        self.assertIn("independent-submit a", report["candidates"]["fused"]["reason"])
+        _, report = compile_candidates(self.plan.program, self.keys.public, TASK_ID,
+                                       **{**options, "mode": "fused", "available_data": iter(("x", "y")),
+                                          "available_authorizers": iter(("alice", "bob"))})
+        self.assertEqual(report["selected"], "fused")
+
+    def test_gate_cost_estimate_works_when_zero_input_would_be_rejected(self):
+        source = GATED_EXAMPLE.read_text().replace("5 cell>u32 u32<", "u32>cell 0 >")
+        contracts = Contracts(schedule(parse(source), "split"), self.keys.public, TASK_ID)
+        done = {"deploy": Transaction((Input(bytes(32), 0),), (contracts.root,))}
+        with self.assertRaisesRegex(ValueError, "gate qualify rejected"):
+            contracts.prepare("split", done, {"z": 0})
+        self.assertEqual(contracts.describe()["estimated_cost"]["assumptions"]["external_u32_values"]["z"], 0)
+
+    def test_gated_topology_local_fusion_and_rebinding(self):
+        source = GATED_EXAMPLE.read_text()
+        plan = schedule(parse(source), "split")
+        self.assertEqual(plan.templates[0].executes, ("qualify", "split"))
+        self.assertEqual(schedule(parse(source), "fused").templates[0].executes, ("qualify", "a", "b", "route"))
+        delayed = schedule(parse(source), "split", available_data=("x", "y"))
+        self.assertEqual(delayed.templates[0].executes, ("qualify",))
+        self.assertIn("unavailable at split", delayed.boundary_reasons[0])
+        plan = schedule(parse(source + "\nindependent-submit qualify\n"), "split")
+        self.assertEqual(plan.templates[1].inputs[0].step, "qualify")
+        contracts = Contracts(plan, self.keys.public, TASK_ID, target="both", optimization="stack")
+        done = {"deploy": Transaction((Input(bytes(32), 0),), (contracts.root,))}
+        gate = contracts.prepare("qualify", done, {"z": 2}, version=1)
+        done["qualify"] = gate.seal(self.keys.sign)
+        self.assertTrue(chain_verdict(done["qualify"], gate.parents))
+        with self.assertRaisesRegex(ValueError, "gate qualify rejected input z"):
+            contracts.prepare("qualify", done, {"z": 5}, version=1)
+        wrong = replace(gate, payload=((encode_num(5),),))
+        self.assertFalse(chain_verdict(wrong.seal(self.keys.sign), wrong.parents))
+        prior = contracts.prepare("split", done, version=2)
+        replacement = replace(gate, tx=replace(gate.tx, locktime=1)).seal(self.keys.sign)
+        self.assertEqual(invalidated(plan, "qualify", done["qualify"], replacement),
+                         {"split": ("operator",), "a": ("alice",), "b": ("bob",), "route": ()})
+        changed = contracts.prepare("split", {**done, "qualify": replacement}, version=2)
+        self.assertNotEqual(prior.signing_requests()[0].outpoint, changed.signing_requests()[0].outpoint)
+        signature = self.keys.sign(prior.signing_requests()[0])
+        self.assertFalse(chain_verdict(changed.seal(lambda _: signature), changed.parents))
+        self.assertTrue(chain_verdict(changed.seal(self.keys.sign), changed.parents))
+
+    def test_exact_version(self):
+        cases = (("forkid-v1", 1, 5, 2), ("chronicle-v2", 2, 2, 1))
+        self.assertEqual(self.contracts.version, 2)
+        for target, version, activation, wrong_version in cases:
+            with self.subTest(target=target):
+                contracts = Contracts(self.plan, self.keys.public, TASK_ID, target=target)
+                deploy = Transaction((Input(bytes(32), 0),), (contracts.root,), version=version)
+                split = contracts.prepare("split", {"deploy": deploy}).seal(self.keys.sign)
+                a = contracts.prepare("a", {"split": split}, {"x": 10})
+                self.assertEqual(a.tx.version, version)
+                self.assertEqual(a.signing_requests()[0].sighash, 0x41)
+                context = dict(spend_height=4, activation_height=activation, utxo_heights=(3,))
+                validate_at_heights(a.seal(self.keys.sign), a.parents, **context)
+                changed = replace(a, tx=replace(a.tx, version=wrong_version))
+                with self.assertRaisesRegex(ValueError, "OP_EQUALVERIFY"):
+                    validate_at_heights(changed.seal(self.keys.sign), changed.parents, **context)
+
+    def test_one_deployment_accepts_both_versions_in_any_join_position(self):
+        contracts = Contracts(self.plan, self.keys.public, TASK_ID, target="both")
+        deploy = Transaction((Input(bytes(32), 0),), (contracts.root,), version=2)
+        split = contracts.prepare("split", {"deploy": deploy}, version=1)
+        self.assertTrue(chain_verdict(split.seal(self.keys.sign), split.parents))
+        done = {"deploy": deploy, "split": split.seal(self.keys.sign)}
+        results = {step: {} for step in ("a", "b")}
+        for version, (step, data) in product((1, 2), (("a", {"x": 10}), ("b", {"y": 5}))):
+            branch = contracts.prepare(step, done, data, version=version)
+            results[step][version] = branch.seal(self.keys.sign)
+            self.assertTrue(chain_verdict(results[step][version], branch.parents))
+        for a, b, joined in product((1, 2), repeat=3):
+            with self.subTest(a=a, b=b, join=joined):
+                join = contracts.prepare("route", {"a": results["a"][a], "b": results["b"][b]}, version=joined)
+                self.assertTrue(chain_verdict(join.seal(self.keys.sign), join.parents))
+        with self.assertRaisesRegex(ValueError, "unavailable for target both"):
+            contracts.prepare("split", {"deploy": deploy}, version=3)
+        with self.assertRaisesRegex(ValueError, "unavailable for target chronicle-v2"):
+            self.contracts.prepare("split", self.done, version=1)
+
+if __name__ == "__main__":
+    unittest.main()

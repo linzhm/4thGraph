@@ -8,7 +8,7 @@
 
 ## 立即试用 4thG
 
-**[PELS Counter](#pels-counter)** · [P2PKH](#p2pkh-example) · [P2PK](#p2pk-example) · [安装 CLI](https://github.com/linzhm/4thGraph/blob/feat/4thgraph/projects/4thgraph/INSTALL.md)
+**[PELS Counter](#pels-counter)** · [P2PKH](#p2pkh-example) · [P2PK](#p2pk-example) · [安装 CLI](projects/4thgraph/INSTALL.md)
 
 <a name="pels-counter"></a>
 
@@ -19,13 +19,13 @@
 **1. 获取源码。** 需要 Git 和 Python 3.11 或更新版本。
 
 ```sh
-git clone --branch feat/4thgraph https://github.com/linzhm/4thGraph.git
+git clone https://github.com/linzhm/4thGraph.git
 cd 4thGraph
 export PYTHONPATH=.:projects/4thgraph
 counter=projects/4thgraph/examples/pels_counter.py
 ```
 
-**2. 编译锁脚本。** 4thG 编译下面的 Forth 状态转换。示例再把这段规则绑定到实际交易的后继输出。[Forth 源码](https://github.com/linzhm/4thGraph/blob/feat/4thgraph/projects/4thgraph/examples/pels-counter.fth)
+**2. 编译锁脚本。** 4thG 编译下面的 Forth 状态转换。示例再把这段规则绑定到实际交易的后继输出。[Forth 源码](projects/4thgraph/examples/pels-counter.fth)
 
 ```forth
 bsv-effect: advance u32 -- u32 ;
@@ -49,7 +49,7 @@ bash shared/verify_node.sh --profile default -- python "$counter" replay \
   --output projects/4thgraph/build/pels-counter.json
 ```
 
-复放先为 `0` 创建测试输出，再把 `0 → 1 → 2` 的两笔花费挖入区块。每次花费扣 **1,000 sat**。JSON 报告记录双引擎判定和入块结果。要单独构造花费，运行 `spend --parent` 并传入父交易原始字节。[花费与验证说明](https://github.com/linzhm/4thGraph/blob/feat/4thgraph/projects/4thgraph/examples/README.md#spend-and-verify-on-regtest)
+复放先为 `0` 创建测试输出，再把 `0 → 1 → 2` 的两笔花费挖入区块。每次花费扣 **1,000 sat**。JSON 报告记录双引擎判定和入块结果。要单独构造花费，运行 `spend --parent` 并传入父交易原始字节。[花费与验证说明](projects/4thgraph/examples/README.md#spend-and-verify-on-regtest)
 
 <a name="p2pkh-example"></a>
 
@@ -60,7 +60,7 @@ bash shared/verify_node.sh --profile default -- python "$counter" replay \
 python3 projects/4thgraph/examples/payments.py --hash160 751e76e8199196d454941c45d1b3a323f1433bd6
 ```
 
-锁中写入公钥哈希。花费时压入签名和公钥。[Forth 源码](https://github.com/linzhm/4thGraph/blob/feat/4thgraph/projects/4thgraph/examples/payments.fth) · [签名交易示例](projects/p2pk-p2pkh-baseline/README.zh-CN.md)
+锁中写入公钥哈希。花费时压入签名和公钥。[Forth 源码](projects/4thgraph/examples/payments.fth) · [签名交易示例](projects/p2pk-p2pkh-baseline/README.zh-CN.md)
 
 </details>
 
@@ -73,11 +73,11 @@ python3 projects/4thgraph/examples/payments.py --hash160 751e76e8199196d454941c4
 python3 projects/4thgraph/examples/payments.py --public-key 0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798
 ```
 
-锁中写入压缩公钥。花费时压入签名。[Forth 源码](https://github.com/linzhm/4thGraph/blob/feat/4thgraph/projects/4thgraph/examples/payments.fth) · [签名交易示例](projects/p2pk-p2pkh-baseline/README.zh-CN.md)
+锁中写入压缩公钥。花费时压入签名。[Forth 源码](projects/4thgraph/examples/payments.fth) · [签名交易示例](projects/p2pk-p2pkh-baseline/README.zh-CN.md)
 
 </details>
 
-4thG 还支持栈优化、交易边界候选搜索和编译决策报告，可将受支持的 Forth 词编译为 Circom。[工具链手册](https://github.com/linzhm/4thGraph/tree/feat/4thgraph/projects/4thgraph) · [Forth 语言规范](https://github.com/linzhm/4thGraph/blob/feat/4thgraph/projects/4thgraph/language.md)
+4thG 还支持栈优化、交易边界候选搜索和编译决策报告，可将受支持的 Forth 词编译为 Circom。[工具链手册](projects/4thgraph) · [Forth 语言规范](projects/4thgraph/language.md)
 
 <a name="4thg-comparisons"></a>
 
@@ -85,7 +85,7 @@ python3 projects/4thgraph/examples/payments.py --public-key 0279be667ef9dcbbac55
 
 | 项目 | 对照结果 |
 | --- | --- |
-| P2PKH-R1 Forth v0.3.0 探索版 | Forth 基线逐字节复现 v0.2.0 锁。优化后完整锁由 46,302 B 降到 **45,776 B**，两进两出 ForkID ALL 付款由 93,374 B 降到 **92,322 B**。复放还覆盖 OTDA，以及用 sCrypt 编译曲线内核的版本。[改造与复放](https://github.com/linzhm/4thGraph/tree/feat/4thgraph/projects/p2pkh-r1/experiments/forth) |
+| P2PKH-R1 Forth v0.3.0 探索版 | Forth 基线逐字节复现 v0.2.0 锁。优化后完整锁由 46,302 B 降到 **45,776 B**，两进两出 ForkID ALL 付款由 93,374 B 降到 **92,322 B**。复放还覆盖 OTDA，以及用 sCrypt 编译曲线内核的版本。[改造与复放](projects/p2pkh-r1/experiments/forth) |
 | BLS12-381 Groth16 验证器（开发中） | 用 Forth 编排链下证明的链上验证，支持全固定、混合以及花费时提供全部公开输入。与 nChain 的对照采用相同的公开输入域和配对预计算数据放置方式。 |
 | CCTP 交易布局（开发中） | 在单笔融合、同交易双输入和两笔串行布局中复放同一个 Groth16 验证任务，比较整条路径字节与最慢单笔花费的验证时间。 |
 

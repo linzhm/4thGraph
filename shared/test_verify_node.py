@@ -17,15 +17,18 @@ def write_stub(directory, name, body):
 
 
 class VerifyNodeTests(unittest.TestCase):
-    def run_launcher(self, directory, *, rpc_port=None, test_exit=0):
+    def run_launcher(self, directory, *, rpc_port=None, chronicle_height=None, test_exit=0):
         temporary = directory / 'node-temp'
         temporary.mkdir()
         env = dict(os.environ, PATH=f"{directory}:{os.environ['PATH']}", LC_ALL='C',
                    TMPDIR=str(temporary), VERIFY_NODE_TEST_TRACE=str(directory),
                    VERIFY_NODE_TEST_EXIT=str(test_exit), REGTEST_URL='http://127.0.0.1:1')
         env.pop('REGTEST_RPC_PORT', None)
+        env.pop('REGTEST_CHRONICLE_HEIGHT', None)
         if rpc_port is not None:
             env['REGTEST_RPC_PORT'] = rpc_port
+        if chronicle_height is not None:
+            env['REGTEST_CHRONICLE_HEIGHT'] = chronicle_height
         result = subprocess.run(['bash', str(LAUNCHER), 'test_fixture'], env=env, cwd=directory,
                                 capture_output=True, timeout=10)
         self.assertEqual(list(temporary.iterdir()), [])
@@ -51,8 +54,19 @@ class VerifyNodeTests(unittest.TestCase):
                 self.assertIn(b'REGTEST_RPC_PORT', result.stderr)
                 self.assertFalse((directory / 'downloaded').exists())
 
-    def test_selected_port_reaches_node_readiness_probe_and_tests(self):
-        for override, port, test_exit in ((None, 18443, 0), ('18461', 18461, 0), ('01861', 1861, 7)):
+    def test_invalid_chronicle_heights_fail_before_download(self):
+        for height in ('1', '2147483648', '-1', 'not-a-height'):
+            with self.subTest(height=height), TemporaryDirectory() as tmp:
+                directory = Path(tmp)
+                write_stub(directory, 'curl', 'touch "$VERIFY_NODE_TEST_TRACE/downloaded"\n')
+                result = self.run_launcher(directory, chronicle_height=height)
+                self.assertEqual(result.returncode, 2)
+                self.assertIn(b'REGTEST_CHRONICLE_HEIGHT', result.stderr)
+                self.assertFalse((directory / 'downloaded').exists())
+
+    def test_selected_configuration_reaches_node_and_tests(self):
+        cases = ((None, 18443, None, 2, 0), ('18461', 18461, '01000', 1000, 0), ('01861', 1861, None, 2, 7))
+        for override, port, chronicle_height, expected_height, test_exit in cases:
             with self.subTest(override=override, test_exit=test_exit), TemporaryDirectory() as tmp:
                 directory = Path(tmp)
                 write_stub(directory, 'curl', 'printf %s "test archive bytes" > "${!#}"\n')
@@ -75,16 +89,21 @@ while :; do sleep 0.1; done
 ''')
                 write_stub(directory, 'python', '''test -s "$REGTEST_COOKIE"
 printf '%s\n' "$REGTEST_URL" > "$VERIFY_NODE_TEST_TRACE/test-url"
+printf '%s\n' "$SCRIPT_LAB_CHRONICLE_HEIGHT" > "$VERIFY_NODE_TEST_TRACE/test-height"
 printf '%s\n' "$@" > "$VERIFY_NODE_TEST_TRACE/test-args"
 exit "$VERIFY_NODE_TEST_EXIT"
 ''')
-                result = self.run_launcher(directory, rpc_port=override, test_exit=test_exit)
+                result = self.run_launcher(directory, rpc_port=override,
+                                           chronicle_height=chronicle_height, test_exit=test_exit)
                 self.assertEqual(result.returncode, test_exit, result.stderr)
                 self.assertIn(f'-rpcport={port}', (directory / 'node-args').read_text().splitlines())
+                self.assertIn(f'-chronicleactivationheight={expected_height}',
+                              (directory / 'node-args').read_text().splitlines())
                 cli_args = (directory / 'cli-args').read_text().splitlines()
                 self.assertIn('-rpcconnect=127.0.0.1', cli_args)
                 self.assertIn(f'-rpcport={port}', cli_args)
                 self.assertIn('getblockcount', cli_args)
                 self.assertEqual((directory / 'test-url').read_text().strip(), f'http://127.0.0.1:{port}')
+                self.assertEqual((directory / 'test-height').read_text().strip(), str(expected_height))
                 self.assertEqual((directory / 'test-args').read_text().splitlines(),
                                  ['-m', 'unittest', '-v', 'test_fixture'])

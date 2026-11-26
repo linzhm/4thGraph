@@ -28,7 +28,7 @@ Ordinary payments use ForkID ALL (`0x41`) and a 326-byte unlock. The v0.2.0 two-
 
 ## Forth experiment
 
-The Forth source `r1.fth` reproduces the full v0.2.0 lock byte for byte. The v0.3.0 build saves two bytes at each of 263 internal point doublings, or 526 bytes in the full lock. The lock checks untrusted witness fields before curve arithmetic. On the same regtest node, the v0.2.0 baseline, v0.3.0 build, and 66,265 B matched sCrypt kernel build each completed payments using ForkID ALL, OTDA ALL, and paired OTDA SINGLE. [Forth source and replay](https://github.com/linzhm/4thGraph/blob/f6f2c66e8476b29975b43be76850229ee38b47ea/projects/p2pkh-r1/experiments/forth/README.md)
+The Forth source `r1.fth` reproduces the full v0.2.0 lock byte for byte. The v0.3.0 build saves two bytes at each of 263 internal point doublings, or 526 bytes in the full lock. The lock checks untrusted witness fields before curve arithmetic. On the same regtest node, the v0.2.0 baseline, v0.3.0 build, and 66,265 B matched sCrypt kernel build each completed payments using ForkID ALL, OTDA ALL, and paired OTDA SINGLE. [Forth source and replay](experiments/forth/README.md)
 
 ## Wallet integration
 
