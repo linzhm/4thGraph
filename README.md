@@ -22,7 +22,7 @@ BSV Script Lab provides locking templates that wallets can recognize, SDKs that 
 
 Start with native P2PKH to run your first payment. The projects share the same wallet calls in TypeScript, Rust, Go, and Python. Each project guide covers its signing request, template options, and local dependencies. [Wallet SDK quickstart](shared/sdk/README.md)
 
-4thGraph is a Forth compiler for BSV Script and multi-transaction workflows. [4thGraph and regtest replay](projects/forth-multi-tx/README.md)
+4thGraph is a Forth compiler for BSV Script and multi-transaction workflows. [4thGraph and regtest replay](projects/4thgraph/README.md)
 
 <a name="transaction-costs"></a>
 

@@ -69,8 +69,8 @@ independent-submit <gate-or-work-step>
 `--capabilities` 输出机器可读的词集、执行位置和交易版本清单。 `--entry <word>` 只编译指定的已标注定义，便于检查 Script 字节和栈签名。事务构建在发现首个无效使用时退出，并指明源文件行列。诊断区分未知词、未导入的 Core Extension 词、无法下沉的标准词和调用链中的宿主词。
 
 ```sh
-PYTHONPATH=. python projects/forth-multi-tx/protocol.py --capabilities
-PYTHONPATH=. python projects/forth-multi-tx/protocol.py projects/forth-multi-tx/example.fth --entry inc
+PYTHONPATH=. python projects/4thgraph/protocol.py --capabilities
+PYTHONPATH=. python projects/4thgraph/protocol.py projects/4thgraph/example.fth --entry inc
 ```
 
 版本目标与词集、运算语义和调度分别配置。 `--target both` 让同一份锁接受版本 1 和 2，选 `Contracts.prepare(..., version=1)` 或 `version=2` 在实例化每步时决定实际版本。锁验证当前交易和每份结果父交易自身的版本及来源。版本进入签名摘要，改动父交易版本后须重新绑定其后继。

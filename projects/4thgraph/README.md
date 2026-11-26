@@ -2,7 +2,7 @@
 
 A Forth compiler for BSV Script and multi-transaction workflows.
 
-当前构建版本为 **v0.1.1**。项目位于 BSV Script Lab 仓库内，编译与复放产物可写入 `projects/forth-multi-tx/build/`。
+当前构建版本为 **v0.1.1**。项目位于 BSV Script Lab 仓库内，编译与复放产物可写入 `projects/4thgraph/build/`。
 
 同一份 Forth 源码可以生成融合版和拆分版。示例计算 `a = 2x`、`b = y + 1`，两支结果和汇合的和都按 `u32` 表示。回绕后的和小于 20 时走复核，其余走结算。两种后继各锁给一个配置的公钥。编译器以 Forth 2012 Core 为语义基线，`+` 使用 64 位 cell，`u32+` 固定按 32 位回绕。 [示例源码](example.fth) · [语言与 BSV 扩展规范](language.md)
 
@@ -14,9 +14,9 @@ A Forth compiler for BSV Script and multi-transaction workflows.
 python -m venv .venv
 . .venv/bin/activate
 python -m pip install ecdsa -r shared/requirements-chronicle.txt
-PYTHONPATH=. python -m unittest discover -v -s projects/forth-multi-tx
+PYTHONPATH=. python -m unittest discover -v -s projects/4thgraph
 PYTHONPATH=. bash shared/verify_node.sh --profile default -- \
-  python projects/forth-multi-tx/replay.py --output projects/forth-multi-tx/build/replay.json --samples 21
+  python projects/4thgraph/replay.py --output projects/4thgraph/build/replay.json --samples 21
 ```
 
 编译和复放都用 `--target` 选目标。三个目标均使用原始 ForkID ALL（`0x41`）。
@@ -33,10 +33,10 @@ PYTHONPATH=. bash shared/verify_node.sh --profile default -- \
 
 ```sh
 REGTEST_CHRONICLE_HEIGHT=1000 PYTHONPATH=. bash shared/verify_node.sh --profile default -- \
-  python projects/forth-multi-tx/replay.py --target forkid-v1 --output projects/forth-multi-tx/build/replay-v1.json --samples 21
+  python projects/4thgraph/replay.py --target forkid-v1 --output projects/4thgraph/build/replay-v1.json --samples 21
 
 PYTHONPATH=. bash shared/verify_node.sh --profile default -- \
-  python projects/forth-multi-tx/replay.py --target both --output projects/forth-multi-tx/build/replay-both.json --samples 21
+  python projects/4thgraph/replay.py --target both --output projects/4thgraph/build/replay-both.json --samples 21
 ```
 
 复放 JSON 保存源码、两套脚本和符号模板、每笔交易的原始字节与真实 outpoint、每个输入的 BSV Node 脚本判定、Node 入池及挖块结果，以及 chain-gang 的整笔交易判定。启动时使用钱包矿工奖励建立共享资金夹具。报告从各路径自己的部署交易开始计量。
@@ -44,10 +44,10 @@ PYTHONPATH=. bash shared/verify_node.sh --profile default -- \
 可用复放报告里的测试公钥离线编译。换用自己的公钥时，`keys.json` 的格式为角色名到压缩 secp256k1 公钥十六进制字符串的映射。编译会验证每个必需角色的公钥确实对应曲线上的点。
 
 ```sh
-jq '.fixture_public_keys' projects/forth-multi-tx/build/replay.json > projects/forth-multi-tx/build/fixture-keys.json
-PYTHONPATH=. python projects/forth-multi-tx/protocol.py projects/forth-multi-tx/example.fth \
-  --mode split --target both --keys projects/forth-multi-tx/build/fixture-keys.json --task-id "$(jq -r .task_id projects/forth-multi-tx/build/replay.json)"
-PYTHONPATH=. python projects/forth-multi-tx/protocol.py --capabilities
+jq '.fixture_public_keys' projects/4thgraph/build/replay.json > projects/4thgraph/build/fixture-keys.json
+PYTHONPATH=. python projects/4thgraph/protocol.py projects/4thgraph/example.fth \
+  --mode split --target both --keys projects/4thgraph/build/fixture-keys.json --task-id "$(jq -r .task_id projects/4thgraph/build/replay.json)"
+PYTHONPATH=. python projects/4thgraph/protocol.py --capabilities
 ```
 
 `--mode auto` 在所有输入和分支授权都可同时取得时选融合。可用 `--available-data x` 或 `--available-authorizers alice` 模拟另一支晚到。往示例末尾加上 `independent-submit a` 后，`auto` 选择拆分，`--mode fused` 报告约束的源文件行号。可显式请求拆分，在两种调度都合法时做同源对照。
@@ -59,7 +59,7 @@ PYTHONPATH=. python projects/forth-multi-tx/protocol.py --capabilities
 以下命令从仓库根目录生成首份对照。已有 v0.1.0 归档时，会一起收录为历史基线。
 
 ```bash
-project=projects/forth-multi-tx
+project=projects/4thgraph
 PYTHONPATH=. bash shared/verify_node.sh --profile default -- \
   python "$project/replay.py" --target both --optimize stack --join-witness shared \
   --output "$project/build/v0.1.1-parallel-both-height2.json"
@@ -78,7 +78,7 @@ PYTHONPATH=. python "$project/decision_report.py" "$project/build/v0.1.1-paralle
 
 ```sh
 PYTHONPATH=. bash shared/verify_node.sh --profile default -- \
-  python -m unittest discover -v -s projects/forth-multi-tx -p test_regtest.py
+  python -m unittest discover -v -s projects/4thgraph -p test_regtest.py
 ```
 
 ## 语言与运行器
@@ -95,8 +95,8 @@ PYTHONPATH=. bash shared/verify_node.sh --profile default -- \
 
 ```sh
 PYTHONPATH=. bash shared/verify_node.sh --profile default -- \
-  python projects/forth-multi-tx/replay.py --topology gated-parallel --target both \
-  --optimize stack --join-witness shared --output projects/forth-multi-tx/build/gated.json
+  python projects/4thgraph/replay.py --topology gated-parallel --target both \
+  --optimize stack --join-witness shared --output projects/4thgraph/build/gated.json
 ```
 
 ```mermaid
