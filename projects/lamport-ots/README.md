@@ -21,6 +21,8 @@ The sizes below use ordinary BIP143 ALL (`0x41`) and Chronicle OTDA ALL (`0x61`)
 
 Full-key inputs cost less to spend into ordinary outputs. The committed profiles store SHA-256 of the ordered public key and use an additional 8,192 bytes per input to reconstruct it. Shorter output locks also reduce OTDA ALL preimages, which serialize the outputs into each input's signing preimage. [Marginal and lifecycle costs](docs/optimization.md#transaction-and-lifecycle-costs)
 
+For version-2 Chronicle spends, opt-in OTDA reconstruction reduces the compact profile's OTDA ALL 2×2 payment from **74,120 to 48,830 bytes** when both outputs use that profile. [Reconstruction and wallet options](docs/optimization.md#otda-unlocking-reconstruction)
+
 The reference supports all twelve BIP143 and OTDA ALL, NONE and SINGLE combinations with optional ANYONECANPAY. BIP143 ALL is the wallet default. The reference requires explicit approval for unpaired SINGLE, which commits to zero outputs. The legacy two-push BIP143 ALL profile remains spendable. The detached digest verifier is for tests only because the same proof can authorize a different transaction. [Wire and Script specification](docs/spec.md) · [Acceptance domain](docs/acceptance.md)
 
 ## Build a payment
@@ -42,4 +44,4 @@ python projects/lamport-ots/reference/measure.py --committed-costs
 
 Run `bash projects/lamport-ots/reference/verify_apple.sh` on macOS with Apple Container, or `bash projects/lamport-ots/reference/verify.sh` for the Linux BSV Node replay. [Validation receipts](docs/validation.md) · [Original ALL vector](versions/v0.1.0/vector.json) · [Universal sighash vectors](versions/v0.1.0/universal-vectors.json) · [v0.1.0 measurements](versions/v0.1.0/measurements.json)
 
-The funded regtest replay confirmed mempool admission and mining for funding, one turnover and exit for both Forth profiles under BIP143 ALL and Chronicle OTDA ALL. [Funded results and reproduction](docs/validation.md#funded-regtest)
+The funded regtest replay confirmed mempool admission and mining for funding, one turnover and exit for both Forth profiles under BIP143 ALL and Chronicle OTDA ALL. It also replayed the same lifecycle with reconstruction enabled on the compact profile. [Funded results and reproduction](docs/validation.md#funded-regtest)

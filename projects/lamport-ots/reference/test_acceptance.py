@@ -9,12 +9,14 @@ from engines import chain_valid
 from fixtures import INVALID_PREVOUT_CASES, cases, mode_fixture, test_secret
 from forth_verifier import committed_verifier_code
 from lamport import OneTimeSigner, public_key, sign_digest, verify_digest
-from payment import sign_spend
+from measure import instructions
+from payment import authorization, sign_spend
 from script import (
-    committed_locking_script, compact_forth_committed_locking_script, forth_committed_locking_script, locking_script,
+    committed_locking_script, compact_forth_committed_locking_script, compact_forth_pattern,
+    forth_committed_locking_script, locking_script,
 )
 from fourthgraph.bsv.evaluate import evaluate, ScriptError
-from fourthgraph.bsv.script import number, push
+from fourthgraph.bsv.script import OPS, number, push
 from fourthgraph.bsv.transaction import Input, Output, Transaction
 from test_node import node_check
 
@@ -118,6 +120,65 @@ class LamportAcceptance(unittest.TestCase):
             with self.subTest(template=factory.__name__):
                 self.check_payment_domain(factory)
 
+    def test_reconstructed_payment_decisions_cover_the_declared_domain(self):
+        self.check_payment_domain(compact_forth_committed_locking_script, compress_otda=True)
+
+    def test_otda_reconstruction_preserves_witness_and_falls_back(self):
+        pattern = compact_forth_pattern()
+        self.assertEqual(evaluate(pattern.program), (list(pattern.fixed_parts), []))
+        key = public_key(test_secret(b'forth/masks'))
+        lock = compact_forth_committed_locking_script(key)
+        self.assertEqual(sha256(lock).hexdigest(), '1be800178fb084ca720e5c0e16663f1714f62169f6b1a96c2817e93ca8e17201')
+        self.assertEqual(pattern.match(lock), (sha256(key).digest(),))
+        self.assertIsNone(pattern.match(lock[:-1] + b'\x00'))
+
+        for mode, version, paired, reconstructed in (
+            (0x61, 2, True, True), (0xe1, 2, True, True),
+            (0x63, 2, True, True), (0xe3, 2, True, True),
+            (0x63, 2, False, False), (0xe3, 2, False, False),
+            (0x61, 1, True, False), (0x41, 2, True, False), (0x62, 2, True, False),
+        ):
+            with self.subTest(mode=hex(mode), version=version, paired=paired):
+                secret, parents, signed = mode_fixture(mode, paired=paired, version=version, compress_otda=True,
+                                                       lock_factory=compact_forth_committed_locking_script)
+                literal = sign_spend(signed.with_script(1, b''), 1, parents[1].serialize(), public_key(secret),
+                                     lambda digest: sign_digest(secret, digest), sighash=mode,
+                                     allow_unpaired_single=not paired)
+                actual, expected = signed.inputs[1].script, literal.inputs[1].script
+                self.assertEqual(evaluate(actual), evaluate(expected))
+                if reconstructed:
+                    self.assertLess(len(actual), len(expected))
+                else:
+                    self.assertEqual(actual, expected)
+
+    def test_reconstructs_mixed_outputs_in_wire_order(self):
+        secret, parents, initial = mode_fixture(0x61, compress_otda=True,
+                                                lock_factory=compact_forth_committed_locking_script)
+        first, compact = initial.outputs
+        outputs = (replace(first, script=b'\x51'), compact, Output(1, b'\x00'))
+        tx = replace(initial.with_script(1, b''), outputs=outputs)
+
+        def sign(digest):
+            return sign_digest(secret, digest)
+
+        options = tx, 1, parents[1].serialize(), public_key(secret), sign
+        signed = sign_spend(*options, sighash=0x61, compress_otda=True)
+        literal = sign_spend(*options, sighash=0x61)
+        unlock = signed.inputs[1].script
+        self.assertLess(len(unlock), len(literal.inputs[1].script))
+        self.assertEqual(evaluate(unlock), evaluate(literal.inputs[1].script))
+        self.assertEqual(evaluate(unlock)[0][0], authorization(tx, 1, parents[1].outputs[0].value, 0x61).preimage)
+        self.assertTrue(chain_valid(signed, parents))
+        if os.environ.get('REGTEST_COOKIE'):
+            self.assertTrue(node_check(signed, parents[1], 1))
+
+        other_key = public_key(test_secret(b'nonmatching output'))
+        other_lock = forth_committed_locking_script(other_key)
+        ordinary = replace(tx, outputs=(outputs[0], replace(compact, script=other_lock), outputs[2]))
+        sign_args = ordinary, *options[1:]
+        self.assertEqual(sign_spend(*sign_args, sighash=0x61, compress_otda=True),
+                         sign_spend(*sign_args, sighash=0x61))
+
     def test_forth_reconstructs_the_key_for_every_digest_byte(self):
         secret = test_secret(b'forth/masks')
         key = public_key(secret)
@@ -147,7 +208,7 @@ class LamportAcceptance(unittest.TestCase):
                 self.assertEqual(node_check(tx, parents[1], 1, chronicle=chronicle, funding_height=height),
                                  chronicle or not bool(mode & 0x20))
 
-    def check_payment_domain(self, lock_factory):
+    def check_payment_domain(self, lock_factory, *, compress_otda=False):
         expected = {
             (version, paired, mode, edit)
             for version, paired, mode, edit in product(VERSIONS, PAIRING, MODES, EDITS)
@@ -169,16 +230,20 @@ class LamportAcceptance(unittest.TestCase):
         visited = set()
         for version, paired, mode in product(VERSIONS, PAIRING, MODES):
             _, parents, signed = mode_fixture(mode, paired=paired, version=version,
-                                              lock_factory=lock_factory)
+                                              lock_factory=lock_factory, compress_otda=compress_otda)
+            functional = any(opcode > OPS['OP_16'] for opcode, _ in instructions(signed.inputs[1].script))
             for edit, candidate, prevouts in edited_payments(signed, parents):
                 row = (version, paired, mode, edit)
                 with self.subTest(row=row):
                     self.assertIn(row, expected)
                     self.assertNotIn(row, visited)
                     visited.add(row)
-                    self.assertEqual(chain_valid(candidate, prevouts), row in accepted, 'chain-gang')
+                    expect_push_only = functional and candidate.version == 1
+                    self.assertEqual(chain_valid(candidate, prevouts, expect_push_only=expect_push_only),
+                                     row in accepted, 'chain-gang')
                     if os.environ.get('REGTEST_COOKIE'):
-                        self.assertEqual(node_check(candidate, prevouts[1], 1), row in accepted, 'BSV Node')
+                        self.assertEqual(node_check(candidate, prevouts[1], 1, expect_push_only=expect_push_only),
+                                         row in accepted, 'BSV Node')
         self.assertEqual(visited, expected)
 
     def test_committed_proof_binds_every_selected_secret_and_sibling(self):

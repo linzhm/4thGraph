@@ -62,6 +62,12 @@ input/output selection. Its preimage has variable length and omits the prevout
 amount. The node authenticates the serialized fields through the fixed-r
 signature relation described in [security.md](security.md).
 
+An opted-in version-2 unlock can reconstruct P for OTDA ALL or paired SINGLE,
+including ANYONECANPAY, from matching compact Forth outputs. The functional
+unlock leaves the identical preimage, proof and selector on the main stack and
+an empty altstack. The verifier binds the resulting preimage to the spending
+input in the same way as a literal push. [Reconstruction design](optimization.md#otda-unlocking-reconstruction)
+
 ALL covers all outputs, NONE covers no outputs, and SINGLE covers the output
 at the signing input index when it exists. The current outpoint, sequence,
 version and locktime are committed. Without ANYONECANPAY, all input outpoints

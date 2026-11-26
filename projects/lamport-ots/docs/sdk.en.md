@@ -37,6 +37,10 @@ const signedHex = wallet.signPayment({
 
 Use `signInput` for a prepared transaction. Supply the transaction, its input index and the corresponding prevout. See the [call table](../../../sdk/docs/reference.md#calls-and-data) for the matching Rust, Go, and Python interfaces.
 
+## Reconstruct OTDA preimages
+
+For a trusted Chronicle spend context, set `chronicleActive: true`, `compressOtda: true` and an OTDA sighash such as `0x61` in the signing request. Use `compress_otda=True` in Python or `CompressOTDA` in Go. With a version-2 transaction, reconstruction applies to compact Forth outputs covered by OTDA ALL or a paired OTDA SINGLE, including ANYONECANPAY. The wallet chooses the shorter encoding and calls the signer with the same digest as the literal encoding. Fund the output using the existing `committed-key-forth-compact` profile. [Encoding and measurements](optimization.md#otda-unlocking-reconstruction)
+
 ## Keep key state with the invoice
 
 Record the exact payment profile on the invoice and retain the full 16,384-byte public key in order. The committed profiles use those bytes to assemble the spending proof. Recover the public key and the key-consumption record together.

@@ -13,10 +13,12 @@ from fourthgraph.bsv.script import push
 from fourthgraph.bsv.differential import node_script_valid
 
 
-def node_check(tx, parent, index, *, chronicle=True, funding_height=3):
+def node_check(tx, parent, index, *, chronicle=True, funding_height=3, expect_push_only=False):
     previous = parent.outputs[0]
     cookie = Path(os.environ['REGTEST_COOKIE']).read_text().strip().split(':',1)
     flags = sum(1<<b for b in (1,2,3,16,18,19))
+    if expect_push_only:
+        flags |= 1 << 5
     if chronicle:
         flags |= 1 << 20
         if funding_height >= 2:
@@ -26,7 +28,7 @@ def node_check(tx, parent, index, *, chronicle=True, funding_height=3):
     response = requests.post(os.environ.get('REGTEST_URL','http://127.0.0.1:18443'),auth=tuple(cookie),timeout=30,
         json=dict(jsonrpc='1.0',id=1,method='verifyscript',params=[[request],False,5000]))
     response.raise_for_status()
-    return node_script_valid(response.json(), flags, chronicle_active=chronicle)
+    return node_script_valid(response.json(), flags, chronicle_active=chronicle, expect_push_only=expect_push_only)
 
 
 class NodeTests(unittest.TestCase):

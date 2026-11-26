@@ -31,9 +31,15 @@ SCRIPT_WORDS = {
 
 
 @cache
-def committed_verifier_code():
+def committed_verifier_parts():
     compiler = SourceCompiler(SOURCE.read_text(encoding="ascii"), vocabulary=SCRIPT_WORDS, source_path=SOURCE)
     start = lower(compiler.words["start-commitment"])
     one_byte = lower(compiler.words["committed-byte"])
     finish = lower(compiler.words["finish-commitment"])
+    return start, one_byte, finish
+
+
+@cache
+def committed_verifier_code():
+    start, one_byte, finish = committed_verifier_parts()
     return start + one_byte * 32 + finish

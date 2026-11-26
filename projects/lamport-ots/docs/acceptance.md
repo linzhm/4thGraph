@@ -41,6 +41,12 @@ versions and creation/spend eras. A development evaluator test checks all 256
 possible byte values and one mixed digest for the Forth reconstruction word.
 [Current execution record](validation.md)
 
+The reconstruction suite repeats the 408-row authorization domain with compact
+outputs and reconstruction enabled. Six v2-to-v1 edits retain functional
+unlocking and expect the explicit push-only rejection. Focused cases compare
+the complete reconstructed and literal witness stacks, including mixed output
+order, and verify literal fallback. [Fixtures](../reference/test_acceptance.py)
+
 ## Digest-only and legacy locks
 
 For each index and starting commitment choice, the digest-only fixture flips

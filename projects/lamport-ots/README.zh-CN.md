@@ -21,6 +21,8 @@ Lamport OTS 将 8,192 字节的一次性签名绑定到 BSV 当前交易输入�
 
 全公钥格式花费到普通输出时，每个输入的成本较低。承诺格式只在锁中保存有序公钥的 SHA-256，每个输入多携带 8,192 字节以重建公钥。OTDA ALL 还会在每个输入的签名原文中序列化本笔交易的输出，缩短输出锁同时也缩短签名原文。[边际成本与生命周期（英文）](docs/optimization.md#transaction-and-lifecycle-costs)
 
+Chronicle v2 交易可显式启用 OTDA 原文重建。当两个输出均使用紧凑模板时，OTDA ALL 两进两出从 **74,120 降至 48,830 字节**。[重建机制与钱包选项（英文）](docs/optimization.md#otda-unlocking-reconstruction)
+
 参考实现支持 BIP143 与 Chronicle OTDA 的 ALL、NONE、SINGLE 及 ANYONECANPAY 共十二种组合，默认使用 BIP143 ALL。无配对 SINGLE 不承诺任何输出，参考 API 要求调用方显式批准。旧版两项见证的 BIP143 ALL 付款锁仍可花费。分离摘要验证器仅供测试，同一证明可以被复制到另一笔交易。[线格式与脚本规范（英文）](docs/spec.md) · [验收范围（英文）](docs/acceptance.md)
 
 ## 构建付款
@@ -42,4 +44,4 @@ python projects/lamport-ots/reference/measure.py --committed-costs
 
 macOS 用 Apple Container 运行 `bash projects/lamport-ots/reference/verify_apple.sh`，Linux 运行 `bash projects/lamport-ots/reference/verify.sh` 进行 BSV Node 复放。[验证记录（英文）](docs/validation.md) · [原始 ALL 向量](versions/v0.1.0/vector.json) · [通用签名模式向量](versions/v0.1.0/universal-vectors.json) · [v0.1.0 测量清单](versions/v0.1.0/measurements.json)
 
-在 BSV Node 默认 regtest 交易策略下，两种 Forth 模板的入金、一次周转和退出均已入池并入块，周转和退出分别覆盖 BIP143 ALL 和 Chronicle OTDA ALL。[逐阶段结果与复现命令（英文）](docs/validation.md#funded-regtest)
+在 BSV Node 默认 regtest 交易策略下，两种 Forth 模板及启用重建的紧凑模板均完成入金、一次周转和退出。两种 ALL 模式的各阶段均已入池并入块。[逐阶段结果与复现命令（英文）](docs/validation.md#funded-regtest)
