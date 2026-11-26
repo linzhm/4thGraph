@@ -23,9 +23,10 @@
 从仓库根目录创建 Python 3.12 项目环境。测试使用公开夹具密钥和固定版本的 chain-gang。BSV Node 复放在隔离的 regtest 上进行。
 
 ```sh
-python3.12 -m venv .venv/p2pkh-schnorr
-.venv/p2pkh-schnorr/bin/python -m pip install -r projects/p2pkh-schnorr/reference/requirements.txt
-export SCRIPT_LAB_SDK_PYTHON="$PWD/.venv/p2pkh-schnorr/bin/python"
+bash tools/setup-workspaces.sh
+python3.12 -m venv projects/p2pkh-schnorr/workspace/p2pkh-schnorr
+projects/p2pkh-schnorr/workspace/p2pkh-schnorr/bin/python -m pip install -r projects/p2pkh-schnorr/reference/requirements.txt
+export SCRIPT_LAB_SDK_PYTHON="$PWD/projects/p2pkh-schnorr/workspace/p2pkh-schnorr/bin/python"
 PYTHONPATH=src:. "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/reference/generate_template.py --check
 PYTHONPATH="$PWD:$PWD/projects/p2pkh-schnorr/reference" \
   bash tools/verify_node.sh -- "$SCRIPT_LAB_SDK_PYTHON" -m unittest -v test_schnorr test_musig2
@@ -47,14 +48,14 @@ bash tools/verify_node.sh -- bash sdk/verify_wallet.sh p2pkh-schnorr
 
 ```sh
 bash tools/verify_node.sh -- "$SCRIPT_LAB_SDK_PYTHON" -m fourthgraph.benchmark.run \
-  --project p2pkh-schnorr --venvs-dir .venv --output /tmp/p2pkh-schnorr-benchmark
+  --project p2pkh-schnorr --venvs-dir projects/p2pkh-schnorr/workspace --output projects/p2pkh-schnorr/workspace/build/benchmark
 ```
 
 在 BSV Node 1.2.3 的默认 regtest 策略下，ForkID ALL 和 OTDA ALL 两组带 UTXO 的入金与退出交易均进入内存池并出块。
 
 ```sh
 bash tools/verify_node.sh --profile default -- "$SCRIPT_LAB_SDK_PYTHON" -m fourthgraph.benchmark.admission \
-  p2pkh-schnorr --output /tmp/p2pkh-schnorr-admission.json
+  p2pkh-schnorr --output projects/p2pkh-schnorr/workspace/build/admission.json
 ```
 
 [sCrypt 对照](docs/scrypt-comparison.zh-CN.md)包括 2021 年文章链接的验签器，以及用 sCrypt 编写的同见证布局 BIP340 实现。[原生 2-of-2 对照](docs/threshold-comparison.zh-CN.md)包含完整交易生命周期和链下签名材料的实测数据。

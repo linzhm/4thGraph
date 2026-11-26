@@ -33,9 +33,9 @@ MuSig2 每个输入需要两轮依赖的签名消息。两方各生成 66 字节
 
 ```sh
 PYTHONPATH=src:. bash tools/verify_node.sh -- \
-  .venv/p2pkh-schnorr/bin/python projects/p2pkh-schnorr/reference/compare_threshold.py \
+  projects/p2pkh-schnorr/workspace/p2pkh-schnorr/bin/python projects/p2pkh-schnorr/reference/compare_threshold.py \
   --output /tmp/p2pkh-schnorr-threshold.json
 PYTHONPATH=src:. bash tools/verify_node.sh --profile default -- \
-  .venv/p2pkh-schnorr/bin/python projects/p2pkh-schnorr/reference/compare_threshold.py \
+  projects/p2pkh-schnorr/workspace/p2pkh-schnorr/bin/python projects/p2pkh-schnorr/reference/compare_threshold.py \
   --admission --output /tmp/p2pkh-schnorr-threshold-admission.json
 ```

@@ -9,11 +9,11 @@
 使用版本 0.2.0 创建新收款输出。统一客户端用同一套调用识别已核验的旧版输出和新版输出。公钥为 65 字节未压缩 P-256 编码，也可以用 `ownerHash160` 创建收款脚本。运行时使用项目参考环境，在仓库根目录安装以下依赖。
 
 ```sh
-python3.12 -m venv .venv
-.venv/bin/python -m pip install -r projects/p2pkh-r1/reference/requirements.txt
+python3.12 -m venv projects/p2pkh-r1/workspace/venv
+projects/p2pkh-r1/workspace/venv/bin/python -m pip install -r projects/p2pkh-r1/reference/requirements.txt
 ```
 
-使用[统一接入指南](../../../sdk/README.zh-CN.md)里的 `config` 和已核验的交易数据。
+以下示例使用已核验的交易数据。将桥接配置中的 `python` 指向 `projects/p2pkh-r1/workspace/venv/bin/python`，`bridge` 指向当前检出的 `sdk/python/bridge.py`。[共享接入示例](../../../sdk/docs/integration.zh-CN.md#first-payment)
 
 ```ts
 import { resolve } from "node:path";
@@ -39,7 +39,7 @@ const signedHex = wallet.signPayment({
 从仓库根目录复放四语言向量。
 
 ```sh
-SCRIPT_LAB_SDK_PYTHON="$PWD/.venv/bin/python" \
+SCRIPT_LAB_SDK_PYTHON="$PWD/projects/p2pkh-r1/workspace/venv/bin/python" \
   bash tools/verify_node.sh -- bash sdk/verify_wallet.sh p2pkh-r1
 ```
 

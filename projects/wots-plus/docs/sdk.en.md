@@ -10,7 +10,13 @@ Select `canonical` (default), `cached-constants`, or `cached-steps`. Supply the 
 
 The runtime uses the Python 3.12 standard library. The replay needs the test dependencies below.
 
-Use the quickstart's bridge configuration and approved wallet data. Create a receiving script and prepare a payment with the same client.
+Create the Python environment for the bridge from the repository root.
+
+```sh
+python3.12 -m venv projects/wots-plus/workspace/venv
+```
+
+Use authenticated transaction data. Set `config.python` to the absolute path of `projects/wots-plus/workspace/venv/bin/python` and `config.bridge` to this checkout’s `sdk/python/bridge.py`. [Shared integration example](../../../sdk/docs/integration.md#first-payment)
 
 ```ts
 import { WalletClient } from "./sdk/typescript/index.ts";
@@ -29,7 +35,7 @@ const signedHex = wallet.signPayment({
 }, ({ payload }) => signer.signWotsOnce(keyId, payload));
 ```
 
-Use `signInput` for a prepared transaction. Supply the transaction, its input index and the corresponding prevout. See the [call table](../../../sdk/README.md#calls-and-data) for the matching Rust, Go, and Python interfaces.
+Use `signInput` for a prepared transaction. Supply the transaction, its input index and the corresponding prevout. See the [call table](../../../sdk/docs/reference.md#calls-and-data) for the matching Rust, Go, and Python interfaces.
 
 ## Choose a receive template and rehearse a retry
 
@@ -40,7 +46,7 @@ Use a durable signer and a fresh key for each output. For a broadcaster retry, r
 ## Replay vectors
 
 ```sh
-.venv/bin/python -m pip install -r projects/wots-plus/reference/requirements.txt
-SCRIPT_LAB_SDK_PYTHON="$PWD/.venv/bin/python" \
+projects/wots-plus/workspace/venv/bin/python -m pip install -r projects/wots-plus/reference/requirements.txt
+SCRIPT_LAB_SDK_PYTHON="$PWD/projects/wots-plus/workspace/venv/bin/python" \
   bash tools/verify_node.sh -- bash sdk/verify_wallet.sh wots-plus
 ```

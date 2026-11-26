@@ -9,11 +9,11 @@
 Create new outputs with v0.2.0. The unified client can recognize existing and current templates. Use an uncompressed 65-byte P-256 key or pass `ownerHash160` for receiving. From the repository root, set up the project's reference environment.
 
 ```sh
-python3.12 -m venv .venv
-.venv/bin/python -m pip install -r projects/p2pkh-r1/reference/requirements.txt
+python3.12 -m venv projects/p2pkh-r1/workspace/venv
+projects/p2pkh-r1/workspace/venv/bin/python -m pip install -r projects/p2pkh-r1/reference/requirements.txt
 ```
 
-Use `config` from the [wallet quickstart](../../../sdk/README.md) and authenticated wallet data.
+Use authenticated transaction data. Set `config.python` to the absolute path of `projects/p2pkh-r1/workspace/venv/bin/python` and `config.bridge` to this checkout’s `sdk/python/bridge.py`. [Shared integration example](../../../sdk/docs/integration.md#first-payment)
 
 ```ts
 import { resolve } from "node:path";
@@ -39,7 +39,7 @@ The signer returns a 64-byte `r ∥ s` signature. The default payload is `SHA256
 Replay the vector in all four languages from the repository root.
 
 ```sh
-SCRIPT_LAB_SDK_PYTHON="$PWD/.venv/bin/python" \
+SCRIPT_LAB_SDK_PYTHON="$PWD/projects/p2pkh-r1/workspace/venv/bin/python" \
   bash tools/verify_node.sh -- bash sdk/verify_wallet.sh p2pkh-r1
 ```
 

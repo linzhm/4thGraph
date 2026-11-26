@@ -23,9 +23,10 @@ The verifier uses 64 two-bit windows over four 128-bit components. It splits the
 From the repository root, create a Python 3.12 project environment. The tests use public fixture keys and run against the pinned chain-gang build. The BSV Node replay runs on an isolated regtest.
 
 ```sh
-python3.12 -m venv .venv/p2pkh-schnorr
-.venv/p2pkh-schnorr/bin/python -m pip install -r projects/p2pkh-schnorr/reference/requirements.txt
-export SCRIPT_LAB_SDK_PYTHON="$PWD/.venv/p2pkh-schnorr/bin/python"
+bash tools/setup-workspaces.sh
+python3.12 -m venv projects/p2pkh-schnorr/workspace/p2pkh-schnorr
+projects/p2pkh-schnorr/workspace/p2pkh-schnorr/bin/python -m pip install -r projects/p2pkh-schnorr/reference/requirements.txt
+export SCRIPT_LAB_SDK_PYTHON="$PWD/projects/p2pkh-schnorr/workspace/p2pkh-schnorr/bin/python"
 PYTHONPATH=src:. "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/reference/generate_template.py --check
 PYTHONPATH="$PWD:$PWD/projects/p2pkh-schnorr/reference" \
   bash tools/verify_node.sh -- "$SCRIPT_LAB_SDK_PYTHON" -m unittest -v test_schnorr test_musig2
@@ -47,14 +48,14 @@ All sizes are in bytes. Stack payload is the approximate combined main and alter
 
 ```sh
 bash tools/verify_node.sh -- "$SCRIPT_LAB_SDK_PYTHON" -m fourthgraph.benchmark.run \
-  --project p2pkh-schnorr --venvs-dir .venv --output /tmp/p2pkh-schnorr-benchmark
+  --project p2pkh-schnorr --venvs-dir projects/p2pkh-schnorr/workspace --output projects/p2pkh-schnorr/workspace/build/benchmark
 ```
 
 Under BSV Node 1.2.3's default regtest policy, funding and exit transactions entered the mempool and were mined in both ForkID ALL and OTDA ALL runs.
 
 ```sh
 bash tools/verify_node.sh --profile default -- "$SCRIPT_LAB_SDK_PYTHON" -m fourthgraph.benchmark.admission \
-  p2pkh-schnorr --output /tmp/p2pkh-schnorr-admission.json
+  p2pkh-schnorr --output projects/p2pkh-schnorr/workspace/build/admission.json
 ```
 
 The [sCrypt comparison](docs/scrypt-comparison.en.md) includes the 2021 article's linked verifier and a sCrypt BIP340 implementation with a common witness layout. The [native 2-of-2 comparison](docs/threshold-comparison.en.md) measures the full transaction lifecycle and the amount of signing data produced off-chain.

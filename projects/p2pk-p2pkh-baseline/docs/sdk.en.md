@@ -11,11 +11,11 @@ Pass a compressed 33-byte secp256k1 key. A P2PKH receive script can also use `cr
 Create a Python 3.12 environment and install the dependencies from the repository root.
 
 ```sh
-python3.12 -m venv .venv
-.venv/bin/python -m pip install -r projects/p2pk-p2pkh-baseline/reference/requirements-sdk.txt
+python3.12 -m venv projects/p2pk-p2pkh-baseline/workspace/venv
+projects/p2pk-p2pkh-baseline/workspace/venv/bin/python -m pip install -r projects/p2pk-p2pkh-baseline/reference/requirements-sdk.txt
 ```
 
-Use the quickstart's bridge configuration and approved wallet data. Create a receiving script and prepare a payment with the same client.
+Use authenticated transaction data. Set `config.python` to the absolute path of `projects/p2pk-p2pkh-baseline/workspace/venv/bin/python` and `config.bridge` to this checkout’s `sdk/python/bridge.py`. [Shared integration example](../../../sdk/docs/integration.md#first-payment)
 
 ```ts
 import { WalletClient } from "./sdk/typescript/index.ts";
@@ -34,7 +34,7 @@ const signedHex = wallet.signPayment({
 }, ({ payload }) => signer.signSecp256k1DigestDer(payload));
 ```
 
-Use `signInput` for a prepared transaction. Supply the transaction, its input index and the corresponding prevout. See the [call table](../../../sdk/README.md#calls-and-data) for the matching Rust, Go, and Python interfaces.
+Use `signInput` for a prepared transaction. Supply the transaction, its input index and the corresponding prevout. See the [call table](../../../sdk/docs/reference.md#calls-and-data) for the matching Rust, Go, and Python interfaces.
 
 ## Check your signer and template
 
@@ -47,7 +47,7 @@ Use `signInput` for a prepared transaction. Supply the transaction, its input in
 ## Replay vectors
 
 ```sh
-.venv/bin/python -m pip install -r projects/p2pk-p2pkh-baseline/reference/requirements.txt ecdsa==0.19.1
-SCRIPT_LAB_SDK_PYTHON="$PWD/.venv/bin/python" \
+projects/p2pk-p2pkh-baseline/workspace/venv/bin/python -m pip install -r projects/p2pk-p2pkh-baseline/reference/requirements.txt ecdsa==0.19.1
+SCRIPT_LAB_SDK_PYTHON="$PWD/projects/p2pk-p2pkh-baseline/workspace/venv/bin/python" \
   bash tools/verify_node.sh -- bash sdk/verify_wallet.sh p2pk-p2pkh-baseline
 ```

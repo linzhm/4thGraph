@@ -11,11 +11,11 @@
 从仓库根目录创建 Python 3.12 虚拟环境并安装依赖。
 
 ```sh
-python3.12 -m venv .venv
-.venv/bin/python -m pip install -r projects/p2pk-p2pkh-baseline/reference/requirements-sdk.txt
+python3.12 -m venv projects/p2pk-p2pkh-baseline/workspace/venv
+projects/p2pk-p2pkh-baseline/workspace/venv/bin/python -m pip install -r projects/p2pk-p2pkh-baseline/reference/requirements-sdk.txt
 ```
 
-沿用统一接入指南的 `config` 和已审批的交易数据。生成由钱包控制的收款脚本，用同一客户端准备付款。
+以下示例使用已核验的交易数据。将桥接配置中的 `python` 指向 `projects/p2pk-p2pkh-baseline/workspace/venv/bin/python`，`bridge` 指向当前检出的 `sdk/python/bridge.py`。[共享接入示例](../../../sdk/docs/integration.zh-CN.md#first-payment)
 
 ```ts
 import { WalletClient } from "./sdk/typescript/index.ts";
@@ -34,7 +34,7 @@ const signedHex = wallet.signPayment({
 }, ({ payload }) => signer.signSecp256k1DigestDer(payload));
 ```
 
-已构造的交易用 `signInput`，传入交易、本次输入索引和对应的 prevout。Rust、Go、Python 的等价入口在[调用表](../../../sdk/README.zh-CN.md#调用与数据)。
+已构造的交易用 `signInput`，传入交易、本次输入索引和对应的 prevout。Rust、Go、Python 的等价入口在[调用表](../../../sdk/docs/reference.zh-CN.md#calls-and-data)。
 
 ## 核对签名器和模板
 
@@ -47,7 +47,7 @@ const signedHex = wallet.signPayment({
 ## 复放向量
 
 ```sh
-.venv/bin/python -m pip install -r projects/p2pk-p2pkh-baseline/reference/requirements.txt ecdsa==0.19.1
-SCRIPT_LAB_SDK_PYTHON="$PWD/.venv/bin/python" \
+projects/p2pk-p2pkh-baseline/workspace/venv/bin/python -m pip install -r projects/p2pk-p2pkh-baseline/reference/requirements.txt ecdsa==0.19.1
+SCRIPT_LAB_SDK_PYTHON="$PWD/projects/p2pk-p2pkh-baseline/workspace/venv/bin/python" \
   bash tools/verify_node.sh -- bash sdk/verify_wallet.sh p2pk-p2pkh-baseline
 ```

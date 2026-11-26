@@ -10,7 +10,13 @@
 
 运行时使用 Python 3.12 标准库，复放额外依赖见下方。
 
-沿用统一接入指南的 `config` 和已审批的交易数据。生成由钱包控制的收款脚本，用同一客户端准备付款。
+在仓库根目录为桥接程序创建 Python 环境。
+
+```sh
+python3.12 -m venv projects/wots-plus/workspace/venv
+```
+
+以下示例使用已核验的交易数据。将桥接配置中的 `python` 指向 `projects/wots-plus/workspace/venv/bin/python`，`bridge` 指向当前检出的 `sdk/python/bridge.py`。[共享接入示例](../../../sdk/docs/integration.zh-CN.md#first-payment)
 
 ```ts
 import { WalletClient } from "./sdk/typescript/index.ts";
@@ -29,7 +35,7 @@ const signedHex = wallet.signPayment({
 }, ({ payload }) => signer.signWotsOnce(keyId, payload));
 ```
 
-已构造的交易用 `signInput`，传入交易、本次输入索引和对应的 prevout。Rust、Go、Python 的等价入口在[调用表](../../../sdk/README.zh-CN.md#调用与数据)。
+已构造的交易用 `signInput`，传入交易、本次输入索引和对应的 prevout。Rust、Go、Python 的等价入口在[调用表](../../../sdk/docs/reference.zh-CN.md#calls-and-data)。
 
 ## 选择收款模板并演练重试
 
@@ -40,7 +46,7 @@ const signedHex = wallet.signPayment({
 ## 复放向量
 
 ```sh
-.venv/bin/python -m pip install -r projects/wots-plus/reference/requirements.txt
-SCRIPT_LAB_SDK_PYTHON="$PWD/.venv/bin/python" \
+projects/wots-plus/workspace/venv/bin/python -m pip install -r projects/wots-plus/reference/requirements.txt
+SCRIPT_LAB_SDK_PYTHON="$PWD/projects/wots-plus/workspace/venv/bin/python" \
   bash tools/verify_node.sh -- bash sdk/verify_wallet.sh wots-plus
 ```

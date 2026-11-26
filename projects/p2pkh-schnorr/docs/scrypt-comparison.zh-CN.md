@@ -58,9 +58,9 @@ gh release download v1.19.1 --repo sCrypt-Inc/compiler_dist \
 chmod +x "$scratch/scryptc-1.19.1-Linux-x86_64"
 export SCRYPTC="$scratch/scryptc-1.19.1-Linux-x86_64" GHCRTS=-N2
 PYTHONPATH=src:. bash tools/verify_node.sh -- \
-  .venv/p2pkh-schnorr/bin/python projects/p2pkh-schnorr/reference/compare_scrypt.py \
+  projects/p2pkh-schnorr/workspace/p2pkh-schnorr/bin/python projects/p2pkh-schnorr/reference/compare_scrypt.py \
   "$scratch/boilerplate" --compiler-study --samples 15
 PYTHONPATH=src:. bash tools/verify_node.sh -- \
-  .venv/p2pkh-schnorr/bin/python projects/p2pkh-schnorr/reference/compare_bip340.py \
+  projects/p2pkh-schnorr/workspace/p2pkh-schnorr/bin/python projects/p2pkh-schnorr/reference/compare_bip340.py \
   --compiler "$SCRYPTC" --samples 15
 ```

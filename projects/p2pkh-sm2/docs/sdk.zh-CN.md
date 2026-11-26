@@ -13,11 +13,11 @@
 从仓库根目录创建 Python 3.12 虚拟环境并安装依赖。
 
 ```sh
-python3.12 -m venv .venv
-.venv/bin/python -m pip install -r projects/p2pkh-sm2/reference/requirements-sdk.txt
+python3.12 -m venv projects/p2pkh-sm2/workspace/venv
+projects/p2pkh-sm2/workspace/venv/bin/python -m pip install -r projects/p2pkh-sm2/reference/requirements-sdk.txt
 ```
 
-沿用统一接入指南的 `config` 和已审批的交易数据。生成由钱包控制的收款脚本，用同一客户端准备付款。
+以下示例使用已核验的交易数据。将桥接配置中的 `python` 指向 `projects/p2pkh-sm2/workspace/venv/bin/python`，`bridge` 指向当前检出的 `sdk/python/bridge.py`。[共享接入示例](../../../sdk/docs/integration.zh-CN.md#first-payment)
 
 ```ts
 import { WalletClient } from "./sdk/typescript/index.ts";
@@ -36,7 +36,7 @@ const signedHex = wallet.signPayment({
 }, ({ payload, userId }) => signer.signSm2(payload, userId!));
 ```
 
-已构造的交易用 `signInput`，传入交易、本次输入索引和对应的 prevout。Rust、Go、Python 的等价入口在[调用表](../../../sdk/README.zh-CN.md#调用与数据)。
+已构造的交易用 `signInput`，传入交易、本次输入索引和对应的 prevout。Rust、Go、Python 的等价入口在[调用表](../../../sdk/docs/reference.zh-CN.md#calls-and-data)。
 
 SDK 接收 SINGLE 时要求交易具备同索引输出。Python 参考钱包也支持无配对的 OTDA 伴随编码。[参考钱包](../reference/README.zh-CN.md)
 
@@ -52,7 +52,7 @@ SDK 接收 SINGLE 时要求交易具备同索引输出。Python 参考钱包也�
 ## 复放向量
 
 ```sh
-.venv/bin/python -m pip install -r projects/p2pkh-sm2/reference/requirements.txt
-SCRIPT_LAB_SDK_PYTHON="$PWD/.venv/bin/python" \
+projects/p2pkh-sm2/workspace/venv/bin/python -m pip install -r projects/p2pkh-sm2/reference/requirements.txt
+SCRIPT_LAB_SDK_PYTHON="$PWD/projects/p2pkh-sm2/workspace/venv/bin/python" \
   bash tools/verify_node.sh -- bash sdk/verify_wallet.sh p2pkh-sm2
 ```
