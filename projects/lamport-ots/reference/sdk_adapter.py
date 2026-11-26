@@ -3,7 +3,7 @@ from payment import sign_previous as authorize_previous
 from payment import sign_spend as authorize
 from script import (
     committed_locking_script, compact_forth_committed_locking_script, forth_committed_locking_script,
-    legacy_locking_script, locking_script,
+    legacy_locking_script, locking_script, v020_forth_committed_locking_script,
 )
 
 RECEIVE_TEMPLATES = {
@@ -11,6 +11,7 @@ RECEIVE_TEMPLATES = {
     "committed-key": committed_locking_script,
     "committed-key-forth": forth_committed_locking_script,
     "committed-key-forth-compact": compact_forth_committed_locking_script,
+    "committed-key-forth-v0.2.0": v020_forth_committed_locking_script,
 }
 
 

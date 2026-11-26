@@ -6,6 +6,7 @@ from lamport import OneTimeSigner
 from payment import sign_spend
 from script import (
     committed_locking_script, compact_forth_committed_locking_script, forth_committed_locking_script, locking_script,
+    v020_forth_committed_locking_script,
 )
 from fourthgraph.benchmark.cases import Coin, Template
 from fourthgraph.bsv.transaction import Output
@@ -30,5 +31,9 @@ TEMPLATES = {
     "committed-key-forth-compact": Template(partial(coin, factory=compact_forth_committed_locking_script)),
     "committed-key-forth-compact-reconstructed": Template(
         partial(coin, factory=compact_forth_committed_locking_script, compress_otda=True),
+    ),
+    "committed-key-forth-v0.2.0": Template(partial(coin, factory=v020_forth_committed_locking_script)),
+    "committed-key-forth-v0.2.0-reconstructed": Template(
+        partial(coin, factory=v020_forth_committed_locking_script, compress_otda=True),
     ),
 }

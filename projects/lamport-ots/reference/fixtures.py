@@ -67,7 +67,7 @@ def cases():
 
 
 def mode_fixture(flag, *, paired=True, version=2, lock_factory=None, compress_otda=False):
-    from script import compact_forth_committed_locking_script, locking_script
+    from script import locking_script
     from payment import sign_spend
 
     secret = test_secret(b'universal/' + bytes([flag, paired]))
@@ -78,8 +78,7 @@ def mode_fixture(flag, *, paired=True, version=2, lock_factory=None, compress_ot
     outputs = (Output(500, b'\x51'), Output(10400, b'\x51')) if paired else (Output(10900, b'\x51'),)
     if compress_otda:
         outputs = tuple(
-            replace(output, script=compact_forth_committed_locking_script(
-                public_key(test_secret(b'compact output/' + bytes([i])))))
+            replace(output, script=lock_factory(public_key(test_secret(b'compact output/' + bytes([i])))))
             for i, output in enumerate(outputs)
         )
     tx = Transaction((Input(other.txid_wire(), 0), Input(parent.txid_wire(), 0)), outputs, version=version)

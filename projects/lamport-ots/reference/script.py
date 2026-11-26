@@ -8,6 +8,7 @@ from fourthgraph.bsv.otda_reconstruction import Reconstruction
 from fourthgraph.bsv.pushtx import N, R, PUBLIC, ORDINARY_CODE, COMPANION_CODE
 from fourthgraph.bsv.pushtx import authorization_checks, binding_der, check_binding
 from fourthgraph.bsv.script import asm, push, number
+from fixed_template import v020_forth_pattern
 from lamport import KEY_BYTES, SIGNATURE_BYTES, require_bytes
 
 
@@ -90,18 +91,31 @@ def forth_committed_locking_script(key):
 
 def compact_forth_committed_locking_script(key):
     """Build the Forth committed-key lock with the compact transaction binding."""
+    return _bind_commitment(key, compact_forth_pattern())
+
+
+def v020_forth_committed_locking_script(key):
+    """Build the v0.2.0 candidate from its pinned lock layout."""
+    return _bind_commitment(key, v020_forth_pattern())
+
+
+def _bind_commitment(key, pattern):
     require_bytes(key, KEY_BYTES, 'public key')
-    prefix, suffix = compact_forth_pattern().fixed_parts
+    prefix, suffix = pattern.fixed_parts
     return prefix + sha256(key).digest() + suffix
 
 
 @cache
 def compact_forth_pattern():
     """Build the literal lock parts and the program that reconstructs them."""
+    return compile_forth_pattern()
+
+
+def compile_forth_pattern(*, packed=False):
     from forth_verifier import committed_verifier_parts
 
-    start, one_byte, finish = committed_verifier_parts()
-    prefix = _payment_guard(KEY_BYTES) + start
+    start, one_byte, finish = committed_verifier_parts(packed=packed)
+    prefix = _payment_guard(KEY_BYTES, compact_types=packed) + start
     commitment_push = finish + b'\x20'  # Direct push of the 32-byte commitment.
     suffix = asm('OP_EQUALVERIFY') + _payment_binding(compact=True)
     # Rebuild the 32 identical fragments without executing their contents.
@@ -117,8 +131,8 @@ def _forth_committed_verifier(key):
     return committed_verifier_code() + push(sha256(key).digest()) + asm('OP_EQUALVERIFY')
 
 
-def _payment_guard(proof_bytes):
-    code = authorization_checks(ORDINARY_CODE, COMPANION_CODE)
+def _payment_guard(proof_bytes, *, compact_types=False):
+    code = authorization_checks(ORDINARY_CODE, COMPANION_CODE, compact_types=compact_types)
     return code + asm('OP_SIZE') + number(proof_bytes) + asm('OP_NUMEQUALVERIFY OP_SWAP OP_HASH256 OP_DUP OP_TOALTSTACK')
 
 

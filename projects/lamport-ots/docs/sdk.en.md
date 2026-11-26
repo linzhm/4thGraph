@@ -4,6 +4,8 @@
 
 Choose `full-key` (default), `committed-key`, or either experimental profile `committed-key-forth` and `committed-key-forth-compact` for receiving. Pass the complete ordered public key to recognition. The SDK also recognizes legacy outputs, whose spending mode is BIP143 ALL. [Profile and transaction costs](../README.md#choose-a-payment-profile)
 
+Select `committed-key-forth-v0.2.0` to create the 6,525-byte candidate. The SDK fills the pinned template's commitment field from the full ordered public key. [Versioned layout](../versions/v0.2.0/layout.json)
+
 <a name="quickstart"></a>
 
 ## Sign a payment
@@ -39,7 +41,7 @@ Use `signInput` for a prepared transaction. Supply the transaction, its input in
 
 ## Reconstruct OTDA preimages
 
-For a trusted Chronicle spend context, set `chronicleActive: true`, `compressOtda: true` and an OTDA sighash such as `0x61` in the signing request. Use `compress_otda=True` in Python or `CompressOTDA` in Go. With a version-2 transaction, reconstruction applies to compact Forth outputs covered by OTDA ALL or a paired OTDA SINGLE, including ANYONECANPAY. The wallet chooses the shorter encoding and calls the signer with the same digest as the literal encoding. Fund the output using the existing `committed-key-forth-compact` profile. [Encoding and measurements](optimization.md#otda-unlocking-reconstruction)
+For a trusted Chronicle spend context, set `chronicleActive: true`, `compressOtda: true` and an OTDA sighash such as `0x61` in the signing request. Use `compress_otda=True` in Python or `CompressOTDA` in Go. With a version-2 transaction, reconstruction applies to compact Forth and v0.2.0 outputs covered by OTDA ALL or a paired OTDA SINGLE, including ANYONECANPAY. The wallet may use both template dictionaries in one witness. It chooses the shortest encoding and calls the signer with the same digest as the literal encoding. [Encoding and measurements](optimization.md#otda-unlocking-reconstruction)
 
 ## Keep key state with the invoice
 

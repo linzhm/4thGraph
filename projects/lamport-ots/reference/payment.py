@@ -5,7 +5,9 @@ from lamport import bits, verify_digest
 from script import (
     COMPANION_CODE, ORDINARY_CODE, N, R, committed_locking_script, compact_forth_committed_locking_script,
     compact_forth_pattern, forth_committed_locking_script, legacy_locking_script, locking_script,
+    v020_forth_committed_locking_script, v020_forth_pattern,
 )
+from fourthgraph.bsv.otda_reconstruction import reconstruct_mixed
 from fourthgraph.bsv.script import number, push
 from fourthgraph.bsv.transaction import (
     CHRONICLE, FORKID, SIGHASH_ALL, SIGHASH_SINGLE, SIGHASH_TYPES,
@@ -46,6 +48,13 @@ def _checked_digest(auth):
     if (int.from_bytes(digest, 'big')+R) % N == 0:
         raise ValueError('degenerate binding digest; rebuild before signing')
     return digest
+
+
+def _reconstruct_otda(preimage, outputs):
+    patterns = (compact_forth_pattern(), v020_forth_pattern())
+    programs = [pattern.build(preimage, outputs) for pattern in patterns]
+    programs.append(reconstruct_mixed(preimage, outputs, patterns))
+    return min((program for program in programs if program is not None), key=len, default=None)
 
 
 def current_input_unlock(auth, public_key, signature, *, committed=False):
@@ -102,7 +111,7 @@ def sign_previous(tx, index, previous, public_key, signer, *, sighash=DEFAULT_SI
     universal = locking_script(public_key)
     legacy = legacy_locking_script(public_key)
     committed = (committed_locking_script(public_key), forth_committed_locking_script(public_key),
-                 compact_forth_committed_locking_script(public_key))
+                 compact_forth_committed_locking_script(public_key), v020_forth_committed_locking_script(public_key))
     if previous.script not in (universal, legacy, *committed):
         raise ValueError('funding output does not match public key and canonical template')
     own_scripts = (universal, legacy, *committed, locking_script(public_key, transaction=False))
@@ -117,7 +126,7 @@ def sign_previous(tx, index, previous, public_key, signer, *, sighash=DEFAULT_SI
     if (compress_otda and tx.version == 2 and sighash & CHRONICLE and not auth.companion
             and base in (SIGHASH_ALL, SIGHASH_SINGLE)):
         outputs = (tx.outputs[index],) if base == SIGHASH_SINGLE else tx.outputs
-        program = compact_forth_pattern().build(auth.preimage, outputs)
+        program = _reconstruct_otda(auth.preimage, outputs)
     signature = signer(_checked_digest(auth))
     witness = current_input_unlock(auth, public_key, signature, committed=previous.script in committed)
     if program is not None:

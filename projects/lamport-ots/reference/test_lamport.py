@@ -205,5 +205,14 @@ class LamportTests(unittest.TestCase):
         self.assertEqual(json.loads((ROOT/'versions/v0.1.0/vector.json').read_text()),vector())
         self.assertEqual(json.loads((ROOT/'versions/v0.1.0/universal-vectors.json').read_text()),universal_vector())
 
+    def test_v020_candidate_artifacts_reproduce(self):
+        from fixed_template import TEMPLATE_DIRECTORY, v020_forth_pattern
+        from generate_template import build_artifacts
+
+        for filename, expected in build_artifacts().items():
+            self.assertEqual((TEMPLATE_DIRECTORY / filename).read_text(encoding='ascii'), expected, filename)
+        pattern = v020_forth_pattern()
+        self.assertEqual(evaluate(pattern.program), (list(pattern.fixed_parts), []))
+
 
 if __name__ == '__main__': unittest.main()
