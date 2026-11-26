@@ -64,7 +64,7 @@ class Node:
         return reply["result"]
 
     def verdicts(self, tx, parents, *, spend_height=SPEND_HEIGHT, activation_height=ACTIVATION_HEIGHT,
-                 utxo_heights=None):
+                 utxo_heights=None, timeout_us=5000):
         raw = tx.serialize().hex()
         if utxo_heights is None:
             utxo_heights = (UTXO_HEIGHT,) * len(tx.inputs)
@@ -78,7 +78,7 @@ class Node:
                 flags |= NODE_UTXO_AFTER_CHRONICLE
             inputs.append(dict(tx=raw, n=index, flags=flags, reportflags=True,
                                txo=dict(lock=prevout.script.hex(), value=prevout.value, height=height)))
-        result = self.call("verifyscript", [inputs, False, 5000])
+        result = self.call("verifyscript", [inputs, False, timeout_us])
         for row, request in zip(result, inputs, strict=True):
             if row["flags"] != request["flags"] or row["result"] not in {"ok", "error"}:
                 raise ValueError(f"unexpected BSV Node result: {row}")

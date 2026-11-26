@@ -1,81 +1,68 @@
-"""Typed Forth front end, followed by transaction scheduling and Script lowering."""
+"""Forth 2012 Core subset, typed BSV declarations and transaction scheduling."""
 
-from collections.abc import Callable
+from bisect import bisect_right
 from dataclasses import dataclass
-from hashlib import sha256
 import re
 
-from shared.script import asm, number, push
+from shared.script import asm
 
-U32 = 1 << 32
-TYPES = {"u32", "bool", "route", "bytes", "script", "transaction", "outpoint", "utxo", "request"}
+from wordsets import (
+    BSV_SOURCE, CORE_EXT_SCRIPT, CORE_EXT_WORDS, CORE_WORDS, HOST_WORDS, NAMED_LITERALS,
+    OPTIONAL_WORDSETS, PRIMITIVES, SHUFFLES, TYPES, WRAP_U32, Literal, Primitive, cell_literal,
+)
 
 
-def push_value(value):
-    if len(value) == 1 and 1 <= value[0] <= 16:
-        return number(value[0])
-    if value == b"\x81":
-        return number(-1)
-    return push(value)
+class CompileError(ValueError):
+    pass
 
 
 @dataclass(frozen=True)
-class Literal:
-    kind: str
-    value: int | bytes
-
-    def lower(self):
-        if isinstance(self.value, bytes):
-            return push_value(self.value)
-        return number(self.value)
-
-
-@dataclass(frozen=True)
-class Primitive:
-    takes: tuple[str, ...]
-    gives: tuple[str, ...]
-    code: bytes | None
-    run: Callable[..., tuple]
-    evidence: str
+class Token:
+    text: str
+    line: int
+    column: int
 
     @property
-    def location(self):
-        return "host" if self.code is None else "script"
+    def name(self):
+        return self.text.casefold()
+
+    def error(self, message):
+        return CompileError(f"line {self.line}, column {self.column}: {message}")
 
 
-def chain(takes, gives, code, run):
-    return Primitive(tuple(takes.split()), tuple(gives.split()), code, run, "script execution")
+class Tokens:
+    def __init__(self, source):
+        self.source = source
+        self.offset = 0
+        self.lines = [0, *(match.end() for match in re.finditer("\n", source))]
+        self.wordsets = set()
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        while match := TOKEN.search(self.source, self.offset):
+            self.offset = match.end()
+            line = bisect_right(self.lines, match.start())
+            token = Token(match[0], line, match.start() - self.lines[line - 1] + 1)
+            if token.name == "(":
+                end = self.source.find(")", self.offset)
+                if end < 0:
+                    raise token.error("unterminated Forth comment")
+                self.offset = end + 1
+            elif token.name == "\\":
+                if "core-ext" not in self.wordsets:
+                    raise token.error("Forth 2012 CORE EXT word '\\' requires 'bsv-use core-ext'")
+                end = self.source.find("\n", self.offset)
+                self.offset = len(self.source) if end < 0 else end + 1
+            else:
+                return token
+        raise StopIteration
 
 
-WRAP_U32 = number(U32) + asm("OP_MOD")
-PRIMITIVES = {
-    "u32+": chain("u32 u32", "u32", asm("OP_ADD") + WRAP_U32, lambda x, y: ((x + y) % U32,)),
-    "u32<": chain("u32 u32", "bool", asm("OP_LESSTHAN"), lambda x, y: (int(x < y),)),
-    "cat": chain("bytes bytes", "bytes", asm("OP_CAT"), lambda x, y: (x + y,)),
-    "sha256": chain("bytes", "bytes", asm("OP_SHA256"), lambda x: (sha256(x).digest(),)),
-    "bytes=": chain("bytes bytes", "bool", asm("OP_EQUAL"), lambda x, y: (int(x == y),)),
-}
-
-
-def host(takes, gives, method, evidence):
-    return Primitive(tuple(takes.split()), tuple(gives.split()), None,
-                     lambda context, value: (getattr(context, method)(value),), evidence)
-
-
-HOST_WORDS = {
-    "lookup-utxo": host("outpoint", "utxo", "lookup", "live UTXO provider"),
-    "sign": host("request", "bytes", "sign", "external signer and native CHECKSIG"),
-    "submit": host("transaction", "bytes", "submit", "node transaction admission"),
-    "utxo-outpoint": host("utxo", "outpoint", "outpoint", "bound parent transaction bytes"),
-    "utxo-script": host("utxo", "script", "script", "bound output script"),
-}
-ROUTES = {"review": Literal("route", 0), "settle": Literal("route", 1)}
-SHUFFLES = {
-    "dup": (1, (0, 0), "OP_DUP"),
-    "drop": (1, (), "OP_DROP"),
-    "swap": (2, (1, 0), "OP_SWAP"),
-    "over": (2, (0, 1, 0), "OP_OVER"),
-}
+TOKEN = re.compile(r"'[ -~]'(?=\s|$)|\S+")
+CONTROL = {":", ";", "if", "else", "then"}
+RESERVED_STEPS = {"deploy", "split", "fused"}
 
 
 @dataclass(frozen=True)
@@ -95,6 +82,7 @@ class Word:
     gives: tuple[str, ...]
     body: tuple
     location: str
+    host_uses: tuple[Token, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -113,6 +101,7 @@ class Program:
     join_name: str
     operator: str
     independent: tuple[tuple[str, int], ...]
+    optional_wordsets: tuple[str, ...]
 
 
 @dataclass(frozen=True)
@@ -137,142 +126,242 @@ class Plan:
     fusion_blockers: tuple[str, ...]
 
 
-class CompileError(ValueError):
-    pass
+def required(tokens, at, field):
+    value = next(tokens, None)
+    if value is None:
+        raise at.error(f"expected {field} after {at.text!r}")
+    return value
 
 
-def transform(stack, takes, gives):
+def identifier(tokens, at, field):
+    token = required(tokens, at, field)
+    if not re.fullmatch(r"[a-z][a-z0-9_-]*", token.name):
+        raise token.error(f"invalid {field} {token.text!r}")
+    return token.name
+
+
+def transform(stack, takes, gives, at):
     start = len(stack) - len(takes)
     if start < 0 or tuple(stack[start:]) != takes:
-        raise CompileError(f"expected stack suffix {takes}, found {tuple(stack)}")
+        raise at.error(f"{at.text!r} expected stack suffix {takes}, found {tuple(stack)}")
     stack[start:] = gives
 
 
-def body(tokens, stack, words):
+def unavailable(token, *, enabled):
+    name = token.name
+    if name in CORE_EXT_WORDS and "core-ext" not in enabled:
+        return token.error(f"Forth 2012 CORE EXT word {token.text!r} requires 'bsv-use core-ext'")
+    if name in CORE_WORDS or name in CORE_EXT_WORDS:
+        wordset = "CORE" if name in CORE_WORDS else "CORE EXT"
+        return token.error(f"Forth 2012 {wordset} word {token.text!r} cannot compile to BSV Script")
+    return token.error(f"unknown Forth word {token.text!r}")
+
+
+def body(tokens, stack, words, opener):
     instructions = []
-    location = "script"
+    host_uses = []
     for token in tokens:
-        if token in {"else", "then"}:
-            return tuple(instructions), location, token
-        if token == "if":
-            transform(stack, ("bool",), ())
+        name = token.name
+        if name in {"else", "then", ";"}:
+            return tuple(instructions), tuple(host_uses), token
+        if name == "if":
+            transform(stack, ("cell",), (), token)
             other = list(stack)
-            yes, yes_location, stop = body(tokens, stack, words)
-            if stop != "else":
-                raise CompileError("if requires else and then")
-            no, no_location, stop = body(tokens, other, words)
-            if stop != "then" or stack != other:
-                raise CompileError("if requires then and equal branch stack types")
+            yes, yes_host, stop = body(tokens, stack, words, token)
+            no, no_host = (), ()
+            if stop.name == "else":
+                no, no_host, stop = body(tokens, other, words, token)
+            if stop.name != "then" or stack != other:
+                raise token.error("IF must end in THEN and leave equal stack types on both branches")
             instructions.append(Conditional(yes, no))
-            if "host" in (yes_location, no_location):
-                location = "host"
+            host_uses.extend((*yes_host, *no_host))
             continue
-        if token in SHUFFLES:
-            count, order, _ = SHUFFLES[token]
-            types = stack[-count:]
-            if len(types) != count:
-                raise CompileError(f"stack underflow at {token}")
-            stack[-count:] = [types[i] for i in order]
-            instructions.append(Shuffle(token))
+        if name in CORE_EXT_SCRIPT and "core-ext" not in tokens.wordsets and name not in words:
+            raise unavailable(token, enabled=tokens.wordsets)
+        if name in SHUFFLES and name not in words:
+            count, order, _ = SHUFFLES[name]
+            entries = stack[-count:]
+            if len(entries) != count:
+                raise token.error(f"stack underflow at {token.text}")
+            stack[-count:] = [entries[i] for i in order]
+            instructions.append(Shuffle(name))
             continue
-        if token in ROUTES:
-            instruction = ROUTES[token]
-        elif re.fullmatch(r"[0-9]+", token):
-            value = int(token)
-            if value >= U32:
-                raise CompileError("u32 literal out of range")
-            instruction = Literal("u32", value)
-        elif re.fullmatch(r"0x(?:[0-9a-fA-F]{2})*", token):
-            instruction = Literal("bytes", bytes.fromhex(token[2:]))
-        else:
-            instruction = words.get(token) or PRIMITIVES.get(token) or HOST_WORDS.get(token)
+        instruction = resolve(tokens, token, words)
         if isinstance(instruction, Literal):
             stack.append(instruction.kind)
-        elif instruction is not None:
-            transform(stack, instruction.takes, instruction.gives)
-            if instruction.location == "host":
-                location = "host"
         else:
-            raise CompileError(f"unknown Forth word {token!r}")
+            transform(stack, instruction.takes, instruction.gives, token)
+            if isinstance(instruction, Word):
+                host_uses.extend(instruction.host_uses)
+            elif instruction.location == "host":
+                host_uses.append(token)
         instructions.append(instruction)
-    return tuple(instructions), location, None
+    raise opener.error(f"unterminated {opener.text!r}")
 
 
-def name_ok(name):
-    return re.fullmatch(r"[a-z][a-z0-9_-]*", name) is not None
+def resolve(tokens, token, words):
+    name = token.name
+    instruction = words.get(name) or NAMED_LITERALS.get(name) or PRIMITIVES.get(name) or HOST_WORDS.get(name)
+    if instruction is not None:
+        return instruction
+    if name == "bytes-hex":
+        value = required(tokens, token, "hexadecimal byte string")
+        if not re.fullmatch(r"(?:[0-9a-fA-F]{2})+", value.text):
+            raise value.error("BYTES-HEX requires whole bytes written as hexadecimal pairs")
+        return Literal("bytes", bytes.fromhex(value.text))
+    try:
+        literal = cell_literal(token.text)
+    except ValueError as error:
+        raise token.error(str(error)) from error
+    if literal is not None:
+        return literal
+    if name in BSV_SOURCE:
+        raise token.error(f"{token.text!r} is a source declaration and cannot be used inside a definition")
+    raise unavailable(token, enabled=tokens.wordsets)
+
+
+def require_script(word):
+    if word.location != "script":
+        uses = ", ".join(f"{token.text} (line {token.line}, column {token.column})"
+                         for token in dict.fromkeys(word.host_uses))
+        suffix = f": {uses}" if uses else ""
+        raise CompileError(f"host-only words cannot compile to BSV Script{suffix}")
+
+
+def check_word(words, at, takes, gives):
+    word = words.get(at.name)
+    if word is None:
+        raise at.error(f"undefined worker or join word {at.text!r}")
+    try:
+        require_script(word)
+    except CompileError as error:
+        raise at.error(str(error)) from error
+    if (word.takes, word.gives) != (takes, gives):
+        raise at.error(f"{at.text!r} requires signature {takes} -- {gives}")
+    return word
+
+
+class SourceCompiler:
+    def __init__(self, source):
+        self.tokens = Tokens(source)
+        self.words = {}
+        self.effects = {}
+        self.work = {}
+        self.join = None
+        self.operator = None
+        self.independent = []
+        for token in self.tokens:
+            self.declaration(token)
+        if self.effects:
+            at, _, _ = next(iter(self.effects.values()))
+            raise at.error(f"stack effect for {at.text!r} has no following definition")
+
+    @property
+    def optional_wordsets(self):
+        return tuple(sorted(self.tokens.wordsets))
+
+    def effect(self, at):
+        name = required(self.tokens, at, "definition name")
+        if name.name in self.effects or name.name in CONTROL | BSV_SOURCE:
+            raise name.error(f"invalid or duplicate effect declaration for {name.text!r}")
+        before, after = [], []
+        current = before
+        for token in self.tokens:
+            if token.name == ";" and current is after:
+                self.effects[name.name] = name, tuple(before), tuple(after)
+                return
+            if token.name == "--" and current is before:
+                current = after
+            elif token.name in TYPES:
+                current.append(token.name)
+            else:
+                raise token.error("expected a stack type, '--', or the closing ';'")
+        raise at.error("unterminated BSV-EFFECT: declaration")
+
+    def define(self, at):
+        name = required(self.tokens, at, "definition name")
+        declaration = self.effects.pop(name.name, None)
+        if declaration is None:
+            raise name.error(f"typed Script builds require a preceding 'bsv-effect: {name.text} ... ;'")
+        _, takes, gives = declaration
+        stack = list(takes)
+        instructions, host_uses, stop = body(self.tokens, stack, self.words, at)
+        if stop.name != ";":
+            raise stop.error(f"unexpected {stop.text!r}, expected ';'")
+        if tuple(stack) != gives:
+            raise name.error(f"body leaves {tuple(stack)}, declared {gives}")
+        self.words[name.name] = Word(takes, gives, instructions, "host" if host_uses else "script", host_uses)
+
+    def declaration(self, token):
+        tokens = self.tokens
+        match token.name:
+            case "bsv-use":
+                wordset = required(tokens, token, "optional word set")
+                if wordset.name not in OPTIONAL_WORDSETS:
+                    raise wordset.error(f"optional Forth word set {wordset.text!r} is unavailable")
+                tokens.wordsets.add(wordset.name)
+            case "bsv-effect:":
+                self.effect(token)
+            case ":":
+                self.define(token)
+            case "work:":
+                name = identifier(tokens, token, "work step")
+                if name in self.work or name in RESERVED_STEPS:
+                    raise token.error(f"invalid or duplicate work step {name!r}")
+                input_name = identifier(tokens, token, "input name")
+                word = check_word(self.words, required(tokens, token, "worker word"), ("u32",), ("u32",))
+                owner = identifier(tokens, token, "signer role")
+                self.work[name] = Work(name, input_name, word, owner)
+            case "join:":
+                if self.join is not None:
+                    raise token.error("expected one join")
+                name = identifier(tokens, token, "join step")
+                left = identifier(tokens, token, "first work step")
+                right = identifier(tokens, token, "second work step")
+                word = check_word(self.words, required(tokens, token, "join word"), ("u32", "u32"), ("route",))
+                self.join = token, name, left, right, word
+            case "split-authority:":
+                if self.operator is not None:
+                    raise token.error("expected one split authority")
+                self.operator = identifier(tokens, token, "signer role")
+            case "independent-submit":
+                self.independent.append((identifier(tokens, token, "work step"), token.line))
+            case name if name in self.work:
+                # The original prototype spelled this declaration "<step> independent-submit".
+                directive = required(tokens, token, "independent-submit")
+                if directive.name != "independent-submit":
+                    raise directive.error("expected independent-submit after the work step")
+                self.independent.append((name, token.line))
+            case name if name in CORE_EXT_SCRIPT and "core-ext" not in tokens.wordsets and name not in self.words:
+                raise unavailable(token, enabled=tokens.wordsets)
+            case name if name in self.words or name in PRIMITIVES or name in SHUFFLES or name in HOST_WORDS \
+                    or name in NAMED_LITERALS:
+                raise token.error("top-level execution is unavailable in a Script build")
+            case _:
+                raise unavailable(token, enabled=tokens.wordsets)
+
+    def program(self):
+        if len(self.work) != 2 or self.join is None or self.operator is None:
+            raise CompileError("expected two work declarations, one join and one split authority")
+        at, name, left, right, word = self.join
+        if left == right or set((left, right)) != self.work.keys() or name in self.work or name in RESERVED_STEPS:
+            raise at.error("join must consume both work steps once and have a distinct step name")
+        for step, line in self.independent:
+            if step not in self.work:
+                raise CompileError(f"line {line}: unknown work step {step!r}")
+        return Program(self.words, (self.work[left], self.work[right]), word, name, self.operator,
+                       tuple(self.independent), self.optional_wordsets)
 
 
 def parse(source):
-    words = {}
-    work = {}
-    independent = []
-    join = None
-    operator = None
-    for line_no, line in enumerate(source.splitlines(), 1):
-        line = line.partition("\\")[0].strip()
-        if not line:
-            continue
-        try:
-            if line.startswith(":"):
-                match = re.fullmatch(r":\s+(\S+)\s+\(([^()]*)--([^()]*)\)\s+(.*?)\s*;", line)
-                if not match:
-                    raise CompileError("expected : name ( inputs -- outputs ) words ;")
-                name, before, after, code = match.groups()
-                if not name_ok(name) or name in words or name in PRIMITIVES or name in HOST_WORDS \
-                        or name in SHUFFLES or name in ROUTES or name in {"if", "else", "then"}:
-                    raise CompileError(f"invalid or duplicate word {name!r}")
-                takes, gives = tuple(before.split()), tuple(after.split())
-                if (set(takes) | set(gives)) - TYPES:
-                    raise CompileError("unknown stack type")
-                stack = list(takes)
-                instructions, location, stop = body(iter(code.split()), stack, words)
-                if stop or tuple(stack) != gives:
-                    raise CompileError(f"body leaves {tuple(stack)}, declared {gives}")
-                words[name] = Word(takes, gives, instructions, location)
-                continue
-            tokens = line.split()
-            match tokens:
-                case [input_name, word_name, owner, "work:", step] if all(map(name_ok, (input_name, owner, step))):
-                    if step in work or step in {"deploy", "split", "fused"}:
-                        raise CompileError(f"invalid or duplicate work step {step!r}")
-                    word = words.get(word_name)
-                    check_word(word, ("u32",), ("u32",), word_name)
-                    work[step] = Work(step, input_name, word, owner)
-                case [left, right, word_name, "join:", name] if name_ok(name) and join is None:
-                    word = words.get(word_name)
-                    check_word(word, ("u32", "u32"), ("route",), word_name)
-                    join = left, right, word, name
-                case [owner, "split-authority"] if name_ok(owner) and operator is None:
-                    operator = owner
-                case [step, "independent-submit"]:
-                    independent.append((step, line_no))
-                case _:
-                    raise CompileError("invalid declaration")
-        except CompileError as error:
-            raise CompileError(f"line {line_no}: {error}") from error
-    if len(work) != 2 or join is None or operator is None:
-        raise CompileError("expected two work declarations, one join and one split authority")
-    left, right, word, name = join
-    if left == right or set((left, right)) != work.keys() or name in work or name in {"deploy", "split", "fused"}:
-        raise CompileError("join must consume both work steps once and have a distinct step name")
-    for step, line_no in independent:
-        if step not in work:
-            raise CompileError(f"line {line_no}: unknown work step {step!r}")
-    return Program(words, (work[left], work[right]), word, name, operator, tuple(independent))
-
-
-def check_word(word, takes, gives, name):
-    if word is None or (word.takes, word.gives, word.location) != (takes, gives, "script"):
-        raise CompileError(f"{name!r} must be a Script word with signature {takes} -- {gives}")
-
-
+    return SourceCompiler(source).program()
 def schedule(program, mode="auto", *, available_data=None, available_authorizers=None):
     if mode not in {"auto", "fused", "split"}:
         raise CompileError(f"unknown schedule {mode!r}")
     a, b = program.work
     data = {a.input, b.input} if available_data is None else set(available_data)
     authorizers = {a.owner, b.owner} if available_authorizers is None else set(available_authorizers)
-    blockers = [f"line {line}: {step} independent-submit requires a separate transaction for {step}"
+    blockers = [f"line {line}: independent-submit {step} requires a separate transaction for {step}"
                 for step, line in program.independent]
     for work in program.work:
         if work.input not in data:
@@ -332,8 +421,7 @@ def inline(instructions):
 
 
 def lower(word):
-    if word.location != "script":
-        raise CompileError("host word cannot lower to Script")
+    require_script(word)
     return lower_body(word.body)
 
 
@@ -359,7 +447,7 @@ def lower_body(instructions):
         elif isinstance(instruction, Shuffle):
             code.extend(asm(SHUFFLES[instruction.name][2]))
         elif isinstance(instruction, Conditional):
-            code.extend(asm("OP_IF") + lower_body(instruction.yes) + asm("OP_ELSE")
+            code.extend(asm("OP_0NOTEQUAL OP_IF") + lower_body(instruction.yes) + asm("OP_ELSE")
                         + lower_body(instruction.no) + asm("OP_ENDIF"))
         elif instruction is PRIMITIVES["u32+"] and index and folded[index - 1] == Literal("u32", 1):
             code.extend(asm("OP_1ADD") + WRAP_U32)

@@ -10,10 +10,12 @@ from shared.pushtx import PUBLIC, binding_der
 from shared.script import asm, decode_num, encode_num, number, push
 from shared.transaction import FORKID, SIGHASH_ALL, Input, Output, Transaction, hash256, preimage_forkid
 
-from compiler import U32, Plan, Template, evaluate, lower, parse, push_value, schedule
+from compiler import CompileError, Plan, SourceCompiler, Template, evaluate, lower, schedule
+from wordsets import U32, capabilities, push_value
 
 DEFAULT_TARGET = "chronicle-v2"
-TARGETS = {"forkid-v1": (1, "genesis"), DEFAULT_TARGET: (2, "chronicle")}
+TARGETS = {"forkid-v1": ((1,), "genesis"), DEFAULT_TARGET: ((2,), "chronicle"),
+           "both": ((1, 2), "genesis")}
 FLAG = FORKID | SIGHASH_ALL
 FLAG_BYTES = FLAG.to_bytes(4, "little")
 BINDING_CODE = asm("OP_CHECKSIG")
@@ -34,10 +36,19 @@ def copy_preimage():
     return asm("OP_FROMALTSTACK OP_DUP OP_TOALTSTACK")
 
 
-def begin(version):
+def check_version(versions, suffix=b""):
+    expected = [push(version.to_bytes(4, "little") + suffix) for version in versions]
+    if len(expected) == 1:
+        return expected[0] + asm("OP_EQUALVERIFY")
+    first, second = expected
+    return (asm("OP_DUP") + first + asm("OP_EQUAL OP_SWAP") + second
+            + asm("OP_EQUAL OP_BOOLOR OP_VERIFY"))
+
+
+def begin(versions):
     # Fixed BIP143 shape: the executed CODESEPARATOR leaves a one-byte scriptCode.
     return (asm("OP_SIZE") + number(158) + asm("OP_NUMEQUALVERIFY OP_DUP OP_TOALTSTACK OP_DUP")
-            + field(0, 4) + push(version.to_bytes(4, "little")) + asm("OP_EQUALVERIFY")
+            + field(0, 4) + check_version(versions)
             + field(154, 4) + push(FLAG_BYTES) + asm("OP_EQUALVERIFY"))
 
 
@@ -79,11 +90,11 @@ def p2pk(public):
     return push(public) + asm("OP_CHECKSIG")
 
 
-def proof(index, data_prefix, version):
+def proof(index, data_prefix, versions):
     # Entry rawWork splitTxid. The first input must spend the indicated split slot.
-    bound_prefix = (push(version.to_bytes(4, "little") + b"\x01") + asm("OP_SWAP OP_CAT")
+    bound_prefix = (asm("OP_OVER") + field(0, 5) + check_version(versions, b"\x01")
                     + push(index.to_bytes(4, "little")) + asm("OP_CAT OP_OVER")
-                    + field(0, 41) + asm("OP_EQUALVERIFY"))
+                    + field(5, 36) + asm("OP_EQUALVERIFY"))
     # The branch covenant fixes both outputs and the exact last output layout.
     # The 4 bytes after the fixed-width value are the transaction locktime.
     tail = (asm("OP_SIZE") + number(len(data_prefix) + RESULT_WIDTH + 4)
@@ -92,24 +103,24 @@ def proof(index, data_prefix, version):
     return bound_prefix + tail
 
 
-def join_lock(code, terminals, data_prefix, version):
+def join_lock(code, terminals, data_prefix, versions):
     # Lock prefix pushes splitTxid above witness rawA rawB P.
-    read_results = (asm("OP_2 OP_PICK OP_OVER") + proof(0, data_prefix, version)
-                    + asm("OP_TOALTSTACK OP_OVER OP_OVER") + proof(1, data_prefix, version)
+    read_results = (asm("OP_2 OP_PICK OP_OVER") + proof(0, data_prefix, versions)
+                    + asm("OP_TOALTSTACK OP_OVER OP_OVER") + proof(1, data_prefix, versions)
                     + asm("OP_FROMALTSTACK OP_SWAP"))
     bind_prevouts = (asm("OP_DROP OP_HASH256") + push(ZERO_INDEX) + asm("OP_CAT OP_SWAP OP_HASH256")
                      + push(ZERO_INDEX) + asm("OP_CAT OP_SWAP OP_CAT OP_HASH256") + check_field(PREVOUTS_HASH))
-    return asm("OP_SWAP") + begin(version) + read_results + code + route_check(terminals) + bind_prevouts + finish()
+    return asm("OP_SWAP") + begin(versions) + read_results + code + route_check(terminals) + bind_prevouts + finish()
 
 
-def work_lock(index, code, owner, join_code, data_prefix, version):
+def work_lock(index, code, owner, join_code, data_prefix, versions):
     example = Output(RESULT_VALUE, push(bytes(32)) + join_code)
     result_prefix = example.serialize()[:-(32 + len(join_code))]
     # From the branch result, build the whole output vector as it must appear on wire.
     output_vector = (number(RESULT_WIDTH) + asm("OP_NUM2BIN") + push(data_prefix) + asm("OP_SWAP OP_CAT")
                      + copy_preimage() + field(CURRENT_OUTPOINT, 32) + push(result_prefix) + asm("OP_SWAP OP_CAT")
                      + push(join_code) + asm("OP_CAT OP_SWAP OP_CAT OP_HASH256"))
-    return (begin(version) + single_input() + push(index.to_bytes(4, "little")) + check_field(CURRENT_OUTPOINT + 32, 4)
+    return (begin(versions) + single_input() + push(index.to_bytes(4, "little")) + check_field(CURRENT_OUTPOINT + 32, 4)
             + authorize(owner) + validate_u32() + code + output_vector + check_field(OUTPUTS_HASH) + finish())
 
 
@@ -215,7 +226,8 @@ class Contracts:
         if target not in TARGETS:
             raise ValueError(f"unknown compilation target {target!r}")
         self.target = target
-        self.version, self.era = TARGETS[target]
+        self.versions, self.era = TARGETS[target]
+        self.version = self.versions[-1]
         if len(task_id) != 32:
             raise ValueError("task id must be 32 bytes")
         required = {name for step in plan.templates for name in step.authorizers} | {"settle", "review"}
@@ -234,17 +246,17 @@ class Contracts:
         select_route = lower(plan.program.join)
         if plan.mode == "fused":
             # Entry x y sigB sigA P. Both values remain in the same Script stack.
-            code = (begin(self.version) + single_input() + authorize(keys[a.owner]) + authorize(keys[b.owner])
+            code = (begin(self.versions) + single_input() + authorize(keys[a.owner]) + authorize(keys[b.owner])
                     + validate_u32() + asm("OP_SWAP") + validate_u32() + lower(a.word)
                     + asm("OP_SWAP") + lower(b.word) + select_route + route_check(self.terminals) + finish())
         else:
-            self.join_code = join_lock(select_route, self.terminals, self.data_prefix, self.version)
+            self.join_code = join_lock(select_route, self.terminals, self.data_prefix, self.versions)
             self.work_outputs = tuple(
                 Output(WORK_VALUE, work_lock(i, lower(step.word), keys[step.owner], self.join_code,
-                                             self.data_prefix, self.version))
+                                             self.data_prefix, self.versions))
                 for i, step in enumerate(plan.program.work)
             )
-            code = (begin(self.version) + single_input() + authorize(keys[plan.program.operator])
+            code = (begin(self.versions) + single_input() + authorize(keys[plan.program.operator])
                     + push(output_hash(self.work_outputs)) + check_field(OUTPUTS_HASH) + finish())
         self.root = Output(ROOT_VALUE, code)
 
@@ -256,7 +268,9 @@ class Contracts:
             "target": self.target,
             "era": self.era,
             "transaction_version": self.version,
+            "supported_transaction_versions": self.versions,
             "sighash": f"{FLAG:02x}",
+            "enabled_optional_wordsets": self.plan.program.optional_wordsets,
             "schedule": self.plan.mode,
             "fusion_blockers": self.plan.fusion_blockers,
             "templates": [asdict(template) for template in self.plan.templates],
@@ -287,7 +301,10 @@ class Contracts:
             raise ValueError("incorrect result data output")
         return decode_num(encoded[-RESULT_WIDTH:])
 
-    def prepare(self, name, completed, data=None):
+    def prepare(self, name, completed, data=None, *, version=None):
+        version = self.version if version is None else version
+        if type(version) is not int or version not in self.versions:
+            raise ValueError(f"transaction version {version} is unavailable for target {self.target}")
         template = self.templates[name]
         previous = tuple(UTXO(completed[ref.step], ref.vout) for ref in template.inputs)
         inputs = tuple(Input(utxo.outpoint.txid, utxo.outpoint.vout) for utxo in previous)
@@ -310,7 +327,7 @@ class Contracts:
             result, = evaluate(step.word, value)
             outputs = (self.result_output(previous[0].parent), self.data_output(result))
             payload = ((encode_num(value),),)
-        return Draft(template, Transaction(inputs, outputs, version=self.version), previous, payload, self.keys)
+        return Draft(template, Transaction(inputs, outputs, version=version), previous, payload, self.keys)
 
 
 def input_value(data, name):
@@ -324,22 +341,44 @@ def input_value(data, name):
 
 def main():
     cli = argparse.ArgumentParser(description="Compile Forth source to Script and symbolic transaction templates.")
-    cli.add_argument("source", type=Path)
+    cli.add_argument("source", type=Path, nargs="?")
+    action = cli.add_mutually_exclusive_group()
+    action.add_argument("--capabilities", action="store_true", help="list the supported Forth and BSV words")
+    action.add_argument("--entry", help="compile one annotated Forth word to Script without a transaction plan")
     cli.add_argument("--mode", choices=("auto", "fused", "split"), default="auto")
-    cli.add_argument("--target", choices=TARGETS, default=DEFAULT_TARGET, help="Script era and transaction version")
-    cli.add_argument("--keys", type=Path, required=True, help="JSON map of role to compressed public key hex")
-    cli.add_argument("--task-id", required=True, help="32-byte hex data identifier")
+    cli.add_argument("--target", choices=TARGETS, default=DEFAULT_TARGET, help="permitted transaction versions")
+    cli.add_argument("--keys", type=Path, help="JSON map of role to compressed public key hex")
+    cli.add_argument("--task-id", help="32-byte hex data identifier")
     cli.add_argument("--available-data", nargs="*")
     cli.add_argument("--available-authorizers", nargs="*")
     args = cli.parse_args()
+    if args.capabilities:
+        print(json.dumps({**capabilities(), "targets": {
+            name: {"transaction_versions": versions, "era": era} for name, (versions, era) in TARGETS.items()
+        }}, indent=2))
+        return
+    if args.source is None:
+        cli.error("a Forth source file is required")
+    if args.entry is None and (args.keys is None or args.task_id is None):
+        cli.error("transaction builds require --keys and --task-id")
     try:
-        plan = schedule(parse(args.source.read_text()), args.mode, available_data=args.available_data,
-                        available_authorizers=args.available_authorizers)
-        keys = {name: bytes.fromhex(key) for name, key in json.loads(args.keys.read_text()).items()}
-        contracts = Contracts(plan, keys, bytes.fromhex(args.task_id), target=args.target)
+        source = SourceCompiler(args.source.read_text())
+        if args.entry is not None:
+            word = source.words.get(args.entry.casefold())
+            if word is None:
+                raise CompileError(f"undefined entry word {args.entry!r}")
+            result = {"entry": args.entry, "takes": word.takes, "gives": word.gives,
+                      "enabled_optional_wordsets": source.optional_wordsets, "script_hex": lower(word).hex()}
+        else:
+            plan = schedule(source.program(), args.mode, available_data=args.available_data,
+                            available_authorizers=args.available_authorizers)
+            keys = {name: bytes.fromhex(key) for name, key in json.loads(args.keys.read_text()).items()}
+            result = Contracts(plan, keys, bytes.fromhex(args.task_id), target=args.target).describe()
+    except CompileError as error:
+        cli.error(f"{args.source}: {error}")
     except (OSError, ValueError) as error:
         cli.error(str(error))
-    print(json.dumps(contracts.describe(), indent=2))
+    print(json.dumps(result, indent=2))
 
 
 if __name__ == "__main__":

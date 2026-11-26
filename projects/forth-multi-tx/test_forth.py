@@ -1,6 +1,7 @@
 """Regression tests for Forth lowering and the transaction binding invariants."""
 
 from dataclasses import replace
+from itertools import product
 import unittest
 
 from shared.benchmark_validation import chain_verdict
@@ -9,9 +10,10 @@ from shared.evaluate import evaluate as evaluate_script
 from shared.script import decode_num, encode_num
 from shared.transaction import Input, Transaction
 
-from compiler import CompileError, U32, evaluate, lower, parse, schedule
+from compiler import CompileError, SourceCompiler, evaluate, lower, parse, schedule
 from protocol import Contracts, invalidated
 from replay import EXAMPLE, TASK_ID, TestKeys
+from wordsets import CELL_SIGN, U32, capabilities
 
 SOURCE = EXAMPLE.read_text()
 
@@ -19,17 +21,19 @@ SOURCE = EXAMPLE.read_text()
 class CompilerTests(unittest.TestCase):
     def test_stack_types_and_host_location(self):
         with self.assertRaisesRegex(CompileError, "declared"):
-            parse(SOURCE.replace("dup u32+", "dup"))
-        with self.assertRaisesRegex(CompileError, "equal branch stack types"):
-            parse(SOURCE.replace("else settle", "else 1"))
-        source = ": find ( outpoint -- utxo ) lookup-utxo ;\n" + SOURCE
-        program = parse(source)
-        self.assertEqual(program.words["find"].location, "host")
-        with self.assertRaises(CompileError):
-            lower(program.words["find"])
+            parse(SOURCE.replace("DUP u32+", "DUP"))
+        with self.assertRaisesRegex(CompileError, "equal stack types"):
+            parse(SOURCE.replace("ELSE route-settle", "ELSE 1"))
+        source = "bsv-effect: fetch outpoint -- utxo ;\n: fetch bsv-lookup-utxo ;\n"
+        word = SourceCompiler(source).words["fetch"]
+        self.assertEqual(word.location, "host")
+        with self.assertRaisesRegex(CompileError, r"bsv-lookup-utxo \(line 2, column 9\)"):
+            lower(word)
+        with self.assertRaisesRegex(CompileError, "host-only.*bsv-lookup-utxo"):
+            parse(source + SOURCE.replace("x double alice", "x fetch alice"))
 
     def test_arithmetic_and_literal_lowering(self):
-        source = ": wrap ( -- u32 ) 4294967295 1 u32+ ;\n" + SOURCE
+        source = "bsv-effect: wrap -- u32 ;\n: wrap 4294967295 cell>u32 1 cell>u32 u32+ ;\n" + SOURCE
         words = parse(source).words
         for name, values, expected in (
             ("double", (U32 - 1,), U32 - 2),
@@ -45,6 +49,57 @@ class CompilerTests(unittest.TestCase):
                 self.assertEqual((list(map(decode_num, stack)), alt), ([expected], []))
         self.assertEqual(lower(words["wrap"]), b"\x00")
 
+    def test_core_cell_semantics(self):
+        source = """
+bsv-effect: sum cell cell -- cell ;
+: SUM ( an ordinary multiline
+  comment may contain unknown words ) + ;
+bsv-effect: signed-less cell cell -- cell ;
+: signed-less < ;
+bsv-effect: unsigned-less cell cell -- cell ;
+: unsigned-less U< ;
+bsv-effect: guard cell cell -- cell ;
+: guard IF 2 + THEN ;
+bsv-effect: numerals -- cell ;
+: numerals #-2 $10 + %10 + 'A' + ' ' + ;
+"""
+        words = SourceCompiler(source).words
+        for name, args, expected in (
+            ("sum", (U32 - 1, 1), U32),
+            ("sum", (CELL_SIGN - 1, 1), -CELL_SIGN),
+            ("sum", (-CELL_SIGN, -1), CELL_SIGN - 1),
+            ("signed-less", (-1, 0), -1),
+            ("unsigned-less", (-1, 0), 0),
+            ("unsigned-less", (0, -1), -1),
+            ("guard", (5, -7), 7),
+            ("guard", (5, 0), 5),
+            ("numerals", (), 113),
+        ):
+            with self.subTest(name=name, args=args):
+                word = words[name]
+                self.assertEqual(evaluate(word, *args), (expected,))
+                stack, alt = evaluate_script(lower(word), list(map(encode_num, args)))
+                self.assertEqual((list(map(decode_num, stack)), alt), ([expected], []))
+
+    def test_optional_words_and_build_diagnostics(self):
+        manifest = capabilities()
+        self.assertIn("+", manifest["wordsets"]["core"]["script"])
+        self.assertIn("execute", manifest["wordsets"]["core"]["unsupported"])
+        self.assertFalse(manifest["wordsets"]["core-ext"]["enabled_by_default"])
+        self.assertIn("true", manifest["wordsets"]["core-ext"]["script"])
+        source = "bsv-effect: flag -- cell ;\n: flag TRUE ;"
+        with self.assertRaisesRegex(CompileError, r"line 2, column 8: .*CORE EXT word 'TRUE' requires"):
+            SourceCompiler(source)
+        self.assertEqual(evaluate(SourceCompiler("bsv-use core-ext \\ enabled\n" + source).words["flag"]), (-1,))
+        with self.assertRaisesRegex(CompileError, r"line 2, column 8: .*CORE word 'EXECUTE' cannot compile"):
+            SourceCompiler(source.replace("TRUE", "EXECUTE"))
+        with self.assertRaisesRegex(CompileError, "unknown Forth word 'TYPO'"):
+            SourceCompiler(source.replace("TRUE", "TYPO"))
+        with self.assertRaisesRegex(CompileError, "optional Forth word set 'search' is unavailable"):
+            SourceCompiler("bsv-use search")
+        with self.assertRaisesRegex(CompileError, "preceding 'bsv-effect:"):
+            SourceCompiler(": ordinary ( cell -- cell ) 1 + ;")
+
     def test_schedule_constraints(self):
         program = parse(SOURCE)
         self.assertEqual(schedule(program).mode, "fused")
@@ -52,10 +107,11 @@ class CompilerTests(unittest.TestCase):
         self.assertEqual(plan.mode, "split")
         self.assertIn("b: input y is unavailable at fusion", plan.fusion_blockers)
         self.assertIn("b: authorizer bob is unavailable at fusion", plan.fusion_blockers)
-        constrained = parse(SOURCE + "\na independent-submit\n")
+        constrained = parse(SOURCE + "\nindependent-submit a\n")
         self.assertEqual(schedule(constrained).mode, "split")
-        with self.assertRaisesRegex(CompileError, "line 11: a independent-submit"):
+        with self.assertRaisesRegex(CompileError, rf"line {len(SOURCE.splitlines()) + 2}: independent-submit a"):
             schedule(constrained, "fused")
+        self.assertEqual(schedule(parse(SOURCE + "\na independent-submit\n")).mode, "split")
 
 
 class ProtocolTests(unittest.TestCase):
@@ -114,6 +170,25 @@ class ProtocolTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, "OP_EQUALVERIFY"):
                     validate_at_heights(changed.seal(self.keys.sign), changed.parents, **context)
 
+    def test_one_deployment_accepts_both_versions_in_any_join_position(self):
+        contracts = Contracts(self.plan, self.keys.public, TASK_ID, target="both")
+        deploy = Transaction((Input(bytes(32), 0),), (contracts.root,), version=2)
+        split = contracts.prepare("split", {"deploy": deploy}, version=1)
+        self.assertTrue(chain_verdict(split.seal(self.keys.sign), split.parents))
+        done = {"deploy": deploy, "split": split.seal(self.keys.sign)}
+        results = {step: {} for step in ("a", "b")}
+        for version, (step, data) in product((1, 2), (("a", {"x": 10}), ("b", {"y": 5}))):
+            branch = contracts.prepare(step, done, data, version=version)
+            results[step][version] = branch.seal(self.keys.sign)
+            self.assertTrue(chain_verdict(results[step][version], branch.parents))
+        for a, b, joined in product((1, 2), repeat=3):
+            with self.subTest(a=a, b=b, join=joined):
+                join = contracts.prepare("route", {"a": results["a"][a], "b": results["b"][b]}, version=joined)
+                self.assertTrue(chain_verdict(join.seal(self.keys.sign), join.parents))
+        with self.assertRaisesRegex(ValueError, "unavailable for target both"):
+            contracts.prepare("split", {"deploy": deploy}, version=3)
+        with self.assertRaisesRegex(ValueError, "unavailable for target chronicle-v2"):
+            self.contracts.prepare("split", self.done, version=1)
 
 if __name__ == "__main__":
     unittest.main()

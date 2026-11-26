@@ -14,8 +14,9 @@ from shared.chain_gang import validate_at_heights
 from shared.evaluate import evaluate as evaluate_script
 from shared.transaction import Input, Transaction
 
-from compiler import CompileError, HOST_WORDS, Word, evaluate, parse, schedule
+from compiler import CompileError, Word, evaluate, parse, schedule
 from protocol import DEFAULT_TARGET, TARGETS, Contracts, FLAG, Host, ROOT_VALUE, UTXO, invalidated
+from wordsets import HOST_WORDS
 
 EXAMPLE = Path(__file__).with_name("example.fth")
 TASK_ID = seed("forth/task-id")
@@ -70,7 +71,8 @@ class Replay:
         self.node = node
         self.samples = samples
         self.target = target
-        self.version, _ = TARGETS[target]
+        self.versions, _ = TARGETS[target]
+        self.version = self.versions[-1]
         self.activation_height = activation_height
         self.keys = TestKeys()
         self.known = {}
@@ -105,15 +107,16 @@ class Replay:
             raise ValueError(f"regtest could not mine the shared bootstrap: {self.traces.get(bootstrap.txid())}")
         return bootstrap
 
-    def deploy(self, contracts, bootstrap, slot):
+    def deploy(self, contracts, bootstrap, slot, *, version=None):
         utxo = UTXO(bootstrap, slot)
-        tx = Transaction((Input(utxo.outpoint.txid, slot),), (contracts.root,), version=contracts.version)
+        version = contracts.version if version is None else version
+        tx = Transaction((Input(utxo.outpoint.txid, slot),), (contracts.root,), version=version)
         tx = SOURCE.unlock(tx, 0, bootstrap, FLAG, None)
         return tx, self.record(tx, (utxo,))
 
     def sign(self, draft, host=None):
         host = self.host if host is None else host
-        return draft.seal(lambda request: host_call("sign", host, request))
+        return draft.seal(lambda request: host_call("bsv-sign", host, request))
 
     def record(self, tx, previous, *, expected=True, live_only=False):
         if Transaction.parse(tx.serialize()) != tx:
@@ -124,7 +127,7 @@ class Replay:
             raise ValueError("replay input does not match its recorded previous output")
         if expected:
             for utxo in previous:
-                host_call("lookup-utxo", self.host, utxo.outpoint)
+                host_call("bsv-lookup-utxo", self.host, utxo.outpoint)
         spend_height = self.node.call("getblockcount", []) + 1
         # Give the hypothetical parent in the missing-UTXO control the next block height.
         heights = tuple(self.traces.get(parent.txid(), {}).get("height", spend_height) for parent in parents)
@@ -139,9 +142,9 @@ class Replay:
             return True, None
 
         samples = self.samples if expected else 0
-        node, node_ms = timed(lambda: self.node.verdicts(tx, parents, **context), samples)
+        node, node_ms = timed(lambda: self.node.verdicts(tx, parents, timeout_us=50_000, **context), samples)
         (chain, chain_error), chain_ms = timed(chain_check, samples)
-        mined = bool(host_call("submit", self.host, tx))
+        mined = bool(host_call("bsv-submit", self.host, tx))
         if (all(node), chain, mined) != (expected or live_only, expected, expected):
             raise ValueError(f"unexpected verdict for {tx.txid()}: scripts={node}, chain-gang={chain}, "
                              f"admission={self.traces[tx.txid()]}")
@@ -166,8 +169,8 @@ class Replay:
 
         return self.sign(draft, replace(self.host, sign=owner_only))
 
-    def branch(self, contracts, name, done, data):
-        draft = contracts.prepare(name, done, data)
+    def branch(self, contracts, name, done, data, *, version=None):
+        draft = contracts.prepare(name, done, data, version=version)
         work = draft.template.outputs == ("result", "data")
         tx = self.sign_work(draft) if work else self.sign(draft)
         done[name] = tx
@@ -182,7 +185,7 @@ class Replay:
         wrong_output, = (item for item in contracts.terminals if item != join.tx.outputs[0])
         bad_route = replace(join, tx=replace(join.tx, outputs=(wrong_output,)))
         wrong_successor = self.record(self.sign(bad_route), bad_route.previous, expected=False)
-        other_version = 1 if join.tx.version == 2 else 2
+        other_version = {"forkid-v1": 2, "chronicle-v2": 1, "both": 3}[self.target]
         bad_version = replace(join, tx=replace(join.tx, version=other_version))
         wrong_version = self.record(self.sign(bad_version), bad_version.previous, expected=False)
         return {"missing_input": missing_input, "wrong_split_same_task_id": wrong_split,
@@ -190,21 +193,26 @@ class Replay:
 
     def path(self, plan, bootstrap, slot, data, route, *, foreign=None):
         c = Contracts(plan, self.keys.public, TASK_ID, target=self.target)
-        root, funding = self.deploy(c, bootstrap, slot)
+        first_version, second_version = self.versions[0], self.versions[-1]
+        if route == "review":
+            first_version, second_version = second_version, first_version
+        root, funding = self.deploy(c, bootstrap, slot, version=second_version)
         done = {"deploy": root}
         records = {"deploy": funding}
         controls = {}
         rebinding = {}
         if plan.mode == "fused":
-            records["fused"] = self.branch(c, "fused", done, data)
+            records["fused"] = self.branch(c, "fused", done, data, version=first_version)
         else:
             a, b = plan.program.work
-            records["split"] = self.branch(c, "split", done, None)
+            records["split"] = self.branch(c, "split", done, None, version=second_version)
             left, right = (b, a) if route == "review" else (a, b)
-            records[left.name] = self.branch(c, left.name, done, {left.input: data[left.input]})
-            right_draft = c.prepare(right.name, done, {right.input: data[right.input]})
+            versions = {a.name: first_version, b.name: second_version}
+            records[left.name] = self.branch(c, left.name, done, {left.input: data[left.input]},
+                                              version=versions[left.name])
+            right_draft = c.prepare(right.name, done, {right.input: data[right.input]}, version=versions[right.name])
             done[right.name] = self.sign_work(right_draft)
-            join = c.prepare(plan.program.join_name, done)
+            join = c.prepare(plan.program.join_name, done, version=first_version)
             if foreign:
                 # Signed bytes for both branches exist, but the right parent is still absent on chain.
                 controls["missing_from_utxo_set"] = self.record(
@@ -216,7 +224,7 @@ class Replay:
                 controls.update(self.controls(c, done, join, foreign))
             records[join.template.name] = self.record(self.sign(join), join.previous)
             split = done["split"]
-            split_draft = c.prepare("split", done)
+            split_draft = c.prepare("split", done, version=split.version)
             replacement = replace(split_draft, tx=replace(split_draft.tx, locktime=split.locktime + 1))
             rebound = self.sign(replacement)
             rebinding = {"old_split_txid": split.txid(), "replacement_split_txid": rebound.txid(),
@@ -268,7 +276,8 @@ def main():
     source = EXAMPLE.read_text()
     pp = parse(source)
     fused, split = schedule(pp, "fused"), schedule(pp, "split")
-    independent = parse(source + "\na independent-submit\n")
+    constrained_source = source + "\nindependent-submit a\n"
+    independent = parse(constrained_source)
     constrained = schedule(independent)
     try:
         schedule(independent, "fused")
@@ -295,7 +304,7 @@ def main():
         "target": args.target, "chronicle_activation_height": activation,
         "task_id": TASK_ID.hex(), "bootstrap_raw": bootstrap.serialize().hex(),
         "fixture_public_keys": {name: key.hex() for name, key in replay.keys.public.items()},
-        "source": source, "constrained_source": source + "\na independent-submit\n",
+        "source": source, "constrained_source": constrained_source,
         "plans": {plan.mode: Contracts(plan, replay.keys.public, TASK_ID, target=args.target).describe()
                   for plan in (fused, split)},
         "constrained_auto_schedule": constrained.mode, "constrained_fused_error": rejected,
