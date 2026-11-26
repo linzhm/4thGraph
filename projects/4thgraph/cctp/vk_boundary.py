@@ -2,9 +2,10 @@
 
 from dataclasses import dataclass
 from hashlib import sha256
+from importlib import import_module
 from pathlib import Path
 
-from forth_verifier import Groth16Words, load_frontend
+from forth_verifier import Groth16Words
 from public_inputs import verification_key_point
 from verifier import prepared_lines, unlocking_fields, unlocking_script
 
@@ -12,6 +13,7 @@ from shared.pushtx import PUBLIC, binding_der
 from shared.script import asm, number, push
 from shared.transaction import Input, Output, Transaction, hash256, preimage_all
 
+frontend = import_module("projects.4thgraph.compiler")
 SOURCE = Path(__file__).with_name("vk-boundary.fth")
 VERSION = 2
 MSM_VALUE, PAIRING_VALUE, STATE_VALUE, TERMINAL_VALUE = 30_000, 70_000, 25_000, 75_000
@@ -43,19 +45,12 @@ class BoundaryWords(Groth16Words):
         return lines, self.g1.negate((x, y)), finite
 
 
-def compile_entry(checkout, key, entry):
-    frontend = load_frontend(Path(checkout).resolve())
+def compile_entry(key, entry):
     words = BoundaryWords(key)
     vocabulary = words.vocabulary(frontend.Primitive)
-    frontend.TYPES |= {kind for word in vocabulary.values() for kind in (*word.takes, *word.gives)}
-
-    class Source(frontend.SourceCompiler):
-        def declaration(self, token):
-            if not self.words:
-                self.words.update(vocabulary)
-            super().declaration(token)
-
-    word = Source(SOURCE.read_text()).words[entry]
+    types = frontend.TYPES | {kind for word in vocabulary.values() for kind in (*word.takes, *word.gives)}
+    compiler = frontend.SourceCompiler(SOURCE.read_text(), source_path=SOURCE, vocabulary=vocabulary, stack_types=types)
+    word = compiler.words[entry]
     if word.takes or word.gives:
         raise ValueError(f"{entry} must have an empty compile-time stack effect")
     intrinsics = set(vocabulary.values())
@@ -225,8 +220,8 @@ class Layouts:
     domain: bytes
 
     @classmethod
-    def compile(cls, checkout, key):
-        fused, msm, pairing = (compile_entry(checkout, key, entry) for entry in
+    def compile(cls, key):
+        fused, msm, pairing = (compile_entry(key, entry) for entry in
                                ("groth16-verify", "groth16-msm", "groth16-pairing"))
         # The two arithmetic scripts commit to the VK and accepted relation.
         domain = sha256(b"4thGraph CCTP Groth16 VK boundary v1\0"

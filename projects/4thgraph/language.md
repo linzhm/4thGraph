@@ -2,11 +2,11 @@
 
 ## 兼容范围
 
-编译器以 Forth 2012 Core 为语义基线，实现适合静态栈检查和 BSV Script 的有界子集。定义名查找不区分大小写。冒号定义用 `: … ;`，`( … )` 在源文件中只作注释。构建前为定义显式声明 `bsv-effect:`，编译器检查该定义实际留下的栈。支持 `IF … [ELSE …] THEN`，并要求两条分支在汇合处具有相同栈类型。编译时已读到的定义可被后续定义调用。 [Forth 2012 Core](https://forth-standard.org/standard/core)
+编译器以 Forth 2012 Core 为语义基线，实现适合静态栈检查和 BSV Script 的有界子集。定义名查找不区分大小写。冒号定义在词名后用 `( 输入类型 -- 输出类型 )` 声明栈效果，以分号结束。编译器检查定义实际留下的栈，其余位置的括号文本作为注释。支持 `IF … [ELSE …] THEN`，并要求两条分支在汇合处具有相同栈类型。编译时已读到的定义可被后续定义调用。 [Forth 2012 Core](https://forth-standard.org/standard/core)
 
 - 本实现把 `cell` 定为 64 位二进制补码。Script 中用等价的有符号 ScriptNum 表示。标准 `+`、`-` 等 cell 算术超出范围时按模 2⁶⁴ 回绕。带符号比较与 `U<` 的无符号比较读取同一位模式。比较得到的 Forth flag 为全 1 或全 0，对应 `-1` 或 `0`。 `IF` 接受任何非零 cell 为真。
 - 数字字面值属于 `cell`。直接数字以十进制解释，也接受 Forth 的显式前缀 `#`、`$`、`%` 和可打印字符字面值，如 `'A'`。地址空间、运行时进制切换、I/O 和动态执行等功能目前保留为构建诊断。
-- 可选词集在使用前用 `bsv-use` 声明。当前可导入 `core-ext` 的子集，含 `TRUE`、`FALSE`、`NIP`、`TUCK`、`0<>`、`0>`、`<>` 和行注释词 `\`。其它词集以及当前无法编译的 Core Extension 词有各自的错误信息。 [Forth 2012 使用要求](https://forth-standard.org/standard/usage)
+- 编译器默认启用支持的 Core Extension 和 File Extension 词。前者包括 `TRUE`、`FALSE`、`NIP`、`TUCK`、`0<>`、`0>`、`<>` 和行注释词 `\`。用 File Extension 的 `REQUIRE` 载入源码。 [Forth 2012 使用要求](https://forth-standard.org/standard/usage)
 
 ## 扩展命名
 
@@ -31,24 +31,24 @@
 顶层声明读取符号参数。各声明不接触运行时 Forth 数据栈。
 
 ```text
-bsv-use <optional-wordset>
-bsv-effect: <word> <input-types...> -- <output-types...> ;
-work: <step> <input> <word> <signer-role>
-join: <step> <left-work> <right-work> <word>
-gate: <step> <input> <word> <signer-role>
-split-authority: <signer-role>
-recovery: <block-height> <signer-role>
-independent-submit <gate-or-work-step>
+REQUIRE <file>
+: <word> ( <input-types...> -- <output-types...> ) <body> ;
+work: <step> <input> <word> <signer-role> ;
+join: <step> <left-work> <right-work> <word> ;
+gate: <step> <input> <word> <signer-role> ;
+split-authority: <signer-role> ;
+recovery: <block-height> <signer-role> ;
+independent-submit: <gate-or-work-step> ;
 ```
 
-- `bsv-effect:` 为随后同名的冒号定义声明静态栈效果。输入和输出的顺序均从栈底写到栈顶。
+- 栈效果中的类型由编译器核对。输入和输出的顺序均从栈底写到栈顶。
 - `work:` 声明外部数据名、计算词和分支签名角色。计算词必须具有 `u32 -- u32` 效果，并能编译成 Script。
 - `join:` 按顺序消费两个不同的工作步骤。汇合词具有 `u32 u32 -- route` 效果。声明次序决定结果的逻辑次序，以及拆分的工作输出索引与汇合的输入次序。
 - `gate:` 可选。其词具有 `u32 -- cell` 效果，只有非零结果允许继续。完整融合先验证条件，再运行分支和汇合。拆分时，如果门和拆分的授权角色相同、数据和签名可同时取得且没有独立边界，则同一笔交易执行两步。独立门只创建已承诺的拆分锁，拆分随后绑定 `gate-step:0`。同一规则适用于两个版本的交易。
 - `split-authority:` 指定创建工作输出的签名角色。拆分完成后，每支只需对应的签名角色即可提交。
 - `recovery:` 给部署、独立门、工作和结果的可花费输出增加超时退款分支。指定的十进制区块高度须在 1 到 499,999,999 之间。锁验证实际交易的 `nLockTime` 等于该值、输入序列为 `0xfffffffe`，并要求指定角色签署。每笔退款只花费一个实际中间 outpoint，发送至该角色的 P2PK，价值为原输出扣除固定 1,000 sat 费用。`nLockTime = h` 的退款最早可进入高度 `h+1` 的区块。常规路径和退款路径花费同一 UTXO。
-- 同一程序中，重复的外部输入名表示同一个 `u32` 值。例如 `work: a x double alice` 和 `work: b x inc bob` 都读取 `x`。融合时见证传一次 `x`，锁将其复制到各使用位置。拆分时，`split` 在每个使用 `x` 的工作锁开头写入相同的值，并核对整个输出向量。若独立的门也读取 `x`，门先将其写入拆分锁，再由拆分传给工作锁。运行器从实际花费的前输出读取该值。各分支仍可独立提交。
-- `independent-submit` 将工作步骤声明为可独立提交的交易边界。存在该约束时，自动调度选择拆分，强制融合报告源码行号。编译器也接受原型曾使用的后缀写法 `<work-step> independent-submit`。
+- 同一程序中，重复的外部输入名表示同一个 `u32` 值。例如 `work: a x double alice ;` 和 `work: b x inc bob ;` 都读取 `x`。融合时见证传一次 `x`，锁将其复制到各使用位置。拆分时，`split` 在每个使用 `x` 的工作锁开头写入相同的值，并核对整个输出向量。若独立的门也读取 `x`，门先将其写入拆分锁，再由拆分传给工作锁。运行器从实际花费的前输出读取该值。各分支仍可独立提交。
+- `independent-submit:` 将工作步骤声明为可独立提交的交易边界。存在该约束时，自动调度选择拆分，强制融合报告源码行号。编译器也接受原型曾使用的后缀写法 `<work-step> independent-submit`。
 
 宿主词使用独立类型。 `bsv-lookup-utxo ( outpoint -- utxo )` 由 UTXO 提供者执行，`bsv-sign ( request -- bytes )` 由外部签名器返回 DER 签名，`bsv-submit ( transaction -- bytes )` 由提交接口执行。 `utxo>outpoint` 和 `utxo>script` 读取已绑定输出。词库描述各自的验证依据，宿主词进入工作词或汇合词的调用链时，构建会报告调用位置和对应的宿主词。
 
@@ -74,7 +74,7 @@ independent-submit <gate-or-work-step>
 
 `--optimize baseline` 使用原有字节码后端。`--optimize safe` 在带类型的栈表示上做范围分析和分支指令选择。输出的 `rewrites` 记录规则、源码行列及触发规则的栈类型和范围。单独导出的词遵循 `takes` 中的数值范围，交易模板在进入计算前检查外部输入范围。
 
-`--capabilities` 输出机器可读的词集、执行位置和交易版本清单。 `--entry <word>` 只编译指定的已标注定义，便于检查 Script 字节和栈签名。事务构建在发现首个无效使用时退出，并指明源文件行列。诊断区分未知词、未导入的 Core Extension 词、无法下沉的标准词和调用链中的宿主词。
+`--capabilities` 输出机器可读的词集、执行位置和交易版本清单。 `--entry <word>` 只编译指定的已标注定义，便于检查 Script 字节和栈签名。事务构建在发现首个无效使用时退出，并指明源文件行列。诊断区分未知词、无法下沉的标准词和调用链中的宿主词。
 
 ```sh
 PYTHONPATH=. python projects/4thgraph/protocol.py --capabilities
@@ -85,6 +85,6 @@ PYTHONPATH=. python projects/4thgraph/protocol.py projects/4thgraph/example.fth 
 
 ## 电路后端
 
-电路源码声明 `advance ( u32 -- u32 )` 和 `decide ( u32 -- route )` 两个带 `bsv-effect:` 的定义。后端支持整数字面值、字面 `cell>u32`、现有栈排列、`u32+`、`u32<`、路由字面值和以字面值或 `u32<` 标志驱动的 `IF`。`u32<` 的 Forth 真值为 `-1`，电路在选择分支时用相应的布尔位。生成超出操作或线宽预算的电路，以及无法生成约束的词，都会报告源码行列。
+电路源码声明 `advance ( u32 -- u32 )` 和 `decide ( u32 -- route )` 两个带类型的定义。后端支持整数字面值、字面 `cell>u32`、现有栈排列、`u32+`、`u32<`、路由字面值和以字面值或 `u32<` 标志驱动的 `IF`。`u32<` 的 Forth 真值为 `-1`，电路在选择分支时用相应的布尔位。生成超出操作或线宽预算的电路，以及无法生成约束的词，都会报告源码行列。
 
 生成的约束将 `next` 与 `route` 作为公开输出。交易绑定还使用 `current`、`bindLo` 和 `bindHi`。Circom 和 snarkjs 负责生成 R1CS 以及计算和检查完整赋值，4thGraph 把透明验证器和后继锁编译为 Script。详见 [重跑命令](README.md#从-forth-生成约束)。

@@ -52,7 +52,7 @@ PYTHONPATH=.:$project python "$project/workflow-forth/build.py" \
   "$project/workflow-forth/counter.fth"
 PYTHONPATH=.:$project python "$project/workflow-forth/build.py" \
   "$project/workflow-forth/counter.fth" \
-  --rules "$project/workflow-forth/counter-rules.fth" \
+  --rules "$project/proof/counter.fth" \
   --keys /path/to/public-keys.json --current 19
 PYTHONPATH=.:$project python -m unittest discover -s "$project/workflow-forth" -v
 PYTHONPATH=.:$project bash shared/verify_node.sh --profile raised -- \

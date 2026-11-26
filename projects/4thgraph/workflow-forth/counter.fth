@@ -1,6 +1,6 @@
+BASE @ DECIMAL
 REQUIRE workflow.fth
-
-REQUIRE counter-rules.fth
+REQUIRE ../proof/counter.fth
 
 0 CONSTANT deposit
 1 CONSTANT pending
@@ -26,3 +26,4 @@ pending-resources terminal-resources one-item two-items
 root-resources emit-roots
 settle emit-stage
 prepare emit-stage
+BASE !

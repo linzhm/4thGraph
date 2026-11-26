@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from circuit_backend import circuit_words, compile_circuit
+from circuit_backend import emit_circuit, parse_circuit
 from circuit_tools import CircuitFixture
 from compiler import PROJECT_NAME, PROJECT_VERSION, evaluate
 from lowering import BASELINE, compile_word
@@ -44,9 +44,7 @@ def compare_circuit(circuit, advance, decide, currents):
     return rows
 
 
-def run_case(replay, circuit, source, bootstrap, slot, *, current, next_state, optimization):
-    contract = ProofContract(source, circuit, current, replay.keys.public, target=replay.target,
-                             optimization=optimization)
+def run_case(replay, circuit, contract, source, bootstrap, slot, *, current, next_state):
     parent, deploy = replay.deploy(contract, bootstrap, slot)
     other_parent, other_deploy = replay.deploy(contract, bootstrap, slot + 1)
     previous, foreign = (UTXO(parent, 0),), (UTXO(other_parent, 0),)
@@ -101,21 +99,28 @@ def main():
         raise ValueError("proof replay requires an empty peerless regtest")
     activation = int(os.environ.get("SCRIPT_LAB_CHRONICLE_HEIGHT", ACTIVATION_HEIGHT))
     replay = Replay(node, 3, args.target, activation)
-    source = (FIXTURE / ("workflow.fth" if args.generated else "counter.fth")).read_bytes()
-    circuit_source = compile_circuit(source) if args.generated else (FIXTURE / "counter.circom").read_bytes()
-    next_state = (args.current + 1) % U32
+    source_path = FIXTURE / ("workflow.fth" if args.generated else "counter.fth")
+    source = source_path.read_bytes()
     if args.generated:
-        advance, decide = circuit_words(source)
-        next_state, = evaluate(advance, args.current)
+        program = parse_circuit(source, source_path=source_path)
+        circuit_source = emit_circuit(program)
+        next_state, = evaluate(program.transition, args.current)
+    else:
+        program = None
+        circuit_source = (FIXTURE / "counter.circom").read_bytes()
+        next_state = (args.current + 1) % U32
     with TemporaryDirectory(prefix="4thgraph-counter-") as temporary:
         circuit = CircuitFixture(circuit_source, temporary, has_route=args.generated)
         vectors = []
         if args.compare_domains:
-            vectors = compare_circuit(circuit, advance, decide, (0, 7, 18, 19, 20, U32 - 2, U32 - 1))
+            vectors = compare_circuit(circuit, program.transition, program.route, (0, 7, 18, 19, 20, U32 - 2, U32 - 1))
         bootstrap = replay.fund(4)
-        cases = {variant: run_case(replay, circuit, source, bootstrap, 2 * i, current=args.current,
-                                   next_state=next_state, optimization=variant)
-                 for i, variant in enumerate((BASELINE, "stack"))}
+        cases = {}
+        for i, variant in enumerate((BASELINE, "stack")):
+            contract = ProofContract(program or source, circuit, args.current, replay.keys.public, target=args.target,
+                                     optimization=variant, source_path=source_path)
+            cases[variant] = run_case(replay, circuit, contract, source, bootstrap, 2 * i,
+                                      current=args.current, next_state=next_state)
         if cases["stack"]["script_bytes"] >= cases[BASELINE]["script_bytes"]:
             raise ValueError("optimized proof verifier did not reduce script bytes")
         args.output.parent.mkdir(parents=True, exist_ok=True)

@@ -10,7 +10,7 @@ import secrets
 from tempfile import TemporaryDirectory
 from time import perf_counter
 
-from circuit_backend import circuit_words, compile_circuit
+from circuit_backend import emit_circuit, parse_circuit
 from circuit_tools import CircuitFixture, SNARKJS_PACKAGE
 from compiler import evaluate
 from groth16_script import BASE_FIELD, ScriptVerifier, build_adapter, public_signals, runar_proof
@@ -43,8 +43,8 @@ def demo_keys(circuit):
     return (circuit.directory / "verification_key.json").read_bytes()
 
 
-def prove(circuit, source, current, binding, label):
-    advance, decide = circuit_words(source)
+def prove(circuit, program, current, binding, label):
+    advance, decide = program.transition, program.route
     next_state, = evaluate(advance, current)
     route, = evaluate(decide, next_state)
     expected = tuple(map(str, (next_state, route, current, *binding)))
@@ -119,18 +119,19 @@ def main():
         raise ValueError("Groth16 replay requires an empty peerless regtest")
     activation = int(os.environ["SCRIPT_LAB_CHRONICLE_HEIGHT"])
     source = SOURCE.read_bytes()
+    program = parse_circuit(source, source_path=SOURCE)
     keys = TestKeys()
     owner = keys.public["operator"]
 
     with TemporaryDirectory(prefix="4thgraph-groth16-replay-") as temporary:
         adapter = Path(temporary) / "adapter"
         build_adapter(args.runar, adapter, go=args.go)
-        circuit = CircuitFixture(compile_circuit(source), temporary, has_route=True)
+        circuit = CircuitFixture(emit_circuit(program), temporary, has_route=True)
         key = demo_keys(circuit)
         verifier = ScriptVerifier(adapter, key, temporary)
         # These are fixed statement data; the owner's signature covers the actual spend.
-        signals, proof = prove(circuit, source, (1 << 32) - 1, (1, 2), "wrap")
-        other_signals, other_proof = prove(circuit, source, 19, (1, 2), "other")
+        signals, proof = prove(circuit, program, (1 << 32) - 1, (1, 2), "wrap")
+        other_signals, other_proof = prove(circuit, program, 19, (1, 2), "other")
         lock = verifier.compile(signals, owner)
         witness = verifier.witness(signals, proof)
         wrong_statement = verifier.witness(other_signals, other_proof)
@@ -166,7 +167,7 @@ def main():
             "setup": "local-test-only", "bsv_node_version": node.version, "chain_gang": engine,
             "activation_height": activation, "regtest_profile": os.environ.get("SCRIPT_LAB_REGTEST_PROFILE"),
             "transaction_version": args.tx_version, "expected_spend": active,
-            "forth_source_sha256": sha256(source).hexdigest(), "circuit": circuit.describe(),
+            "forth_source_sha256": sha256(source).hexdigest(), "relation": program.describe(), "circuit": circuit.describe(),
             "verification_key": json.loads(key), "artifact": verifier.artifact(signals, owner, lock),
             "proof": json.loads(proof), "other_proof": json.loads(other_proof), "other_public_signals": other_signals,
             "witness_bytes": len(witness), "bootstrap_raw": bootstrap.serialize().hex(),

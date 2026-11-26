@@ -145,7 +145,7 @@ def main():
         raise ValueError("recovery replay requires an empty peerless regtest")
     activation = int(os.environ.get("SCRIPT_LAB_CHRONICLE_HEIGHT", ACTIVATION_HEIGHT))
     replay = Replay(node, 3, args.target, activation, "stack", args.join_witness)
-    source = EXAMPLE.read_bytes() + f"\nrecovery: {HEIGHT} review\n".encode()
+    source = EXAMPLE.read_bytes() + f"\nrecovery: {HEIGHT} review ;\n".encode()
     contracts = replay.contracts(schedule(parse(source.decode()), "split"))
     a, b = contracts.plan.program.work
     bootstrap = replay.fund(5)

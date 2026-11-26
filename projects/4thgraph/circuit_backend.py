@@ -192,13 +192,12 @@ def select_circuit(frontend, entries=None):
     return CircuitProgram(*words, selection, tuple(definitions), frontend.library_imports)
 
 
-def circuit_words(source):
-    program = select_circuit(SourceCompiler(source.decode()))
-    return program.transition, program.route
+def parse_circuit(source, *, entries=None, source_path=None):
+    return select_circuit(SourceCompiler(source.decode(), source_path=source_path), entries)
 
 
 def compile_circuit(source, *, entries=None, source_path=None):
-    return emit_circuit(select_circuit(SourceCompiler(source.decode(), source_path=source_path), entries))
+    return emit_circuit(parse_circuit(source, entries=entries, source_path=source_path))
 
 
 def emit_circuit(program, *, max_expansion=MAX_EXPANSION):

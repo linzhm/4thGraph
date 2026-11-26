@@ -52,7 +52,7 @@ PYTHONPATH=. python projects/4thgraph/protocol.py --capabilities
 
 ### 编译公开状态关系
 
-`relation: u32-inc decide ;` 指定一个 `u32 -- u32` 转换词和一个 `u32 -- route` 路由词。构建器从同一次源码解析取得两个词，将初始状态固定在锁中，核对花费的实际后继付款和状态回执。分文件定义可用 `REQUIRE` 导入。[完整示例](examples/verify-state.fth)
+`relation: advance decide ;` 指定一个 `u32 -- u32` 转换词和一个 `u32 -- route` 路由词。构建器从同一次源码解析取得两个词，将初始状态固定在锁中，核对花费的实际后继付款和状态回执。分文件定义可用 `REQUIRE` 导入。[完整示例](examples/verify-state.fth)
 
 ```sh
 project=projects/4thgraph
@@ -67,7 +67,7 @@ PYTHONPATH=. python "$project/verification.py" "$app" --keys "$keys" --current 1
 
 只有词定义的电路源文件须用 `circuit_backend.py SOURCE --entries TRANSITION ROUTE --output FILE` 显式指定入口。含阶段声明的工作流由阶段依赖决定入口。
 
-`--mode auto` 在所有输入和分支授权都可同时取得时选融合。可用 `--available-data x` 或 `--available-authorizers alice` 模拟另一支晚到。往示例末尾加上 `independent-submit a` 后，`auto` 选择拆分，`--mode fused` 报告约束的源文件行号。可显式请求拆分，在两种调度都合法时做同源对照。
+`--mode auto` 在所有输入和分支授权都可同时取得时选融合。可用 `--available-data x` 或 `--available-authorizers alice` 模拟另一支晚到。往示例末尾加上 `independent-submit: a ;` 后，`auto` 选择拆分，`--mode fused` 报告约束的源文件行号。可显式请求拆分，在两种调度都合法时做同源对照。
 
 ## 编译决策报告
 
@@ -115,15 +115,15 @@ PYTHONPATH=. python "$project/decision_report.py" "$project/build/search-replay.
 
 ## 语言与运行器
 
-- `bsv-effect: name cell -- cell ;` 声明静态栈效果。 `: name ( optional comment ) 1 + ;` 按 Forth 语义定义词。通过 `bsv-use core-ext` 启用受支持的 Core Extension 词。构建会报告无法编译到 Script 的用法及源码位置。
-- `work: a x double alice` 将输入、计算和签名角色连到工作步骤。 `join: route a b decide` 按指定顺序声明汇合依赖。 `split-authority: operator` 声明启动拆分的签名角色。当前调度器识别一对并行分支和一个汇合。选择交易边界后，后端再内联、折叠字面量和选择 Script 指令。
-- 若把第二支改为 `work: b x inc bob`，两支都使用同一个 `x`。融合版只需提供一次。拆分版在创建工作输出时锁定 `x`，Alice 和 Bob 之后可各自提交，其签名请求绑定包含该值的实际前输出。若独立的门也使用 `x`，提供它的时点提前到门交易。共享值以明文进入相应的锁脚本。
+- `: inc-cell ( cell -- cell ) 1 + ;` 在定义中声明静态栈效果。受支持的 Core Extension 词默认启用。构建会报告无法编译到 Script 的用法及源码位置。
+- `work: a x double alice ;` 将输入、计算和签名角色连到工作步骤。 `join: route a b decide ;` 按指定顺序声明汇合依赖。 `split-authority: operator ;` 声明启动拆分的签名角色。当前调度器识别一对并行分支和一个汇合。选择交易边界后，后端再内联、折叠字面量和选择 Script 指令。
+- 若把第二支改为 `work: b x inc bob ;`，两支都使用同一个 `x`。融合版只需提供一次。拆分版在创建工作输出时锁定 `x`，Alice 和 Bob 之后可各自提交，其签名请求绑定包含该值的实际前输出。若独立的门也使用 `x`，提供它的时点提前到门交易。共享值以明文进入相应的锁脚本。
 - 词库声明执行位置和验证依据。Script 词由链上执行。宿主词通过 `Host` 的注入接口查询 UTXO、请求签名和提交交易，并可从 UTXO 取得脚本和 outpoint。测试签名器使用公开可复现的私钥，仅供 regtest。
 - `Contracts.prepare` 把符号引用如 `split:0` 解析为已封装父交易的真实 outpoint，核对前输出、已提供的父交易关系，以及汇合结果的槽位、同次拆分来源和编码。含门条件的步骤会先在宿主检查条件。 `Draft.signing_requests` 给外部签名器提供角色、前输出、待签交易、见证输入及 ForkID ALL 摘要。 `Draft.seal` 校验草稿绑定并装配签名和当前交易原像。实际可花费性仍由 UTXO 集和链上脚本验证。父 txid 改变时，`invalidated` 沿依赖图列出需重新绑定的交易和需更新的授权。
 
 ## 交易与验证
 
-`example.fth` 是并行双分支。`gated.fth` 在分支前有一道授权条件。后者可以完整融合、把条件与拆分合并，或将条件交易独立提交后由拆分绑定其输出。`independent-submit qualify` 强制最后一种计划。两个示例共用汇合验证和版本选择。 [带门的源码](gated.fth)
+`example.fth` 是并行双分支。`gated.fth` 在分支前有一道授权条件。后者可以完整融合、把条件与拆分合并，或将条件交易独立提交后由拆分绑定其输出。`independent-submit: qualify ;` 强制最后一种计划。两个示例共用汇合验证和版本选择。 [带门的源码](gated.fth)
 
 ```sh
 PYTHONPATH=. bash shared/verify_node.sh --profile default -- \
@@ -230,7 +230,7 @@ PYTHONPATH=. bash shared/verify_node.sh --profile default -- \
 
 ### 从 Forth 生成约束
 
-`proof/workflow.fth` 的 `advance` 和 `decide` 同时用于宿主求值、Script 和 Circom。后端把 32 位回绕显式编码为进位和范围约束，用 33 位分解确定无符号比较结果。复放继续用固定版本的 snarkjs 计算并检查赋值。锁还校验电路公布的路由与 Forth 生成的后继选择一致。
+工作流、验证声明和 Gforth 计数器通过 `REQUIRE` 共用 `proof/counter.fth` 中的 `advance` 和 `decide`。同一份定义用于宿主求值、Script 和 Circom。后端把 32 位回绕显式编码为进位和范围约束，用 33 位分解确定无符号比较结果。复放继续用固定版本的 snarkjs 计算并检查赋值。锁还校验电路公布的路由与 Forth 生成的后继选择一致。
 
 该示例生成 107 条约束。Chronicle 激活后的双版本样本中，完整验证锁从 9,196 B 降到 4,481 B。复放对照覆盖普通输入、18 和 19 跨越分支阈值，以及 4,294,967,295 回绕到 0。
 

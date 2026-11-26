@@ -3,6 +3,7 @@
 from bisect import bisect_right
 from dataclasses import InitVar, dataclass, field
 from hashlib import sha256
+from os.path import relpath
 from pathlib import Path
 import re
 
@@ -459,7 +460,7 @@ class SourceCompiler:
         # Diagnostics use catalog names for bundled files and source paths for other files.
         if name is None:
             base = self.root_source.parent if self.root_source is not None else Path.cwd()
-            name = path.relative_to(base).as_posix() if path.is_relative_to(base) else str(path)
+            name = Path(relpath(path, base)).as_posix()
         backend_words = ({word: primitive for word, primitive in p256_vocabulary().items() if word not in self.words}
                          if name == "std/p256" else {})
         self.words.update(backend_words)

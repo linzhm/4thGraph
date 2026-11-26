@@ -19,7 +19,7 @@ from workflow_contract import WorkflowContracts
 
 HERE = Path(__file__).resolve().parent
 COUNTER = HERE / "counter.fth"
-RULES = HERE / "counter-rules.fth"
+RULES = HERE.parent / "proof" / "counter.fth"
 FORTH = shutil.which(os.environ.get("GFORTH", "gforth"))
 
 
@@ -95,7 +95,7 @@ class PlanTests(unittest.TestCase):
 class ForthWorkflowTests(unittest.TestCase):
     def load_variant(self, **updates):
         source = COUNTER.read_text().replace("REQUIRE workflow.fth", f"REQUIRE {HERE / 'workflow.fth'}")
-        source = source.replace("REQUIRE counter-rules.fth", f"REQUIRE {RULES}")
+        source = source.replace("REQUIRE ../proof/counter.fth", f"REQUIRE {RULES}")
         for old, new in updates.items():
             self.assertIn(old, source)
             source = source.replace(old, new)
@@ -158,7 +158,7 @@ class ForthWorkflowTests(unittest.TestCase):
             rules.write_text("REQUIRE helpers.fth\n" + RULES.read_text().replace("1 cell>u32 u32+", "helper"))
             workflow = folder / "counter.fth"
             workflow.write_text(COUNTER.read_text().replace("REQUIRE workflow.fth", f"REQUIRE {HERE / 'workflow.fth'}")
-                                .replace("counter-rules.fth", "rules.fth"))
+                                .replace("../proof/counter.fth", "rules.fth"))
             net = load_plan(workflow)
             keys = TestKeys().public
             self.assertEqual(lower_serial(net, rules, keys, 18).root,
@@ -175,7 +175,7 @@ class ForthWorkflowTests(unittest.TestCase):
             rules.write_text("REQUIRE helpers.fth\n" + RULES.read_text().replace("1 cell>u32 u32+", "helper"))
             workflow = folder / "counter.fth"
             workflow.write_text(COUNTER.read_text().replace("REQUIRE workflow.fth", f"REQUIRE {HERE / 'workflow.fth'}")
-                                .replace("REQUIRE counter-rules.fth", "REQUIRE helpers.fth\n"
+                                .replace("REQUIRE ../proof/counter.fth", "REQUIRE helpers.fth\n"
                                          ": helper ( u32 -- u32 ) 3 cell>u32 u32+ ;\nREQUIRE rules.fth"))
             with self.assertRaisesRegex(CompileError, "different definition of 'helper'"):
                 lower_serial(load_plan(workflow), rules, TestKeys().public, 18)
@@ -187,10 +187,10 @@ class ForthWorkflowTests(unittest.TestCase):
             rules = Path(temp) / "rules.fth"
             workflow = Path(temp) / "counter.fth"
             workflow.write_text(COUNTER.read_text().replace("REQUIRE workflow.fth", f"REQUIRE {HERE / 'workflow.fth'}")
-                                .replace("REQUIRE counter-rules.fth", "HEX REQUIRE rules.fth DECIMAL"))
+                                .replace("REQUIRE ../proof/counter.fth", "HEX REQUIRE rules.fth DECIMAL"))
             for numeral, expected in (("20", "0 0 0"), ("#20", "0 1 1"), ("$14", "0 1 1")):
                 with self.subTest(numeral=numeral):
-                    rules.write_text(RULES.read_text().replace("20 cell>u32", numeral + " cell>u32"))
+                    rules.write_text(RULES.read_text().replace("#20 cell>u32", numeral + " cell>u32"))
                     result = subprocess.check_output([FORTH, str(workflow), "-e",
                                                       "cr 19 decide . 20 decide . 21 decide . bye"], text=True)
                     self.assertEqual(result.splitlines()[-1].strip(), expected)
@@ -203,9 +203,16 @@ class ForthWorkflowTests(unittest.TestCase):
                         self.assertEqual(contract.deployment_outputs, reference.deployment_outputs)
                         self.assertEqual(contract.state_codes, reference.state_codes)
 
+    def test_packaged_workflow_preserves_the_callers_numeric_base(self):
+        for base in (2, 16):
+            with self.subTest(base=base):
+                command = f"{base} BASE ! REQUIRE {COUNTER} BASE @ DECIMAL . 19 decide . 20 decide . bye"
+                result = subprocess.check_output([FORTH, "-e", command], text=True)
+                self.assertEqual(result.splitlines()[-1].strip(), f"{base} 0 1")
+
     def test_host_dictionary_lookup_precedes_numeric_conversion(self):
-        net = self.load_variant(**{f"REQUIRE {RULES}": f"32 CONSTANT 20\nREQUIRE {RULES}"})
-        with self.assertRaisesRegex(CompileError, "literal '20': Gforth compiled no single-cell literal"):
+        net = self.load_variant(**{f"REQUIRE {RULES}": f"32 CONSTANT #20\nREQUIRE {RULES}"})
+        with self.assertRaisesRegex(CompileError, "literal '#20': Gforth compiled no single-cell literal"):
             lower_serial(net, RULES, TestKeys().public, 19)
 
     def test_rules_bind_the_shared_route_and_arithmetic_primitives(self):
@@ -224,7 +231,7 @@ class ForthWorkflowTests(unittest.TestCase):
             rules.write_text("REQUIRE identity.fth\n" + RULES.read_text().replace("1 cell>u32", "identity 1 cell>u32"))
             workflow = folder / "counter.fth"
             workflow.write_text(COUNTER.read_text().replace("REQUIRE workflow.fth", f"REQUIRE {HERE / 'workflow.fth'}")
-                                .replace("REQUIRE counter-rules.fth", "REQUIRE identity.fth\nIMMEDIATE\nREQUIRE rules.fth"))
+                                .replace("REQUIRE ../proof/counter.fth", "REQUIRE identity.fth\nIMMEDIATE\nREQUIRE rules.fth"))
             with self.assertRaisesRegex(CompileError, "Gforth executes 'identity' at compile time"):
                 lower_serial(load_plan(workflow), rules, TestKeys().public, 19)
 
