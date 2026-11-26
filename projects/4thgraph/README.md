@@ -226,6 +226,26 @@ PYTHONPATH=. bash shared/verify_node.sh --profile default -- \
   --output "$project/build/v0.2.0-circuit-both-2.json"
 ```
 
+## Groth16 链上验证器
+
+`groth16_script.py` 把 BN254 的 snarkjs 验证密钥和五个预期公开信号编译成一个 BSV 锁。锁中固定验证密钥和公开信号。Rúnar 的配对验证使用随证明提供的辅助算术见证，Script 核验这些见证及 Groth16 配对关系。锁还要求所有者提供 ForkID ALL 签名，由该签名覆盖真实交易的输入和输出。Forth 示例的信号顺序为 `next`、`route`、`current`、`bindLo`、`bindHi`。
+
+此验证器使用 Chronicle 操作码。部署锁约 1.52 MB，算术见证约 31 KB。下面的本地复放使用 `raised` 节点配置和独立的钱包资金。要观察激活前的拒绝，可设置 `REGTEST_CHRONICLE_HEIGHT=1000`。
+
+以下命令用现有 Forth 电路生成测试专用 Groth16 密钥和证明，然后复放有资金的部署与花费。需要 Node.js、npm 和 Go 1.26.6。Rúnar 检出固定提交，证明工具沿用本项目固定的 Circom 和 snarkjs。
+
+```sh
+project=projects/4thgraph
+runar="$project/build/runar"
+git clone https://github.com/icellan/runar.git "$runar"
+git -C "$runar" checkout --detach dbcc4269f8e0895c4738cf86948b05b7d62a2010
+PYTHONPATH=. bash shared/verify_node.sh --profile raised -- \
+  python "$project/groth16_replay.py" --runar "$runar" \
+  --output "$project/build/groth16-verifier-v2.json"
+```
+
+已持有验证密钥时，用 `groth16_script.py --runar DIR --verification-key verification_key.json --public expected.json --owner HEX --output lock.json` 生成锁。`expected.json` 是由部署方确定的五个公开标量。加 `--proof proof.json --witness-output witness.hex` 会导出 push-only 解锁前缀。花费时在前缀后追加对完整锁脚本生成的 DER 签名及 `0x41`。复放报告同时记录测试专用设置、Script 字节、两独立引擎判定和 regtest 挖块结果。
+
 ## 链上编译器里程碑
 
 用 PELS counter 验证下一步。让有界的 Script 编译器计算确定性的后继脚本或符号交易计划，让部署输出承诺该编译结果。计划先编码 `(父步骤, vout)`，部署交易最终字节和 txid 确定后再绑定真实 outpoint 和授权。这样部署承诺的对象在部署 txid 出现前就能确定。当前原型完成宿主侧编译、绑定和复放。
