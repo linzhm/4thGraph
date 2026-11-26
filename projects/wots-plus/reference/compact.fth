@@ -127,3 +127,15 @@ REQUIRE BSV
     ( Restore the frame while incrementing the index and appending the endpoint. )
     op-swap op-2rot op-bin2num op-1add op-6 op-roll op-2rot op-nip op-cat
 ;
+
+: compact-v6-chain-start ( script -- script )
+    ( The altstack holds the signature and endpoints buffer above the step counts. )
+    op-fromaltstack 32 bsv-num op-split op-fromaltstack op-swap op-toaltstack
+;
+
+: compact-v6-chain-end ( script -- script )
+    ( Append the endpoint behind the remaining signature and previous endpoints. )
+    op-fromaltstack op-swap op-cat op-toaltstack
+    ( Increment the final byte of the PRF base while preserving the other bytes. )
+    op-swap op-bin2num op-3 op-pick op-add op-swap
+;

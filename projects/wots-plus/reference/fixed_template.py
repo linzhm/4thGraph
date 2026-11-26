@@ -82,7 +82,7 @@ def compact_pattern(profile="compact"):
 
     # WOTSP-SHA2_256 uses 64 message chains and three checksum chains.
     # Keep one copy for the checksum and double the other six times.
-    if profile == "compact-v5":
+    if profile in ("compact-v5", "compact-v6"):
         first_program, chain_program, last_program = _compact_fragment_programs(first, chain, last)
     else:
         first_program, chain_program, last_program = map(push, (first, chain, last))

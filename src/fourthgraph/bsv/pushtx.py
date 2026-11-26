@@ -102,13 +102,22 @@ def authorization_checks(ordinary_code, companion_code, *, compact=False):
     return code + asm('OP_ENDIF OP_ENDIF')
 
 
-def check_binding(companion_code, *, compact=False, reuse_r=False):
+def _companion_der_from_public():
+    # Copy the x coordinate. The fixed companion s shares its final 31 bytes.
+    return (asm('OP_OVER OP_1 OP_SPLIT OP_NIP OP_DUP OP_1 OP_SPLIT OP_NIP')
+            + push(ONE_DER[36:39]) + asm('OP_SWAP OP_CAT OP_CAT')
+            + push(ONE_DER[:4]) + asm('OP_SWAP OP_CAT'))
+
+
+def check_binding(companion_code, *, compact=False, reuse_r=False, compact_companion=False):
     """Consume the authorized digest and enforce the native current-input relation."""
     # Entry H; alt bottom-to-top mode, type. Both signatures are derived on chain.
     code = binding_der(compact=compact) + asm('OP_FROMALTSTACK OP_CAT')
     code += _public_from_der() if reuse_r else push(PUBLIC)
     code += asm('OP_FROMALTSTACK OP_DUP OP_IF OP_TOALTSTACK OP_OVER OP_SIZE OP_1SUB OP_SPLIT OP_NIP')
-    code += push(b'\x20') + asm('OP_OR') + push(ONE_DER) + asm('OP_SWAP OP_CAT')
+    code += push(b'\x20') + asm('OP_OR')
+    code += _companion_der_from_public() if compact_companion else push(ONE_DER)
+    code += asm('OP_SWAP OP_CAT')
     # The ordinary and companion signatures use the same public key.
     code += asm('OP_OVER') if reuse_r else push(PUBLIC)
     code += asm('OP_FROMALTSTACK OP_ENDIF OP_CODESEPARATOR') + companion_code

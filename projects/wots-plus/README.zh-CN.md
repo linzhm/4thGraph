@@ -30,8 +30,9 @@ WOTS+ 是 v0.1.0 开发基线，按 RFC 8391 的 `WOTSP-SHA2_256` 哈希链验�
 | `cached_constants="compact-v3"` | 25,965 字节 | 成对复制哈希输入的固定字段，压缩缓存常量和交易绑定 |
 | `cached_constants="compact-v4"` | 23,296 字节 | 在链值旁缓存地址选择位掩码，复用交易绑定的公钥 |
 | `cached_constants="compact-v5"` | 22,494 字节 | 跨链保留常量，在解析摘要时计算剩余步数 |
+| `cached_constants="compact-v6"` | 21,982 字节 | 用同一个缓冲区保存签名和端点，直接递增地址里的链索引 |
 
-八种锁的普通 BIP143 解锁都为 2,310 字节。启用 Chronicle 并采用版本 2 交易时，可用 `compress_otda=True` 重建 Compact 系列和 `cached-steps` 输出。OTDA ALL 可在同一笔交易中重建这六种输出，配对 SINGLE 只重建同索引输出。未知输出原样处理，无配对 SINGLE 采用伴随验签。仅验证给定摘要的 `transaction=False` 模板用于算法测试。
+九种锁的普通 BIP143 解锁都为 2,310 字节。启用 Chronicle 并采用版本 2 交易时，可用 `compress_otda=True` 重建 Compact 系列和 `cached-steps` 输出。OTDA ALL 可在同一笔交易中重建这七种输出，配对 SINGLE 只重建同索引输出。未知输出原样处理，无配对 SINGLE 采用伴随验签。仅验证给定摘要的 `transaction=False` 模板用于算法测试。
 
 ## 开发和钱包接入
 
@@ -51,7 +52,7 @@ bash projects/wots-plus/reference/verify.sh
 可选用 [Lean Script 求值器](https://github.com/Calhooon/bsv-script-lean#try-it)重放同一批合成输入。
 
 ```sh
-python projects/wots-plus/reference/test_lean.py --compact-v5 /path/to/bsv-script-lean/eval/bsvs
+python projects/wots-plus/reference/test_lean.py --compact-v6 /path/to/bsv-script-lean/eval/bsvs
 ```
 
 该入口单独检查交易激活规则和指定输入的 Script 判定。
@@ -66,17 +67,19 @@ python projects/wots-plus/reference/test_lean.py --compact-v5 /path/to/bsv-scrip
 
 `compact-v4` 将地址选择位掩码留在链值旁边，用 `OP_TUCK` 和 `OP_2SWAP` 减少每步的重复取值，每条链降到 324 字节。交易绑定从普通签名中构造固定公钥，并在无配对 OTDA SINGLE 的伴随验签中复用。
 
-`compact-v5` 跨链保留零前缀和选择位掩码，在解析摘要和校验和时直接算出剩余步数。每条链降到 312 字节。OTDA 重建程序用缓存的字节串拼接重复指令。在两进两出 BIP143 ALL 夹具中，开发求值器测得两栈载荷峰值从 3,044 字节降到 2,921 字节，主栈和备用栈峰值分别为 32 项和 67 项。[Forth 实现](reference/compact.fth)
+`compact-v5` 跨链保留零前缀和选择位掩码，在解析摘要和校验和时直接算出剩余步数。每条链降到 312 字节。OTDA 重建程序用缓存的字节串拼接重复指令。
 
-| 实测项目 | `cached-steps` | `compact` | `compact-v2` | `compact-v3` | `compact-v4` | `compact-v5` |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| 锁定脚本 | 33,956 B | 29,217 B | 27,070 B | 25,965 B | 23,296 B | 22,494 B |
-| OTDA 重建程序 | 3,097 B | 2,395 B | 2,358 B | 1,979 B | 1,884 B | 1,126 B |
-| 两进两出 BIP143 ALL | 72,650 B | 63,172 B | 58,878 B | 56,668 B | 51,330 B | 49,726 B |
-| 两进两出 OTDA ALL，启用重建 | 79,090 B | 68,208 B | 63,840 B | 60,872 B | 55,344 B | 52,224 B |
-| 两进两出配对 OTDA SINGLE，启用重建 | 78,921 B | 68,039 B | 63,671 B | 60,703 B | 55,175 B | 52,055 B |
+`compact-v6` 每条链从备用栈缓冲区的开头取一个签名元素，将算出的端点追加到末尾，并直接递增 PRF 地址的链索引。每条链降到 305 字节，固定的伴随签名也改由公钥重建。在两进两出 BIP143 ALL 夹具中，开发求值器测得备用栈峰值从 67 项增到 68 项，主栈峰值为 32 项。[Forth 实现](reference/compact.fth)
 
-钱包 SDK 用 `template: "compact-v5"` 选择此模板。[接入示例](docs/sdk.zh-CN.md#quickstart)
+| 实测项目 | `cached-steps` | `compact` | `compact-v2` | `compact-v3` | `compact-v4` | `compact-v5` | `compact-v6` |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 锁定脚本 | 33,956 B | 29,217 B | 27,070 B | 25,965 B | 23,296 B | 22,494 B | 21,982 B |
+| OTDA 重建程序 | 3,097 B | 2,395 B | 2,358 B | 1,979 B | 1,884 B | 1,126 B | 1,076 B |
+| 两进两出 BIP143 ALL | 72,650 B | 63,172 B | 58,878 B | 56,668 B | 51,330 B | 49,726 B | 48,702 B |
+| 两进两出 OTDA ALL，启用重建 | 79,090 B | 68,208 B | 63,840 B | 60,872 B | 55,344 B | 52,224 B | 51,100 B |
+| 两进两出配对 OTDA SINGLE，启用重建 | 78,921 B | 68,039 B | 63,671 B | 60,703 B | 55,175 B | 52,055 B | 50,931 B |
+
+钱包 SDK 用 `template: "compact-v6"` 选择此模板。[接入示例](docs/sdk.zh-CN.md#quickstart)
 
 ### 缓存步骤模板实测
 

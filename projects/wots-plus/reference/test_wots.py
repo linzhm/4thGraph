@@ -96,12 +96,22 @@ class WotsTests(unittest.TestCase):
         with self.assertRaises(ScriptError):
             evaluate(binding_der(compact=True), [zero])
 
-    def test_binding_key_reuse_passes_the_same_checksigs(self):
+    def test_compact_v6_carries_the_address_with_boundary_seeds(self):
+        secret, _ = fixture_seeds(b"buffered-address")
+        for seed in (bytes(N), b"\xff" * N, b"\x00\x80" * (N // 2)):
+            with self.subTest(seed=seed):
+                lock = locking_script(public_key(secret, seed), transaction=False, cached_constants="compact-v6")
+                for digest in (bytes(N), b"\xff" * N, bytes(range(N))):
+                    signature = sign_digest(secret, seed, digest)
+                    self.assertEqual(evaluate(lock, [digest, signature]), ([b"\x01"], []))
+
+    def test_binding_key_and_der_reuse_pass_the_same_checksigs(self):
         digest = sha256(b"binding key reuse fixture").digest()
         for mode, flag in ((0, 0x41), (1, 0x43), (1, 0xc3)):
             prefix = number(mode) + asm("OP_TOALTSTACK") + push(bytes([flag])) + asm("OP_TOALTSTACK")
             expected = []
             actual = []
+            compressed = []
 
             def capture(calls):
                 def checksig(signature, key):
@@ -110,11 +120,15 @@ class WotsTests(unittest.TestCase):
                 return checksig
 
             with self.subTest(mode=mode, flag=flag):
-                for reuse, calls in ((False, expected), (True, actual)):
-                    code = prefix + check_binding(COMPANION_CODE, compact=True, reuse_r=reuse)
+                for reuse, derive_der, calls in ((False, False, expected), (True, False, actual),
+                                                 (True, True, compressed)):
+                    code = prefix + check_binding(
+                        COMPANION_CODE, compact=True, reuse_r=reuse, compact_companion=derive_der,
+                    )
                     self.assertEqual(evaluate(code, [digest], capture(calls)), ([b"\x01"], []))
                 self.assertEqual(len(actual), 1 + mode)
                 self.assertEqual(actual, expected)
+                self.assertEqual(compressed, expected)
 
     def test_keys_and_malformed_values(self):
         secret, key = generate_keypair()
