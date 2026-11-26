@@ -81,7 +81,24 @@ def committed_locking_script(key):
     return _payment_lock(KEY_BYTES, _committed_verifier(key))
 
 
-def _payment_lock(proof_bytes, verifier_code):
+def forth_committed_locking_script(key):
+    """Build the experimental Forth-compiled committed-key payment lock."""
+    return _payment_lock(KEY_BYTES, _forth_committed_verifier(key))
+
+
+def compact_forth_committed_locking_script(key):
+    """Build the Forth committed-key lock with the compact transaction binding."""
+    return _payment_lock(KEY_BYTES, _forth_committed_verifier(key), compact_binding=True)
+
+
+def _forth_committed_verifier(key):
+    from forth_verifier import committed_verifier_code
+
+    require_bytes(key, KEY_BYTES, 'public key')
+    return committed_verifier_code() + push(sha256(key).digest()) + asm('OP_EQUALVERIFY')
+
+
+def _payment_lock(proof_bytes, verifier_code, *, compact_binding=False):
     code = authorization_checks(ORDINARY_CODE, COMPANION_CODE)
     code += asm('OP_SIZE') + number(proof_bytes) + asm('OP_NUMEQUALVERIFY OP_SWAP OP_HASH256 OP_DUP OP_TOALTSTACK')
-    return code + verifier_code + asm('OP_FROMALTSTACK') + check_binding(COMPANION_CODE)
+    return code + verifier_code + asm('OP_FROMALTSTACK') + check_binding(COMPANION_CODE, compact=compact_binding)

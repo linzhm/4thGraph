@@ -3,7 +3,8 @@ from dataclasses import dataclass
 
 from lamport import bits, verify_digest
 from script import (
-    COMPANION_CODE, ORDINARY_CODE, N, R, committed_locking_script, legacy_locking_script, locking_script,
+    COMPANION_CODE, ORDINARY_CODE, N, R, committed_locking_script, compact_forth_committed_locking_script,
+    forth_committed_locking_script, legacy_locking_script, locking_script,
 )
 from fourthgraph.bsv.script import number, push
 from fourthgraph.bsv.transaction import (
@@ -96,10 +97,11 @@ def sign_previous(tx, index, previous, public_key, signer, *, sighash=DEFAULT_SI
     """Authorize an input with its already matched previous output."""
     universal = locking_script(public_key)
     legacy = legacy_locking_script(public_key)
-    committed = committed_locking_script(public_key)
-    if previous.script not in (universal, legacy, committed):
+    committed = (committed_locking_script(public_key), forth_committed_locking_script(public_key),
+                 compact_forth_committed_locking_script(public_key))
+    if previous.script not in (universal, legacy, *committed):
         raise ValueError('funding output does not match public key and canonical template')
-    own_scripts = (universal, legacy, committed, locking_script(public_key, transaction=False))
+    own_scripts = (universal, legacy, *committed, locking_script(public_key, transaction=False))
     if any(output.script in own_scripts for output in tx.outputs):
         raise ValueError('change must use a fresh Lamport key')
     auth = authorization(tx, index, previous.value, sighash, legacy=previous.script == legacy)
@@ -107,7 +109,7 @@ def sign_previous(tx, index, previous, public_key, signer, *, sighash=DEFAULT_SI
             and allow_unpaired_single is not True):
         raise ValueError('unpaired SINGLE commits to no outputs; explicit opt-in required')
     signature = signer(_checked_digest(auth))
-    witness = current_input_unlock(auth, public_key, signature, committed=previous.script == committed)
+    witness = current_input_unlock(auth, public_key, signature, committed=previous.script in committed)
     return tx.with_script(index, witness)
 
 

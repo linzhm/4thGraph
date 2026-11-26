@@ -4,9 +4,11 @@ The fixture checks the repository's wire encoding and payment commitment rules
 against independently specified outcomes. The tests use public deterministic
 test keys. [Wire and payment rules](spec.md)
 
-## Universal payment lock
+## Transaction-bound payment profiles
 
-The domain fixes the input being signed at index one of a two-input transaction
+The same domain runs for `full-key`, `committed-key`, `committed-key-forth` and
+`committed-key-forth-compact`.
+It fixes the input being signed at index one of a two-input transaction
 with one or two outputs. The fixture crosses all twelve advertised sighash
 bytes, versions 1 and 2, and both output shapes. It keeps the initial witness
 fixed across the following edits.
@@ -31,6 +33,13 @@ and acceptance set from these axes and verdict rules. It rejects unknown or
 repeated rows, requires the observed row set to equal the entire expected
 set, and compares each chain-gang and BSV Node result with the expected
 verdict. [Fixture](../reference/test_acceptance.py)
+
+Each committed profile also checks a valid proof, 512 one-bit mutations covering
+every selected-secret and sibling-hash block, and short and long proofs. Each
+committed profile runs 96 BSV Node activation cases across modes, transaction
+versions and creation/spend eras. A development evaluator test checks all 256
+possible byte values and one mixed digest for the Forth reconstruction word.
+[Current execution record](validation.md)
 
 ## Digest-only and legacy locks
 
@@ -66,7 +75,7 @@ Coverage is exact for these defined domains. Other transaction shapes,
 simultaneous field edits, different activation or relay policy configurations,
 and arbitrary Script byte strings remain outside this proof.
 
-## Executed coverage audit
+## Historical coverage audit
 
 On Linux, BSV Node 1.2.3 and chain-gang at the pinned revision
 `5cb8c6e410dbfad1c619cec3ca54d1bcaacd4eb7` agreed on all 408 universal and 32
