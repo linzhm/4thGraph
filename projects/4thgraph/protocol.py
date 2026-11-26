@@ -34,6 +34,9 @@ RESULT_WIDTH = 5  # Four unsigned payload bytes plus a zero sign byte.
 PREVOUTS_HASH = 4
 CURRENT_OUTPOINT = 68
 OUTPUTS_HASH = 118
+CURRENT_SEQUENCE, LOCKTIME = 114, 150
+REFUND_SEQUENCE = 0xFFFFFFFE
+REFUND_FEE = 1_000
 JOIN_WITNESSES = ("full", "shared")
 CANDIDATE_ORDER = ("fused", "split")
 RANK_ORDER = ("whole_path_bytes", "max_signature_checks", "dependency_depth_including_deploy")
@@ -170,6 +173,24 @@ def p2pk(public):
     return push(public) + asm("OP_CHECKSIG")
 
 
+def refund_output(value, public):
+    return Output(value - REFUND_FEE, p2pk(public))
+
+
+def recoverable_lock(normal, value, public, height, versions, *, prefixed=False):
+    suffix = finish()
+    if not normal.endswith(suffix):
+        raise ValueError("recoverable covenant requires the shared ForkID verification suffix")
+    # A result or committed shared input pushes one value above the selector.
+    # Both branches converge before CODESEPARATOR to preserve the scriptCode.
+    select = asm("OP_SWAP OP_IF OP_DROP") if prefixed else asm("OP_IF")
+    refund = (begin(versions) + single_input() + authorize(public)
+              + push(REFUND_SEQUENCE.to_bytes(4, "little")) + check_field(CURRENT_SEQUENCE, 4)
+              + push(height.to_bytes(4, "little")) + check_field(LOCKTIME, 4)
+              + push(output_hash((refund_output(value, public),))) + check_field(OUTPUTS_HASH))
+    return select + refund + asm("OP_ELSE") + normal[:-len(suffix)] + asm("OP_ENDIF") + suffix
+
+
 def proof(index, data_prefix, versions):
     # Entry rawWork splitTxid. The first input must spend the indicated split slot.
     bound_prefix = (asm("OP_OVER") + field(0, 5) + check_version(versions, b"\x01")
@@ -257,6 +278,7 @@ class Draft:
     previous: tuple[UTXO, ...]
     payload: tuple[tuple[bytes, ...], ...]
     keys: Mapping[str, bytes]
+    recovery_selector: bool | None = None
 
     @property
     def parents(self):
@@ -289,10 +311,11 @@ class Draft:
                           for i, utxo in enumerate(self.previous))
         signatures = tuple(sign(request) + bytes([request.sighash]) for request in requests)
         tx = self.tx
+        selector = () if self.recovery_selector is None else (encode_num(int(self.recovery_selector)),)
         for i, (fields, preimage) in enumerate(zip(self.payload, preimages, strict=True)):
             if i == 0:
                 fields = (*fields, *reversed(signatures))
-            tx = tx.with_script(i, b"".join(push_value(value) for value in (*fields, preimage)))
+            tx = tx.with_script(i, b"".join(push_value(value) for value in (*fields, preimage, *selector)))
         return tx
 
 
@@ -356,6 +379,9 @@ class Contracts:
         if not isinstance(task_id, bytes) or len(task_id) != 32:
             raise ValueError("task id must be 32 bytes")
         required = {name for step in plan.templates for name in step.authorizers} | {"settle", "review"}
+        self.recovery = plan.program.recovery
+        if self.recovery is not None:
+            required.add(self.recovery.owner)
         keys = dict(keys)
         for name in sorted(required):
             if not is_compressed_public_key(keys.get(name)):
@@ -393,6 +419,7 @@ class Contracts:
                     + asm("OP_SWAP") + self.words[b.name].script + select_route + route_check(self.terminals) + finish())
         else:
             self.join_code = join_lock(select_route, self.terminals, self.data_prefix, self.versions, join_witness)
+            self.join_code = self.state_lock(self.join_code, RESULT_VALUE, prefixed=True)
             # A committed prefix leaves [signature preimage fixed-u32]. Move its
             # canonical ScriptNum into the old input position before verification.
             from_lock = asm("OP_BIN2NUM OP_ROT OP_ROT")
@@ -401,7 +428,9 @@ class Contracts:
             for i, step in enumerate(plan.program.work):
                 script = work_lock(i, self.words[step.name].script, keys[step.owner], self.join_code,
                                    self.data_prefix, self.versions)
-                work_outputs.append(Output(WORK_VALUE, (from_lock if i in committed else b"") + script))
+                if i in committed:
+                    script = from_lock + script
+                work_outputs.append(Output(WORK_VALUE, self.state_lock(script, WORK_VALUE, prefixed=i in committed)))
             self.work_layout = OutputLayout(tuple(work_outputs), committed)
             gate_shares = gate is not None and gate.input == self.shared_input
             if gate_shares:
@@ -416,11 +445,44 @@ class Contracts:
                 # With a shared input both transactions carry the work locks.
                 # Divide the existing 5,000 sat fixture fee between gate and split.
                 fork_value = (ROOT_VALUE + 2 * WORK_VALUE) // 2 if committed else GATED_FORK_VALUE
-                fork = Output(fork_value, (from_lock if gate_shares else b"") + code)
+                fork_code = (from_lock if gate_shares else b"") + code
+                fork = Output(fork_value, self.state_lock(fork_code, fork_value, prefixed=gate_shares))
                 self.fork_layout = OutputLayout((fork,), (0,) if gate_shares else ())
                 code = (begin(self.versions) + single_input() + authorize(keys[gate.owner]) + guard
                         + self.fork_layout.hash_script() + check_field(OUTPUTS_HASH) + finish())
-        self.root = Output(ROOT_VALUE, code)
+        self.root = Output(ROOT_VALUE, self.state_lock(code, ROOT_VALUE))
+
+    def state_lock(self, code, value, *, prefixed=False):
+        if self.recovery is None:
+            return code
+        return recoverable_lock(code, value, self.keys[self.recovery.owner], self.recovery.height,
+                                self.versions, prefixed=prefixed)
+
+    def recovery_refs(self):
+        return tuple(dict.fromkeys(ref for step in self.plan.templates for ref in step.inputs))
+
+    def recovery_status(self, completed, live_outpoints, *, tip_height):
+        if self.recovery is None:
+            raise ValueError("this program has no recovery policy")
+        live = set(live_outpoints)
+        state = {}
+        for ref in self.recovery_refs():
+            if ref.step not in completed:
+                continue
+            utxo = self.bound_input(ref, completed)
+            if utxo.outpoint in live:
+                state[ref] = utxo
+        return {
+            "tip_height": tip_height,
+            "advance": [{"step": step.name, "authorizers": step.authorizers,
+                         "inputs": [state[ref].outpoint.text() for ref in step.inputs],
+                         "external_inputs": self.external_inputs(step)}
+                        for step in self.plan.templates if all(ref in state for ref in step.inputs)],
+            "refund": [{"from": asdict(ref), "outpoint": utxo.outpoint.text(), "satoshis": utxo.output.value,
+                        "refund_satoshis": utxo.output.value - REFUND_FEE, "authorizer": self.recovery.owner,
+                        "height_reached": tip_height >= self.recovery.height}
+                       for ref, utxo in state.items()],
+        }
 
     @property
     def work_outputs(self):
@@ -452,7 +514,7 @@ class Contracts:
         spec = {
             "project": PROJECT_NAME,
             "compiler_version": PROJECT_VERSION,
-            "schema_version": 2 if self.shared_input is not None else 1,
+            "schema_version": 3 if self.recovery is not None else (2 if self.shared_input is not None else 1),
             "target": self.target,
             "optimization": self.optimization,
             "join_witness": self.join_witness,
@@ -486,6 +548,11 @@ class Contracts:
             spec["shared_input"] = self.shared_input
             for row, template in zip(spec["templates"], self.plan.templates, strict=True):
                 row["external_inputs"] = self.external_inputs(template)
+        if self.recovery is not None:
+            spec["recovery"] = {"locktime": self.recovery.height, "sequence": REFUND_SEQUENCE,
+                                "authorizer": self.recovery.owner, "fee_satoshis": REFUND_FEE,
+                                "destination_script_hex": p2pk(self.keys[self.recovery.owner]).hex(),
+                                "recoverable_outputs": [asdict(ref) for ref in self.recovery_refs()]}
         return spec
 
     def result_output(self, split):
@@ -556,10 +623,26 @@ class Contracts:
     def prepare(self, name, completed, data=None, *, version=None):
         return self._prepare(name, completed, data, version=version)
 
-    def _prepare(self, name, completed, data, *, version=None, estimate=False):
+    def resolve_version(self, version):
         version = self.version if version is None else version
         if type(version) is not int or version not in self.versions:
             raise ValueError(f"transaction version {version} is unavailable for target {self.target}")
+        return version
+
+    def prepare_refund(self, step, completed, *, vout=0, version=None):
+        ref = ParentOutput(step, vout)
+        if self.recovery is None or ref not in self.recovery_refs():
+            raise ValueError(f"{step}:{vout} has no recovery path")
+        utxo = self.bound_input(ref, completed)
+        owner = self.recovery.owner
+        tx = Transaction((Input(utxo.outpoint.txid, vout, sequence=REFUND_SEQUENCE),),
+                         (refund_output(utxo.output.value, self.keys[owner]),),
+                         version=self.resolve_version(version), locktime=self.recovery.height)
+        template = Template("refund", (ref,), (owner,), ("refund",))
+        return Draft(template, tx, (utxo,), ((),), self.keys, recovery_selector=True)
+
+    def _prepare(self, name, completed, data, *, version=None, estimate=False):
+        version = self.resolve_version(version)
         template = self.templates[name]
         previous = tuple(self.bound_input(ref, completed) for ref in template.inputs)
         inputs = tuple(Input(utxo.outpoint.txid, utxo.outpoint.vout) for utxo in previous)
@@ -597,7 +680,8 @@ class Contracts:
             step = a if name == a.name else b
             result, = evaluate(step.word, values[step.input])
             outputs = (self.result_output(previous[0].parent), self.data_output(result))
-        return Draft(template, Transaction(inputs, outputs, version=version), previous, payload, self.keys)
+        return Draft(template, Transaction(inputs, outputs, version=version), previous, payload, self.keys,
+                     recovery_selector=False if self.recovery is not None else None)
 
 
 def input_value(data, name):
@@ -844,6 +928,8 @@ def main():
     action.add_argument("--capabilities", action="store_true", help="list the supported Forth and BSV words")
     action.add_argument("--entry", help="compile one annotated Forth word to Script without a transaction plan")
     cli.add_argument("--version", action="version", version=f"%(prog)s {PROJECT_VERSION}")
+    cli.add_argument("--assume-input-ranges", action="store_true",
+                     help="for --entry, rely on the caller to validate declared input ranges and encodings")
     cli.add_argument("--mode", choices=("auto", "fused", "split"), default="auto")
     cli.add_argument("--target", choices=TARGETS, default=DEFAULT_TARGET, help="permitted transaction versions")
     cli.add_argument("--optimize", choices=OPTIMIZATIONS, default=BASELINE)
@@ -861,6 +947,8 @@ def main():
         cli.error("--objective requires --search")
     if args.entry and (args.search or args.gate_boundary != "auto"):
         cli.error("transaction search and boundaries require a transaction build")
+    if args.assume_input_ranges and args.entry is None:
+        cli.error("--assume-input-ranges requires --entry")
     if args.capabilities:
         print(json.dumps({"project": PROJECT_NAME, "compiler_version": PROJECT_VERSION, "description": PROJECT_DESCRIPTION,
                           **capabilities(), "optimizations": OPTIMIZATIONS, "join_witnesses": JOIN_WITNESSES,
@@ -880,11 +968,16 @@ def main():
             word = source.words.get(args.entry.casefold())
             if word is None:
                 raise CompileError(f"undefined entry word {args.entry!r}")
-            compiled = compile_word(word, args.optimize)
+            compiled = compile_word(word, args.optimize, check_input_ranges=not args.assume_input_ranges)
             result = {"project": PROJECT_NAME, "compiler_version": PROJECT_VERSION, "schema_version": 1,
                       "entry": args.entry, "takes": word.takes, "gives": word.gives,
                       "enabled_optional_wordsets": source.optional_wordsets, "optimization": args.optimize,
                       "script_hex": compiled.script.hex(), **compiled.describe()}
+            if word.ranges:
+                result["ranges"] = {item.name: {"base": item.base, "lower": item.lower,
+                                                "upper_exclusive": item.upper} for item in word.ranges}
+                if any(item.name in word.takes for item in word.ranges):
+                    result["input_range_checks"] = "assumed" if args.assume_input_ranges else "emitted"
         else:
             raw_keys = json.loads(args.keys.read_text())
             if not isinstance(raw_keys, dict) or any(not isinstance(key, str) for key in raw_keys.values()):

@@ -26,17 +26,53 @@
 
 `+` 接受两个 cell。 `u32+` 接受两个 `u32`。需要跨越类型边界的源码应写出转换，例如 `1 cell>u32 u32+`。
 
+## 整数范围
+
+`range: <name> <base> <lower> <upper> ;` 声明下界包含、上界排除的整数区间。基类型可用 `cell`、`u32`、`route` 和 `script-int`。边界可用十进制或 `#`、`$`、`%` 前缀整数。声明读取数学整数。普通 Forth 字面量仍遵循 64 位 cell 语义。
+
+```forth
+range: r1-digit script-int 0 16 ;
+range: r1-q-depth script-int 5 51 ;
+
+bsv-effect: q-pick-depth r1-digit -- r1-q-depth ;
+: q-pick-depth 3 cell>int int* 50 cell>int swap int- ;
+```
+
+`cell>int` 保留数值并转换为 ScriptNum 类型。 `int+`、`int-`、`int*` 按 Script 整数运算，`int-rem` 保留被除数的余数符号并拒绝零除数。编译器跟踪字面量、计算结果和分支汇合的区间。调用及返回值必须满足相应签名。证明不足时报源码位置。
+
+直接导出的词默认检查所有带范围类型的入口参数，验证规范 ScriptNum 编码和区间。已由调用方验证的入口可用 `--entry <word> --assume-input-ranges` 省去自动检查。产物 JSON 给出范围及入口检查状态。显式的 `check-range <name>` 校验栈顶值并保留它，支持在词内缩小区间，两种入口模式都执行这条检查。原始字节须先解码为相应基类型。
+
+`--optimize safe` 和 `stack` 在证明除数为正、操作数符合数值长度约束且被除数的绝对值小于除数后省掉 `int-rem`。编译报告记录位置信息、参与证明的区间和字节差值。 [R1 窗口示例](../p2pkh-r1/experiments/forth/window-ranges.fth)
+
+### 窗口范围对照
+
+[window-ranges.fth](../p2pkh-r1/experiments/forth/window-ranges.fth) 提取了 R1 数字和选点深度的类型化计算。用 `q-depth-probe` 比较入口检查的成本。 `safe` 证明深度在 `[5, 51)`，省去用于对照的模 64 运算。入口的规范编码与范围检查占 9 B。
+
+| q-depth-probe | 默认验证入口 | 由调用方验证入口 |
+| --- | ---: | ---: |
+| `baseline` | 18 B | 9 B |
+| `safe` | 15 B | 6 B |
+
+```sh
+root=projects/4thgraph
+source=projects/p2pkh-r1/experiments/forth/window-ranges.fth
+PYTHONPATH=. python "$root/protocol.py" "$source" --entry q-depth-probe --optimize safe
+PYTHONPATH=. python "$root/protocol.py" "$source" --entry q-depth-probe --optimize safe --assume-input-ranges
+```
+
 ## 交易声明
 
 顶层声明读取符号参数。各声明不接触运行时 Forth 数据栈。
 
 ```text
 bsv-use <optional-wordset>
+range: <name> <base> <lower> <upper> ;
 bsv-effect: <word> <input-types...> -- <output-types...> ;
 work: <step> <input> <word> <signer-role>
 join: <step> <left-work> <right-work> <word>
 gate: <step> <input> <word> <signer-role>
 split-authority: <signer-role>
+recovery: <block-height> <signer-role>
 independent-submit <gate-or-work-step>
 ```
 
@@ -45,6 +81,7 @@ independent-submit <gate-or-work-step>
 - `join:` 按顺序消费两个不同的工作步骤。汇合词具有 `u32 u32 -- route` 效果。声明次序决定结果的逻辑次序，以及拆分的工作输出索引与汇合的输入次序。
 - `gate:` 可选。其词具有 `u32 -- cell` 效果，只有非零结果允许继续。完整融合先验证条件，再运行分支和汇合。拆分时，如果门和拆分的授权角色相同、数据和签名可同时取得且没有独立边界，则同一笔交易执行两步。独立门只创建已承诺的拆分锁，拆分随后绑定 `gate-step:0`。同一规则适用于两个版本的交易。
 - `split-authority:` 指定创建工作输出的签名角色。拆分完成后，每支只需对应的签名角色即可提交。
+- `recovery:` 给部署、独立门、工作和结果的可花费输出增加超时退款分支。指定的十进制区块高度须在 1 到 499,999,999 之间。锁验证实际交易的 `nLockTime` 等于该值、输入序列为 `0xfffffffe`，并要求指定角色签署。每笔退款只花费一个实际中间 outpoint，发送至该角色的 P2PK，价值为原输出扣除固定 1,000 sat 费用。`nLockTime = h` 的退款最早可进入高度 `h+1` 的区块。常规路径和退款路径花费同一 UTXO。
 - 同一程序中，重复的外部输入名表示同一个 `u32` 值。例如 `work: a x double alice` 和 `work: b x inc bob` 都读取 `x`。融合时见证传一次 `x`，锁将其复制到各使用位置。拆分时，`split` 在每个使用 `x` 的工作锁开头写入相同的值，并核对整个输出向量。若独立的门也读取 `x`，门先将其写入拆分锁，再由拆分传给工作锁。运行器从实际花费的前输出读取该值。各分支仍可独立提交。
 - `independent-submit` 将工作步骤声明为可独立提交的交易边界。存在该约束时，自动调度选择拆分，强制融合报告源码行号。编译器也接受原型曾使用的后缀写法 `<work-step> independent-submit`。
 
@@ -80,3 +117,9 @@ PYTHONPATH=. python projects/4thgraph/protocol.py projects/4thgraph/example.fth 
 ```
 
 版本目标与词集、运算语义和调度分别配置。 `--target both` 让同一份锁接受版本 1 和 2，选 `Contracts.prepare(..., version=1)` 或 `version=2` 在实例化每步时决定实际版本。锁验证当前交易和每份结果父交易自身的版本及来源。版本进入签名摘要，改动父交易版本后须重新绑定其后继。
+
+## 电路后端
+
+电路源码声明 `advance ( u32 -- u32 )` 和 `decide ( u32 -- route )` 两个带 `bsv-effect:` 的定义。后端支持整数字面值、字面 `cell>u32`、现有栈排列、`u32+`、`u32<`、路由字面值和以字面值或 `u32<` 标志驱动的 `IF`。`u32<` 的 Forth 真值为 `-1`，电路在选择分支时用相应的布尔位。生成超出操作或线宽预算的电路，以及无法生成约束的词，都会报告源码行列。
+
+生成的约束将 `next` 与 `route` 作为公开输出。交易绑定还使用 `current`、`bindLo` 和 `bindHi`。Circom 和 snarkjs 负责生成 R1CS 以及计算和检查完整赋值，4thGraph 把透明验证器和后继锁编译为 Script。详见 [重跑命令](README.md#从-forth-生成约束)。

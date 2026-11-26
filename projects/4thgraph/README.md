@@ -2,7 +2,7 @@
 
 A Forth compiler for BSV Script and multi-transaction workflows.
 
-当前构建版本为 **v0.1.3**。项目位于 BSV Script Lab 仓库内，编译与复放产物可写入 `projects/4thgraph/build/`。
+当前构建版本为 **v0.2.0**。项目位于 BSV Script Lab 仓库内，编译与复放产物可写入 `projects/4thgraph/build/`。
 
 同一份 Forth 源码可以生成融合版和拆分版。示例计算 `a = 2x`、`b = y + 1`，两支结果和汇合的和都按 `u32` 表示。回绕后的和小于 20 时走复核，其余走结算。两种后继各锁给一个配置的公钥。编译器以 Forth 2012 Core 为语义基线，`+` 使用 64 位 cell，`u32+` 固定按 32 位回绕。 [示例源码](example.fth) · [语言与 BSV 扩展规范](language.md)
 
@@ -134,7 +134,27 @@ flowchart LR
 
 **汇合。** 两个输入的锁都接收完整的两笔结果父交易。各自检查它们花费了同一笔拆分的输出 0 和 1，再将两笔父交易的哈希和结果 vout 0 拼成有序的 outpoint 向量，与真实交易原像的 `hashPrevouts` 核对。两个锁都从已核验的交易字节取结果，并检查有且仅有一个正确后继输出。任务 ID 只标识结果数据。活动 UTXO 集决定实际可花费的结果。
 
-各锁通过固定 `OP_CODESEPARATOR` 后缀的 PUSHTX 验证 ForkID ALL 原像。绑定依赖哈希抗碰撞和原像抗性。脚本读取经过认证的交易版本四字节，v1 对应 `01000000`，v2 对应 `02000000`。原型使用普通压栈见证和单值成功栈。签名覆盖交易效果，见证里的原始 `x/y` 可由导出同一已签效果的等价输入替换。拆分后任一方可以独立提交自己的分支，最终资金仍要等两支结果。当前模板没有超时和退款交易。
+各锁通过固定 `OP_CODESEPARATOR` 后缀的 PUSHTX 验证 ForkID ALL 原像。绑定依赖哈希抗碰撞和原像抗性。脚本读取经过认证的交易版本四字节，v1 对应 `01000000`，v2 对应 `02000000`。原型使用普通压栈见证和单值成功栈。签名覆盖交易效果，见证里的原始 `x/y` 可由导出同一已签效果的等价输入替换。拆分后任一方可以独立提交自己的分支，正常汇合要等两支结果。
+
+### 超时退出
+
+源码可用 `recovery: 145 review` 声明绝对区块高度和退款签名角色。调用 `Contracts.prepare_refund` 时传入原交易步骤和 vout。状态报告从实际存活的 outpoint 列出下一步、所需角色和各退款金额。示例中的退出需由 `review` 签名，角色可用性影响实际恢复。
+
+| 当前已确认状态 | 正常推进 | 高度 145 后可花费的退款输入 |
+| --- | --- | --- |
+| 仅部署 | Operator 拆分 | `deploy:0` |
+| 两份工作输出 | Alice 和 Bob 各花费自己的工作输出 | `split:0`、`split:1` |
+| Alice 有结果，Bob 缺席 | Bob 可继续计算 | `a:0`、`split:1` |
+| 两份结果 | 任何持有两份结果的提交者可汇合 | `a:0`、`b:0` |
+| Alice 结果已退出 | Bob 的剩余工作输出或结果仍可各自花费 | 存活的 `split:1` 或 `b:0` |
+
+BSV Node 1.2.3 可在到期前把签名正确的退款放进非最终池。该笔退款无法提前花费链上输出。复放中，节点以 `txn-mempool-conflict` 拒绝与它冲突的正常汇合，并在到期后仍把重发的原交易报告为已在池中。状态报告的 `height_reached` 表示链上高度条件已满足。报告同时记录节点队列和入池结果。两种未预先排队的到期竞态各在独立工作流内复放，首笔确认的交易消耗共同的结果 outpoint。
+
+```sh
+PYTHONPATH=. bash shared/verify_node.sh --profile default -- \
+  python projects/4thgraph/recovery_replay.py --target both \
+  --output projects/4thgraph/build/v0.1.4-recovery-both.json
+```
 
 ## 测量
 
@@ -178,6 +198,35 @@ PYTHONPATH=. bash shared/verify_node.sh --profile default -- \
 | 另一次真实拆分产生的结果，任务 ID 相同 | 全部父输出可花费，两个结果锁拒绝 | 拒绝 |
 | 选择错误的后继锁 | 全部父输出可花费，两个结果锁拒绝 | 拒绝 |
 | 用该目标未允许的交易版本提交汇合 | 全部父输出可花费，两个结果锁拒绝 | 拒绝 |
+
+## 链上验证算术证明
+
+`proof/counter.circom` 定义 32 位计数器。Circom 2.2.2 生成固定的 BN254 R1CS 和 WASM，snarkjs 0.7.5 生成并独立检查每条赋值证明。验证数据是导出的 R1CS 及其摘要。证明公开完整赋值，采用透明验证，无需可信设置。
+
+4thGraph 把 R1CS 约束和 `proof/counter.fth` 中的后继选择一起编译进锁。锁验证当前值与部署承诺一致，并要求新值写入实际后继输出。公开绑定是完整、经认证的 ForkID ALL 原像的 `HASH256`，其中包含版本、outpoint、序列、后继输出和锁定时间。另一笔花费或改动锁定时间后，原证明中的公开绑定会失配。优化版复用域模数，并简化零乘积、单位系数和可居中表示的系数。
+
+```sh
+PYTHONPATH=. bash shared/verify_node.sh --profile default -- \
+  python projects/4thgraph/proof_replay.py --target both \
+  --output projects/4thgraph/build/v0.1.5-proof-both-2.json
+```
+
+报告含基线与优化版的脚本、正向完整交易、两栈峰值、验证耗时，以及改动赋值、错误当前值、错误后继和跨花费重用的判定。复放会调用固定版本的 npm 工具生成验证数据。已有 snarkjs 的 R1CS JSON 时，也可用 `proof_contract.py --verification-key` 单独构建。
+
+### 从 Forth 生成约束
+
+`proof/workflow.fth` 的 `advance` 和 `decide` 同时用于宿主求值、Script 和 Circom。后端把 32 位回绕显式编码为进位和范围约束，用 33 位分解确定无符号比较结果。复放继续用固定版本的 snarkjs 计算并检查赋值。锁还校验电路公布的路由与 Forth 生成的后继选择一致。
+
+该示例生成 107 条约束。Chronicle 激活后的双版本样本中，完整验证锁从 9,196 B 降到 4,481 B。复放对照覆盖普通输入、18 和 19 跨越分支阈值，以及 4,294,967,295 回绕到 0。
+
+```sh
+project=projects/4thgraph
+PYTHONPATH=. python "$project/circuit_backend.py" "$project/proof/workflow.fth" \
+  --output "$project/build/workflow.circom"
+PYTHONPATH=. bash shared/verify_node.sh --profile default -- \
+  python "$project/proof_replay.py" --generated --compare-domains --target both \
+  --output "$project/build/v0.2.0-circuit-both-2.json"
+```
 
 ## 链上编译器里程碑
 

@@ -4,17 +4,19 @@ from bisect import bisect_right
 from dataclasses import dataclass
 import re
 
-from shared.script import asm
+from shared.script import asm, number
+from ranges import NUMERIC_TYPES, RangeType, Slot, primitive_outputs, range_bound
 
 from wordsets import (
     BSV_SOURCE, CORE_EXT_SCRIPT, CORE_EXT_WORDS, CORE_WORDS, HOST_WORDS, NAMED_LITERALS,
-    NUMERIC_RANGES, OPTIONAL_WORDSETS, PRIMITIVES, SHUFFLES, TYPES, WRAP_U32, Literal, Primitive, cell_literal,
+    OPTIONAL_WORDSETS, PRIMITIVES, SHUFFLES, TYPES, WRAP_U32, Literal, Primitive, cell_literal,
 )
 
 PROJECT_NAME = "4thGraph"
 PROJECT_DESCRIPTION = "A Forth compiler for BSV Script and multi-transaction workflows."
-PROJECT_VERSION = "0.1.3"
+PROJECT_VERSION = "0.2.0"
 GATE_BOUNDARIES = ("auto", "merged", "separate")
+LOCKTIME_THRESHOLD = 500_000_000
 
 
 class CompileError(ValueError):
@@ -95,6 +97,11 @@ class Word:
     location: str
     host_uses: tuple[Token, ...] = ()
     name: str | None = None
+    ranges: tuple[RangeType, ...] = ()
+
+    def slots(self, kinds):
+        refinements = {item.name: item.slot for item in self.ranges}
+        return tuple(refinements[kind] if kind in refinements else Slot.of(kind) for kind in kinds)
 
 
 @dataclass(frozen=True)
@@ -102,6 +109,12 @@ class Work:
     name: str
     input: str
     word: Word
+    owner: str
+
+
+@dataclass(frozen=True)
+class Recovery:
+    height: int
     owner: str
 
 
@@ -115,6 +128,7 @@ class Program:
     independent: tuple[tuple[str, int], ...]
     optional_wordsets: tuple[str, ...]
     gate: Work | None = None
+    recovery: Recovery | None = None
 
     @property
     def input_order(self):
@@ -167,8 +181,10 @@ def identifier(tokens, at, field):
 
 def transform(stack, takes, gives, at):
     start = len(stack) - len(takes)
-    if start < 0 or tuple(stack[start:]) != takes:
-        raise at.error(f"{at.text!r} expected stack suffix {takes}, found {tuple(stack)}")
+    if start < 0 or not all(value.within(target) for value, target in zip(stack[start:], takes, strict=True)):
+        expected = tuple(slot.describe() for slot in takes)
+        actual = tuple(slot.describe() for slot in stack)
+        raise at.error(f"{at.text!r} expected stack suffix {expected}, found {actual}")
     stack[start:] = gives
 
 
@@ -182,7 +198,7 @@ def unavailable(token, *, enabled):
     return token.error(f"unknown Forth word {token.text!r}")
 
 
-def body(tokens, stack, words, opener):
+def body(tokens, stack, words, opener, ranges):
     instructions = []
     host_uses = {}
     for token in tokens:
@@ -190,14 +206,15 @@ def body(tokens, stack, words, opener):
         if name in {"else", "then", ";"}:
             return tuple(instructions), tuple(host_uses), token
         if name == "if":
-            transform(stack, ("cell",), (), token)
+            transform(stack, (Slot.of("cell"),), (), token)
             other = list(stack)
-            yes, yes_host, stop = body(tokens, stack, words, token)
+            yes, yes_host, stop = body(tokens, stack, words, token, ranges)
             no, no_host = (), ()
             if stop.name == "else":
-                no, no_host, stop = body(tokens, other, words, token)
-            if stop.name != "then" or stack != other:
+                no, no_host, stop = body(tokens, other, words, token, ranges)
+            if stop.name != "then" or [slot.kind for slot in stack] != [slot.kind for slot in other]:
                 raise token.error("IF must end in THEN and leave equal stack types on both branches")
+            stack[:] = [a.merge(b) for a, b in zip(stack, other, strict=True)]
             instructions.append(Located(Conditional(yes, no), token))
             host_uses.update(dict.fromkeys((*yes_host, *no_host)))
             continue
@@ -211,20 +228,25 @@ def body(tokens, stack, words, opener):
             stack[-count:] = [entries[i] for i in order]
             instructions.append(Located(Shuffle(name), token))
             continue
-        instruction = resolve(tokens, token, words)
+        instruction = resolve(tokens, token, words, ranges)
         if isinstance(instruction, Literal):
-            stack.append(instruction.kind)
+            stack.append(Slot.literal(instruction))
+        elif isinstance(instruction, Word):
+            transform(stack, instruction.slots(instruction.takes), instruction.slots(instruction.gives), token)
+            host_uses.update(dict.fromkeys(instruction.host_uses))
         else:
-            transform(stack, instruction.takes, instruction.gives, token)
-            if isinstance(instruction, Word):
-                host_uses.update(dict.fromkeys(instruction.host_uses))
-            elif instruction.location == "host":
+            start = len(stack) - len(instruction.takes)
+            args = stack[start:] if start >= 0 else ()
+            takes = tuple(map(Slot.of, instruction.takes))
+            transform(stack, takes, (), token)
+            stack.extend(primitive_outputs(instruction, args))
+            if instruction.location == "host":
                 host_uses[token] = None
         instructions.append(Located(instruction, token))
     raise opener.error(f"unterminated {opener.text!r}")
 
 
-def resolve(tokens, token, words):
+def resolve(tokens, token, words, ranges):
     name = token.name
     instruction = words.get(name) or NAMED_LITERALS.get(name) or PRIMITIVES.get(name) or HOST_WORDS.get(name)
     if instruction is not None:
@@ -234,6 +256,11 @@ def resolve(tokens, token, words):
         if not re.fullmatch(r"(?:[0-9a-fA-F]{2})+", value.text):
             raise value.error("BYTES-HEX requires whole bytes written as hexadecimal pairs")
         return Literal("bytes", bytes.fromhex(value.text))
+    if name == "check-range":
+        target = required(tokens, token, "declared range name")
+        if target.name not in ranges:
+            raise target.error(f"undefined range {target.text!r}")
+        return ranges[target.name].check()
     try:
         literal = cell_literal(token.text)
     except ValueError as error:
@@ -270,11 +297,13 @@ class SourceCompiler:
     def __init__(self, source):
         self.tokens = Tokens(source)
         self.words = {}
+        self.ranges = {}
         self.effects = {}
         self.work = {}
         self.gate = None
         self.join = None
         self.operator = None
+        self.recovery = None
         self.independent = []
         for token in self.tokens:
             try:
@@ -301,11 +330,33 @@ class SourceCompiler:
                 return
             if token.name == "--" and current is before:
                 current = after
-            elif token.name in TYPES:
+            elif token.name in TYPES or token.name in self.ranges:
                 current.append(token.name)
             else:
                 raise token.error("expected a stack type, '--', or the closing ';'")
         raise at.error("unterminated BSV-EFFECT: declaration")
+
+    def declare_range(self, at):
+        name = identifier(self.tokens, at, "range name")
+        if name in TYPES or name in self.ranges:
+            raise at.error(f"duplicate or reserved range name {name!r}")
+        base = required(self.tokens, at, "numeric base type")
+        if base.name not in NUMERIC_TYPES:
+            raise base.error("range base must be cell, u32, route, or script-int")
+        endpoints = []
+        for label in ("inclusive lower bound", "exclusive upper bound"):
+            token = required(self.tokens, at, label)
+            try:
+                endpoints.append(range_bound(token.text))
+            except ValueError as error:
+                raise token.error(str(error)) from error
+        end = required(self.tokens, at, "';'")
+        if end.name != ";" or endpoints[0] >= endpoints[1]:
+            raise at.error("RANGE: requires a nonempty interval followed by ';'")
+        spec = RangeType(name, base.name, *endpoints)
+        if not spec.slot.within(Slot.of(base.name)):
+            raise base.error(f"range {name!r} exceeds the value range of {base.name}")
+        self.ranges[name] = spec
 
     def define(self, at):
         name = required(self.tokens, at, "definition name")
@@ -313,13 +364,19 @@ class SourceCompiler:
         if declaration is None:
             raise name.error(f"typed Script builds require a preceding 'bsv-effect: {name.text} ... ;'")
         _, takes, gives = declaration
-        stack = list(takes)
-        instructions, host_uses, stop = body(self.tokens, stack, self.words, at)
+        ranges = tuple(self.ranges[kind] for kind in dict.fromkeys((*takes, *gives)) if kind in self.ranges)
+        signature = Word(takes, gives, (), "script", ranges=ranges)
+        stack = list(signature.slots(takes))
+        instructions, host_uses, stop = body(self.tokens, stack, self.words, at, self.ranges)
         if stop.name != ";":
             raise stop.error(f"unexpected {stop.text!r}, expected ';'")
-        if tuple(stack) != gives:
-            raise name.error(f"body leaves {tuple(stack)}, declared {gives}")
-        self.words[name.name] = Word(takes, gives, instructions, "host" if host_uses else "script", host_uses, name.name)
+        outputs = signature.slots(gives)
+        if len(stack) != len(outputs) or not all(value.within(target) for value, target in zip(stack, outputs, strict=True)):
+            actual = tuple(slot.describe() for slot in stack)
+            expected = tuple(slot.describe() for slot in outputs)
+            raise name.error(f"body leaves {actual}, declared {gives} with ranges {expected}")
+        self.words[name.name] = Word(takes, gives, instructions, "host" if host_uses else "script",
+                                     host_uses, name.name, ranges)
 
     def declaration(self, token):
         tokens = self.tokens
@@ -331,6 +388,8 @@ class SourceCompiler:
                 tokens.wordsets.add(wordset.name)
             case "bsv-effect:":
                 self.effect(token)
+            case "range:":
+                self.declare_range(token)
             case ":":
                 self.define(token)
             case "work:":
@@ -361,6 +420,13 @@ class SourceCompiler:
                 if self.operator is not None:
                     raise token.error("expected one split authority")
                 self.operator = identifier(tokens, token, "signer role")
+            case "recovery:":
+                if self.recovery is not None:
+                    raise token.error("expected at most one recovery policy")
+                height = required(tokens, token, "decimal block height")
+                if not re.fullmatch(r"[0-9]{1,9}", height.text) or not 0 < int(height.text) < LOCKTIME_THRESHOLD:
+                    raise height.error("recovery height must be a block height from 1 to 499999999")
+                self.recovery = Recovery(int(height.text), identifier(tokens, token, "recovery signer role"))
             case "independent-submit":
                 self.independent.append((identifier(tokens, token, "gate or work step"), token.line))
             case name if name in self.work or self.gate is not None and name == self.gate.name:
@@ -392,7 +458,7 @@ class SourceCompiler:
             if step not in step_names:
                 raise CompileError(f"line {line}: unknown gate or work step {step!r}")
         return Program(self.words, (self.work[left], self.work[right]), word, name, self.operator,
-                       tuple(self.independent), self.optional_wordsets, self.gate)
+                       tuple(self.independent), self.optional_wordsets, self.gate, self.recovery)
 
 
 def parse(source):
@@ -513,9 +579,10 @@ def schedule(program, mode="auto", *, available_data=None, available_authorizers
 def evaluate(word, *values, context=None):
     if len(values) != len(word.takes):
         raise ValueError("incorrect argument count for Forth word")
-    for kind, value in zip(word.takes, values, strict=True):
-        bounds = NUMERIC_RANGES.get(kind)
-        if bounds is not None and (type(value) is not int or not bounds[0] <= value <= bounds[1]):
+    for kind, slot, value in zip(word.takes, word.slots(word.takes), values, strict=True):
+        bounds = slot.bounds
+        if slot.kind in NUMERIC_TYPES and (type(value) is not int or
+                                          bounds is not None and not bounds[0] <= value <= bounds[1]):
             raise ValueError(f"argument is out of range for {kind}")
         if kind == "bytes" and not isinstance(value, bytes):
             raise ValueError("expected a bytes argument")
@@ -561,18 +628,33 @@ def expanded(instructions):
             yield instruction, source
 
 
-def lower(word):
+def lower(word, *, check_input_ranges=True):
     require_script(word)
     try:
-        return lower_body(word.body)
+        prefix = entry_range_checks(word) if check_input_ranges else b""
+        return prefix + lower_body(word.body)
     except RecursionError as error:
         raise CompileError("expanded conditional nesting exceeds the compiler's recursion limit") from error
+
+
+def entry_range_checks(word):
+    refinements = {item.name: item for item in word.ranges}
+    code = bytearray()
+    for depth, kind in enumerate(reversed(word.takes)):
+        if kind not in refinements:
+            continue
+        if depth:
+            code.extend(asm("OP_OVER") if depth == 1 else number(depth) + asm("OP_PICK"))
+        code.extend(refinements[kind].check().code)
+        if depth:
+            code.extend(asm("OP_DROP"))
+    return bytes(code)
 
 
 def lower_body(instructions):
     folded = []
     for instruction, _ in expanded(instructions):
-        if isinstance(instruction, Primitive):
+        if isinstance(instruction, Primitive) and not instruction.may_fail:
             count = len(instruction.takes)
             args = folded[-count:]
             if len(args) == count and all(isinstance(arg, Literal) for arg in args):

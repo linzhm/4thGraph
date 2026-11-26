@@ -18,6 +18,10 @@ v0.2.0 是当前开发版本。新建输出使用 [46,302 字节的固定锁](te
 
 普通付款使用 ForkID ALL（`0x41`），每个解锁为 326 字节。两进两出夹具从 v0.1.0 的 119,934 字节降到 v0.2.0 的 93,374 字节。Chronicle 激活后可以按需使用 OTDA。对版本 2 交易，参考钱包可以在 OTDA ALL 下重建可识别的输出，在配对 SINGLE 下只重建同索引输出。无配对的 SINGLE 走伴随验签。
 
+## Forth 探索版
+
+Forth 探索版 v0.3.0 位于 `experiments/forth/`，从 `r1.fth` 编译完整 R1 锁。基线逐字节复现 v0.2.0。优化版和同算法 sCrypt 内核版使用同一套付款夹具比较。 [Forth 源码与对照结果](experiments/forth/README.md)
+
 ## 钱包接入
 
 [TypeScript、Rust 和 Go 指南](docs/sdk.zh-CN.md)介绍如何收款以及构造普通 ForkID ALL 付款。[Python 参考钱包](reference/README.md)可为每个输入选择签名类型，支持混合输入和 Chronicle OTDA。请求外部签名前，先核对入金 outpoint、金额和锁定脚本，再确认目标输出和费用。
