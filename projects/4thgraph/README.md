@@ -257,6 +257,8 @@ PYTHONPATH=. bash shared/verify_node.sh --profile raised -- \
 
 此夹具的锁为 **279,463 B**，v2 花费为 **1,132 B**。在 `raised` 配置下，四种时代与版本组合各复放一次有效花费及九个拒绝用例。默认配置下有效 v2 花费也能入块，完整反例复放的 `verifyscript` RPC 遇到 3 ms 超时。
 
+CCTP 的动态公开输入原型使用同一 Forth 源码生成融合、双输入和串行布局，并复放同一密钥和证明的 zkscript 外部基线。[VK_x 交易边界与重跑命令](cctp/README.md)
+
 ### BN254 参考
 
 `groth16_script.py` 把 BN254 的 snarkjs 验证密钥和五个预期公开信号编译成一个 BSV 锁。锁中固定验证密钥和公开信号。Rúnar 的配对验证使用随证明提供的辅助算术见证，Script 核验这些见证及 Groth16 配对关系。锁还要求所有者提供 ForkID ALL 签名，由该签名覆盖真实交易的输入和输出。Forth 示例的信号顺序为 `next`、`route`、`current`、`bindLo`、`bindHi`。
