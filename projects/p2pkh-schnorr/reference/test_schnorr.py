@@ -14,7 +14,8 @@ from coincurve.context import GLOBAL_CONTEXT
 from bip340 import FIELD, ORDER, lift_x, to_bytes, verify
 from payment import lock_for_public_key, sign_payment, sign_spend
 from schnorr_script import (
-    TEMPLATE_DIR, _contract, authorization_codes, compile_unlock, compiled_template, lock_for_owner, owner_hash, recognize, verifier,
+    TEMPLATE_DIRS, TEMPLATE_VERSION, _contract, authorization_codes, compile_unlock, compiled_template,
+    lock_for_owner, owner_hash, recognize, recognize_template, verifier,
 )
 from fourthgraph.benchmark.validation import Node, chain_verdict
 from fourthgraph.bsv.evaluate import ScriptError, evaluate
@@ -22,7 +23,7 @@ from fourthgraph.bsv.script import decode_num, encode_num, number, push
 from fourthgraph.bsv.spend_authorization import SpendAuthorization, prepare_authorization
 from fourthgraph.bsv.transaction import CHRONICLE, Input, Output, Transaction
 
-VECTORS = TEMPLATE_DIR / "bip340-vectors.csv"
+VECTORS = TEMPLATE_DIRS["v0.6.0"] / "bip340-vectors.csv"
 HALF_RADIX = 1 << 128
 LAMBDA = 0x5363AD4CC05C30E0A5261C028812645A122E22EA20816678DF02967C1B23BD72
 MODES = (0x41, 0x42, 0x43, 0x61, 0x62, 0x63, 0xC1, 0xC2, 0xC3, 0xE1, 0xE2, 0xE3)
@@ -150,8 +151,9 @@ class SchnorrTests(unittest.TestCase):
             with self.subTest(case=case):
                 self.check_detached(unlock, False)
 
-    def sign_two_inputs(self, tx, sighash):
-        for i, (parent, public, key) in enumerate(zip(self.parents, self.public_keys, self.keys, strict=True)):
+    def sign_two_inputs(self, tx, sighash, parents=None):
+        parents = self.parents if parents is None else parents
+        for i, (parent, public, key) in enumerate(zip(parents, self.public_keys, self.keys, strict=True)):
             tx = sign_spend(tx, i, parent.serialize(), public,
                             lambda message: key.sign_schnorr(message, aux_randomness=bytes(32)),
                             sighash=sighash, chronicle_active=bool(sighash & CHRONICLE))
@@ -181,8 +183,9 @@ class SchnorrTests(unittest.TestCase):
         signed = sign_payment(parent, 1, (target,), 100, public,
                               lambda message: self.keys[0].sign_schnorr(message, aux_randomness=bytes(32)))
         self.check_spend(signed, self.parents[:1], [True])
-        with self.assertRaisesRegex(ValueError, "invalid BIP340 signature"):
-            sign_payment(parent, 1, (target,), 100, public, lambda _: bytes(64))
+        for invalid in (None, bytes(63), bytes(64), bytearray(64)):
+            with self.subTest(invalid=invalid), self.assertRaisesRegex(ValueError, "invalid BIP340 signature"):
+                sign_payment(parent, 1, (target,), 100, public, lambda _: invalid)
 
         def unexpected(_):
             self.fail("invalid payment reached the signer")
@@ -206,7 +209,28 @@ class SchnorrTests(unittest.TestCase):
         raw = lock_for_owner(owner)
         self.assertEqual(raw, reference[:offset] + owner + reference[offset + 20:])
         self.assertEqual(compiled_template(owner), (raw, offset))
-        self.assertEqual(recognize(raw), owner)
+        self.assertEqual(recognize_template(raw), (TEMPLATE_VERSION, owner))
+        self.assertLess(len(raw), 30_398)
+
+    def test_mixed_template_spend(self):
+        version = "v0.6.0"
+        public = self.public_keys[0]
+        raw = lock_for_public_key(public, version=version)
+        self.assertEqual(sha256(lock_for_owner(bytes(20), version=version)).hexdigest(),
+                         "12c75b80b65e983369998e8c2ba581979bb1d4cc67c99a4f8694394447a6a877")
+        self.assertEqual(recognize_template(raw), (version, owner_hash(public)))
+        self.assertIsNone(recognize_template(raw[:-1] + b"\x51"))
+        first, second = self.parents
+        legacy = replace(first.outputs[1], script=raw)
+        parents = (replace(first, outputs=(first.outputs[0], legacy)), second)
+        first_input, second_input = self.unsigned.inputs
+        inputs = (replace(first_input, txid=parents[0].txid_wire()), second_input)
+        unsigned = replace(self.unsigned, inputs=inputs)
+        for sighash in MODES:
+            with self.subTest(sighash=hex(sighash)):
+                signed = self.sign_two_inputs(unsigned, sighash, parents)
+                self.check_spend(signed, parents, [True, True])
+                self.check_spend(replace(signed, locktime=1), parents, [False, False])
 
     def test_forth_unlock_preserves_witness_encoding(self):
         witness = (b"x" * 32, b"y" * 32, b"s" * 64, b"r" * 32)
@@ -239,6 +263,7 @@ class SchnorrTests(unittest.TestCase):
     def test_doubling_agrees_with_complete_addition(self):
         contract = _contract()
         double = contract.emit("secp256k1-double", b"")
+        pair = contract.emit("secp256k1-double-pair", b"")
         add = contract.emit("secp256k1-add", b"")
         points = [(0, 1, 0)]
         for scalar in range(1, 17):
@@ -256,6 +281,11 @@ class SchnorrTests(unittest.TestCase):
                 self.assertEqual(decode_num(new[0]), FIELD)
                 self.assertEqual([decode_num(item) % FIELD for item in old[1:]],
                                  [decode_num(item) % FIELD for item in new[1:]])
+                separate, separate_alt = evaluate(double, new)
+                combined, combined_alt = evaluate(pair, [encode_num(FIELD), *map(encode_num, point)])
+                self.assertEqual((separate_alt, combined_alt), ([], []))
+                self.assertEqual([decode_num(item) % FIELD for item in separate],
+                                 [decode_num(item) % FIELD for item in combined])
 
     def test_lambda_scalar_split(self):
         split = _contract().emit("secp256k1-lambda-split", b"")

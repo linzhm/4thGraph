@@ -1,14 +1,18 @@
 from itertools import product
 from importlib import import_module
 from random import Random
+from re import escape
 import unittest
 
 from compile_r1 import SOURCE, compile_source, previous_build
 from curve_compiler import B3, FIELD
 from fixed_templates import compiled_template, otda_pattern
+from msm_compiler import R1MSMCompiler
 from replay_r1 import template
 from fourthgraph.bsv.evaluate import evaluate
 from fourthgraph.bsv.script import encode_num
+from fourthgraph.compiler.lowering import OPTIMIZATIONS, compile_word
+from fourthgraph.compiler.source import CompileError, SourceCompiler
 
 
 class CompileR1Tests(unittest.TestCase):
@@ -17,6 +21,22 @@ class CompileR1Tests(unittest.TestCase):
         cls.source = SOURCE.read_bytes()
         cls.unoptimized = compile_source(cls.source, bytes(20))
         cls.optimized = compile_source(cls.source, bytes(20), optimize=True)
+
+    def test_r1_wallet_primitives_cannot_compile_as_spending_code(self):
+        for builder, names in (
+            (self.unoptimized, ("bsv-owner",)),
+            (previous_build(bytes(20), optimize=True), ("bsv-owner", "bsv-optimize?")),
+            (R1MSMCompiler().frontend, ("bsv-owner", "p256.mul2")),
+        ):
+            for name in names:
+                primitive = builder.words[name]
+                takes, gives = " ".join(primitive.takes), " ".join(primitive.gives)
+                source = f": wrapped ( {takes} -- {gives} ) {name} ;"
+                word = SourceCompiler(source, vocabulary={name: primitive}).words["wrapped"]
+                for optimization in OPTIMIZATIONS:
+                    with self.subTest(name=name, optimization=optimization):
+                        with self.assertRaisesRegex(CompileError, f"host-only words.*{escape(name)}"):
+                            compile_word(word, optimization)
 
     def test_complete_lock_and_otda_cost(self):
         reference = compiled_template(scheduled=True)

@@ -53,12 +53,17 @@ REQUIRE stdlib/secp256k1.fth
     bsv-empty swap script-pick-depth 3 bsv-repeat-code bsv-cat-code
 ;
 
+: bip340-copy-affine ( script cell -- script )
+    ( Copy x and y at the same depth in succession. )
+    bsv-empty swap script-pick-depth 2 bsv-repeat-code bsv-cat-code
+;
+
 : bip340-window-row ( script cell -- script )
     ( The build argument is the depth of P.x. The top point is iQ. )
-    ( Append iQ+P, iQ+2P and iQ+3P. )
-    swap 2 bip340-copy-point over 3 + bip340-copy-point secp256k1-add
-    5 bip340-copy-point over 3 + bip340-copy-point secp256k1-add
-    8 bip340-copy-point swap 3 + bip340-copy-point secp256k1-add
+    ( Append iQ+P, iQ+2P and iQ+3P using the original affine P. )
+    swap 2 bip340-copy-point over 3 + bip340-copy-affine secp256k1-add-affine
+    2 bip340-copy-point over 6 + bip340-copy-affine secp256k1-add-affine
+    2 bip340-copy-point swap 9 + bip340-copy-affine secp256k1-add-affine
 ;
 
 : bip340-fixed-window-table ( script -- script )
@@ -131,7 +136,7 @@ REQUIRE stdlib/secp256k1.fth
 : bip340-variable-window-table ( script -- script )
     ( Input: three coordinates each of signed P and Q. )
     op-toaltstack op-toaltstack op-toaltstack
-    op-3dup secp256k1-double 5 bip340-copy-point 5 bip340-copy-point secp256k1-add
+    op-3dup secp256k1-double 2 bip340-copy-point 8 bip340-copy-affine secp256k1-add-affine
     ( P, 2P, 3P. Restore Q to start its row. )
     3 script-restore-items 11 bip340-window-row
     11 bip340-copy-point secp256k1-double 23 bip340-window-row
@@ -153,17 +158,17 @@ REQUIRE stdlib/secp256k1.fth
 
 : bip340-variable-window-add ( script -- script )
     ( Variable points occupy three stack items. For TV15, X is at depth 40. )
-    op-dup op-if op-3 op-mul 85 bsv-num op-swap op-sub
-      op-dup op-toaltstack op-pick op-fromaltstack op-dup op-toaltstack op-pick
-      op-fromaltstack op-pick secp256k1-add
-    op-else op-drop op-endif
+    op-ifdup op-if op-3 op-mul 86 bsv-num op-swap op-sub
+      ( Keep the depth on the main stack while copying X and Y. )
+      op-dup op-pick op-over op-pick op-rot op-1sub op-pick secp256k1-add
+    op-endif
 ;
 
 : bip340-fixed-window-add ( script -- script )
     ( Fixed points are affine and occupy two items. For TF15, x is at depth 9. )
-    op-dup op-if op-2 op-mul 39 bsv-num op-swap op-sub
+    op-ifdup op-if op-2 op-mul 39 bsv-num op-swap op-sub
       op-dup op-toaltstack op-pick op-fromaltstack op-pick secp256k1-add-affine
-    op-else op-drop op-endif
+    op-endif
 ;
 
 : bip340-window-addends ( script -- script )
@@ -178,7 +183,7 @@ REQUIRE stdlib/secp256k1.fth
 
 : bip340-joint-window-step ( script -- script )
     ( Accumulator = 4*accumulator + one point from each table. )
-    secp256k1-double secp256k1-double bip340-window-addends bip340-next-window
+    secp256k1-double-pair bip340-window-addends bip340-next-window
 ;
 
 : bip340-joint-multiply ( script -- script )
@@ -186,7 +191,7 @@ REQUIRE stdlib/secp256k1.fth
     ( The initial accumulator is infinity. The final window does not advance the mask. )
     bip340-window-addends bip340-next-window
     bsv-empty bip340-joint-window-step 62 bsv-repeat-code bsv-cat-code
-    secp256k1-double secp256k1-double bip340-window-addends
+    secp256k1-double-pair bip340-window-addends
     ( Reject infinity. Compare X and Y to r*Z and ry*Z modulo the field prime. )
     op-dup op-verify
     84 script-pick-depth 1 script-pick-depth op-mul 3 script-pick-depth op-swap op-sub

@@ -2,31 +2,25 @@
 
 from bip340 import lift_x
 from payment import lock_for_public_key, sign_previous as authorize_previous, sign_spend as authorize
-from schnorr_script import TEMPLATE_VERSION, lock_for_owner, owner_hash, recognize as recognize_owner
-
-
-def _check_profile(profile):
-    if profile not in (None, TEMPLATE_VERSION):
-        raise ValueError("unsupported Schnorr locking template")
+from schnorr_script import lock_for_owner, owner_hash, recognize_template
 
 
 def lock_owner(owner, profile=None):
-    _check_profile(profile)
-    return lock_for_owner(owner)
+    return lock_for_owner(owner, version=profile)
 
 
 def lock(public_key, profile):
-    _check_profile(profile)
-    return lock_for_public_key(public_key)
+    return lock_for_public_key(public_key, version=profile)
 
 
 def recognize(script, public_key):
-    owner = recognize_owner(script)
-    if owner is None:
+    match = recognize_template(script)
+    if match is None:
         return None
+    version, owner = match
     if public_key is not None and (lift_x(public_key) is None or owner_hash(public_key) != owner):
         return None
-    return {"template": TEMPLATE_VERSION, "ownerHash160": owner.hex()}
+    return {"template": version, "ownerHash160": owner.hex()}
 
 
 def sign_spend(tx, index, funding_raw, public_key, signer, sighash, options):
