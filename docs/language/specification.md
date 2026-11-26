@@ -110,6 +110,26 @@ relation: <transition-word> <route-word> ;
 
 `--capabilities` 输出机器可读的词集、执行位置和交易版本清单。 `--entry <word>` 只编译指定的已标注定义，便于检查 Script 字节和栈签名。事务构建在发现首个无效使用时退出，并指明源文件行列。诊断区分未知词、无法下沉的标准词和调用链中的宿主词。
 
+### 钱包锁中的数值公式
+
+构造钱包锁的 `ScriptBuilder` 支持 `formula:`。栈效果使用已声明的 `script-int` 范围，`{: ... :}` 为输入命名，`let` 将栈顶结果赋给一个局部名称。名称可以反复读取。末尾留在栈上的值按声明顺序返回。
+
+```forth
+range: small script-int 0 11 ;
+range: squared script-int 0 101 ;
+
+formula: square ( small -- squared )
+    {: x :}
+    x x int*
+;
+```
+
+`int-from-bottom INDEX RANGE` 读调用者留在栈底的数值，索引从零开始。调用者负责保证输入与栈底值采用规范的 ScriptNum 编码并符合声明范围。编译器沿公式推导中间量范围，检查输出范围与 Genesis 数值长度上限，并要求 `int-rem` 的除数有可证的正下界。
+
+优化构建比较原顺序发码、依赖图调度和加入等价改写的候选，按序列化字节数选择。报告给出候选字节数、选中规则及源码的中间量位宽上界。P2PKH-R1 用这条路径编译 P-256 的点加和倍点。 [源码和复放](../../projects/p2pkh-r1/experiments/forth)
+
+编译器保存公式的中间表示。调用构造器能证明某个参数为常量时，可在生成字节前绑定该参数并重新推导中间量范围，生成少一个运行时输入的内核。R1 的仿射点加只在选中的固定生成元表项满足 `Z=1` 时进入该内核，零下标由组单位元分支处理。 [R1 前置扫描和候选](../../projects/p2pkh-r1/experiments/forth/README.md#点乘窗口候选)
+
 ## 电路入口
 
 `circuit_backend.py` 根据阶段依赖选取一个 `u32 -- u32` 转换词和一个 `u32 -- route` 路由词。仅有词定义的文件须通过 `--entries TRANSITION ROUTE` 指定入口。带工作流声明的文件以声明为准。本入口编译计算和路由，交易签名与独立提交仍由交易规划器处理。
