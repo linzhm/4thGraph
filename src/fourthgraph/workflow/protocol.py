@@ -14,6 +14,7 @@ from fourthgraph.bsv.pushtx import PUBLIC, binding_der
 from fourthgraph.bsv.script import asm, encode_num, is_compressed_public_key, number, push, without_codeseparators
 from fourthgraph.bsv.transaction import CHRONICLE, FORKID, SIGHASH_ALL, Input, Output, Transaction, hash256, preimage_forkid, preimage_otda
 
+from fourthgraph.compiler.ranges import NUMERIC_TYPES
 from fourthgraph.compiler.source import (
     GATE_BOUNDARIES, PROJECT_DESCRIPTION, PROJECT_NAME, PROJECT_VERSION, CompileError, ParentOutput, Plan,
     SourceCompiler, Template, Workflow, WORKFLOW_MODES, availability, evaluate, fused_template, fusion_constraints, gate_constraints,
@@ -1014,7 +1015,7 @@ def main():
     cli.add_argument("--bind-bytes", metavar="NAME=HEX", action="append", default=[],
                      help="bind a declared byte parameter at compile time (repeatable)")
     cli.add_argument("--assume-input-ranges", action="store_true",
-                     help="for --entry, rely on the caller to validate declared input ranges and encodings")
+                     help="for --entry, rely on the caller to check numeric input types and ScriptNum encodings")
     cli.add_argument("--mode", choices=("auto", "split", *WORKFLOW_MODES), default="auto")
     cli.add_argument("--target", type=normalize_target, choices=TARGETS, default=DEFAULT_TARGET,
                      help="permitted transaction versions")
@@ -1076,7 +1077,8 @@ def main():
             word = source.words.get(entry)
             if word is None:
                 raise CompileError(f"undefined entry word {args.entry!r}")
-            compiled = compile_word(word, args.optimize, check_input_ranges=not args.assume_input_ranges)
+            compiled = compile_word(word, args.optimize, spend_entry=True,
+                                    check_input_ranges=not args.assume_input_ranges)
             result = {"project": PROJECT_NAME, "compiler_version": PROJECT_VERSION, "schema_version": 1,
                       "entry": word.name, "takes": word.takes, "gives": word.gives,
                       "enabled_optional_wordsets": source.optional_wordsets, "optimization": args.optimize,
@@ -1088,8 +1090,8 @@ def main():
             if word.ranges:
                 result["ranges"] = {item.name: {"base": item.base, "lower": item.lower,
                                                 "upper_exclusive": item.upper} for item in word.ranges}
-                if any(item.name in word.takes for item in word.ranges):
-                    result["input_range_checks"] = "assumed" if args.assume_input_ranges else "emitted"
+            if any(slot.kind in NUMERIC_TYPES for slot in word.slots(word.takes)):
+                result["input_range_checks"] = "assumed" if args.assume_input_ranges else "emitted"
         else:
             if args.keys is None:
                 cli.error("transaction builds require --keys")
