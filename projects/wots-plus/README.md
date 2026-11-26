@@ -28,6 +28,12 @@ from `locking_script(key, transaction=False)` accepts a caller-provided digest
 and is only for testing the primitive. The payment lock supports the twelve
 ForkID and Chronicle OTDA modes, with ForkID `ALL` (`0x41`) as the wallet default.
 
+## Use cases and trade-offs
+
+Use WOTS+ to compare SHA-256 one-time signatures when witness size matters. The raw signature is 2,144 bytes, while a Lamport signature here is 8,192 bytes. A fair transaction comparison includes both the payment locks and the unlocking scripts. WOTS+ offers a canonical lock and two cache presets. Use the published measurements to examine how the smaller cached-step lock and eligible OTDA reconstruction affect funding, turnover and exit. [Measured costs](#complete-transactions-and-stack-measurements)
+
+The payment workflow requires a fresh key per UTXO, including change. Reserve that key durably before returning a signature. A wallet investigating repeated turnover should test key reservation and rebroadcast alongside script verification. [Wallet integration](docs/sdk.en.md)
+
 ## Run the checks
 
 Run from the repository root in a Python virtual environment.

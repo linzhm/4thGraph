@@ -33,6 +33,12 @@ external signature. The caller authenticates the funding transaction and
 approves the transaction intent.
 [Transaction-binding construction](../../shared/pushtx.py)
 
+## Use cases and trade-offs
+
+Evaluate Pure ML-DSA-44 when measuring FIPS 204 signer interoperability or large-script resource limits. A lab can start with the detached conformance vectors and then run the payment wrapper with the same kind of public key and a dedicated payment signer. The wrapper passes a 32-byte payment message to Pure ML-DSA-44 with an empty context. Key and signature validation, transaction binding, and node admission each have their own evidence. [Reproduction steps](#reproduce-the-checks)
+
+The fixed-key payment lock is about 926 kB in the measured fixtures. Evaluate script size, transaction size and validation policy on the target node or miner before choosing this format for a funded workflow. [Funded regtest method](../../shared/benchmark.md#funded-regtest-measurements)
+
 ## Sampling boundary
 
 Python and Script use the same 221-byte SHAKE256 output budget specified by

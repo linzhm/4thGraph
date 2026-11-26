@@ -43,6 +43,14 @@ SCRIPT_LAB_SDK_PYTHON="$PWD/.venv/bin/python" \
   bash shared/verify_node.sh -- bash shared/sdk/verify_wallet.sh p2pkh-r1
 ```
 
+## 接通签名设备
+
+1. 先用夹具复放普通 ForkID ALL，确认识别结果里的所有者哈希和模板，再接入实际设备。
+2. 按设备的行为选接口。若设备接收预先计算的摘要，使用默认模式。若设备内部恰好执行一次 SHA-256，设 `signMessage: true`。回调返回定长的 64 字节 `r ∥ s`。设备返回 DER 时，先转换格式。
+3. 将绝对路径 `historyPath` 指向各签名进程共用的持久存储，并演练重启后读回同一份历史。如果钱包因检测到签名随机数重复而阻止使用密钥，先排查签名器和受影响的密钥，再恢复付款。
+
+[签名随机数历史与钱包行为](../reference/README.md)
+
 ## 正则与完整指纹
 
 1. 检查原始脚本恰为 **46,302 字节**。

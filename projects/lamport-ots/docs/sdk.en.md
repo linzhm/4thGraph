@@ -31,6 +31,12 @@ const signedHex = wallet.signPayment({
 
 Use `signInput` for a prepared transaction. Supply the transaction, its input index and the corresponding prevout. See the [call table](../../../shared/sdk/README.md#calls-and-data) for the matching Rust, Go, and Python interfaces.
 
+## Keep key state with the invoice
+
+Record whether the invoice uses `full-key` or `committed-key` and retain the ordered public key for both. Its 16,384 bytes have a fixed order. The committed template uses those bytes to assemble the spending proof. Recover the public key and the key-consumption record together.
+
+Reserve the key before the signer releases the 8,192-byte signature. A timeout after requesting a signature can leave the key consumed. Recover and rebroadcast the same signed transaction when available, and use fresh keys on new outputs. [One-time signing in the shared SDK](../../../shared/sdk/README.md#one-time-signing)
+
 ## Replay vectors
 
 ```sh

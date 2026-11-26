@@ -8,6 +8,8 @@ A Forth compiler for BSV Script and multi-transaction workflows.
 
 同一份 Forth 源码可以生成融合版和拆分版。示例计算 `a = 2x`、`b = y + 1`，两支结果和汇合的和都按 `u32` 表示。回绕后的和小于 20 时走复核，其余走结算。两种后继各锁给一个配置的公钥。编译器以 Forth 2012 Core 为语义基线，`+` 使用 64 位 cell，`u32+` 固定按 32 位回绕。 [示例源码](example.fth) · [语言与 BSV 扩展规范](language.md)
 
+可独立安装 `4thgraph` CLI 和 Codex 的 `$4thgraph` skill。Skill 包含 Forth 编写、编译优化和复放证据检查的工作流。 [安装说明](INSTALL.md)
+
 ## 复放与编译
 
 从仓库根目录运行。Node 启动器创建临时、无对等节点的 regtest，下载并校验 BSV Node 1.2.3。

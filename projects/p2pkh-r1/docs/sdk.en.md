@@ -34,7 +34,7 @@ const signedHex = wallet.signPayment({
 }, ({ payload }) => signer.signP256DigestRaw(payload));
 ```
 
-The signer returns a 64-byte `r ∥ s` signature. The default payload is `SHA256d(P)`. For a device that applies SHA-256 internally, set `signMessage: true` and pass its `message` payload `SHA256(P)` to the device. Share a persistent `historyPath` across wallet processes to track P-256 nonce reuse. Use `signInput` for a prepared transaction. With Chronicle active, `compressOtda: true` can encode eligible version-2 OTDA unlocks. The native source entry points and low-level protocol operations are documented below.
+The signer returns a 64-byte `r ∥ s` signature. The default payload is `SHA256d(P)`. For a device that applies SHA-256 internally, set `signMessage: true` and pass its `message` payload `SHA256(P)` to the device. Share a persistent `historyPath` across wallet processes to track P-256 nonce reuse. Use `signInput` for a prepared transaction. With Chronicle active, `compressOtda: true` can encode eligible version-2 OTDA unlocks.
 
 Replay the vector in all four languages from the repository root.
 
@@ -42,6 +42,14 @@ Replay the vector in all four languages from the repository root.
 SCRIPT_LAB_SDK_PYTHON="$PWD/.venv/bin/python" \
   bash shared/verify_node.sh -- bash shared/sdk/verify_wallet.sh p2pkh-r1
 ```
+
+## Bring up a device signer
+
+1. Replay ordinary ForkID ALL with the test fixture. Confirm that recognition returns the expected owner hash and template before trying a physical device.
+2. Use the default with a prehashed signer. Set `signMessage: true` when the device applies SHA-256 exactly once. Return fixed-width, 64-byte `r ∥ s`. Convert DER to that format if your device returns DER.
+3. Configure an absolute persistent `historyPath` on storage shared by signing processes. Exercise a restart using the same history. If the wallet blocks a key after detecting nonce reuse, investigate the signer and affected key before resuming payment.
+
+[Nonce history and wallet behavior](../reference/README.md)
 
 ## Regex and complete fingerprint
 
