@@ -69,7 +69,7 @@ class CircuitBackendTests(unittest.TestCase):
         selected = select_circuit(SourceCompiler(definitions.decode()), entries)
         self.assertEqual(selected.describe()["selection"], "explicit")
         self.assertEqual(compile_circuit(definitions, entries=entries), compile_circuit(CUSTOM))
-        with self.assertRaisesRegex(CompileError, r"line 4, column 3: .*requires stack effect u32 -- u32"):
+        with self.assertRaisesRegex(CompileError, r"line 8, column 3: .*requires stack effect u32 -- u32"):
             compile_circuit(definitions, entries=reversed(entries))
         with self.assertRaisesRegex(CompileError, "undefined circuit word 'missing'"):
             compile_circuit(definitions, entries=("missing", entries[1]))

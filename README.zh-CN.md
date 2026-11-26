@@ -102,7 +102,7 @@ flowchart LR
 
 | 层次 | 开发者写什么，工具交付什么 |
 | --- | --- |
-| **语言与标准库** | 用带类型的 Forth 词描述计算，用合约声明描述参与角色、交易依赖和状态转换。编译器检查栈效果和数值范围。[SDL 规范](docs/language/specification.md) · [语法](docs/language/syntax.md) · [标准库](docs/language/stdlib.md) |
+| **语言与标准库** | 用带类型的 Forth 词描述计算，用合约声明描述参与角色、交易依赖和状态转换。编译器检查栈效果和数值范围。[SDL 规范](docs/language/specification.md) · [中文语法](docs/language/syntax.md) · [English syntax](docs/language/syntax.en.md) · [标准库](docs/language/stdlib.md) |
 | **编译与规划** | 编译器生成 BSV Script，规划器比较满足约束的交易布局及成本。证明后端为支持的关系生成电路和验证器。[工具链手册](docs/toolchain.md) |
 | **运行与验证** | 运行器绑定实际父输出、请求签名并组装见证。复放报告把构建产物与实际交易、BSV Node 和 chain-gang 的判定对应起来。[仓库目录](docs/repository-layout.md) · [复放流程](docs/toolchain.md#复放与编译) |
 

@@ -1,3 +1,5 @@
+REQUIRE BSV
+
 ( SM2 curve arithmetic, witness checks and payment binding match the v1 reference. )
 
 : sm2-p-type ( bytes -- bytes )
@@ -255,7 +257,7 @@
 : sm2-one-der ( bytes -- bytes )
     bytes-hex 3044022079be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f8179802207abe667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798 s-push ;
 
-: sm2-lock ( bytes -- bytes )
+: sm2-check-witness-format ( bytes -- bytes )
     op-depth 3 s-num op-numequalverify sm2-p-type op-dup bytes-hex 5fffffff s-push op-and
     bytes-hex 00 s-push op-cat op-bin2num 65 s-num 68 s-num op-within op-verify op-dup
     bytes-hex 43000000 s-push op-equal op-swap bytes-hex c3000000 s-push op-equal op-boolor
@@ -265,8 +267,17 @@
     32 s-num op-split op-drop sm2-zero32 op-equalverify op-else sm2-p-type op-1 op-split op-drop
     bytes-hex 20 s-push op-and bytes-hex 00 s-push op-equal op-if 2 s-num op-pick op-size
     158 s-num op-numequalverify op-drop 2 s-num op-pick 104 s-num op-split op-nip 2 s-num
-    op-split op-drop bytes-hex 01ac s-push op-equalverify op-endif op-endif sm2-check-owner
-    sm2-p-type op-1 op-split op-drop op-toaltstack sm2-verify-owner-signature op-fromaltstack
+    op-split op-drop bytes-hex 01ac s-push op-equalverify op-endif op-endif ;
+
+: sm2-bind-spend ( bytes -- bytes )
+    op-fromaltstack
     op-if op-over op-size op-1sub op-split op-nip bytes-hex 20 s-push op-or sm2-one-der op-swap
     op-cat sm2-k1-pub op-2swap op-codeseparator op-checksigverify op-endif op-codeseparator
     op-checksig ;
+
+: sm2-lock ( bytes -- bytes )
+    sm2-check-witness-format
+    sm2-check-owner
+    sm2-p-type op-1 op-split op-drop op-toaltstack
+    sm2-verify-owner-signature
+    sm2-bind-spend ;

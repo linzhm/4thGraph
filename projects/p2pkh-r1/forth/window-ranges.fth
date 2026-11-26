@@ -1,3 +1,5 @@
+REQUIRE BSV
+
 ( Runtime words for the R1 four-bit window. Bounds are half-open. )
 range: r1-scalar script-int 0 $ffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc632551 ;
 range: r1-digit script-int 0 16 ;

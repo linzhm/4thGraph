@@ -1,3 +1,5 @@
+REQUIRE BSV
+
 ( P-256 projective kernels. Inputs and outputs are ordered bottom to top. )
 ( p is the positive field modulus, b3 is three times the curve coefficient b. )
 ( Coordinates and temporary integers use ScriptNum, with signed output residues. )

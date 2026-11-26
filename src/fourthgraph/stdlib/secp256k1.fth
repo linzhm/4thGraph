@@ -1,3 +1,5 @@
+REQUIRE BSV
+
 ( secp256k1 constants and complete homogeneous projective point arithmetic. )
 REQUIRE stdlib/script-fragments.fth
 
@@ -38,7 +40,9 @@ REQUIRE stdlib/script-fragments.fth
     op-over secp256k1-lattice-a2 op-mul op-sub ( k1 = k-c1*a1-c2*a2 )
     2 script-pick-depth secp256k1-lattice-minus-b1 op-mul
     2 script-pick-depth secp256k1-lattice-a1 op-mul op-sub ( k2 = -c1*b1-c2*b2 )
-    op-toaltstack op-toaltstack op-2drop op-2drop op-drop op-fromaltstack op-fromaltstack
+    op-toaltstack op-toaltstack
+    2 script-drop-pairs op-drop
+    2 script-restore-items
 ;
 
 : secp256k1-add ( script -- script )

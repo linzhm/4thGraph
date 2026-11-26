@@ -53,7 +53,9 @@ class ForthVerifierTests(unittest.TestCase):
         self.assertEqual(artifact["entry_interface"], interface["interfaces"][GROTH16_ENTRY])
         self.assertEqual(artifact["verification_key_sha256"], sha256(self.key.encode()).hexdigest())
         self.assertEqual(artifact["entry_interface_sha256"], interface["interface_sha256"])
-        self.assertEqual(artifact["libraries"][0]["interface_sha256"], interface["interface_sha256"])
+        imports = {library["name"]: library for library in artifact["libraries"]}
+        self.assertEqual(set(imports), {"std/bsv", "std/groth16-bls12-381"})
+        self.assertEqual(imports["std/groth16-bls12-381"]["interface_sha256"], interface["interface_sha256"])
 
         continuation = lock + asm("OP_DROP OP_1")
         parent, spend = spend_fixture(continuation, current.witness(signals, proof))
@@ -69,14 +71,14 @@ class ForthVerifierTests(unittest.TestCase):
         baseline = ForthVerifier(self.key, self.source)
         self.assertNotEqual(verifier.compile(SOURCES), baseline.compile(SOURCES))
 
-    def test_reports_missing_stage_at_use_site(self):
+    def test_reports_missing_stage_at_pairing_preparation(self):
         invalid = self.source.replace(b"swap bls12-381-check-g1-points", b"swap")
-        with self.assertRaisesRegex(CompileError, r"line 7, column 5: .* expected stack suffix"):
+        with self.assertRaisesRegex(CompileError, r"line 5, column 3: body leaves .*groth16-checked-g1"):
             ForthVerifier(self.key, invalid)
 
     def test_reports_unsupported_words(self):
         invalid = self.source.replace(b"swap bls12", b"1 drop swap bls12")
-        with self.assertRaisesRegex(CompileError, r"line 6, column 5: '1' cannot compile"):
+        with self.assertRaisesRegex(CompileError, r"line 8, column 5: '1' cannot compile"):
             ForthVerifier(self.key, invalid)
 
     def test_bounds_expanded_verifier_helpers(self):

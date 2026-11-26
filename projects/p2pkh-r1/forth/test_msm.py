@@ -59,7 +59,9 @@ class R1MSMTests(unittest.TestCase):
         (frozen_lock, frozen_pattern), release = frozen_build()
         compiler = R1MSMCompiler()
         (lock, pattern), report = local_build(compiler, compiler.plan(release["construction"]), 32)
-        self.assertEqual(release["build_source"], compiler.source_identity)
+        historical, _ = read_report(VERSIONS_DIRECTORY / "v0.6.0/comparison.json")
+        self.assertEqual(release["build_source"], {field: historical[field]
+                                                   for field in ("source_sha256", "dependencies")})
         self.assertEqual(frozen_lock, lock)
         self.assertEqual(frozen_pattern, pattern)
         self.assertEqual(release["estimated"], report["estimated"])

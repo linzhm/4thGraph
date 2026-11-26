@@ -1,3 +1,5 @@
+REQUIRE BSV
+
 ( BIP340 verifier. Its runtime stack is message px py signature ry. )
 REQUIRE stdlib/script-fragments.fth
 REQUIRE stdlib/secp256k1.fth
@@ -194,4 +196,7 @@ REQUIRE stdlib/secp256k1.fth
     43 script-drop-pairs op-1
 ;
 
-: bip340-verify ( script -- script ) op-depth op-5 op-numequalverify bip340-prepare-challenge bip340-joint-multiply ;
+: bip340-check-witness-depth ( script -- script ) op-depth op-5 op-numequalverify ;
+
+: bip340-verify ( script -- script )
+    bip340-check-witness-depth bip340-prepare-challenge bip340-joint-multiply ;

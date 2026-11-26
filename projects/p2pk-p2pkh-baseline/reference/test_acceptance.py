@@ -13,9 +13,10 @@ from urllib.request import Request, urlopen
 
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec, utils
-from tx_engine import Tx
+from tx_engine import Tx, hash160
 
 from script_lab import OTHER_PUB, OWNER_PUB, TEMPLATES
+from fourthgraph.bsv.native_payments import p2pk_lock, p2pkh_lock
 from fourthgraph.bsv.script import push
 from fourthgraph.bsv.transaction import (
     ANYONECANPAY, CHRONICLE, SIGHASH_ALL, SIGHASH_NONE, Input, Output, Transaction,
@@ -75,7 +76,10 @@ def digest(tx, index, previous, flag, amount):
 
 @cache
 def fixture(template, version, index):
-    lock = bytes.fromhex(TEMPLATES[template][1])
+    expected_lock = bytes.fromhex(TEMPLATES[template][1])
+    lock = p2pk_lock(OWNER_PUB) if template == "p2pk" else p2pkh_lock(bytes(hash160(OWNER_PUB)))
+    if lock != expected_lock:
+        raise AssertionError(f"compiled {template} lock differs from the native baseline")
     owned = Transaction((Input(b'\x11' * 32, 0),), (Output(10_000, lock),))
     other = Transaction((Input(b'\x22' * 32, 0),), (Output(1_000, b'\x51'),))
     parents = (owned, other) if index == 0 else (other, owned)

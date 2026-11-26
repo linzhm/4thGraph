@@ -15,7 +15,7 @@ class Bip340LibraryTests(unittest.TestCase):
             : detached ( script -- script ) bip340-verify ;
         """)
         self.assertEqual({item.name for item in app.library_imports},
-                         {"std/bip340", "std/script-fragments", "std/secp256k1"})
+                         {"std/bip340", "std/bsv", "std/script-fragments", "std/secp256k1"})
         lock = app.emit("detached", b"")
         # Official BIP340 vector 0 plus the reconstructed even y coordinates.
         fields = (

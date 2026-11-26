@@ -28,6 +28,30 @@
 
 `+` 接受两个 cell。 `u32+` 接受两个 `u32`。需要跨越类型边界的源码应写出转换，例如 `1 cell>u32 u32+`。
 
+## 原生 Script 指令
+
+用 Forth 词写栈操作和控制流。`REQUIRE BSV` 加载受支持的 Genesis 与 Chronicle 共有原生 `OP_*` 词，以及 `verify ( cell -- )`。例如，`OP_CAT` 的栈效果是 `bytes bytes -- bytes`，`OP_ADD` 接受两个 `script-int`，遵循 ScriptNum 算术。`OP_EQUAL` 和 `OP_CHECKSIG` 返回 Script 的 `1` 或 `0`，Forth 的 `=` 返回对应的 `-1` 或 `0`。支持的指令列在 `--capabilities` 的 `bsv.native_opcodes` 中。
+
+`bytes-param: <name> <size> ;` 声明定长的构建参数。编译时用 `--bind-bytes <name>=<hex>` 传入数据。`lock:` 按见证顺序声明命名输入，主体按 Forth 的后缀顺序执行。中间的 `verify` 消耗栈顶并在零值时中止。最后的 `verify` 可以直接用它接收的唯一栈值作 Script 的最终判定，非零表示通过。
+
+```forth
+REQUIRE BSV
+bytes-param: owner-hash 20 ;
+
+: check-owner ( bytes -- cell )
+    OP_HASH160 owner-hash OP_EQUAL ;
+
+: check-signature ( bytes bytes -- cell )
+    OP_CHECKSIG ;
+
+lock: p2pkh ( signature:bytes public-key:bytes )
+    signature public-key dup
+    check-owner verify
+    check-signature verify ;
+```
+
+`lock:` 可以调用已定义的词并使用 Forth 的 `IF … ELSE … THEN`。编译器检查两支的栈类型和顺序，再生成 Script 分支。`OP_CHECKSIG` 和 `OP_CHECKSIGVERIFY` 由节点根据花费交易验证。宿主测试可以通过 `evaluate(..., checksig=callback)` 提供验证回调。 [Forth 2012 IF](https://forth-standard.org/standard/core/IF) · [P2PKH 构建命令](../../projects/p2pk-p2pkh-baseline/forth/README.md)
+
 ## 整数范围
 
 `range: <name> <base> <lower> <upper> ;` 声明下界包含、上界排除的整数区间。基类型可用 `cell`、`u32`、`route` 和 `script-int`。边界可用十进制或 `#`、`$`、`%` 前缀整数。声明读取数学整数。普通 Forth 字面量仍遵循 64 位 cell 语义。

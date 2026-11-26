@@ -1,3 +1,5 @@
+REQUIRE BSV
+
 ( These words construct Script. The committed verifier rebuilds the ordered key. )
 : lamport-bit ( bytes -- bytes )
     32 s-num op-split op-swap op-sha256 op-swap
@@ -21,8 +23,10 @@
     authorization bytes-cat op-size witness-size s-num op-numequalverify
     op-swap op-hash256 op-dup op-toaltstack ;
 
+: lamport-bind-spend ( bytes -- bytes ) op-fromaltstack binding bytes-cat ;
+
 : lamport-committed-key ( bytes -- bytes )
-    lamport-authorization lamport-committed-verifier op-fromaltstack binding bytes-cat ;
+    lamport-authorization lamport-committed-verifier lamport-bind-spend ;
 
 : lamport-full-key ( bytes -- bytes )
-    lamport-authorization full-key-verifier bytes-cat op-fromaltstack binding bytes-cat ;
+    lamport-authorization full-key-verifier bytes-cat lamport-bind-spend ;

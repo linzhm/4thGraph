@@ -151,6 +151,8 @@ def evaluate(raw, stack=None, checksig=None, *, observe_stack=None):
                 else: put(int(eq))
             elif name=='VERIFY':
                 if not truth(pop()): raise ScriptError('VERIFY')
+            elif name in ('RIPEMD160', 'SHA1'):
+                stack.append(new(name.lower(), pop()).digest())
             elif name in ('SHA256','HASH256','HASH160'):
                 v=sha256(pop()).digest()
                 stack.append(sha256(v).digest() if name=='HASH256' else new('ripemd160',v).digest() if name=='HASH160' else v)

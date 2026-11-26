@@ -4,9 +4,11 @@
 
 | 模块 | 公开接口 | 现有项目 |
 | --- | --- | --- |
+| `std/bsv` | `REQUIRE BSV` 加载 `verify ( cell -- )` 和受支持的原生 `OP_*` 词 | [P2PKH 示例](../../projects/p2pk-p2pkh-baseline/forth/p2pkh.fth) |
 | `std/u32` | `u32-inc ( u32 -- u32 )`，按 32 位回绕 | [PELS Counter](../../projects/pels-counter/pels-counter.fth) |
 | `std/p2pk` | `p2pk-lock ( bytes -- bytes )`，接收 33 字节压缩公钥并返回锁脚本 | [库源码](../../src/fourthgraph/stdlib/p2pk.fth) · [P2PK 示例](../../projects/p2pk-p2pkh-baseline/forth/p2pk.fth) |
 | `std/p2pkh` | `p2pkh-lock ( bytes -- bytes )`，接收 20 字节公钥哈希并返回锁脚本 | [库源码](../../src/fourthgraph/stdlib/p2pkh.fth) · [P2PKH 示例](../../projects/p2pk-p2pkh-baseline/forth/p2pkh.fth) |
+| `std/native-p2pk`、`std/native-p2pkh` | 绑定接收者后编译原生付款锁 | [付款构建命令](../../projects/p2pk-p2pkh-baseline/forth/README.md) |
 | `std/p256` | `p256-add`、`p256-double`，项目式坐标，保留栈底的 `p b3` | [P-256 内核](../../src/fourthgraph/stdlib/p256.fth) |
 | `std/script-fragments` | 构造栈搬运、32 字节反序和无符号大端整数解码片段 | [库源码](../../src/fourthgraph/stdlib/script-fragments.fth) |
 | `std/secp256k1` | 齐次射影点加、仿射混合点加、倍点和标量分解 | [曲线内核](../../src/fourthgraph/stdlib/secp256k1.fth) |
@@ -24,11 +26,12 @@ Forth 的库和应用使用同一种词定义。加载文件会解释顶层内�
 
 - **按调用边界拆模块。** P2PK 的调用者提供压缩公钥，P2PKH 的调用者提供公钥哈希。两种锁可以独立构建，所以各有模块。共享坐标约定与域运算的 `p256-add` 和 `p256-double` 属于同一模块。按相关功能组织模块，也便于把内部辅助词留在模块中。 [Rust 模块组织](https://doc.rust-lang.org/book/ch07-02-defining-modules-to-control-scope-and-privacy.html)
 - **显式列出公开词。** 在 `stdlib.py` 登记每个导出词的栈签名、输入契约和失败行为。辅助词随文件加载。库的调用方依赖清单规定的公开接口，便于对单个词做差分和提取。 [Scheme R7RS 库声明](https://standards.scheme.org/r7rs-html5/index.html#5.6.1)
-- **示例选择入口，构建产生脚本。** `stdlib/p2pk.fth` 定义 `p2pk-lock`，`projects/p2pk-p2pkh-baseline/forth/p2pk.fth` 导入该词并声明入口。加载示例时解析依赖和定义。构建时执行构造词得到序列化锁，BSV 节点在验证花费时执行生成锁中的 `OP_CHECKSIG`。 [P2PK 构建和复放](../../projects/p2pk-p2pkh-baseline/forth/README.md)
+- **原生付款入口。** P2PK 和 P2PKH 的示例加载打包的 `lock:` 定义。构建时绑定接收者，花费时由 Script 执行同一份 Forth 中的验证。 [构建和复放](../../projects/p2pk-p2pkh-baseline/forth/README.md)
 
 以下例子把两个项目的库词编译进同一个 Script。回绕后的计数和生成的 P2PKH 锁都保留在数据栈上。 [完整 Forth 源码](../../projects/workflow-examples/library-composition.fth)
 
 ```forth
+REQUIRE BSV
 REQUIRE stdlib/u32.fth
 REQUIRE stdlib/p2pkh.fth
 : advance-and-pay ( u32 bytes -- u32 bytes ) swap u32-inc swap p2pkh-lock ;
