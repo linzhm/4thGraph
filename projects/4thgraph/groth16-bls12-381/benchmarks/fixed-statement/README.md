@@ -25,7 +25,7 @@
 - 两版均接受有效证明，在 BSV Node 1.2.3 regtest 入池并挖块。使用同一把密钥、但对应另一组公开信号的有效证明时，两版在 BSV Node 和 chain-gang 都拒绝。耗时是每个引擎七次验证的中位数，节点值含 RPC 开销。
 - 结果适用于本夹具和受测 nChain 配置。nChain 的通用入口支持花费时提供公开输入。将固定点梯度移入锁、使用投影坐标入口或调整取模阈值，都属于其他配置。
 
-[测试专用证明夹具](../../proof/groth16/bls12381-counter.json) · [4thGraph 生成器](../../groth16_bls12381.py) · [nChain Groth16 生成器](https://github.com/nchain-innovation/zkscript_package/blob/fc20fb743edbc5bc5aba9d16625d50d1f50a3ef4/src/zkscript/groth16/model/groth16.py)
+[测试专用证明夹具](../../fixtures/counter.json) · [4thGraph 生成器](../../bls12381/verifier.py) · [nChain Groth16 生成器](https://github.com/nchain-innovation/zkscript_package/blob/fc20fb743edbc5bc5aba9d16625d50d1f50a3ef4/src/zkscript/groth16/model/groth16.py)
 
 ## 复现
 
@@ -33,8 +33,10 @@
 
 ```sh
 lab=$(pwd)
-bench="$lab/projects/4thgraph/benchmarks/nchain-fixed"
-fixture="$lab/projects/4thgraph/proof/groth16/bls12381-counter.json"
+project="$lab/projects/4thgraph"
+verifier="$project/groth16-bls12-381"
+bench="$verifier/benchmarks/fixed-statement"
+fixture="$verifier/fixtures/counter.json"
 scratch=$(mktemp -d)
 git clone https://github.com/nchain-innovation/zkscript_package "$scratch/nchain"
 git -C "$scratch/nchain" checkout --detach fc20fb743edbc5bc5aba9d16625d50d1f50a3ef4
@@ -47,7 +49,7 @@ git -C "$scratch/nchain" apply "$bench/nchain-stack.patch"
   PYTHONPATH=. .venv/bin/python "$bench/prepare_nchain.py" "$fixture" "$scratch/scripts"
 )
 
-PYTHONPATH=.:projects/4thgraph bash shared/verify_node.sh --profile raised -- \
+PYTHONPATH="$lab:$project:$verifier" bash shared/verify_node.sh --profile raised -- \
   python "$bench/replay_comparison.py" "$fixture" "$scratch/scripts"
 ```
 

@@ -104,9 +104,9 @@ class Replay:
             return tx.txid_wire()
         return b""
 
-    def fund(self, cells):
+    def fund(self, cells, *, coin=SOURCE):
         self.node.call("generate", [101])
-        outputs = (SOURCE.output,) * cells
+        outputs = (coin.output,) * cells
         raw = Transaction((), outputs, version=self.version).serialize().hex()
         funded = self.node.call("fundrawtransaction", [raw, {"changePosition": cells, "feeRate": 0.00002}])
         signed = self.node.call("signrawtransaction", [funded["hex"]])
@@ -117,18 +117,19 @@ class Replay:
             raise ValueError(f"regtest could not mine the shared bootstrap: {self.traces.get(bootstrap.txid())}")
         return bootstrap
 
-    def deploy(self, contracts, bootstrap, slot, *, version=None):
+    def deploy(self, contracts, bootstrap, slot, *, version=None, coin=SOURCE):
         utxo = UTXO(bootstrap, slot)
         version = contracts.version if version is None else version
-        tx = Transaction((Input(utxo.outpoint.txid, slot),), (contracts.root,), version=version)
-        tx = SOURCE.unlock(tx, 0, bootstrap, FLAG, None)
+        outputs = getattr(contracts, "deployment_outputs", (contracts.root,))
+        tx = Transaction((Input(utxo.outpoint.txid, slot),), outputs, version=version)
+        tx = coin.unlock(tx, 0, bootstrap, FLAG, None)
         return tx, self.record(tx, (utxo,))
 
     def sign(self, draft, host=None):
         host = self.host if host is None else host
         return draft.seal(lambda request: host_call("bsv-sign", host, request))
 
-    def record(self, tx, previous, *, expected=True, live_only=False):
+    def record(self, tx, previous, *, expected=True, live_only=False, input_scripts=None):
         if Transaction.parse(tx.serialize()) != tx:
             raise ValueError("transaction serialization round trip failed")
         parents = tuple(utxo.parent for utxo in previous)
@@ -137,9 +138,11 @@ class Replay:
             raise ValueError("replay input does not match its recorded previous output")
         chain_parents = []
         missing = []
+        spent_parents = set()
         for utxo in previous:
             if live_only and self.node.call("gettxout", [utxo.parent.txid(), utxo.vout]) is None:
                 missing.append(utxo.outpoint.text())
+                spent_parents.add(utxo.parent.txid_wire())
             else:
                 host_call("bsv-lookup-utxo", self.host, utxo.outpoint)
                 chain_parents.append(utxo.parent)
@@ -163,7 +166,11 @@ class Replay:
         mined = bool(host_call("bsv-submit", self.host, tx))
         admission = self.traces[tx.txid()]
         expected_code = None if expected else (-25 if live_only else -26)
-        if (node != [expected or live_only] * len(tx.inputs) or chain != expected or mined != expected
+        expected_scripts = [expected or live_only] * len(tx.inputs) if input_scripts is None else list(input_scripts)
+        # chain-gang receives complete parent transactions. A live sibling can
+        # supply the historical bytes of a spent output from the same parent.
+        chain_has_spent_parent = live_only and spent_parents <= {parent.txid_wire() for parent in chain_parents}
+        if (node != expected_scripts or chain != (expected or chain_has_spent_parent) or mined != expected
                 or admission["mempool"] != expected or admission.get("rpc_code") != expected_code):
             raise ValueError(f"unexpected verdict for {tx.txid()}: scripts={node}, chain-gang={chain}, "
                              f"admission={admission}")
@@ -175,7 +182,7 @@ class Replay:
             "validation_context": context,
             "bsv_node": {"input_scripts": node, "verify_rpc_median_ms": node_ms, **admission},
             "chain_gang": {"transaction": chain, "median_ms": chain_ms, "error": chain_error,
-                           "missing_outpoints": missing},
+                           "missing_outpoints": missing, "all_inputs_live": not missing},
             "stack": stack_peaks(tx, previous) if expected else None,
         }
 
@@ -188,6 +195,10 @@ class Replay:
             return self.keys.sign(request)
 
         return self.sign(draft, replace(self.host, sign=owner_only))
+
+    def record_step(self, draft, tx):
+        binding = draft.binding_evidence(tx)
+        return {**self.record(tx, draft.previous), "binding": binding}
 
     def branch(self, contracts, name, done, data, *, version=None, controls=None):
         draft = contracts.prepare(name, done, data, version=version)
@@ -203,7 +214,7 @@ class Replay:
         work = draft.template.outputs == ("result", "data")
         tx = self.sign_work(draft) if work else self.sign(draft)
         done[name] = tx
-        return {**self.record(tx, draft.previous), "authorizers": list(draft.template.authorizers)}
+        return {**self.record_step(draft, tx), "authorizers": list(draft.template.authorizers)}
 
     def false_gate(self, contracts, name, done, data, version):
         draft = contracts.prepare(name, done, data, version=version)
@@ -224,13 +235,18 @@ class Replay:
         bad_origin = replace(join, tx=replace(join.tx, inputs=(join.tx.inputs[0], foreign_input)),
                              previous=(join.previous[0], foreign), payload=(fields, fields))
         wrong_split = self.record(self.sign(bad_origin), bad_origin.previous, expected=False)
+        reversed_parents = tuple(reversed(join.previous))
+        reversed_fields = contracts.join_payload(tuple(item.parent for item in reversed_parents))
+        bad_slots = replace(join, tx=replace(join.tx, inputs=tuple(reversed(join.tx.inputs))),
+                            previous=reversed_parents, payload=(reversed_fields, reversed_fields))
+        wrong_slots = self.record(self.sign(bad_slots), bad_slots.previous, expected=False)
         wrong_output, = (item for item in contracts.terminals if item != join.tx.outputs[0])
         bad_route = replace(join, tx=replace(join.tx, outputs=(wrong_output,)))
         wrong_successor = self.record(self.sign(bad_route), bad_route.previous, expected=False)
         other_version = {"forkid-v1": 2, "chronicle-v2": 1, "both": 3}[self.target]
         bad_version = replace(join, tx=replace(join.tx, version=other_version))
         wrong_version = self.record(self.sign(bad_version), bad_version.previous, expected=False)
-        return {"missing_input": missing_input, "wrong_split_same_task_id": wrong_split,
+        return {"missing_input": missing_input, "wrong_split_same_task_id": wrong_split, "wrong_slots": wrong_slots,
                 "wrong_successor": wrong_successor, "wrong_version": wrong_version}
 
     def path(self, plan, bootstrap, slot, data, route, *, foreign=None):
@@ -273,11 +289,11 @@ class Replay:
                 if missing["chain_gang"]["missing_outpoints"] != [UTXO(done[right.name], 0).outpoint.text()]:
                     raise ValueError("missing-result control recorded a different absent branch")
                 controls["missing_from_utxo_set"] = missing
-            records[right.name] = {**self.record(done[right.name], right_draft.previous),
+            records[right.name] = {**self.record_step(right_draft, done[right.name]),
                                    "authorizers": list(right_draft.template.authorizers)}
             if foreign:
                 controls.update(self.controls(c, join, foreign))
-            records[join.template.name] = self.record(self.sign(join), join.previous)
+            records[join.template.name] = self.record_step(join, self.sign(join))
             split = done["split"]
             split_draft = c.prepare("split", done, data, version=split.version)
             replacement = replace(split_draft, tx=replace(split_draft.tx, locktime=split.locktime + 1))
@@ -399,7 +415,7 @@ def main():
 def baseline_replay(replay, source):
     pp = parse(source.decode())
     constrained_step = pp.gate.name if pp.gate is not None else "a"
-    constrained_source = source + f"\nindependent-submit {constrained_step}\n".encode()
+    constrained_source = source + f"\nindependent-submit: {constrained_step} ;\n".encode()
     independent = parse(constrained_source.decode())
     options = dict(mode="auto", target=replay.target, optimization=replay.optimization, join_witness=replay.join_witness)
     fused_and_split, original_plans, original_decision = compile_decision(

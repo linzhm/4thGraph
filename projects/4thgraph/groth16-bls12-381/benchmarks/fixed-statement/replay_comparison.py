@@ -6,7 +6,7 @@ from pathlib import Path
 from time import perf_counter
 from statistics import median
 
-from groth16_bls12381 import ScriptVerifier
+from bls12381.verifier import ScriptVerifier
 from groth16_replay import fund, sign_spend, verify_spend
 from protocol import FLAG, authorize
 from replay import TestKeys

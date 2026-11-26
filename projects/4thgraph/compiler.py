@@ -1,26 +1,39 @@
 """Forth 2012 Core subset, typed BSV declarations and transaction scheduling."""
 
 from bisect import bisect_right
-from dataclasses import dataclass
+from dataclasses import InitVar, dataclass, field
+from hashlib import sha256
+from os.path import relpath
+from pathlib import Path
 import re
 
 from shared.script import asm, number
-from ranges import NUMERIC_TYPES, RangeType, Slot, primitive_outputs, range_bound
 
-from wordsets import (
-    BSV_SOURCE, CORE_EXT_SCRIPT, CORE_EXT_WORDS, CORE_WORDS, HOST_WORDS, NAMED_LITERALS,
-    OPTIONAL_WORDSETS, PRIMITIVES, SHUFFLES, TYPES, WRAP_U32, Literal, Primitive, cell_literal,
-)
+if __package__:
+    from .ranges import NUMERIC_TYPES, RangeType, Slot, primitive_outputs, range_bound
+    from .stdlib import LibraryImport, interface_digest, p256_vocabulary, read_library, required_source
+    from .transaction_graph import CompileError, ParentOutput, Port, StageGraph, StageNode, Template, TransactionGraph
+    from .wordsets import (
+        BSV_SOURCE, CORE_EXT_WORDS, CORE_WORDS, FILE_EXT_SOURCE, FILE_EXT_WORDS, HOST_WORDS,
+        LEGACY_IMPLICIT_END, NAMED_LITERALS, OPTIONAL_WORDSETS, PRIMITIVES, SHUFFLES, TYPES, WRAP_U32,
+        Literal, Primitive, cell_literal,
+    )
+else:
+    from ranges import NUMERIC_TYPES, RangeType, Slot, primitive_outputs, range_bound
+    from stdlib import LibraryImport, interface_digest, p256_vocabulary, read_library, required_source
+    from transaction_graph import CompileError, ParentOutput, Port, StageGraph, StageNode, Template, TransactionGraph
+    from wordsets import (
+        BSV_SOURCE, CORE_EXT_WORDS, CORE_WORDS, FILE_EXT_SOURCE, FILE_EXT_WORDS, HOST_WORDS,
+        LEGACY_IMPLICIT_END, NAMED_LITERALS, OPTIONAL_WORDSETS, PRIMITIVES, SHUFFLES, TYPES, WRAP_U32,
+        Literal, Primitive, cell_literal,
+    )
 
 PROJECT_NAME = "4thGraph"
 PROJECT_DESCRIPTION = "A Forth compiler for BSV Script and multi-transaction workflows."
-PROJECT_VERSION = "0.2.0"
+PROJECT_VERSION = "0.2.7"
 GATE_BOUNDARIES = ("auto", "merged", "separate")
 LOCKTIME_THRESHOLD = 500_000_000
-
-
-class CompileError(ValueError):
-    pass
+MAX_EXPANSION = 16_384
 
 
 @dataclass(frozen=True)
@@ -28,43 +41,78 @@ class Token:
     text: str
     line: int
     column: int
+    module: str | None = None
 
     @property
     def name(self):
         return self.text.casefold()
 
+    @property
+    def location(self):
+        prefix = f"{self.module}, " if self.module else ""
+        return f"{prefix}line {self.line}, column {self.column}"
+
     def error(self, message):
-        return CompileError(f"line {self.line}, column {self.column}: {message}")
+        return CompileError(f"{self.location}: {message}")
 
 
 class Tokens:
-    def __init__(self, source):
+    def __init__(self, source, module=None):
         self.source = source.replace("\r\n", "\n").replace("\r", "\n")
+        self.module = module
         self.offset = 0
+        self.pending = None
         self.lines = [0, *(match.end() for match in re.finditer("\n", self.source))]
-        self.wordsets = set()
 
     def __iter__(self):
         return self
 
     def __next__(self):
+        if self.pending is not None:
+            token, self.pending = self.pending, None
+            return token
         while match := TOKEN.search(self.source, self.offset):
             self.offset = match.end()
             line = bisect_right(self.lines, match.start())
-            token = Token(match[0], line, match.start() - self.lines[line - 1] + 1)
+            token = Token(match[0], line, match.start() - self.lines[line - 1] + 1, self.module)
             if token.name == "(":
                 end = self.source.find(")", self.offset)
                 if end < 0:
                     raise token.error("unterminated Forth comment")
                 self.offset = end + 1
             elif token.name == "\\":
-                if "core-ext" not in self.wordsets:
-                    raise token.error("Forth 2012 CORE EXT word '\\' requires 'bsv-use core-ext'")
                 end = self.source.find("\n", self.offset)
                 self.offset = len(self.source) if end < 0 else end + 1
             else:
                 return token
         raise StopIteration
+
+    def filename(self, at):
+        end = self.source.find("\n", self.offset)
+        end = len(self.source) if end < 0 else end
+        name = re.match(r"\s*(\S+)", self.source[self.offset:end])
+        if name is None:
+            raise at.error(f"expected a filename after {at.text!r}")
+        self.offset += name.end()
+        return name[1]
+
+    def stack_effect(self):
+        opening = re.match(r"\s*\((?=\s)", self.source[self.offset:])
+        if opening is None:
+            return None
+        start = self.offset + opening.end()
+        end = self.source.find(")", start)
+        if end < 0:
+            return None
+        terms = self.source[start:end].casefold().split()
+        if "--" not in terms:
+            return None
+        self.offset = end + 1
+        return terms
+
+    def peek(self):
+        self.pending = next(self, None)
+        return self.pending
 
 
 TOKEN = re.compile(r"'[ -~]'(?=\s|$)|\S+")
@@ -110,6 +158,8 @@ class Work:
     input: str
     word: Word
     owner: str
+    declaration: Token
+    input_token: Token
 
 
 @dataclass(frozen=True)
@@ -127,8 +177,11 @@ class Program:
     operator: str
     independent: tuple[tuple[str, int], ...]
     optional_wordsets: tuple[str, ...]
+    join_declaration: Token
+    join_inputs: tuple[Token, Token]
     gate: Work | None = None
     recovery: Recovery | None = None
+    libraries: tuple[LibraryImport, ...] = ()
 
     @property
     def input_order(self):
@@ -140,29 +193,69 @@ class Program:
         order = self.input_order
         return next((name for name in order if order.count(name) > 1), None)
 
+    def stage_graph(self):
+        inputs, stages = {}, []
+        gate_output = None
+        if self.gate is not None:
+            gate = self.gate
+            source = Port(gate.input, "u32", gate.input_token)
+            inputs[source.name] = source
+            gate_output = Port(f"{gate.name}:accepted", "guard", gate.declaration)
+            stages.append(StageNode(gate.name, gate.word.name, gate.owner, (source,), (gate_output,), gate.declaration))
+        for step in self.work:
+            source = Port(step.input, "u32", step.input_token)
+            inputs.setdefault(source.name, source)
+            result = Port(f"{step.name}:result", "u32", step.declaration, linear=True)
+            guard = () if gate_output is None else (Port(gate_output.name, "guard", step.declaration),)
+            stages.append(StageNode(step.name, step.word.name, step.owner, (source, *guard), (result,), step.declaration))
+        takes = tuple(Port(f"{token.name}:result", "u32", token) for token in self.join_inputs)
+        result = Port(f"{self.join_name}:route", "route", self.join_declaration)
+        stages.append(StageNode(self.join_name, self.join.name, None, takes, (result,), self.join_declaration))
+        return StageGraph.build(tuple(inputs.values()), stages)
+
 
 @dataclass(frozen=True)
-class ParentOutput:
-    step: str
-    vout: int
-
-
-@dataclass(frozen=True)
-class Template:
+class Stage:
     name: str
-    inputs: tuple[ParentOutput, ...]
-    authorizers: tuple[str, ...]
-    outputs: tuple[str, ...]
-    executes: tuple[str, ...] = ()
+    word: Word
+    source: Token
+    result: Token
+    owner: str
+    declaration: Token
+
+
+@dataclass(frozen=True)
+class Workflow:
+    input: Token
+    stages: tuple[Stage, ...]
+    independent: tuple[tuple[str, int], ...] = ()
+    recovery: Recovery | None = None
+    libraries: tuple[LibraryImport, ...] = ()
+
+    def stage_graph(self):
+        source = Port(self.input.name, "u32", self.input, linear=True)
+        return StageGraph.build((source,), [
+            StageNode(stage.name, stage.word.name, stage.owner,
+                      (Port(stage.source.name, stage.word.takes[0], stage.source),),
+                      (Port(stage.result.name, stage.word.gives[0], stage.result, linear=True),), stage.declaration)
+            for stage in self.stages
+        ])
 
 
 @dataclass(frozen=True)
 class Plan:
     mode: str
-    program: Program
+    program: Program | Workflow
     templates: tuple[Template, ...]
     fusion_blockers: tuple[str, ...]
     boundary_reasons: tuple[str, ...] = ()
+    deployment_outputs: tuple[str, ...] = ("root-lock",)
+    stage_graph: InitVar[StageGraph | None] = None
+    graph: TransactionGraph = field(init=False)
+
+    def __post_init__(self, stage_graph):
+        graph = TransactionGraph(stage_graph or self.program.stage_graph(), self.deployment_outputs, self.templates)
+        object.__setattr__(self, "graph", graph)
 
 
 def required(tokens, at, field):
@@ -172,11 +265,15 @@ def required(tokens, at, field):
     return value
 
 
-def identifier(tokens, at, field):
+def named_token(tokens, at, field):
     token = required(tokens, at, field)
     if not re.fullmatch(r"[a-z][a-z0-9_-]*", token.name):
         raise token.error(f"invalid {field} {token.text!r}")
-    return token.name
+    return token
+
+
+def identifier(tokens, at, field):
+    return named_token(tokens, at, field).name
 
 
 def transform(stack, takes, gives, at):
@@ -188,13 +285,10 @@ def transform(stack, takes, gives, at):
     stack[start:] = gives
 
 
-def unavailable(token, *, enabled):
-    name = token.name
-    if name in CORE_EXT_WORDS and "core-ext" not in enabled:
-        return token.error(f"Forth 2012 CORE EXT word {token.text!r} requires 'bsv-use core-ext'")
-    if name in CORE_WORDS or name in CORE_EXT_WORDS:
-        wordset = "CORE" if name in CORE_WORDS else "CORE EXT"
-        return token.error(f"Forth 2012 {wordset} word {token.text!r} cannot compile to BSV Script")
+def unavailable(token):
+    for wordset, words in (("CORE", CORE_WORDS), ("CORE EXT", CORE_EXT_WORDS), ("FILE EXT", FILE_EXT_WORDS)):
+        if token.name in words:
+            return token.error(f"Forth 2012 {wordset} word {token.text!r} cannot compile to BSV Script")
     return token.error(f"unknown Forth word {token.text!r}")
 
 
@@ -218,8 +312,6 @@ def body(tokens, stack, words, opener, ranges):
             instructions.append(Located(Conditional(yes, no), token))
             host_uses.update(dict.fromkeys((*yes_host, *no_host)))
             continue
-        if name in CORE_EXT_SCRIPT and "core-ext" not in tokens.wordsets and name not in words:
-            raise unavailable(token, enabled=tokens.wordsets)
         if name in SHUFFLES and name not in words:
             count, order, _ = SHUFFLES[name]
             entries = stack[-count:]
@@ -267,15 +359,14 @@ def resolve(tokens, token, words, ranges):
         raise token.error(str(error)) from error
     if literal is not None:
         return literal
-    if name in BSV_SOURCE:
+    if name in BSV_SOURCE | FILE_EXT_SOURCE:
         raise token.error(f"{token.text!r} is a source declaration and cannot be used inside a definition")
-    raise unavailable(token, enabled=tokens.wordsets)
+    raise unavailable(token)
 
 
 def require_script(word):
     if word.location != "script":
-        uses = ", ".join(f"{token.text} (line {token.line}, column {token.column})"
-                         for token in dict.fromkeys(word.host_uses))
+        uses = ", ".join(f"{token.text} ({token.location})" for token in dict.fromkeys(word.host_uses))
         suffix = f": {uses}" if uses else ""
         raise CompileError(f"host-only words cannot compile to BSV Script{suffix}")
 
@@ -294,9 +385,19 @@ def check_word(words, at, takes, gives):
 
 
 class SourceCompiler:
-    def __init__(self, source):
-        self.tokens = Tokens(source)
-        self.words = {}
+    def __init__(self, source, *, vocabulary=None, stack_types=TYPES, backend=None, source_path=None):
+        self.source = source
+        self.tokens = None
+        self.words = dict(vocabulary or {})
+        self.definitions = {}
+        self.backend = backend
+        self.root_source = Path(source_path).resolve() if source_path is not None else None
+        self.source_path = None
+        self.active_files = []
+        self.loaded_files = set()
+        self.imported_words = {}
+        self.libraries = {}
+        self.stack_types = stack_types
         self.ranges = {}
         self.effects = {}
         self.work = {}
@@ -305,22 +406,93 @@ class SourceCompiler:
         self.operator = None
         self.recovery = None
         self.independent = []
-        for token in self.tokens:
-            try:
-                self.declaration(token)
-            except RecursionError as error:
-                raise token.error("conditional nesting exceeds the compiler's recursion limit") from error
+        self.workflow_input = None
+        self.stages = []
+        self.relation = None
+        self.read_source(source, self.root_source)
         if self.effects:
             at, _, _ = next(iter(self.effects.values()))
             raise at.error(f"stack effect for {at.text!r} has no following definition")
 
     @property
     def optional_wordsets(self):
-        return tuple(sorted(self.tokens.wordsets))
+        return OPTIONAL_WORDSETS
+
+    @property
+    def library_imports(self):
+        return tuple(self.libraries[name] for name in sorted(self.libraries))
+
+    def read_source(self, source, path, label=None):
+        previous_tokens, previous_path = self.tokens, self.source_path
+        self.tokens, self.source_path = Tokens(source, label), path
+        if path is not None:
+            self.active_files.append(path)
+        try:
+            for token in self.tokens:
+                try:
+                    self.declaration(token)
+                except RecursionError as error:
+                    raise token.error("source loading or conditional nesting exceeds the compiler's recursion limit") from error
+        finally:
+            if path is not None:
+                self.active_files.pop()
+            self.tokens, self.source_path = previous_tokens, previous_path
+
+    def require_file(self, at):
+        filename = self.tokens.filename(at)
+        directory = self.source_path.parent if self.source_path is not None else Path.cwd()
+        try:
+            path, name, library = required_source(filename, directory)
+        except (OSError, ValueError) as error:
+            raise at.error(f"could not resolve required file {filename!r}: {error}") from error
+        if path in self.loaded_files:
+            return
+        if path in self.active_files:
+            cycle = " -> ".join(item.name for item in (*self.active_files, path))
+            raise at.error(f"REQUIRE cycle: {cycle}")
+        if library is not None and library.backend is not None and self.backend != library.backend:
+            raise at.error(f"{filename!r} requires the {library.backend} backend")
+        try:
+            raw = read_library(name) if library is not None else path.read_bytes()
+            content = raw.decode("utf-8")
+        except (OSError, UnicodeError) as error:
+            raise at.error(f"could not read required file {filename!r}: {error}") from error
+        # Diagnostics use catalog names for bundled files and source paths for other files.
+        if name is None:
+            base = self.root_source.parent if self.root_source is not None else Path.cwd()
+            name = Path(relpath(path, base)).as_posix()
+        backend_words = ({word: primitive for word, primitive in p256_vocabulary().items() if word not in self.words}
+                         if name == "std/p256" else {})
+        self.words.update(backend_words)
+        try:
+            self.read_source(content, path, name)
+        finally:
+            for spelling, primitive in backend_words.items():
+                if self.words[spelling] is primitive:
+                    del self.words[spelling]
+        interface = None
+        if library is not None:
+            for export in library.exports:
+                entry = export.name
+                word, defined = self.words.get(entry), self.definitions.get(entry)
+                if defined is None or defined.module != name:
+                    raise at.error(f"{filename!r} does not define the declared export {entry!r}")
+                if (word.takes, word.gives) != (export.takes, export.gives):
+                    raise defined.error(f"{entry!r} does not match its public stack effect "
+                                        f"{export.takes} -- {export.gives}")
+                for spelling in export.names:
+                    self.words[spelling] = word
+                    self.definitions[spelling] = defined
+                    self.imported_words[spelling] = (name, export)
+            interface = interface_digest(name, library)
+        self.loaded_files.add(path)
+        self.libraries[name] = LibraryImport(name, sha256(raw).hexdigest(), interface)
 
     def effect(self, at):
         name = required(self.tokens, at, "definition name")
-        if name.name in self.effects or name.name in CONTROL | BSV_SOURCE:
+        if name.name.startswith("bsv-"):
+            raise name.error(f"the bsv- prefix is reserved by 4thGraph: {name.text!r}")
+        if name.name in self.effects or name.name in CONTROL | BSV_SOURCE | FILE_EXT_SOURCE:
             raise name.error(f"invalid or duplicate effect declaration for {name.text!r}")
         before, after = [], []
         current = before
@@ -330,7 +502,7 @@ class SourceCompiler:
                 return
             if token.name == "--" and current is before:
                 current = after
-            elif token.name in TYPES or token.name in self.ranges:
+            elif token.name in self.stack_types or token.name in self.ranges:
                 current.append(token.name)
             else:
                 raise token.error("expected a stack type, '--', or the closing ';'")
@@ -338,7 +510,7 @@ class SourceCompiler:
 
     def declare_range(self, at):
         name = identifier(self.tokens, at, "range name")
-        if name in TYPES or name in self.ranges:
+        if name in self.stack_types or name in self.ranges:
             raise at.error(f"duplicate or reserved range name {name!r}")
         base = required(self.tokens, at, "numeric base type")
         if base.name not in NUMERIC_TYPES:
@@ -361,9 +533,19 @@ class SourceCompiler:
     def define(self, at):
         name = required(self.tokens, at, "definition name")
         declaration = self.effects.pop(name.name, None)
-        if declaration is None:
-            raise name.error(f"typed Script builds require a preceding 'bsv-effect: {name.text} ... ;'")
-        _, takes, gives = declaration
+        if name.name.startswith("bsv-") or name.name in CONTROL | BSV_SOURCE | FILE_EXT_SOURCE:
+            raise name.error(f"invalid or reserved definition name {name.text!r}")
+        if declaration is not None:
+            _, takes, gives = declaration
+        else:
+            terms = self.tokens.stack_effect()
+            if terms is None:
+                raise name.error("expected a stack effect comment after the definition name")
+            if terms.count("--") != 1 or any(kind not in self.stack_types and kind not in self.ranges
+                                             for kind in terms if kind != "--"):
+                raise name.error("stack effect requires declared types separated by exactly one '--'")
+            separator = terms.index("--")
+            takes, gives = tuple(terms[:separator]), tuple(terms[separator + 1:])
         ranges = tuple(self.ranges[kind] for kind in dict.fromkeys((*takes, *gives)) if kind in self.ranges)
         signature = Word(takes, gives, (), "script", ranges=ranges)
         stack = list(signature.slots(takes))
@@ -377,15 +559,14 @@ class SourceCompiler:
             raise name.error(f"body leaves {actual}, declared {gives} with ranges {expected}")
         self.words[name.name] = Word(takes, gives, instructions, "host" if host_uses else "script",
                                      host_uses, name.name, ranges)
+        self.definitions[name.name] = name
+        self.imported_words.pop(name.name, None)
 
     def declaration(self, token):
         tokens = self.tokens
         match token.name:
-            case "bsv-use":
-                wordset = required(tokens, token, "optional word set")
-                if wordset.name not in OPTIONAL_WORDSETS:
-                    raise wordset.error(f"optional Forth word set {wordset.text!r} is unavailable")
-                tokens.wordsets.add(wordset.name)
+            case "require":
+                self.require_file(token)
             case "bsv-effect:":
                 self.effect(token)
             case "range:":
@@ -393,33 +574,37 @@ class SourceCompiler:
             case ":":
                 self.define(token)
             case "work:":
-                name = identifier(tokens, token, "work step")
-                if name in self.work or name in RESERVED_STEPS:
-                    raise token.error(f"invalid or duplicate work step {name!r}")
-                input_name = identifier(tokens, token, "input name")
+                name = named_token(tokens, token, "work step")
+                if name.name in self.work or name.name in RESERVED_STEPS:
+                    raise name.error(f"invalid or duplicate work step {name.text!r}")
+                input_name = named_token(tokens, token, "input name")
                 word = check_word(self.words, required(tokens, token, "worker word"), ("u32",), ("u32",))
                 owner = identifier(tokens, token, "signer role")
-                self.work[name] = Work(name, input_name, word, owner)
+                self.work[name.name] = Work(name.name, input_name.name, word, owner, name, input_name)
+                end_declaration(tokens, token)
             case "gate:":
                 if self.gate is not None:
                     raise token.error("expected at most one gate")
-                name = identifier(tokens, token, "gate step")
-                input_name = identifier(tokens, token, "input name")
+                name = named_token(tokens, token, "gate step")
+                input_name = named_token(tokens, token, "input name")
                 word = check_word(self.words, required(tokens, token, "gate word"), ("u32",), ("cell",))
                 owner = identifier(tokens, token, "signer role")
-                self.gate = Work(name, input_name, word, owner)
+                self.gate = Work(name.name, input_name.name, word, owner, name, input_name)
+                end_declaration(tokens, token)
             case "join:":
                 if self.join is not None:
                     raise token.error("expected one join")
-                name = identifier(tokens, token, "join step")
-                left = identifier(tokens, token, "first work step")
-                right = identifier(tokens, token, "second work step")
+                name = named_token(tokens, token, "join step")
+                left = named_token(tokens, token, "first work step")
+                right = named_token(tokens, token, "second work step")
                 word = check_word(self.words, required(tokens, token, "join word"), ("u32", "u32"), ("route",))
-                self.join = token, name, left, right, word
+                self.join = name, left, right, word
+                end_declaration(tokens, token)
             case "split-authority:":
                 if self.operator is not None:
                     raise token.error("expected one split authority")
                 self.operator = identifier(tokens, token, "signer role")
+                end_declaration(tokens, token)
             case "recovery:":
                 if self.recovery is not None:
                     raise token.error("expected at most one recovery policy")
@@ -427,42 +612,184 @@ class SourceCompiler:
                 if not re.fullmatch(r"[0-9]{1,9}", height.text) or not 0 < int(height.text) < LOCKTIME_THRESHOLD:
                     raise height.error("recovery height must be a block height from 1 to 499999999")
                 self.recovery = Recovery(int(height.text), identifier(tokens, token, "recovery signer role"))
-            case "independent-submit":
-                self.independent.append((identifier(tokens, token, "gate or work step"), token.line))
+                end_declaration(tokens, token)
+            case "workflow-input:":
+                if self.workflow_input is not None:
+                    raise token.error("expected one workflow input")
+                self.workflow_input = named_token(tokens, token, "workflow input")
+                kind = required(tokens, token, "workflow input type")
+                if kind.name != "u32":
+                    raise kind.error("workflow input must be u32")
+                end_declaration(tokens, token)
+            case "stage:":
+                labels = ("stage name", "Script word", "input value", "output value", "signer role")
+                self.stages.append(tuple(named_token(tokens, token, label) for label in labels))
+                end_declaration(tokens, token)
+            case "relation:" | "verify:":
+                if "std/verify" not in self.libraries:
+                    raise token.error("relation: requires 'REQUIRE stdlib/verify.fth'")
+                if self.relation is not None:
+                    raise token.error("expected one relation declaration")
+                transition = named_token(tokens, token, "transition word")
+                route = named_token(tokens, token, "route word")
+                self.relation = (transition, route)
+                end_declaration(tokens, token)
+            case "independent-submit:" | "independent-submit":
+                self.independent.append((identifier(tokens, token, "transaction step"), token.line))
+                end_declaration(tokens, token)
             case name if name in self.work or self.gate is not None and name == self.gate.name:
                 # The original prototype spelled this declaration "<step> independent-submit".
                 directive = required(tokens, token, "independent-submit")
                 if directive.name != "independent-submit":
                     raise directive.error("expected independent-submit after the work step")
                 self.independent.append((name, token.line))
-            case name if name in CORE_EXT_SCRIPT and "core-ext" not in tokens.wordsets and name not in self.words:
-                raise unavailable(token, enabled=tokens.wordsets)
             case name if name in self.words or name in PRIMITIVES or name in SHUFFLES or name in HOST_WORDS \
                     or name in NAMED_LITERALS:
                 raise token.error("top-level execution is unavailable in a Script build")
             case _:
-                raise unavailable(token, enabled=tokens.wordsets)
+                raise unavailable(token)
+
+    def require_workflow_declarations(self):
+        if self.relation:
+            raise self.relation[0].error("use the relation compiler for a relation: declaration")
 
     def program(self):
+        self.require_workflow_declarations()
+        if self.workflow_input is not None or self.stages:
+            raise CompileError("stage workflows require the workflow planner")
         if len(self.work) != 2 or self.join is None or self.operator is None:
             raise CompileError("expected two work declarations, one join and one split authority")
-        at, name, left, right, word = self.join
-        if left == right or set((left, right)) != self.work.keys() or name in self.work or name in RESERVED_STEPS:
-            raise at.error("join must consume both work steps once and have a distinct step name")
+        name, left, right, word = self.join
+        if name.name in self.work or name.name in RESERVED_STEPS:
+            raise name.error("join must have a distinct step name")
+        for operand in (left, right):
+            if operand.name not in self.work:
+                raise operand.error(f"no producer for {operand.text!r}")
+        if left.name == right.name:
+            raise right.error(f"illegal repeated consumption of {right.text!r}")
         step_names = set(self.work)
         if self.gate is not None:
-            if self.gate.name in step_names | RESERVED_STEPS | {name}:
-                raise CompileError(f"invalid or duplicate gate step {self.gate.name!r}")
+            if self.gate.name in step_names | RESERVED_STEPS | {name.name}:
+                raise self.gate.declaration.error(f"invalid or duplicate gate step {self.gate.name!r}")
             step_names.add(self.gate.name)
         for step, line in self.independent:
             if step not in step_names:
                 raise CompileError(f"line {line}: unknown gate or work step {step!r}")
-        return Program(self.words, (self.work[left], self.work[right]), word, name, self.operator,
-                       tuple(self.independent), self.optional_wordsets, self.gate, self.recovery)
+        return Program(self.words, (self.work[left.name], self.work[right.name]), word, name.name, self.operator,
+                       tuple(self.independent), self.optional_wordsets, name, (left, right),
+                       self.gate, self.recovery, self.library_imports)
+
+    def workflow(self):
+        self.require_workflow_declarations()
+        if self.workflow_input is None:
+            if self.stages:
+                raise self.stages[0][0].error("staged workflow needs a workflow-input: declaration")
+            raise CompileError("expected a workflow-input: declaration")
+        if self.work or self.join or self.operator or self.gate:
+            raise self.workflow_input.error("staged workflows cannot contain parallel work or join declarations")
+        if len(self.stages) < 2:
+            raise self.workflow_input.error("a workflow needs at least two stages")
+        stages = {}
+        names = set(RESERVED_STEPS)
+        for name, entry, source, result, owner in self.stages:
+            if name.name in names:
+                raise name.error(f"duplicate or reserved stage {name.text!r}")
+            names.add(name.name)
+            word = self.words.get(entry.name)
+            if word is None:
+                raise entry.error(f"undefined Script word {entry.text!r}")
+            try:
+                require_script(word)
+            except CompileError as error:
+                raise entry.error(str(error)) from error
+            if len(word.takes) != 1 or len(word.gives) != 1:
+                raise entry.error("workflow words must consume and produce exactly one value")
+            stages[name.name] = Stage(name.name, word, source, result, owner.name, name)
+        workflow = Workflow(self.workflow_input, tuple(stages.values()), tuple(self.independent), self.recovery,
+                            self.library_imports)
+        ordered = tuple(stages[stage.name] for stage in workflow.stage_graph().stages)
+        for stage, expected in zip(ordered, (*("u32" for _ in ordered[:-1]), "route"), strict=True):
+            if stage.word.gives != (expected,):
+                raise stage.result.error(f"expected a chain of u32 states ending in route, found {stage.word.gives[0]}")
+        for step, line in self.independent:
+            if step not in stages:
+                raise CompileError(f"line {line}: unknown workflow stage {step!r}")
+        return Workflow(self.workflow_input, ordered, workflow.independent, workflow.recovery, workflow.libraries)
 
 
-def parse(source):
-    return SourceCompiler(source).program()
+def end_declaration(tokens, at):
+    end = tokens.peek()
+    if end is not None and end.name == ";":
+        next(tokens)
+    elif at.name not in (*LEGACY_IMPLICIT_END, "independent-submit"):
+        raise (end or at).error(f"expected ';' after {at.text!r}")
+
+
+WORKFLOW_MODES = ("fused", "serial", "atomic")
+
+
+def workflow_blockers(program, mode, available_authorizers):
+    if mode != "serial" and len(program.stages) != 2:
+        stage = program.stages[2].declaration
+        return [{"code": "unsupported_stage_count", "line": stage.line,
+                 "message": f"{stage.location}: {mode} supports two stages; use serial for a longer chain"}]
+    required_roles = ((program.stages[0].owner,) if mode == "serial"
+                      else tuple(dict.fromkeys(stage.owner for stage in program.stages)))
+    reasons = [
+        {"code": "unavailable_authorizer", "role": role,
+         "message": f"{role} must be available for the first spend in the {mode} layout"}
+        for role in required_roles if role not in available_authorizers
+    ]
+    if mode != "serial":
+        reasons.extend(
+            {"code": "independent_submit", "stage": step, "line": line,
+             "message": f"line {line}: independent-submit {step} requires a separate transaction"}
+            for step, line in program.independent
+        )
+    return reasons
+
+
+def plan_workflow(program, mode, *, available_authorizers=None):
+    available = {stage.owner for stage in program.stages} if available_authorizers is None else set(available_authorizers)
+    if mode == "auto":
+        mode = "serial" if workflow_blockers(program, "fused", available) else "fused"
+    if mode not in WORKFLOW_MODES:
+        raise CompileError("workflow mode must be fused, serial or atomic")
+    blockers = workflow_blockers(program, mode, available)
+    if blockers:
+        raise CompileError("; ".join(reason["message"] for reason in blockers))
+    return workflow_layout(program, mode)
+
+
+def workflow_layout(program, mode):
+    graph = program.stage_graph()
+    first, second = graph.stages[:2]
+    if mode == "fused":
+        templates = (
+            Template(mode, (ParentOutput("deploy", 0),), tuple(dict.fromkeys((first.authorizer, second.authorizer))),
+                     ("terminal", "receipt"), (first.name, second.name)),
+        )
+        deployment, reasons = ("state-lock",), ()
+    if mode == "serial":
+        templates = tuple(
+            Template(stage.name, (ParentOutput(parent, 0),), (stage.authorizer,),
+                     ("terminal", "receipt") if stage is graph.stages[-1] else ("state",), (stage.name,))
+            for stage, parent in zip(graph.stages, ("deploy", *(node.name for node in graph.stages[:-1])), strict=True)
+        )
+        deployment = ("state-lock",)
+        reasons = ("materialize each u32 result in the next transaction's input",)
+    if mode == "atomic":
+        templates = (
+            Template(mode, (ParentOutput("deploy", 0), ParentOutput("deploy", 1)),
+                     (first.authorizer, second.authorizer), ("terminal", "receipt"), (first.name, second.name)),
+        )
+        deployment = ("state-lock", "route-lock")
+        reasons = ("check each stage in a separate input and bind both inputs to the same deployment and outputs",)
+    return Plan(mode, program, templates, (), reasons, deployment, graph)
+
+
+def parse(source, *, source_path=None):
+    return SourceCompiler(source, source_path=source_path).program()
 
 
 def availability(program, data, authorizers):
@@ -542,6 +869,7 @@ def split_templates(program, separate_gate):
 def schedule(program, mode="auto", *, available_data=None, available_authorizers=None, gate_boundary="auto"):
     if mode not in {"auto", "fused", "split"}:
         raise CompileError(f"unknown schedule {mode!r}")
+    graph = program.stage_graph()
     gate = program.gate
     if gate_boundary not in GATE_BOUNDARIES:
         raise CompileError(f"unknown gate boundary {gate_boundary!r}")
@@ -573,7 +901,7 @@ def schedule(program, mode="auto", *, available_data=None, available_authorizers
             first = gate.name if separate and gate.input == shared else "split"
             reasons.append(f"{first}: input {shared} must be available here to bind it for all consuming steps")
         templates = split_templates(program, separate)
-    return Plan(mode, program, templates, tuple(blockers), tuple(reasons))
+    return Plan(mode, program, templates, tuple(blockers), tuple(reasons), stage_graph=graph)
 
 
 def evaluate(word, *values, context=None):
@@ -628,8 +956,37 @@ def expanded(instructions):
             yield instruction, source
 
 
-def lower(word, *, check_input_ranges=True):
+def bounded_expansion(*roots, limit):
+    """Count expanded calls and branches without materializing their instructions."""
+    sizes = {}
+    pending = [(body, None) for body in roots]
+    while pending:
+        body, children = pending.pop()
+        if id(body) in sizes:
+            continue
+        if children is None:
+            children = []
+            for item in body:
+                node = item.instruction if isinstance(item, Located) else item
+                if isinstance(node, Word):
+                    children.append(node.body)
+                elif isinstance(node, Conditional):
+                    children.extend((node.yes, node.no))
+            pending.append((body, children))
+            pending.extend((child, None) for child in children if id(child) not in sizes)
+        else:
+            sizes[id(body)] = min(limit + 1, len(body) + sum(sizes[id(child)] for child in children))
+    return min(limit + 1, sum(sizes[id(body)] for body in roots))
+
+
+def check_word_expansion(word, max_expansion):
+    if bounded_expansion(word.body, limit=max_expansion) > max_expansion:
+        raise CompileError(f"word {word.name!r} exceeds the {max_expansion}-operation expansion budget before lowering")
+
+
+def lower(word, *, check_input_ranges=True, max_expansion=MAX_EXPANSION):
     require_script(word)
+    check_word_expansion(word, max_expansion)
     try:
         prefix = entry_range_checks(word) if check_input_ranges else b""
         return prefix + lower_body(word.body)

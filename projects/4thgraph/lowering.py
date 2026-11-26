@@ -4,7 +4,10 @@ from dataclasses import asdict, dataclass, replace
 
 from shared.script import asm
 
-from compiler import CompileError, Conditional, Shuffle, Token, entry_range_checks, expanded, lower, require_script
+from compiler import (
+    MAX_EXPANSION, CompileError, Conditional, Shuffle, Token, check_word_expansion, entry_range_checks, expanded, lower,
+    require_script,
+)
 from ranges import PRIMITIVE_NAMES, Slot, primitive_outputs, raw_interval, remainder_is_identity
 from stack_schedule import Graph
 from wordsets import NUMERIC_RANGES, PRIMITIVES, SHUFFLES, U32, WRAP_CELL, WRAP_U32, Literal
@@ -35,6 +38,7 @@ class Rewrite:
     inputs: tuple[Slot, ...]
     script_bytes: tuple[int, int] | None = None
     basis: str | None = None
+    module: str | None = None
 
 
 @dataclass(frozen=True)
@@ -49,6 +53,8 @@ class CompiledWord:
             row = asdict(rewrite)
             if rewrite.basis is None:
                 del row["basis"]
+            if rewrite.module is None:
+                del row["module"]
             rewrites.append(row)
         return {"script_bytes": len(self.script), "rewrites": rewrites}
 
@@ -76,6 +82,7 @@ def build_block(body, stack, rewrites, *, schedule=False):
     for node, source in expanded(body):
         depth = len(stack)
         position = (source.line, source.column) if source is not None else (None, None)
+        module = source.module if source is not None else None
         if isinstance(node, Literal):
             slot = Slot.literal(node)
             stack.append(slot)
@@ -98,7 +105,7 @@ def build_block(body, stack, rewrites, *, schedule=False):
                 cmp = code[-1]
                 code[-1] = replace(cmp, script=cmp.script[:-1])
                 prefix = b""
-                rewrites.append(Rewrite("comparison-feeds-if", *position, (flag,)))
+                rewrites.append(Rewrite("comparison-feeds-if", *position, (flag,), module=module))
             script = (prefix + asm("OP_IF") + emit(yes_code)
                       + asm("OP_ELSE") + emit(no_code) + asm("OP_ENDIF"))
             code.append(Operation(source, (flag,), (), script, depth, arms=(yes_code, no_code)))
@@ -125,7 +132,7 @@ def build_block(body, stack, rewrites, *, schedule=False):
                     depth -= 1
                     takes = args[:-1]
                     script = asm("OP_1ADD") + script[1:]
-                    rewrites.append(Rewrite("add-one-instruction", *position, args))
+                    rewrites.append(Rewrite("add-one-instruction", *position, args, module=module))
             if rule == "integer-remainder-in-range":
                 original_bytes = len(node.code)
                 if code and code[-1].literal is not None:
@@ -134,9 +141,9 @@ def build_block(body, stack, rewrites, *, schedule=False):
                     takes = args[:-1]
                     script = b""
                 rewrites.append(Rewrite(rule, *position, args, (original_bytes, len(script)),
-                                        "positive bounded divisor exceeds the dividend magnitude"))
+                                        "positive bounded divisor exceeds the dividend magnitude", module=module))
             elif rule:
-                rewrites.append(Rewrite(rule, *position, args))
+                rewrites.append(Rewrite(rule, *position, args, module=module))
             stack[start:] = outputs
             # Arbitrary byte strings may exceed a Script stack resource limit
             # when used by a compound primitive. Keep their evaluation order.
@@ -180,11 +187,13 @@ def schedule_block(block, rewrites):
         return block
     source = start.source
     line, column = (source.line, source.column) if source else (None, None)
+    module = source.module if source else None
     if len(script) < before:
-        rewrites.append(Rewrite("stack-last-use-and-sharing", line, column, (), (before, len(script))))
+        rewrites.append(Rewrite("stack-last-use-and-sharing", line, column, (), (before, len(script)), module=module))
     if len(compact) < min(before, len(script)):
         rewrites.append(Rewrite("stack-local-operand-scheduling", line, column, (), (min(before, len(script)), len(compact)),
-                                "total basic block, live-use counts, exact commutative opcode, unchanged output order"))
+                                "total basic block, live-use counts, exact commutative opcode, unchanged output order",
+                                module=module))
         script = compact
     return (Operation(source, (), (), script, start.depth),)
 
@@ -193,12 +202,13 @@ def emit(operations):
     return b"".join(op.script for op in operations)
 
 
-def compile_word(word, optimization=BASELINE, *, check_input_ranges=True):
+def compile_word(word, optimization=BASELINE, *, check_input_ranges=True, max_expansion=MAX_EXPANSION):
     if optimization not in OPTIMIZATIONS:
         raise ValueError(f"unknown optimization {optimization!r}")
-    require_script(word)
     if optimization == BASELINE:
-        return CompiledWord(lower(word, check_input_ranges=check_input_ranges))
+        return CompiledWord(lower(word, check_input_ranges=check_input_ranges, max_expansion=max_expansion))
+    require_script(word)
+    check_word_expansion(word, max_expansion)
     rewrites = []
     try:
         operations = build_block(word.body, list(word.slots(word.takes)), rewrites,

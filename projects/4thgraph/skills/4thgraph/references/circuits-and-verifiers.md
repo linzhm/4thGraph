@@ -1,11 +1,12 @@
 # Circuits and verifiers
 
-Use the tools and examples from the pinned BSV Script Lab checkout. Check the selected entry point and its `--help` before building. The installed `4thgraph` and `4thgraph-report` commands cover offline Script compilation, transaction planning and decision reporting.
+Use the tools and examples from the pinned BSV Script Lab checkout. Check the selected entry point and its `--help` before building. The installed `4thgraph-circuit` and `4thgraph-verify` commands can build outside the checkout. Use the checkout for funded replay.
 
 ## Forth to circuit
 
 - Use `projects/4thgraph/circuit_backend.py` with `projects/4thgraph/proof/workflow.fth` as the authoring example. Keep the entry effects `advance ( u32 -- u32 )` and `decide ( u32 -- route )`. Use the circuit subset documented in `projects/4thgraph/language.md`. Verify wraparound and branch thresholds in the host, Script and circuit.
 - Use `proof_replay.py --generated --compare-domains` with the project's regtest launcher to check the generated circuit and the transparent R1CS verifier. This verifier checks a disclosed full assignment. Its example derives the public binding from the authenticated full ForkID ALL preimage and checks the actual successor output.
+- For a `relation:` declaration, use `4thgraph-verify` or `verification.py` to compile the same resolved words to Script and Circom. Report the eligible paths after proof policy, setup and lock-budget checks. Use the generated R1CS path to bind the circuit to the verifier.
 
 ## Groth16
 

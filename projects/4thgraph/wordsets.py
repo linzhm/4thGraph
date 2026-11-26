@@ -113,6 +113,12 @@ def signed_remainder(value, divisor):
     return -magnitude if value < 0 else magnitude
 
 
+def check_byte_size(value, size):
+    if len(value) != size:
+        raise ValueError(f"expected {size} bytes, got {len(value)}")
+    return value
+
+
 BSV_PRIMITIVES = {
     "cell>int": script_word("cell", "script-int", b"", int),
     "int+": script_word("script-int script-int", "script-int", asm("OP_ADD"), add),
@@ -124,6 +130,8 @@ BSV_PRIMITIVES = {
     "cell>u32": script_word("cell", "u32", residue(U32), lambda x: x % U32),
     "u32>cell": script_word("u32", "cell", b"", lambda x: x),
     "bytes-cat": script_word("bytes bytes", "bytes", asm("OP_CAT"), lambda x, y: x + y),
+    "bytes-check-size": script_word("bytes cell", "bytes", asm("OP_OVER OP_SIZE OP_NIP OP_NUMEQUALVERIFY"),
+                                     check_byte_size, may_fail=True),
     "bytes-sha256": script_word("bytes", "bytes", asm("OP_SHA256"), lambda x: sha256(x).digest()),
     "bytes=": cell_comparison("bytes bytes", asm("OP_EQUAL"), lambda x, y: x == y),
 }
@@ -184,11 +192,28 @@ UNUSED VALUE WITHIN [COMPILE] \
 """.lower().split())
 CORE_SOURCE = {":", ";", "("}
 CORE_EXT_SOURCE = {"\\"}
+FILE_EXT_SOURCE = {"require"}
+FILE_EXT_WORDS = set(r'include require required refill rename-file restore-input save-input source-id s\"'.split())
 CORE_SCRIPT = CORE_PRIMITIVES.keys() | CORE_SHUFFLES.keys() | {"if", "else", "then"}
 CORE_EXT_SCRIPT = CORE_EXT_PRIMITIVES.keys() | CORE_EXT_SHUFFLES.keys() | CORE_EXT_LITERALS.keys()
-BSV_SOURCE = {"bsv-use", "bsv-effect:", "range:", "work:", "join:", "gate:", "split-authority:", "recovery:", "independent-submit"}
+DECLARATIONS = {
+    "range:": "<name> <base> <lower> <upper> ;",
+    "work:": "<step> <input> <word> <signer-role> ;",
+    "join:": "<step> <left-work> <right-work> <word> ;",
+    "gate:": "<step> <input> <word> <signer-role> ;",
+    "split-authority:": "<signer-role> ;",
+    "recovery:": "<block-height> <signer-role> ;",
+    "independent-submit:": "<step> ;",
+    "workflow-input:": "<value> u32 ;",
+    "stage:": "<stage> <word> <input-value> <output-value> <signer-role> ;",
+    "relation:": "<transition-word> <route-word> ;",
+}
+LEGACY_DECLARATIONS = {"independent-submit": "independent-submit:", "verify:": "relation:",
+                       "bsv-effect:": "stack-effect comment after the definition name"}
+LEGACY_IMPLICIT_END = ("work:", "join:", "gate:", "split-authority:", "recovery:")
+BSV_SOURCE = DECLARATIONS.keys() | LEGACY_DECLARATIONS.keys()
 BSV_SCRIPT = BSV_PRIMITIVES.keys() | ROUTES.keys() | {"bytes-hex", "check-range"}
-OPTIONAL_WORDSETS = {"core-ext"}
+OPTIONAL_WORDSETS = ("core-ext", "file-ext")
 
 
 def capabilities():
@@ -201,9 +226,20 @@ def capabilities():
         "cell": {"bits": CELL_BITS, "encoding": "signed canonical ScriptNum", "overflow": "wrap"},
         "wordsets": {
             "core": wordset(CORE_WORDS, CORE_SOURCE, CORE_SCRIPT, True),
-            "core-ext": wordset(CORE_EXT_WORDS, CORE_EXT_SOURCE, CORE_EXT_SCRIPT, False),
+            "core-ext": wordset(CORE_EXT_WORDS, CORE_EXT_SOURCE, CORE_EXT_SCRIPT, True),
+            "file-ext": wordset(FILE_EXT_WORDS, FILE_EXT_SOURCE, set(), True),
         },
         "bsv": {"source": sorted(BSV_SOURCE), "script": sorted(BSV_SCRIPT),
+                "source_syntax": {
+                    "position": "top-level",
+                    "reserved_word_prefix": "bsv-",
+                    "stack_effect": ": <word> ( <input-types...> -- <output-types...> ) <body> ;",
+                    "declarations": DECLARATIONS,
+                    "relation_backends": ("script", "r1cs", "groth16-bls12-381"),
+                    "legacy_aliases": LEGACY_DECLARATIONS,
+                    "legacy_implicit_end": LEGACY_IMPLICIT_END,
+                    "legacy_postfix": "<work-or-gate-step> independent-submit",
+                },
                 "host": {name: {"takes": word.takes, "gives": word.gives, "evidence": word.evidence}
                          for name, word in HOST_WORDS.items()}},
     }

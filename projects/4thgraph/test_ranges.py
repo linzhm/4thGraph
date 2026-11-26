@@ -8,7 +8,7 @@ from lowering import compile_word
 from shared.evaluate import ScriptError, evaluate as evaluate_script
 from shared.script import decode_num, encode_num
 
-EXAMPLE = Path(__file__).resolve().parents[1] / "p2pkh-r1/experiments/forth/window-ranges.fth"
+EXAMPLE = Path(__file__).with_name("p2pkh-r1") / "window-ranges.fth"
 SOURCE = EXAMPLE.read_text()
 
 

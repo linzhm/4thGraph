@@ -2,13 +2,8 @@
 
 import argparse
 import json
-from pathlib import Path
 
-from compiler import SourceCompiler, evaluate
-from protocol import is_compressed_public_key
-
-
-SOURCE = Path(__file__).with_suffix(".fth")
+from shared.native_payments import p2pk_lock, p2pkh_lock
 
 
 def main():
@@ -18,17 +13,13 @@ def main():
     recipient.add_argument("--hash160", type=bytes.fromhex, help="20-byte public-key hash for P2PKH")
     args = parser.parse_args()
 
-    if args.public_key is not None:
-        if not is_compressed_public_key(args.public_key):
-            parser.error("--public-key must be a compressed secp256k1 public key")
-        entry, data = "p2pk", args.public_key
-    else:
-        if len(args.hash160) != 20:
-            parser.error("--hash160 must contain 20 bytes")
-        entry, data = "p2pkh", args.hash160
-
-    program = SourceCompiler(SOURCE.read_text())
-    lock, = evaluate(program.words[entry], data)
+    try:
+        if args.public_key is not None:
+            entry, lock = "p2pk", p2pk_lock(args.public_key)
+        else:
+            entry, lock = "p2pkh", p2pkh_lock(args.hash160)
+    except ValueError as error:
+        parser.error(str(error))
     print(json.dumps({"template": entry, "script_bytes": len(lock), "script_hex": lock.hex()}, indent=2))
 
 

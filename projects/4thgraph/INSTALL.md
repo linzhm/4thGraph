@@ -13,7 +13,7 @@ export PATH="$HOME/.local/bin:$PATH"
 4thgraph --capabilities
 ```
 
-This installs `4thgraph` and `4thgraph-report` in `~/.local/bin`. Use `--prefix /path/to/prefix` for a different destination. The commands bundle the compiler modules and their shared Python dependencies, so they can run outside the checkout with Python alone. Run the installer again from the desired revision to upgrade. To uninstall, remove the two commands from the chosen prefix's `bin` directory.
+This installs `4thgraph`, `4thgraph-report`, `4thgraph-circuit`, and `4thgraph-verify` in `~/.local/bin`. Use `--prefix /path/to/prefix` for a different destination. The commands bundle the compiler modules, standard library sources, and shared Python dependencies. Script and Circom source builds run outside the checkout with Python alone. Proof builds that use Circom or snarkjs also need Node.js and npm. Run the installer again from the desired revision to upgrade. To uninstall, remove the four commands from the chosen prefix's `bin` directory.
 
 From the repository root, compile the example word and inspect its stack signature, bytecode, and rewrites:
 
@@ -34,7 +34,7 @@ Use `--mode fused` to require a single post-deployment spend, or `--mode split` 
 4thgraph-report replay.json --output-dir decision
 ```
 
-Use the same checkout revision for the CLI and skill. To generate new replay evidence, use the checkout's [regtest workflow](README.md#复放与编译) with BSV Node and the pinned chain-gang build. Use the checkout for the [circuit and verifier builders](skills/4thgraph/references/circuits-and-verifiers.md) and their backend-specific dependencies.
+Use the same checkout revision for the CLI and skill. Use `4thgraph-circuit` to emit Circom and `4thgraph-verify` to build a `relation:` declaration. Run funded replay with the checkout's [regtest workflow](README.md#复放与编译), BSV Node, and the pinned chain-gang build. [Syntax book](syntax.md) · [Verification paths](stdlib.md#验证路径)
 
 ## Codex Agent Skill
 

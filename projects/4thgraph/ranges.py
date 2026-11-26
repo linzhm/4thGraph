@@ -4,7 +4,11 @@ from dataclasses import dataclass
 import re
 
 from shared.script import asm, number
-from wordsets import Literal, NUMERIC_RANGES, PRIMITIVES, Primitive, U32
+
+if __package__:
+    from .wordsets import Literal, NUMERIC_RANGES, PRIMITIVES, Primitive, U32
+else:
+    from wordsets import Literal, NUMERIC_RANGES, PRIMITIVES, Primitive, U32
 
 NUMERIC_TYPES = NUMERIC_RANGES.keys() | {"script-int"}
 PRIMITIVE_NAMES = {id(word): name for name, word in PRIMITIVES.items()}
