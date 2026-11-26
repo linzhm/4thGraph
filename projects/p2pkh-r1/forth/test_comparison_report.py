@@ -8,7 +8,7 @@ import unittest
 from unittest.mock import patch
 
 from comparison_report import SCHEMA_VERSION, read_report
-from msm_experiment import SOURCE, compare, guided_candidates, main
+from msm_experiment import SOURCE, compare, guided_candidates, local_build, main
 from msm_compiler import R1MSMCompiler
 
 
@@ -60,6 +60,34 @@ class ComparisonReportTests(unittest.TestCase):
                     self.assertEqual(main(), expected)
                     self.assertEqual(replay.call_args.args[0].source, source if explicit else SOURCE)
                     self.assertEqual(json.loads(output.read_text()), report)
+
+    def test_compare_rejects_a_dependency_changed_after_preflight(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "msm.fth"
+            source.write_bytes(SOURCE.read_bytes())
+            dependency = root / "r1.fth"
+            dependency.write_bytes(SOURCE.with_name("r1.fth").read_bytes() + b"\nREQUIRE nested.fth\n")
+            nested = root / "nested.fth"
+            original = b"( original dependency )\n"
+            nested.write_bytes(original)
+            args = SimpleNamespace(source=source, workflow="explicit", candidate=["split-4"],
+                                   budget=1, full_budget=1, vectors=12, samples=1, matrix=False, reference=None)
+
+            def edit_after_preflight(*args):
+                nested.write_bytes(original + b"( changed after preflight )\n")
+                return local_build(*args)
+
+            with patch("msm_experiment.local_build", side_effect=edit_after_preflight), patch(
+                "msm_experiment.shortlist", return_value=()
+            ):
+                report, _ = compare(args)
+            row = report["candidates"]["split-4"]
+            self.assertEqual(row["status"], "local-rejected")
+            self.assertRegex(row["reason"], r"dependencies changed.*nested\.fth")
+            self.assertNotIn("build_source", row)
+            self.assertEqual(report["dependencies"]["nested.fth"], sha256(original).hexdigest())
+            self.assertEqual(report["source_verification"]["status"], "unverified")
 
     def test_compare_can_reuse_its_output_as_a_reference(self):
         options = dict(

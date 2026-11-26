@@ -8,9 +8,9 @@ from pathlib import Path
 from fourthgraph.bsv.evaluate import evaluate
 from fourthgraph.bsv.otda_reconstruction import Reconstruction
 from fourthgraph.compiler.ranges import Slot, primitive_outputs
+from fourthgraph.compiler.script_builder import ScriptBuilder, build_word
 from fourthgraph.compiler.wordsets import PRIMITIVES
 
-from compile_r1 import ScriptBuilder, script_word
 from fixed_templates import compiled_template
 from msm_lowering import FIELD, INFINITY, ORDER, Strategy, WindowPlan, constant_point
 from msm_lowering import opcode_count, reconstruction, window_program
@@ -64,13 +64,18 @@ class R1MSMCompiler:
 
     def builder(self, *, optimize):
         return ScriptBuilder(self.source.decode(), source_path=self.source_path, optimize=optimize, vocabulary={
-            "bsv-owner": script_word("", "bytes", b"", lambda: OWNER),
-            "p256.mul2": script_word("script script", "script", b"", bytes.__add__),
+            "bsv-owner": build_word("", "bytes", lambda: OWNER),
+            "p256.mul2": build_word("script script", "script", bytes.__add__),
         })
 
     @cached_property
     def optimized(self):
-        return self.builder(optimize=True)
+        compiler = self.builder(optimize=True)
+        changed = set(self.frontend.library_imports).symmetric_difference(compiler.library_imports)
+        if changed:
+            names = ", ".join(sorted({entry.name for entry in changed}))
+            raise ValueError(f"required Forth dependencies changed after R1 preflight: {names}")
+        return compiler
 
     @cached_property
     def source_identity(self):
