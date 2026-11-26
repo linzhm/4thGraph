@@ -40,6 +40,7 @@ class Primitive:
     code: bytes | None
     run: Callable[..., tuple]
     evidence: str
+    comparison: bool = False
 
     @property
     def location(self):
@@ -73,7 +74,8 @@ def cell_arithmetic(takes, opcode, operation):
 
 def cell_comparison(takes, code, compare):
     # Forth true flags have every bit set. Our canonical ScriptNum for that cell is -1.
-    return script_word(takes, "cell", code + asm("OP_NEGATE"), lambda *values: -int(compare(*values)))
+    return Primitive(tuple(takes.split()), ("cell",), code + asm("OP_NEGATE"),
+                     lambda *values: (-int(compare(*values)),), "script execution", comparison=True)
 
 
 UNSIGNED_CELL = add_modulus_if_negative(CELL_MODULUS)

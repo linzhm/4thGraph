@@ -11,6 +11,9 @@ from wordsets import (
     OPTIONAL_WORDSETS, PRIMITIVES, SHUFFLES, TYPES, WRAP_U32, Literal, Primitive, cell_literal,
 )
 
+PROJECT_NAME = "4thGraph"
+PROJECT_DESCRIPTION = "A Forth compiler for BSV Script and multi-transaction workflows."
+
 
 class CompileError(ValueError):
     pass
@@ -74,6 +77,12 @@ class Shuffle:
 class Conditional:
     yes: tuple
     no: tuple
+
+
+@dataclass(frozen=True)
+class Located:
+    instruction: object
+    source: Token
 
 
 @dataclass(frozen=True)
@@ -173,7 +182,7 @@ def body(tokens, stack, words, opener):
                 no, no_host, stop = body(tokens, other, words, token)
             if stop.name != "then" or stack != other:
                 raise token.error("IF must end in THEN and leave equal stack types on both branches")
-            instructions.append(Conditional(yes, no))
+            instructions.append(Located(Conditional(yes, no), token))
             host_uses.extend((*yes_host, *no_host))
             continue
         if name in CORE_EXT_SCRIPT and "core-ext" not in tokens.wordsets and name not in words:
@@ -184,7 +193,7 @@ def body(tokens, stack, words, opener):
             if len(entries) != count:
                 raise token.error(f"stack underflow at {token.text}")
             stack[-count:] = [entries[i] for i in order]
-            instructions.append(Shuffle(name))
+            instructions.append(Located(Shuffle(name), token))
             continue
         instruction = resolve(tokens, token, words)
         if isinstance(instruction, Literal):
@@ -195,7 +204,7 @@ def body(tokens, stack, words, opener):
                 host_uses.extend(instruction.host_uses)
             elif instruction.location == "host":
                 host_uses.append(token)
-        instructions.append(instruction)
+        instructions.append(Located(instruction, token))
     raise opener.error(f"unterminated {opener.text!r}")
 
 
@@ -355,6 +364,8 @@ class SourceCompiler:
 
 def parse(source):
     return SourceCompiler(source).program()
+
+
 def schedule(program, mode="auto", *, available_data=None, available_authorizers=None):
     if mode not in {"auto", "fused", "split"}:
         raise CompileError(f"unknown schedule {mode!r}")
@@ -389,6 +400,8 @@ def evaluate(word, *values, context=None):
 
     def run(instructions):
         for instruction in instructions:
+            if isinstance(instruction, Located):
+                instruction = instruction.instruction
             if isinstance(instruction, Word):
                 run(instruction.body)
             elif isinstance(instruction, Literal):
@@ -414,6 +427,8 @@ def evaluate(word, *values, context=None):
 
 def inline(instructions):
     for instruction in instructions:
+        if isinstance(instruction, Located):
+            instruction = instruction.instruction
         if isinstance(instruction, Word):
             yield from inline(instruction.body)
         else:

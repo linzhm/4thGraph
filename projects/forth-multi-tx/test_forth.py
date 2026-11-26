@@ -2,6 +2,7 @@
 
 from dataclasses import replace
 from itertools import product
+from random import Random
 import unittest
 
 from shared.benchmark_validation import chain_verdict
@@ -11,6 +12,7 @@ from shared.script import decode_num, encode_num
 from shared.transaction import Input, Transaction
 
 from compiler import CompileError, SourceCompiler, evaluate, lower, parse, schedule
+from lowering import compile_word
 from protocol import Contracts, invalidated
 from replay import EXAMPLE, TASK_ID, TestKeys
 from wordsets import CELL_SIGN, U32, capabilities
@@ -48,6 +50,24 @@ class CompilerTests(unittest.TestCase):
                 stack, alt = evaluate_script(lower(words[name]), [encode_num(v) for v in values])
                 self.assertEqual((list(map(decode_num, stack)), alt), ([expected], []))
         self.assertEqual(lower(words["wrap"]), b"\x00")
+
+    def test_safe_lowering_ranges_and_comparison_result(self):
+        words = SourceCompiler(SOURCE + "\nbsv-effect: compare cell cell -- cell ;\n: compare < ;\n").words
+        self.assertEqual([len(compile_word(words["inc"], mode).script) for mode in ("baseline", "safe")], [70, 8])
+        optimized = compile_word(words["decide"], "safe")
+        self.assertEqual(len(optimized.script), 16)
+        change, = (item for item in optimized.rewrites if item.rule == "comparison-feeds-if")
+        self.assertEqual(SOURCE.splitlines()[change.line - 1][change.column - 1:][:2], "IF")
+        rng = Random(11704)
+        edges = (0, 1, 19, 20, 21, 1 << 31, U32 - 2, U32 - 1)
+        data = [(words["inc"], (x,)) for x in (*edges, *(rng.getrandbits(32) for _ in range(128)))]
+        data += [(words["decide"], (x, y)) for x, y in product(edges, repeat=2)]
+        data += [(words["compare"], (0, 1)), (words["compare"], (1, 0))]
+        for word, args in data:
+            expected = list(evaluate(word, *args))
+            for mode in ("baseline", "safe"):
+                stack, alt = evaluate_script(compile_word(word, mode).script, list(map(encode_num, args)))
+                self.assertEqual((list(map(decode_num, stack)), alt), (expected, []), (args, mode))
 
     def test_core_cell_semantics(self):
         source = """
