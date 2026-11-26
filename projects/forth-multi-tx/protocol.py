@@ -13,7 +13,8 @@ from shared.script import asm, encode_num, number, push
 from shared.transaction import FORKID, SIGHASH_ALL, Input, Output, Transaction, hash256, preimage_forkid
 
 from compiler import (
-    PROJECT_DESCRIPTION, PROJECT_NAME, PROJECT_VERSION, CompileError, Plan, SourceCompiler, Template, evaluate, schedule,
+    PROJECT_DESCRIPTION, PROJECT_NAME, PROJECT_VERSION, CompileError, Plan, SourceCompiler, Template, availability,
+    evaluate, fused_template, fusion_constraints, schedule,
 )
 from lowering import BASELINE, OPTIMIZATIONS, compile_word
 from stack_schedule import Graph
@@ -33,6 +34,8 @@ PREVOUTS_HASH = 4
 CURRENT_OUTPOINT = 68
 OUTPUTS_HASH = 118
 JOIN_WITNESSES = ("full", "shared")
+CANDIDATE_ORDER = ("fused", "split")
+RANK_ORDER = ("whole_path_bytes", "max_signature_checks", "dependency_depth_including_deploy")
 SECP256K1_FIELD = (1 << 256) - (1 << 32) - 977
 
 
@@ -429,7 +432,7 @@ class Contracts:
                 return (step.input,)
         return ()
 
-    def describe(self):
+    def describe(self, *, cost=None):
         def describe_output(output):
             return {"satoshis": output.value, "script_hex": output.script.hex()}
 
@@ -455,7 +458,7 @@ class Contracts:
             "fusion_blockers": self.plan.fusion_blockers,
             "boundary_reasons": self.plan.boundary_reasons,
             "topology": "gated-parallel" if self.plan.program.gate is not None else "parallel",
-            "estimated_cost": estimate_cost(self),
+            "estimated_cost": estimate_cost(self) if cost is None else cost,
             "templates": [asdict(template) for template in self.plan.templates],
             "deploy_output": describe_output(self.root),
             "terminal_outputs": {route: describe_output(output)
@@ -640,29 +643,86 @@ def estimate_cost(contracts):
     }
 
 
-def compile_candidates(program, keys, task_id, *, mode, available_data, available_authorizers, **options):
-    available_data = None if available_data is None else frozenset(available_data)
-    available_authorizers = None if available_authorizers is None else frozenset(available_authorizers)
-    if mode != "auto":
-        schedule(program, mode, available_data=available_data, available_authorizers=available_authorizers)
-    viable, evidence = {}, {}
-    for candidate in ("fused", "split"):
-        try:
-            plan = schedule(program, candidate, available_data=available_data,
-                            available_authorizers=available_authorizers)
-            contract = Contracts(plan, keys, task_id, **options)
-        except ValueError as error:
-            evidence[candidate] = {"eligible": False, "reason": str(error)}
-            continue
-        evidence[candidate] = {"eligible": True, "cost": estimate_cost(contract)}
-        viable[candidate] = contract
-    if mode == "auto" and viable:
-        order = ("whole_path_bytes", "max_signature_checks", "dependency_depth_including_deploy")
-        mode = min(viable, key=lambda name: tuple(evidence[name]["cost"][metric] for metric in order))
-    if mode not in viable:
-        reasons = ", ".join(f"{name}: {row.get('reason')}" for name, row in evidence.items() if not row["eligible"])
+def artifact_digest(document):
+    fields = {key: value for key, value in document.items() if key != "artifact_sha256"}
+    return sha256(json.dumps(fields, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+
+
+def build_artifact(document, source_bytes):
+    artifact = {**document, "source_sha256": sha256(source_bytes).hexdigest()}
+    return {**artifact, "artifact_sha256": artifact_digest(artifact)}
+
+
+def candidate_rank(cost):
+    return tuple(cost[metric] for metric in RANK_ORDER)
+
+
+def select_candidate(candidates, mode):
+    eligible = [name for name in CANDIDATE_ORDER if candidates[name]["eligible"]]
+    selected = mode
+    if mode == "auto" and eligible:
+        selected = min(eligible, key=lambda name: candidate_rank(candidates[name]["cost"]))
+    if selected not in eligible:
+        reasons = ", ".join(f"{name}: {row['reason']}" for name, row in candidates.items() if not row["eligible"])
         raise CompileError(f"no requested transaction plan is eligible ({reasons})")
-    return viable[mode], {"selected": mode, "candidates": evidence}
+    basis = "explicit_request" if mode != "auto" else ("only_eligible_candidate" if len(eligible) == 1 else "lowest_rank")
+    return selected, basis
+
+
+def compile_decision(program, keys, task_id, *, mode, available_data=None, available_authorizers=None,
+                     source_bytes=None, **options):
+    data, authorizers = availability(program, available_data, available_authorizers)
+    if mode != "auto":
+        schedule(program, mode, available_data=data, available_authorizers=authorizers)
+    blockers = fusion_constraints(program, data, authorizers)
+    viable, artifacts, evidence = {}, {}, {}
+    words = {step.name: step.word.name for step in program.work}
+    words[program.join_name] = program.join.name
+    if program.gate is not None:
+        words[program.gate.name] = program.gate.word.name
+    for candidate in CANDIDATE_ORDER:
+        if candidate == "fused" and blockers:
+            graph = {**asdict(fused_template(program)), "external_inputs": tuple(dict.fromkeys(program.input_order))}
+            evidence[candidate] = {
+                "eligible": False, "reason": "fusion excluded: " + "; ".join(row["message"] for row in blockers),
+                "exclusions": blockers, "graph": [graph], "boundary_reasons": [],
+            }
+            continue
+        plan = schedule(program, candidate, available_data=data, available_authorizers=authorizers)
+        try:
+            contract = Contracts(plan, keys, task_id, **options)
+            cost = estimate_cost(contract)
+        except ValueError as error:
+            evidence[candidate] = {
+                "eligible": False, "reason": str(error), "exclusions": [{"code": "build_error", "message": str(error)}],
+                "graph": [asdict(step) for step in plan.templates], "boundary_reasons": plan.boundary_reasons,
+            }
+            continue
+        spec = contract.describe(cost=cost)
+        evidence[candidate] = {
+            "eligible": True, "cost": cost, "boundary_reasons": plan.boundary_reasons,
+            "graph": [{**asdict(step), "external_inputs": contract.external_inputs(step)} for step in plan.templates],
+            "words": {step: {"word": words[step], **build} for step, build in spec["word_builds"].items()},
+            "rank": candidate_rank(cost),
+        }
+        if source_bytes is not None:
+            artifacts[candidate] = build_artifact(spec, source_bytes)
+            evidence[candidate]["artifact_sha256"] = artifacts[candidate]["artifact_sha256"]
+        viable[candidate] = contract
+    selected, basis = select_candidate(evidence, mode)
+    explanation = {
+        "requested": mode, "selected": selected, "selection_basis": basis, "rank_order": RANK_ORDER,
+        "tie_break_order": CANDIDATE_ORDER,
+        "availability": {"data": sorted(data), "authorizers": sorted(authorizers),
+                         "data_defaulted": available_data is None, "authorizers_defaulted": available_authorizers is None},
+        "candidates": evidence,
+    }
+    return viable, artifacts, explanation
+
+
+def compile_candidates(program, keys, task_id, **options):
+    viable, _, explanation = compile_decision(program, keys, task_id, **options)
+    return viable[explanation["selected"]], explanation
 
 
 def main():
@@ -710,17 +770,16 @@ def main():
             if not isinstance(raw_keys, dict) or any(not isinstance(key, str) for key in raw_keys.values()):
                 raise ValueError("keys must be a JSON object mapping roles to public key hex strings")
             keys = {name: bytes.fromhex(key) for name, key in raw_keys.items()}
-            contract, explanation = compile_candidates(
+            _, artifacts, explanation = compile_decision(
                 source.program(), keys, bytes.fromhex(args.task_id), mode=args.mode, available_data=args.available_data,
                 available_authorizers=args.available_authorizers, target=args.target, optimization=args.optimize,
-                join_witness=args.join_witness,
+                join_witness=args.join_witness, source_bytes=source_bytes,
             )
-            result = contract.describe()
+            result = artifacts[explanation["selected"]]
             if args.explain:
-                result["schedule_explanation"] = explanation
-        result["source_sha256"] = sha256(source_bytes).hexdigest()
-        canonical = json.dumps(result, sort_keys=True, separators=(",", ":")).encode()
-        result["artifact_sha256"] = sha256(canonical).hexdigest()
+                result = {**result, "schedule_explanation": explanation}
+        if args.entry is not None or args.explain:
+            result = build_artifact(result, source_bytes)
     except CompileError as error:
         cli.error(f"{args.source}: {error}")
     except (OSError, ValueError) as error:

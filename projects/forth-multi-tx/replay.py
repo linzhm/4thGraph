@@ -17,7 +17,8 @@ from shared.transaction import Input, Transaction
 
 from compiler import PROJECT_NAME, PROJECT_VERSION, CompileError, Word, evaluate, parse, schedule
 from lowering import BASELINE, OPTIMIZATIONS
-from protocol import DEFAULT_TARGET, JOIN_WITNESSES, TARGETS, Contracts, FLAG, Host, ROOT_VALUE, UTXO, invalidated
+from protocol import DEFAULT_TARGET, JOIN_WITNESSES, TARGETS, Contracts, FLAG, Host, ROOT_VALUE, UTXO
+from protocol import compile_decision, invalidated
 from wordsets import HOST_WORDS
 
 EXAMPLE = Path(__file__).with_name("example.fth")
@@ -233,7 +234,8 @@ class Replay:
                 "wrong_successor": wrong_successor, "wrong_version": wrong_version}
 
     def path(self, plan, bootstrap, slot, data, route, *, foreign=None):
-        c = self.contracts(plan)
+        c = plan if isinstance(plan, Contracts) else self.contracts(plan)
+        plan = c.plan
         first_version, second_version = self.versions[0], self.versions[-1]
         if route == "review":
             first_version, second_version = second_version, first_version
@@ -265,9 +267,12 @@ class Replay:
             join = c.prepare(plan.program.join_name, done, version=first_version)
             if foreign:
                 # Signed bytes for both branches exist, but the right parent is still absent on chain.
-                controls["missing_from_utxo_set"] = self.record(
+                missing = self.record(
                     self.sign(join), join.previous, expected=False, live_only=True,
                 )
+                if missing["chain_gang"]["missing_outpoints"] != [UTXO(done[right.name], 0).outpoint.text()]:
+                    raise ValueError("missing-result control recorded a different absent branch")
+                controls["missing_from_utxo_set"] = missing
             records[right.name] = {**self.record(done[right.name], right_draft.previous),
                                    "authorizers": list(right_draft.template.authorizers)}
             if foreign:
@@ -295,6 +300,7 @@ def metrics(plan, records):
     return {
         "whole_path_bytes": sum(row["bytes"] for row in records.values()),
         "post_deployment_bytes": sum(row["bytes"] for name, row in records.items() if name != "deploy"),
+        "max_transaction_bytes": max(row["bytes"] for row in records.values()),
         "transaction_count": len(records),
         "dependency_depth_including_deploy": max(depths.values()),
         "dependency_depth_after_deploy": max(depths.values()) - 1,
@@ -327,47 +333,55 @@ def main():
     activation = int(os.environ.get("SCRIPT_LAB_CHRONICLE_HEIGHT", ACTIVATION_HEIGHT))
     replay = Replay(node, args.samples, args.target, activation, args.optimize, args.join_witness)
     example = GATED_EXAMPLE if args.topology == "gated-parallel" else EXAMPLE
-    source = example.read_text()
-    pp = parse(source)
-    fused, split = schedule(pp, "fused"), schedule(pp, "split")
+    source = example.read_bytes()
+    pp = parse(source.decode())
     constrained_step = pp.gate.name if pp.gate is not None else "a"
-    constrained_source = source + f"\nindependent-submit {constrained_step}\n"
-    independent = parse(constrained_source)
-    constrained = schedule(independent)
+    constrained_source = source + f"\nindependent-submit {constrained_step}\n".encode()
+    independent = parse(constrained_source.decode())
+    options = dict(mode="auto", target=args.target, optimization=args.optimize, join_witness=args.join_witness)
+    fused_and_split, original_plans, original_decision = compile_decision(
+        pp, replay.keys.public, TASK_ID, source_bytes=source, **options,
+    )
+    constrained, constrained_plans, constrained_decision = compile_decision(
+        independent, replay.keys.public, TASK_ID, source_bytes=constrained_source, **options,
+    )
     try:
         schedule(independent, "fused")
     except CompileError as err:
         rejected = str(err)
     else:
         raise ValueError("hard independent submission boundary did not block fusion")
-    bootstrap = replay.fund(5)
-    c = replay.contracts(split)
-    other, deployment = replay.deploy(c, bootstrap, 4)
+    bootstrap = replay.fund(7)
+    c = fused_and_split["split"]
+    other, deployment = replay.deploy(c, bootstrap, 6)
     foreign = {"deploy": other}
     gate_input = {pp.gate.input: 2} if pp.gate is not None else {}
     split_row = replay.branch(c, "split", foreign, gate_input)
     b_row = replay.branch(c, "b", foreign, {"y": 5})
-    cases = {
-        "fused_settle": replay.path(fused, bootstrap, 0, {"x": 10, "y": 5, **gate_input}, "settle"),
-        "fused_review": replay.path(fused, bootstrap, 1, {"x": (1 << 32) - 1, "y": 2, **gate_input}, "review"),
-        "split_settle": replay.path(split, bootstrap, 2, {"x": 10, "y": 5, **gate_input},
-                                    "settle", foreign=foreign["b"]),
-        "split_review": replay.path(constrained, bootstrap, 3, {"x": (1 << 32) - 1, "y": 2, **gate_input},
-                                    "review", foreign=foreign["b"]),
-    }
+    plans = {**original_plans, "constrained": constrained_plans["split"]}
+    cases = {}
+    for plan_id, contract in (*fused_and_split.items(), ("constrained", constrained["split"])):
+        scenario = "constrained" if plan_id == "constrained" else "original"
+        for route, data in (("settle", {"x": 10, "y": 5}), ("review", {"x": (1 << 32) - 1, "y": 2})):
+            control = foreign["b"] if contract.plan.mode == "split" else None
+            row = replay.path(contract, bootstrap, len(cases), {**data, **gate_input}, route, foreign=control)
+            cases[f"{plan_id}_{route}"] = {
+                "scenario": scenario, "candidate": contract.plan.mode,
+                "source_sha256": plans[plan_id]["source_sha256"], "artifact_sha256": plans[plan_id]["artifact_sha256"],
+                **row,
+            }
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps({
-        "project": PROJECT_NAME, "compiler_version": PROJECT_VERSION, "schema_version": 1, "sample_count": args.samples,
+        "project": PROJECT_NAME, "compiler_version": PROJECT_VERSION, "schema_version": 2, "sample_count": args.samples,
         "bsv_node_version": node.version, "chain_gang": engine,
         "regtest_profile": os.environ.get("SCRIPT_LAB_REGTEST_PROFILE"),
         "target": args.target, "topology": args.topology, "optimization": args.optimize, "join_witness": args.join_witness,
         "chronicle_activation_height": activation,
         "task_id": TASK_ID.hex(), "bootstrap_raw": bootstrap.serialize().hex(),
         "fixture_public_keys": {name: key.hex() for name, key in replay.keys.public.items()},
-        "source": source, "constrained_source": constrained_source,
-        "plans": {**{plan.mode: replay.contracts(plan).describe() for plan in (fused, split)},
-                  "constrained": replay.contracts(constrained).describe()},
-        "constrained_auto_schedule": constrained.mode, "constrained_fused_error": rejected,
+        "source": source.decode(), "constrained_source": constrained_source.decode(),
+        "plans": plans, "decisions": {"original": original_decision, "constrained": constrained_decision},
+        "constrained_auto_schedule": constrained_decision["selected"], "constrained_fused_error": rejected,
         "foreign_same_task_id": {"deploy": deployment, "split": split_row, "b": b_row},
         "cases": cases,
     }, indent=2) + "\n")

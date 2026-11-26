@@ -13,7 +13,7 @@ from wordsets import (
 
 PROJECT_NAME = "4thGraph"
 PROJECT_DESCRIPTION = "A Forth compiler for BSV Script and multi-transaction workflows."
-PROJECT_VERSION = "0.1.0"
+PROJECT_VERSION = "0.1.1"
 
 
 class CompileError(ValueError):
@@ -93,6 +93,7 @@ class Word:
     body: tuple
     location: str
     host_uses: tuple[Token, ...] = ()
+    name: str | None = None
 
 
 @dataclass(frozen=True)
@@ -317,7 +318,7 @@ class SourceCompiler:
             raise stop.error(f"unexpected {stop.text!r}, expected ';'")
         if tuple(stack) != gives:
             raise name.error(f"body leaves {tuple(stack)}, declared {gives}")
-        self.words[name.name] = Word(takes, gives, instructions, "host" if host_uses else "script", host_uses)
+        self.words[name.name] = Word(takes, gives, instructions, "host" if host_uses else "script", host_uses, name.name)
 
     def declaration(self, token):
         tokens = self.tokens
@@ -397,31 +398,54 @@ def parse(source):
     return SourceCompiler(source).program()
 
 
+def availability(program, data, authorizers):
+    stages = (*program.work, program.gate) if program.gate is not None else program.work
+    if data is None:
+        data = program.input_order
+    if authorizers is None:
+        authorizers = (program.operator, *(step.owner for step in stages))
+    return frozenset(data), frozenset(authorizers)
+
+
+def fusion_constraints(program, data, authorizers):
+    blockers = [
+        {"code": "independent_submit", "step": step, "line": line,
+         "message": f"line {line}: independent-submit {step} requires a separate transaction for {step}"}
+        for step, line in program.independent
+    ]
+    stages = (*program.work, program.gate) if program.gate is not None else program.work
+    for work in stages:
+        if work.input not in data:
+            blockers.append({"code": "unavailable_input", "step": work.name, "input": work.input,
+                             "message": f"{work.name}: input {work.input} is unavailable at fusion"})
+        if work.owner not in authorizers:
+            blockers.append({"code": "unavailable_authorizer", "step": work.name, "authorizer": work.owner,
+                             "message": f"{work.name}: authorizer {work.owner} is unavailable at fusion"})
+    return blockers
+
+
+def fused_template(program):
+    a, b = program.work
+    gate = program.gate
+    owners = (a.owner, b.owner, gate.owner) if gate is not None else (a.owner, b.owner)
+    order = (gate.name, a.name, b.name) if gate is not None else (a.name, b.name)
+    return Template("fused", (ParentOutput("deploy", 0),), owners, ("terminal",), (*order, program.join_name))
+
+
 def schedule(program, mode="auto", *, available_data=None, available_authorizers=None):
     if mode not in {"auto", "fused", "split"}:
         raise CompileError(f"unknown schedule {mode!r}")
     a, b = program.work
     gate = program.gate
-    stages = (*program.work, gate) if gate is not None else program.work
-    data = {step.input for step in stages} if available_data is None else set(available_data)
-    authorizers = {step.owner for step in stages} if available_authorizers is None else set(available_authorizers)
-    blockers = [f"line {line}: independent-submit {step} requires a separate transaction for {step}"
-                for step, line in program.independent]
-    for work in stages:
-        if work.input not in data:
-            blockers.append(f"{work.name}: input {work.input} is unavailable at fusion")
-        if work.owner not in authorizers:
-            blockers.append(f"{work.name}: authorizer {work.owner} is unavailable at fusion")
+    data, authorizers = availability(program, available_data, available_authorizers)
+    blockers = [row["message"] for row in fusion_constraints(program, data, authorizers)]
     if mode == "fused" and blockers:
         raise CompileError("fusion excluded: " + "; ".join(blockers))
     if mode == "auto":
         mode = "split" if blockers else "fused"
     reasons = []
     if mode == "fused":
-        owners = (a.owner, b.owner, gate.owner) if gate is not None else (a.owner, b.owner)
-        order = (gate.name, a.name, b.name) if gate is not None else (a.name, b.name)
-        templates = (Template("fused", (ParentOutput("deploy", 0),), owners, ("terminal",),
-                              (*order, program.join_name)),)
+        templates = (fused_template(program),)
     else:
         prefix, fork_parent, fork_steps = (), "deploy", ("split",)
         if gate is not None:

@@ -2,7 +2,7 @@
 
 A Forth compiler for BSV Script and multi-transaction workflows.
 
-当前构建版本为 **v0.1.0**。项目位于 BSV Script Lab 仓库内，编译与复放产物可写入 `projects/forth-multi-tx/build/`。
+当前构建版本为 **v0.1.1**。项目位于 BSV Script Lab 仓库内，编译与复放产物可写入 `projects/forth-multi-tx/build/`。
 
 同一份 Forth 源码可以生成融合版和拆分版。示例计算 `a = 2x`、`b = y + 1`，两支结果和汇合的和都按 `u32` 表示。回绕后的和小于 20 时走复核，其余走结算。两种后继各锁给一个配置的公钥。编译器以 Forth 2012 Core 为语义基线，`+` 使用 64 位 cell，`u32+` 固定按 32 位回绕。 [示例源码](example.fth) · [语言与 BSV 扩展规范](language.md)
 
@@ -51,6 +51,35 @@ PYTHONPATH=. python projects/forth-multi-tx/protocol.py --capabilities
 ```
 
 `--mode auto` 在所有输入和分支授权都可同时取得时选融合。可用 `--available-data x` 或 `--available-authorizers alice` 模拟另一支晚到。往示例末尾加上 `independent-submit a` 后，`auto` 选择拆分，`--mode fused` 报告约束的源文件行号。可显式请求拆分，在两种调度都合法时做同源对照。
+
+## 编译决策报告
+
+`protocol.py --explain` 给出候选交易图、可用性假设、逐词改写和选择理由。`replay.py` 的复放格式 2 将原始源码的融合、拆分和带约束的拆分各跑一次结算和复核。六条路径各带其实际使用的构建摘要。
+
+以下命令从仓库根目录生成首份对照。已有 v0.1.0 归档时，会一起收录为历史基线。
+
+```bash
+project=projects/forth-multi-tx
+PYTHONPATH=. bash shared/verify_node.sh --profile default -- \
+  python "$project/replay.py" --target both --optimize stack --join-witness shared \
+  --output "$project/build/v0.1.1-parallel-both-height2.json"
+
+archives=()
+for path in "$project"/build/v0.1.0-*parallel-*.json; do
+  if [[ -f "$path" ]]; then
+    archives+=(--baseline "$path")
+  fi
+done
+PYTHONPATH=. python "$project/decision_report.py" "$project/build/v0.1.1-parallel-both-height2.json" \
+  --output-dir "$project/build/v0.1.1-decision" "${archives[@]}"
+```
+
+报告器离线生成 `decision-report.json` 和 `decision-report.md`。评估另一拓扑时，为复放加上 `--topology gated-parallel`。复审相关的有资金回归可以在独立的 regtest 实例运行。
+
+```sh
+PYTHONPATH=. bash shared/verify_node.sh --profile default -- \
+  python -m unittest discover -v -s projects/forth-multi-tx -p test_regtest.py
+```
 
 ## 语言与运行器
 
