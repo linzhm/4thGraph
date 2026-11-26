@@ -98,11 +98,13 @@ def queued_status(node, original):
 
 def refund_controls(replay, draft):
     tx = draft.tx
+    owner, = draft.template.authorizers
+    wrong_role = "operator" if owner != "operator" else "alice"
     controls = {
         "lower_locktime": replay.sign(replace(draft, tx=replace(tx, locktime=0))),
         "final_sequence": replay.sign(replace(draft, tx=replace(tx, inputs=(replace(tx.inputs[0], sequence=0xffffffff),)))),
         "wrong_amount": replay.sign(replace(draft, tx=replace(tx, outputs=(replace(tx.outputs[0], value=tx.outputs[0].value - 1),)))),
-        "wrong_signer": draft.seal(lambda request: replay.keys.sign(replace(request, authorizer="operator"))),
+        "wrong_signer": draft.seal(lambda request: replay.keys.sign(replace(request, authorizer=wrong_role))),
     }
     return {name: replay.record(spend, draft.previous, expected=False) for name, spend in controls.items()}
 
@@ -119,12 +121,12 @@ def race(replay, contracts, done, records, states, *, winner):
     first, second = ("join", "refund") if winner == "join" else ("refund", "join")
     first_draft, first_tx = candidate[first]
     second_draft, second_tx = candidate[second]
-    records[first] = replay.record(first_tx, first_draft.previous)
+    records[first] = replay.record_step(first_draft, first_tx)
     records[f"{second}_after_{first}"] = replay.record(second_tx, second_draft.previous, expected=False, live_only=True)
     states["after_conflict"] = snapshot(replay, contracts, done)
     if winner == "refund":
         other = contracts.prepare_refund(contracts.plan.program.work[1].name, done)
-        records["refund_other_result"] = replay.record(replay.sign(other), other.previous)
+        records["refund_other_result"] = replay.record_step(other, replay.sign(other))
     states["terminal"] = snapshot(replay, contracts, done)
     if states["terminal"]["advance"] or states["terminal"]["refund"]:
         raise ValueError("race left live workflow outputs")
@@ -145,7 +147,7 @@ def main():
         raise ValueError("recovery replay requires an empty peerless regtest")
     activation = int(os.environ.get("SCRIPT_LAB_CHRONICLE_HEIGHT", ACTIVATION_HEIGHT))
     replay = Replay(node, 3, args.target, activation, "stack", args.join_witness)
-    source = EXAMPLE.read_bytes() + f"\nrecovery: {HEIGHT} review\n".encode()
+    source = EXAMPLE.read_bytes() + f"\nrecovery: {HEIGHT} review ;\n".encode()
     contracts = replay.contracts(schedule(parse(source.decode()), "split"))
     a, b = contracts.plan.program.work
     bootstrap = replay.fund(5)

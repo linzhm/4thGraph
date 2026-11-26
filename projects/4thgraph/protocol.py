@@ -2,34 +2,39 @@
 
 import argparse
 from collections.abc import Callable, Mapping
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from hashlib import sha256
 import json
 from pathlib import Path
 from types import MappingProxyType
 
 from shared.pushtx import PUBLIC, binding_der
-from shared.script import asm, encode_num, number, push
-from shared.transaction import FORKID, SIGHASH_ALL, Input, Output, Transaction, hash256, preimage_forkid
+from shared.script import asm, encode_num, is_compressed_public_key, number, push, without_codeseparators
+from shared.transaction import CHRONICLE, FORKID, SIGHASH_ALL, Input, Output, Transaction, hash256, preimage_forkid, preimage_otda
 
 from compiler import (
     GATE_BOUNDARIES, PROJECT_DESCRIPTION, PROJECT_NAME, PROJECT_VERSION, CompileError, ParentOutput, Plan,
-    SourceCompiler, Template, availability, evaluate, fused_template, fusion_constraints, gate_constraints,
+    SourceCompiler, Template, Workflow, WORKFLOW_MODES, availability, evaluate, fused_template, fusion_constraints, gate_constraints,
     schedule, split_templates,
 )
 from lowering import BASELINE, OPTIMIZATIONS, compile_word
 from stack_schedule import Graph
+from stdlib import capabilities as library_capabilities, describe_export
+from transaction_graph import TransactionGraph, mermaid
 from wordsets import U32, capabilities, push_value
 
 DEFAULT_TARGET = "chronicle-v2"
 TARGETS = {"forkid-v1": ((1,), "genesis"), DEFAULT_TARGET: ((2,), "chronicle"),
            "both": ((1, 2), "genesis")}
 FLAG = FORKID | SIGHASH_ALL
+SIGHASH_FAMILIES = {"forkid": FLAG, "chronicle": FLAG | CHRONICLE}
+SIGHASH_FAMILY_OPTIONS = tuple(SIGHASH_FAMILIES)
 FLAG_BYTES = FLAG.to_bytes(4, "little")
 BINDING_CODE = asm("OP_CHECKSIG")
 ZERO_INDEX = bytes(4)
 ROOT_VALUE, WORK_VALUE, RESULT_VALUE, TERMINAL_VALUE = 1_020_000, 507_500, 502_500, 1_000_000
 GATED_FORK_VALUE = ROOT_VALUE - 1_000
+GATED_RECOVERY_WORK_VALUE = 507_000
 RESULT_WIDTH = 5  # Four unsigned payload bytes plus a zero sign byte.
 PREVOUTS_HASH = 4
 CURRENT_OUTPOINT = 68
@@ -45,20 +50,6 @@ OBJECTIVES = {
     "peak-validation": ("max_signature_checks", "max_input_script_bytes", "whole_path_bytes",
                         "dependency_depth_including_deploy"),
 }
-SECP256K1_FIELD = (1 << 256) - (1 << 32) - 977
-
-
-def is_compressed_public_key(encoded):
-    if not isinstance(encoded, bytes) or len(encoded) != 33 or encoded[0] not in (2, 3):
-        return False
-    x = int.from_bytes(encoded[1:], "big")
-    if x >= SECP256K1_FIELD:
-        return False
-    # A nonzero quadratic residue has one root of each parity.
-    square = (pow(x, 3, SECP256K1_FIELD) + 7) % SECP256K1_FIELD
-    if square == 0:
-        return encoded[0] == 2
-    return pow(square, (SECP256K1_FIELD - 1) // 2, SECP256K1_FIELD) == 1
 
 
 def field(offset, width):
@@ -94,15 +85,21 @@ def single_input():
     return copy_preimage() + field(CURRENT_OUTPOINT, 36) + asm("OP_HASH256") + check_field(PREVOUTS_HASH)
 
 
-def finish():
-    return (asm("OP_FROMALTSTACK OP_HASH256") + binding_der() + push(bytes([FLAG])) + asm("OP_CAT")
+def finish(flag=FLAG):
+    return (asm("OP_FROMALTSTACK OP_HASH256") + binding_der() + push(bytes([flag])) + asm("OP_CAT")
             + push(PUBLIC) + asm("OP_CODESEPARATOR") + BINDING_CODE)
 
 
-def authorize(public):
+def authorize(public, flag=FLAG):
     # Check the signature's actual sighash before passing it to native CHECKSIG.
-    return (asm("OP_SIZE OP_1SUB OP_SPLIT") + push(bytes([FLAG])) + asm("OP_EQUALVERIFY")
-            + push(bytes([FLAG])) + asm("OP_CAT") + push(public) + asm("OP_CHECKSIGVERIFY"))
+    split = asm("OP_SIZE OP_1SUB OP_SPLIT")
+    if flag == FLAG:
+        expected = push(bytes([FLAG]))
+        check = expected + asm("OP_EQUALVERIFY") + expected
+    else:
+        expected = push(bytes([flag]))
+        check = asm("OP_DUP") + expected + asm("OP_EQUALVERIFY")
+    return split + check + asm("OP_CAT") + push(public) + asm("OP_CHECKSIGVERIFY")
 
 
 def validate_u32():
@@ -177,13 +174,12 @@ def refund_output(value, public):
     return Output(value - REFUND_FEE, p2pk(public))
 
 
-def recoverable_lock(normal, value, public, height, versions, *, prefixed=False):
+def recoverable_lock(normal, value, public, height, versions, *, prefixed=0):
     suffix = finish()
     if not normal.endswith(suffix):
         raise ValueError("recoverable covenant requires the shared ForkID verification suffix")
-    # A result or committed shared input pushes one value above the selector.
     # Both branches converge before CODESEPARATOR to preserve the scriptCode.
-    select = asm("OP_SWAP OP_IF OP_DROP") if prefixed else asm("OP_IF")
+    select = asm(("OP_IF", "OP_SWAP OP_IF OP_DROP", "OP_ROT OP_IF OP_2DROP")[prefixed])
     refund = (begin(versions) + single_input() + authorize(public)
               + push(REFUND_SEQUENCE.to_bytes(4, "little")) + check_field(CURRENT_SEQUENCE, 4)
               + push(height.to_bytes(4, "little")) + check_field(LOCKTIME, 4)
@@ -269,6 +265,7 @@ class SignRequest:
     transaction: Transaction
     previous_output: Output
     witness_data: tuple[bytes, ...]
+    input_index: int = 0
 
 
 @dataclass(frozen=True)
@@ -279,10 +276,18 @@ class Draft:
     payload: tuple[tuple[bytes, ...], ...]
     keys: Mapping[str, bytes]
     recovery_selector: bool | None = None
+    input_authorizers: tuple[tuple[str, ...], ...] | None = None
+    context_encoder: Callable[[bytes], bytes] | None = None
+    sighash: int = FLAG
 
     @property
     def parents(self):
         return tuple(utxo.parent for utxo in self.previous)
+
+    def preimage(self, index, script_code):
+        if self.sighash & CHRONICLE:
+            return preimage_otda(self.tx, index, without_codeseparators(script_code), self.sighash)
+        return preimage_forkid(self.tx, index, self.previous[index].output.value, script_code, self.sighash)
 
     def signing_requests(self):
         if len(self.tx.inputs) != len(self.previous) or len(self.previous) != len(self.payload):
@@ -294,29 +299,57 @@ class Draft:
                 raise ValueError("draft input does not match its bound previous output")
             if any(not isinstance(value, bytes) for value in fields):
                 raise ValueError("draft witness fields must be bytes")
-        if not self.template.authorizers:
-            return ()
-        if len(self.previous) != 1:
-            raise ValueError("an authorized draft must have exactly one input")
-        utxo = self.previous[0]
-        digest = hash256(preimage_forkid(self.tx, 0, utxo.output.value, utxo.output.script, FLAG))
-        return tuple(SignRequest(self.template.name, utxo.outpoint, owner, self.keys[owner], FLAG, digest,
-                                 self.tx, utxo.output, self.payload[0])
-                     for owner in self.template.authorizers)
+        roles = self.input_authorizers
+        if roles is None:
+            if not self.template.authorizers:
+                return ()
+            if len(self.previous) == 1:
+                roles = (self.template.authorizers,)
+            else:
+                raise ValueError("multi-input authorized drafts require roles per input")
+        if (len(roles) != len(self.previous)
+                or tuple(owner for owners in roles for owner in owners) != self.template.authorizers):
+            raise ValueError("input authorization does not match the transaction template")
+        requests = []
+        for index, (utxo, owners) in enumerate(zip(self.previous, roles, strict=True)):
+            if not owners:
+                continue
+            digest = hash256(self.preimage(index, utxo.output.script))
+            requests.extend(SignRequest(self.template.name, utxo.outpoint, owner, self.keys[owner], self.sighash, digest,
+                                        self.tx, utxo.output, self.payload[index], index) for owner in owners)
+        return tuple(requests)
 
     def seal(self, sign: Callable[[SignRequest], bytes]):
         # The external callback returns DER. Append the required sighash in the runner.
         requests = self.signing_requests()
-        preimages = tuple(preimage_forkid(self.tx, i, utxo.output.value, BINDING_CODE, FLAG)
-                          for i, utxo in enumerate(self.previous))
-        signatures = tuple(sign(request) + bytes([request.sighash]) for request in requests)
+        preimages = tuple(self.preimage(i, BINDING_CODE) for i in range(len(self.previous)))
+        if self.context_encoder is not None:
+            preimages = tuple(map(self.context_encoder, preimages))
+        signatures = [[] for _ in self.previous]
+        for request in requests:
+            signatures[request.input_index].append(sign(request) + bytes([request.sighash]))
         tx = self.tx
         selector = () if self.recovery_selector is None else (encode_num(int(self.recovery_selector)),)
         for i, (fields, preimage) in enumerate(zip(self.payload, preimages, strict=True)):
-            if i == 0:
-                fields = (*fields, *reversed(signatures))
+            fields = (*fields, *reversed(signatures[i]))
             tx = tx.with_script(i, b"".join(push_value(value) for value in (*fields, preimage, *selector)))
         return tx
+
+    def binding_evidence(self, tx):
+        unsigned_inputs = tuple(replace(item, script=b"") for item in tx.inputs)
+        if replace(tx, inputs=unsigned_inputs) != self.tx:
+            raise ValueError("sealed transaction does not match its draft inputs and outputs")
+        requests = self.signing_requests()
+        return {
+            "step": self.template.name, "executes": self.template.executes,
+            "inputs": [{"input_index": index, "from": asdict(ref), "outpoint": utxo.outpoint.text(),
+                        "authorizers": [{"role": req.authorizer, "digest": req.digest.hex()}
+                                        for req in requests if req.input_index == index]}
+                       for index, (ref, utxo) in enumerate(zip(self.template.inputs, self.previous, strict=True))],
+            "outputs": [{"vout": index, "kind": kind, "outpoint": Outpoint(tx.txid_wire(), index).text(),
+                         "satoshis": output.value}
+                        for index, (kind, output) in enumerate(zip(self.template.outputs, tx.outputs, strict=True))],
+        }
 
 
 def invalidated(plan, step, before, after):
@@ -420,6 +453,7 @@ class Contracts:
         else:
             self.join_code = join_lock(select_route, self.terminals, self.data_prefix, self.versions, join_witness)
             self.join_code = self.state_lock(self.join_code, RESULT_VALUE, prefixed=True)
+            work_value = GATED_RECOVERY_WORK_VALUE if gate is not None and self.recovery else WORK_VALUE
             # A committed prefix leaves [signature preimage fixed-u32]. Move its
             # canonical ScriptNum into the old input position before verification.
             from_lock = asm("OP_BIN2NUM OP_ROT OP_ROT")
@@ -430,7 +464,7 @@ class Contracts:
                                    self.data_prefix, self.versions)
                 if i in committed:
                     script = from_lock + script
-                work_outputs.append(Output(WORK_VALUE, self.state_lock(script, WORK_VALUE, prefixed=i in committed)))
+                work_outputs.append(Output(work_value, self.state_lock(script, work_value, prefixed=i in committed)))
             self.work_layout = OutputLayout(tuple(work_outputs), committed)
             gate_shares = gate is not None and gate.input == self.shared_input
             if gate_shares:
@@ -442,9 +476,10 @@ class Contracts:
                 split_code += validate_u32()
             code = split_code + self.work_layout.hash_script() + check_field(OUTPUTS_HASH) + finish()
             if self.separate_gate:
-                # With a shared input both transactions carry the work locks.
-                # Divide the existing 5,000 sat fixture fee between gate and split.
-                fork_value = (ROOT_VALUE + 2 * WORK_VALUE) // 2 if committed else GATED_FORK_VALUE
+                # Both transactions carry the work locks. With recovery the
+                # larger scripts need 3,000 sat each in the regtest fixture.
+                fork_value = ((ROOT_VALUE + 2 * work_value) // 2
+                              if committed or self.recovery else GATED_FORK_VALUE)
                 fork_code = (from_lock if gate_shares else b"") + code
                 fork = Output(fork_value, self.state_lock(fork_code, fork_value, prefixed=gate_shares))
                 self.fork_layout = OutputLayout((fork,), (0,) if gate_shares else ())
@@ -530,10 +565,13 @@ class Contracts:
             "topology": "gated-parallel" if self.plan.program.gate is not None else "parallel",
             "estimated_cost": estimate_cost(self) if cost is None else cost,
             "templates": [asdict(template) for template in self.plan.templates],
+            "transaction_graph": self.plan.graph.describe(recovery=self.recovery, external_inputs=self.external_inputs),
             "deploy_output": describe_output(self.root),
             "terminal_outputs": {route: describe_output(output)
                                  for route, output in zip(("review", "settle"), self.terminals, strict=True)},
         }
+        if self.plan.program.libraries:
+            spec["libraries"] = tuple(map(asdict, self.plan.program.libraries))
         if self.plan.mode == "split":
             spec.update(
                 work_outputs=describe_layout(self.work_layout),
@@ -696,20 +734,21 @@ def input_value(data, name):
 def estimate_cost(contracts):
     # Fixed fixture for plan comparison. ECDSA signature size and input
     # encoding may vary in a signed transaction, so this is not a fee quote.
-    fake_der = bytes(71)
+    program = contracts.plan.program
+    workflow = isinstance(program, Workflow)
+    fake_der = bytes(72 if workflow else 71)
     deploy = Transaction((Input(bytes(32), 0, push(fake_der + bytes([FLAG]))),),
-                         (contracts.root,), version=contracts.version)
+                         contracts.deployment_outputs if workflow else (contracts.root,), version=contracts.version)
     done = {"deploy": deploy}
     depths = {"deploy": 1}
     rows = {"deploy": {"bytes": len(deploy.serialize()), "signature_checks": 1,
                        "input_script_bytes": len(deploy.inputs[0].script) + 35,  # P2PK funding lock
                        "depends_on": [], "decision": "fund the first lock"}}
-    program = contracts.plan.program
-    data = {step.input: 0 for step in program.work}
-    if program.gate is not None:
+    data = {} if workflow else {step.input: 0 for step in program.work}
+    if not workflow and program.gate is not None:
         data[program.gate.input] = 0
     for step in contracts.plan.templates:
-        draft = contracts._prepare(step.name, done, data, estimate=True)
+        draft = contracts.prepare(step.name, done) if workflow else contracts._prepare(step.name, done, data, estimate=True)
         tx = draft.seal(lambda _: fake_der)
         done[step.name] = tx
         depths[step.name] = 1 + max(depths[ref.step] for ref in step.inputs)
@@ -718,6 +757,8 @@ def estimate_cost(contracts):
             ("work", "work"): "create separately spendable work outputs",
             ("result", "data"): "materialize a result for the join",
             ("split-lock",): "verify the gate before creating a separately authorized fork",
+            ("state",): "commit the verified state to the next transaction's input",
+            ("terminal", "receipt"): "choose the successor and record its workflow root and state",
         }[step.outputs]
         rows[step.name] = {
             "bytes": len(tx.serialize()),
@@ -779,8 +820,9 @@ def candidate_evidence(contract, spec, order):
         words[program.gate.name] = program.gate.word.name
     cost = spec["estimated_cost"]
     return {
-        "eligible": True, "cost": cost, "boundary_reasons": plan.boundary_reasons,
+        "eligible": True, "static_check": "passed", "cost": cost, "boundary_reasons": plan.boundary_reasons,
         "graph": describe_graph(program, plan.templates),
+        "transaction_graph": spec["transaction_graph"],
         "words": {step: {"word": words[step], **build} for step, build in spec["word_builds"].items()},
         "rank": candidate_rank(cost, order),
     }
@@ -788,6 +830,11 @@ def candidate_evidence(contract, spec, order):
 
 def describe_graph(program, templates):
     return [{**asdict(step), "external_inputs": template_external_inputs(program, step)} for step in templates]
+
+
+def excluded_parallel_graph(program, templates):
+    graph = TransactionGraph(program.stage_graph(), ("root-lock",), templates, executable=False)
+    return graph.describe(recovery=program.recovery, external_inputs=lambda step: template_external_inputs(program, step))
 
 
 def compile_decision(program, keys, task_id, *, mode, available_data=None, available_authorizers=None,
@@ -803,8 +850,10 @@ def compile_decision(program, keys, task_id, *, mode, available_data=None, avail
     for candidate in CANDIDATE_ORDER:
         if candidate == "fused" and blockers:
             evidence[candidate] = {
-                "eligible": False, "reason": "fusion excluded: " + "; ".join(row["message"] for row in blockers),
+                "eligible": False, "static_check": "excluded",
+                "reason": "fusion excluded: " + "; ".join(row["message"] for row in blockers),
                 "exclusions": blockers, "graph": describe_graph(program, (fused_template(program),)),
+                "transaction_graph": excluded_parallel_graph(program, (fused_template(program),)),
                 "boundary_reasons": [],
             }
             continue
@@ -815,8 +864,10 @@ def compile_decision(program, keys, task_id, *, mode, available_data=None, avail
             cost = estimate_cost(contract)
         except ValueError as error:
             evidence[candidate] = {
-                "eligible": False, "reason": str(error), "exclusions": [{"code": "build_error", "message": str(error)}],
+                "eligible": False, "static_check": "excluded", "reason": str(error),
+                "exclusions": [{"code": "build_error", "message": str(error)}],
                 "graph": describe_graph(program, plan.templates), "boundary_reasons": plan.boundary_reasons,
+                "transaction_graph": excluded_parallel_graph(program, plan.templates),
             }
             continue
         spec = contract.describe(cost=cost)
@@ -832,6 +883,8 @@ def compile_decision(program, keys, task_id, *, mode, available_data=None, avail
         "availability": availability_report(data, authorizers, available_data, available_authorizers),
         "candidates": evidence,
     }
+    if selected in artifacts:
+        explanation["selected_artifact_sha256"] = artifacts[selected]["artifact_sha256"]
     return viable, artifacts, explanation
 
 
@@ -902,9 +955,10 @@ def compile_search(program, keys, task_id, *, source_bytes, mode="auto", gate_bo
                 except ValueError as error:
                     blockers = [{"code": "build_error", "message": str(error)}]
             if blockers:
-                candidates[name] = {**dimensions, "eligible": False, "exclusions": blockers,
+                candidates[name] = {**dimensions, "eligible": False, "static_check": "excluded", "exclusions": blockers,
                                     "reason": "; ".join(row["message"] for row in blockers),
-                                    "graph": describe_graph(program, templates), "boundary_reasons": []}
+                                    "graph": describe_graph(program, templates), "boundary_reasons": [],
+                                    "transaction_graph": excluded_parallel_graph(program, templates)}
                 continue
             artifact = build_artifact(spec, source_bytes)
             viable[name], artifacts[name] = contract, artifact
@@ -913,6 +967,7 @@ def compile_search(program, keys, task_id, *, source_bytes, mode="auto", gate_bo
     selected, basis = search_selection(candidates, objective)
     return viable, artifacts, {
         "requested": mode, "selected": selected, "selection_basis": basis, "objective": objective,
+        "selected_artifact_sha256": artifacts[selected]["artifact_sha256"],
         "objective_winners": {goal: search_selection(candidates, goal)[0] for goal in OBJECTIVES},
         "rank_order": OBJECTIVES[objective], "tie_break_order": sorted(candidates),
         "search_space": {"gate_boundary": gate_boundary, "join_witness": join_witness or "all"},
@@ -927,53 +982,104 @@ def main():
     action = cli.add_mutually_exclusive_group()
     action.add_argument("--capabilities", action="store_true", help="list the supported Forth and BSV words")
     action.add_argument("--entry", help="compile one annotated Forth word to Script without a transaction plan")
+    action.add_argument("--cpn", action="store_true", help="render the selected transaction graph as Mermaid")
     cli.add_argument("--version", action="version", version=f"%(prog)s {PROJECT_VERSION}")
-    cli.add_argument("--mode", choices=("auto", "fused", "split"), default="auto")
+    cli.add_argument("--assume-input-ranges", action="store_true",
+                     help="for --entry, rely on the caller to validate declared input ranges and encodings")
+    cli.add_argument("--mode", choices=("auto", "split", *WORKFLOW_MODES), default="auto")
     cli.add_argument("--target", choices=TARGETS, default=DEFAULT_TARGET, help="permitted transaction versions")
+    cli.add_argument("--sighash-family", choices=SIGHASH_FAMILY_OPTIONS, default="forkid",
+                     help="staged workflow signature preimage formats accepted by the lock")
     cli.add_argument("--optimize", choices=OPTIMIZATIONS, default=BASELINE)
     cli.add_argument("--join-witness", choices=JOIN_WITNESSES)
     cli.add_argument("--gate-boundary", choices=GATE_BOUNDARIES, default="auto")
     cli.add_argument("--search", action="store_true", help="enumerate permitted transaction boundaries and witness layouts")
     cli.add_argument("--objective", choices=OBJECTIVES)
-    cli.add_argument("--explain", action="store_true", help="show both candidates and how the plan was chosen")
+    cli.add_argument("--max-tx-bytes", type=int, help="maximum estimated serialized transaction size in a staged workflow")
+    cli.add_argument("--explain", action="store_true", help="show the candidates and how the plan was chosen")
     cli.add_argument("--keys", type=Path, help="JSON map of role to compressed public key hex")
     cli.add_argument("--task-id", help="32-byte hex data identifier")
+    cli.add_argument("--current", type=int, help="initial deployed u32 for a staged workflow")
     cli.add_argument("--available-data", nargs="*")
     cli.add_argument("--available-authorizers", nargs="*")
     args = cli.parse_args()
     if args.objective and not args.search:
         cli.error("--objective requires --search")
-    if args.entry and (args.search or args.gate_boundary != "auto"):
+    if args.max_tx_bytes is not None and not args.search:
+        cli.error("--max-tx-bytes requires --search")
+    if args.entry and (args.search or args.sighash_family != "forkid" or args.gate_boundary != "auto" or args.current is not None
+                       or args.mode in ("serial", "atomic")):
         cli.error("transaction search and boundaries require a transaction build")
+    if args.assume_input_ranges and args.entry is None:
+        cli.error("--assume-input-ranges requires --entry")
     if args.capabilities:
         print(json.dumps({"project": PROJECT_NAME, "compiler_version": PROJECT_VERSION, "description": PROJECT_DESCRIPTION,
-                          **capabilities(), "optimizations": OPTIMIZATIONS, "join_witnesses": JOIN_WITNESSES,
-                          "topologies": ("parallel", "gated-parallel"), "search_objectives": OBJECTIVES,
+                          **capabilities(), "libraries": library_capabilities(),
+                          "optimizations": OPTIMIZATIONS, "join_witnesses": JOIN_WITNESSES,
+                          "topologies": ("parallel", "gated-parallel", "workflow"), "workflow_modes": WORKFLOW_MODES,
+                          "workflow_sighash_families": {name: f"{flag:02x}" for name, flag in SIGHASH_FAMILIES.items()},
+                          "search_objectives": OBJECTIVES,
                           "gate_boundaries": GATE_BOUNDARIES, "targets": {
             name: {"transaction_versions": versions, "era": era} for name, (versions, era) in TARGETS.items()
         }}, indent=2))
         return
     if args.source is None:
         cli.error("a Forth source file is required")
-    if args.entry is None and (args.keys is None or args.task_id is None):
-        cli.error("transaction builds require --keys and --task-id")
+    if args.entry is None and args.keys is None:
+        cli.error("transaction builds require --keys")
     try:
         source_bytes = args.source.read_bytes()
-        source = SourceCompiler(source_bytes.decode())
+        source = SourceCompiler(source_bytes.decode(), source_path=args.source)
         if args.entry is not None:
-            word = source.words.get(args.entry.casefold())
+            entry = args.entry.casefold()
+            word = source.words.get(entry)
             if word is None:
                 raise CompileError(f"undefined entry word {args.entry!r}")
-            compiled = compile_word(word, args.optimize)
+            compiled = compile_word(word, args.optimize, check_input_ranges=not args.assume_input_ranges)
             result = {"project": PROJECT_NAME, "compiler_version": PROJECT_VERSION, "schema_version": 1,
-                      "entry": args.entry, "takes": word.takes, "gives": word.gives,
+                      "entry": word.name, "takes": word.takes, "gives": word.gives,
                       "enabled_optional_wordsets": source.optional_wordsets, "optimization": args.optimize,
                       "script_hex": compiled.script.hex(), **compiled.describe()}
+            if source.library_imports:
+                result["libraries"] = tuple(map(asdict, source.library_imports))
+            if entry in source.imported_words:
+                result["library_export"] = describe_export(*source.imported_words[entry])
+            if word.ranges:
+                result["ranges"] = {item.name: {"base": item.base, "lower": item.lower,
+                                                "upper_exclusive": item.upper} for item in word.ranges}
+                if any(item.name in word.takes for item in word.ranges):
+                    result["input_range_checks"] = "assumed" if args.assume_input_ranges else "emitted"
         else:
             raw_keys = json.loads(args.keys.read_text())
             if not isinstance(raw_keys, dict) or any(not isinstance(key, str) for key in raw_keys.values()):
                 raise ValueError("keys must be a JSON object mapping roles to public key hex strings")
             keys = {name: bytes.fromhex(key) for name, key in raw_keys.items()}
+            if source.relation:
+                cli.error("use verification.py to build a relation: declaration")
+            if source.workflow_input is not None or source.stages:
+                if args.current is None:
+                    cli.error("staged workflows require --current")
+                if (args.task_id is not None or args.join_witness or args.gate_boundary != "auto"
+                        or args.available_data is not None):
+                    cli.error("staged workflows do not accept parallel workflow options")
+                from workflow_contract import compile_workflow
+
+                result, report = compile_workflow(
+                    source.workflow(), keys, args.current, source_bytes=source_bytes, mode=args.mode,
+                    target=args.target, optimization=args.optimize, available_authorizers=args.available_authorizers,
+                    search=args.search, objective=args.objective or "path-bytes", max_tx_bytes=args.max_tx_bytes,
+                    sighash_family=args.sighash_family,
+                )
+                if args.explain:
+                    result = build_artifact({**result, "schedule_explanation": report}, source_bytes)
+                print(mermaid(result["transaction_graph"]) if args.cpn else json.dumps(result, indent=2, sort_keys=True))
+                return
+            if args.task_id is None or args.current is not None:
+                cli.error("parallel builds require --task-id and take their u32 values at spend time")
+            if args.sighash_family != "forkid":
+                cli.error("Chronicle sighashes require a staged workflow")
+            if args.max_tx_bytes is not None:
+                cli.error("--max-tx-bytes applies to staged workflow search")
             params = dict(mode=args.mode, available_data=args.available_data, available_authorizers=args.available_authorizers,
                           target=args.target, optimization=args.optimize, gate_boundary=args.gate_boundary,
                           source_bytes=source_bytes)
@@ -994,7 +1100,7 @@ def main():
         cli.error(f"{args.source}: {error}")
     except (OSError, ValueError) as error:
         cli.error(str(error))
-    print(json.dumps(result, indent=2, sort_keys=True))
+    print(mermaid(result["transaction_graph"]) if args.cpn else json.dumps(result, indent=2, sort_keys=True))
 
 
 if __name__ == "__main__":

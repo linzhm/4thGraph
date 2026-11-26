@@ -7,9 +7,9 @@ import os
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from circuit_backend import circuit_words, compile_circuit
+from circuit_backend import emit_circuit, select_circuit
 from circuit_tools import CircuitFixture
-from compiler import PROJECT_NAME, PROJECT_VERSION, evaluate
+from compiler import PROJECT_NAME, PROJECT_VERSION, SourceCompiler, evaluate
 from lowering import BASELINE, compile_word
 from proof_contract import FIELD, NEXT, ROUTE, ProofContract
 from protocol import DEFAULT_TARGET, TARGETS, UTXO, build_artifact
@@ -20,6 +20,7 @@ from shared.script import decode_num, encode_num
 from wordsets import U32
 
 FIXTURE = Path(__file__).with_name("proof")
+DEFAULT_VECTORS = (0, 7, 18, 19, 20, U32 - 2, U32 - 1)
 
 
 def witness(fixture, contract, tx, current):
@@ -36,17 +37,18 @@ def compare_circuit(circuit, advance, decide, currents):
         route, route_alt = evaluate_script(decide_script, step)
         proof = circuit.prove(current=current, binding=(1, 2))
         expected = expected_next, expected_route
+        current_wire = circuit.key.current_wire
         if (alt or route_alt or tuple(map(decode_num, (*step, *route))) != expected
-                or (proof[NEXT], proof[ROUTE]) != expected):
+                or (proof[NEXT], proof[ROUTE]) != expected or proof[current_wire:current_wire + 3] != (current, 1, 2)):
             raise ValueError(f"host, Script and R1CS disagree at {current}")
         rows.append({"current": current, "next": expected_next, "route": expected_route,
                      "witness_checked_by_snarkjs": True})
     return rows
 
 
-def run_case(replay, circuit, source, bootstrap, slot, *, current, next_state, optimization):
+def run_case(replay, circuit, source, bootstrap, slot, *, current, next_state, optimization, program=None):
     contract = ProofContract(source, circuit.key, current, replay.keys.public, target=replay.target,
-                             optimization=optimization)
+                             optimization=optimization, program=program)
     parent, deploy = replay.deploy(contract, bootstrap, slot)
     other_parent, other_deploy = replay.deploy(contract, bootstrap, slot + 1)
     previous, foreign = (UTXO(parent, 0),), (UTXO(other_parent, 0),)
@@ -61,21 +63,30 @@ def run_case(replay, circuit, source, bootstrap, slot, *, current, next_state, o
     wrong_state = witness(circuit, contract, tx, (current + 1) % U32)
     wrong = replace(tx, outputs=(replace(tx.outputs[0], value=tx.outputs[0].value - 1), tx.outputs[1]))
     wrong_effect = witness(circuit, contract, wrong, current)
+    route, = evaluate(contract.route, next_state)
+    wrong_terminal = replace(tx, outputs=(contract.terminals[1 - route], tx.outputs[1]))
+    wrong_terminal_proof = witness(circuit, contract, wrong_terminal, current)
     changed_locktime = replace(tx, locktime=tx.locktime + 1)
     controls = {
         "tampered_proof": replay.record(contract.seal(tx, changed), previous, expected=False),
         "wrong_public_state": replay.record(contract.seal(tx, wrong_state), previous, expected=False),
         "valid_proof_for_wrong_output": replay.record(contract.seal(wrong, wrong_effect), previous, expected=False),
+        "valid_proof_for_wrong_terminal": replay.record(contract.seal(wrong_terminal, wrong_terminal_proof),
+                                                        previous, expected=False),
         "valid_proof_for_another_outpoint": replay.record(contract.seal(other, proof), foreign, expected=False),
         "valid_proof_for_another_locktime": replay.record(
             contract.seal(changed_locktime, proof), previous, expected=False,
         ),
     }
+    if circuit.key.outputs == 2:
+        wrong_route = (*proof[:ROUTE], 1 - route, *proof[ROUTE + 1:])
+        controls["wrong_public_route"] = replay.record(contract.seal(tx, wrong_route), previous, expected=False)
     spend = replay.record(contract.seal(tx, proof), previous)
     other_spend = replay.record(contract.seal(other, other_proof), foreign)
     return {
         "build": build_artifact(contract.describe(), source), "script_bytes": len(contract.root.script),
-        "current": current, "next": next_state, "deploy": deploy, "spend": spend, "foreign_deploy": other_deploy,
+        "current": current, "next": next_state, "route": ("review", "settle")[route],
+        "deploy": deploy, "spend": spend, "foreign_deploy": other_deploy,
         "foreign_spend": other_spend, "controls": controls,
         "assignment": list(map(str, proof)), "other_assignment": list(map(str, other_proof)),
     }
@@ -85,14 +96,28 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--target", choices=TARGETS, default=DEFAULT_TARGET)
     parser.add_argument("--current", type=int, default=U32 - 1)
-    parser.add_argument("--generated", action="store_true", help="generate the circuit from workflow.fth")
+    parser.add_argument("--generated", action="store_true", help="generate the circuit from Forth")
+    parser.add_argument("--source", type=Path, help="Forth circuit source for --generated (default: proof/workflow.fth)")
+    parser.add_argument("--entries", nargs=2, metavar=("TRANSITION", "ROUTE"), help="select two Forth words")
     parser.add_argument("--compare-domains", action="store_true", help="verify host, Script and generated circuit vectors")
+    parser.add_argument("--vectors", nargs="+", type=int, help="u32 inputs for --compare-domains")
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
-    if args.compare_domains and not args.generated:
-        parser.error("--compare-domains requires --generated")
+    if (args.compare_domains or args.source or args.entries) and not args.generated:
+        parser.error("--compare-domains, --source and --entries require --generated")
+    if args.vectors and not args.compare_domains:
+        parser.error("--vectors requires --compare-domains")
+    if args.vectors and any(not 0 <= value < U32 for value in args.vectors):
+        parser.error("--vectors values must be u32")
     if not 0 <= args.current < U32:
         parser.error("--current must be a u32")
+    source_path = args.source or FIXTURE / ("workflow.fth" if args.generated else "counter.fth")
+    try:
+        source = source_path.read_bytes()
+        program = select_circuit(SourceCompiler(source.decode(), source_path=source_path), args.entries) if args.generated else None
+        circuit_source = emit_circuit(program) if program else (FIXTURE / "counter.circom").read_bytes()
+    except (OSError, ValueError) as error:
+        parser.error(f"{source_path}: {error}")
     engine = chain_metadata()
     if engine["commit"] != CONTEXT_PIN:
         raise ValueError("proof replay requires the height-aware chain-gang pin")
@@ -101,20 +126,17 @@ def main():
         raise ValueError("proof replay requires an empty peerless regtest")
     activation = int(os.environ.get("SCRIPT_LAB_CHRONICLE_HEIGHT", ACTIVATION_HEIGHT))
     replay = Replay(node, 3, args.target, activation)
-    source = (FIXTURE / ("workflow.fth" if args.generated else "counter.fth")).read_bytes()
-    circuit_source = compile_circuit(source) if args.generated else (FIXTURE / "counter.circom").read_bytes()
     next_state = (args.current + 1) % U32
-    if args.generated:
-        advance, decide = circuit_words(source)
-        next_state, = evaluate(advance, args.current)
+    if program:
+        next_state, = evaluate(program.transition, args.current)
     with TemporaryDirectory(prefix="4thgraph-counter-") as temporary:
         circuit = CircuitFixture(circuit_source, temporary, has_route=args.generated)
         vectors = []
         if args.compare_domains:
-            vectors = compare_circuit(circuit, advance, decide, (0, 7, 18, 19, 20, U32 - 2, U32 - 1))
+            vectors = compare_circuit(circuit, program.transition, program.route, args.vectors or DEFAULT_VECTORS)
         bootstrap = replay.fund(4)
         cases = {variant: run_case(replay, circuit, source, bootstrap, 2 * i, current=args.current,
-                                   next_state=next_state, optimization=variant)
+                                   next_state=next_state, optimization=variant, program=program)
                  for i, variant in enumerate((BASELINE, "stack"))}
         if cases["stack"]["script_bytes"] >= cases[BASELINE]["script_bytes"]:
             raise ValueError("optimized proof verifier did not reduce script bytes")
@@ -123,7 +145,8 @@ def main():
             "project": PROJECT_NAME, "compiler_version": PROJECT_VERSION, "proof": "transparent-r1cs-assignment",
             "target": args.target, "bsv_node_version": node.version, "chain_gang": engine, "activation_height": activation,
             "bootstrap_raw": bootstrap.serialize().hex(), "circuit": circuit.describe(), "policy": source.decode(),
-            "generated": args.generated, "cross_domain_vectors": vectors, "circuit_source": circuit_source.decode(),
+            "generated": args.generated, "forth_circuit": program.describe() if program else None,
+            "cross_domain_vectors": vectors, "circuit_source": circuit_source.decode(),
             "cases": cases,
         }, indent=2) + "\n")
 

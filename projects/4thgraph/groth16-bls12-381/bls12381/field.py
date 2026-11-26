@@ -38,9 +38,10 @@ def opcode(name):
 class ScriptField:
     """Signed residues are sufficient at arithmetic boundaries inside Script."""
 
-    def __init__(self, inputs):
+    def __init__(self, inputs, *, chronicle=False):
         self.graph = Graph(inputs)
         self.valid = 1
+        self.chronicle = chronicle
 
     def value(self, a):
         return self.graph.define(number(a)) if type(a) is int else a
@@ -77,7 +78,15 @@ class ScriptField:
             return b
         if b == 1:
             return a
+        if self.chronicle and a == 2:
+            return self.op("OP_2MUL", b)
+        if self.chronicle and b == 2:
+            return self.op("OP_2MUL", a)
         return self.op("OP_MUL", a, b)
+
+    def half_digit(self, digit):
+        # MSM digits are nonnegative and occupy at most two bits.
+        return self.op("OP_2DIV", digit) if self.chronicle else self.op("OP_DIV", digit, 2)
 
     def reduce(self, a):
         return a % Q if type(a) is int else self.op("OP_MOD", a, Q)

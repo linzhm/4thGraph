@@ -17,8 +17,9 @@ from shared.benchmark_validation import CONTEXT_PIN, Node, chain_metadata
 from shared.script import asm, number, push
 from shared.transaction import Input, Output, Transaction, preimage_all
 
-ROOT = Path(__file__).resolve().parents[4]
-PROJECT = ROOT / "projects/4thgraph"
+FORTH_VERIFIER = Path(__file__).resolve().parents[2]
+PROJECT = FORTH_VERIFIER.parent
+ROOT = PROJECT.parents[1]
 TERMINAL_VALUE = 75_000
 CCTP_COMPACT_SHA256 = "196ad323cd359b46bd7fbdf16fe486aaf7e09fea869edddefebc34082743650b"
 CCTP_WINDOWED_SHA256 = "e797549499d4ef9857afb1e29471099a058a67b15c2f94d5e7895e4aa39d257f"
@@ -32,9 +33,10 @@ def affine_g2(point):
     return [list(pair) for pair in (*point, (1, 0))]
 
 
-def native_profiles(key, proofs):
+def native_profiles(key, proofs, *, input_sources=None, script_era="genesis"):
     metadata = {"protocol": "groth16", "curve": "bls12381"}
     material = {
+        "script_era": script_era,
         "key": {**metadata, "nPublic": len(key.ic) - 1, "IC": [affine_g1(point) for point in key.ic],
                 "vk_alpha_1": affine_g1(key.alpha), "vk_beta_2": affine_g2(key.beta),
                 "vk_gamma_2": affine_g2(key.gamma), "vk_delta_2": affine_g2(key.delta)},
@@ -42,6 +44,8 @@ def native_profiles(key, proofs):
                    "proof": {**metadata, "pi_a": affine_g1(proof.a), "pi_b": affine_g2(proof.b),
                              "pi_c": affine_g1(proof.c)}} for signals, proof in proofs],
     }
+    if input_sources is not None:
+        material["input_sources"] = input_sources
     # Both compilers have a module named compiler.py. The native compiler
     # runs with only the lab and its own project on the import path.
     with TemporaryDirectory(prefix="groth16-inputs-") as directory:
@@ -49,7 +53,7 @@ def native_profiles(key, proofs):
         fixture.write_text(json.dumps(material) + "\n")
         subprocess.run([sys.executable, str(Path(__file__).with_name("generate_native.py")),
                         str(fixture), str(output)], check=True, cwd=ROOT,
-                       env={**os.environ, "PYTHONPATH": os.pathsep.join(map(str, (ROOT, PROJECT)))})
+                       env={**os.environ, "PYTHONPATH": os.pathsep.join(map(str, (ROOT, PROJECT, FORTH_VERIFIER)))})
         return json.loads(output.read_text())
 
 
@@ -57,10 +61,36 @@ def public_state(packet):
     return Output(TERMINAL_VALUE, push(b"\0" + packet) + asm("OP_DROP OP_1"))
 
 
+def affine_controls(artifact, witness, other, packet, other_packet):
+    def flip(offset):
+        return witness[:offset] + bytes([witness[offset] ^ 1]) + witness[offset + 1:]
+
+    line_bytes = artifact.get("pairing_line_packet_bytes", 0)
+    line_push = len(push(bytes(line_bytes))) if line_bytes else 0
+    trace_bytes = artifact["slope_packet_bytes"]
+    slope_start = line_push + len(push(bytes(trace_bytes))) - trace_bytes
+    msm_end = slope_start + artifact["msm_slope_count"] * 48
+    msm = witness[slope_start:msm_end]
+    used = next(i for i, byte in enumerate(msm) if byte)
+    public_start = len(witness) - len(push(packet))
+    controls = {
+        "crossed_statement_with_valid_msm": (witness[:slope_start] + other[slope_start:msm_end]
+                                             + witness[msm_end:public_start] + push(other_packet)),
+        "tampered_msm_slope": flip(slope_start + used),
+        "tampered_b_slope": flip(msm_end),
+    }
+    if line_bytes:
+        controls["tampered_fixed_delta"] = flip(line_push - line_bytes)
+        controls["tampered_fixed_gamma"] = flip(line_push - line_bytes + 4 * 48)
+    return controls
+
+
 def main():
     cli = argparse.ArgumentParser(description=__doc__)
     cli.add_argument("--archive", type=Path, required=True, help="prepared CCTP reference")
     cli.add_argument("--output", type=Path, required=True)
+    cli.add_argument("--script-era", choices=("genesis", "chronicle"), default="genesis",
+                     help="Script era for the native 4thGraph builds")
     args = cli.parse_args()
     engine = chain_metadata()
     if engine["commit"] != CONTEXT_PIN:
@@ -71,7 +101,7 @@ def main():
     activation = int(os.environ["SCRIPT_LAB_CHRONICLE_HEIGHT"])
     key, proofs, paths = load_cases(args.archive)
 
-    native = native_profiles(key, proofs)
+    native = native_profiles(key, proofs, script_era=args.script_era)
     locks = {name: bytes.fromhex(profile["artifact"]["script_hex"]) for name, profile in native.items()}
     witnesses = {(name, int(i)): bytes.fromhex(witness) for name, profile in native.items()
                  for i, witness in profile["witness"].items()}
@@ -130,6 +160,14 @@ def main():
             rejects[f"{name}_{i + 1}_crossed_proof_with_valid_msm"] = replay.reject(
                 name, tx.with_script(0, substituted), (root,), [False],
             )
+        elif name.startswith("4thgraph-affine-"):
+            packet, other_packet = packets[name, i], packets[name, 1 - i]
+            bad_witness = witness[:-len(push(packet))] + push(other_packet)
+            controls = affine_controls(native[name]["artifact"], witness, witnesses[name, 1 - i], packet, other_packet)
+            for control, malformed in controls.items():
+                rejects[f"{name}_{i + 1}_{control}"] = replay.reject(
+                    name, tx.with_script(0, malformed), (root,), [False],
+                )
         elif name in cctp_modes:
             suffix, other = (b"".join(map(number, proofs[j][0])) for j in (i, 1 - i))
             if not witness.endswith(suffix):
