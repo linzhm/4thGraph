@@ -24,7 +24,7 @@ v0.3.0 是完整锁的 Forth 优化构建。编译器的 `--optimize` 选择 v0.
 
 ### 输入与内部范围
 
-锁在使用见证中的数据前检查栈形状、字段长度、授权类型、公钥、标量和逆元。窗口索引由检查后的标量推导。独立窗口词的 `--assume-input-ranges` 不参与完整锁构建。v0.3.0 的字节改动仅出现在 263 处倍点，完整锁每条成功路径仍经过所有授权检查。基线和 v0.3.0 在双引擎上通过 16 个正例和 216 个畸形输入对照，覆盖越界标量、异常逆元宽度、非法曲线点和见证栈形状。v0.3.0 另通过 Node 的 1,296 个付款判定、chain-gang 的 432 个付款判定和 24 个畸形见证反例。 [验收矩阵](../../reference/acceptance.md)
+锁在见证进入曲线点运算前检查栈形状、字段长度、授权类型、公钥、标量和逆元。窗口索引由检查后的标量推导。独立窗口词的 `--assume-input-ranges` 不参与完整锁构建。v0.3.0 的字节改动仅出现在 263 处倍点，完整锁每条成功路径仍经过所有授权检查。基线和 v0.3.0 在双引擎上通过 16 个正例和 216 个畸形输入对照，覆盖越界标量、异常逆元宽度、非法曲线点和见证栈形状。v0.3.0 另通过 Node 的 1,296 个付款判定、chain-gang 的 432 个付款判定和 24 个畸形见证反例。 [验收矩阵](../../reference/acceptance.md)
 
 ### 完整锁复跑
 
@@ -42,7 +42,7 @@ bash shared/verify_node.sh --profile raised -- \
   python "$experiment/replay_r1.py" --matrix --output /tmp/r1-forth-comparison.json
 ```
 
-三版对照在同时包含本实验和 #45 的临时检出中运行。使用 #45 固定的 Linux x86-64 sCrypt 编译器。
+三版对照在同时包含本实验和 #45 夹具提交 `89d90e0` 的临时检出中运行。使用 #45 固定的 Linux x86-64 sCrypt 编译器。 [夹具提交](https://github.com/linzhm/bsv-script-lab/commit/89d90e0b6be95b9dbb34bb09475417f210c8da3a)
 
 ```sh
 GHCRTS=-N2 bash shared/verify_node.sh --profile raised -- \

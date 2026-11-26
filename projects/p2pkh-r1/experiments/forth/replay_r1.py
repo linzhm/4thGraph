@@ -120,7 +120,7 @@ def compare(source, *, matrix=False, scryptc=None):
                for name, optimized in (("baseline", False), ("optimized", True))}
     report = {"baseline_version": BASELINE_VERSION, "experiment_version": VERSION,
               "source_sha256": sha256(source).hexdigest(), "bsv_node_version": node.version, "chain_gang": engine,
-              "regtest_profile": os.environ["SCRIPT_LAB_REGTEST_PROFILE"]}
+              "regtest_profile": os.environ.get("SCRIPT_LAB_REGTEST_PROFILE")}
     if scryptc is not None:
         layouts["scrypt"], report["scrypt"] = scrypt_template(scryptc)
     replay = Replay(node, 7, "chronicle-v2", int(os.environ["SCRIPT_LAB_CHRONICLE_HEIGHT"]))
