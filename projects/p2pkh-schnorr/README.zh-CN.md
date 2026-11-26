@@ -1,4 +1,4 @@
-# P2PKH-Schnorr v0.7.0
+# P2PKH-Schnorr v0.8.0
 
 [English](README.md) · [4thGraph](../../README.zh-CN.md) · [项目目录](../README.zh-CN.md) · [版本](versions/index.json)
 
@@ -12,11 +12,11 @@
 
 付款示例通过 `REQUIRE stdlib/bip340.fth` 引入 4thGraph 标准库。`schnorr-lock` 将库里的验签词与所有者校验、当前输入绑定组合成付款锁。`schnorr-unlock` 为每次花费构造解锁脚本。[付款示例源码](reference/schnorr.fth) · [4thGraph 验签库](../../src/fourthgraph/stdlib/bip340.fth)
 
-在仓库根目录运行 `PYTHONPATH=src:. python projects/p2pkh-schnorr/reference/generate_template.py --check` 核对当前锁和布局。用 `--write` 重新生成。钱包默认创建 v0.7.0 输出，并支持识别和花费原版 v0.6.0 输出。[v0.6.0 布局](versions/v0.6.0/layout.json)
+在仓库根目录运行 `PYTHONPATH=src:. python projects/p2pkh-schnorr/reference/generate_template.py --check` 核对当前锁和布局。用 `--write` 重新生成。钱包默认创建 v0.8.0 输出，也支持识别和花费 v0.6.0 与 v0.7.0 输出。[版本目录](versions/index.json)
 
 钱包用 libsecp256k1 验证外部签名，再将审批过的预映像和公开见证交给 `schnorr-unlock` 生成解锁脚本。[钱包 SDK](docs/sdk.zh-CN.md#quickstart)
 
-验签器把签名标量拆成两段，用 secp256k1 自同态分解挑战标量，再用 64 个两位窗口联合累加四个 128 位分量。v0.7.0 使用仿射点加构建部分变量基点表，压缩查表指令，并把连续两次倍点的首个 X 坐标取模推迟到第二次。独立验签器从 29,415 字节缩至 28,677 字节。[标量分解和窗口构造](docs/spec.zh-CN.md#联合标量乘法)
+验签器用 64 个两位窗口联合累加四个 128 位分量。v0.8.0 一次将四个分量交错排列成 64 字节，每个字节包含一个窗口所需的两个点表索引。点乘循环从备用栈逐字节读取索引。独立验签器从 28,677 字节缩至 27,380 字节。[标量分解和窗口构造](docs/spec.zh-CN.md#联合标量乘法)
 
 ## 复现验收
 
@@ -37,14 +37,14 @@ bash tools/verify_node.sh -- bash sdk/verify_wallet.sh p2pkh-schnorr
 
 ## 交易实测
 
-每个 v0.7.0 锁定脚本为 **29,660 字节**，比 v0.6.0 少 738 字节。所有者槽位从字节偏移 **238** 开始。下表的两进两出场景都新建两个 Schnorr 输出。解锁脚本包含签名预映像、BIP340 签名和坐标见证。
+每个 v0.8.0 锁定脚本为 **28,363 字节**，比 v0.7.0 少 1,297 字节。所有者槽位从字节偏移 **238** 开始。下表的两进两出场景都新建两个 Schnorr 输出。解锁脚本包含签名预映像、BIP340 签名和坐标见证。
 
 | 签名模式 | 每个锁定脚本 | 每个解锁脚本 | 整笔交易 | 新增输入 | 新增输出 | 入金与退出 | 一次周转 | 两栈载荷峰值 |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| BIP143 ALL | 29,660 | 329 | 60,096 | 372 | 29,671 | 60,322 | 120,418 | 3,321 |
-| Chronicle OTDA ALL | 29,660 | 59,611 | 178,660 | 59,777 | 89,021 | 60,335 | 238,996 | 119,054 |
+| BIP143 ALL | 28,363 | 329 | 57,502 | 372 | 28,374 | 57,728 | 115,229 | 3,315 |
+| Chronicle OTDA ALL | 28,363 | 57,017 | 170,878 | 57,183 | 85,130 | 57,742 | 228,620 | 113,866 |
 
-单位均为字节。栈载荷取开发求值器测得的第一个输入的主栈和备用栈合计峰值。完整输入在 BSV Node 1.2.3 和 chain-gang 上用显式提供的上一输出验证。OTDA ALL 的每份预映像都包含完整输出字节。[模板布局及指纹](versions/v0.7.0/layout.json) · [复放实测记录](versions/v0.7.0/measurements.json) · [基准口径](../../docs/benchmark.zh-CN.md)
+单位均为字节。栈载荷取开发求值器测得的第一个输入的主栈和备用栈合计峰值。完整输入在 BSV Node 1.2.3 和 chain-gang 上用显式提供的上一输出验证。OTDA ALL 的每份预映像都包含完整输出字节。[模板布局及指纹](versions/v0.8.0/layout.json) · [复放实测记录](versions/v0.8.0/measurements.json) · [基准口径](../../docs/benchmark.zh-CN.md)
 
 ```sh
 PYTHONPATH=src:. bash tools/verify_node.sh -- "$SCRIPT_LAB_SDK_PYTHON" -m fourthgraph.benchmark.run \

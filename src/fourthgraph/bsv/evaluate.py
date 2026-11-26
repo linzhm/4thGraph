@@ -111,7 +111,7 @@ def evaluate(raw, stack=None, checksig=None, *, observe_stack=None):
                 y=pop(); x=pop()
                 if len(x)!=len(y): raise ScriptError('bitwise length')
                 stack.append(bytes((a^b if name=='XOR' else a&b if name=='AND' else a|b) for a,b in zip(x,y)))
-            elif name == 'LSHIFT':
+            elif name in ('LSHIFT', 'RSHIFT'):
                 shift = num()
                 data = pop()
                 if shift < 0:
@@ -121,7 +121,7 @@ def evaluate(raw, stack=None, checksig=None, *, observe_stack=None):
                     stack.append(bytes(len(data)))
                 else:
                     value = int.from_bytes(data, 'big')
-                    shifted = (value << shift) % (1 << width)
+                    shifted = (value << shift) % (1 << width) if name == 'LSHIFT' else value >> shift
                     stack.append(shifted.to_bytes(len(data), 'big'))
             elif name in ('NUMNOTEQUAL', 'GREATERTHANOREQUAL'):
                 right, left = num(), num()

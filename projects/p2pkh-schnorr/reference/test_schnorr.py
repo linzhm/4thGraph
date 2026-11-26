@@ -3,6 +3,7 @@
 import csv
 from dataclasses import replace
 from hashlib import sha256
+from itertools import product
 import os
 from random import Random
 import unittest
@@ -18,8 +19,9 @@ from schnorr_script import (
     lock_for_owner, owner_hash, recognize, recognize_template, verifier,
 )
 from fourthgraph.benchmark.validation import Node, chain_verdict
+from fourthgraph.bsv.chain_gang import validate_at_heights
 from fourthgraph.bsv.evaluate import ScriptError, evaluate
-from fourthgraph.bsv.script import decode_num, encode_num, number, push
+from fourthgraph.bsv.script import asm, decode_num, encode_num, number, push
 from fourthgraph.bsv.spend_authorization import SpendAuthorization, prepare_authorization
 from fourthgraph.bsv.transaction import CHRONICLE, Input, Output, Transaction
 
@@ -173,6 +175,16 @@ class SchnorrTests(unittest.TestCase):
                     expected = {1: [False, False], 2: [True, True], 3: [False, True]}[sighash & 31]
                     self.check_spend(changed, self.parents, expected)
 
+    def test_bip143_spend_before_chronicle(self):
+        signed = self.sign_two_inputs(self.unsigned, 0x41)
+        activation_height = int(os.environ.get("SCRIPT_LAB_CHRONICLE_HEIGHT", "2"))
+        # Genesis starts at height 1. The default Chronicle height leaves one eligible block.
+        height = activation_height - 1
+        context = dict(spend_height=height, activation_height=activation_height, utxo_heights=(height, height))
+        validate_at_heights(signed, self.parents, **context)
+        if self.node:
+            self.assertEqual(self.node.verdicts(signed, self.parents, **context), [True, True])
+
     def test_payment_and_preflight(self):
         parent = self.parents[0].serialize()
         public = self.public_keys[0]
@@ -210,27 +222,30 @@ class SchnorrTests(unittest.TestCase):
         self.assertEqual(raw, reference[:offset] + owner + reference[offset + 20:])
         self.assertEqual(compiled_template(owner), (raw, offset))
         self.assertEqual(recognize_template(raw), (TEMPLATE_VERSION, owner))
-        self.assertLess(len(raw), 30_398)
+        self.assertLess(len(raw), len(lock_for_owner(bytes(20), version="v0.7.0")))
 
     def test_mixed_template_spend(self):
-        version = "v0.6.0"
         public = self.public_keys[0]
-        raw = lock_for_public_key(public, version=version)
-        self.assertEqual(sha256(lock_for_owner(bytes(20), version=version)).hexdigest(),
-                         "12c75b80b65e983369998e8c2ba581979bb1d4cc67c99a4f8694394447a6a877")
-        self.assertEqual(recognize_template(raw), (version, owner_hash(public)))
-        self.assertIsNone(recognize_template(raw[:-1] + b"\x51"))
         first, second = self.parents
-        legacy = replace(first.outputs[1], script=raw)
-        parents = (replace(first, outputs=(first.outputs[0], legacy)), second)
         first_input, second_input = self.unsigned.inputs
-        inputs = (replace(first_input, txid=parents[0].txid_wire()), second_input)
-        unsigned = replace(self.unsigned, inputs=inputs)
-        for sighash in MODES:
-            with self.subTest(sighash=hex(sighash)):
-                signed = self.sign_two_inputs(unsigned, sighash, parents)
-                self.check_spend(signed, parents, [True, True])
-                self.check_spend(replace(signed, locktime=1), parents, [False, False])
+        versions = {
+            "v0.6.0": "12c75b80b65e983369998e8c2ba581979bb1d4cc67c99a4f8694394447a6a877",
+            "v0.7.0": "b1aff80ac6a66e83cf915f6636b54fd7853b2803543d2410a19840efb50ad966",
+        }
+        for version, checksum in versions.items():
+            raw = lock_for_public_key(public, version=version)
+            self.assertEqual(sha256(lock_for_owner(bytes(20), version=version)).hexdigest(), checksum)
+            self.assertEqual(recognize_template(raw), (version, owner_hash(public)))
+            self.assertIsNone(recognize_template(raw[:-1] + b"\x51"))
+            legacy = replace(first.outputs[1], script=raw)
+            parents = (replace(first, outputs=(first.outputs[0], legacy)), second)
+            inputs = (replace(first_input, txid=parents[0].txid_wire()), second_input)
+            unsigned = replace(self.unsigned, inputs=inputs)
+            for sighash in MODES:
+                with self.subTest(version=version, sighash=hex(sighash)):
+                    signed = self.sign_two_inputs(unsigned, sighash, parents)
+                    self.check_spend(signed, parents, [True, True])
+                    self.check_spend(replace(signed, locktime=1), parents, [False, False])
 
     def test_forth_unlock_preserves_witness_encoding(self):
         witness = (b"x" * 32, b"y" * 32, b"s" * 64, b"r" * 32)
@@ -321,6 +336,28 @@ class SchnorrTests(unittest.TestCase):
                     stack = [encode_num(FIELD), b"outer", *map(encode_num, (*left, bx, by))]
                     self.assertEqual(evaluate(mixed, stack), evaluate(full, [*stack, encode_num(1)]))
 
+    @staticmethod
+    def window_stream(scalars):
+        return bytes(sum(((value >> shift) & 3) << (2 * lane) for lane, value in enumerate(scalars))
+                     for shift in range(126, -1, -2))
+
+    def test_window_stream_packing(self):
+        pack = _contract().emit("bip340-pack-windows", b"")
+        for lane in range(4):
+            for digit in range(64):
+                with self.subTest(lane=lane, digit=digit):
+                    values = [0] * 4
+                    values[lane] = 3 << (2 * digit)
+                    expected = bytearray(64)
+                    expected[63 - digit] = 3 << (2 * lane)
+                    self.assertEqual(evaluate(pack, [b"outer", *map(encode_num, values)]),
+                                     ([b"outer", bytes(expected)], []))
+        rng = Random(340)
+        vectors = ([0] * 4, [HALF_RADIX - 1] * 4,
+                   *(tuple(rng.getrandbits(128) for _ in range(4)) for _ in range(64)))
+        for scalars in vectors:
+            self.assertEqual(evaluate(pack, list(map(encode_num, scalars))), ([self.window_stream(scalars)], []))
+
     def test_joint_window_table_and_selectors(self):
         contract = _contract()
         split = contract.emit("secp256k1-lambda-split", b"")
@@ -345,11 +382,11 @@ class SchnorrTests(unittest.TestCase):
             p = -public_multiple if k1 < 0 else public_multiple
             q = LAMBDA * (-public_multiple if k2 < 0 else public_multiple)
             built, alt = evaluate(table, list(map(encode_num, original)))
-            self.assertEqual(alt, [])
-            self.assertEqual(len(built), 86)
+            scalar_lanes = (s % HALF_RADIX, s // HALF_RADIX, abs(k1), abs(k2))
+            self.assertEqual(alt, [self.window_stream(scalar_lanes)])
+            self.assertEqual(len(built), 81)
             self.assertEqual(list(map(decode_num, built[:3])), original[:3])
-            self.assertEqual(list(map(decode_num, built[-8:])),
-                             [s % HALF_RADIX, s // HALF_RADIX, abs(k1), abs(k2), 1 << 126, 0, 1, 0])
+            self.assertEqual(list(map(decode_num, built[-3:])), [0, 1, 0])
             for index in range(1, 16):
                 with self.subTest(public_multiple=public_multiple, table_index=index):
                     high, low = divmod(index, 4)
@@ -358,17 +395,15 @@ class SchnorrTests(unittest.TestCase):
                     self.assertEqual(tuple(map(decode_num, built[start:start + 2])),
                                      affine_generator_multiple(high * HALF_RADIX + low))
 
-            selectors = {(i, 0) for i in range(16)} | {(0, i) for i in range(16)} | {(i, 15 - i) for i in range(16)}
-            for fixed, variable in sorted(selectors):
+            for fixed, variable in product(range(16), repeat=2):
                 with self.subTest(public_multiple=public_multiple, fixed=fixed, variable=variable):
                     high, low = divmod(fixed, 4)
                     vhigh, vlow = divmod(variable, 4)
-                    digits = [low, high, vlow, vhigh]
-                    initial = [*digits, 1, 0, 1, 0]
-                    selected, alt = evaluate(step, built[:-8] + list(map(encode_num, initial)))
-                    self.assertEqual(alt, [])
-                    self.assertEqual(selected[:-8], built[:-8])
-                    self.assertEqual(list(map(decode_num, selected[-8:-3])), [*digits, 0])
+                    remaining = b"\xff"
+                    stream = bytes([variable * 16 + fixed]) + remaining
+                    selected, alt = evaluate(push(stream) + asm("OP_TOALTSTACK") + step, built)
+                    self.assertEqual(alt, [remaining])
+                    self.assertEqual(selected[:-3], built[:-3])
                     check_point(selected[-3:], high * HALF_RADIX + low + vhigh * q + vlow * p)
 
     def test_joint_multiplication_scalar_edges(self):
