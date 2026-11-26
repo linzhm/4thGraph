@@ -8,6 +8,9 @@
 | `std/p2pk` | `p2pk-lock ( bytes -- bytes )`，接收 33 字节压缩公钥并返回锁脚本 | [库源码](stdlib/p2pk.fth) · [P2PK 示例](examples/p2pk.fth) |
 | `std/p2pkh` | `p2pkh-lock ( bytes -- bytes )`，接收 20 字节公钥哈希并返回锁脚本 | [库源码](stdlib/p2pkh.fth) · [P2PKH 示例](examples/p2pkh.fth) |
 | `std/p256` | `p256-add`、`p256-double`，项目式坐标，保留栈底的 `p b3` | [P-256 内核](stdlib/p256.fth) |
+| `std/script-fragments` | 构造栈搬运、32 字节反序和无符号大端整数解码片段 | [库源码](stdlib/script-fragments.fth) |
+| `std/secp256k1` | 齐次射影点加、仿射混合点加、倍点和标量分解 | [曲线内核](stdlib/secp256k1.fth) |
+| `std/bip340` | `bip340-verify ( script -- script )`，构造 BIP340 验签片段 | [付款示例](../p2pkh-schnorr/README.zh-CN.md) |
 | `std/groth16-bls12-381` | `groth16-bls12-381-verify ( -- groth16-verified )`，由 BLS12-381 verifier 后端编译 | [Groth16 Forth 源码](groth16-bls12-381/verifier.fth) |
 | `std/verify` | `relation: TRANSITION ROUTE ;`，声明一个可用多种后端验证的关系 | [状态验证示例](examples/verify-state.fth) |
 

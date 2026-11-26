@@ -96,6 +96,10 @@ def wallet_library(module, entries, *, accumulator="bytes", parameters=()):
     return Library(ROOT / library_resource(f"std/wallet/{module}"), exports, WALLET_BACKEND)
 
 
+def script_fragment(name, runtime_inputs=(), *, takes=("script",), failure=""):
+    return Export(name, takes, ("script",), (WALLET_BACKEND,), runtime_inputs, failure)
+
+
 def library_resource(name):
     if name == "std/groth16-bls12-381":
         return Path("groth16-bls12-381/verifier.fth")
@@ -132,6 +136,52 @@ LIBRARIES = {
         p256_export("p256-add", ("p", "b3", "x1", "y1", "z1", "x2", "y2", "z2")),
         p256_export("p256-double", ("p", "b3", "x", "y", "z")),
     )),
+    "std/script-fragments": Library(ROOT / "stdlib/script-fragments.fth", (
+        script_fragment("script-pick-depth", takes=("script", "cell"),
+                        failure="The spend stack must contain the selected depth."),
+        script_fragment("script-save-depth", takes=("script", "cell"),
+                        failure="The spend stack must contain the selected depth."),
+        script_fragment("script-drop-pairs", takes=("script", "cell"),
+                        failure="The spend stack must contain twice the build count."),
+        script_fragment("script-restore-items", takes=("script", "cell"),
+                        failure="The alternate stack must contain the build count."),
+        script_fragment("script-reverse32", (Parameter("value", "bytes", "Exactly 32 bytes"),),
+                        failure="Pass a 32-byte element."),
+        script_fragment("script-uint256be", (Parameter("value", "bytes", "Exactly 32 bytes"),),
+                        failure="Pass a 32-byte element."),
+    ), WALLET_BACKEND),
+    "std/secp256k1": Library(ROOT / "stdlib/secp256k1.fth", (
+        script_fragment("secp256k1-field"),
+        script_fragment("secp256k1-order"),
+        script_fragment("secp256k1-gx"),
+        script_fragment("secp256k1-gy"),
+        script_fragment("secp256k1-reduce", (Parameter("integer", "script-int", "Value to reduce"),),
+                        failure="The caller places the field prime at the bottom of the main stack."),
+        script_fragment("secp256k1-endomorphism-x", (Parameter("x", "script-int", "Projective x coordinate"),),
+                        failure="The caller places the field prime at the bottom of the main stack."),
+        script_fragment("secp256k1-lambda-split", (Parameter("k", "script-int", "Scalar in [0, n]"),),
+                        failure="The caller supplies a scalar in range. Leaves the two signed components."),
+        script_fragment("secp256k1-add", (
+            Parameter("left", "projective-point", "Three homogeneous ScriptNum coordinates"),
+            Parameter("right", "projective-point", "Three homogeneous ScriptNum coordinates"),
+        ), failure="The caller supplies valid points and the field prime at the bottom of the main stack."),
+        script_fragment("secp256k1-add-affine", (
+            Parameter("left", "projective-point", "Three homogeneous ScriptNum coordinates"),
+            Parameter("right", "affine-point", "Two affine ScriptNum coordinates"),
+        ), failure="The caller supplies valid points and the field prime at the bottom of the main stack."),
+        script_fragment("secp256k1-double", (
+            Parameter("point", "projective-point", "Three homogeneous ScriptNum coordinates"),
+        ), failure="The caller supplies a valid point and the field prime at the bottom of the main stack."),
+    ), WALLET_BACKEND),
+    "std/bip340": Library(ROOT / "stdlib/bip340.fth", (
+        script_fragment("bip340-verify", (
+            Parameter("message", "bytes", "BIP340 message of any supported length"),
+            Parameter("public-x", "bytes", "32-byte x-only public key"),
+            Parameter("public-y", "bytes", "32-byte even public y coordinate"),
+            Parameter("signature", "bytes", "64-byte BIP340 signature"),
+            Parameter("nonce-y", "bytes", "32-byte even nonce y coordinate"),
+        ), failure="An invalid witness or signature aborts. A valid signature leaves one true item."),
+    ), WALLET_BACKEND),
     "std/groth16-bls12-381": Library(ROOT / "groth16-bls12-381/verifier.fth", (GROTH16_VERIFY,), "groth16-bls12-381"),
     "std/verify": Library(ROOT / "stdlib/verify.fth", declarations=("relation:",)),
     "std/wallet/r1": wallet_library("r1", ("r1-lock",), accumulator="script", parameters=(

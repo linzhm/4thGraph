@@ -5,7 +5,7 @@ cd "$(dirname "$0")/../.."
 
 project=${1:?usage: verify_wallet.sh PROJECT}
 case "$project" in
-  p2pk-p2pkh-baseline|p2pkh-r1|p2pkh-r1-deferred|p2pkh-sm2|lamport-ots|wots-plus|ml-dsa) ;;
+  p2pk-p2pkh-baseline|p2pkh-r1|p2pkh-r1-deferred|p2pkh-sm2|p2pkh-schnorr|lamport-ots|wots-plus|ml-dsa) ;;
   *) printf 'Unknown wallet project: %s\n' "$project" >&2; exit 2 ;;
 esac
 

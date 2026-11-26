@@ -14,6 +14,7 @@ CALLBACKS = {
     "p2pk-p2pkh-baseline": ("ecdsa-secp256k1", "digest", "der-low-s"),
     "p2pkh-r1": ("ecdsa-p256", "digest", "raw-rs"),
     "p2pkh-sm2": ("sm2", "message", "raw-rs"),
+    "p2pkh-schnorr": ("schnorr-secp256k1", "message", "bip340"),
     "lamport-ots": ("lamport-ots", "digest", "raw"),
     "wots-plus": ("wots-plus", "digest", "raw"),
     "ml-dsa": ("pure-ml-dsa-44", "message", "raw"),

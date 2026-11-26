@@ -186,6 +186,7 @@ For Lamport and WOTS+ in Python, wrap your digest signer with `durable_signer(da
 | P2PKH-R1 | P-256 digest or device-hashed message, 64-byte `r ∥ s` | [R1 SDK](../../projects/p2pkh-r1/docs/sdk.en.md#quickstart) |
 | P2PKH-R1-Deferred | Activation builds the unlocking script from the committed R1 output | [Deferred SDK](../../projects/p2pkh-r1-deferred/docs/sdk.en.md#quickstart) |
 | P2PKH-SM2 | SM2 message and user ID, 64-byte `r ∥ s` or DER SignedData | [SM2 SDK](../../projects/p2pkh-sm2/docs/sdk.en.md#quickstart) |
+| P2PKH-Schnorr | 32-byte BSV transaction message, 64-byte BIP340 signature | [Schnorr SDK](../../projects/p2pkh-schnorr/docs/sdk.en.md#quickstart) |
 | Lamport OTS | 32-byte digest, 8,192-byte signature | [Lamport SDK](../../projects/lamport-ots/docs/sdk.en.md#quickstart) |
 | WOTS+ | 32-byte digest, 2,144-byte signature | [WOTS+ SDK](../../projects/wots-plus/docs/sdk.en.md#quickstart) |
 | Pure ML-DSA-44 | 32-byte message with empty context, 2,420-byte signature | [ML-DSA SDK](../../projects/ml-dsa/docs/sdk.en.md#quickstart) |

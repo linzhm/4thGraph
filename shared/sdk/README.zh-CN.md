@@ -188,6 +188,7 @@ Python 接入 Lamport 或 WOTS+ 时，用 `sign_once = durable_signer(database, 
 | P2PKH-R1 | P-256 摘要或交给设备散列的消息，64 字节 `r ∥ s` | [R1 SDK](../../projects/p2pkh-r1/docs/sdk.zh-CN.md#quickstart) |
 | P2PKH-R1-Deferred | 启用操作依据承诺的 R1 输出生成解锁脚本 | [Deferred SDK](../../projects/p2pkh-r1-deferred/docs/sdk.zh-CN.md#quickstart) |
 | P2PKH-SM2 | SM2 消息和用户 ID，64 字节 `r ∥ s` 或 DER SignedData | [SM2 SDK](../../projects/p2pkh-sm2/docs/sdk.zh-CN.md#quickstart) |
+| P2PKH-Schnorr | 32 字节 BSV 交易消息，64 字节 BIP340 签名 | [Schnorr SDK](../../projects/p2pkh-schnorr/docs/sdk.zh-CN.md#quickstart) |
 | Lamport OTS | 32 字节摘要，8,192 字节签名 | [Lamport SDK](../../projects/lamport-ots/docs/sdk.zh-CN.md#quickstart) |
 | WOTS+ | 32 字节摘要，2,144 字节签名 | [WOTS+ SDK](../../projects/wots-plus/docs/sdk.zh-CN.md#quickstart) |
 | 纯模式 ML-DSA-44 | 32 字节消息和空上下文，2,420 字节签名 | [ML-DSA SDK](../../projects/ml-dsa/docs/sdk.zh-CN.md#quickstart) |

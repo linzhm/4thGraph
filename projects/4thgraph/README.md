@@ -127,6 +127,24 @@ PYTHONPATH=. python "$project/decision_report.py" "$project/build/search-replay.
 - 词库声明执行位置和验证依据。Script 词由链上执行。宿主词通过 `Host` 的注入接口查询 UTXO、请求签名和提交交易，并可从 UTXO 取得脚本和 outpoint。测试签名器使用公开可复现的私钥，仅供 regtest。
 - `Contracts.prepare` 把符号引用如 `split:0` 解析为已封装父交易的真实 outpoint，核对前输出、已提供的父交易关系，以及汇合结果的槽位、同次拆分来源和编码。含门条件的步骤会先在宿主检查条件。 `Draft.signing_requests` 给外部签名器提供角色、前输出、待签交易、见证输入及 ForkID ALL 摘要。 `Draft.seal` 校验草稿绑定并装配签名和当前交易原像。实际可花费性仍由 UTXO 集和链上脚本验证。父 txid 改变时，`invalidated` 沿依赖图列出需重新绑定的交易和需更新的授权。
 
+## Schnorr 基础库
+
+`std/secp256k1` 提供曲线常数、完备射影点加和倍点。`std/bip340` 导出 `bip340-verify`，供付款锁和其他合约复用。两者可通过 Script 构建后端的 `REQUIRE` 加载。库接口和依赖记录在编译器的 `--capabilities` 中。[曲线库](stdlib/secp256k1.fth) · [验签库](stdlib/bip340.fth)
+
+```python
+from importlib import import_module
+
+ScriptBuilder = import_module("projects.4thgraph.script_builder").ScriptBuilder
+builder = ScriptBuilder("REQUIRE stdlib/bip340.fth\n")
+lock = builder.emit("bip340-verify", b"")
+```
+
+验签片段要求主栈从底到顶为消息、公钥 x、公钥 y、64 字节签名、nonce y。坐标用 32 字节无符号大端编码，两个 y 均取偶数。验签成功留下一个真值，失败终止执行。调用者可在备用栈保留自己的数据。
+
+点加直接展开交叉项，并在栈项最后一次使用时移动该项。射影点加为 103 字节，右侧为仿射点的专用点加为 95 字节。倍点复用两项输出的中间值，编译为 58 字节。BIP340 验签词用 secp256k1 自同态分解公开挑战标量，在 64 个两位窗口中联合累加四个 128 位标量。[曲线运算](stdlib/secp256k1.fth) · [验签实现](stdlib/bip340.fth)
+
+独立的 P2PKH-Schnorr 示例把所有者承诺和交易绑定组合进付款锁，并通过统一钱包 SDK 构造和识别输出。[付款示例](../p2pkh-schnorr/README.zh-CN.md) · [统一钱包 SDK](../../shared/sdk/README.zh-CN.md)
+
 ## 交易与验证
 
 `example.fth` 是并行双分支。`gated.fth` 在分支前有一道授权条件。后者可以完整融合、把条件与拆分合并，或将条件交易独立提交后由拆分绑定其输出。`independent-submit: qualify ;` 强制最后一种计划。两个示例共用汇合验证和版本选择。 [带门的源码](gated.fth)

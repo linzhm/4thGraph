@@ -1,0 +1,71 @@
+// Detached BIP340 verifier for comparing compiler output with the same
+// complete homogeneous formulas and five witness fields as Script Lab.
+struct ProjectivePoint {
+    int x;
+    int y;
+    int z;
+}
+
+contract Bip340 {
+    static const int P = 0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f;
+    static const int N = 0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141;
+    static const ProjectivePoint G = {
+        0x79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798,
+        0x483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8, 1
+    };
+    static const int TOP_BIT = 1 << 255;
+    static const bytes CHALLENGE_TAG = b'7bb52d7a9fef58323eb1bf7a407db382d2f3f2d81bb1224f49fe518f6d48d37c7bb52d7a9fef58323eb1bf7a407db382d2f3f2d81bb1224f49fe518f6d48d37c';
+
+    static function fromBE32(bytes value) : int {
+        return unpack(reverseBytes(value, 32) + b'00');
+    }
+
+    static function pointSum(ProjectivePoint p, ProjectivePoint q, int field) : ProjectivePoint {
+        int xx = p.x * q.x;
+        int yy = p.y * q.y;
+        int zz = p.z * q.z;
+        int xy = (p.x + p.y) * (q.x + q.y) - (xx + yy);
+        int xz = (p.x + p.z) * (q.x + q.z) - (xx + zz);
+        int yz = (p.y + p.z) * (q.y + q.z) - (yy + zz);
+        int minus = yy - 21 * zz;
+        int plus = yy + 21 * zz;
+        int t = 3 * xx;
+        int k = 21 * xz;
+        return {(xy * minus - yz * k) % field,
+                (minus * plus + t * k) % field,
+                (yz * plus + xy * t) % field};
+    }
+
+    public function verify(bytes message, bytes publicX, bytes publicY, bytes signature, bytes nonceY) {
+        require(len(publicX) == 32 && len(publicY) == 32 && len(signature) == 64 && len(nonceY) == 32);
+        // Keep the field modulus on the stack instead of embedding it at each reduction.
+        int field = P;
+        bytes rx = signature[:32];
+        int x = fromBE32(publicX);
+        int y = fromBE32(publicY);
+        int r = fromBE32(rx);
+        int ry = fromBE32(nonceY);
+        int s = fromBE32(signature[32:]);
+        require(x < P && y < P && r < P && ry < P && s < N);
+        require(y % 2 == 0 && ry % 2 == 0);
+        require((y * y - (x * x * x + 7)) % field == 0);
+        int e = fromBE32(sha256(CHALLENGE_TAG + rx + publicX + message)) % N;
+        int k = N - e;
+        ProjectivePoint pk = {x, y, 1};
+        ProjectivePoint pair = pointSum(pk, G, field);
+        ProjectivePoint result = {0, 1, 0};
+        int mask = TOP_BIT;
+        loop (256) {
+            result = pointSum(result, result, field);
+            int selector = 2 * (s / mask % 2) + k / mask % 2;
+            if (selector != 0) {
+                ProjectivePoint addend = selector == 1 ? pk : (selector == 2 ? G : pair);
+                result = pointSum(result, addend, field);
+            }
+            mask /= 2;
+        }
+        require(result.z != 0);
+        require((result.x - r * result.z) % field == 0);
+        require((result.y - ry * result.z) % field == 0);
+    }
+}

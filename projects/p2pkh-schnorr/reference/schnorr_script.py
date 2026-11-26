@@ -1,0 +1,82 @@
+"""Compile the Forth contract and instantiate its frozen Schnorr lock."""
+
+from functools import cache
+from hashlib import new, sha256
+from importlib import import_module
+import json
+from pathlib import Path
+
+ScriptBuilder = import_module("projects.4thgraph.script_builder").ScriptBuilder
+SOURCE = Path(__file__).with_name("schnorr.fth")
+TEMPLATE_DIR = Path(__file__).resolve().parents[1] / "template"
+TEMPLATE_VERSION = "v0.6.0"
+
+
+@cache
+def _contract():
+    return ScriptBuilder.from_file(SOURCE)
+
+
+@cache
+def authorization_codes():
+    contract = _contract()
+    return (contract.emit("schnorr-ordinary-code", b""),
+            contract.emit("schnorr-companion-code", b""))
+
+
+@cache
+def verifier():
+    """Consume message, public x, public y, BIP340 signature, and nonce y."""
+    return ScriptBuilder("REQUIRE stdlib/bip340.fth\n").emit("bip340-verify", b"")
+
+
+def compile_unlock(preimage, companion, public_x, public_y, signature, nonce_y):
+    """Instantiate the Forth unlocking word with approved, encoded witness data."""
+    return _contract().emit("schnorr-unlock", preimage, int(companion),
+                            public_x, public_y, signature, nonce_y)
+
+
+def compiled_template(owner=bytes(20)):
+    """Return the compiled locking script and byte offset of its owner slot."""
+    _check_owner(owner)
+    contract = _contract()
+    offset = len(contract.emit("schnorr-lock-prefix", b"")) + 1
+    return contract.emit("schnorr-lock", b"", owner), offset
+
+
+def owner_hash(public_key):
+    if not isinstance(public_key, bytes) or len(public_key) != 32:
+        raise ValueError("expected a 32-byte BIP340 public key")
+    return new("ripemd160", sha256(public_key).digest()).digest()
+
+
+def _check_owner(owner):
+    if not isinstance(owner, bytes) or len(owner) != 20:
+        raise ValueError("expected a 20-byte owner hash")
+
+
+@cache
+def _canonical():
+    raw = bytes.fromhex((TEMPLATE_DIR / "template.hex").read_text(encoding="ascii"))
+    layout = json.loads((TEMPLATE_DIR / "layout.json").read_text(encoding="utf-8"))
+    start = layout["owner_hash160"]["offset"]
+    if (layout["version"] != TEMPLATE_VERSION or layout["owner_hash160"]["length"] != 20
+            or len(raw) != layout["script_bytes"] or sha256(raw).hexdigest() != layout["base_script_sha256"]
+            or not 0 < start <= len(raw) - 20 or raw[start - 1:start + 20] != b"\x14" + bytes(20)):
+        raise ValueError("Schnorr locking template differs from its manifest")
+    return raw, start
+
+
+def lock_for_owner(owner):
+    _check_owner(owner)
+    raw, start = _canonical()
+    return raw[:start] + owner + raw[start + 20:]
+
+
+def recognize(script):
+    """Return the committed owner only after comparing all fixed bytes."""
+    raw, start = _canonical()
+    if (isinstance(script, bytes) and len(script) == len(raw)
+            and script[:start] == raw[:start] and script[start + 20:] == raw[start + 20:]):
+        return script[start:start + 20]
+    return None

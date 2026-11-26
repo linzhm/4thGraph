@@ -1,0 +1,3 @@
+-r ../../../shared/requirements-chronicle.txt
+coincurve==21.0.0
+ecdsa==0.19.1

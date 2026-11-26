@@ -101,6 +101,7 @@ python3 projects/4thgraph/examples/payments.py --public-key 0279be667ef9dcbbac55
 | [P2PKH-R1](projects/p2pkh-r1/README.zh-CN.md) | 接入已有 P‑256 签名设备或服务，或对照 Forth 编译的锁 | 核对设备的签名方式，并持久保存 P‑256 签名随机数历史 | [v0.3.0 Forth 探索版](projects/p2pkh-r1/README.zh-CN.md#version-history) | [v0.2.0 SDK 指南](projects/p2pkh-r1/docs/sdk.zh-CN.md#quickstart) |
 | [P2PKH-R1-Deferred](projects/p2pkh-r1-deferred/README.zh-CN.md) | 先用短锁接收入金，可以稍后单独启用的场景 | 预留手续费输入和启用步骤，届时生成完整 R1 输出 | v0.2.0 开发版 | [接入指南](projects/p2pkh-r1-deferred/docs/sdk.zh-CN.md#quickstart) |
 | [P2PKH-SM2](projects/p2pkh-sm2/README.zh-CN.md) | 接入 SM2 签名器或 GB/T 35275‑2026 SignedData 服务，或重建符合条件的 OTDA 输出 | 核对 SM2 消息和用户标识，使用 SignedData 时绑定预期签名者 | v1.1.0 候选版 | [接入指南](projects/p2pkh-sm2/docs/sdk.zh-CN.md#quickstart) |
+| [P2PKH-Schnorr](projects/p2pkh-schnorr/README.zh-CN.md) | 向 BIP340 x-only 公钥哈希或 MuSig2 聚合公钥付款 | 使用外部 BIP340 签名器和 4thGraph 编译的模板 | v0.6.0 候选版 | [接入指南](projects/p2pkh-schnorr/docs/sdk.zh-CN.md#quickstart) |
 | [Lamport OTS](projects/lamport-ots/README.zh-CN.md) | 比较 SHA‑256 一次性签名在完整公钥锁和公钥承诺锁下的开销 | 每个 UTXO 使用新密钥，在更小的入金锁和更小的花费输入之间取舍 | v0.1 开发版 | [接入指南](projects/lamport-ots/docs/sdk.zh-CN.md#quickstart) |
 | [WOTS+](projects/wots-plus/README.zh-CN.md) | 研究更短的 SHA‑256 一次性签名及不同收款模板 | 管理一次性密钥，并比较缓存式锁和 OTDA 重建 | v0.1 开发版 | [接入指南](projects/wots-plus/docs/sdk.zh-CN.md#quickstart) |
 | [纯模式 ML-DSA-44](projects/ml-dsa/README.zh-CN.md) | 验证 FIPS 204 签名互操作，评估大脚本的花费成本 | 使用纯模式签名器，验证目标节点和矿工的大脚本接收策略 | v0.1 开发版 | [接入指南](projects/ml-dsa/docs/sdk.zh-CN.md#quickstart) |
