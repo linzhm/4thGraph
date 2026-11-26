@@ -26,7 +26,7 @@ The reference `OneTimeSigner` enforces this rule within one process for testing.
 Use `locking_script(key)` for transaction-bound tests. The detached verifier
 from `locking_script(key, transaction=False)` accepts a caller-provided digest
 and is only for testing the primitive. The payment lock supports the twelve
-ForkID and Chronicle OTDA modes, with ForkID `ALL` (`0x41`) as the wallet default.
+BIP143 and Chronicle OTDA modes, with BIP143 `ALL` (`0x41`) as the wallet default.
 
 ## Use cases and trade-offs
 
@@ -61,11 +61,11 @@ payment vectors are in [template/vectors.json](template/vectors.json).
 payment lock. Each WOTS+ step uses the same SHA-256 inputs as the existing
 script. The generator keeps the two key-and-mask address fields and the
 zero function prefix on the stack and retrieves them as needed. The raw
-signature is 2,144 bytes, and the ordinary ForkID unlocking script is
+signature is 2,144 bytes, and the ordinary BIP143 unlocking script is
 2,310 bytes. Use a fresh one-time key for each UTXO across both formats.
 
 In signed payments with two WOTS+ inputs and two WOTS+ outputs, the
-candidate saves 11,966 bytes under ForkID ALL and 35,898 bytes under
+candidate saves 11,966 bytes under BIP143 ALL and 35,898 bytes under
 Chronicle OTDA ALL. The acceptance tests run the 1,230-row matrix and
 mutations across all 67 signature chains for both formats.
 
@@ -75,8 +75,8 @@ path adds a WOTS+ two-input, two-output payment in between.
 
 | Path | Existing format | Cached constants |
 | --- | ---: | ---: |
-| ForkID ALL, fund and exit | 89,496 B | 77,530 B |
-| ForkID ALL, one turnover | 178,765 B | 154,833 B |
+| BIP143 ALL, fund and exit | 89,496 B | 77,530 B |
+| BIP143 ALL, one turnover | 178,765 B | 154,833 B |
 | Chronicle OTDA ALL, fund and exit | 89,510 B | 77,543 B |
 | Chronicle OTDA ALL, one turnover | 347,775 B | 299,911 B |
 
@@ -88,8 +88,8 @@ P2PKH and the WOTS+ signature and witness format are identical.
 `locking_script(key, cached_constants="steps")` builds a 33,956-byte lock.
 It adds fifteen four-byte step indices to the existing stack cache. The
 steps feed exactly the same addresses into SHA-256. The ordinary signature
-and 2,310-byte ForkID witness keep their existing encodings. The two-in,
-two-out ForkID ALL example saves 4,654 bytes compared with the
+and 2,310-byte BIP143 witness keep their existing encodings. The two-in,
+two-out BIP143 ALL example saves 4,654 bytes compared with the
 36,283-byte cache. Chronicle OTDA ALL saves 13,962 bytes.
 
 The development evaluator measured a main stack peak of 28 items, up from
@@ -137,7 +137,7 @@ python projects/wots-plus/reference/test_lean.py /path/to/bsv-script-lean/eval/b
 ```
 
 The runner checks the transaction gate and the selected input's Script verdict
-for the sighash matrix and malformed witnesses. It also checks a ForkID `ALL`
+for the sighash matrix and malformed witnesses. It also checks a BIP143 `ALL`
 spend at Genesis-era heights before Chronicle. This is a separate executable
 specification check alongside BSV Node and chain-gang.
 

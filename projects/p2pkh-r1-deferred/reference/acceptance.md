@@ -10,12 +10,12 @@ funding locks and the earlier full-key format against both R1 target versions. T
 | Funding layout | 1,435-byte hash-only lock, 1,480-byte full-key lock |
 | Target R1 version | v0.1.0, v0.2.0 |
 | Transaction version | 1, 2 |
-| Sighash | ALL, NONE or SINGLE × ForkID or OTDA × with or without ANYONECANPAY |
+| Sighash | ALL, NONE or SINGLE × BIP143 or OTDA × with or without ANYONECANPAY |
 | Rule context | Genesis UTXO and Genesis spend, Genesis UTXO and Chronicle spend, Chronicle UTXO and Chronicle spend |
 | Activation case | Unchanged, fresh witness for wrong target amount, fresh witness for wrong recipient script, missing target, changed sponsor output, changed activation sequence, fresh witness with wrong binding amount, extra stack item, fresh witness for the same owner at the wrong R1 version |
 
 An unchanged witness passes in the applicable context. The Genesis context
-rejects all OTDA modes. The mandatory ForkID SINGLE binding must always commit
+rejects all OTDA modes. The mandatory BIP143 SINGLE binding must always commit
 to the equal-value target at the activation input's index. The fixture supplies
 fresh preimages for wrong target amounts, scripts and template versions below the wallet's preflight
 to exercise the lock's own check. Changing the sponsor output with a stale

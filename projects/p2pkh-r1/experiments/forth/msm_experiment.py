@@ -11,7 +11,7 @@ from msm_compiler import CALIBRATION, SOURCE, R1MSMCompiler, payment_estimates
 from msm_lowering import verify_window
 from replay_r1 import CONTEXT_PIN, MODES, Node, Replay, chain_metadata, matrix_check, replay_layout
 
-OBJECTIVES = ("lock_bytes", "forkid-all", "otda-all", "otda-single")
+OBJECTIVES = ("lock_bytes", "bip143-all", "otda-all", "otda-single")
 # This fourth explicit candidate already appears in the previous comparison.
 REFERENCE_TRIAL = "split-5"
 
@@ -46,12 +46,12 @@ def estimated_cost(compiler, plan, program, lock, pattern):
     # reconstructed OTDA bytes dominate the two OTDA fixture modes.
     counts = plan.counts()
     digits = counts["g_lookups"] + counts["q_lookups"] + counts["joint_lookups"]
-    forkid_peak = 99 * plan.table_points + 2 * digits + 400
+    bip143_peak = 99 * plan.table_points + 2 * digits + 400
     return {
         **costs, "lock_bytes": size, "otda_program_bytes": otda, "payment_bytes": payment_estimates(size, otda),
         "payment_peak_stack_payload_bytes": {
-            "forkid-all": forkid_peak, "otda-all": max(forkid_peak, 4 * size + 400),
-            "otda-single": max(forkid_peak, 2 * size + 400),
+            "bip143-all": bip143_peak, "otda-all": max(bip143_peak, 4 * size + 400),
+            "otda-single": max(bip143_peak, 2 * size + 400),
         },
     }
 
@@ -91,6 +91,18 @@ def shortlist(rows, limit):
     return selected
 
 
+def reference_rows(document):
+    rows = document["layouts"] if "layouts" in document else document["candidates"]
+    result = {}
+    for name, candidate in rows.items():
+        row = dict(candidate.get("measured", candidate))
+        if "payment_bytes" in row:
+            row["payment_bytes"] = {"bip143-all" if mode == "forkid-all" else mode: size
+                                    for mode, size in row["payment_bytes"].items()}
+        result[name] = row
+    return result
+
+
 def compare(args):
     start = perf_counter()
     compiler = R1MSMCompiler(args.source)
@@ -106,7 +118,7 @@ def compare(args):
     reference = {}
     if args.reference:
         raw = args.reference.read_bytes()
-        reference = json.loads(raw)["layouts"]
+        reference = reference_rows(json.loads(raw))
     known = {*CALIBRATION, REFERENCE_TRIAL, *reference}
     rows, builds = {}, {}
     summary = {
@@ -230,9 +242,11 @@ def cost_difference(rows, candidate, baseline):
 
 
 def markdown(report):
+    labels = {"lock_bytes": "Lock bytes", "bip143-all": "BIP143 ALL",
+              "otda-all": "OTDA ALL", "otda-single": "OTDA SINGLE"}
     lines = ["# R1 candidate comparison", "",
              "Each value is an estimate / measured result in bytes. Peak values cover both Script stacks.", "",
-             "| Candidate | Status | Lock | ForkID ALL | OTDA ALL | OTDA SINGLE | Peak ForkID / OTDA ALL / SINGLE |",
+             "| Candidate | Status | Lock | BIP143 ALL | OTDA ALL | OTDA SINGLE | Peak stack (BIP143 ALL / OTDA ALL / OTDA SINGLE) |",
              "| --- | --- | ---: | ---: | ---: | ---: | --- |"]
     for name, row in report["candidates"].items():
         estimate, measured = row.get("estimated", {}), row.get("measured", {})
@@ -246,7 +260,8 @@ def markdown(report):
         lines.append("| " + " | ".join([name.replace("|", r"\|"), row["status"], lock, *payments, ", ".join(peaks)]) + " |")
     lines.extend(["", "## Decisions", ""])
     for metric, name in report["selected"].items():
-        lines.append(f"- **{metric}** selects `{name}` at {objective(report['candidates'][name], 'measured', metric):,} B.")
+        cost = objective(report["candidates"][name], "measured", metric)
+        lines.append(f"- **{labels[metric]}** selects `{name}` at {cost:,} B.")
     for name, row in report["candidates"].items():
         reason = row.get("reason") or row.get("decision", {}).get("reason")
         if reason:

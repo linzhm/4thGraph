@@ -1,4 +1,4 @@
-"""Lower ForkID and Chronicle OTDA contexts from transaction commitments."""
+"""Lower BIP143 and Chronicle OTDA contexts from transaction commitments."""
 
 from dataclasses import dataclass
 
@@ -88,23 +88,23 @@ class LinkedContext:
 
 @dataclass(frozen=True)
 class DualLinkedContext:
-    forkid: LinkedContext
-    chronicle: LinkedContext
+    bip143: LinkedContext
+    otda: LinkedContext
 
     def check_size(self):
         # Both packed layouts place the version and outpoint at the same offsets.
-        return (asm("OP_SIZE") + number(self.chronicle.packed_bytes) + asm("OP_NUMEQUAL OP_IF")
-                + push(bytes([OTDA_ALL])) + asm("OP_ELSE") + self.forkid.check_size()
+        return (asm("OP_SIZE") + number(self.otda.packed_bytes) + asm("OP_NUMEQUAL OP_IF")
+                + push(bytes([OTDA_ALL])) + asm("OP_ELSE") + self.bip143.check_size()
                 + push(bytes([ALL])) + asm("OP_ENDIF OP_TOALTSTACK"))
 
     def pack(self, preimage):
-        context = self.chronicle if preimage.endswith(OTDA_ALL.to_bytes(4, "little")) else self.forkid
+        context = self.otda if preimage.endswith(OTDA_ALL.to_bytes(4, "little")) else self.bip143
         return context.pack(preimage)
 
     def bind_outputs(self):
         # Both branches consume the shared output vector and replace the packed context with the preimage.
         return (COPY_LINKED_SIGHASH + push(bytes([OTDA_ALL])) + asm("OP_EQUAL OP_IF")
-                + self.chronicle.bind_outputs() + asm("OP_ELSE") + self.forkid.bind_outputs() + asm("OP_ENDIF"))
+                + self.otda.bind_outputs() + asm("OP_ELSE") + self.bip143.bind_outputs() + asm("OP_ENDIF"))
 
 
 @dataclass(frozen=True)
@@ -179,14 +179,14 @@ def reconstructed_context(template, sighash, hash_outputs, *, script_size=None):
 
 def check_single_input(preimage):
     if len(preimage) <= PREIMAGE_FIXED_BYTES or preimage[-4:] != ALL_BYTES:
-        raise ValueError("expected a ForkID ALL preimage")
+        raise ValueError("expected a BIP143 ALL preimage")
     if (hash256(preimage[OUTPOINT_OFFSET:OUTPOINT_OFFSET + 36]) != preimage[4:36]
             or hash256(preimage[-44:-40]) != preimage[36:68]):
         raise ValueError("preimage does not commit to a single input")
 
 
 def pack_context(preimage, *, script_size=None, reuse=None):
-    """Encode the witness for the single-input ForkID ALL reconstruction."""
+    """Encode the witness for the single-input BIP143 ALL reconstruction."""
     check_single_input(preimage)
     script_offset = SCRIPT_CODE_OFFSET
     if script_size is not None:

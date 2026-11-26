@@ -14,13 +14,13 @@ P2PKH-R1 让 BSV 钱包接入已有的 P‑256 签名器。输出锁定到收款
 
 参考钱包用 **v0.2.0** 创建新输出，也能花费已有的 v0.1.0 输出。Forth 实验的最短锁为 **41,538 B**，最小 OTDA ALL 付款为 **91,692 B**，两个结果来自不同构造。表中付款均为两进两出。
 
-| 模板 | 完整锁 | ForkID ALL 付款 | OTDA ALL 付款 |
+| 模板 | 完整锁 | BIP143 ALL 付款 | OTDA ALL 付款 |
 | --- | ---: | ---: | ---: |
 | 钱包默认模板 v0.2.0 | 46,302 B | 93,374 B | 101,250 B |
 | Forth 实验，4 位分表，特化固定生成元 `G` | **41,538 B** | **83,846 B** | 92,032 B |
 | Forth 实验，2 位联合表 | 42,378 B | 85,526 B | **91,692 B** |
 
-两个优胜实验方案都完成了 ForkID ALL、OTDA ALL 和配对 OTDA SINGLE 付款，在 BSV Node regtest 入块，并通过 chain-gang 独立验证。 [构建与复现](experiments/forth/README.md) · [历史基准](experiments/forth/history.md)
+两个优胜实验方案都完成了 BIP143 ALL、OTDA ALL 和配对 OTDA SINGLE 付款，在 BSV Node regtest 入块，并通过 chain-gang 独立验证。 [构建与复现](experiments/forth/README.md) · [历史基准](experiments/forth/history.md)
 
 ## 钱包接入
 

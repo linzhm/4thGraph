@@ -42,7 +42,7 @@ PYTHONPATH=src:. python -m fourthgraph.workflow.protocol "projects/workflow-exam
 
 ## 验证路径
 
-`relation:` 声明公开的 `current → next → route` 关系。每种候选检查相同的部署状态、真实输入、结算或复核输出，以及记录新状态的回执。电路后端共享 `next, route, current, bindLo, bindHi` 的公开信号顺序。证明路径从经认证的 ForkID ALL 原像取得 SHA-256d，核对证明中的两个绑定字段。
+`relation:` 声明公开的 `current → next → route` 关系。每种候选检查相同的部署状态、真实输入、结算或复核输出，以及记录新状态的回执。电路后端共享 `next, route, current, bindLo, bindHi` 的公开信号顺序。证明路径从经认证的 BIP143 ALL 原像取得 SHA-256d，核对证明中的两个绑定字段。
 
 | 路径 | 资格条件 |
 | --- | --- |

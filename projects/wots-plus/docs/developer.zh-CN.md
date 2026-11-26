@@ -10,7 +10,7 @@
 
 ## 协议规范
 
-采用 RFC 8391 的 `WOTSP-SHA2_256` 哈希链，项目付款格式使用 64 字节公钥和 2,144 字节签名。锁同时验证哈希链证明及所选输入的交易授权，支持 ForkID 和 Chronicle OTDA 的十二种签名类型。在符合条件的版本 2 交易中，缓存步骤输出可以在 OTDA ALL 或配对 SINGLE 解锁内重建。
+采用 RFC 8391 的 `WOTSP-SHA2_256` 哈希链，项目付款格式使用 64 字节公钥和 2,144 字节签名。锁同时验证哈希链证明及所选输入的交易授权，支持 BIP143 和 Chronicle OTDA 的十二种签名类型。在符合条件的版本 2 交易中，缓存步骤输出可以在 OTDA ALL 或配对 SINGLE 解锁内重建。
 
 [线格式与脚本规范（英文）](spec.md) · [RFC 8391](https://www.rfc-editor.org/rfc/rfc8391) · [缓存步骤布局](../template/cached-steps-layout.json)
 

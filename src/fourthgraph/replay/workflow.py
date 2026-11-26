@@ -19,7 +19,7 @@ from fourthgraph.bsv.transaction import Input, Transaction
 
 from fourthgraph.compiler.source import PROJECT_NAME, PROJECT_VERSION, CompileError, Word, evaluate, parse, schedule
 from fourthgraph.compiler.lowering import BASELINE, OPTIMIZATIONS
-from fourthgraph.workflow.protocol import DEFAULT_TARGET, JOIN_WITNESSES, TARGETS, Contracts, FLAG, Host, ROOT_VALUE, UTXO
+from fourthgraph.workflow.protocol import DEFAULT_TARGET, JOIN_WITNESSES, TARGETS, Contracts, FLAG, Host, ROOT_VALUE, UTXO, normalize_target
 from fourthgraph.workflow.protocol import OBJECTIVES, compile_decision, compile_search, invalidated
 from fourthgraph.compiler.wordsets import HOST_WORDS
 
@@ -76,6 +76,7 @@ class Replay:
     def __init__(self, node, samples, target, activation_height, optimization=BASELINE, join_witness="full"):
         self.node = node
         self.samples = samples
+        target = normalize_target(target)
         self.target = target
         self.optimization = optimization
         self.join_witness = join_witness
@@ -245,7 +246,7 @@ class Replay:
         wrong_output, = (item for item in contracts.terminals if item != join.tx.outputs[0])
         bad_route = replace(join, tx=replace(join.tx, outputs=(wrong_output,)))
         wrong_successor = self.record(self.sign(bad_route), bad_route.previous, expected=False)
-        other_version = {"forkid-v1": 2, "chronicle-v2": 1, "both": 3}[self.target]
+        other_version = {"bip143-v1": 2, "chronicle-v2": 1, "both": 3}[self.target]
         bad_version = replace(join, tx=replace(join.tx, version=other_version))
         wrong_version = self.record(self.sign(bad_version), bad_version.previous, expected=False)
         return {"missing_input": missing_input, "wrong_split_same_task_id": wrong_split, "wrong_slots": wrong_slots,
@@ -370,7 +371,7 @@ def main():
     cli = argparse.ArgumentParser(description=__doc__)
     cli.add_argument("--output", type=Path, required=True)
     cli.add_argument("--samples", type=int, default=7)
-    cli.add_argument("--target", choices=TARGETS, default=DEFAULT_TARGET)
+    cli.add_argument("--target", type=normalize_target, choices=TARGETS, default=DEFAULT_TARGET)
     cli.add_argument("--optimize", choices=OPTIMIZATIONS, default=BASELINE)
     cli.add_argument("--join-witness", choices=JOIN_WITNESSES)
     cli.add_argument("--topology", choices=("parallel", "gated-parallel"), default="parallel")

@@ -33,7 +33,7 @@ PYTHONPATH=src:.:projects/p2pkh-sm2/reference python -m unittest -v test_signed_
 运行 `bash projects/p2pkh-sm2/reference/verify.sh` 可在 BSV Node 1.2.3 和
 chain-gang 中重放付款。脚本用 Cargo 构建 Rust 签名器，并调用 Python 签名器。
 若已有 Rust 可执行文件，将 `SM2_SIGNED_DATA_SIGNER` 设为它的绝对路径即可跳过
-构建。两种签名器均测试附带原文的 ForkID 和分离原文的 Chronicle OTDA 付款。
+构建。两种签名器均测试附带原文的 BIP143 和分离原文的 Chronicle OTDA 付款。
 [Python 测试签名器](interop/python-signer/README.zh-CN.md) · [Rust 测试签名器](interop/rust-signer/README.zh-CN.md)
 
 ## 付款组合的穷举覆盖

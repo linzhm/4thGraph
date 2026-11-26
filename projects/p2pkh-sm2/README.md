@@ -21,7 +21,7 @@ transaction through PUSHTX and native `OP_CHECKSIG`.
 
 Evaluate P2PKH-SM2 when a wallet already uses an SM2 signing service. A provider that exposes a raw SM2 API returns the signature directly. A GB/T 35275-2026 provider can return a direct single-signer SignedData envelope under the wallet's trusted signer configuration. The SDK checks that off-chain envelope and writes the extracted 64-byte signature into the transaction. Track which provider operation the wallet uses and validate the exact message and user ID at integration time. [Signing contract](docs/sdk.en.md)
 
-For payments that create other SM2 outputs, compare ForkID and OTDA using the same input and output counts. On eligible Chronicle spends, the v1.1.0 candidate shortens the OTDA unlock by reconstructing the signed preimage. The cost of creating a new SM2 output still includes the 144,925-byte lock. [Reconstruction measurements](#otda-constructor)
+For payments that create other SM2 outputs, compare BIP143 and OTDA using the same input and output counts. On eligible Chronicle spends, the v1.1.0 candidate shortens the OTDA unlock by reconstructing the signed preimage. The cost of creating a new SM2 output still includes the 144,925-byte lock. [Reconstruction measurements](#otda-constructor)
 
 ## Project version and locking template
 
@@ -32,9 +32,9 @@ The v1.1.0 candidate adds default OTDA reconstruction to the unlocking script. T
 | Recipient identifier | HASH160 of the 65-byte public key `04 \|\| X_BE32 \|\| Y_BE32` |
 | SM2 user ID | The fixed ASCII value `1234567812345678` |
 | Locking script | 144,925 bytes |
-| Unlocking script | 291 bytes with ForkID, 294 bytes with unpaired OTDA SINGLE, and transaction-dependent for other OTDA modes |
+| Unlocking script | 291 bytes with BIP143, 294 bytes with unpaired OTDA SINGLE, and transaction-dependent for other OTDA modes |
 | Unlocking stack | Signing preimage, uncompressed public key, and 64-byte `r \|\| s` signature |
-| Signature modes | ForkID and Chronicle OTDA, each with ALL, NONE, or SINGLE and optional ANYONECANPAY |
+| Signature modes | BIP143 and Chronicle OTDA, each with ALL, NONE, or SINGLE and optional ANYONECANPAY |
 
 The current source includes the [layout manifest](template/layout.json),
 [standard SM2 vector](template/sm2-standard.json),
@@ -59,7 +59,7 @@ its hash. The generator validates the public key before hashing it.
 
 ## Authorize and verify a payment
 
-Use `sign_payment` for a one-input ForkID ALL payment (`0x41`). Use
+Use `sign_payment` for a one-input BIP143 ALL payment (`0x41`). Use
 `sign_input` to choose a signature mode for each input of a prepared
 transaction. For OTDA, pass the Chronicle activation state for the actual
 spend. The wallet calls an external signer and verifies the returned signature
@@ -90,7 +90,7 @@ outpoint, its value, required confirmations and the recipient's lock before
 asking the signer to approve a payment. The GB/T envelope is processed by
 the off-chain adapter. The unlock carries the extracted raw signature.
 
-In the 2×2 fixture, ForkID ALL uses a 291-byte unlock. The literal OTDA ALL encoding serializes
+In the 2×2 fixture, BIP143 ALL uses a 291-byte unlock. The literal OTDA ALL encoding serializes
 both outputs into each input's signing preimage and raises the unlock to
 290,109 bytes. A third output adds 144,925 bytes of output lock and also
 changes both existing OTDA unlocks. The marginal table shows those costs
@@ -102,7 +102,7 @@ BSV Node 1.2.3 and the project's pinned chain-gang validate the complete inputs 
 
 | Signing mode and unlocking encoding | Inputs×outputs | Previous locks | Unlocks | New locks | Total | Main / alt items | Stack payload |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| ForkID ALL `0x41` | 2×2 | 144,925 × 2 | 291 × 2 | 144,925 × 2 | 290,554 | 122 / 133 | 4,147 |
+| BIP143 ALL `0x41` | 2×2 | 144,925 × 2 | 291 × 2 | 144,925 × 2 | 290,554 | 122 / 133 | 4,147 |
 | OTDA ALL `0x61`, v1.1.0 default | 2×2 | 144,925 × 2 | 13,023 × 2 | 144,925 × 2 | 316,018 | 122 / 133 | 580,080 |
 | OTDA ALL `0x61`, v1.0.0 literal | 2×2 | 144,925 × 2 | 290,109 × 2 | 144,925 × 2 | 870,194 | 122 / 133 | 580,080 |
 
@@ -123,7 +123,7 @@ Each marginal cell shows the **change in total bytes (output locks / input unloc
 
 The 12,703-byte constructor is part of `scriptSig`. It reuses SM3 round and message-expansion fragments, SM2 point addition and doubling, and repeated instruction runs to rebuild the same signing preimage. For each eligible output it fills the receiver's HASH160 slot in the 144,925-byte lock. The signing callback receives the same message and SM2 user ID as the literal encoding. Use the final signed transaction ID to build a child.
 
-After Chronicle activation, version-2 OTDA ALL can reconstruct matching outputs in their original order. Paired OTDA SINGLE can reconstruct the same-index output and preserve the preceding null outputs in the preimage. Both support `ANYONECANPAY`. Other output templates keep their literal bytes. ForkID, NONE, unpaired SINGLE, version 1 and non-smaller encodings continue with the literal unlocking script. [SDK options](docs/sdk.en.md) · [Constructor and generator](reference/README.md#otda-constructor)
+After Chronicle activation, version-2 OTDA ALL can reconstruct matching outputs in their original order. Paired OTDA SINGLE can reconstruct the same-index output and preserve the preceding null outputs in the preimage. Both support `ANYONECANPAY`. Other output templates keep their literal bytes. BIP143, NONE, unpaired SINGLE, version 1 and non-smaller encodings continue with the literal unlocking script. [SDK options](docs/sdk.en.md) · [Constructor and generator](reference/README.md#otda-constructor)
 
 | OTDA ALL, bytes | Literal | Reconstructed |
 | --- | ---: | ---: |

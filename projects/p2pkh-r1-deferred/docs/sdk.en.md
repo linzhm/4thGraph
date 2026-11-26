@@ -33,7 +33,7 @@ const targetScript = r1.createLock({ publicKey: spendKeyHex });
 const activatedHex = deferred.activate({ transaction: preparedHex, inputIndex, prevout });
 ```
 
-`activate` uses ForkID SINGLE (`0x43`) by default and fills the selected input without a signing callback. Assemble the transaction first, placing the full R1 output at the same index and retaining the Deferred amount. Sign any fee-paying input separately. Use the ordinary R1 SDK to spend the resulting output.
+`activate` uses BIP143 SINGLE (`0x43`) by default and fills the selected input without a signing callback. Assemble the transaction first, placing the full R1 output at the same index and retaining the Deferred amount. Sign any fee-paying input separately. Use the ordinary R1 SDK to spend the resulting output.
 
 Replay the vector in all four languages from the repository root.
 
@@ -46,7 +46,7 @@ SCRIPT_LAB_SDK_PYTHON="$PWD/projects/p2pkh-r1-deferred/workspace/venv/bin/python
 
 1. Authenticate the deposit UTXO and recognize it with its actual amount. Match the owner against the invoice and use the returned `targetTemplate`.
 2. Build the complete R1 output for that owner at the full deposit amount. Place it at the same index as the activation input. Arrange fees with a separate sponsor input and finalize its change.
-3. Call `activate` with the prepared transaction, input index and authenticated prevout. The default is ForkID SINGLE (`0x43`). Other modes use the same-index target plus the parameters in the protocol specification. Sign the sponsor input separately.
+3. Call `activate` with the prepared transaction, input index and authenticated prevout. The default is BIP143 SINGLE (`0x43`). Other modes use the same-index target plus the parameters in the protocol specification. Sign the sponsor input separately.
 4. Track the activated R1 outpoint and use the [R1 wallet integration](../../p2pkh-r1/docs/sdk.en.md) for later payments.
 
 ## Track the deposit and the activated outpoint

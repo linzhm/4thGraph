@@ -31,8 +31,8 @@ bytes and leaves one true item and an empty altstack.
 | NONE | `42` | `c2` | `62` | `e2` |
 | SINGLE | `43` | `c3` | `63` | `e3` |
 
-All twelve types include FORKID, as required by the node under strict encoding
-with FORKID enabled. The hash type is the final four little-endian bytes of P.
+All twelve types set `SIGHASH_FORKID` (`0x40`). The hash type is the final
+four little-endian bytes of P.
 The script verifies the exact type, including zero high bytes, and uses the
 authenticated byte on the native signature. The wallet default is `41`.
 
@@ -73,7 +73,7 @@ never signs the constant.
 ## Previous template and detached verification
 
 `legacy_locking_script(key)` emits the original byte-identical two-push
-ForkID ALL template with 158-byte preimage and scriptCode `ac`.
+BIP143 ALL template with 158-byte preimage and scriptCode `ac`.
 `sign_spend` recognizes it and requires type `41`. New locks from
 `locking_script(key)` use the universal format. The digest-only variant takes
 a 32-byte digest and signature and provides detached verification.

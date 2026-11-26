@@ -18,7 +18,7 @@ Native P2PKH is the first wallet integration example and the transaction-cost ba
 
 Start here when bringing up a transaction builder, a secp256k1 signing device, or a wallet migration. Check serialization with the public vector first. Then connect your own signer and use the same workflow to compare another signature scheme.
 
-P2PKH is the usual choice when a payment request provides a public-key hash. The spending wallet reveals the full public key with the signature. P2PK is useful as a control when the payer already has the recipient's public key. For ForkID ALL, P2PK moves 10 bytes into each receive output and saves about 34 bytes per spending input. Compare both sides if your wallet batches funding or consolidates many inputs. [Transaction costs](#complete-transactions-and-stack-measurements)
+P2PKH is the usual choice when a payment request provides a public-key hash. The spending wallet reveals the full public key with the signature. P2PK is useful as a control when the payer already has the recipient's public key. For BIP143 ALL, P2PK moves 10 bytes into each receive output and saves about 34 bytes per spending input. Compare both sides if your wallet batches funding or consolidates many inputs. [Transaction costs](#complete-transactions-and-stack-measurements)
 
 ## Run
 
@@ -46,7 +46,7 @@ pipe the same command into `cmp - ../template/baseline.json`.
 Fixture key scalars are public constants (1 and 2). Never use them to hold
 funds. The parent references a made-up outpoint; the spend is verified by
 supplying that parent directly to the library. Both use version 1 and the
-signer uses SIGHASH_ALL with FORKID. These tests exercise parent-aware script
+signer uses BIP143 ALL (`SIGHASH_ALL | SIGHASH_FORKID`, `0x41`). These tests exercise parent-aware script
 validation, not prior-outpoint existence, node policy, regtest mining, or
 mainnet. Do not broadcast these fixtures.
 
@@ -71,7 +71,7 @@ acceptance are separate milestones for issue #1.
 
 The [native acceptance matrix](reference/acceptance.md) exhaustively covers
 2,880 complete-input combinations in its declared domain, including all
-12 paired ForkID and Chronicle OTDA sighash combinations. It also checks
+12 paired BIP143 and Chronicle OTDA sighash combinations. It also checks
 80 unpaired SINGLE mutation cases and 192 cases around Chronicle activation.
 Explicit transaction commitments determine the expected result for each row.
 
@@ -84,7 +84,7 @@ hash matches the lock. Use these fixtures to validate an existing wallet's
 serialization and signature handling. Authenticate the funding outpoint,
 value and locking script before requesting a signature.
 
-With the ForkID ALL benchmark, moving from P2PK to P2PKH saves 10 bytes
+With the BIP143 ALL benchmark, moving from P2PK to P2PKH saves 10 bytes
 on each output lock and adds about 34 bytes to each input unlock. The
 whole-transaction cost therefore depends on the number of each. The
 complete-input tests use the modes and activation contexts in the

@@ -93,8 +93,8 @@ def universal_sizes():
     return {
         'locking_script_bytes_including_key': len(lock),
         'locking_non_key_bytes_including_push_headers': len(lock)-16384,
-        'forkid_ordinary_unlocking_script_bytes': unlock_bytes,
-        'forkid_ordinary_total_lock_and_unlock_bytes': len(lock)+unlock_bytes,
+        'bip143_ordinary_unlocking_script_bytes': unlock_bytes,
+        'bip143_ordinary_total_lock_and_unlock_bytes': len(lock)+unlock_bytes,
         'unpaired_otda_single_unlocking_script_bytes': len(mode_fixture(0x63,paired=False)[2].inputs[1].script),
         'locking_instructions_including_pushes_and_both_branches': len(ops),
         'sha256_opcodes': sum(op==0xa8 and data is None for op,data in ops),

@@ -46,5 +46,5 @@ def components(_samples):
 
     return {"compiled_output_bytes": len(locking_script_from_owner_hash(bytes(20), compiled_curve=True)),
             "mode_specific_experiment_output_bytes": {
-                family: len(specialized_lock(bytes(20), family)) for family in ("forkid", "otda")
+                family: len(specialized_lock(bytes(20), family)) for family in ("bip143", "otda")
             }}

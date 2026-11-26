@@ -44,7 +44,7 @@ for a prepared transaction. Each API accepts `signer(digest32) -> signature8192`
 and returns a signed transaction. The callback is invoked once after preflight.
 A `SINGLE` input with no output at its index commits to no outputs. Approve that
 scope explicitly with `allow_unpaired_single=True` on `sign_spend` when the
-application deliberately uses it. This applies to both ForkID and OTDA.
+application deliberately uses it. This applies to both BIP143 and OTDA.
 Before calling the signer for a child payment, verify the parent has reached
 the required confirmation depth and use the verified, unspent outpoint. Approve
 the transaction and sighash. Keep private keys and durable one-use state in

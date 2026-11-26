@@ -1,4 +1,4 @@
-( The input is a ForkID or OTDA preimage, signature, and companion selector. )
+( The input is a BIP143 or OTDA preimage, signature, and companion selector. )
 : ml-dsa-payment-verifier ( bytes -- bytes )
     op-over op-size 32 s-num op-numequalverify op-drop
     decode-signature bytes-cat

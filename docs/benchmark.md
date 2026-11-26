@@ -14,11 +14,11 @@ authorization.
 
 ## Compare transaction costs
 
-P2PKH-R1's two-input, two-output ForkID ALL payments measure **119,934 B** in v0.1.0, **93,374 B** in v0.2.0, and **92,322 B** in the Forth v0.3.0 experiment. Deferred uses a **1,435 B** deposit lock and creates the **46,302 B** R1 v0.2.0 lock at activation. [R1 measurements](../projects/p2pkh-r1/README.md#complete-transactions-and-stack-measurements) · [Deferred measurements](../projects/p2pkh-r1-deferred/README.md)
+P2PKH-R1's two-input, two-output BIP143 ALL payments measure **119,934 B** in v0.1.0, **93,374 B** in v0.2.0, and **92,322 B** in the Forth v0.3.0 experiment. Deferred uses a **1,435 B** deposit lock and creates the **46,302 B** R1 v0.2.0 lock at activation. [R1 measurements](../projects/p2pkh-r1/README.md#complete-transactions-and-stack-measurements) · [Deferred measurements](../projects/p2pkh-r1-deferred/README.md)
 
 The unified benchmark measured **260 complete transactions** across seven projects and 32 template and sighash combinations at commit `beeb4dd`. Additional mixed-output and paired `SINGLE` replays measured 88 transactions across 11 combinations. The Deferred v0.2.0 row uses the rerun at `9c5603d`. The R1 Forth v0.3.0 row comes from its funded regtest comparison. [R1 Forth replay](../projects/p2pkh-r1/README.md#forth-experiment)
 
-| Project and measured version | Inputs × outputs | Prevout lock | ForkID ALL unlock | ForkID ALL tx | OTDA ALL tx | ForkID ALL peak stack payload |
+| Project and measured version | Inputs × outputs | Prevout lock | BIP143 ALL unlock | BIP143 ALL tx | OTDA ALL tx | BIP143 ALL peak stack payload |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
 | Native P2PKH | 2 × 2 | 25 | 107 | 374 | 374 | 145 |
 | P2PKH-R1 v0.2.0 | 2 × 2 | 46,302 | 326 | 93,374 | 101,250 | 3,479 |
@@ -29,7 +29,7 @@ The unified benchmark measured **260 complete transactions** across seven projec
 | WOTS+, cached steps with reconstruction | 2 × 2 | 33,956 | 2,310 | 72,650 | 79,090 | 2,701 |
 | Pure ML-DSA-44 | 2 × 2 | 926,412 | 2,588 | 1,858,122 | 5,563,725 | — |
 
-All sizes are in bytes. Lock, unlock, and stack measurements use the first ForkID ALL input. Peak stack payload is the local evaluator's peak combined data size on the main and alternate stacks. Deferred activation includes a fee-sponsor input. ML-DSA-44 stack data is unavailable. Each project README has the per-input and per-output measurements, the cost of adding an input or output, and the lifecycle totals.
+All sizes are in bytes. Lock, unlock, and stack measurements use the first BIP143 ALL input. Peak stack payload is the local evaluator's peak combined data size on the main and alternate stacks. Deferred activation includes a fee-sponsor input. ML-DSA-44 stack data is unavailable. Each project README has the per-input and per-output measurements, the cost of adding an input or output, and the lifecycle totals.
 
 The OTDA ALL measurements for R1 v0.2.0 and cached-steps WOTS+ use explicit reconstruction.
 
@@ -64,7 +64,7 @@ commit so the runner can verify the package provenance. `--chain-only` and
 
 ## Interpretation
 
-The reports measure complete 2×2, 3×2 and 2×3 transactions under ForkID ALL
+The reports measure complete 2×2, 3×2 and 2×3 transactions under BIP143 ALL
 and Chronicle OTDA ALL. Deferred R1 requires a matching activation output for
 every activation input. Its added-input measurement varies the activation
 pair and keeps the sponsor input. Its added-output measurement uses a larger

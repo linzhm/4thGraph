@@ -1,12 +1,18 @@
 """Typed stage dependencies, compiled artifacts and parent binding."""
 
+from contextlib import redirect_stdout
 from dataclasses import replace
 from hashlib import sha256
+from io import StringIO
+import json
+from pathlib import Path
+from tempfile import TemporaryDirectory
 import unittest
+from unittest.mock import patch
 
 from fourthgraph.compiler.source import WORKFLOW_MODES, CompileError, ParentOutput, SourceCompiler
 from fourthgraph.workflow.forkid_lowering import LINKED_CONTEXT_BYTES, OTDA_ALL, LinkedContext
-from fourthgraph.workflow.protocol import BINDING_CODE, FLAG, artifact_digest, invalidated
+from fourthgraph.workflow.protocol import BINDING_CODE, FLAG, artifact_digest, invalidated, main
 from fourthgraph.replay.workflow import TestKeys
 from fourthgraph.bsv.chain_gang import validate_at_heights
 from fourthgraph.bsv.evaluate import evaluate as evaluate_script
@@ -17,6 +23,26 @@ from fourthgraph.replay.typed_workflow import SOURCE
 
 
 class WorkflowTests(unittest.TestCase):
+    def test_cli_aliases_emit_identical_canonical_artifacts(self):
+        keys = TestKeys().public
+        with TemporaryDirectory() as scratch:
+            path = Path(scratch) / "keys.json"
+            path.write_text(json.dumps({name: key.hex() for name, key in keys.items()}))
+            base = ["4thgraph", str(SOURCE), "--keys", str(path), "--current", "19", "--mode", "fused"]
+            for canonical, legacy, target, flag in (
+                (["--target", "bip143-v1", "--sighash-family", "bip143"],
+                 ["--target", "forkid-v1", "--sighash-family", "forkid"], "bip143-v1", "41"),
+                (["--sighash-family", "otda"], ["--sighash-family", "chronicle"], "chronicle-v2", "61"),
+            ):
+                builds = []
+                for options in (canonical, legacy):
+                    with patch("sys.argv", base + options), redirect_stdout(StringIO()) as output:
+                        main()
+                    builds.append(json.loads(output.getvalue()))
+                self.assertEqual(builds[0], builds[1])
+                self.assertEqual(builds[0]["target"], target)
+                self.assertEqual(builds[0]["sighash"], flag)
+
     def test_linked_context_rebuilds_the_exact_forkid_preimage(self):
         program = SourceCompiler(SOURCE.read_text(), source_path=SOURCE).workflow()
         contract = WorkflowContracts(program, TestKeys().public, 19, target="both")
@@ -45,11 +71,11 @@ class WorkflowTests(unittest.TestCase):
         program = SourceCompiler(source.decode(), source_path=SOURCE).workflow()
         keys = TestKeys()
         artifact, report = compile_workflow(program, keys.public, 19, source_bytes=source, search=True,
-                                            target="both", sighash_family="chronicle")
+                                            target="both", sighash_family="otda")
         self.assertEqual(artifact["sighash"], "61")
         self.assertEqual(artifact["era"], "chronicle")
         self.assertEqual(report["candidates"]["atomic"]["exclusions"][0]["code"], "unsupported_sighash_context")
-        contract = WorkflowContracts(program, keys.public, 19, target="both", sighash_family="chronicle")
+        contract = WorkflowContracts(program, keys.public, 19, target="both", sighash_family="otda")
         root = Transaction((Input(bytes(32), 0),), (contract.root,))
         for version in (1, 2):
             draft = contract.prepare("fused", {"deploy": root}, version=version)
@@ -74,8 +100,8 @@ class WorkflowTests(unittest.TestCase):
         artifact, report = compile_workflow(program, keys.public, 19, source_bytes=source, search=True, **options)
         self.assertEqual(artifact, contract.artifact(source))
         self.assertEqual(artifact["sighash_families"], {
-            "forkid": {"flag": "41", "packed_context_bytes": 56},
-            "chronicle": {"flag": "61", "packed_context_bytes": 48},
+            "bip143": {"flag": "41", "packed_context_bytes": 56},
+            "otda": {"flag": "61", "packed_context_bytes": 48},
         })
         self.assertEqual(report["candidates"]["atomic"]["exclusions"][0]["code"], "unsupported_sighash_context")
         with self.assertRaisesRegex(CompileError, "requires a Chronicle spend target"):

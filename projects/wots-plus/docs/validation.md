@@ -46,7 +46,9 @@ selected positions in that witness. Arbitrary Script bytes, all keys and
 signature mutations, other chain heights, miner policy and persistent key
 management fall outside the finite payment proof. [WOTS+ specification](spec.md)
 
-## ForkID `ALL` measurements
+<a name="forkid-all-measurements"></a>
+
+## BIP143 `ALL` measurements
 
 Both measurements used a single-input, single-output synthetic payment. Lock
 and unlock columns are Script bytes, excluding transaction wire overhead. The

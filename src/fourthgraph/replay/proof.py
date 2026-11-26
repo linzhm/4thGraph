@@ -14,7 +14,7 @@ from fourthgraph.verification.circuit_tools import CircuitFixture
 from fourthgraph.compiler.source import PROJECT_NAME, PROJECT_VERSION, evaluate
 from fourthgraph.compiler.lowering import BASELINE, compile_word
 from fourthgraph.verification.proof_contract import FIELD, NEXT, ROUTE, ProofContract
-from fourthgraph.workflow.protocol import DEFAULT_TARGET, TARGETS, UTXO, build_artifact
+from fourthgraph.workflow.protocol import DEFAULT_TARGET, TARGETS, UTXO, build_artifact, normalize_target
 from fourthgraph.replay.workflow import Replay
 from fourthgraph.benchmark.validation import ACTIVATION_HEIGHT, CONTEXT_PIN, Node, chain_metadata
 from fourthgraph.bsv.evaluate import evaluate as evaluate_script
@@ -96,7 +96,7 @@ def run_case(replay, circuit, source, bootstrap, slot, *, current, next_state, o
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--target", choices=TARGETS, default=DEFAULT_TARGET)
+    parser.add_argument("--target", type=normalize_target, choices=TARGETS, default=DEFAULT_TARGET)
     parser.add_argument("--current", type=int, default=U32 - 1)
     parser.add_argument("--generated", action="store_true", help="generate the circuit from Forth")
     parser.add_argument("--source", type=Path, help="Forth circuit source for --generated (default: proof/workflow.fth)")
