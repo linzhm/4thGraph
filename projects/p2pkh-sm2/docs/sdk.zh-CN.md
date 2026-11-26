@@ -2,7 +2,7 @@
 
 [English](sdk.en.md) · [开发指南](developer.zh-CN.md#sdk) · [统一钱包接入](../../../sdk/README.zh-CN.md)
 
-收款脚本可由 65 字节未压缩 SM2 公钥或 20 字节所有者哈希生成。SDK 的 `template: "v1.0.0"` 选择锁定模板 `1`，v1.1.0 候选版沿用此模板。将 32 字节交易消息和 SDK 提供的用户 ID 一起交给 SM2 签名器，返回 64 字节 `r ∥ s`。使用 GB/T 35275-2026 服务时，将 `signerIdentifier` 设为可信的 DER 颁发者与序列号十六进制，返回 SDK 请求的 DER SignedData。
+收款脚本可由 65 字节未压缩 SM2 公钥或 20 字节所有者哈希生成。创建新输出时，SDK 默认以 `template: "v1.0.0"` 选择锁定模板 `1`，也可用 `template: "v1.2.0"` 选用更小的模板 `2`。识别和花费以实际的上一输出锁定脚本为准。将 32 字节交易消息和 SDK 提供的用户 ID 一起交给 SM2 签名器，返回 64 字节 `r ∥ s`。使用 GB/T 35275-2026 服务时，将 `signerIdentifier` 设为可信的 DER 颁发者与序列号十六进制，返回 SDK 请求的 DER SignedData。
 
 使用 OTDA 时，根据实际花费环境设置 `chronicleActive`。对符合条件的版本 2 OTDA ALL 和配对 SINGLE，SDK 自动选择更短的编码，包含 ANYONECANPAY 组合。两种编码给签名器提供同样的消息和用户 ID。构建子交易时使用最终已签交易的 ID。
 

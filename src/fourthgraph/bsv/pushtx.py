@@ -31,6 +31,12 @@ def binding_der(*, compact=False):
     return b''.join(_binding_der_parts(compact))
 
 
+def _copy_public_from_der():
+    # The fixed r starts at byte four of DER and is the x coordinate of the key.
+    return (asm('OP_DUP OP_4 OP_SPLIT OP_NIP') + number(32)
+            + asm('OP_SPLIT OP_DROP OP_2 OP_SWAP OP_CAT'))
+
+
 def fixed_key_checksig_parts(sighash, *, compact=False, reuse_r=False):
     """Emit the fixed-key authentication as linkable code fragments."""
     der = _binding_der_parts(compact)
@@ -38,10 +44,7 @@ def fixed_key_checksig_parts(sighash, *, compact=False, reuse_r=False):
     if not reuse_r:
         check = flag + push(PUBLIC) + asm('OP_CHECKSIG')
     else:
-        # The fixed r starts at byte four of DER and is the x coordinate of the key.
-        public = (asm('OP_DUP OP_4 OP_SPLIT OP_NIP') + number(32)
-                  + asm('OP_SPLIT OP_DROP OP_2 OP_SWAP OP_CAT'))
-        check = public + asm('OP_SWAP') + flag + asm('OP_SWAP OP_CHECKSIG')
+        check = _copy_public_from_der() + asm('OP_SWAP') + flag + asm('OP_SWAP OP_CHECKSIG')
     return (*der, check)
 
 
@@ -92,11 +95,17 @@ def authorization_checks(ordinary_code, companion_code):
     return code + asm('OP_ENDIF OP_ENDIF')
 
 
-def check_binding(companion_code):
+def check_binding(companion_code, *, compact=False):
     """Consume the authorized digest and enforce the native current-input relation."""
     # Entry H; alt bottom-to-top mode, type. Both signatures are derived on chain.
-    code = binding_der() + asm('OP_FROMALTSTACK OP_CAT') + push(PUBLIC)
+    code = binding_der(compact=compact)
+    if compact:
+        code += _copy_public_from_der() + asm('OP_SWAP OP_FROMALTSTACK OP_CAT OP_SWAP')
+    else:
+        code += asm('OP_FROMALTSTACK OP_CAT') + push(PUBLIC)
     code += asm('OP_FROMALTSTACK OP_DUP OP_IF OP_TOALTSTACK OP_OVER OP_SIZE OP_1SUB OP_SPLIT OP_NIP')
-    code += push(b'\x20') + asm('OP_OR') + push(ONE_DER) + asm('OP_SWAP OP_CAT') + push(PUBLIC)
+    code += push(b'\x20') + asm('OP_OR') + push(ONE_DER) + asm('OP_SWAP OP_CAT')
+    # The companion check uses the same fixed public key that is already on stack.
+    code += asm('OP_OVER') if compact else push(PUBLIC)
     code += asm('OP_FROMALTSTACK OP_ENDIF OP_CODESEPARATOR') + companion_code
     return code

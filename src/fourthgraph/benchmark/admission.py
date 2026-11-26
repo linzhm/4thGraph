@@ -9,7 +9,7 @@ from tempfile import TemporaryDirectory
 from time import sleep
 
 from fourthgraph.benchmark.run import PROJECTS, ROOT, dump_json
-from fourthgraph.benchmark.cases import native_coin, payment
+from fourthgraph.benchmark.cases import allocations, native_coin, payment
 from fourthgraph.benchmark.validation import Node, RPCError, chain_metadata
 from fourthgraph.bsv.transaction import Transaction
 
@@ -44,7 +44,7 @@ def submit_and_mine(node, tx):
             "blocks_checked": 3}
 
 
-def admission_case(node, template, label, flag, scratch):
+def admission_case(node, template, label, flag, scratch, *, turnover=False):
     coins = [template.create(f"{label}/{index}", COIN_VALUE) for index in range(2)]
     if template.deferred:
         sponsor = native_coin(label + "/sponsor", SPEND_FEE)
@@ -79,10 +79,19 @@ def admission_case(node, template, label, flag, scratch):
         if not legs["activation"]["mined"]:
             return legs
         coins = [coin.activated for coin in coins]
-    destinations = [native_coin(f"{label}/exit/{index}", COIN_VALUE - SPEND_FEE // 2) for index in range(2)]
-    exit_tx = payment([(tx, 0, coins[0], flag), (tx, 1, coins[1], flag)],
+    phases = ("turnover", "exit") if turnover else ("exit",)
+    for phase in phases:
+        values = allocations(sum(coin.output.value for coin in coins) - SPEND_FEE, len(coins))
+        create = native_coin if phase == "exit" else template.create
+        destinations = [create(f"{label}/{phase}/{index}", value) for index, value in enumerate(values)]
+        if phase == "turnover" and template.deferred:
+            destinations = [coin.activated for coin in destinations]
+        leg = payment([(tx, index, coin, flag) for index, coin in enumerate(coins)],
                       destinations, scratch, fee=SPEND_FEE)
-    legs["exit"] = submit_and_mine(node, exit_tx.tx)
+        legs[phase] = submit_and_mine(node, leg.tx)
+        if not legs[phase]["mined"]:
+            break
+        tx, coins = leg.tx, destinations
     return legs
 
 
@@ -90,6 +99,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("project", choices=PROJECTS)
     parser.add_argument("--output", required=True, type=Path)
+    parser.add_argument("--template", help="limit the replay to one project template")
+    parser.add_argument("--turnover", action="store_true", help="mine one same-template payment before exit")
     args = parser.parse_args()
     profile = os.environ.get("SCRIPT_LAB_REGTEST_PROFILE")
     if profile not in {"default", "raised"}:
@@ -97,19 +108,23 @@ def main():
     node = Node(os.environ["REGTEST_URL"], os.environ["REGTEST_COOKIE"])
     if node.call("getconnectioncount", []) != 0:
         raise ValueError("admission requires a peerless regtest node")
-    if node.call("getblockcount", []) == 0:
-        node.call("generate", [101])
     meta = chain_metadata()
     if meta["commit"] != PROJECTS[args.project][0]:
         raise ValueError(f"unexpected chain-gang pin: {meta}")
     sys.path.insert(0, str(ROOT / "projects" / args.project / "reference"))
     templates = import_module("benchmark_adapter").TEMPLATES
+    if args.template is not None:
+        if args.template not in templates:
+            parser.error(f"unknown {args.project} template {args.template!r}; choose from {', '.join(templates)}")
+        templates = {args.template: templates[args.template]}
+    if node.call("getblockcount", []) == 0:
+        node.call("generate", [101])
     cases = {}
     with TemporaryDirectory(prefix="script-lab-admission-") as temp:
         for name, template in templates.items():
             for mode in (0x41, 0x61):
                 label = f"{args.project}/{name}/{mode:02x}"
-                cases[label] = admission_case(node, template, label, mode, Path(temp))
+                cases[label] = admission_case(node, template, label, mode, Path(temp), turnover=args.turnover)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     dump_json(args.output, {"schema_version": 1, "profile": profile, "bsv_node_version": node.version,
                             "project": args.project, "chain_gang": meta,

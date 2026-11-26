@@ -2,7 +2,7 @@
 
 [English](sdk.en.md) · [开发指南](developer.zh-CN.md#sdk) · [统一钱包接入](../../../sdk/README.zh-CN.md)
 
-收款时选择 `full-key`（默认）或 `committed-key`，识别时传入完整且顺序一致的公钥。SDK 也能识别旧版输出，其花费模式为 BIP143 ALL。签名器接收 32 字节摘要，返回 8,192 字节签名。释放签名前持久记录密钥已使用。找零用新密钥，重试时保留已签交易。
+收款时可选择 `full-key`（默认）、`committed-key` 或两个实验模板 `committed-key-forth` 和 `committed-key-forth-compact`。识别时传入完整有序公钥。SDK 也能识别旧版输出，其花费模式为 BIP143 ALL。[模板与交易成本](../README.zh-CN.md#选择付款模板)
 
 <a name="quickstart"></a>
 
@@ -39,7 +39,7 @@ const signedHex = wallet.signPayment({
 
 ## 随付款请求保存密钥状态
 
-记录付款请求使用 `full-key` 还是 `committed-key`，并为两者保留按序排列的公钥。这 16,384 字节有固定顺序。承诺模板在组装花费证明时会用到这些字节。钱包恢复时应同时恢复公钥和密钥消耗记录。
+记录付款请求使用的具体模板，并保留完整的 16,384 字节有序公钥。承诺模板需要用公钥组装花费证明。钱包恢复时同时恢复公钥和密钥消耗记录。
 
 签名器释放 8,192 字节的签名前，先持久记录这把密钥已消耗。签名请求超时后，密钥可能已经用过。若已签交易可恢复，使用相同字节重播。新输出使用新密钥。[统一 SDK 的一次性签名接入](../../../sdk/docs/reference.zh-CN.md#one-time-signing)
 

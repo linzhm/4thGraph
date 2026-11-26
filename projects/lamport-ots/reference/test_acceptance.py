@@ -7,9 +7,12 @@ import unittest
 
 from engines import chain_valid
 from fixtures import INVALID_PREVOUT_CASES, cases, mode_fixture, test_secret
+from forth_verifier import committed_verifier_code
 from lamport import OneTimeSigner, public_key, sign_digest, verify_digest
 from payment import sign_spend
-from script import committed_locking_script, locking_script
+from script import (
+    committed_locking_script, compact_forth_committed_locking_script, forth_committed_locking_script, locking_script,
+)
 from fourthgraph.bsv.evaluate import evaluate, ScriptError
 from fourthgraph.bsv.script import number, push
 from fourthgraph.bsv.transaction import Input, Output, Transaction
@@ -18,6 +21,7 @@ from test_node import node_check
 
 VERSIONS = (1, 2)
 PAIRING = (False, True)
+COMMITTED_FACTORIES = (committed_locking_script, forth_committed_locking_script, compact_forth_committed_locking_script)
 # The twelve byte values and commitment groups are specified in docs/spec.md.
 ALL = {0x41, 0x61, 0xc1, 0xe1}
 NONE = {0x42, 0x62, 0xc2, 0xe2}
@@ -110,17 +114,36 @@ class LamportAcceptance(unittest.TestCase):
         self.check_payment_domain(locking_script)
 
     def test_committed_payment_decisions_cover_the_declared_domain(self):
-        self.check_payment_domain(committed_locking_script)
+        for factory in COMMITTED_FACTORIES:
+            with self.subTest(template=factory.__name__):
+                self.check_payment_domain(factory)
+
+    def test_forth_reconstructs_the_key_for_every_digest_byte(self):
+        secret = test_secret(b'forth/masks')
+        key = public_key(secret)
+        code = committed_verifier_code()
+        self.assertEqual(sha256(code).hexdigest(), '2099467370ba8b0fcf533d5c997e33256ee0251fd0548fc3c69557e8ac95a73b')
+        uniform = (bytes([value]) * 32 for value in range(256))
+        for digest in (*uniform, bytes(range(224, 256))):
+            with self.subTest(digest=digest.hex()):
+                proof = bytearray()
+                for slot in range(256):
+                    selected = (digest[slot // 8] >> (slot % 8)) & 1
+                    start = 64 * slot
+                    pair = secret[start:start+64]
+                    proof += (pair[32:] + sha256(pair[:32]).digest() if selected
+                              else pair[:32] + sha256(pair[32:]).digest())
+                self.assertEqual(evaluate(code, [bytes(proof), digest]), ([sha256(key).digest()], []))
 
     @unittest.skipUnless(os.environ.get('REGTEST_COOKIE'), 'requires BSV Node regtest')
     def test_committed_chronicle_activation_boundary(self):
         shapes = [(mode, paired) for mode in MODES for paired in ((False, True) if mode in SINGLE else (True,))]
         self.assertEqual(len(shapes), 16)
-        cases = product(VERSIONS, shapes, ((False, 1), (True, 1), (True, 3)))
-        for version, (mode, paired), (chronicle, height) in cases:
-            with self.subTest(version=version, mode=hex(mode), paired=paired, chronicle=chronicle, height=height):
-                _, parents, tx = mode_fixture(mode, paired=paired, version=version,
-                                              lock_factory=committed_locking_script)
+        cases = product(COMMITTED_FACTORIES, VERSIONS, shapes, ((False, 1), (True, 1), (True, 3)))
+        for factory, version, (mode, paired), (chronicle, height) in cases:
+            with self.subTest(template=factory.__name__, version=version, mode=hex(mode), paired=paired,
+                              chronicle=chronicle, height=height):
+                _, parents, tx = mode_fixture(mode, paired=paired, version=version, lock_factory=factory)
                 self.assertEqual(node_check(tx, parents[1], 1, chronicle=chronicle, funding_height=height),
                                  chronicle or not bool(mode & 0x20))
 
@@ -159,7 +182,12 @@ class LamportAcceptance(unittest.TestCase):
         self.assertEqual(visited, expected)
 
     def test_committed_proof_binds_every_selected_secret_and_sibling(self):
-        _, parents, signed = mode_fixture(0x41, lock_factory=committed_locking_script)
+        for factory in COMMITTED_FACTORIES:
+            with self.subTest(template=factory.__name__):
+                self.check_committed_proof(factory)
+
+    def check_committed_proof(self, factory):
+        _, parents, signed = mode_fixture(0x41, lock_factory=factory)
         (preimage, proof, mode), _ = evaluate(signed.inputs[1].script)
         self.assertEqual(len(proof), 16384)
         self.assertEqual(mode, b'')
@@ -179,20 +207,20 @@ class LamportAcceptance(unittest.TestCase):
         check(proof + b'\0', False)
 
     def test_committed_2in_2out_and_fresh_key_preflight(self):
-        for mode in (0x41, 0x61):
-            with self.subTest(mode=hex(mode)):
+        for factory, mode in product(COMMITTED_FACTORIES, (0x41, 0x61)):
+            with self.subTest(template=factory.__name__, mode=hex(mode)):
                 signers = [OneTimeSigner(test_secret(bytes([mode, index]))) for index in range(2)]
                 keys = [signer.public_key for signer in signers]
                 funding = tuple(
                     Transaction((Input(bytes([index + 1]) * 32, 0),),
-                                (Output(1000, committed_locking_script(key)),))
+                                (Output(1000, factory(key)),))
                     for index, key in enumerate(keys)
                 )
-                fresh_locks = tuple(committed_locking_script(public_key(test_secret(bytes([mode, index]))))
+                fresh_locks = tuple(factory(public_key(test_secret(bytes([mode, index]))))
                                     for index in (2, 3))
                 tx = Transaction(tuple(Input(parent.txid_wire(), 0) for parent in funding),
                                  tuple(Output(900, lock) for lock in fresh_locks))
-                for lock_factory in (locking_script, committed_locking_script):
+                for lock_factory in (locking_script, *COMMITTED_FACTORIES):
                     reused = replace(tx, outputs=(Output(900, lock_factory(keys[0])), tx.outputs[1]))
                     with self.assertRaisesRegex(ValueError, 'fresh Lamport key'):
                         sign_spend(reused, 0, funding[0].serialize(), keys[0], signers[0].sign, sighash=mode)
