@@ -53,6 +53,20 @@ outputs using all four dictionaries. Lean `spec@1c051ea` matched all 125
 fixtures. Python, TypeScript, Go and Rust wallet replays passed.
 [Measurements and replay commands](../README.md#compact-profile)
 
+## Compact v4 profile
+
+Compiler revision `6699658` builds a 23,296-byte lock and a 1,884-byte
+reconstruction program. Focused checks exercise all 16 starting digits
+and compare the signatures and public keys passed to native CHECKSIG
+on both the ordinary and companion paths.
+
+BSV Node 1.2.3 and chain-gang at `74676b9` matched all 1,230 payment
+outcomes and rejected all 67 signature-chain mutations. Both engines
+validated the measured transaction sizes and mixed OTDA ALL outputs
+using all five dictionaries. Lean `spec@1c051ea` matched all 125 fixtures.
+Python, TypeScript, Go and Rust wallet replays passed, along with 24
+Lamport regression tests. [Measurements and replay commands](../README.md#compact-profile)
+
 ## Bounded coverage of complete payments
 
 The [acceptance fixture](../reference/test_acceptance.py) builds the expected key

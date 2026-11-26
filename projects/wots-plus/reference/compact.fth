@@ -69,11 +69,15 @@ REQUIRE BSV
     op-nip compact-append-endpoint op-1add
 ;
 
-: compact-v3-chain-start ( script -- script )
+: compact-chain-prefix ( script -- script )
     ( The index is a raw byte, including the initial zero. )
     compact-chain-input op-cat
     ( Keep the zero function prefix immediately below the chain address. )
-    op-6 op-pick op-swap op-rot compact-step-count
+    op-6 op-pick op-swap op-rot
+;
+
+: compact-v3-chain-start ( script -- script )
+    compact-chain-prefix compact-step-count
 ;
 
 : compact-v3-hash-step ( script cell -- script )
@@ -87,4 +91,22 @@ REQUIRE BSV
 
 : compact-v3-chain-end ( script -- script )
     op-rot op-drop op-nip compact-append-endpoint op-bin2num op-1add
+;
+
+: compact-v4-chain-start ( script -- script )
+    ( Also keep the selector bit mask next to the chain value. )
+    compact-chain-prefix op-8 op-pick op-swap compact-step-count
+;
+
+: compact-v4-hash-step ( script cell -- script )
+    ( Function prefix, chain address, selector mask, value. )
+    swap op-2over swap bsv-num op-pick op-cat
+    ( Keep the address below the copied prefix and key, then move it next to the value. )
+    op-tuck op-sha256 op-2swap op-4 op-pick op-or op-sha256
+    ( The copied prefix and key are already below the value and mask. )
+    op-xor op-cat op-cat op-sha256
+;
+
+: compact-v4-chain-end ( script -- script )
+    op-2swap op-2drop op-nip compact-append-endpoint op-bin2num op-1add
 ;

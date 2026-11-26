@@ -8,9 +8,10 @@ import unittest
 
 from fixtures import fixture_seeds, funding_transaction, mode_fixture, vector_document
 from payment import sign_payment
-from script import CACHE_PROFILES, COMPANION_CODE, ORDINARY_CODE, locking_script
+from script import CACHE_PROFILES, COMPACT_PROFILES, COMPANION_CODE, ORDINARY_CODE, locking_script
 from fourthgraph.bsv.evaluate import ScriptError, evaluate
-from fourthgraph.bsv.pushtx import N as CURVE_ORDER, R as BINDING_R, authorization_checks, binding_der
+from fourthgraph.bsv.pushtx import N as CURVE_ORDER, R as BINDING_R, authorization_checks, binding_der, check_binding
+from fourthgraph.bsv.script import asm, number, push
 from fourthgraph.bsv.transaction import SIGHASH_TYPES, Output
 from wots import (
     CHAINS,
@@ -67,7 +68,7 @@ class WotsTests(unittest.TestCase):
                 key = public_key(*seeds)
                 digest = bytes([17 * digit]) * N
                 signature = sign_digest(*seeds, digest)
-                for profile in ("compact-v2", "compact-v3"):
+                for profile in COMPACT_PROFILES[1:]:
                     lock = locking_script(key, transaction=False, cached_constants=profile)
                     self.assertEqual(evaluate(lock, [digest, signature]), ([b"\x01"], []), profile)
 
@@ -94,6 +95,26 @@ class WotsTests(unittest.TestCase):
         zero = (CURVE_ORDER - BINDING_R).to_bytes(32, "big")
         with self.assertRaises(ScriptError):
             evaluate(binding_der(compact=True), [zero])
+
+    def test_binding_key_reuse_passes_the_same_checksigs(self):
+        digest = sha256(b"binding key reuse fixture").digest()
+        for mode, flag in ((0, 0x41), (1, 0x43), (1, 0xc3)):
+            prefix = number(mode) + asm("OP_TOALTSTACK") + push(bytes([flag])) + asm("OP_TOALTSTACK")
+            expected = []
+            actual = []
+
+            def capture(calls):
+                def checksig(signature, key):
+                    calls.append((signature, key))
+                    return True
+                return checksig
+
+            with self.subTest(mode=mode, flag=flag):
+                for reuse, calls in ((False, expected), (True, actual)):
+                    code = prefix + check_binding(COMPANION_CODE, compact=True, reuse_r=reuse)
+                    self.assertEqual(evaluate(code, [digest], capture(calls)), ([b"\x01"], []))
+                self.assertEqual(len(actual), 1 + mode)
+                self.assertEqual(actual, expected)
 
     def test_keys_and_malformed_values(self):
         secret, key = generate_keypair()

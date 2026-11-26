@@ -13,7 +13,7 @@ from wots import CHAINS, KEY_BYTES, N, SIGNATURE_BYTES, W
 ORDINARY_CODE = asm('OP_NOP OP_ENDIF OP_CHECKSIG')
 COMPANION_CODE = asm('OP_NOP OP_IF OP_CHECKSIGVERIFY OP_ELSE OP_CODESEPARATOR') + ORDINARY_CODE
 
-COMPACT_PROFILES = ('compact', 'compact-v2', 'compact-v3')
+COMPACT_PROFILES = ('compact', 'compact-v2', 'compact-v3', 'compact-v4')
 CACHE_PROFILES = (False, True, 'steps', *COMPACT_PROFILES)
 
 
@@ -70,7 +70,9 @@ def _compact_chain(profile='compact'):
         # The counter starts at 15 minus the signed digit. The first false
         # gate consumes zero, and the innermost gate consumes the final flag.
         code += builder.emit('compact-countdown-gate', b'') * (W - 2) + asm('OP_IF')
-        table_depth = 9
+        # v4 copies the prefix and address before the lookup and keeps the
+        # selector mask next to the value for the entire chain.
+        table_depth = 12 if profile == 'compact-v4' else 9
     else:
         for limit in reversed(range(2, W)):
             code = builder.emit('compact-if-digit-below', code, limit)
@@ -110,7 +112,7 @@ def _compact_constants(public_seed, *, synthesize):
 
 
 def _compact_verifier(public_seed, commitment, *, profile):
-    synthesize = profile == 'compact-v3'
+    synthesize = profile in ('compact-v3', 'compact-v4')
     constants = _compact_constants(public_seed, synthesize=synthesize)
     roll = number(W + 3) + asm('OP_ROLL')
     if profile != 'compact':
@@ -178,9 +180,10 @@ def locking_script(key, *, transaction=True, cached_constants=False):
 
 
 def _payment_script(key, *, cached_constants):
-    compact = cached_constants == 'compact-v3'
+    compact = cached_constants in ('compact-v3', 'compact-v4')
     shape = authorization_checks(ORDINARY_CODE, COMPANION_CODE, compact=compact)
     shape += asm('OP_SIZE') + number(SIGNATURE_BYTES) + asm('OP_NUMEQUALVERIFY')
     shape += asm('OP_SWAP OP_HASH256 OP_DUP OP_TOALTSTACK')
+    binding = check_binding(COMPANION_CODE, compact=compact, reuse_r=cached_constants == 'compact-v4')
     return (shape + verifier(key, cached_constants=cached_constants)
-            + asm('OP_FROMALTSTACK') + check_binding(COMPANION_CODE, compact=compact))
+            + asm('OP_FROMALTSTACK') + binding)
