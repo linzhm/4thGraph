@@ -8,11 +8,76 @@
 
 Receive to P2PK or P2PKH, then sign a payment with your secp256k1 signer.
 
-[Protocol](docs/developer.en.md#protocol) · [Security](docs/developer.en.md#security) · [Verify](#run) · [Transaction costs](#complete-transactions-and-stack-measurements)
+[Protocol](docs/developer.en.md#protocol) · [Forth and compiled Script](#forth-source-and-compiled-script) · [Security](docs/developer.en.md#security) · [Verify](#run) · [Transaction costs](#complete-transactions-and-stack-measurements)
 
 Native P2PKH is the first wallet integration example and the transaction-cost baseline for 4thGraph. P2PK uses the same secp256k1 signer and provides a control for placing the public key in the output lock. Both templates have public fixtures that you can replay as you integrate another project.
 
 [Build locks from Forth](forth/README.md) · [Reproduce the benchmark](../../docs/benchmark.md)
+
+## Forth source and compiled Script
+
+The Forth constructors check the recipient field width and assemble the locking scripts. Both examples use the public fixture key.
+
+### P2PK
+
+The constructor takes a 33-byte compressed secp256k1 public key. The spending input supplies `<signature>`. [Example entry](forth/p2pk.fth) · [Standard library](../../src/fourthgraph/stdlib/p2pk.fth)
+
+```forth
+: p2pk-lock ( bytes -- bytes )
+    33 bytes-check-size
+    bytes-hex 21 swap bytes-cat bytes-hex ac bytes-cat ;
+
+: p2pk ( bytes -- bytes ) p2pk-lock ;
+```
+
+The 35-byte lock pushes the public key and executes `OP_CHECKSIG`.
+
+```text
+0x0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798 OP_CHECKSIG
+```
+
+```text
+210279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798ac
+```
+
+### P2PKH
+
+The constructor takes a 20-byte HASH160 of the public key. The spending input supplies `<signature> <public key>`. [Example entry](forth/p2pkh.fth) · [Standard library](../../src/fourthgraph/stdlib/p2pkh.fth)
+
+```forth
+: p2pkh-lock ( bytes -- bytes )
+    20 bytes-check-size
+    bytes-hex 76a914 swap bytes-cat bytes-hex 88ac bytes-cat ;
+
+: p2pkh ( bytes -- bytes ) p2pkh-lock ;
+```
+
+The 25-byte lock checks the supplied public key's hash before checking the signature.
+
+```text
+OP_DUP OP_HASH160 0x751e76e8199196d454941c45d1b3a323f1433bd6 OP_EQUALVERIFY OP_CHECKSIG
+```
+
+```text
+76a914751e76e8199196d454941c45d1b3a323f1433bd688ac
+```
+
+### Optimization and reproduction
+
+In 4thGraph 0.2.7, `baseline`, `safe`, and `stack` emit identical bytecode for each constructor. Evaluating that bytecode with the fixture inputs produces the 35-byte P2PK and 25-byte P2PKH locks above, byte for byte against the existing `lock_hex` values. The wallet build evaluates the Forth constructors off-chain and uses the resulting bytes as the transaction output scripts. [Baseline fixtures](template/baseline.json)
+
+From the repository root, print the locks and inspect the `stack` optimization reports for both constructors.
+
+```sh
+export PYTHONPATH=src:.
+forth=projects/p2pk-p2pkh-baseline/forth
+python3 "$forth/payments.py" --public-key 0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798
+python3 "$forth/payments.py" --hash160 751e76e8199196d454941c45d1b3a323f1433bd6
+
+for entry in p2pk p2pkh; do
+  python3 -m fourthgraph.workflow.protocol "$forth/$entry.fth" --entry "$entry" --optimize stack
+done
+```
 
 ## Use cases and trade-offs
 
