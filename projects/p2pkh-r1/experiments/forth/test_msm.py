@@ -3,7 +3,7 @@ from tempfile import TemporaryDirectory
 import unittest
 
 from msm_compiler import CALIBRATION, SOURCE, R1MSMCompiler
-from msm_experiment import local_build, reference_rows
+from msm_experiment import frozen_build, local_build, reference_rows
 
 
 class R1MSMTests(unittest.TestCase):
@@ -56,6 +56,16 @@ class R1MSMTests(unittest.TestCase):
                     cost = report["estimated"]["affine_g"]
                     self.assertEqual(cost["multiplications_removed_on_nonzero_path"], 192)
                     self.assertEqual(cost["guard_bytes_added"], 320)
+
+    def test_frozen_template_matches_the_reviewed_construction(self):
+        (frozen_lock, frozen_pattern), release = frozen_build()
+        compiler = R1MSMCompiler()
+        (lock, pattern), report = local_build(compiler, compiler.plan(release["construction"]), 32)
+        self.assertEqual(release["build_source"], compiler.source_identity)
+        self.assertEqual(frozen_lock, lock)
+        self.assertEqual(frozen_pattern, pattern)
+        self.assertEqual(release["estimated"], report["estimated"])
+        self.assertEqual((len(lock.script), len(pattern.program), lock.owner_start), (41364, 5658, 208))
 
 
 if __name__ == "__main__":

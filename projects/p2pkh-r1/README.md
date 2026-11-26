@@ -12,21 +12,21 @@ P2PKH-R1 lets a BSV wallet use an existing P-256 signer. The output commits to t
 
 ## Measured results
 
-### Latest iteration
+### v0.5.0 → v0.6.0
 
-**`split-5x4-affine-g`** is the validated experimental template selected this round. The lock is **357 B smaller** than the previous selection, and a two-input, two-output BIP143 ALL payment is **714 B smaller**. [Build and replay](experiments/forth/README.md)
+**v0.6.0** freezes `split-5x4-affine-g` as the latest compiler template. It saves **357 B per lock** and **714 B per BIP143 ALL payment**. The OTDA reconstruction program grows by 148 B, and each measured OTDA payment shrinks by **418 B**. Payments use two inputs and two outputs. [Frozen artifacts and hashes](template/v0.6.0/layout.json) · [Build and replay](experiments/forth/README.md)
 
-| Iteration | Template | Lock | BIP143 ALL payment | OTDA ALL payment |
-| --- | --- | ---: | ---: | ---: |
-| Previous | `split-5x4` | 41,721 B | 84,212 B | 95,282 B |
-| Latest | `split-5x4-affine-g` | **41,364 B** | **83,498 B** | **94,864 B** |
+| Version | Compiler construction | Lock | BIP143 ALL payment | OTDA ALL payment | OTDA SINGLE payment |
+| --- | --- | ---: | ---: | ---: | ---: |
+| v0.5.0 | `split-5x4` | 41,721 B | 84,212 B | 95,282 B | 95,211 B |
+| **v0.6.0** | `split-5x4-affine-g` | **41,364 B** | **83,498 B** | **94,864 B** | **94,793 B** |
 
-The same high-level Forth calls `P256.mul2(u,G,v,Q)`. The compiler uses `Z=1` for nonzero entries in the fixed-generator table to specialize 51 additions and handles the zero index separately. The new template passed funded BSV Node and independent chain-gang replay and acceptance for BIP143 ALL, OTDA ALL, and paired OTDA SINGLE. [High-level source](experiments/forth/msm.fth) · [Acceptance matrix](reference/acceptance.md)
+Both versions compile the same Forth call to `P256.mul2(u,G,v,Q)` with 5-bit and 4-bit windows for `G` and `Q`. In v0.6.0, the compiler proves `Z=1` for nonzero entries in the fixed-generator table, specializes 51 additions, and guards the zero index. Both versions passed funded BSV Node and independent chain-gang replay for the three payment modes above and the R1 acceptance matrix. [High-level source](experiments/forth/msm.fth) · [Version measurements](experiments/forth/results.json) · [Acceptance matrix](reference/acceptance.md)
 
 <details>
 <summary>Earlier version iterations</summary>
 
-Each row shows the validated template selected that round. Payment figures use two inputs and two outputs. Forth window experiments use their reproducible template names.
+Each row shows the validated template selected that round. Payments use two inputs and two outputs.
 
 | Previous selection | Selected template | Main improvement | Lock | BIP143 ALL | OTDA ALL |
 | --- | --- | --- | ---: | ---: | ---: |
@@ -34,7 +34,7 @@ Each row shows the validated template selected that round. Payment figures use t
 | v0.1.0 | v0.2.0 | Reschedule P-256 arithmetic and share curve kernels in OTDA reconstruction | 46,302 B | 93,374 B | 101,250 B |
 | v0.2.0 | Forth v0.3.0 | Generate the full lock from Forth and shorten 263 point doublings | 45,776 B | 92,322 B | 100,192 B |
 | Forth v0.3.0 | Forth v0.4.0 | Express point arithmetic as bounded formulas and let the compiler rewrite and schedule them | 42,536 B | 85,842 B | 93,664 B |
-| Forth v0.4.0 | `split-5x4` | Compile the double-scalar multiplication with a 5-bit fixed table and a 4-bit public-key table to reduce loop additions | 41,721 B | 84,212 B | 95,282 B |
+| Forth v0.4.0 | v0.5.0 (`split-5x4`) | Compile the double-scalar multiplication with a 5-bit fixed table and a 4-bit public-key table to reduce loop additions | 41,721 B | 84,212 B | 95,282 B |
 
 The main sequence selects templates by lock and BIP143 payment size. The window iteration also selected `joint-2` for OTDA, where it still gives a 91,692 B two-input, two-output payment. [Window replay results](experiments/forth/results.json)
 

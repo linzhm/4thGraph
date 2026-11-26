@@ -4,6 +4,8 @@
 
 `msm.fth` 用显式的 P‑256 双标量乘法表达窗口计算。编译器扫描固定生成元、标量范围和曲线点校验，比较各构造的实际锁与付款字节数，并逐字节核对 OTDA 重建。
 
+v0.6.0 冻结了 `split-5x4-affine-g` 的完整锁和对应的 OTDA 重建程序。`compare --candidate v0.6.0` 直接读取并核对冻结产物，占用一个本地候选名额和一个付款复放名额。待测构造继续从 Forth 编译。 [冻结清单](../../template/v0.6.0/layout.json)
+
 从仓库根目录运行。Python 环境需要 [R1 参考依赖](../../reference/requirements.txt)、`ecdsa` 和 [Chronicle chain-gang 固定版本](../../../../tools/requirements-chronicle.txt)。
 
 ```sh
@@ -11,11 +13,13 @@ project=projects/p2pkh-r1
 experiment="$project/experiments/forth"
 export PYTHONPATH="src:.:$project/reference"
 
-python "$experiment/msm_experiment.py" scan --candidate split-4
+python "$experiment/msm_experiment.py" scan --candidate split-5x4
+python "$experiment/msm_experiment.py" build --candidate split-5x4-affine-g --output /tmp/r1-build.json
 python -m unittest discover -v -s "$experiment" -p 'test_*.py'
 bash tools/verify_node.sh --profile raised -- \
-  python "$experiment/msm_experiment.py" compare --matrix \
-  --output /tmp/r1-comparison.json --evidence /tmp/r1-replay.json
+  python "$experiment/msm_experiment.py" compare --workflow explicit --matrix \
+  --candidate split-5x4 --candidate v0.6.0 --budget 2 --full-budget 2 \
+  --output /tmp/r1-comparison.json --evidence /tmp/r1-replay.json --markdown /tmp/r1-comparison.md
 ```
 
 报告记录前置扫描依据、各候选的估算与实测、以及每种付款模式的优胜候选。交易证据包含两进两出的付款、两套引擎的判定和改动锁定时间后的拒绝结果。 [已验证的实测数据](results.json)

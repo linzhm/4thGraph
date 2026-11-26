@@ -4,8 +4,8 @@
     "r1.fth": "8acaf9f81bc367c98f9a42d561e302c6f27cc376ad3f3f8c8d49f5176cbaa7d9"
   },
   "selected": {
-    "lock_bytes": "split-4-affine-g",
-    "bip143-all": "split-4-affine-g",
+    "lock_bytes": "split-5x4-affine-g",
+    "bip143-all": "split-5x4-affine-g",
     "otda-all": "joint-2",
     "otda-single": "joint-2"
   },
@@ -176,6 +176,7 @@
       }
     },
     "split-5x4": {
+      "template_version": "0.5.0",
       "lock_sha256": "c1b6236400f19031ced904c29ac6ccdea57ee209d2fe7f4069ab3ae8be5a0c51",
       "otda_program_sha256": "aac67720278b32cd95e39a4144489e420204f62ac0ec0aa25c2db3c108f84113",
       "point_vectors": 32,
@@ -187,9 +188,9 @@
         "otda-single": 95211
       },
       "payment_peak_stack_payload_bytes": {
-        "bip143-all": 4683,
+        "bip143-all": 4685,
         "otda-all": 167289,
-        "otda-single": 83844
+        "otda-single": 83843
       },
       "unlock_bytes": {
         "bip143-all": [
@@ -207,15 +208,67 @@
       },
       "payment_evidence": {
         "bip143-all": {
-          "spend_txid": "b04ffae255a029cb4f752084dc3d386614f47e5ffa681308a5f659f835a43493",
+          "spend_txid": "d74db5e231145da24a693d4b7bc2e1053a143d638e83ccbef3e462fed0517be8",
           "locktime_mutation_rejected": true
         },
         "otda-all": {
-          "spend_txid": "82695eccf377d95f5731d0f8076f431b7d1626aede3eda983f4939b3327821ef",
+          "spend_txid": "57d2cc80ff5cec3130185469c3085949e9522c06ec9e22ff67fee61cddccb667",
           "locktime_mutation_rejected": true
         },
         "otda-single": {
-          "spend_txid": "76940a99e3f94d6692b4fd06e50790c28a980ea3936161d481eef72117702ed8",
+          "spend_txid": "1fbf8da9fd3749eda57af65a1a88dc9344b8905c03701f0427228ba1ad9d871f",
+          "locktime_mutation_rejected": true
+        }
+      },
+      "acceptance": {
+        "node_payment_cases": 1296,
+        "chain_gang_payment_cases": 432,
+        "valid_witness_controls": 4,
+        "invalid_witness_controls": 24
+      }
+    },
+    "split-5x4-affine-g": {
+      "template_version": "0.6.0",
+      "lock_sha256": "d4dc90255e60d8dff51e1f8464391304d4b0946457445e62f558c66e84edb27a",
+      "otda_program_sha256": "109b059b5e75bf888762397f8f58445d8c95d1c14727c8356c5bbb196b8f95bd",
+      "point_vectors": 32,
+      "lock_bytes": 41364,
+      "otda_program_bytes": 5658,
+      "payment_bytes": {
+        "bip143-all": 83498,
+        "otda-all": 94864,
+        "otda-single": 94793
+      },
+      "payment_peak_stack_payload_bytes": {
+        "bip143-all": 4684,
+        "otda-all": 165862,
+        "otda-single": 83129
+      },
+      "unlock_bytes": {
+        "bip143-all": [
+          326,
+          326
+        ],
+        "otda-all": [
+          6009,
+          6009
+        ],
+        "otda-single": [
+          5969,
+          5978
+        ]
+      },
+      "payment_evidence": {
+        "bip143-all": {
+          "spend_txid": "7892c2c030fb6e61c8eb262814457817a76cf12bb6fc4dc74fff3f99ba546c24",
+          "locktime_mutation_rejected": true
+        },
+        "otda-all": {
+          "spend_txid": "a41acc1b410b73153f77b6c0ae68ae4acbf1eee1f0419001095b99282dfbd404",
+          "locktime_mutation_rejected": true
+        },
+        "otda-single": {
+          "spend_txid": "e4b9f0d78df9fc2f67e1d24cbfc3feff47adbfdc4b232cefd9a3acf6cd1f8c5d",
           "locktime_mutation_rejected": true
         }
       },

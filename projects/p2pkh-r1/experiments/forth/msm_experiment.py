@@ -7,6 +7,8 @@ import os
 from pathlib import Path
 from time import perf_counter
 
+from fixed_templates import read_compiled_template, read_otda_reconstruction
+from fourthgraph.bsv.evaluate import evaluate
 from msm_compiler import CALIBRATION, SOURCE, R1MSMCompiler, payment_estimates
 from msm_lowering import verify_window
 from replay_r1 import CONTEXT_PIN, MODES, Node, Replay, chain_metadata, matrix_check, replay_layout
@@ -14,6 +16,7 @@ from replay_r1 import CONTEXT_PIN, MODES, Node, Replay, chain_metadata, matrix_c
 OBJECTIVES = ("lock_bytes", "bip143-all", "otda-all", "otda-single")
 # This fourth explicit candidate already appears in the previous comparison.
 REFERENCE_TRIAL = "split-5"
+FROZEN_BASELINE = "v0.6.0"
 
 
 def elapsed(start):
@@ -74,6 +77,26 @@ def local_build(compiler, plan, vectors):
     }
 
 
+def frozen_build():
+    start = perf_counter()
+    directory = SOURCE.parents[2] / "template" / FROZEN_BASELINE
+    layout = json.loads((directory / "layout.json").read_text(encoding="ascii"))
+    if f"v{layout['template_version']}" != FROZEN_BASELINE:
+        raise ValueError("R1 baseline layout has the wrong version")
+    lock = read_compiled_template(directory, layout)
+    _, program = read_otda_reconstruction(directory, layout["compressed_preimage"])
+    pattern = lock.reconstruction(program)
+    if evaluate(program) != (list(pattern.fixed_parts), []):
+        raise ValueError("frozen OTDA reconstruction differs from the versioned lock")
+    return (lock, pattern), {
+        "status": "local-verified", "template_version": layout["template_version"],
+        "construction": layout["construction"], "build_source": layout["build_source"],
+        "reconstruction_byte_match": True, "estimated": layout["estimated"],
+        "lock_sha256": layout["script_sha256"], "otda_program_sha256": layout["compressed_preimage"]["program_sha256"],
+        "phase_seconds": {"load_and_check": elapsed(start)},
+    }
+
+
 def scan_proposal(scans):
     opportunities = [opportunity for scan in scans.values() for opportunity in scan["opportunities"]
                      if opportunity["id"] == "affine-g" and opportunity["try"]]
@@ -84,7 +107,8 @@ def shortlist(rows, limit):
     names = [name for name, row in rows.items() if row["status"] == "local-verified"]
     leaders = [min(names, key=lambda name: objective(rows[name], "estimated", metric))
                for metric in OBJECTIVES] if names else []
-    selected = tuple(dict.fromkeys((*leaders, *names)))[:limit]
+    baseline = (FROZEN_BASELINE,) if FROZEN_BASELINE in names else ()
+    selected = tuple(dict.fromkeys((*baseline, *leaders, *names)))[:limit]
     for name in names:
         if name not in selected:
             rows[name].update(status="local-only", reason="full-payment replay budget exhausted")
@@ -115,11 +139,13 @@ def compare(args):
         proposal = None
         default_candidates = (*CALIBRATION, REFERENCE_TRIAL)
     names = tuple(dict.fromkeys(args.candidate or default_candidates))
+    if FROZEN_BASELINE in names:
+        names = (FROZEN_BASELINE, *(name for name in names if name != FROZEN_BASELINE))
     reference = {}
     if args.reference:
         raw = args.reference.read_bytes()
         reference = reference_rows(json.loads(raw))
-    known = {*CALIBRATION, REFERENCE_TRIAL, *reference}
+    known = {*CALIBRATION, REFERENCE_TRIAL, FROZEN_BASELINE, *reference}
     rows, builds = {}, {}
     summary = {
         **compiler.source_identity, "workflow": args.workflow, "proposal": proposal, "scans": scans,
@@ -136,7 +162,7 @@ def compare(args):
     local_attempts = 0
     for name in names:
         try:
-            plan = compiler.plan(name)
+            plan = None if name == FROZEN_BASELINE else compiler.plan(name)
         except ValueError as error:
             rows[name] = {"status": "ineligible", "reason": str(error)}
             continue
@@ -145,7 +171,8 @@ def compare(args):
             continue
         local_attempts += 1
         try:
-            builds[name], rows[name] = local_build(compiler, plan, args.vectors)
+            builds[name], rows[name] = (frozen_build() if name == FROZEN_BASELINE
+                                        else local_build(compiler, plan, args.vectors))
             if times["first_locally_verified_seconds"] is None:
                 times["first_locally_verified_seconds"] = elapsed(start)
             if name not in known and times["first_novel_locally_verified_seconds"] is None:
@@ -200,10 +227,13 @@ def compare(args):
                if field in reference.get(name, {})}
         for name in controls
     }
+    comparisons = [("split-5x4", "split-4"), ("joint-2", "split-5x4"),
+                   ("split-4-affine-g", "split-4"), ("split-5x4-affine-g", "split-5x4")]
+    if FROZEN_BASELINE in verified:
+        comparisons.extend((name, FROZEN_BASELINE) for name in verified if name != FROZEN_BASELINE)
     summary["cost_differences"] = [
         cost_difference(rows, candidate, baseline)
-        for candidate, baseline in (("split-5x4", "split-4"), ("joint-2", "split-5x4"),
-                                    ("split-4-affine-g", "split-4"))
+        for candidate, baseline in comparisons
         if candidate in verified and baseline in verified
     ]
     summary["novel_candidates_verified"] = [
@@ -303,7 +333,9 @@ def main():
         command = sub.add_parser(name)
         command.add_argument("--source", type=Path, default=SOURCE)
         command.add_argument("--candidate", action="append" if name == "compare" else "store",
-                             default=None if name == "compare" else "split-4")
+                             default=None if name == "compare" else "split-4",
+                             help=(f"window construction or frozen {FROZEN_BASELINE} baseline; repeat to compare"
+                                   if name == "compare" else "window construction"))
         command.add_argument("--output", type=Path)
         if name == "scan":
             command.add_argument("--format", choices=("text", "json"))
