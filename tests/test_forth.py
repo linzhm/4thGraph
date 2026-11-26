@@ -13,6 +13,7 @@ from fourthgraph.bsv.transaction import Input, Output, Transaction
 
 from fourthgraph.compiler.source import CompileError, SourceCompiler, evaluate, lower, parse, schedule
 from fourthgraph.compiler.lowering import compile_word
+from fourthgraph.compiler.script_builder import ScriptBuilder
 from fourthgraph.workflow.protocol import Contracts, OutputLayout, compile_candidates, invalidated, output_hash
 from fourthgraph.replay.workflow import EXAMPLE, GATED_EXAMPLE, TASK_ID, TestKeys
 from fourthgraph.compiler.wordsets import CELL_SIGN, U32, capabilities
@@ -21,6 +22,18 @@ SOURCE = EXAMPLE.read_text()
 
 
 class CompilerTests(unittest.TestCase):
+    def test_build_time_script_words_cannot_be_compiled_as_spending_code(self):
+        builder = ScriptBuilder(": append-drop ( script -- script ) op-drop ;")
+        word = builder.words["append-drop"]
+        self.assertEqual(builder.emit("append-drop", b""), b"\x75")
+        for mode in ("baseline", "safe", "stack"):
+            with self.assertRaisesRegex(CompileError, "build-time Script constructor"):
+                compile_word(word, mode)
+        composed = SourceCompiler(": wrapper ( script -- script ) append-drop ;",
+                                  vocabulary={"append-drop": word})
+        with self.assertRaisesRegex(CompileError, "append-drop"):
+            compile_word(composed.words["wrapper"])
+
     def test_stack_types_and_host_location(self):
         with self.assertRaisesRegex(CompileError, "declared"):
             parse(SOURCE.replace("DUP u32+", "DUP"))

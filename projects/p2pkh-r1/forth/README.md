@@ -6,6 +6,8 @@
 
 `compare --candidate v0.6.0` 直接读取并核对冻结的锁和 OTDA 重建程序，占用一个本地候选名额和一个付款复放名额。传入构造名时从 Forth 编译。v0.6.0 和 v0.7.0 使用同一份两进两出夹具。 [v0.6.0 清单](../versions/v0.6.0/manifest.json) · [v0.7.0 清单](../versions/v0.7.0/manifest.json)
 
+`compare` 默认从冻结的 v0.6.0 出发，优先扫描其后续改写，再从校准构造中选择候选。每个新构造也会扫描一次，候选受 `--budget` 限制。用 `--candidate` 可以直接指定候选。
+
 从仓库根目录运行。Python 环境需要 [R1 参考依赖](../reference/requirements.txt)、`ecdsa` 和 [Chronicle chain-gang 固定版本](../../../tools/requirements-chronicle.txt)。
 
 ```sh

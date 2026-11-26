@@ -47,6 +47,7 @@ class Primitive:
     checked_bounds: tuple[int, int] | None = None
     requires_checksig: bool = False
     expansion_cost: int = 1
+    branch_code: bytes | None = None  # Emits canonical Script truth for OP_IF.
 
     @property
     def location(self):
@@ -82,7 +83,7 @@ def cell_arithmetic(takes, opcode, operation):
 def cell_comparison(takes, code, compare):
     # Forth true flags have every bit set. Our canonical ScriptNum for that cell is -1.
     return Primitive(tuple(takes.split()), ("cell",), code + asm("OP_NEGATE"),
-                     lambda *values: (-int(compare(*values)),), "script execution", comparison=True)
+                     lambda *values: (-int(compare(*values)),), "script execution", comparison=True, branch_code=code)
 
 
 UNSIGNED_CELL = add_modulus_if_negative(CELL_MODULUS)

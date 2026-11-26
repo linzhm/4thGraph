@@ -24,7 +24,7 @@ from fourthgraph.bsv.script import asm, encode_num, number, push
 from fourthgraph.bsv.transaction import Input, Output, Transaction
 from fourthgraph.stdlib import LIBRARIES, Library, capabilities
 from fourthgraph.verification.plan import compile_solutions
-from fourthgraph.compiler.wordsets import U32
+from fourthgraph.compiler.wordsets import U32, Primitive
 
 PROJECTS = Path(__file__).resolve().parents[1] / "projects"
 COMPOSITION = (PROJECTS / "workflow-examples/library-composition.fth").read_text()
@@ -58,6 +58,56 @@ class LibraryTests(unittest.TestCase):
             SourceCompiler(source, bindings={"owner-hash": OWNER[:-1]})
         with self.assertRaisesRegex(CompileError, "check-signature.*expected stack suffix"):
             SourceCompiler(source.replace("public-key dup", "public-key"), bindings={"owner-hash": OWNER})
+
+    def test_lock_entries_cannot_be_inlined_or_used_as_workflow_gates(self):
+        source = "REQUIRE BSV\nlock: positive ( value:u32 ) value u32>cell 0 > verify ;\n"
+        frontend = SourceCompiler(source)
+        word = frontend.words["positive"]
+        self.assertEqual(evaluate(word, 0), (0,))
+        self.assertEqual(evaluate_script(compile_word(word).script, [b""]), ([b""], []))
+        for suffix in (": bypass ( u32 -- cell ) positive drop 1 ;",
+                       "gate: approval state positive alice ;",
+                       "lock: composed ( value:u32 ) value positive ;"):
+            with self.subTest(suffix=suffix):
+                with self.assertRaisesRegex(CompileError, "positive.*lock entry.*cannot be called"):
+                    SourceCompiler(source + suffix)
+
+    def test_named_lock_rewrites_only_a_single_use_branch_flag(self):
+        frontend = SourceCompiler("""
+REQUIRE BSV
+lock: decide ( value:cell ) value 0 > IF 1 ELSE 0 THEN ;
+lock: retain ( value:cell ) value 0 > dup IF 1 drop THEN ;
+""")
+        decide = frontend.words["decide"]
+        retain = frontend.words["retain"]
+        self.assertEqual(len(compile_word(decide).script), 9)
+        for mode in ("safe", "stack"):
+            compiled = compile_word(decide, mode)
+            self.assertEqual(compiled.script, asm("OP_0 OP_GREATERTHAN OP_IF OP_1 OP_ELSE OP_0 OP_ENDIF"))
+            rewrite, = compiled.rewrites
+            self.assertEqual((rewrite.rule, rewrite.script_bytes), ("comparison-feeds-if", (3, 1)))
+            retained = compile_word(retain, mode)
+            self.assertEqual(retained.rewrites, ())
+            for value in (-1, 0, 1):
+                self.assertEqual(evaluate_script(compiled.script, [encode_num(value)])[0],
+                                 [encode_num(int(value > 0))])
+                self.assertEqual(evaluate_script(retained.script, [encode_num(value)])[0],
+                                 [encode_num(-int(value > 0))])
+
+        custom = Primitive(("cell",), ("cell",), asm("OP_0NOTEQUAL OP_0 OP_SWAP OP_SUB"),
+                           lambda value: (-int(value != 0),), "custom flag", comparison=True)
+        frontend = SourceCompiler("""
+: plain ( cell -- cell ) custom IF 1 ELSE 0 THEN ;
+lock: named ( value:cell ) value custom IF 1 ELSE 0 THEN ;
+""", vocabulary={"custom": custom})
+        for entry in ("plain", "named"):
+            for mode in ("safe", "stack"):
+                with self.subTest(entry=entry, mode=mode):
+                    compiled = compile_word(frontend.words[entry], mode)
+                    self.assertEqual(compiled.rewrites, ())
+                    for value in (0, 1):
+                        self.assertEqual(evaluate_script(compiled.script, [encode_num(value)]),
+                                         ([encode_num(value)], []))
 
     def test_named_lock_schedules_multi_result_words_and_unused_inputs(self):
         source = """

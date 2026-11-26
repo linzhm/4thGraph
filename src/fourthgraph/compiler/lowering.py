@@ -1,19 +1,21 @@
 """Typed stack lowering with opt-in, source-traceable Script rewrites."""
 
+from collections import Counter
 from dataclasses import asdict, dataclass, replace
 
 from fourthgraph.bsv.script import asm
 
 from fourthgraph.compiler.source import (
-    MAX_EXPANSION, CompileError, Conditional, Shuffle, Token, check_word_expansion, entry_range_checks, expanded, lower,
-    require_script,
+    MAX_EXPANSION, CompileError, Conditional, LockBranch, Shuffle, Token, check_word_expansion,
+    entry_range_checks, expanded, lower, require_script,
 )
 from fourthgraph.compiler.ranges import PRIMITIVE_NAMES, Slot, primitive_outputs, raw_interval, remainder_is_identity
-from fourthgraph.compiler.stack_schedule import Graph
-from fourthgraph.compiler.wordsets import NUMERIC_RANGES, PRIMITIVES, SHUFFLES, U32, WRAP_CELL, WRAP_U32, Literal
+from fourthgraph.compiler.stack_schedule import Graph, emit_steps
+from fourthgraph.compiler.wordsets import NUMERIC_RANGES, PRIMITIVES, SHUFFLES, U32, WRAP_CELL, WRAP_U32, Literal, Primitive
 
 BASELINE = "baseline"
 OPTIMIZATIONS = (BASELINE, "safe", "stack")
+NORMALIZE_FLAG = asm("OP_0NOTEQUAL")
 
 
 @dataclass(frozen=True)
@@ -24,7 +26,7 @@ class Operation:
     script: bytes
     depth: int
     literal: Literal | None = None
-    comparison: bool = False
+    branch_code: bytes | None = None
     total: bool = False
     permutation: tuple[int, ...] | None = None
     arms: tuple[tuple, tuple] | None = None
@@ -100,10 +102,10 @@ def build_block(body, stack, rewrites, *, schedule=False):
             yes_code = build_block(node.yes, yes, rewrites, schedule=schedule)
             no_code = build_block(node.no, no, rewrites, schedule=schedule)
             stack[:] = [a.merge(b) for a, b in zip(yes, no, strict=True)]
-            prefix = asm("OP_0NOTEQUAL")
-            if code and code[-1].comparison:
+            prefix = NORMALIZE_FLAG
+            if code and code[-1].branch_code is not None:
                 cmp = code[-1]
-                code[-1] = replace(cmp, script=cmp.script[:-1])
+                code[-1] = replace(cmp, script=cmp.branch_code)
                 prefix = b""
                 rewrites.append(Rewrite("comparison-feeds-if", *position, (flag,), module=module))
             script = (prefix + asm("OP_IF") + emit(yes_code)
@@ -149,7 +151,7 @@ def build_block(body, stack, rewrites, *, schedule=False):
             # when used by a compound primitive. Keep their evaluation order.
             total = not node.may_fail and all(part.kind in NUMERIC_RANGES for part in (*takes, *outputs))
             code.append(Operation(source, takes, outputs, script, depth,
-                                  comparison=node.comparison, total=total))
+                                  branch_code=node.branch_code, total=total))
     return schedule_blocks(code, rewrites) if schedule else tuple(code)
 
 
@@ -202,18 +204,53 @@ def emit(operations):
     return b"".join(op.script for op in operations)
 
 
+def emit_lock_block(block, inputs, rewrites, *, optimize):
+    uses = Counter(block.returns)
+    uses.update(value for step in block.steps for value in step.args)
+    steps = []
+    previous = None
+    for step in block.steps:
+        node = step.node
+        if isinstance(node, LockBranch):
+            prefix = NORMALIZE_FLAG
+            flag = step.args[-1]
+            if (optimize and previous is not None and isinstance(previous.node, Primitive)
+                    and previous.node.branch_code is not None and previous.results == (flag,) and uses[flag] == 1):
+                code = previous.node.branch_code
+                at = step.source
+                line, column = (at.line, at.column) if at is not None else (None, None)
+                module = at.module if at is not None else None
+                before = len(steps[-1][0]) + len(prefix)
+                steps[-1] = (code, previous.args, previous.results)
+                prefix = b""
+                rewrites.append(Rewrite("comparison-feeds-if", line, column, (Slot.of("cell"),),
+                                        (before, len(code)), module=module))
+            yes = emit_lock_block(node.yes, node.inputs, rewrites, optimize=optimize)
+            no = emit_lock_block(node.no, node.inputs, rewrites, optimize=optimize)
+            script = prefix + asm("OP_IF") + yes + asm("OP_ELSE") + no + asm("OP_ENDIF")
+        else:
+            script = node.lower() if isinstance(node, Literal) else node.code
+        steps.append((script, step.args, step.results))
+        previous = step
+    return emit_steps(inputs, steps, block.returns, compact=True)
+
+
 def compile_word(word, optimization=BASELINE, *, check_input_ranges=True, max_expansion=MAX_EXPANSION):
     if optimization not in OPTIMIZATIONS:
         raise ValueError(f"unknown optimization {optimization!r}")
-    if optimization == BASELINE:
+    if optimization == BASELINE and word.lock is None:
         return CompiledWord(lower(word, check_input_ranges=check_input_ranges, max_expansion=max_expansion))
     require_script(word)
     check_word_expansion(word, max_expansion)
     rewrites = []
+    prefix = entry_range_checks(word) if check_input_ranges else b""
     try:
+        if word.lock is not None:
+            script = emit_lock_block(word.lock, tuple(range(len(word.takes))), rewrites,
+                                     optimize=optimization != BASELINE)
+            return CompiledWord(prefix + script, rewrites=tuple(rewrites))
         operations = build_block(word.body, list(word.slots(word.takes)), rewrites,
                                  schedule=optimization == "stack")
     except RecursionError as error:
         raise CompileError("expanded conditional nesting exceeds the compiler's recursion limit") from error
-    prefix = entry_range_checks(word) if check_input_ranges else b""
     return CompiledWord(prefix + emit(operations), operations, tuple(rewrites))

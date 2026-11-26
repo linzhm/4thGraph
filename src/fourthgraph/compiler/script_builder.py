@@ -59,7 +59,7 @@ class ScriptBuilder(SourceCompiler):
             raise name.error(f"invalid or duplicate formula name {name.text!r}")
         code, report = formula.lower(optimize=self.optimize)
         append = script_word("script", "script", b"", lambda prefix: prefix + code)
-        self.words[name.name] = Word(("script",), ("script",), (Located(append, name),), "script", name=name.name)
+        self.words[name.name] = Word(("script",), ("script",), (Located(append, name),), "build", name=name.name)
         self.definitions[name.name] = name
         self.formulas[name.name] = report
         self.formula_ir[name.name] = formula

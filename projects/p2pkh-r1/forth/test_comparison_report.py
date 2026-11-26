@@ -7,10 +7,22 @@ import unittest
 from unittest.mock import patch
 
 from comparison_report import SCHEMA_VERSION, read_report
-from msm_experiment import SOURCE, compare
+from msm_experiment import SOURCE, compare, guided_candidates
+from msm_compiler import R1MSMCompiler
 
 
 class ComparisonReportTests(unittest.TestCase):
+    def test_guided_search_follows_the_frozen_construction(self):
+        compiler = R1MSMCompiler()
+        candidates, proposal, scans = guided_candidates(compiler, 2)
+        self.assertEqual(candidates[:2], ("v0.6.0", "split-5x4-affine-g-ifdup"))
+        self.assertEqual(proposal["id"], "affine-g-ifdup")
+        self.assertIn(proposal["try"], scans)
+        self.assertEqual(len(set(candidates)), len(candidates))
+
+        _, proposal, _ = guided_candidates(compiler, 1)
+        self.assertIsNone(proposal)
+
     def test_compare_can_reuse_its_output_as_a_reference(self):
         options = dict(
             source=SOURCE, workflow="explicit", candidate=["joint-2-affine-g"], budget=1, full_budget=1,

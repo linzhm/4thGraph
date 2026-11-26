@@ -72,8 +72,7 @@ def version_candidate(name):
     return re.fullmatch(r"v[0-9]+\.[0-9]+\.[0-9]+", name) is not None
 
 
-def frozen_build(version=FROZEN_BASELINE):
-    start = perf_counter()
+def frozen_layout(version):
     if not version_candidate(version):
         raise ValueError(f"invalid R1 version: {version}")
     directory = VERSIONS_DIRECTORY / version
@@ -85,6 +84,12 @@ def frozen_build(version=FROZEN_BASELINE):
         raise ValueError(f"no frozen R1 window cost data for {version}")
     if f"v{layout['template_version']}" != version:
         raise ValueError("R1 baseline layout has the wrong version")
+    return directory, layout
+
+
+def frozen_build(version=FROZEN_BASELINE):
+    start = perf_counter()
+    directory, layout = frozen_layout(version)
     lock = read_compiled_template(directory, layout)
     _, program = read_otda_reconstruction(directory, layout["compressed_preimage"])
     pattern = lock.reconstruction(program)
@@ -99,10 +104,33 @@ def frozen_build(version=FROZEN_BASELINE):
     }
 
 
-def scan_proposal(scans):
-    opportunities = [opportunity for scan in scans.values() for opportunity in scan["opportunities"]
-                     if opportunity["id"] == "affine-g" and opportunity["try"]]
-    return max(opportunities, key=lambda item: item["priority"])
+def scan_proposal(scans, seen):
+    opportunities = (opportunity for scan in scans for opportunity in scan["opportunities"]
+                     if opportunity["try"] and opportunity["try"] not in seen)
+    return max(opportunities, key=lambda item: item["priority"], default=None)
+
+
+def guided_candidates(compiler, budget):
+    _, baseline = frozen_layout(FROZEN_BASELINE)
+    construction = baseline["construction"]
+    seeds = tuple(dict.fromkeys((construction, *CALIBRATION)))
+    scans = {name: compiler.scan(compiler.plan(name)) for name in seeds}
+    seen = set(seeds)
+    candidates = [FROZEN_BASELINE]
+    proposal = None
+    lead = scans[construction]
+    while len(candidates) < budget:
+        opportunity = scan_proposal((lead,), seen) or scan_proposal(scans.values(), seen)
+        if opportunity is None:
+            break
+        proposal = proposal or opportunity
+        candidate = opportunity["try"]
+        seen.add(candidate)
+        candidates.append(candidate)
+        lead = compiler.scan(compiler.plan(candidate))
+        scans[candidate] = lead
+    candidates.extend(name for name in CALIBRATION if name != construction)
+    return tuple(candidates), proposal, scans
 
 
 def shortlist(rows, limit):
@@ -126,14 +154,14 @@ def compare(args):
         reference = report["candidates"]
     compiler = R1MSMCompiler(args.source)
     scans = {}
-    if args.workflow == "guided":
-        scans = {name: compiler.scan(compiler.plan(name)) for name in CALIBRATION}
-        proposal = scan_proposal(scans)
-        default_candidates = (CALIBRATION[0], proposal["try"], *CALIBRATION[1:])
-    else:
-        proposal = None
-        default_candidates = (*CALIBRATION, REFERENCE_TRIAL)
-    names = tuple(sorted(dict.fromkeys(args.candidate or default_candidates),
+    proposal = None
+    candidates = args.candidate
+    if not candidates:
+        if args.workflow == "guided":
+            candidates, proposal, scans = guided_candidates(compiler, args.budget)
+        else:
+            candidates = (*CALIBRATION, REFERENCE_TRIAL)
+    names = tuple(sorted(dict.fromkeys(candidates),
                          key=lambda name: not version_candidate(name)))
     prior_builds = {name for name, row in reference.items() if row.get("measured") or row.get("estimated")}
     known = {*CALIBRATION, REFERENCE_TRIAL, *prior_builds, *(name for name in names if version_candidate(name))}
