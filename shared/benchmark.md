@@ -84,3 +84,38 @@ This test mines wallet funding, attempts admission and checks generated blocks
 for each accepted transaction. Each outcome identifies the funding, activation
 or exit phase. It measures local BSV Node behavior for a representative exit
 under each mode. Mainnet and miner policy require their own evidence.
+
+## Optimization regression matrix
+
+Run the matrix from the repository root with the
+[shared Chronicle pin](requirements-chronicle.txt), `ecdsa==0.19.1`,
+`coincurve==21.0.0`, and `cryptography>=43` installed. OpenSSL 3.5 or newer
+is required for the ML-DSA test signer.
+
+```sh
+python -m unittest -v shared.test_optimization_matrix
+bash shared/verify_node.sh -- python -m unittest -v shared.test_optimization_matrix
+```
+
+If an existing installation reports the same package version but lacks
+the Chronicle context API, refresh it with
+`python -m pip install --force-reinstall --no-deps -r shared/requirements-chronicle.txt`.
+
+The first command checks the installed chain-gang engine. The second also checks
+per-input verdicts on BSV Node 1.2.3. For a single project, run
+`python -m shared.test_optimization_matrix <project-directory-name>`.
+
+The payment rows vary input and output counts, transaction versions, sighash
+combinations, and previous-output indices across the benchmark templates. Each
+row checks a signed spend and the expected effect of changing its locktime or
+last output, or dropping one input witness. The 4thGraph rows check every counter build with several starting
+states and fee policies, including rejected successor states and amounts.
+
+The sponsored transaction matrix covers all 12 ForkID and Chronicle OTDA
+sighash combinations for every payment template. It alternates transaction
+versions and uses 252- and 253-byte change scripts to exercise both CompactSize
+widths. Each row checks the original spend, changes to the paired and unpaired
+outputs, an appended input, and a change to the sponsor's sequence. Deferred
+activation must preserve its paired output even with SIGHASH_NONE. The counter
+matrix also spends two successive outputs and rejects replay against the
+original outpoint.
