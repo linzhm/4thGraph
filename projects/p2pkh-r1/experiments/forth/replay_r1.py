@@ -1,4 +1,4 @@
-"""Replay complete baseline and optimized P2PKH-R1 payments on regtest."""
+"""Compare complete P2PKH-R1 payment locks on one regtest node."""
 
 import argparse
 from dataclasses import replace
@@ -6,6 +6,7 @@ from hashlib import sha256
 import json
 import os
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
 from tx_engine import Script, Tx
@@ -43,6 +44,37 @@ def template(source, *, optimize):
     return replace(reference, script=raw, owner_start=len(prefix)), pattern
 
 
+def scrypt_template(binary):
+    # The optional comparison uses the pinned arithmetic fixture from PR #45.
+    try:
+        import compare_scrypt
+    except ModuleNotFoundError as error:
+        if error.name != "compare_scrypt":
+            raise
+        raise ValueError("the sCrypt benchmark checkout must include PR #45") from error
+    from curve_compiler import curve_blocks
+
+    digest = sha256(binary.read_bytes()).hexdigest()
+    if digest != compare_scrypt.COMPILER_SHA256:
+        raise ValueError("expected the pinned Linux x86-64 scryptc 1.20.0 compiler")
+    reference = curve_blocks(scheduled=True)
+    with TemporaryDirectory(prefix="r1-scrypt-") as work:
+        candidate = reference | compare_scrypt.scrypt_kernels(binary.resolve(), Path(work))
+    vectors = compare_scrypt.check_kernels(reference, candidate)
+    lock, copies = compare_scrypt.compare_locks(reference, candidate)
+    prefix, suffix = lock.script[:lock.owner_start], lock.script[lock.owner_end:]
+    program = shared_kernel_program(prefix, suffix, injected=candidate)
+    fixture = Path(compare_scrypt.__file__)
+    metadata = {
+        "compiler_sha256": digest,
+        "fixture_sha256": sha256(fixture.read_bytes()).hexdigest(),
+        "source_sha256": sha256((fixture.parent / "comparison/projective.scrypt").read_bytes()).hexdigest(),
+        "kernel_vectors": vectors,
+        "kernel_copies": copies,
+    }
+    return (lock, Reconstruction(program, (prefix, suffix), (20,))), metadata
+
+
 def spend(deposit, locks, pattern, owners, mode):
     outputs = tuple(Output(400_000, raw) for raw in locks)
     unsigned = Transaction(tuple(Input(deposit.txid_wire(), index) for index in range(2)), outputs, version=2)
@@ -77,7 +109,7 @@ def matrix_check(candidate):
             "valid_witness_controls": 4, "invalid_witness_controls": 24}
 
 
-def compare(source, *, matrix=False):
+def compare(source, *, matrix=False, scryptc=None):
     engine = chain_metadata()
     if engine["commit"] != CONTEXT_PIN:
         raise ValueError("use the pinned Chronicle-aware chain-gang")
@@ -87,7 +119,10 @@ def compare(source, *, matrix=False):
     layouts = {name: template(source, optimize=optimized)
                for name, optimized in (("baseline", False), ("optimized", True))}
     report = {"baseline_version": BASELINE_VERSION, "experiment_version": VERSION,
-              "source_sha256": sha256(source).hexdigest(), "bsv_node_version": node.version, "chain_gang": engine}
+              "source_sha256": sha256(source).hexdigest(), "bsv_node_version": node.version, "chain_gang": engine,
+              "regtest_profile": os.environ["SCRIPT_LAB_REGTEST_PROFILE"]}
+    if scryptc is not None:
+        layouts["scrypt"], report["scrypt"] = scrypt_template(scryptc)
     replay = Replay(node, 7, "chronicle-v2", int(os.environ["SCRIPT_LAB_CHRONICLE_HEIGHT"]))
     bootstrap = replay.fund(len(layouts) * len(MODES))
     report["funding_parent_hex"] = bootstrap.serialize().hex()
@@ -122,9 +157,10 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source", type=Path, default=SOURCE)
     parser.add_argument("--matrix", action="store_true")
+    parser.add_argument("--scryptc", type=Path, help="include the pinned sCrypt arithmetic comparison from PR #45")
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
-    report = compare(args.source.read_bytes(), matrix=args.matrix)
+    report = compare(args.source.read_bytes(), matrix=args.matrix, scryptc=args.scryptc)
     args.output.write_text(json.dumps(report, indent=2) + "\n")
 
 

@@ -9,7 +9,7 @@ from compiler import CompileError, SourceCompiler, evaluate
 from shared.script import OPS, number, push
 from wordsets import script_word
 
-VERSION = "0.1.0-alpha.2"
+VERSION = "0.3.0"
 BASELINE_VERSION = "0.2.0"
 SOURCE = Path(__file__).with_name("r1.fth")
 
@@ -72,6 +72,7 @@ def main():
     lock = compile_source(source, args.owner_hash160, optimize=args.optimize).emit("r1-lock")
     print(json.dumps({
         "experiment_version": VERSION, "baseline_version": BASELINE_VERSION,
+        "lock_version": VERSION if args.optimize else BASELINE_VERSION,
         "source_sha256": sha256(source).hexdigest(), "optimized": args.optimize,
         "lock_bytes": len(lock), "lock_sha256": sha256(lock).hexdigest(), "lock_hex": lock.hex(),
     }, indent=2))
