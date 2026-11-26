@@ -6,8 +6,8 @@ from pathlib import Path
 import random
 import unittest
 
-from fips204 import PUBLIC_KEY_BYTES, _GAMMA2, _use_hint, verification_equation, verify
-from hint_script import apply_hints_script
+from fips204 import PUBLIC_KEY_BYTES, _GAMMA2, _pack, _use_hint, verification_equation, verify
+from hint_script import apply_hints_script, apply_sparse_hints_script
 from mldsa import authorize_digest, test_only_vector as deterministic_test_vector, verify_openssl
 from ntt_script import checked_equation_script, ring_product_script, transform_script, verification_equation_script
 from polynomial import DEGREE, MODULUS, ROOT_OF_UNITY, inverse_ntt, ntt
@@ -89,6 +89,21 @@ class ArithmeticTests(unittest.TestCase):
         self.assertEqual(evaluate(kernel, [rows, hints]), ([expected], []))
         with self.assertRaises(ScriptError):
             evaluate(kernel, [rows, hints[:-1]])
+
+    def test_sparse_hints_patch_shared_groups_and_wrap_high_bits(self):
+        alpha = 2 * _GAMMA2
+        boundary = (0, 43 * alpha + 1, MODULUS - 1, 43 * alpha, _GAMMA2, _GAMMA2 + 1)
+        residues = [boundary[index % len(boundary)] for index in range(4 * DEGREE)]
+        rows = pack(residues)
+        kept = b"caller stack item"
+        full_weight = (*range(70), 254, 255, 256, 257, 510, 511, 512, 513, 1022, 1023)
+        for hints in ((), full_weight):
+            with self.subTest(weight=len(hints)):
+                sparse = b"".join(index.to_bytes(2, "little") for index in hints)
+                expected = _pack([_use_hint(value, index in hints)
+                                  for index, value in enumerate(residues)], 6)
+                self.assertEqual(evaluate(apply_sparse_hints_script(), [kept, rows, sparse]),
+                                 ([kept, expected], []))
 
     def test_fixed_key_verification_equation(self):
         key, witness, expected = equation_fixture()

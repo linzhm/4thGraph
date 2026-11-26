@@ -74,11 +74,14 @@ class SignatureScriptTests(unittest.TestCase):
             ((0, 1, 127, 128, 255), (), (7, 8), (254, 255)),
             ((), tuple(range(80)), (), ()),
         ):
-            with self.subTest(rows=rows):
-                encoded = _hint_encoding(rows)
-                expected = _bitmap(_hints(encoded))
-                code = push(encoded) + hint_decode_script() + push(expected) + asm('OP_EQUAL')
-                self.assertTrue(_context(code).evaluate())
+            encoded = _hint_encoding(rows)
+            bitmap = _bitmap(_hints(encoded))
+            positions = b''.join((row * DEGREE + index).to_bytes(2, 'little')
+                                 for row, indices in enumerate(rows) for index in indices)
+            for sparse, expected in ((False, bitmap), (True, positions)):
+                with self.subTest(rows=rows, sparse=sparse):
+                    code = push(encoded) + hint_decode_script(sparse=sparse) + push(expected) + asm('OP_EQUAL')
+                    self.assertTrue(_context(code).evaluate())
 
     def test_noncanonical_hints(self):
         malformed = (
@@ -89,10 +92,11 @@ class SignatureScriptTests(unittest.TestCase):
             bytes(79) + b'\x80' + bytes(4),
         )
         for encoded in malformed:
-            with self.subTest(encoded=encoded.hex()):
-                self.assertIsNone(_hints(encoded))
-                code = push(encoded) + hint_decode_script() + asm('OP_DROP OP_1')
-                self.assertFalse(_context(code).evaluate(quiet=True))
+            self.assertIsNone(_hints(encoded))
+            for sparse in (False, True):
+                with self.subTest(encoded=encoded.hex(), sparse=sparse):
+                    code = push(encoded) + hint_decode_script(sparse=sparse) + asm('OP_DROP OP_1')
+                    self.assertFalse(_context(code).evaluate(quiet=True))
 
     def test_response_norm_and_signature_length(self):
         response = [0] * (RESPONSE_COUNT * DEGREE)
@@ -100,12 +104,17 @@ class SignatureScriptTests(unittest.TestCase):
         encoded = _pack([GAMMA1 - value for value in response], RESPONSE_BITS)
         code = push(encoded) + response_decode_script() + push(_residues(response)) + asm('OP_EQUAL')
         self.assertTrue(_context(code).evaluate())
+        signed = response_decode_script(signed=True, reuse_constants=True)
+        expected = b''.join((abs(value) | (0x800000 if value < 0 else 0)).to_bytes(3, 'little')
+                            for value in response)
+        self.assertTrue(_context(push(encoded) + signed + push(expected) + asm('OP_EQUAL')).evaluate())
 
         for invalid in (RESPONSE_NORM_LIMIT, -RESPONSE_NORM_LIMIT):
             response[DEGREE] = invalid
             encoded = _pack([GAMMA1 - value for value in response], RESPONSE_BITS)
-            code = push(encoded) + response_decode_script() + asm('OP_DROP OP_1')
-            self.assertFalse(_context(code).evaluate(quiet=True))
+            for decode in (response_decode_script(), signed):
+                code = push(encoded) + decode + asm('OP_DROP OP_1')
+                self.assertFalse(_context(code).evaluate(quiet=True))
 
         for signature in (self.signature[:-1], self.signature + b'\x00'):
             code = push(signature) + signature_decode_script() + asm('OP_2DROP OP_DROP OP_1')

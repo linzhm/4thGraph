@@ -5,7 +5,7 @@ from pathlib import Path
 
 from challenge_script import sample_in_ball_script
 from fips204 import CHALLENGE_BYTES, PUBLIC_KEY_BYTES
-from hint_script import apply_hints_script
+from hint_script import apply_hints_script, apply_sparse_hints_script
 from mldsa import DIGEST_BYTES
 from ntt_script import checked_equation_script, verification_equation_script
 from shake_script import shake256_script
@@ -27,11 +27,12 @@ _PAYMENT_SOURCE = Path(__file__).with_name("payment-lock.fth")
 def verify_message_script(public_key, message_bytes, *, context=b"", legacy=False):
     """Compile a verifier that consumes the message and signature from the stack."""
     challenges = _reconstruct_challenge(public_key, message_bytes, context=context,
-                                        compact=not legacy, optimize=not legacy)
+                                        compact=not legacy, optimize=not legacy, sparse_hints=not legacy)
     return challenges + asm("OP_EQUAL")
 
 
-def _reconstruct_challenge(public_key, message_bytes, *, context=b"", compact, optimize, packed=True):
+def _reconstruct_challenge(public_key, message_bytes, *, context=b"", compact, optimize,
+                           packed=True, sparse_hints=False):
     if not isinstance(public_key, bytes) or len(public_key) != PUBLIC_KEY_BYTES:
         raise ValueError("ML-DSA-44 public key must be 1,312 bytes")
     if not isinstance(context, bytes) or len(context) > 255:
@@ -40,13 +41,14 @@ def _reconstruct_challenge(public_key, message_bytes, *, context=b"", compact, o
         raise ValueError("ML-DSA message length must be a nonnegative integer")
 
     code = bytearray(asm("OP_OVER OP_SIZE") + number(message_bytes) + asm("OP_NUMEQUALVERIFY OP_DROP"))
-    code += signature_decode_script(compact=compact, signed_response=optimize)
+    code += signature_decode_script(compact=compact, signed_response=optimize, sparse_hints=sparse_hints)
     # [message, c_tilde, z, hints] -> [message, c_tilde, c || z].
     code += asm("OP_TOALTSTACK OP_OVER") + sample_in_ball_script(compact=compact, optimize=optimize)
     equation = (checked_equation_script(public_key, packed=packed) if optimize
                 else verification_equation_script(public_key, compact=compact))
     code += asm("OP_SWAP OP_CAT") + equation
-    code += asm("OP_FROMALTSTACK") + apply_hints_script(compact=compact)
+    code += asm("OP_FROMALTSTACK")
+    code += apply_sparse_hints_script() if sparse_hints else apply_hints_script(compact=compact)
 
     # Compute mu from the approved message and append the reconstructed w1.
     prefix = shake_256(public_key).digest(64) + bytes((0, len(context))) + context
@@ -61,7 +63,7 @@ def locking_script(public_key, *, legacy=False):
     """Bind the Pure ML-DSA-44 verifier to the current transaction input."""
     if legacy:
         return _historical_lock(public_key, compact=False)
-    challenges = _reconstruct_challenge(public_key, DIGEST_BYTES, compact=True, optimize=True)
+    challenges = _reconstruct_challenge(public_key, DIGEST_BYTES, compact=True, optimize=True, sparse_hints=True)
     return _compile_payment_lock(challenges)
 
 
@@ -92,9 +94,9 @@ def _historical_lock(public_key, *, compact):
     return code + check_binding(COMPANION_CODE)
 
 
-def _v02_lock(public_key):
-    challenges = _reconstruct_challenge(public_key, DIGEST_BYTES, compact=True, optimize=True, packed=False)
-    # Reproduce the v0.2.0 Forth output even if a future compiler reschedules it.
+def _historical_forth_lock(public_key, *, packed):
+    challenges = _reconstruct_challenge(public_key, DIGEST_BYTES, compact=True, optimize=True, packed=packed)
+    # The v0.2.0 and v0.3.0 Forth locks share this emitted wrapper.
     code = authorization_checks(ORDINARY_CODE, COMPANION_CODE)
     code += asm("OP_SWAP OP_HASH256 OP_DUP OP_ROT")
     return code + challenges + asm("OP_EQUALVERIFY") + check_binding(COMPANION_CODE)
@@ -103,6 +105,7 @@ def _v02_lock(public_key):
 def matches_lock(script, public_key):
     """Match any supported generation of the fixed-key payment template."""
     return (script == locking_script(public_key)
-            or script == _v02_lock(public_key)
+            or script == _historical_forth_lock(public_key, packed=True)
+            or script == _historical_forth_lock(public_key, packed=False)
             or script == _historical_lock(public_key, compact=True)
             or script == _historical_lock(public_key, compact=False))

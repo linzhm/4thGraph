@@ -30,9 +30,9 @@ TEMPLATES = {"pure-ml-dsa-44": Template(coin)}
 
 def components(_samples):
     from challenge_script import sample_in_ball_script
-    from hint_script import apply_hints_script
+    from hint_script import apply_hints_script, apply_sparse_hints_script
     from ntt_script import checked_equation_script, transform_script, verification_equation_script
-    from script import _compile_payment_lock, _historical_lock, _reconstruct_challenge, _v02_lock
+    from script import _compile_payment_lock, _historical_forth_lock, _historical_lock, _reconstruct_challenge
     from shake_script import shake256_script
     from signature_script import signature_decode_script
     from test_mldsa import equation_fixture
@@ -42,10 +42,11 @@ def components(_samples):
     payment_key, _ = test_only_vector(TEST_SEED, bytes(32), openssl=os.environ.get("ML_DSA_OPENSSL", "openssl"))
     previous_challenges = _reconstruct_challenge(payment_key, DIGEST_BYTES, compact=True, optimize=False)
     profiles = (
-        ("legacy", False, False, _historical_lock(payment_key, compact=False)),
-        ("compact", True, False, _historical_lock(payment_key, compact=True)),
-        ("v0.2.0", True, True, _v02_lock(payment_key)),
-        ("optimized", True, True, locking_script(payment_key)),
+        ("legacy", False, False, False, _historical_lock(payment_key, compact=False)),
+        ("compact", True, False, False, _historical_lock(payment_key, compact=True)),
+        ("v0.2.0", True, True, False, _historical_forth_lock(payment_key, packed=False)),
+        ("v0.3.0", True, True, False, _historical_forth_lock(payment_key, packed=True)),
+        ("optimized", True, True, True, locking_script(payment_key)),
     )
     return {
         "arithmetic_script_bytes": {
@@ -63,12 +64,13 @@ def components(_samples):
         "shake256_832_to_32_script_bytes": len(shake256_script(832, 32)),
         "payment_script_bytes": {
             label: {
-                "signature_decode": len(signature_decode_script(compact=compact, signed_response=optimize)),
+                "signature_decode": len(signature_decode_script(
+                    compact=compact, signed_response=optimize, sparse_hints=sparse)),
                 "sample_in_ball": len(sample_in_ball_script(compact=compact, optimize=optimize)),
-                "apply_hints": len(apply_hints_script(compact=compact)),
+                "apply_hints": len(apply_sparse_hints_script() if sparse else apply_hints_script(compact=compact)),
                 "shake256_832_to_32": len(shake256_script(832, 32, compact=compact, optimize=optimize)),
                 "payment_lock": len(lock),
             }
-            for label, compact, optimize, lock in profiles
+            for label, compact, optimize, sparse, lock in profiles
         },
     }
