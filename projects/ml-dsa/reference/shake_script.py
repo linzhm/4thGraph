@@ -1,8 +1,7 @@
 """Fixed-length FIPS 202 SHAKE128 and SHAKE256 bytecode for Bitcoin Script.
 
-The permutation uses byte-vector shifts, XOR, AND and INVERT on eight-byte
-lanes. These are Genesis opcodes, with no dependency on Chronicle's numeric
-shift extensions. Lengths are fixed when the script is generated.
+The permutation uses Genesis byte-vector shifts, XOR, AND and INVERT on
+eight-byte lanes and five-lane rows. Lengths are fixed at generation time.
 """
 
 from functools import cache
@@ -15,7 +14,8 @@ from fourthgraph.bsv.script import asm, number, push
 
 
 _LANE_BYTES = 8
-_STATE_BYTES = 200
+_ROW_BYTES = 5 * _LANE_BYTES
+_STATE_BYTES = 5 * _ROW_BYTES
 _POSITIONS = tuple((x, y) for y in range(5) for x in range(5))
 
 # Indexed by x, then y. FIPS 202 Algorithms 2–7 and Table 2.
@@ -43,6 +43,9 @@ _REVERSE_LANE = (
     asm('OP_1 OP_SPLIT OP_SWAP OP_TOALTSTACK') * (_LANE_BYTES - 1)
     + asm('OP_FROMALTSTACK OP_CAT') * (_LANE_BYTES - 1)
 )
+_PACK_ROW = asm('OP_CAT') * 4
+_SPLIT_ROW = asm('OP_8 OP_SPLIT') * 4
+_UNPACK_ROWS = _SPLIT_ROW + (asm('OP_FROMALTSTACK') + _SPLIT_ROW) * 4
 
 
 def _rotate_left(bits):
@@ -68,6 +71,16 @@ def _rotate_doubled_lane(bits):
         return b''
     # Shifting two copies fills the vacated bits of the first copy.
     return asm('OP_DUP OP_CAT') + number(bits) + asm('OP_LSHIFT OP_8 OP_SPLIT OP_DROP')
+
+
+def _rotate_bytes(offset):
+    return number(offset) + asm('OP_SPLIT OP_SWAP OP_CAT')
+
+
+def _rotate_packed_lane(bits):
+    if bits and bits % 8 == 0:
+        return _rotate_bytes(bits // 8)
+    return _rotate_doubled_lane(bits)
 
 
 class _Round:
@@ -130,17 +143,18 @@ class _Round:
             for x in range(5):
                 self.drop(('c', x))
 
-    def move_and_rotate(self):
+    def move_and_rotate(self, *, theta_done=False):
         uses_left = [5] * 5
         for x, y in _POSITIONS:
             source_x, source_y = _PI_SOURCES[x, y]
             self.roll(('a', source_x, source_y))
-            uses_left[source_x] -= 1
-            self.pick(('d', source_x), last_use=uses_left[source_x] == 0)
-            self.binary('OP_XOR')
+            if not theta_done:
+                uses_left[source_x] -= 1
+                self.pick(('d', source_x), last_use=uses_left[source_x] == 0)
+                self.binary('OP_XOR')
             self.code += self.rotate(_ROTATION[source_x][source_y])
             self.name(('b', x, y))
-        if not self.compact:
+        if not self.compact and not theta_done:
             for x in range(5):
                 self.drop(('d', x))
 
@@ -165,13 +179,16 @@ class _Round:
 
 
 @cache
-def keccak_f1600_script(*, compact=True, optimize=True):
+def keccak_f1600_script(*, compact=True, optimize=True, packed_rows=True):
     """Replace a 200-byte packed Keccak state with the permuted state.
 
     Lanes are packed little-endian in x+5y order. They are reversed before
     rotation because the Script byte-vector shifts treat lanes as big-endian.
     The program preserves items below the state and entries on the altstack.
     """
+    if compact and optimize and packed_rows:
+        return _packed_keccak()
+
     code = bytearray(asm('OP_SIZE') + number(_STATE_BYTES) + asm('OP_NUMEQUALVERIFY'))
     reverse = _reverse_bytes(_LANE_BYTES) if compact and optimize else _REVERSE_LANE
     rotate = _rotate_doubled_lane if compact and optimize else _rotate_left
@@ -189,7 +206,48 @@ def keccak_f1600_script(*, compact=True, optimize=True):
     return bytes(code)
 
 
-def _shake_script(message_bytes, output_bytes, rate, *, compact=True, optimize=True):
+def _packed_theta():
+    # The low-bit mask sits below five rows. XORing rows gives all five
+    # column parities at once. The byte rotations shift the lane indices.
+    code = asm('OP_DUP')
+    for depth in range(2, 6):
+        code += number(depth) + asm('OP_PICK OP_XOR')
+    code += asm('OP_DUP') + _rotate_bytes(_LANE_BYTES)
+    # Mask away the bits crossing lane boundaries, then add the wrap bits.
+    code += asm('OP_DUP OP_1 OP_LSHIFT OP_8 OP_PICK OP_INVERT OP_AND OP_SWAP')
+    code += number(63) + asm('OP_RSHIFT OP_8 OP_PICK OP_AND OP_OR OP_SWAP')
+    code += _rotate_bytes(_ROW_BYTES - _LANE_BYTES) + asm('OP_XOR')
+    # Apply the same correction to all rows and split them for rho and pi.
+    code += asm('OP_SWAP OP_OVER OP_XOR OP_TOALTSTACK') * 4 + asm('OP_XOR')
+    return code + _UNPACK_ROWS
+
+
+def _packed_keccak():
+    code = bytearray(asm('OP_SIZE') + number(_STATE_BYTES) + asm('OP_NUMEQUALVERIFY'))
+    lane_lsb = bytes(_LANE_BYTES - 1) + b'\x01'
+    code += push(lane_lsb * 5) + asm('OP_SWAP')
+    reverse = _reverse_bytes(_LANE_BYTES)
+    split_lane = asm('OP_8 OP_SPLIT OP_SWAP') + reverse + asm('OP_SWAP')
+    code += split_lane * 24 + reverse
+    code += (_PACK_ROW + asm('OP_TOALTSTACK')) * 4 + _PACK_ROW + asm('OP_FROMALTSTACK') * 4
+
+    rho_pi = _Round(compact=True, rotate=_rotate_packed_lane)
+    rho_pi.move_and_rotate(theta_done=True)
+    theta = _packed_theta()
+    # Chi uses the whole row and its rotations by one and two lanes.
+    chi = _PACK_ROW + asm('OP_DUP') + _rotate_bytes(_LANE_BYTES) + asm('OP_INVERT OP_OVER')
+    chi += _rotate_bytes(2 * _LANE_BYTES) + asm('OP_AND OP_XOR')
+    for constant in _ROUND_CONSTANTS:
+        code += theta + rho_pi.code + (chi + asm('OP_TOALTSTACK')) * 4 + chi
+        code += asm('OP_8 OP_SPLIT OP_SWAP') + push(constant.to_bytes(_LANE_BYTES, 'big'))
+        code += asm('OP_XOR OP_SWAP OP_CAT') + asm('OP_FROMALTSTACK') * 4
+
+    code += asm('OP_TOALTSTACK') * 4 + _UNPACK_ROWS
+    concat_lane = asm('OP_SWAP') + reverse + asm('OP_SWAP OP_CAT')
+    return bytes(code) + reverse + concat_lane * 24 + asm('OP_NIP')
+
+
+def _shake_script(message_bytes, output_bytes, rate, *, compact=True, optimize=True, packed_rows=True):
     if type(message_bytes) is not int or message_bytes < 0:
         raise ValueError('message length must be a nonnegative integer')
     if type(output_bytes) is not int or output_bytes < 1:
@@ -203,7 +261,7 @@ def _shake_script(message_bytes, output_bytes, rate, *, compact=True, optimize=T
 
     code = bytearray(asm('OP_SIZE') + number(message_bytes) + asm('OP_NUMEQUALVERIFY'))
     code += push(padding) + asm('OP_CAT') + push(bytes(_STATE_BYTES))
-    permutation = keccak_f1600_script(compact=compact, optimize=optimize)
+    permutation = keccak_f1600_script(compact=compact, optimize=optimize, packed_rows=packed_rows)
     absorb = (
         asm('OP_SWAP') + number(rate) + asm('OP_SPLIT OP_TOALTSTACK')
         + push(bytes(_STATE_BYTES - rate)) + asm('OP_CAT OP_XOR')
@@ -229,6 +287,7 @@ def shake128_script(message_bytes, output_bytes):
     return _shake_script(message_bytes, output_bytes, rate=168)
 
 
-def shake256_script(message_bytes, output_bytes, *, compact=True, optimize=True):
+def shake256_script(message_bytes, output_bytes, *, compact=True, optimize=True, packed_rows=True):
     """Replace a byte vector of the specified length with a SHAKE256 XOF."""
-    return _shake_script(message_bytes, output_bytes, rate=136, compact=compact, optimize=optimize)
+    return _shake_script(message_bytes, output_bytes, rate=136, compact=compact, optimize=optimize,
+                         packed_rows=packed_rows)

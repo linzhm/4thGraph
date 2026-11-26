@@ -73,9 +73,9 @@ BSV Node 1.2.3 (`101020300`), and Lean `bsvs` from revision
 The pinned corpora also matched 15/15 ACVP cases in Python and Script and
 80/80 Wycheproof cases in Python.
 
-The compact lock and the Forth locks from v0.2.0 through v0.4.0 each matched
+The compact lock and the Forth locks from v0.2.0 through v0.5.0 each matched
 all 640 rows with the same chain-gang pin and BSV Node 1.2.3. The isolated node used
 `-maxstdtxvalidationduration=5000` and `-maxnonstdtxvalidationduration=7000`.
-The v0.4.0 suite reproduced all four earlier locks' SHA-256 fingerprints and
+The v0.5.0 suite reproduced all five earlier locks' SHA-256 fingerprints and
 spent each in BIP143 ALL, OTDA ALL and unpaired OTDA SINGLE on both engines.
-[v0.4.0 measurements](../versions/v0.4.0/measurements.json)
+[v0.5.0 measurements](../versions/v0.5.0/measurements.json)

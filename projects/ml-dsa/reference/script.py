@@ -1,5 +1,6 @@
 """Pure ML-DSA-44 Script verifier and BSV payment binding."""
 
+from enum import IntEnum
 from hashlib import shake_256
 from pathlib import Path
 
@@ -24,15 +25,31 @@ COMPANION_CODE = _TAG + asm("OP_IF OP_CHECKSIGVERIFY OP_ELSE OP_CODESEPARATOR") 
 _PAYMENT_SOURCE = Path(__file__).with_name("payment-lock.fth")
 
 
+class _VerifierVersion(IntEnum):
+    ORIGINAL = 0
+    COMPACT = 1
+    V02 = 2
+    V03 = 3
+    V04 = 4
+    V05 = 5
+
+
+def _shake_options(version):
+    return {
+        "compact": version >= _VerifierVersion.COMPACT,
+        "optimize": version >= _VerifierVersion.V02,
+        "packed_rows": version >= _VerifierVersion.V05,
+    }
+
+
 def verify_message_script(public_key, message_bytes, *, context=b"", legacy=False):
     """Compile a verifier that consumes the message and signature from the stack."""
-    challenges = _reconstruct_challenge(public_key, message_bytes, context=context,
-                                        compact=not legacy, optimize=not legacy, sparse_hints=not legacy)
+    version = _VerifierVersion.ORIGINAL if legacy else _VerifierVersion.V05
+    challenges = _reconstruct_challenge(public_key, message_bytes, context=context, version=version)
     return challenges + asm("OP_EQUAL")
 
 
-def _reconstruct_challenge(public_key, message_bytes, *, context=b"", compact, optimize,
-                           packed=True, sparse_hints=False):
+def _reconstruct_challenge(public_key, message_bytes, *, context=b"", version):
     if not isinstance(public_key, bytes) or len(public_key) != PUBLIC_KEY_BYTES:
         raise ValueError("ML-DSA-44 public key must be 1,312 bytes")
     if not isinstance(context, bytes) or len(context) > 255:
@@ -40,12 +57,18 @@ def _reconstruct_challenge(public_key, message_bytes, *, context=b"", compact, o
     if type(message_bytes) is not int or message_bytes < 0:
         raise ValueError("ML-DSA message length must be a nonnegative integer")
 
+    shake = _shake_options(version)
+    compact = shake["compact"]
+    signed = version >= _VerifierVersion.V02
+    sparse_hints = version >= _VerifierVersion.V04
     code = bytearray(asm("OP_OVER OP_SIZE") + number(message_bytes) + asm("OP_NUMEQUALVERIFY OP_DROP"))
-    code += signature_decode_script(compact=compact, signed_response=optimize, sparse_hints=sparse_hints)
+    code += signature_decode_script(compact=compact, signed_response=signed, sparse_hints=sparse_hints)
     # [message, c_tilde, z, hints] -> [message, c_tilde, c || z].
-    code += asm("OP_TOALTSTACK OP_OVER") + sample_in_ball_script(compact=compact, optimize=optimize)
-    equation = (checked_equation_script(public_key, packed=packed) if optimize
-                else verification_equation_script(public_key, compact=compact))
+    code += asm("OP_TOALTSTACK OP_OVER") + sample_in_ball_script(**shake)
+    if signed:
+        equation = checked_equation_script(public_key, packed=version >= _VerifierVersion.V03)
+    else:
+        equation = verification_equation_script(public_key, compact=compact)
     code += asm("OP_SWAP OP_CAT") + equation
     code += asm("OP_FROMALTSTACK")
     code += apply_sparse_hints_script() if sparse_hints else apply_hints_script(compact=compact)
@@ -53,9 +76,9 @@ def _reconstruct_challenge(public_key, message_bytes, *, context=b"", compact, o
     # Compute mu from the approved message and append the reconstructed w1.
     prefix = shake_256(public_key).digest(64) + bytes((0, len(context))) + context
     code += asm("OP_TOALTSTACK OP_TOALTSTACK") + push(prefix) + asm("OP_SWAP OP_CAT")
-    code += shake256_script(len(prefix) + message_bytes, 64, compact=compact, optimize=optimize)
+    code += shake256_script(len(prefix) + message_bytes, 64, **shake)
     code += asm("OP_FROMALTSTACK OP_SWAP OP_FROMALTSTACK OP_CAT")
-    code += shake256_script(64 + 768, CHALLENGE_BYTES, compact=compact, optimize=optimize)
+    code += shake256_script(64 + 768, CHALLENGE_BYTES, **shake)
     return bytes(code)
 
 
@@ -63,8 +86,8 @@ def locking_script(public_key, *, legacy=False):
     """Bind the Pure ML-DSA-44 verifier to the current transaction input."""
     if legacy:
         return _historical_lock(public_key, compact=False)
-    challenges = _reconstruct_challenge(public_key, DIGEST_BYTES, compact=True, optimize=True, sparse_hints=True)
-    return _compile_payment_lock(challenges)
+    challenges = _reconstruct_challenge(public_key, DIGEST_BYTES, version=_VerifierVersion.V05)
+    return _compile_payment_lock(challenges, compact_binding=True)
 
 
 def _runtime_fragment(takes, gives, code):
@@ -74,12 +97,12 @@ def _runtime_fragment(takes, gives, code):
     return Primitive(tuple(takes.split()), tuple(gives.split()), code, run, "Script runtime", may_fail=True)
 
 
-def _compile_payment_lock(challenges):
+def _compile_payment_lock(challenges, *, compact_binding=False):
     vocabulary = {
         "check-authorization": _runtime_fragment(
             "bytes bytes bytes", "bytes bytes", authorization_checks(ORDINARY_CODE, COMPANION_CODE)),
         "reconstruct-challenge": _runtime_fragment("bytes bytes", "bytes bytes", challenges),
-        "bind-input": _runtime_fragment("bytes", "cell", check_binding(COMPANION_CODE)),
+        "bind-input": _runtime_fragment("bytes", "cell", check_binding(COMPANION_CODE, compact=compact_binding)),
     }
     frontend = SourceCompiler(_PAYMENT_SOURCE.read_text(encoding="ascii"), vocabulary=vocabulary,
                               source_path=_PAYMENT_SOURCE)
@@ -87,16 +110,17 @@ def _compile_payment_lock(challenges):
 
 
 def _historical_lock(public_key, *, compact):
-    challenges = _reconstruct_challenge(public_key, DIGEST_BYTES, compact=compact, optimize=False)
+    version = _VerifierVersion.COMPACT if compact else _VerifierVersion.ORIGINAL
+    challenges = _reconstruct_challenge(public_key, DIGEST_BYTES, version=version)
     code = authorization_checks(ORDINARY_CODE, COMPANION_CODE)
     code += asm("OP_SWAP OP_HASH256 OP_DUP OP_TOALTSTACK OP_SWAP")
     code += challenges + asm("OP_EQUAL OP_VERIFY OP_FROMALTSTACK")
     return code + check_binding(COMPANION_CODE)
 
 
-def _historical_forth_lock(public_key, *, packed):
-    challenges = _reconstruct_challenge(public_key, DIGEST_BYTES, compact=True, optimize=True, packed=packed)
-    # The v0.2.0 and v0.3.0 Forth locks share this emitted wrapper.
+def _historical_forth_lock(public_key, *, version):
+    challenges = _reconstruct_challenge(public_key, DIGEST_BYTES, version=version)
+    # The v0.2.0 through v0.4.0 Forth locks share this emitted wrapper.
     code = authorization_checks(ORDINARY_CODE, COMPANION_CODE)
     code += asm("OP_SWAP OP_HASH256 OP_DUP OP_ROT")
     return code + challenges + asm("OP_EQUALVERIFY") + check_binding(COMPANION_CODE)
@@ -105,7 +129,7 @@ def _historical_forth_lock(public_key, *, packed):
 def matches_lock(script, public_key):
     """Match any supported generation of the fixed-key payment template."""
     return (script == locking_script(public_key)
-            or script == _historical_forth_lock(public_key, packed=True)
-            or script == _historical_forth_lock(public_key, packed=False)
+            or any(script == _historical_forth_lock(public_key, version=version)
+                   for version in (_VerifierVersion.V04, _VerifierVersion.V03, _VerifierVersion.V02))
             or script == _historical_lock(public_key, compact=True)
             or script == _historical_lock(public_key, compact=False))

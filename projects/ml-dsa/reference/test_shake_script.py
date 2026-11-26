@@ -32,6 +32,14 @@ class ShakeScriptTests(unittest.TestCase):
         code += push(b'main') + asm('OP_EQUALVERIFY OP_FROMALTSTACK') + push(b'alt') + asm('OP_EQUAL')
         self.assertTrue(Context(script=_engine_script(code), tx_version=1).evaluate())
 
+    def test_packed_rows_match_lane_permutation_across_lane_boundaries(self):
+        edge_bits = b''.join((1 << (63 if lane % 2 else 0)).to_bytes(8, 'little') for lane in range(25))
+        for state in (edge_bits, bytes(range(200))):
+            with self.subTest(state=state.hex()):
+                code = push(state) + asm('OP_DUP') + keccak_f1600_script() + asm('OP_SWAP')
+                code += keccak_f1600_script(packed_rows=False) + asm('OP_EQUAL')
+                self.assertTrue(Context(script=_engine_script(code), tx_version=1).evaluate())
+
     def test_padding_and_squeezing_match_hashlib(self):
         modes = ((shake128_script, shake_128, 168), (shake256_script, shake_256, 136))
         for emitter, oracle, rate in modes:

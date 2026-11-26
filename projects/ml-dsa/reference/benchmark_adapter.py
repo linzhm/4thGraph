@@ -5,6 +5,7 @@ from mldsa import DIGEST_BYTES, test_only_vector
 from payment import sign_spend
 from script import locking_script
 from fourthgraph.benchmark.cases import Coin, Template, seed
+from fourthgraph.bsv.pushtx import check_binding
 from fourthgraph.bsv.transaction import Output
 
 
@@ -32,22 +33,43 @@ def components(_samples):
     from challenge_script import sample_in_ball_script
     from hint_script import apply_hints_script, apply_sparse_hints_script
     from ntt_script import checked_equation_script, transform_script, verification_equation_script
-    from script import _compile_payment_lock, _historical_forth_lock, _historical_lock, _reconstruct_challenge
-    from shake_script import shake256_script
+    from script import (
+        COMPANION_CODE, _VerifierVersion, _compile_payment_lock, _historical_forth_lock,
+        _historical_lock, _reconstruct_challenge, _shake_options,
+    )
+    from shake_script import keccak_f1600_script, shake256_script
     from signature_script import signature_decode_script
     from test_mldsa import equation_fixture
     from test_payment import TEST_SEED
 
     key, _, _ = equation_fixture()
     payment_key, _ = test_only_vector(TEST_SEED, bytes(32), openssl=os.environ.get("ML_DSA_OPENSSL", "openssl"))
-    previous_challenges = _reconstruct_challenge(payment_key, DIGEST_BYTES, compact=True, optimize=False)
+    previous_challenges = _reconstruct_challenge(payment_key, DIGEST_BYTES, version=_VerifierVersion.COMPACT)
     profiles = (
-        ("legacy", False, False, False, _historical_lock(payment_key, compact=False)),
-        ("compact", True, False, False, _historical_lock(payment_key, compact=True)),
-        ("v0.2.0", True, True, False, _historical_forth_lock(payment_key, packed=False)),
-        ("v0.3.0", True, True, False, _historical_forth_lock(payment_key, packed=True)),
-        ("optimized", True, True, True, locking_script(payment_key)),
+        ("legacy", _VerifierVersion.ORIGINAL, _historical_lock(payment_key, compact=False)),
+        ("compact", _VerifierVersion.COMPACT, _historical_lock(payment_key, compact=True)),
+        ("v0.2.0", _VerifierVersion.V02, _historical_forth_lock(payment_key, version=_VerifierVersion.V02)),
+        ("v0.3.0", _VerifierVersion.V03, _historical_forth_lock(payment_key, version=_VerifierVersion.V03)),
+        ("v0.4.0", _VerifierVersion.V04, _historical_forth_lock(payment_key, version=_VerifierVersion.V04)),
+        ("optimized", _VerifierVersion.V05, locking_script(payment_key)),
     )
+    payment_sizes = {}
+    for label, version, lock in profiles:
+        shake = _shake_options(version)
+        compact = shake["compact"]
+        sparse = version >= _VerifierVersion.V04
+        signature = signature_decode_script(compact=compact, signed_response=version >= _VerifierVersion.V02,
+                                            sparse_hints=sparse)
+        hints = apply_sparse_hints_script() if sparse else apply_hints_script(compact=compact)
+        payment_sizes[label] = {
+            "keccak_f1600": len(keccak_f1600_script(**shake)),
+            "signature_decode": len(signature),
+            "sample_in_ball": len(sample_in_ball_script(**shake)),
+            "apply_hints": len(hints),
+            "shake256_832_to_32": len(shake256_script(832, 32, **shake)),
+            "input_binding": len(check_binding(COMPANION_CODE, compact=version >= _VerifierVersion.V05)),
+            "payment_lock": len(lock),
+        }
     return {
         "arithmetic_script_bytes": {
             label: {
@@ -62,15 +84,5 @@ def components(_samples):
         "v02_checked_equation_script_bytes": len(checked_equation_script(key, packed=False)),
         "forth_lock_with_previous_verifier_bytes": len(_compile_payment_lock(previous_challenges)),
         "shake256_832_to_32_script_bytes": len(shake256_script(832, 32)),
-        "payment_script_bytes": {
-            label: {
-                "signature_decode": len(signature_decode_script(
-                    compact=compact, signed_response=optimize, sparse_hints=sparse)),
-                "sample_in_ball": len(sample_in_ball_script(compact=compact, optimize=optimize)),
-                "apply_hints": len(apply_sparse_hints_script() if sparse else apply_hints_script(compact=compact)),
-                "shake256_832_to_32": len(shake256_script(832, 32, compact=compact, optimize=optimize)),
-                "payment_lock": len(lock),
-            }
-            for label, compact, optimize, sparse, lock in profiles
-        },
+        "payment_script_bytes": payment_sizes,
     }

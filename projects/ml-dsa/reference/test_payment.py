@@ -13,7 +13,7 @@ import unittest
 from fips204 import SIGNATURE_BYTES
 from mldsa import test_only_vector as make_test_vector
 from payment import authorization, sign_spend
-from script import _historical_forth_lock, _historical_lock, locking_script
+from script import _VerifierVersion, _historical_forth_lock, _historical_lock, locking_script
 from sdk_adapter import recognize
 from fourthgraph.bsv.chain_gang import validate_at_heights
 from fourthgraph.bsv.transaction import SIGHASH_TYPES, Input, Output, Transaction
@@ -171,10 +171,12 @@ class PaymentTests(unittest.TestCase):
              '3905094cfb41cad09a939cfe8c8264400faf264a6db0cb30851c7dbdefd93295'),
             (_historical_lock(self.public_key, compact=True),
              '899fc5fd435d593e37fe00af3c834d814d57af4abcd63bf632d0e7870c7fc77f'),
-            (_historical_forth_lock(self.public_key, packed=False),
+            (_historical_forth_lock(self.public_key, version=_VerifierVersion.V02),
              'f579d4c51555f5e5b7820250af52c091112827b8ae9daa2c6500b37fa3832a2e'),
-            (_historical_forth_lock(self.public_key, packed=True),
+            (_historical_forth_lock(self.public_key, version=_VerifierVersion.V03),
              '1be9cf198ad5fdb4ac6355ad6826b1eaca4390180f2d5b4d76510db34b2a4a8c'),
+            (_historical_forth_lock(self.public_key, version=_VerifierVersion.V04),
+             '5ce650cd40ac69c56016541b107328ff45e03d1bfbd9053ae499ecf5d9721799'),
         )
         for previous_lock, fingerprint in earlier:
             self.assertEqual(sha256(previous_lock).hexdigest(), fingerprint)
