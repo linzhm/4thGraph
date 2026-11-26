@@ -86,6 +86,27 @@ bsv-effect: branch u32 u32 cell -- u32 ;
             stack, alt = evaluate_script(compile_word(word, "stack").script, list(map(encode_num, args)))
             self.assertEqual((tuple(map(decode_num, stack)), alt), (evaluate(word, *args), []))
 
+    def test_long_helper_chain_uses_source_semantics_in_every_backend(self):
+        source = "bsv-effect: w0 cell -- cell ;\n: w0 1 + ;\n"
+        source += "".join(f"bsv-effect: w{i} cell -- cell ;\n: w{i} w{i - 1} ;\n" for i in range(1, 1200))
+        words = SourceCompiler(source).words
+        self.assertEqual(evaluate(words["w1199"], 6), (7,))
+        for mode in ("baseline", "safe", "stack"):
+            with self.subTest(mode=mode):
+                self.assertEqual(compile_word(words["w1199"], mode), compile_word(words["w0"], mode))
+        with self.assertRaisesRegex(ValueError, "argument is out of range for cell"):
+            evaluate(words["w1199"], CELL_SIGN)
+
+    def test_host_diagnostics_deduplicate_shared_helper_calls(self):
+        sources = ["bsv-effect: query outpoint -- outpoint ;\n: query bsv-lookup-utxo utxo>outpoint ;\n"]
+        previous = "query"
+        for i in range(100):
+            name = f"f{i}"
+            sources.append(f"bsv-effect: {name} outpoint -- outpoint ;\n: {name} {previous} {previous} ;\n")
+            previous = name
+        word = SourceCompiler("".join(sources)).words[previous]
+        self.assertEqual([token.text for token in word.host_uses], ["bsv-lookup-utxo", "utxo>outpoint"])
+
     def test_core_cell_semantics(self):
         source = """
 bsv-effect: sum cell cell -- cell ;
@@ -175,6 +196,44 @@ class ProtocolTests(unittest.TestCase):
         self.assertTrue(chain_verdict(rebound.seal(self.keys.sign), rebound.parents))
         self.assertFalse(chain_verdict(rebound.seal(lambda _request: signature), rebound.parents))
 
+    def test_rejects_invalid_compressed_keys_before_building_outputs(self):
+        for payload in (bytes(32), b"\xff" * 32):
+            with self.subTest(payload=payload), self.assertRaisesRegex(ValueError, "settle requires a valid"):
+                Contracts(self.plan, {**self.keys.public, "settle": b"\x02" + payload}, TASK_ID)
+
+    def test_rejects_inconsistent_inputs_before_calling_a_signer(self):
+        foreign = replace(self.done["deploy"], outputs=(replace(self.contracts.root, script=b"\x51"),))
+        with self.assertRaisesRegex(ValueError, "deployment output does not match"):
+            self.contracts.prepare("split", {"deploy": foreign})
+        with self.assertRaisesRegex(ValueError, "missing bound output deploy:0"):
+            self.contracts.prepare("split", {})
+        stale = replace(self.split, tx=replace(self.split.tx, inputs=(Input(b"\xff" * 32, 0),)))
+        calls = []
+        with self.assertRaisesRegex(ValueError, "input does not match"):
+            stale.seal(calls.append)
+        with self.assertRaisesRegex(ValueError, "must have the same length"):
+            replace(self.split, payload=()).seal(calls.append)
+        with self.assertRaisesRegex(ValueError, "witness fields must be bytes"):
+            replace(self.split, payload=(("not bytes",),)).seal(calls.append)
+        self.assertEqual(calls, [])
+
+    def test_join_checks_bound_slots_same_split_and_result_encoding(self):
+        a = self.contracts.prepare("a", self.done, {"x": 10}).seal(self.keys.sign)
+        b = self.contracts.prepare("b", self.done, {"y": 5}).seal(self.keys.sign)
+        foreign_split = replace(self.split, tx=replace(self.split.tx, locktime=1)).seal(self.keys.sign)
+        foreign_b = self.contracts.prepare("b", {**self.done, "split": foreign_split},
+                                           {"y": 5}).seal(self.keys.sign)
+        with self.assertRaisesRegex(ValueError, "b does not spend its bound split:1"):
+            self.contracts.prepare("route", {**self.done, "a": a, "b": foreign_b})
+        with self.assertRaisesRegex(ValueError, "join results must spend the same split"):
+            self.contracts.prepare("route", {"a": a, "b": foreign_b})
+        with self.assertRaisesRegex(ValueError, "a does not spend its bound split:0"):
+            self.contracts.prepare("route", {"a": b, "b": a})
+        data = replace(b.outputs[1], script=b.outputs[1].script[:-1] + b"\x80")
+        malformed_b = replace(b, outputs=(b.outputs[0], data))
+        with self.assertRaisesRegex(ValueError, "incorrect result data output"):
+            self.contracts.prepare("route", {"a": a, "b": malformed_b})
+
     def test_branch_commitment_and_real_result_outpoints(self):
         for name, data in (("a", {"x": 10}), ("b", {"y": 5})):
             draft = self.contracts.prepare(name, self.done, data)
@@ -216,6 +275,18 @@ class ProtocolTests(unittest.TestCase):
         _, report = compile_candidates(constrained, self.keys.public, TASK_ID, **options)
         self.assertEqual(report["selected"], "split")
         self.assertIn("independent-submit a", report["candidates"]["fused"]["reason"])
+        _, report = compile_candidates(self.plan.program, self.keys.public, TASK_ID,
+                                       **{**options, "mode": "fused", "available_data": iter(("x", "y")),
+                                          "available_authorizers": iter(("alice", "bob"))})
+        self.assertEqual(report["selected"], "fused")
+
+    def test_gate_cost_estimate_works_when_zero_input_would_be_rejected(self):
+        source = GATED_EXAMPLE.read_text().replace("5 cell>u32 u32<", "u32>cell 0 >")
+        contracts = Contracts(schedule(parse(source), "split"), self.keys.public, TASK_ID)
+        done = {"deploy": Transaction((Input(bytes(32), 0),), (contracts.root,))}
+        with self.assertRaisesRegex(ValueError, "gate qualify rejected"):
+            contracts.prepare("split", done, {"z": 0})
+        self.assertEqual(contracts.describe()["estimated_cost"]["assumptions"]["external_u32_values"]["z"], 0)
 
     def test_gated_topology_local_fusion_and_rebinding(self):
         source = GATED_EXAMPLE.read_text()
@@ -232,7 +303,9 @@ class ProtocolTests(unittest.TestCase):
         gate = contracts.prepare("qualify", done, {"z": 2}, version=1)
         done["qualify"] = gate.seal(self.keys.sign)
         self.assertTrue(chain_verdict(done["qualify"], gate.parents))
-        wrong = contracts.prepare("qualify", done, {"z": 5}, version=1)
+        with self.assertRaisesRegex(ValueError, "gate qualify rejected input z"):
+            contracts.prepare("qualify", done, {"z": 5}, version=1)
+        wrong = replace(gate, payload=((encode_num(5),),))
         self.assertFalse(chain_verdict(wrong.seal(self.keys.sign), wrong.parents))
         prior = contracts.prepare("split", done, version=2)
         replacement = replace(gate, tx=replace(gate.tx, locktime=1)).seal(self.keys.sign)

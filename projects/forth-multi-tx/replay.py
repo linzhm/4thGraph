@@ -12,6 +12,7 @@ from shared.benchmark_cases import native_coin, seed
 from shared.benchmark_validation import ACTIVATION_HEIGHT, CONTEXT_PIN, Node, chain_metadata, timed
 from shared.chain_gang import validate_at_heights
 from shared.evaluate import evaluate as evaluate_script
+from shared.script import encode_num
 from shared.transaction import Input, Transaction
 
 from compiler import PROJECT_NAME, PROJECT_VERSION, CompileError, Word, evaluate, parse, schedule
@@ -185,15 +186,21 @@ class Replay:
         return {**self.record(tx, draft.previous), "authorizers": list(draft.template.authorizers)}
 
     def false_gate(self, contracts, name, done, data, version):
-        gate = contracts.plan.program.gate
-        draft = contracts.prepare(name, done, {**data, gate.input: (1 << 32) - 1}, version=version)
-        return self.record(self.sign(draft), draft.previous, expected=False)
+        draft = contracts.prepare(name, done, data, version=version)
+        fields, = draft.payload
+        invalid = replace(draft, payload=((*fields[:-1], encode_num((1 << 32) - 1)),))
+        return self.record(self.sign(invalid), invalid.previous, expected=False)
 
-    def controls(self, contracts, done, join, foreign_result):
+    def controls(self, contracts, join, foreign_result):
         one = replace(join, tx=replace(join.tx, inputs=join.tx.inputs[:1]), previous=join.previous[:1],
                       payload=join.payload[:1])
         missing_input = self.record(self.sign(one), one.previous, expected=False)
-        bad_origin = contracts.prepare(join.template.name, {**done, contracts.plan.program.work[1].name: foreign_result})
+        # Build the intentionally invalid transaction outside the normal binding API.
+        foreign = UTXO(foreign_result, 0)
+        foreign_input = replace(join.tx.inputs[1], txid=foreign.outpoint.txid)
+        fields = contracts.join_payload((join.previous[0].parent, foreign.parent))
+        bad_origin = replace(join, tx=replace(join.tx, inputs=(join.tx.inputs[0], foreign_input)),
+                             previous=(join.previous[0], foreign), payload=(fields, fields))
         wrong_split = self.record(self.sign(bad_origin), bad_origin.previous, expected=False)
         wrong_output, = (item for item in contracts.terminals if item != join.tx.outputs[0])
         bad_route = replace(join, tx=replace(join.tx, outputs=(wrong_output,)))
@@ -242,7 +249,7 @@ class Replay:
             records[right.name] = {**self.record(done[right.name], right_draft.previous),
                                    "authorizers": list(right_draft.template.authorizers)}
             if foreign:
-                controls.update(self.controls(c, done, join, foreign))
+                controls.update(self.controls(c, join, foreign))
             records[join.template.name] = self.record(self.sign(join), join.previous)
             split = done["split"]
             split_draft = c.prepare("split", done, data, version=split.version)

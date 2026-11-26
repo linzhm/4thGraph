@@ -8,7 +8,7 @@ from shared.script import asm
 
 from wordsets import (
     BSV_SOURCE, CORE_EXT_SCRIPT, CORE_EXT_WORDS, CORE_WORDS, HOST_WORDS, NAMED_LITERALS,
-    OPTIONAL_WORDSETS, PRIMITIVES, SHUFFLES, TYPES, WRAP_U32, Literal, Primitive, cell_literal,
+    NUMERIC_RANGES, OPTIONAL_WORDSETS, PRIMITIVES, SHUFFLES, TYPES, WRAP_U32, Literal, Primitive, cell_literal,
 )
 
 PROJECT_NAME = "4thGraph"
@@ -172,7 +172,7 @@ def unavailable(token, *, enabled):
 
 def body(tokens, stack, words, opener):
     instructions = []
-    host_uses = []
+    host_uses = {}
     for token in tokens:
         name = token.name
         if name in {"else", "then", ";"}:
@@ -187,7 +187,7 @@ def body(tokens, stack, words, opener):
             if stop.name != "then" or stack != other:
                 raise token.error("IF must end in THEN and leave equal stack types on both branches")
             instructions.append(Located(Conditional(yes, no), token))
-            host_uses.extend((*yes_host, *no_host))
+            host_uses.update(dict.fromkeys((*yes_host, *no_host)))
             continue
         if name in CORE_EXT_SCRIPT and "core-ext" not in tokens.wordsets and name not in words:
             raise unavailable(token, enabled=tokens.wordsets)
@@ -205,9 +205,9 @@ def body(tokens, stack, words, opener):
         else:
             transform(stack, instruction.takes, instruction.gives, token)
             if isinstance(instruction, Word):
-                host_uses.extend(instruction.host_uses)
+                host_uses.update(dict.fromkeys(instruction.host_uses))
             elif instruction.location == "host":
-                host_uses.append(token)
+                host_uses[token] = None
         instructions.append(Located(instruction, token))
     raise opener.error(f"unterminated {opener.text!r}")
 
@@ -265,7 +265,10 @@ class SourceCompiler:
         self.operator = None
         self.independent = []
         for token in self.tokens:
-            self.declaration(token)
+            try:
+                self.declaration(token)
+            except RecursionError as error:
+                raise token.error("conditional nesting exceeds the compiler's recursion limit") from error
         if self.effects:
             at, _, _ = next(iter(self.effects.values()))
             raise at.error(f"stack effect for {at.text!r} has no following definition")
@@ -439,53 +442,67 @@ def schedule(program, mode="auto", *, available_data=None, available_authorizers
 
 
 def evaluate(word, *values, context=None):
-    stack = list(values)
-
-    def run(instructions):
-        for instruction in instructions:
-            if isinstance(instruction, Located):
-                instruction = instruction.instruction
-            if isinstance(instruction, Word):
-                run(instruction.body)
-            elif isinstance(instruction, Literal):
-                stack.append(instruction.value)
-            elif isinstance(instruction, Conditional):
-                run(instruction.yes if stack.pop() else instruction.no)
-            elif isinstance(instruction, Shuffle):
-                count, order, _ = SHUFFLES[instruction.name]
-                entries = stack[-count:]
-                stack[-count:] = [entries[i] for i in order]
-            else:
-                start = len(stack) - len(instruction.takes)
-                args = stack[start:]
-                if instruction.location == "host":
-                    args = [context, *args]
-                stack[start:] = instruction.run(*args)
-
     if len(values) != len(word.takes):
         raise ValueError("incorrect argument count for Forth word")
-    run(word.body)
+    for kind, value in zip(word.takes, values, strict=True):
+        bounds = NUMERIC_RANGES.get(kind)
+        if bounds is not None and (type(value) is not int or not bounds[0] <= value <= bounds[1]):
+            raise ValueError(f"argument is out of range for {kind}")
+        if kind == "bytes" and not isinstance(value, bytes):
+            raise ValueError("expected a bytes argument")
+    stack = list(values)
+    frames = [expanded(word.body)]
+    while frames:
+        entry = next(frames[-1], None)
+        if entry is None:
+            frames.pop()
+            continue
+        instruction, _ = entry
+        if isinstance(instruction, Literal):
+            stack.append(instruction.value)
+        elif isinstance(instruction, Conditional):
+            frames.append(expanded(instruction.yes if stack.pop() else instruction.no))
+        elif isinstance(instruction, Shuffle):
+            count, order, _ = SHUFFLES[instruction.name]
+            entries = stack[-count:]
+            stack[-count:] = [entries[i] for i in order]
+        else:
+            start = len(stack) - len(instruction.takes)
+            args = stack[start:]
+            if instruction.location == "host":
+                args = [context, *args]
+            stack[start:] = instruction.run(*args)
     return tuple(stack)
 
 
-def inline(instructions):
-    for instruction in instructions:
-        if isinstance(instruction, Located):
-            instruction = instruction.instruction
-        if isinstance(instruction, Word):
-            yield from inline(instruction.body)
+def expanded(instructions):
+    frames = [iter(instructions)]
+    while frames:
+        entry = next(frames[-1], None)
+        if entry is None:
+            frames.pop()
+            continue
+        if isinstance(entry, Located):
+            instruction, source = entry.instruction, entry.source
         else:
-            yield instruction
+            instruction, source = entry, None
+        if isinstance(instruction, Word):
+            frames.append(iter(instruction.body))
+        else:
+            yield instruction, source
 
 
 def lower(word):
     require_script(word)
-    return lower_body(word.body)
+    try:
+        return lower_body(word.body)
+    except RecursionError as error:
+        raise CompileError("expanded conditional nesting exceeds the compiler's recursion limit") from error
 
 
 def lower_body(instructions):
     folded = []
-    for instruction in inline(instructions):
+    for instruction, _ in expanded(instructions):
         if isinstance(instruction, Primitive):
             count = len(instruction.takes)
             args = folded[-count:]

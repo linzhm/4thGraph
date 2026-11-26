@@ -4,13 +4,12 @@ from dataclasses import asdict, dataclass, replace
 
 from shared.script import asm
 
-from compiler import Conditional, Located, Shuffle, Token, Word, lower, require_script
+from compiler import CompileError, Conditional, Shuffle, Token, expanded, lower, require_script
 from stack_schedule import Graph
-from wordsets import CELL_SIGN, PRIMITIVES, SHUFFLES, U32, WRAP_CELL, WRAP_U32, Literal
+from wordsets import NUMERIC_RANGES, PRIMITIVES, SHUFFLES, U32, WRAP_CELL, WRAP_U32, Literal
 
 BASELINE = "baseline"
 OPTIMIZATIONS = (BASELINE, "safe", "stack")
-NUMERIC_RANGES = {"cell": (-CELL_SIGN, CELL_SIGN - 1), "u32": (0, U32 - 1), "route": (0, 1)}
 
 
 @dataclass(frozen=True)
@@ -64,15 +63,6 @@ class CompiledWord:
 
     def describe(self):
         return {"script_bytes": len(self.script), "rewrites": [asdict(rewrite) for rewrite in self.rewrites]}
-
-
-def expanded(body):
-    for entry in body:
-        node = entry.instruction if isinstance(entry, Located) else entry
-        if isinstance(node, Word):
-            yield from expanded(node.body)
-        else:
-            yield node, entry.source if isinstance(entry, Located) else None
 
 
 def raw_interval(name, args):
@@ -228,6 +218,9 @@ def compile_word(word, optimization=BASELINE):
     if optimization == BASELINE:
         return CompiledWord(lower(word))
     rewrites = []
-    operations = build_block(word.body, [Slot.of(kind) for kind in word.takes], rewrites,
-                             schedule=optimization == "stack")
+    try:
+        operations = build_block(word.body, [Slot.of(kind) for kind in word.takes], rewrites,
+                                 schedule=optimization == "stack")
+    except RecursionError as error:
+        raise CompileError("expanded conditional nesting exceeds the compiler's recursion limit") from error
     return CompiledWord(emit(operations), operations, tuple(rewrites))

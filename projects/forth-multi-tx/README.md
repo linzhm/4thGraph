@@ -41,7 +41,7 @@ PYTHONPATH=. bash shared/verify_node.sh --profile default -- \
 
 复放 JSON 保存源码、两套脚本和符号模板、每笔交易的原始字节与真实 outpoint、每个输入的 BSV Node 脚本判定、Node 入池及挖块结果，以及 chain-gang 的整笔交易判定。启动时使用钱包矿工奖励建立共享资金夹具。报告从各路径自己的部署交易开始计量。
 
-可用复放报告里的测试公钥离线编译。换用自己的公钥时，`keys.json` 的格式为角色名到压缩 secp256k1 公钥十六进制字符串的映射。
+可用复放报告里的测试公钥离线编译。换用自己的公钥时，`keys.json` 的格式为角色名到压缩 secp256k1 公钥十六进制字符串的映射。编译会验证每个必需角色的公钥确实对应曲线上的点。
 
 ```sh
 jq '.fixture_public_keys' projects/forth-multi-tx/build/replay.json > projects/forth-multi-tx/build/fixture-keys.json
@@ -57,7 +57,7 @@ PYTHONPATH=. python projects/forth-multi-tx/protocol.py --capabilities
 - `bsv-effect: name cell -- cell ;` 声明静态栈效果。 `: name ( optional comment ) 1 + ;` 按 Forth 语义定义词。通过 `bsv-use core-ext` 启用受支持的 Core Extension 词。构建会报告无法编译到 Script 的用法及源码位置。
 - `work: a x double alice` 将输入、计算和签名角色连到工作步骤。 `join: route a b decide` 按指定顺序声明汇合依赖。 `split-authority: operator` 声明启动拆分的签名角色。当前调度器识别一对并行分支和一个汇合。选择交易边界后，后端再内联、折叠字面量和选择 Script 指令。
 - 词库声明执行位置和验证依据。Script 词由链上执行。宿主词通过 `Host` 的注入接口查询 UTXO、请求签名和提交交易，并可从 UTXO 取得脚本和 outpoint。测试签名器使用公开可复现的私钥，仅供 regtest。
-- `Contracts.prepare` 把符号引用如 `split:0` 解析为已封装父交易的真实 outpoint。 `Draft.signing_requests` 给外部签名器提供角色、前输出、待签交易、见证输入及 ForkID ALL 摘要。 `Draft.seal` 装配签名和当前交易原像。父 txid 改变时，`invalidated` 沿依赖图列出需重新绑定的交易和需更新的授权。拆分 txid 改变会让 Alice 与 Bob 重新签名，汇合也要重建见证。
+- `Contracts.prepare` 把符号引用如 `split:0` 解析为已封装父交易的真实 outpoint，核对前输出、已提供的父交易关系，以及汇合结果的槽位、同次拆分来源和编码。含门条件的步骤会先在宿主检查条件。 `Draft.signing_requests` 给外部签名器提供角色、前输出、待签交易、见证输入及 ForkID ALL 摘要。 `Draft.seal` 校验草稿绑定并装配签名和当前交易原像。实际可花费性仍由 UTXO 集和链上脚本验证。父 txid 改变时，`invalidated` 沿依赖图列出需重新绑定的交易和需更新的授权。
 
 ## 交易与验证
 

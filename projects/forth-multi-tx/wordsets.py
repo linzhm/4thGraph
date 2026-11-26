@@ -12,6 +12,7 @@ CELL_MODULUS = 1 << CELL_BITS
 CELL_SIGN = CELL_MODULUS // 2
 U32 = 1 << 32
 TYPES = {"cell", "u32", "route", "bytes", "script", "transaction", "outpoint", "utxo", "request"}
+NUMERIC_RANGES = {"cell": (-CELL_SIGN, CELL_SIGN - 1), "u32": (0, U32 - 1), "route": (0, 1)}
 
 
 def push_value(value):

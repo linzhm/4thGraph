@@ -1,14 +1,15 @@
 """ForkID transaction templates and covenants for the two-branch program."""
 
 import argparse
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import asdict, dataclass
 from hashlib import sha256
 import json
 from pathlib import Path
+from types import MappingProxyType
 
 from shared.pushtx import PUBLIC, binding_der
-from shared.script import asm, decode_num, encode_num, number, push
+from shared.script import asm, encode_num, number, push
 from shared.transaction import FORKID, SIGHASH_ALL, Input, Output, Transaction, hash256, preimage_forkid
 
 from compiler import (
@@ -31,6 +32,20 @@ PREVOUTS_HASH = 4
 CURRENT_OUTPOINT = 68
 OUTPUTS_HASH = 118
 JOIN_WITNESSES = ("full", "shared")
+SECP256K1_FIELD = (1 << 256) - (1 << 32) - 977
+
+
+def is_compressed_public_key(encoded):
+    if not isinstance(encoded, bytes) or len(encoded) != 33 or encoded[0] not in (2, 3):
+        return False
+    x = int.from_bytes(encoded[1:], "big")
+    if x >= SECP256K1_FIELD:
+        return False
+    # A nonzero quadratic residue has one root of each parity.
+    square = (pow(x, 3, SECP256K1_FIELD) + 7) % SECP256K1_FIELD
+    if square == 0:
+        return encoded[0] == 2
+    return pow(square, (SECP256K1_FIELD - 1) // 2, SECP256K1_FIELD) == 1
 
 
 def field(offset, width):
@@ -182,15 +197,26 @@ class Draft:
     tx: Transaction
     previous: tuple[UTXO, ...]
     payload: tuple[tuple[bytes, ...], ...]
-    keys: dict[str, bytes]
+    keys: Mapping[str, bytes]
 
     @property
     def parents(self):
         return tuple(utxo.parent for utxo in self.previous)
 
     def signing_requests(self):
+        if len(self.tx.inputs) != len(self.previous) or len(self.previous) != len(self.payload):
+            raise ValueError("draft inputs, previous outputs and witnesses must have the same length")
+        for txin, utxo, fields in zip(self.tx.inputs, self.previous, self.payload, strict=True):
+            if not 0 <= utxo.vout < len(utxo.parent.outputs):
+                raise ValueError("draft previous output index is out of range")
+            if (txin.txid, txin.vout) != (utxo.outpoint.txid, utxo.vout):
+                raise ValueError("draft input does not match its bound previous output")
+            if any(not isinstance(value, bytes) for value in fields):
+                raise ValueError("draft witness fields must be bytes")
         if not self.template.authorizers:
             return ()
+        if len(self.previous) != 1:
+            raise ValueError("an authorized draft must have exactly one input")
         utxo = self.previous[0]
         digest = hash256(preimage_forkid(self.tx, 0, utxo.output.value, utxo.output.script, FLAG))
         return tuple(SignRequest(self.template.name, utxo.outpoint, owner, self.keys[owner], FLAG, digest,
@@ -199,10 +225,12 @@ class Draft:
 
     def seal(self, sign: Callable[[SignRequest], bytes]):
         # The external callback returns DER. Append the required sighash in the runner.
-        signatures = tuple(sign(request) + bytes([request.sighash]) for request in self.signing_requests())
+        requests = self.signing_requests()
+        preimages = tuple(preimage_forkid(self.tx, i, utxo.output.value, BINDING_CODE, FLAG)
+                          for i, utxo in enumerate(self.previous))
+        signatures = tuple(sign(request) + bytes([request.sighash]) for request in requests)
         tx = self.tx
-        for i, (utxo, fields) in enumerate(zip(self.previous, self.payload, strict=True)):
-            preimage = preimage_forkid(self.tx, i, utxo.output.value, BINDING_CODE, FLAG)
+        for i, (fields, preimage) in enumerate(zip(self.payload, preimages, strict=True)):
             if i == 0:
                 fields = (*fields, *reversed(signatures))
             tx = tx.with_script(i, b"".join(push_value(value) for value in (*fields, preimage)))
@@ -249,13 +277,15 @@ class Contracts:
         self.join_witness = join_witness
         self.versions, self.era = TARGETS[target]
         self.version = self.versions[-1]
-        if len(task_id) != 32:
+        if not isinstance(task_id, bytes) or len(task_id) != 32:
             raise ValueError("task id must be 32 bytes")
         required = {name for step in plan.templates for name in step.authorizers} | {"settle", "review"}
-        if any(name not in keys or len(keys[name]) != 33 or keys[name][0] not in (2, 3) for name in required):
-            raise ValueError("each required role needs a compressed secp256k1 public key")
+        keys = dict(keys)
+        for name in sorted(required):
+            if not is_compressed_public_key(keys.get(name)):
+                raise ValueError(f"{name} requires a valid compressed secp256k1 public key")
         self.plan = plan
-        self.keys = dict(keys)
+        self.keys = MappingProxyType(keys)
         self.terminals = tuple(Output(TERMINAL_VALUE, p2pk(keys[name])) for name in ("review", "settle"))
         if self.terminals[0] == self.terminals[1]:
             raise ValueError("settle and review require distinct terminal scripts")
@@ -335,17 +365,23 @@ class Contracts:
         return spec
 
     def result_output(self, split):
-        return Output(RESULT_VALUE, push(split.txid_wire()) + self.join_code)
+        return self.result_output_for(split.txid_wire())
+
+    def result_output_for(self, split_txid):
+        return Output(RESULT_VALUE, push(split_txid) + self.join_code)
 
     def data_output(self, value):
         encoded = encode_num(value).ljust(RESULT_WIDTH, b"\0")
         return Output(0, self.data_script_prefix + encoded)
 
     def result_value(self, parent):
+        if len(parent.outputs) != 2:
+            raise ValueError("result transaction must have two outputs")
         encoded = parent.outputs[1].serialize()
-        if len(encoded) != len(self.data_prefix) + RESULT_WIDTH or not encoded.startswith(self.data_prefix):
+        if (len(encoded) != len(self.data_prefix) + RESULT_WIDTH
+                or not encoded.startswith(self.data_prefix) or encoded[-1] != 0):
             raise ValueError("incorrect result data output")
-        return decode_num(encoded[-RESULT_WIDTH:])
+        return int.from_bytes(encoded[-RESULT_WIDTH:-1], "little")
 
     def join_payload(self, parents):
         if self.join_witness == "full":
@@ -359,18 +395,55 @@ class Contracts:
             fields.extend((raw[:end - len(self.join_code)], raw[end:]))
         return (*fields, self.join_code)
 
+    def bound_input(self, reference, completed):
+        parent = completed.get(reference.step)
+        if not isinstance(parent, Transaction) or not 0 <= reference.vout < len(parent.outputs):
+            raise ValueError(f"missing bound output {reference.step}:{reference.vout}")
+        utxo = UTXO(parent, reference.vout)
+        if reference.step == "deploy":
+            if utxo.output != self.root:
+                raise ValueError("deployment output does not match this contract")
+            return utxo
+        template = self.templates[reference.step]
+        if parent.version not in self.versions or len(parent.inputs) != len(template.inputs):
+            raise ValueError(f"{reference.step} has an unexpected version or input count")
+        for txin, dependency in zip(parent.inputs, template.inputs, strict=True):
+            ancestor = completed.get(dependency.step)
+            if (txin.vout != dependency.vout or dependency.step in completed
+                    and (not isinstance(ancestor, Transaction) or txin.txid != ancestor.txid_wire())):
+                raise ValueError(f"{reference.step} does not spend its bound {dependency.step}:{dependency.vout}")
+        if template.outputs == ("split-lock",):
+            expected = (self.fork_output,)
+        elif template.outputs == ("work", "work"):
+            expected = self.work_outputs
+        elif template.outputs == ("result", "data"):
+            expected = (self.result_output_for(parent.inputs[0].txid), self.data_output(self.result_value(parent)))
+        else:
+            raise ValueError(f"{reference.step} cannot be used as a parent of another contract step")
+        if parent.outputs != expected:
+            raise ValueError(f"{reference.step} outputs do not match this contract")
+        return utxo
+
     def prepare(self, name, completed, data=None, *, version=None):
+        return self._prepare(name, completed, data, version=version)
+
+    def _prepare(self, name, completed, data, *, version=None, estimate=False):
         version = self.version if version is None else version
         if type(version) is not int or version not in self.versions:
             raise ValueError(f"transaction version {version} is unavailable for target {self.target}")
         template = self.templates[name]
-        previous = tuple(UTXO(completed[ref.step], ref.vout) for ref in template.inputs)
+        previous = tuple(self.bound_input(ref, completed) for ref in template.inputs)
         inputs = tuple(Input(utxo.outpoint.txid, utxo.outpoint.vout) for utxo in previous)
         a, b = self.plan.program.work
         gate = self.plan.program.gate
         gate_payload = ()
         if gate is not None and gate.name in template.executes:
-            gate_payload = (encode_num(input_value(data, gate.input)),)
+            value = input_value(data, gate.input)
+            if not estimate:
+                accepted, = evaluate(gate.word, value)
+                if not accepted:
+                    raise ValueError(f"gate {gate.name} rejected input {gate.input}")
+            gate_payload = (encode_num(value),)
         if name == "fused":
             x, y = input_value(data, a.input), input_value(data, b.input)
             result_a, = evaluate(a.word, x)
@@ -383,6 +456,8 @@ class Contracts:
             outputs, payload = (self.fork_output,), (gate_payload,)
         elif name == self.plan.program.join_name:
             parents = tuple(utxo.parent for utxo in previous)
+            if parents[0].inputs[0].txid != parents[1].inputs[0].txid:
+                raise ValueError("join results must spend the same split transaction")
             route, = evaluate(self.plan.program.join, *(self.result_value(parent) for parent in parents))
             outputs, payload = (self.terminals[route],), (self.join_payload(parents),) * 2
         else:
@@ -418,7 +493,7 @@ def estimate_cost(contracts):
     if program.gate is not None:
         data[program.gate.input] = 0
     for step in contracts.plan.templates:
-        draft = contracts.prepare(step.name, done, data)
+        draft = contracts._prepare(step.name, done, data, estimate=True)
         tx = draft.seal(lambda _: fake_der)
         done[step.name] = tx
         depths[step.name] = 1 + max(depths[ref.step] for ref in step.inputs)
@@ -446,6 +521,8 @@ def estimate_cost(contracts):
 
 
 def compile_candidates(program, keys, task_id, *, mode, available_data, available_authorizers, **options):
+    available_data = None if available_data is None else frozenset(available_data)
+    available_authorizers = None if available_authorizers is None else frozenset(available_authorizers)
     if mode != "auto":
         schedule(program, mode, available_data=available_data, available_authorizers=available_authorizers)
     viable, evidence = {}, {}
@@ -509,7 +586,10 @@ def main():
                       "enabled_optional_wordsets": source.optional_wordsets, "optimization": args.optimize,
                       "script_hex": compiled.script.hex(), **compiled.describe()}
         else:
-            keys = {name: bytes.fromhex(key) for name, key in json.loads(args.keys.read_text()).items()}
+            raw_keys = json.loads(args.keys.read_text())
+            if not isinstance(raw_keys, dict) or any(not isinstance(key, str) for key in raw_keys.values()):
+                raise ValueError("keys must be a JSON object mapping roles to public key hex strings")
+            keys = {name: bytes.fromhex(key) for name, key in raw_keys.items()}
             contract, explanation = compile_candidates(
                 source.program(), keys, bytes.fromhex(args.task_id), mode=args.mode, available_data=args.available_data,
                 available_authorizers=args.available_authorizers, target=args.target, optimization=args.optimize,
