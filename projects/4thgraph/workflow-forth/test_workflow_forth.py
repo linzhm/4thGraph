@@ -116,6 +116,11 @@ class ForthWorkflowTests(unittest.TestCase):
         self.assertEqual(selected["output_selection"], {"kind": "range", "count": [2, 2], "index_range": [1, 2]})
         self.assertEqual(selected["verification_policy"], "groth16-required")
 
+    def test_workflow_library_preserves_the_callers_number_base(self):
+        include = f"REQUIRE {HERE / 'workflow.fth'}"
+        net = self.load_variant(**{include: f"HEX {include}\nBASE @ #16 <> [IF] -1 THROW [THEN] DECIMAL"})
+        self.assertEqual(net.describe(), load_plan(COUNTER).describe())
+
     def test_unimplemented_stage_requirements_prevent_lock_generation(self):
         for updated, message in (
             ({"bob forkid-context direct-script stage: settle": "bob forkid-context proof-required stage: settle"},
@@ -202,6 +207,26 @@ class ForthWorkflowTests(unittest.TestCase):
         net = self.load_variant(**{f"REQUIRE {RULES}": f"32 CONSTANT 20\nREQUIRE {RULES}"})
         with self.assertRaisesRegex(CompileError, "literal '20': Gforth compiled no single-cell literal"):
             lower_serial(net, RULES, TestKeys().public, 19)
+
+    def test_rules_bind_the_shared_route_and_arithmetic_primitives(self):
+        for definition, name in (("1 CONSTANT route-review", "route-review"), (": u32+ - cell>u32 ;", "u32+")):
+            with self.subTest(name=name):
+                net = self.load_variant(**{f"REQUIRE {RULES}": f"{definition}\nREQUIRE {RULES}"})
+                with self.assertRaisesRegex(CompileError, "different primitive") as failure:
+                    lower_serial(net, RULES, TestKeys().public, 19)
+                self.assertIn(repr(name), str(failure.exception))
+
+    def test_user_word_must_compile_a_call(self):
+        with TemporaryDirectory() as temp:
+            folder = Path(temp)
+            (folder / "identity.fth").write_text(": identity ( u32 -- u32 ) ;\n")
+            rules = folder / "rules.fth"
+            rules.write_text("REQUIRE identity.fth\n" + RULES.read_text().replace("1 cell>u32", "identity 1 cell>u32"))
+            workflow = folder / "counter.fth"
+            workflow.write_text(COUNTER.read_text().replace("REQUIRE workflow.fth", f"REQUIRE {HERE / 'workflow.fth'}")
+                                .replace("REQUIRE counter-rules.fth", "REQUIRE identity.fth\nIMMEDIATE\nREQUIRE rules.fth"))
+            with self.assertRaisesRegex(CompileError, "Gforth executes 'identity' at compile time"):
+                lower_serial(load_plan(workflow), rules, TestKeys().public, 19)
 
     def test_forth_plan_reproduces_serial_locks_and_validates_real_input_scripts(self):
         keys = TestKeys()

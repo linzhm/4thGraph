@@ -16,7 +16,7 @@ from shared.transaction import (
     ANYONECANPAY, CHRONICLE, SIGHASH_NONE, SIGHASH_SINGLE, SIGHASH_TYPES,
 )
 from protocol import TARGETS
-from wordsets import Literal, cell_literal
+from wordsets import CORE_EXT_SCRIPT, CORE_SCRIPT, NAMED_LITERALS, Literal, cell_literal
 from workflow_contract import WorkflowContracts
 
 
@@ -26,6 +26,10 @@ AMOUNTS = ("none", "signed", "parent")
 SERIAL_MODES = {(0x41,): "forkid", (0x61,): "chronicle", (0x41, 0x61): "both"}
 SYMBOL = re.compile(r"[a-z][a-z0-9_-]*")
 U32_LIMIT = 1 << 32
+RULE_SYNTAX = {"if", "else", "then", ";", "(", "\\"}
+RULE_BUILTINS = CORE_SCRIPT | CORE_EXT_SCRIPT | NAMED_LITERALS.keys() | RULE_SYNTAX | {
+    "cell>u32", "u32>cell", "u32+", "u32<",
+}
 
 
 def field(row):
@@ -253,6 +257,8 @@ class SourceTrace:
         self.lines = defaultdict(dict)
         self.definitions = {}
         self.calls = {}
+        self.builtins = {}
+        self.changed_syntax = {}
         self.literals = {}
         self.bindings = {}
 
@@ -274,14 +280,24 @@ class SourceTrace:
                 line = bytes.fromhex("".join(content))
                 if self.lines[path].setdefault(int(number), line) != line:
                     raise CompileError(f"source changed during Forth execution: {path}")
-            elif tag in ("definition", "call", "literal"):
+            elif tag == "builtin":
+                target, compiled, name = fields
+                self.builtins[name] = (int(target), bool(int(compiled)))
+            elif tag == "call":
+                caller, target, compiled, spelling, column, number, filename = fields
+                position = (trace_path(filename), int(number), int(column))
+                binding = int(target), bool(int(compiled))
+                self.calls[int(caller), position] = binding
+                name = bytes.fromhex(spelling).decode(errors="replace").casefold()
+                if name in RULE_SYNTAX and name in self.builtins and binding != self.builtins[name]:
+                    self.changed_syntax[int(caller)] = (name, position)
+            elif tag in ("definition", "literal"):
                 *caller, value, column, number, filename = fields
                 position = (trace_path(filename), int(number), int(column))
                 if tag == "definition":
                     self.definitions[int(value)] = position
                 else:
-                    table = self.calls if tag == "call" else self.literals
-                    table[int(caller[0]), position] = int(value)
+                    self.literals[int(caller[0]), position] = int(value)
             else:
                 raise CompileError(f"unexpected Gforth trace record {tag!r}")
 
@@ -318,6 +334,9 @@ class BoundRules(SourceCompiler):
             origin = self.positions[id(word)]
             if self.trace.definitions.get(xt) != origin:
                 raise CompileError(f"Gforth bound a different definition of {word.name!r}")
+            if xt in self.trace.changed_syntax:
+                name, (path, line, column) = self.trace.changed_syntax[xt]
+                raise CompileError(f"{path}:{line}:{column + 1}: Gforth redefined the syntax word {name!r}")
             if (id(word), xt) in seen:
                 continue
             seen.add((id(word), xt))
@@ -325,19 +344,27 @@ class BoundRules(SourceCompiler):
             while body:
                 item = body.pop()
                 instruction = item.instruction
-                if isinstance(instruction, Conditional):
-                    body.extend(instruction.yes)
-                    body.extend(instruction.no)
-                elif isinstance(instruction, Word):
-                    site = self.position(origin[0], item.source)
-                    pending.append((instruction, self.trace.calls.get((xt, site))))
+                key = xt, self.position(origin[0], item.source)
+                if isinstance(instruction, Word):
+                    target, compiled = self.trace.calls.get(key, (None, False))
+                    if target is not None and not compiled:
+                        raise item.source.error(f"Gforth executes {instruction.name!r} at compile time")
+                    pending.append((instruction, target))
                 elif isinstance(instruction, Literal) and cell_literal(item.source.text) is not None:
-                    site = self.position(origin[0], item.source)
-                    actual = self.trace.literals.get((xt, site))
+                    actual = self.trace.literals.get(key)
                     if actual != instruction.value:
                         observed = "no single-cell literal" if actual is None else str(actual)
                         raise item.source.error(f"literal {item.source.text!r}: Gforth compiled {observed}, "
                                                 f"4thGraph compiled {instruction.value}")
+                else:
+                    expected = self.trace.builtins.get(item.source.name)
+                    if expected is None:
+                        raise item.source.error(f"{item.source.text!r} has no shared Gforth implementation")
+                    if self.trace.calls.get(key) != expected:
+                        raise item.source.error(f"Gforth bound a different primitive for {item.source.text!r}")
+                    if isinstance(instruction, Conditional):
+                        body.extend(instruction.yes)
+                        body.extend(instruction.no)
 
 
 def load_plan(source, *, forth=None):
@@ -345,7 +372,9 @@ def load_plan(source, *, forth=None):
     tracer = Path(__file__).with_name("source-trace.fs").resolve()
     with TemporaryDirectory(prefix="4thgraph-gforth-") as temporary:
         trace_file = Path(temporary) / "source.trace"
-        result = subprocess.run([forth or os.environ.get("GFORTH", "gforth"), str(tracer), str(source), "-e", "bye"],
+        vocabulary = "4thgraph-trace-vocabulary " + " ".join(sorted(RULE_BUILTINS))
+        result = subprocess.run([forth or os.environ.get("GFORTH", "gforth"), str(tracer), "-e", vocabulary,
+                                 str(source), "-e", "bye"],
                                 cwd=source.parent, env={**os.environ, "FOURTHGRAPH_SOURCE_TRACE": str(trace_file)},
                                 capture_output=True, text=True, check=False)
         if result.returncode:

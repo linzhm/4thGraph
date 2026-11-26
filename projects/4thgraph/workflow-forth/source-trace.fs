@@ -1,5 +1,6 @@
 \ Loaded by the Python builder in its private Gforth process. Addresses
 \ identify dictionary entries only during this run, never in a build artifact.
+REQUIRE rule-words.fth
 VOCABULARY 4thgraph-source-trace
 ALSO 4thgraph-source-trace DEFINITIONS
 S" FOURTHGRAPH_SOURCE_TRACE" getenv w/o create-file throw CONSTANT trace-file
@@ -24,7 +25,14 @@ file-refill-slot @ CONSTANT original-file-refill
 : .definition ( -- ) ." definition " latestxt trace-number trace-position ;
 : trace-definition ( colon-sys -- colon-sys )
   DEFERS :-hook ['] .definition trace-file outfile-execute ;
-: .call ( nt -- ) ." call " latestxt trace-number name>int trace-number trace-position ;
+: .compilation ( nt -- ) name>comp ['] compile, = SWAP trace-number trace-number ;
+: .builtin ( addr u nt -- ) ." builtin " .compilation TYPE CR ;
+: trace-vocabulary ( "names..." -- )
+  BEGIN PARSE-NAME DUP WHILE
+    2DUP find-name ?DUP IF ['] .builtin trace-file outfile-execute ELSE 2DROP THEN
+  REPEAT 2DROP ;
+: .call ( nt -- ) ." call " latestxt trace-number .compilation
+  input-lexeme 2@ trace-hex SPACE trace-position ;
 : .cell ( n -- ) ." literal " latestxt trace-number trace-number trace-position ;
 : trace-token ( addr u -- )
   DUP 0= IF 2DROP EXIT THEN
@@ -45,3 +53,5 @@ PREVIOUS DEFINITIONS
 
 : 4thgraph-trace-binding ( addr u xt -- )
   [ ALSO 4thgraph-source-trace ] trace-binding [ PREVIOUS ] ;
+: 4thgraph-trace-vocabulary ( "names..." -- )
+  [ ALSO 4thgraph-source-trace ] trace-vocabulary [ PREVIOUS ] ;

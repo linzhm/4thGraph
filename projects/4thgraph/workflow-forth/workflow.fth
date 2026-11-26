@@ -1,4 +1,6 @@
 ( Build-time workflow records. Loaded with REQUIRE by the workflow source. )
+BASE @ DECIMAL
+REQUIRE rule-words.fth
 
 : text, ( c-addr u -- ) DUP , HERE OVER CHARS ALLOT SWAP CHARS MOVE ALIGN ;
 : named-create ( "name" -- )
@@ -53,3 +55,5 @@
   DUP 5 slot@ selector. DUP 4 slot@ selector.
   DUP 7 slot@ list. 6 slot@ list. CR
   R> BASE ! ;
+
+BASE !
