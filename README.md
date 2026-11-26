@@ -93,17 +93,19 @@ The lock contains the compressed public key. To spend, push the signature. [Fort
 
 ## Wallet projects
 
-| Project | Use it to | Version | Wallet integration |
-| --- | --- | --- | --- |
-| [Native P2PK and P2PKH](projects/p2pk-p2pkh-baseline/README.md) | Establish a size and signing baseline with native secp256k1 scripts | v0.1 development | [Integration guide](projects/p2pk-p2pkh-baseline/docs/sdk.en.md#quickstart) |
-| [P2PKH-R1](projects/p2pkh-r1/README.md) | Pay to a P-256 public-key hash and compare Forth-compiled locks | [v0.3.0 Forth experiment](projects/p2pkh-r1/README.md#version-history) | [v0.2.0 SDK guide](projects/p2pkh-r1/docs/sdk.en.md#quickstart) |
-| [P2PKH-R1-Deferred](projects/p2pkh-r1-deferred/README.md) | Receive funds with a short lock and activate a standard R1 output later | v0.2.0 development | [Integration guide](projects/p2pkh-r1-deferred/docs/sdk.en.md#quickstart) |
-| [P2PKH-SM2](projects/p2pkh-sm2/README.md) | Pay with SM2 signatures, accept GB/T 35275-2026 SignedData off-chain, and reconstruct eligible OTDA outputs | v1.1.0 candidate | [Integration guide](projects/p2pkh-sm2/docs/sdk.en.md#quickstart) |
-| [Lamport OTS](projects/lamport-ots/README.md) | Evaluate SHA-256 one-time signatures with full-key and committed-key locks | v0.1 development | [Integration guide](projects/lamport-ots/docs/sdk.en.md#quickstart) |
-| [WOTS+](projects/wots-plus/README.md) | Evaluate one-time signatures built from SHA-256 hash chains | v0.1 development | [Integration guide](projects/wots-plus/docs/sdk.en.md#quickstart) |
-| [Pure ML-DSA-44](projects/ml-dsa/README.md) | Evaluate FIPS 204 pure-mode ML-DSA-44 signatures in Script | v0.1 development | [Integration guide](projects/ml-dsa/docs/sdk.en.md#quickstart) |
+The wallet projects give teams recognizable locking templates, a shared SDK for external signers, and complete signed transactions they can replay. They cover ordinary payments, integration with P-256 and SM2 signers, deferred activation, and experiments with one-time and post-quantum signatures.
 
-Start with native P2PKH to run your first payment. The projects share the same wallet calls in TypeScript, Rust, Go, and Python. Each project guide covers its signing request, template options, and local dependencies. [Wallet SDK quickstart](shared/sdk/README.md)
+| Project | Where it fits | Integration decision | Version | Wallet SDK |
+| --- | --- | --- | --- | --- |
+| [Native P2PK and P2PKH](projects/p2pk-p2pkh-baseline/README.md) | A first wallet integration, ordinary secp256k1 payments, or a cost baseline | Choose whether the output carries a public key or its hash | v0.1 development | [Integration guide](projects/p2pk-p2pkh-baseline/docs/sdk.en.md#quickstart) |
+| [P2PKH-R1](projects/p2pkh-r1/README.md) | Connect an existing P-256 signing device or service, or compare Forth-compiled locks | Verify the signing mode and keep persistent P-256 nonce history | [v0.3.0 Forth experiment](projects/p2pkh-r1/README.md#version-history) | [v0.2.0 SDK guide](projects/p2pkh-r1/docs/sdk.en.md#quickstart) |
+| [P2PKH-R1-Deferred](projects/p2pkh-r1-deferred/README.md) | Receive funds into short locks when a separate activation can wait | Budget a fee-paying input and a second step to create the full R1 output | v0.2.0 development | [Integration guide](projects/p2pkh-r1-deferred/docs/sdk.en.md#quickstart) |
+| [P2PKH-SM2](projects/p2pkh-sm2/README.md) | Integrate an SM2 signer or a GB/T 35275-2026 SignedData provider, or reconstruct eligible OTDA outputs | Match the SM2 message and user ID, and bind the expected signer identity for SignedData | v1.1.0 candidate | [Integration guide](projects/p2pkh-sm2/docs/sdk.en.md#quickstart) |
+| [Lamport OTS](projects/lamport-ots/README.md) | Compare the cost of SHA-256 one-time signatures with full-key and committed-key locks | Reserve a fresh key per UTXO and choose between cheaper funding and cheaper inputs | v0.1 development | [Integration guide](projects/lamport-ots/docs/sdk.en.md#quickstart) |
+| [WOTS+](projects/wots-plus/README.md) | A SHA-256 one-time-signature experiment with a smaller signature and several receive templates | Manage one-time keys and compare cached output code and OTDA reconstruction | v0.1 development | [Integration guide](projects/wots-plus/docs/sdk.en.md#quickstart) |
+| [Pure ML-DSA-44](projects/ml-dsa/README.md) | A FIPS 204 interoperability or large-script experiment | Use a Pure ML-DSA-44 signer and validate relay and mining policy for large locks | v0.1 development | [Integration guide](projects/ml-dsa/docs/sdk.en.md#quickstart) |
+
+Start with native P2PKH to run your first payment. The unified SDK uses the same wallet workflow in TypeScript, Rust, Go, and Python. Follow a project guide to connect your signer, choose a template, and replay the appropriate payment or activation. [Wallet SDK quickstart](shared/sdk/README.md)
 
 <a name="transaction-costs"></a>
 
@@ -125,6 +127,8 @@ The unified benchmark measured **260 complete transactions** across seven projec
 | Pure ML-DSA-44 | 2 × 2 | 926,412 | 2,588 | 1,858,122 | 5,563,725 | — |
 
 All sizes are in bytes. Lock, unlock, and stack measurements use the first ForkID ALL input. Peak stack payload is the local evaluator's peak combined data size on the main and alternate stacks. Deferred activation includes a fee-sponsor input. ML-DSA-44 stack data is unavailable. Each project README has the per-input and per-output measurements, the cost of adding an input or output, and the lifecycle totals.
+
+The OTDA ALL measurements for R1 v0.2.0 and cached-steps WOTS+ use explicit reconstruction.
 
 The SM2 candidate uses locking template `1` from v1.0.0 and automatically selects a shorter OTDA unlocking script when available. In the measured OTDA ALL transaction, reconstruction reduces the unlock from 290,109 to 13,023 bytes per input. The complete transaction drops from 870,194 to 316,018 bytes, a 63.7% reduction. [SM2 reconstruction results](projects/p2pkh-sm2/README.md#otda-constructor)
 

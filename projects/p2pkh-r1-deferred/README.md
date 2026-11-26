@@ -12,6 +12,12 @@ Create a short deposit lock, arrange its committed R1 target at the same index, 
 
 Deferred moves the creation of a full R1 locking script from funding to activation. A [1,435-byte funding lock](template/v0.2.0/template.hex) commits to a [46,302-byte P2PKH-R1 v0.2.0 target](../p2pkh-r1/template/v0.2.0/template.hex) at the same value. Existing short locks keep the target version they originally committed to.
 
+## Use cases and trade-offs
+
+Evaluate Deferred for a deposit queue where customers receive many small locking scripts and the operator can schedule activation before withdrawals. Each short lock commits to the target R1 owner, template and full value. Any party with the data and a funded transaction can assemble that transition. Spending the resulting R1 output still requires the owner's signature.
+
+Budget for an extra transaction and a fee sponsor. Several deposits can activate together if every activation input has its committed R1 output at the same index. Until activation confirms, the wallet tracks the short-lock UTXO. If the sponsor is unavailable, it remains in that state. Compare the complete deposit-to-exit workflow with ordinary R1 when users need to spend immediately or when fees are the main cost. [Activation costs](#measured-transaction-costs)
+
 ## Activation and later payment
 
 1. Create the funding output with `funding_output` or `funding_output_from_owner_hash`. On receipt, verify the short lock, value and both target commitments. The Python `recognize` result includes `target_r1_version`. The unified client reports this version as `targetTemplate`.

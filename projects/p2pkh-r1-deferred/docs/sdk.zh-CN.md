@@ -49,4 +49,10 @@ SCRIPT_LAB_SDK_PYTHON="$PWD/.venv/bin/python" \
 3. 将已准备的交易、输入索引和可信 prevout 传给 `activate`。默认使用 ForkID SINGLE（`0x43`）。其他模式同样需要同索引目标输出，参数见协议规范。赞助输入单独签署。
 4. 记录启用后的 R1 outpoint，后续付款按 [R1 钱包接入](../../p2pkh-r1/docs/sdk.zh-CN.md)处理。
 
+## 跟踪短锁和启用后的输出
+
+把短锁 outpoint、金额、所有者和 `targetTemplate` 随付款请求保存。批量启用时，先固定每个启用输入与同索引 R1 输出的对应关系，再组装解锁。输出保留入金全额，因此费用由单独的输入承担。赞助方审批整笔交易并签署自己的输入。
+
+确认后，用启用交易的最终 txid 和输出索引登记新的 R1 outpoint。广播延迟或链重组改变依赖的父交易时，先从链视图核对短锁和启用后的输出，再创建子交易。[R1 花费流程](../../p2pkh-r1/docs/sdk.zh-CN.md#quickstart)
+
 [启用协议](spec.zh-CN.md) · [十二种签名类型向量](../template/v0.2.0/sighash-modes.json) · [参考交易构造](../reference/README.md)

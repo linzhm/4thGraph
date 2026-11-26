@@ -31,6 +31,12 @@ const signedHex = wallet.signPayment({
 
 Use `signInput` for a prepared transaction. Supply the transaction, its input index and the corresponding prevout. See the [call table](../../../shared/sdk/README.md#calls-and-data) for the matching Rust, Go, and Python interfaces.
 
+## Choose a receive template and rehearse a retry
+
+Use `canonical` as a control, then compare `cached-constants` and `cached-steps` with your expected input and output counts. For a version-2 Chronicle transaction that creates eligible cached-step outputs, set `compressOtda: true` to test reconstruction. Retain the canonical 64-byte public key for each output. [Template measurements](../README.md#complete-transactions-and-stack-measurements)
+
+Use a durable signer and a fresh key for each output. For a broadcaster retry, replay the stored transaction bytes. A different transaction needs a fresh authorization, so check key consumption before requesting it. Test that a second signing request for the same key is blocked across process restarts. [Durable signer reference](../../../shared/one_time_signer.py)
+
 ## Replay vectors
 
 ```sh

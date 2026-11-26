@@ -12,6 +12,12 @@
 
 P2PKH-R1 用未压缩的 secp256r1（P-256）公钥的 HASH160 锁定 BSV 输出。付款人只需填入 20 字节收款人哈希。花费时，钱包提供公钥和当前输入的一份经校验的 64 字节 `r || s` 签名。
 
+## 使用场景与取舍
+
+当已有 P‑256 设备或签名服务可为 BSV 付款授权时，用普通 R1 验证钱包接入。例如分别复放两类设备：接收预先计算摘要的设备，以及内部执行 SHA‑256 的设备。处理资金前要核对设备接收的数据和签名编码。钱包的各签名进程共用持久化的签名随机数历史。[设备接入](docs/sdk.zh-CN.md#设备签名和逐输入付款)
+
+R1 在入金时创建完整的付款锁。需要从到账的 UTXO 直接发起普通签名付款时，可采用这条路径，并按钱包策略等待确认。若更看重入金输出体积，钱包也能安排独立的启用交易，则可评估 Deferred。[Deferred 流程](../p2pkh-r1-deferred/README.zh-CN.md)
+
 <a name="version-history"></a>
 
 ## 版本历史
@@ -34,7 +40,7 @@ Forth 源码 `r1.fth` 逐字节复现完整的 v0.2.0 锁。v0.3.0 在 263 处�
 
 ## 钱包接入
 
-[TypeScript、Rust 和 Go 指南](docs/sdk.zh-CN.md)介绍如何收款以及构造普通 ForkID ALL 付款。[Python 参考钱包](reference/README.md)可为每个输入选择签名类型，支持混合输入和 Chronicle OTDA。请求外部签名前，先核对入金 outpoint、金额和锁定脚本，再确认目标输出和费用。
+统一 SDK 支持在 TypeScript、Rust、Go 或 Python 中收款并发起普通 ForkID ALL 付款。签署已经组装的交易或混合交易时，用 `signInput` 为所选输入指定 sighash。使用 Chronicle OTDA 时提供链上下文。调用签名器前，先核对所有 outpoint、金额和脚本，再审批输出和总手续费。[SDK 指南](docs/sdk.zh-CN.md) · [Python 参考钱包](reference/README.md)
 
 ```sh
 cd projects/p2pkh-r1/reference
