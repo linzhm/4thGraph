@@ -1,15 +1,20 @@
 """Authenticate the transaction-bound Lamport lock and use an external signer."""
 from payment import sign_previous as authorize_previous
 from payment import sign_spend as authorize
-from script import committed_locking_script, legacy_locking_script, locking_script
+from script import committed_locking_script, forth_committed_locking_script, legacy_locking_script, locking_script
 
-TEMPLATES = {"full-key": locking_script, "committed-key": committed_locking_script, "legacy": legacy_locking_script}
+TEMPLATES = {
+    "full-key": locking_script,
+    "committed-key": committed_locking_script,
+    "committed-key-forth": forth_committed_locking_script,
+    "legacy": legacy_locking_script,
+}
 
 
 def lock(public_key, profile):
     profile = "full-key" if profile is None else profile
-    if profile not in ("full-key", "committed-key"):
-        raise ValueError("expected full-key or committed-key")
+    if profile not in ("full-key", "committed-key", "committed-key-forth"):
+        raise ValueError("expected full-key, committed-key or committed-key-forth")
     return TEMPLATES[profile](public_key)
 
 

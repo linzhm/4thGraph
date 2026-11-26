@@ -8,11 +8,13 @@ Git revision. Negative cases require a known script rejection or the expected
 prevout error for a deliberately invalid outpoint.
 
 - `lamport.py`: random key generation, strict digest API, process-local one-time guard.
-- `script.py`: deterministic unrolled verifier and fixed-r PUSHTX binding.
+- `script.py`: full-key, legacy and committed-key lock factories with fixed-r PUSHTX binding.
+- `committed-verifier.fth`, `forth_verifier.py`: typed reconstruction and lowering for `forth_committed_locking_script(public_key)`.
 - `payment.py`: prepared-input and single-input wallet APIs, external signer, fresh-change guard.
 - `fixtures.py`: public deterministic secrets for tests only, adversarial case matrix.
 - `engines.py`: development ECDSA callback and complete-transaction chain-gang adapter.
 - `test_lamport.py`: unit, adversarial and differential tests; no node required.
+- `test_acceptance.py`: the payment matrix, committed proof mutations and Forth mask coverage.
 - `test_node.py`: required node conformance (not silently skipped when absent).
 - `measure.py`: reproducible vector and local benchmark.
 - `verify_apple.sh`: Apple Container on macOS, pinned official node image, automatic cleanup.

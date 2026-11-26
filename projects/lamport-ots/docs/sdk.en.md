@@ -2,7 +2,7 @@
 
 [简体中文](sdk.zh-CN.md) · [Developer guide](developer.en.md#sdk) · [Wallet quickstart](../../../sdk/README.md)
 
-Choose `full-key` (default) or `committed-key` for receiving and pass the complete ordered public key to recognition. The SDK can also recognize legacy outputs, whose spending mode is BIP143 ALL. The signer receives a 32-byte digest and returns an 8,192-byte signature. Have the signer durably consume the key before releasing a signature. Use a fresh key for change and keep the signed transaction for retries.
+Choose `full-key` (default), `committed-key` or the experimental `committed-key-forth` for receiving. Pass the complete ordered public key to recognition. The SDK also recognizes legacy outputs, whose spending mode is BIP143 ALL. [Profile and transaction costs](../README.md#choose-a-payment-profile)
 
 <a name="quickstart"></a>
 
@@ -39,7 +39,7 @@ Use `signInput` for a prepared transaction. Supply the transaction, its input in
 
 ## Keep key state with the invoice
 
-Record whether the invoice uses `full-key` or `committed-key` and retain the ordered public key for both. Its 16,384 bytes have a fixed order. The committed template uses those bytes to assemble the spending proof. Recover the public key and the key-consumption record together.
+Record the exact payment profile on the invoice and retain the full 16,384-byte public key in order. Both committed profiles use those bytes to assemble the spending proof. Recover the public key and the key-consumption record together.
 
 Reserve the key before the signer releases the 8,192-byte signature. A timeout after requesting a signature can leave the key consumed. Recover and rebroadcast the same signed transaction when available, and use fresh keys on new outputs. [One-time signing in the shared SDK](../../../sdk/docs/reference.md#one-time-signing)
 

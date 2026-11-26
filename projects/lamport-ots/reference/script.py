@@ -81,6 +81,15 @@ def committed_locking_script(key):
     return _payment_lock(KEY_BYTES, _committed_verifier(key))
 
 
+def forth_committed_locking_script(key):
+    """Build the experimental Forth-compiled committed-key payment lock."""
+    from forth_verifier import committed_verifier_code
+
+    require_bytes(key, KEY_BYTES, 'public key')
+    verifier_code = committed_verifier_code() + push(sha256(key).digest()) + asm('OP_EQUALVERIFY')
+    return _payment_lock(KEY_BYTES, verifier_code)
+
+
 def _payment_lock(proof_bytes, verifier_code):
     code = authorization_checks(ORDINARY_CODE, COMPANION_CODE)
     code += asm('OP_SIZE') + number(proof_bytes) + asm('OP_NUMEQUALVERIFY OP_SWAP OP_HASH256 OP_DUP OP_TOALTSTACK')
