@@ -235,7 +235,7 @@ def capabilities():
                     "reserved_word_prefix": "bsv-",
                     "stack_effect": ": <word> ( <input-types...> -- <output-types...> ) <body> ;",
                     "declarations": DECLARATIONS,
-                    "parse_only_declarations": ("relation:",),
+                    "relation_backends": ("script", "r1cs", "groth16-bls12-381"),
                     "legacy_aliases": LEGACY_DECLARATIONS,
                     "legacy_implicit_end": LEGACY_IMPLICIT_END,
                     "legacy_postfix": "<work-or-gate-step> independent-submit",

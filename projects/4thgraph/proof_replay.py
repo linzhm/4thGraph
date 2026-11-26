@@ -45,7 +45,7 @@ def compare_circuit(circuit, advance, decide, currents):
 
 
 def run_case(replay, circuit, source, bootstrap, slot, *, current, next_state, optimization):
-    contract = ProofContract(source, circuit.key, current, replay.keys.public, target=replay.target,
+    contract = ProofContract(source, circuit, current, replay.keys.public, target=replay.target,
                              optimization=optimization)
     parent, deploy = replay.deploy(contract, bootstrap, slot)
     other_parent, other_deploy = replay.deploy(contract, bootstrap, slot + 1)

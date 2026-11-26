@@ -6,6 +6,7 @@ from dataclasses import asdict, dataclass, replace
 from hashlib import sha256
 import json
 from pathlib import Path
+from tempfile import TemporaryDirectory
 import sys
 from types import MappingProxyType
 
@@ -1066,13 +1067,27 @@ def main():
                 if any(item.name in word.takes for item in word.ranges):
                     result["input_range_checks"] = "assumed" if args.assume_input_ranges else "emitted"
         else:
-            source.reject_relation_build()
             if args.keys is None:
                 cli.error("transaction builds require --keys")
             raw_keys = json.loads(args.keys.read_text())
             if not isinstance(raw_keys, dict) or any(not isinstance(key, str) for key in raw_keys.values()):
                 raise ValueError("keys must be a JSON object mapping roles to public key hex strings")
             keys = {name: bytes.fromhex(key) for name, key in raw_keys.items()}
+            if source.relation:
+                from verification import compile_solutions
+
+                if args.current is None:
+                    cli.error("relation: requires --current")
+                if (args.mode != "auto" or args.cpn or args.cpn_plan or args.search or args.task_id is not None
+                        or args.join_witness or args.gate_boundary != "auto" or args.sighash_family != "forkid"
+                        or args.available_data is not None or args.available_authorizers is not None
+                        or args.optimize != BASELINE):
+                    cli.error("workflow layout options do not apply to relation: builds. "
+                              "Use verification.py to select a proof backend or cost objective")
+                with TemporaryDirectory(prefix="4thgraph-verification-") as scratch:
+                    _, report = compile_solutions(source, keys, args.current, scratch, target=args.target)
+                print(json.dumps(report, indent=2, sort_keys=True))
+                return
             if source.workflow_input is not None or source.stages:
                 if args.current is None:
                     cli.error("staged workflows require --current")

@@ -9,7 +9,7 @@ import subprocess
 from tempfile import TemporaryDirectory
 
 from compiler import PROJECT_NAME
-from proof_contract import FIELD, scalar
+from r1cs import FIELD, scalar
 from protocol import FLAG, artifact_digest, authorize, is_compressed_public_key
 from shared.script import asm
 

@@ -1,10 +1,11 @@
 """Lower bounded Forth u32 arithmetic and route selection to Circom."""
 
 import argparse
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from pathlib import Path
 
-from compiler import CompileError, Conditional, Shuffle, SourceCompiler, expanded
+from compiler import MAX_EXPANSION, CompileError, Conditional, Shuffle, SourceCompiler, Token, Word, bounded_expansion, expanded
+from stdlib import LibraryImport
 from wordsets import U32, Literal, PRIMITIVES, SHUFFLES
 
 BIT_DECOMPOSITION = """pragma circom 2.2.2;
@@ -25,6 +26,29 @@ template Bits(width) {
 """
 MAX_STEPS = 128
 MAX_WIRES = 256
+
+
+@dataclass(frozen=True)
+class CircuitProgram:
+    transition: Word
+    route: Word
+    selection: str
+    definitions: tuple[Token, Token]
+    libraries: tuple[LibraryImport, ...] = ()
+
+    def describe(self):
+        spec = {
+            "selection": self.selection,
+            "entries": {
+                role: {"word": word.name, "takes": word.takes, "gives": word.gives,
+                       "line": at.line, "column": at.column, **({"module": at.module} if at.module else {})}
+                for role, word, at in zip(("transition", "route"), (self.transition, self.route),
+                                          self.definitions, strict=True)
+            },
+        }
+        if self.libraries:
+            spec["libraries"] = tuple(map(asdict, self.libraries))
+        return spec
 
 
 @dataclass(frozen=True)
@@ -128,25 +152,64 @@ class CircuitBuilder:
                 raise token.error(f"generated circuit exceeds the {MAX_WIRES}-wire budget")
 
 
+def select_circuit(frontend, entries=None):
+    names = None if entries is None else tuple(name.casefold() for name in entries)
+    if names is not None and len(names) != 2:
+        raise CompileError("circuit entries require a transition word and a route word")
+    if frontend.relation:
+        transition, route = frontend.relation
+        if (frontend.workflow_input or frontend.stages or frontend.work or frontend.gate or frontend.join
+                or frontend.operator or frontend.independent or frontend.recovery):
+            raise transition.error("relation: cannot be combined with transaction workflow declarations")
+        declared = (transition.name, route.name)
+        if names is not None and names != declared:
+            raise transition.error(f"circuit entries must match relation: {declared}")
+        names, selection = declared, "relation"
+    elif frontend.workflow_input is not None or frontend.stages:
+        stages = frontend.workflow().stages
+        if len(stages) != 2:
+            raise stages[2].declaration.error("the circuit backend requires one transition and one route stage")
+        workflow_names = tuple(stage.word.name for stage in stages)
+        if names is not None and names != workflow_names:
+            raise stages[0].declaration.error(f"circuit entries must match the declared workflow words {workflow_names}")
+        names, selection = workflow_names, "workflow"
+    elif names is None:
+        raise CompileError("declare a relation or a staged workflow, or select two circuit words with --entries")
+    else:
+        selection = "explicit"
+    effects = ((("u32",), ("u32",)), (("u32",), ("route",)))
+    words, definitions = [], []
+    for i, (name, (takes, gives)) in enumerate(zip(names, effects, strict=True)):
+        word, at = frontend.words.get(name), frontend.definitions.get(name)
+        if word is None or at is None:
+            if frontend.relation:
+                raise frontend.relation[i].error(f"undefined circuit word {name!r}")
+            raise CompileError(f"undefined circuit word {name!r}")
+        if (word.takes, word.gives) != (takes, gives):
+            raise at.error(f"circuit word {name!r} requires stack effect {' '.join(takes)} -- {' '.join(gives)}")
+        words.append(word)
+        definitions.append(at)
+    return CircuitProgram(*words, selection, tuple(definitions), frontend.library_imports)
+
+
 def circuit_words(source):
-    frontend = SourceCompiler(source.decode())
-    frontend.reject_relation_build()
-    words = frontend.words
-    signatures = {"advance": (("u32",), ("u32",)), "decide": (("u32",), ("route",))}
-    for name, effect in signatures.items():
-        if name not in words or (words[name].takes, words[name].gives) != effect:
-            raise CompileError(f"circuit source requires {name} with stack effect {effect[0]} -- {effect[1]}")
-    return words["advance"], words["decide"]
+    program = select_circuit(SourceCompiler(source.decode()))
+    return program.transition, program.route
 
 
-def compile_circuit(source):
-    advance, decide = circuit_words(source)
+def compile_circuit(source, *, entries=None, source_path=None):
+    return emit_circuit(select_circuit(SourceCompiler(source.decode(), source_path=source_path), entries))
+
+
+def emit_circuit(program, *, max_expansion=MAX_EXPANSION):
+    if bounded_expansion(program.transition.body, program.route.body, limit=max_expansion) > max_expansion:
+        raise program.definitions[0].error(f"circuit exceeds the {max_expansion}-operation expansion budget before lowering")
     builder = CircuitBuilder()
     builder.bits("current", 32)
     stack = [Wire("u32", "current")]
-    builder.block(advance.body, stack)
+    builder.block(program.transition.body, stack)
     next_state, = stack
-    builder.block(decide.body, stack)
+    builder.block(program.route.body, stack)
     route, = stack
     builder.add(f"next <== {next_state.expr};")
     builder.add(f"route <== {route.expr};")
@@ -163,10 +226,11 @@ def compile_circuit(source):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("source", type=Path)
+    parser.add_argument("--entries", nargs=2, metavar=("TRANSITION", "ROUTE"), help="select two Forth words")
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     try:
-        code = compile_circuit(args.source.read_bytes())
+        code = compile_circuit(args.source.read_bytes(), entries=args.entries, source_path=args.source)
         args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_bytes(code)
     except (OSError, ValueError) as error:

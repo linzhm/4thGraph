@@ -2,7 +2,7 @@
 
 A Forth compiler for BSV Script and multi-transaction workflows.
 
-当前构建版本为 **v0.2.0**。项目位于 BSV Script Lab 仓库内，编译与复放产物可写入 `projects/4thgraph/build/`。
+当前构建版本为 **v0.2.7**。编译与复放产物可写入 `projects/4thgraph/build/`。
 
 同一份 Forth 源码可以生成融合版和拆分版。示例计算 `a = 2x`、`b = y + 1`，两支结果和汇合的和都按 `u32` 表示。回绕后的和小于 20 时走复核，其余走结算。两种后继各锁给一个配置的公钥。编译器以 Forth 2012 Core 为语义基线，`+` 使用 64 位 cell，`u32+` 固定按 32 位回绕。 [示例源码](example.fth) · [语言与 BSV 扩展规范](language.md)
 
@@ -50,7 +50,22 @@ PYTHONPATH=. python projects/4thgraph/protocol.py projects/4thgraph/example.fth 
 PYTHONPATH=. python projects/4thgraph/protocol.py --capabilities
 ```
 
-本分支支持解析 `relation:` 及其旧拼写 `verify:`。在 `REQUIRE stdlib/verify.fth` 后写下 `relation: advance decide ;`，可分别用 `protocol.py SOURCE --entry advance` 和 `--entry decide` 生成两个词的 Script。整条声明的交易验证器构建尚未接入，`--capabilities` 在 `bsv.source_syntax.parse_only_declarations` 中列出这类声明。
+### 编译公开状态关系
+
+`relation: u32-inc decide ;` 指定一个 `u32 -- u32` 转换词和一个 `u32 -- route` 路由词。构建器从同一次源码解析取得两个词，将初始状态固定在锁中，核对花费的实际后继付款和状态回执。分文件定义可用 `REQUIRE` 导入。[完整示例](examples/verify-state.fth)
+
+```sh
+project=projects/4thgraph
+app=$project/examples/verify-state.fth
+keys=$project/build/fixture-keys.json
+PYTHONPATH=. python "$project/protocol.py" "$app" --keys "$keys" --current 19
+PYTHONPATH=. python "$project/circuit_backend.py" "$app" --output "$project/build/relation.circom"
+PYTHONPATH=. python "$project/verification.py" "$app" --keys "$keys" --current 19 --policy require-proof
+```
+
+默认构建生成直接验证的 Script 并报告 Circom 编译结果。`require-proof` 启用由同一电路生成的透明 R1CS 证明。`--policy require-groth16 --groth16 ZKEY PHASE2_PTAU` 选择 BLS12-381 Groth16，并核对设置文件与生成的 R1CS。`--max-lock-bytes` 在选择候选前限制锁长，`--max-expanded-ops` 限制词展开。证明后端使用 Node.js、npx 和固定版本的 Circom 与 snarkjs。用 `shared/verify_node.sh --profile raised --` 运行上述 `verification.py` 命令并附加 `--replay`，可重跑实际花费。
+
+只有词定义的电路源文件须用 `circuit_backend.py SOURCE --entries TRANSITION ROUTE --output FILE` 显式指定入口。含阶段声明的工作流由阶段依赖决定入口。
 
 `--mode auto` 在所有输入和分支授权都可同时取得时选融合。可用 `--available-data x` 或 `--available-authorizers alice` 模拟另一支晚到。往示例末尾加上 `independent-submit a` 后，`auto` 选择拆分，`--mode fused` 报告约束的源文件行号。可显式请求拆分，在两种调度都合法时做同源对照。
 

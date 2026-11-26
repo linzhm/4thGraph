@@ -385,6 +385,7 @@ def check_word(words, at, takes, gives):
 
 class SourceCompiler:
     def __init__(self, source, *, vocabulary=None, stack_types=TYPES, backend=None, source_path=None):
+        self.source = source
         self.tokens = None
         self.words = dict(vocabulary or {})
         self.definitions = {}
@@ -647,14 +648,12 @@ class SourceCompiler:
             case _:
                 raise unavailable(token)
 
-    def reject_relation_build(self):
+    def require_workflow_declarations(self):
         if self.relation:
-            transition, route = self.relation
-            raise transition.error("relation: is parse-only in this build. To compile an individual Script word, "
-                                   f"use protocol.py --entry {transition.text} or --entry {route.text}")
+            raise self.relation[0].error("use the relation compiler for a relation: declaration")
 
     def program(self):
-        self.reject_relation_build()
+        self.require_workflow_declarations()
         if self.workflow_input is not None or self.stages:
             raise CompileError("stage workflows require the workflow planner")
         if len(self.work) != 2 or self.join is None or self.operator is None:
@@ -680,7 +679,7 @@ class SourceCompiler:
                        self.gate, self.recovery, self.library_imports)
 
     def workflow(self):
-        self.reject_relation_build()
+        self.require_workflow_declarations()
         if self.workflow_input is None:
             if self.stages:
                 raise self.stages[0][0].error("staged workflow needs a workflow-input: declaration")
