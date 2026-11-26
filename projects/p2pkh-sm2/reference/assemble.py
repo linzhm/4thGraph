@@ -4,8 +4,7 @@ from pathlib import Path
 import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "src"))
 from fourthgraph.bsv.script import push
-from fourthgraph.compiler.script_builder import ScriptBuilder
-from fourthgraph.compiler.wordsets import script_word
+from fourthgraph.compiler.script_builder import ScriptBuilder, build_word
 from fourthgraph.stdlib import LIBRARIES, read_library
 from sm2 import A,B,G,USER_ID,be32
 from sm3_script import IV,compile_hash,compress,hash_script
@@ -25,9 +24,9 @@ def forth_compiler(owner, version=TEMPLATE_VERSION):
     if len(owner) != 20:
         raise ValueError("expected a 20-byte owner hash")
     blocks = sm3_blocks(version=version)
-    vocabulary = {"owner-hash": script_word("", "bytes", b"", lambda: owner)}
+    vocabulary = {"owner-hash": build_word("", "bytes", lambda: owner)}
     for name, code in blocks.items():
-        vocabulary[name.lower().replace("_", "-")] = script_word("", "script", b"", lambda code=code: code)
+        vocabulary[name.lower().replace("_", "-")] = build_word("", "script", lambda code=code: code)
     return ScriptBuilder(read_library(FORTH_LIBRARY).decode("utf-8"),
                          source_path=LIBRARIES[FORTH_LIBRARY].source, vocabulary=vocabulary)
 
