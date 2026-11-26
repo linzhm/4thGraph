@@ -62,7 +62,7 @@ class NodeTests(unittest.TestCase):
     def test_two_target_versions_activate_together(self):
         _, key, _, funding, unsigned = fixture()
         value = funding.outputs[0].value
-        legacy = funding_output(value, key, target_r1_version=LEGACY_TEMPLATE_VERSION)
+        legacy = funding_output(value, key, target_r1_version=LEGACY_TEMPLATE_VERSION, optimization=None)
         target = target_output(value, key, target_r1_version=recognize(legacy).target_r1_version)
         funding = replace(funding, outputs=(legacy, *funding.outputs[1:]))
         unsigned = replace(unsigned, inputs=tuple(replace(item, txid=funding.txid_wire()) for item in unsigned.inputs),

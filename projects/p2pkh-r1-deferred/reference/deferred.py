@@ -12,11 +12,11 @@ from fourthgraph.bsv.transaction import (
 )
 from fourthgraph.compiler.lowering import OPTIMIZATIONS
 
-from forth_lock import compile_template
+from forth_lock import DEFERRED_TEMPLATE_VERSION, RELEASE_OPTIMIZATION, compile_template, released_template
 
 R1_REFERENCE = Path(__file__).resolve().parents[2] / 'p2pkh-r1/reference'
 sys.path.append(str(R1_REFERENCE))
-from fixed_templates import TEMPLATE_VERSION, TEMPLATE_VERSIONS
+from fixed_templates import LEGACY_TEMPLATE_VERSION, TEMPLATE_VERSIONS
 from p2pkh_r1 import locking_script_from_owner_hash, public_key_hash160
 
 
@@ -27,6 +27,9 @@ COMPANION_CODE = bytes(OPS[name] for name in ('OP_CHECKSIGVERIFY', 'OP_ENDIF', '
 ACTIVATION_SIGHASH = FORKID | SIGHASH_SINGLE
 DIRECT_TYPES = (ACTIVATION_SIGHASH, ACTIVATION_SIGHASH | ANYONECANPAY)
 ASM = Path(__file__).with_name('asm')
+TARGET_R1_VERSION = "0.2.0"
+ASSEMBLY_TEMPLATE_VERSION = "0.2.0"
+RELEASE_BUILD = "release"
 
 
 @dataclass(frozen=True)
@@ -37,16 +40,17 @@ class Commitment:
     target_r1_version: str
     public_key: bytes | None = None
     optimization: str | None = None
+    template_version: str | None = None
 
 
-def target_output(value: int, public_key: bytes, *, target_r1_version: str = TEMPLATE_VERSION) -> Output:
+def target_output(value: int, public_key: bytes, *, target_r1_version: str = TARGET_R1_VERSION) -> Output:
     """Return the versioned P2PKH-R1 destination at the full input value."""
     return target_output_from_owner_hash(value, public_key_hash160(public_key),
                                          target_r1_version=target_r1_version)
 
 
 def target_output_from_owner_hash(value: int, owner_hash160: bytes, *,
-                                  target_r1_version: str = TEMPLATE_VERSION) -> Output:
+                                  target_r1_version: str = TARGET_R1_VERSION) -> Output:
     amount(value)
     return Output(value, locking_script_from_owner_hash(owner_hash160, template_version=target_r1_version))
 
@@ -59,12 +63,11 @@ def _binder_blocks() -> dict[str, bytes]:
     }
 
 
-def _locking_script(value: int, commitment: Commitment) -> bytes:
+def _locking_script(value: int, commitment: Commitment, optimization: str | None) -> bytes:
     owner = commitment.public_key or commitment.owner_hash160
-    if commitment.optimization is not None:
-        return compile_template(commitment.optimization).bind(
-            owner, commitment.script_hash, amount(value), commitment.output_hash,
-        )
+    if optimization is not None:
+        template = released_template() if optimization == RELEASE_BUILD else compile_template(optimization)
+        return template.bind(owner, commitment.script_hash, amount(value), commitment.output_hash)
     return assemble(ASM, bytes(20), injected={
         **_binder_blocks(),
         'HEADER': push(owner) + push(commitment.script_hash),
@@ -81,20 +84,20 @@ def _commitment(owner_hash160: bytes, target: Output, target_r1_version: str,
     return Commitment(owner_hash160, sha256(target.script).digest(), output_hash, target_r1_version, public_key)
 
 
-def funding_output(value: int, public_key: bytes, *, target_r1_version: str = TEMPLATE_VERSION,
-                   optimization: str | None = None) -> Output:
+def funding_output(value: int, public_key: bytes, *, target_r1_version: str = TARGET_R1_VERSION,
+                   optimization: str | None = RELEASE_BUILD) -> Output:
     """Construct a hash-only output from a validated uncompressed P-256 key."""
     return funding_output_from_owner_hash(value, public_key_hash160(public_key),
                                           target_r1_version=target_r1_version, optimization=optimization)
 
 
 def funding_output_from_owner_hash(value: int, owner_hash160: bytes, *,
-                                   target_r1_version: str = TEMPLATE_VERSION,
-                                   optimization: str | None = None) -> Output:
+                                   target_r1_version: str = TARGET_R1_VERSION,
+                                   optimization: str | None = RELEASE_BUILD) -> Output:
     """Construct a short output from the same owner hash as ordinary P2PKH-R1."""
     target = target_output_from_owner_hash(value, owner_hash160, target_r1_version=target_r1_version)
     commitment = _commitment(owner_hash160, target, target_r1_version)
-    return Output(value, _locking_script(value, replace(commitment, optimization=optimization)))
+    return Output(value, _locking_script(value, commitment, optimization))
 
 
 def recognize(output: Output, *, expected_key: bytes | None = None,
@@ -115,13 +118,23 @@ def recognize(output: Output, *, expected_key: bytes | None = None,
             return None
         if expected_key is not None and public_key is not None and expected_key != public_key:
             return None
-        for version in TEMPLATE_VERSIONS:
-            target = target_output_from_owner_hash(output.value, owner, target_r1_version=version)
-            commitment = _commitment(owner, target, version, public_key)
-            for optimization in (None, *OPTIMIZATIONS):
-                candidate = replace(commitment, optimization=optimization)
-                if output.script == _locking_script(output.value, candidate):
-                    return candidate
+        commitments = tuple(
+            _commitment(owner, target_output_from_owner_hash(output.value, owner, target_r1_version=version),
+                        version, public_key)
+            for version in TEMPLATE_VERSIONS
+        )
+        for build in (None, RELEASE_BUILD, *OPTIMIZATIONS):
+            for commitment in commitments:
+                if output.script != _locking_script(output.value, commitment, build):
+                    continue
+                if build == RELEASE_BUILD:
+                    return replace(commitment, optimization=RELEASE_OPTIMIZATION,
+                                   template_version=DEFERRED_TEMPLATE_VERSION)
+                if build is None:
+                    legacy = public_key is not None or commitment.target_r1_version == LEGACY_TEMPLATE_VERSION
+                    return replace(commitment,
+                                   template_version=LEGACY_TEMPLATE_VERSION if legacy else ASSEMBLY_TEMPLATE_VERSION)
+                return replace(commitment, optimization=build)
     except ValueError:
         return None
     return None

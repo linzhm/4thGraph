@@ -1,4 +1,4 @@
-"""Compare the published Deferred lock with three builds of the same Forth source."""
+"""Compare Deferred v0.2.0 assembly with three builds of the same Forth source."""
 import argparse
 from hashlib import sha256
 import json
@@ -6,16 +6,16 @@ from pathlib import Path
 from textwrap import wrap
 
 from deferred import (
-    ACTIVATION_SIGHASH, OPTIMIZATIONS, activate_input, funding_output_from_owner_hash, target_output_from_owner_hash,
+    ACTIVATION_SIGHASH, ASSEMBLY_TEMPLATE_VERSION, OPTIMIZATIONS, TARGET_R1_VERSION,
+    activate_input, funding_output_from_owner_hash, target_output_from_owner_hash,
 )
-from fixed_templates import TEMPLATE_VERSION
-from forth_lock import SOURCE, compile_template
+from forth_lock import RELEASE_OPTIMIZATION, RELEASE_TEMPLATE, SOURCE, compile_template
 from fourthgraph import PROJECT_VERSION
 from fourthgraph.benchmark.validation import stack_profile
 from fourthgraph.bsv.script import asm
 from fourthgraph.bsv.transaction import CHRONICLE, FORKID, SIGHASH_ALL, Input, Output, Transaction
 
-RELEASE = Path(__file__).resolve().parents[1] / "template" / f"v{TEMPLATE_VERSION}"
+ASSEMBLY = RELEASE_TEMPLATE.parent / f"v{ASSEMBLY_TEMPLATE_VERSION}"
 MODES = {
     "BIP143 SINGLE": ACTIVATION_SIGHASH,
     "BIP143 ALL": FORKID | SIGHASH_ALL,
@@ -24,7 +24,7 @@ MODES = {
 
 
 def comparison():
-    layout = json.loads((RELEASE / "layout.json").read_text(encoding="ascii"))
+    layout = json.loads((ASSEMBLY / "layout.json").read_text(encoding="ascii"))
     owners = [(row["value_sats"], bytes.fromhex(row["owner_hash160"])) for row in layout["vectors"][:2]]
     targets = tuple(target_output_from_owner_hash(value, owner) for value, owner in owners)
     sponsor = Output(10_000, asm("OP_1"))
@@ -65,12 +65,13 @@ def comparison():
                 "first_input_stack": profile,
             }
         variants[name] = row
-    if bytes.fromhex((RELEASE / "template.hex").read_text(encoding="ascii")) != scripts["published"]:
-        raise ValueError("published lock differs from the v0.2.0 template")
+    for directory, build in ((ASSEMBLY, "published"), (RELEASE_TEMPLATE, RELEASE_OPTIMIZATION)):
+        if bytes.fromhex((directory / "template.hex").read_text(encoding="ascii")) != scripts[build]:
+            raise ValueError(f"compiled {build} lock differs from the template at {directory.name}")
     report = {
         "compiler_version": PROJECT_VERSION,
         "forth_source_sha256": sha256(SOURCE.read_bytes()).hexdigest(),
-        "target_r1_version": TEMPLATE_VERSION,
+        "target_r1_version": TARGET_R1_VERSION,
         "fixture": {
             "funding_inputs_outputs": [1, 3],
             "activation_inputs_outputs": [3, 3],

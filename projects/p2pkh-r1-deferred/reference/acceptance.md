@@ -2,8 +2,8 @@
 
 The fixture activates input 1 of a two-input transaction into its corresponding
 R1 output, with a sponsor input at index 0. It evaluates both hash-only and full-key
-funding layouts against both R1 target versions for the released assembly and each
-of the three Forth builds. The expected decisions follow the
+funding layouts against both R1 target versions for the earlier assembly,
+Forth `baseline` and `safe`, and the fixed v0.3.0 `stack` template. The expected decisions follow the
 [activation specification](../docs/spec.en.md#spending-the-short-lock).
 
 | Axis | Values |

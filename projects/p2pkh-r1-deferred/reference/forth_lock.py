@@ -1,6 +1,8 @@
 """Compile the typed Deferred lock with 4thGraph and bind its public fields."""
 from dataclasses import dataclass
 from functools import cache
+from hashlib import sha256
+import json
 from pathlib import Path
 
 from fourthgraph.bsv.script import asm, decode_num, encode_num, push
@@ -9,6 +11,9 @@ from fourthgraph.compiler.source import SourceCompiler
 from fourthgraph.compiler.wordsets import Literal, Primitive, script_word
 
 SOURCE = Path(__file__).with_name("deferred-activation.fth")
+DEFERRED_TEMPLATE_VERSION = "0.3.0"
+RELEASE_OPTIMIZATION = "stack"
+RELEASE_TEMPLATE = SOURCE.parents[1] / "template" / f"v{DEFERRED_TEMPLATE_VERSION}"
 FIELD_MARKERS = {
     "funding-owner": b"\xf1" * 20,
     "target-script-hash": b"\xf2" * 32,
@@ -87,6 +92,28 @@ class DeferredTemplate:
         for offset, field in zip(self.fields, (value, output_hash), strict=True):
             body[offset:offset + len(field)] = field
         return push(owner) + push(script_hash) + self.metadata[-1:] + body
+
+
+@cache
+def released_template():
+    """Load immutable v0.3.0 bytes without running the compiler."""
+    layout = json.loads((RELEASE_TEMPLATE / "layout.json").read_text(encoding="ascii"))
+    script = bytes.fromhex((RELEASE_TEMPLATE / "template.hex").read_text(encoding="ascii"))
+    if (layout["template_version"] != DEFERRED_TEMPLATE_VERSION
+            or layout["optimization"] != RELEASE_OPTIMIZATION
+            or layout["script_bytes"] != len(script)
+            or layout["base_script_sha256"] != sha256(script).hexdigest()):
+        raise ValueError("Deferred release template differs from its layout")
+    metadata_end = 55  # Direct 20-byte and 32-byte pushes followed by 2DROP.
+    fields = []
+    for name, length in (("input_value_le64", 8), ("target_txout_hash256", 32)):
+        field = layout["fields"][name]
+        offset = field["offset"]
+        if (field["length"] != length or not metadata_end < offset <= len(script) - length
+                or script[offset - 1] != length):
+            raise ValueError(f"invalid Deferred release template field {name}")
+        fields.append(offset - metadata_end)
+    return DeferredTemplate(script[:metadata_end], CompiledWord(script[metadata_end:]), tuple(fields))
 
 
 @cache

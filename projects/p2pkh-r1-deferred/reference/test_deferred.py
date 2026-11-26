@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
+from unittest.mock import patch
 
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec, utils
@@ -12,11 +13,12 @@ from tx_engine import Script, Tx, TxIn, TxOut
 
 from compare_forth import comparison
 from deferred import (
-    ACTIVATION_SIGHASH, COMPANION_CODE, DIRECT_TYPES, SCRIPT_CODE, activate_input, funding_output,
+    ACTIVATION_SIGHASH, COMPANION_CODE, DEFERRED_TEMPLATE_VERSION, DIRECT_TYPES, RELEASE_BUILD, SCRIPT_CODE,
+    TARGET_R1_VERSION, activate_input, funding_output,
     funding_output_from_owner_hash, recognize, target_output, target_output_from_owner_hash,
 )
-from fixed_templates import LEGACY_TEMPLATE_VERSION, TEMPLATE_VERSION
-from generate_vectors import RELEASE_TEMPLATE, TEMPLATE, artifacts
+from fixed_templates import LEGACY_TEMPLATE_VERSION
+from generate_vectors import TEMPLATE_RECIPES, artifacts
 from fourthgraph.bsv.script import asm, push
 from fourthgraph.bsv.transaction import CHRONICLE, SIGHASH_TYPES, Input, Output, Transaction, hash256, preimage_forkid
 from wallet import sign_payment
@@ -52,7 +54,7 @@ def engine_tx(tx):
     return converted
 
 
-def fixture(*, target_r1_version=TEMPLATE_VERSION, optimization=None):
+def fixture(*, target_r1_version=TARGET_R1_VERSION, optimization=RELEASE_BUILD):
     key, public_key = fixture_key(1)
     _, second_public_key = fixture_key(2)
     recipients = (funding_output(100_000, public_key, target_r1_version=target_r1_version, optimization=optimization),
@@ -124,10 +126,19 @@ class DeferredTests(unittest.TestCase):
                 self.assertTrue(script.endswith(separator + SCRIPT_CODE))
 
     def test_reproduce_public_artifacts(self):
-        for path, version in ((TEMPLATE, LEGACY_TEMPLATE_VERSION), (RELEASE_TEMPLATE, TEMPLATE_VERSION)):
-            for name, content in artifacts(target_r1_version=version).items():
-                with self.subTest(artifact=name, version=version):
+        for path, *recipe in TEMPLATE_RECIPES:
+            for name, content in artifacts(*recipe).items():
+                with self.subTest(artifact=path / name):
                     self.assertEqual((path / name).read_text(encoding='ascii'), content)
+
+    def test_default_funding_and_activation_use_fixed_stack_bytes(self):
+        _, public_key, _, _, _ = fixture()
+        compiled = funding_output(100_000, public_key, optimization="stack")
+        with patch("deferred.compile_template", side_effect=AssertionError("unexpected runtime compilation")):
+            _, _, _, funding, unsigned = fixture()
+            self.assertEqual(funding.outputs[0], compiled)
+            self.assertEqual(recognize(funding.outputs[0]).template_version, DEFERRED_TEMPLATE_VERSION)
+            self.assertEqual(activation_fixture(funding, unsigned).outputs, unsigned.outputs)
 
     def test_public_metadata_and_canonical_recognition(self):
         _, public_key, second_key, funding, unsigned = fixture()
@@ -136,7 +147,8 @@ class DeferredTests(unittest.TestCase):
         self.assertIsNotNone(commitment)
         owner_hash = public_key_hash160(public_key)
         self.assertEqual(commitment.owner_hash160, owner_hash)
-        self.assertEqual(commitment.target_r1_version, TEMPLATE_VERSION)
+        self.assertEqual(commitment.template_version, DEFERRED_TEMPLATE_VERSION)
+        self.assertEqual(commitment.target_r1_version, TARGET_R1_VERSION)
         self.assertIsNone(commitment.public_key)
         self.assertEqual(funding_output_from_owner_hash(output.value, owner_hash), output)
         self.assertEqual(target_output_from_owner_hash(output.value, owner_hash), unsigned.outputs[0])
@@ -146,7 +158,7 @@ class DeferredTests(unittest.TestCase):
         self.assertEqual(output.script[1:21], owner_hash)
         self.assertEqual(output.script[22:54], commitment.script_hash)
         self.assertNotIn(public_key, output.script)
-        self.assertEqual(len(output.script), 1435)
+        self.assertEqual(len(output.script), 1085)
         self.assertEqual(len(unsigned.outputs[0].script), 46302)
         self.assertIsNone(recognize(output, expected_key=second_key))
         self.assertIsNone(recognize(replace(output, value=output.value + 1)))
@@ -158,13 +170,14 @@ class DeferredTests(unittest.TestCase):
             funding_output(output.value, b'\x04' + bytes(64))
 
     def test_legacy_full_key_output_is_recognized_and_activates(self):
-        _, public_key, _, funding, unsigned = fixture(target_r1_version=LEGACY_TEMPLATE_VERSION)
+        _, public_key, _, funding, unsigned = fixture(target_r1_version=LEGACY_TEMPLATE_VERSION, optimization=None)
         output = funding.outputs[0]
         raw = push(public_key) + output.script[21:]
         self.assertEqual(sha256(raw).hexdigest(), 'e606096dc6008a9b0c4bbe082aebeaf480aa4c6277c78400469c7acce9dbfbe7')
         previous = replace(output, script=raw)
         commitment = recognize(previous, expected_key=public_key)
         self.assertEqual(commitment.public_key, public_key)
+        self.assertEqual(commitment.template_version, LEGACY_TEMPLATE_VERSION)
         self.assertEqual(commitment.target_r1_version, LEGACY_TEMPLATE_VERSION)
         original = replace(funding, outputs=(previous, *funding.outputs[1:]))
         tx = replace(unsigned, inputs=tuple(replace(i, txid=original.txid_wire()) for i in unsigned.inputs))
