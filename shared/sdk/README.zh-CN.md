@@ -2,7 +2,7 @@
 
 [English](README.md)
 
-七个项目使用同一套钱包调用。先用原生 P2PKH 跑通交易序列化和 secp256k1 签名，再切换到所选项目和签名器。SDK 通过本地 Python 3.12 进程调用参考实现，并读取当前仓库中的模板。
+用同一套钱包接口创建和识别锁、准备签名请求，以及组装签名交易。先用原生 P2PKH 核对序列化和 secp256k1 签名，再选择其他项目验证相应的签名策略。调用通过本地 Python 3.12 桥接进程执行，使用当前检出的模板。
 
 应用接入所选语言的通用源码包，再用项目标识选择签名方案。项目接入指南分别说明模板、签名格式和特有流程。
 
@@ -138,6 +138,7 @@ Python 接入 Lamport 或 WOTS+ 时，用 `sign_once = durable_signer(database, 
 | P2PKH-R1 | P-256 摘要或交给设备散列的消息，64 字节 `r ∥ s` | [R1 SDK](../../projects/p2pkh-r1/docs/sdk.zh-CN.md#quickstart) |
 | P2PKH-R1-Deferred | 启用操作依据承诺的 R1 输出生成解锁脚本 | [Deferred SDK](../../projects/p2pkh-r1-deferred/docs/sdk.zh-CN.md#quickstart) |
 | P2PKH-SM2 | SM2 消息和用户 ID，64 字节 `r ∥ s` 或 DER SignedData | [SM2 SDK](../../projects/p2pkh-sm2/docs/sdk.zh-CN.md#quickstart) |
+| P2PKH-Schnorr | 32 字节 BSV 交易消息，64 字节 BIP340 签名 | [Schnorr SDK](../../projects/p2pkh-schnorr/docs/sdk.zh-CN.md#quickstart) |
 | Lamport OTS | 32 字节摘要，8,192 字节签名 | [Lamport SDK](../../projects/lamport-ots/docs/sdk.zh-CN.md#quickstart) |
 | WOTS+ | 32 字节摘要，2,144 字节签名 | [WOTS+ SDK](../../projects/wots-plus/docs/sdk.zh-CN.md#quickstart) |
 | 纯模式 ML-DSA-44 | 32 字节消息和空上下文，2,420 字节签名 | [ML-DSA SDK](../../projects/ml-dsa/docs/sdk.zh-CN.md#quickstart) |

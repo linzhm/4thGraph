@@ -12,12 +12,13 @@ from shared.transaction import (  # noqa: E402
     CHRONICLE, SIGHASH_SINGLE, SIGHASH_TYPES, Input, Output, Transaction, amount,
 )
 
-PROJECTS = frozenset(("p2pk-p2pkh-baseline", "p2pkh-sm2", "lamport-ots", "wots-plus", "ml-dsa"))
+PROJECTS = frozenset(("p2pk-p2pkh-baseline", "p2pkh-sm2", "p2pkh-schnorr", "lamport-ots", "wots-plus", "ml-dsa"))
 WALLET_PROJECTS = PROJECTS | {"p2pkh-r1", "p2pkh-r1-deferred"}
 SIGNATURE_FORMATS = {
     "p2pk-p2pkh-baseline": ("ecdsa-secp256k1", "der-low-s"),
     "p2pkh-r1": ("ecdsa-p256", "raw-rs"),
     "p2pkh-sm2": ("sm2", "raw-rs"),
+    "p2pkh-schnorr": ("schnorr-secp256k1", "bip340"),
     "lamport-ots": ("lamport-ots", "raw"),
     "wots-plus": ("wots-plus", "raw"),
     "ml-dsa": ("pure-ml-dsa-44", "raw"),
@@ -188,7 +189,7 @@ def run_wallet(project, adapter, operation, options, message):
     algorithm, fmt = SIGNATURE_FORMATS[project]
     if "signerIdentifier" in options:
         fmt = "signed-data"
-    is_message = project in ("p2pkh-sm2", "ml-dsa") or options.get("signMessage", False)
+    is_message = project in ("p2pkh-sm2", "p2pkh-schnorr", "ml-dsa") or options.get("signMessage", False)
     metadata = {"algorithm": algorithm, "payloadKind": "message" if is_message else "digest",
                 "signatureFormat": fmt, "sighash": sighash}
     public_key = hex_bytes(options["publicKey"])
@@ -233,7 +234,7 @@ def run(message):
     if operation == "lock":
         return adapter.lock(hex_bytes(options["publicKey"]), options.get("profile")).hex()
     if operation == "lockOwner":
-        if project not in ("p2pkh-sm2", "p2pk-p2pkh-baseline"):
+        if not hasattr(adapter, "lock_owner"):
             raise ValueError("this SDK project requires the full public key to create a lock")
         return adapter.lock_owner(hex_bytes(options["ownerHash160"])).hex()
     if operation == "recognize":

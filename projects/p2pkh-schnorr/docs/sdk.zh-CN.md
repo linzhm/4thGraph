@@ -1,0 +1,44 @@
+# P2PKH-Schnorr 钱包 SDK
+
+[English](sdk.en.md) · [项目首页](../README.zh-CN.md) · [统一钱包 SDK](../../../shared/sdk/README.zh-CN.md)
+
+<a name="quickstart"></a>
+
+## 收款和花费
+
+在统一 SDK 中选择项目 `p2pkh-schnorr` 和模板 `v0.1.0`。创建收款脚本时传入 32 字节 x-only 公钥，或其 20 字节 HASH160。客户端读取固定模板并填入所有者哈希。识别时提供实际的输出脚本，也可以一起提供预期公钥。
+
+签名请求的算法为 `schnorr-secp256k1`，数据类型为 `message`，签名格式为 `bip340`。把 32 字节载荷作为消息交给 BIP340 签名器，直接返回签名器给出的 64 字节。SDK 验证签名并推导见证所需的公开坐标。
+
+下面的 TypeScript 调用使用钱包已审批的数据和统一快速入门中的桥接配置。使用项目环境时，将配置指向 `.venv/p2pkh-schnorr` 中的 Python 解释器。调用前，钱包先核验入金 outpoint，再审批输出和手续费。[桥接配置](../../../shared/sdk/README.zh-CN.md#quickstart)
+
+```ts
+import { WalletClient } from "./shared/sdk/typescript/index.ts";
+
+const wallet = new WalletClient("p2pkh-schnorr", { ...config, template: "v0.1.0" });
+const receiveScript = wallet.createLock({ publicKey: receiveKeyHex });
+const prevout = wallet.prevoutFromFunding(fundingTxHex, fundingVout);
+if (!wallet.recognize({ script: prevout.script, publicKey: spendKeyHex })) {
+  throw new Error("Funding output does not match the Schnorr key");
+}
+const signedHex = wallet.signPayment({
+  prevout,
+  publicKey: spendKeyHex,
+  outputs: approvedOutputs,
+  feeSats: approvedFeeSats.toString(),
+}, ({ payload }) => signer.signBip340(payload));
+```
+
+签署已组装的交易时，用 `signInput` 传入当前输入索引和已核验的上一输出。使用 Chronicle OTDA 时，根据实际链上下文填写 `chronicleActive`。SINGLE 需要同索引输出。Python、Rust 和 Go 也提供对应的接口。[统一调用表](../../../shared/sdk/README.zh-CN.md#调用与数据)
+
+## 复放公开向量
+
+按项目首页安装依赖，再运行离线示例。其中使用的密钥和辅助随机数均为公开测试数据。
+
+```sh
+.venv/p2pkh-schnorr/bin/python -m shared.sdk.examples.receive_and_pay p2pkh-schnorr
+SCRIPT_LAB_SDK_PYTHON="$PWD/.venv/p2pkh-schnorr/bin/python" \
+  bash shared/verify_node.sh -- bash shared/sdk/verify_wallet.sh p2pkh-schnorr
+```
+
+[环境与验收范围](../README.zh-CN.md#复现验收)

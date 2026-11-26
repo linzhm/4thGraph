@@ -47,3 +47,7 @@ The SM2 candidate uses locking template `1` from v1.0.0 and automatically select
 ## Reproduce the results
 
 The benchmark guide shows how to replay signed transactions against BSV Node 1.2.3 and the pinned chain-gang version. Each project links its protocol specification, security analysis, acceptance cases, and SDK. [Benchmark guide](shared/benchmark.md)
+
+## Experimental projects
+
+P2PKH-Schnorr v0.1.0 verifies BIP340 signatures in BSV Script and provides a fixed x-only key-hash template. Its costs form a baseline for comparing cooperative MuSig2 spending with native multisig. [Project and measurements](projects/p2pkh-schnorr/README.md) · [Wallet integration](projects/p2pkh-schnorr/docs/sdk.en.md#quickstart)
