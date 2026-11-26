@@ -1,6 +1,6 @@
 # Native P2PK and P2PKH baseline
 
-[简体中文](README.zh-CN.md) · [BSV Script Lab](../../README.md)
+[简体中文](README.zh-CN.md) · [4thGraph](../../README.md) · [Project index](../README.md)
 
 ## Developer resources
 
@@ -10,9 +10,9 @@ Receive to P2PK or P2PKH, then sign a payment with your secp256k1 signer.
 
 [Protocol](docs/developer.en.md#protocol) · [Security](docs/developer.en.md#security) · [Verify](#run) · [Transaction costs](#complete-transactions-and-stack-measurements)
 
-Native P2PKH is the first wallet integration example and the transaction-cost baseline for Script Lab. P2PK uses the same secp256k1 signer and provides a control for placing the public key in the output lock. Both templates have public fixtures that you can replay as you integrate another project.
+Native P2PKH is the first wallet integration example and the transaction-cost baseline for 4thGraph. P2PK uses the same secp256k1 signer and provides a control for placing the public key in the output lock. Both templates have public fixtures that you can replay as you integrate another project.
 
-[Reproduce the benchmark](../../docs/benchmark.md)
+[Build locks from Forth](forth/README.md) · [Reproduce the benchmark](../../docs/benchmark.md)
 
 ## Use cases and trade-offs
 

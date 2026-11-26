@@ -1,6 +1,6 @@
 # P2PKH-R1
 
-[English](README.md) · [BSV Script Lab](../../README.zh-CN.md)
+[English](README.md) · [4thGraph](../../README.zh-CN.md) · [项目目录](../README.zh-CN.md)
 
 ## 开发入口
 

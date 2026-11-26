@@ -22,12 +22,13 @@ Run commands are in the [project README](../README.md). To export exact script
 bytes for your **public test key**, from repository root:
 
 ```sh
-.venv/bin/python - <<'PY'
+bash tools/setup-workspaces.sh
+PYTHONPATH=src:. projects/lamport-ots/workspace/venv/bin/python - <<'PY'
 import sys
 from pathlib import Path
 sys.path.insert(0, 'projects/lamport-ots/reference')
 from fixtures import fixture
-Path('/tmp/lamport-test-lock.bin').write_bytes(fixture()[2])
+Path('projects/lamport-ots/workspace/build/test-lock.bin').write_bytes(fixture()[2])
 PY
 ```
 

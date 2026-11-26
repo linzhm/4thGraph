@@ -43,18 +43,19 @@ Script Lab v0.2.0 基线直接使用现有钱包签名入口和固定模板。�
 按[开发入口](developer.zh-CN.md)配置 Python 环境，从仓库根目录运行。
 
 ```sh
-python3.12 -m venv .venv/p2pkh-r1
-.venv/p2pkh-r1/bin/python -m pip install \
+bash tools/setup-workspaces.sh
+python3.12 -m venv projects/p2pkh-r1/workspace/comparison-venv
+projects/p2pkh-r1/workspace/comparison-venv/bin/python -m pip install \
   -r projects/p2pkh-r1/reference/requirements.txt 'ecdsa==0.19.1'
 scratch=$(mktemp -d)
 gh release download v1.20.0 --repo sCrypt-Inc/compiler_dist \
   --pattern 'scryptc-1.20.0-Linux-x86_64' --dir "$scratch"
 chmod +x "$scratch/scryptc-1.20.0-Linux-x86_64"
 GHCRTS=-N2 PYTHONPATH=src:. bash tools/verify_node.sh -- \
-  .venv/p2pkh-r1/bin/python projects/p2pkh-r1/reference/compare_scrypt.py \
-  --compiler "$scratch/scryptc-1.20.0-Linux-x86_64" --output /tmp/r1-scrypt-comparison.json
+  projects/p2pkh-r1/workspace/comparison-venv/bin/python projects/p2pkh-r1/reference/compare_scrypt.py \
+  --compiler "$scratch/scryptc-1.20.0-Linux-x86_64" --output projects/p2pkh-r1/workspace/build/scrypt-comparison.json
 GHCRTS=-N2 PYTHONPATH=src:. bash tools/verify_node.sh --profile default -- \
-  .venv/p2pkh-r1/bin/python projects/p2pkh-r1/reference/compare_scrypt.py \
+  projects/p2pkh-r1/workspace/comparison-venv/bin/python projects/p2pkh-r1/reference/compare_scrypt.py \
   --compiler "$scratch/scryptc-1.20.0-Linux-x86_64" --admission \
-  --output /tmp/r1-scrypt-admission.json
+  --output projects/p2pkh-r1/workspace/build/scrypt-admission.json
 ```

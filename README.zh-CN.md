@@ -65,7 +65,8 @@ flowchart LR
 
 > [!TIP]
 > **验收结果**
-> 检查 Agent 生成的 Forth 规则和完整锁。运行 regtest 后，两笔加一交易应当入块。BSV Node 和 chain-gang 都应拒绝从 0 直接跳到 2 的花费。[计数器源码与复放](projects/pels-counter/README.md)
+>
+> 检查 Agent 生成的 Forth 规则和完整锁。运行 regtest 后，两笔加一交易应当入块。BSV Node 和 chain-gang 都应拒绝从 0 直接跳到 2 的花费。[计数器源码与复放](projects/pels-counter/README.zh-CN.md)
 
 <a name="4thg-quickstart"></a>
 
@@ -78,11 +79,11 @@ flowchart LR
 | 我想做什么 | 可以从这里开始 |
 | --- | --- |
 | 构建付款、接入签名器 | 用原生 P2PK 或 P2PKH 生成锁和签名交易，再从 TypeScript、Rust、Go 或 Python 调用同一套钱包接口。[付款脚本](projects/p2pk-p2pkh-baseline/forth/README.md) · [钱包 SDK](sdk/README.zh-CN.md#quickstart) |
-| 让状态跨交易延续 | 修改计数器的状态转换，观察错误的计数、金额或后继脚本怎样使花费失败。[PELS Counter](projects/pels-counter/README.md) |
-| 让参与者分别提交、最后结算 | 在同一份 Forth 里声明分支和汇合，比较一次提交与分笔提交所需的交易、签名和字节数。[工作流示例](projects/workflow-examples/README.md) |
-| 为计算生成零知识证明 | 从同一份受支持的状态关系生成 Script 或 Circom，使用匹配的设置文件和见证生成 Groth16 证明，再验证它与实际花费的绑定。[证明计数器](projects/proof-counter/README.md) · [Groth16 验证器](docs/groth16-bls12-381.md) |
+| 让状态跨交易延续 | 修改计数器的状态转换，观察错误的计数、金额或后继脚本怎样使花费失败。[PELS Counter](projects/pels-counter/README.zh-CN.md) |
+| 让参与者分别提交、最后结算 | 在同一份 Forth 里声明分支和汇合，比较一次提交与分笔提交所需的交易、签名和字节数。[工作流示例](projects/workflow-examples/README.zh-CN.md) |
+| 为计算生成零知识证明 | 从同一份受支持的状态关系生成 Script 或 Circom，使用匹配的设置文件和见证生成 Groth16 证明，再验证它与实际花费的绑定。[证明计数器](projects/proof-counter/README.zh-CN.md) · [Groth16 验证器](docs/groth16-bls12-381.md) |
 
-[浏览全部项目](projects/README.md)
+[浏览全部项目](projects/README.zh-CN.md)
 
 <a name="results"></a><a name="4thg-comparisons"></a><a name="transaction-costs"></a>
 

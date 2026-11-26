@@ -1,6 +1,6 @@
 # P2PKH-R1
 
-[简体中文](README.zh-CN.md) · [BSV Script Lab](../../README.md)
+[简体中文](README.zh-CN.md) · [4thGraph](../../README.md) · [Project index](../README.md)
 
 ## Developer resources
 

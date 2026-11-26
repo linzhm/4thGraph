@@ -1,5 +1,7 @@
 # 4thGraph repository layout
 
+[Documentation index](README.md) · [Project index](../projects/README.md) · [Wallet SDK](../sdk/README.md)
+
 ```text
 4thGraph/
 ├── .gitignore                    # Local workspaces and generated files
@@ -8,6 +10,7 @@
 ├── README.md / README.zh-CN.md
 ├── .github/workflows/            # Manual project acceptance jobs
 ├── docs/
+│   ├── README.md / README.zh-CN.md
 │   ├── language/
 │   │   ├── README.md             # 4thGraph SDL documentation index
 │   │   ├── specification.md
@@ -22,6 +25,7 @@
 │   ├── chronicle-regression.md
 │   └── repository-layout.md
 ├── projects/
+│   ├── README.md / README.zh-CN.md
 │   ├── lamport-ots/
 │   ├── ml-dsa/
 │   ├── p2pk-p2pkh-baseline/
@@ -34,6 +38,8 @@
 │   ├── workflow-examples/
 │   └── wots-plus/
 ├── sdk/                          # Go, Python, Rust and TypeScript adapters
+│   ├── README.md / README.zh-CN.md
+│   └── docs/                     # Integration guide and API reference
 ├── showcase/                     # Evidence and reproduction links
 ├── skills/4thgraph/
 │   ├── SKILL.md

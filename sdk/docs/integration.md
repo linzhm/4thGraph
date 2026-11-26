@@ -87,7 +87,7 @@ let signed_hex = wallet.sign_payment(
 ```
 
 ```go
-import sdk "github.com/linzhm/bsv-script-lab/sdk/go"
+import sdk "github.com/linzhm/4thGraph/sdk/go"
 
 wallet := sdk.NewWallet("p2pk-p2pkh-baseline", config, "")
 prevout, err := wallet.PrevoutFromFunding(ctx, fundingHex, vout)

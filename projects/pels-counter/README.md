@@ -1,27 +1,14 @@
 # PELS Counter
 
+[简体中文](README.zh-CN.md) · [Project index](../README.md)
+
+**[Build the lock](#build)** · [Fund and replay on regtest](#spend-and-verify-on-regtest) · [Compare fee rules](#declare-a-fee-constraint)
+
 Run the commands from the repository root with Git and Python 3.11 or later. The counter build commands use the Python standard library.
 
 4thGraph compiles `advance` into a covenant that requires one successor with the incremented `u32` and the same covenant code. The [core PELS source](pels-counter-core.fth) takes the successor's amount from the witness and binds that amount to the actual successor. Its spends use different fees chosen by the transaction builder. The [original tutorial](pels-counter.fth) adds a 1,000 sat fee rule.
 
-### Compare the core PELS rule
-
-The replay uses the regtest dependencies listed below.
-
-```sh
-bash tools/setup-workspaces.sh
-export PYTHONPATH=src:.
-counter=projects/pels-counter/pels_counter.py
-source=projects/pels-counter/pels-counter-core.fth
-python3 "$counter" --source "$source" build
-bash tools/verify_node.sh --profile default -- \
-  python "$counter" --source "$source" replay --compare \
-  --output projects/pels-counter/workspace/build/pels-counter-core.json
-```
-
-Pass `--amount <satoshis>` with `spend --parent <raw-tx>` to supply the amount of the sole successor. Replay evaluates different amounts, then rejects mutations that disagree with the witness, the increment, or the preserved code.
-
-### Build
+## Build
 
 ```sh
 export PYTHONPATH=src:.
@@ -35,11 +22,14 @@ The build combines PUSHTX and witness candidates and selects the least serialize
 
 The successor assertions fix the next counter and the code that the next output preserves. The source supplies the amount rule separately. The compiler can also omit a duplicate code fragment from the witness. It links the two positions and checks that their emitted byte ranges match. The lock restores the omitted copy before hashing the successor and the transaction preimage. The replay includes a forged successor with matching tampered witness data to check that the actual input's code still governs the spend.
 
-### Spend and verify on regtest
+## Spend and verify on regtest
 
-On Linux x86-64, set up the [regtest dependencies](../../docs/install.md#cli), including Rust/Cargo and a C toolchain to build the pinned chain-gang package. Run the following after the build step.
+On Linux x86-64, install curl, Rust/Cargo, and a C toolchain for the pinned chain-gang package. The node launcher downloads and verifies BSV Node. [Regtest infrastructure](../../docs/infrastructure.md)
 
 ```sh
+bash tools/setup-workspaces.sh
+export PYTHONPATH=src:.
+counter=projects/pels-counter/pels_counter.py
 python3 -m venv projects/pels-counter/workspace/venv
 . projects/pels-counter/workspace/venv/bin/activate
 python -m pip install ecdsa -r tools/requirements-chronicle.txt
@@ -60,7 +50,7 @@ The result includes `transaction_hex`, the input and output counter values, the 
 
 In the lock, `OP_CODESEPARATOR` places the counter data outside `scriptCode`. The original witness carries the full ForkID ALL preimage. Reconstructed witnesses supply the version, outpoint, `scriptCode`, previous amount, sequence, and locktime. Script builds the required successor and inserts its hash into the preimage. Every layout authenticates the full preimage against the actual spend with native `OP_CHECKSIG`. [PELS construction](https://patents.google.com/patent/EP4374535A1/en)
 
-### Declare a fee constraint
+## Declare a fee constraint
 
 The default source fixes the fee at 1,000 sat. PELS sources can declare an inclusive interval with `pels-fee: 1000 2000 ;`. Equal endpoints let the compiler derive the fee from the rule. Distinct endpoints let the spender supply a fee. Script checks that value, derives the positive successor amount, and binds the entire successor to the actual transaction.
 
@@ -73,3 +63,20 @@ bash tools/verify_node.sh --profile default -- \
 ```
 
 Use the same `--source` with `spend --parent <raw-tx> --fee 1500` to construct a spend inside that interval. The replay checks both fee bounds, rejects claims outside the interval, and rejects a changed successor that disagrees with an allowed fee.
+
+## Compare the core PELS rule
+
+Use the Python environment from the regtest section.
+
+```sh
+bash tools/setup-workspaces.sh
+export PYTHONPATH=src:.
+counter=projects/pels-counter/pels_counter.py
+source=projects/pels-counter/pels-counter-core.fth
+python3 "$counter" --source "$source" build
+bash tools/verify_node.sh --profile default -- \
+  python "$counter" --source "$source" replay --compare \
+  --output projects/pels-counter/workspace/build/pels-counter-core.json
+```
+
+Pass `--amount <satoshis>` with `spend --parent <raw-tx>` to supply the amount of the sole successor. Replay evaluates different amounts, then rejects mutations that disagree with the witness, the increment, or the preserved code.

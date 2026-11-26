@@ -1,6 +1,6 @@
 # Lamport OTS (SHA-256)
 
-[简体中文](README.zh-CN.md) · [BSV Script Lab](../../README.md)
+[简体中文](README.zh-CN.md) · [4thGraph](../../README.md) · [Project index](../README.md)
 
 ## Developer resources
 
@@ -62,8 +62,8 @@ varies with the serialized transaction. Full measurements are in
 From repository root:
 
 ```sh
-python3 -m venv .venv
-. .venv/bin/activate
+python3 -m venv projects/lamport-ots/workspace/venv
+. projects/lamport-ots/workspace/venv/bin/activate
 python -m pip install -r projects/lamport-ots/reference/requirements.txt
 python -m unittest discover -s projects/lamport-ots/reference -p test_lamport.py -v
 python -m unittest discover -s projects/lamport-ots/reference -p test_acceptance.py -v

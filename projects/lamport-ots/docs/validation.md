@@ -39,10 +39,10 @@ stack observation, and opcode counts are in [measurement.json](../template/measu
 ## Reproduction
 
 Use the commands in the [project README](../README.md). For R1 regression together
-with the Lamport node tests, install both projects’ dependencies in `.venv` and run from the repository root.
+with the Lamport node tests, install both projects’ dependencies in `projects/lamport-ots/workspace/venv` and run from the repository root.
 
 ```sh
-PATH="$PWD/.venv/bin:$PATH" PYTHONPATH="$PWD/projects/p2pkh-r1/reference" LAMPORT_RPC_PORT=18443 \
+PATH="$PWD/projects/lamport-ots/workspace/venv/bin:$PATH" PYTHONPATH="$PWD/projects/p2pkh-r1/reference" LAMPORT_RPC_PORT=18443 \
   bash projects/lamport-ots/reference/verify_apple.sh test_payment
 ```
 

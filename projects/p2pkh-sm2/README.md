@@ -1,6 +1,6 @@
 # P2PKH-SM2 v1.1.0 candidate
 
-[简体中文](README.zh-CN.md) · [BSV Script Lab](../../README.md)
+[简体中文](README.zh-CN.md) · [4thGraph](../../README.md) · [Project index](../README.md)
 
 ## Developer resources
 

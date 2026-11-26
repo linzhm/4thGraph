@@ -1,12 +1,12 @@
 # P2PKH-Schnorr v0.6.0
 
-[English](README.md) · [BSV Script Lab](../../README.zh-CN.md)
+[English](README.md) · [4thGraph](../../README.zh-CN.md) · [项目目录](../README.zh-CN.md)
 
 **实验付款模板。** 在 BSV 上向 BIP340 x-only 公钥的哈希付款。钱包只需在固定锁定脚本中填入 20 字节的所有者哈希，外部签名器返回标准 64 字节 BIP340 签名。
 
 两方可以通过 BIP327 MuSig2 共同出款。现有锁接收聚合公钥的横坐标和最终的 BIP340 签名，沿用现有钱包接口。参考夹具覆盖签名中断，并与要求双方都签字的原生 `CHECKMULTISIG` 实测对照。[MuSig2 与原生 2-of-2](docs/threshold-comparison.zh-CN.md)
 
-**[钱包 SDK 接入](docs/sdk.zh-CN.md#quickstart)** · [付款协议](docs/spec.zh-CN.md) · [BIP340](https://github.com/bitcoin/bips/blob/master/bip-0340.mediawiki)
+**[钱包 SDK 接入](docs/sdk.zh-CN.md#quickstart)** · [付款协议](docs/spec.zh-CN.md) · [复现与验证](#复现验收) · [交易成本](#交易实测) · [BIP340](https://github.com/bitcoin/bips/blob/master/bip-0340.mediawiki)
 
 ## 从 Forth 构建
 

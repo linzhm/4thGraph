@@ -1,6 +1,6 @@
 # 原生 P2PK 与 P2PKH 基准
 
-[English](README.md) · [BSV Script Lab](../../README.zh-CN.md)
+[English](README.md) · [4thGraph](../../README.zh-CN.md) · [项目目录](../README.zh-CN.md)
 
 ## 开发入口
 
@@ -10,9 +10,9 @@
 
 [协议规范](docs/developer.zh-CN.md#protocol) · [安全分析](docs/developer.zh-CN.md#security) · [复现与验证](#复现与验收) · [交易成本](#完整交易与栈测量)
 
-原生 P2PKH 是 Script Lab 的第一个钱包接入示例，也是对照其他签名方案的交易成本基准。P2PK 使用同一个 secp256k1 签名器，把公钥放在输出锁中，供对照输入和输出的成本。两种模板都有可复放的公开向量。
+原生 P2PKH 是 4thGraph 的第一个钱包接入示例，也是对照其他签名方案的交易成本基准。P2PK 使用同一个 secp256k1 签名器，把公钥放在输出锁中，供对照输入和输出的成本。两种模板都有可复放的公开向量。
 
-[复现基准](../../docs/benchmark.zh-CN.md)
+[从 Forth 构建脚本](forth/README.md) · [复现基准](../../docs/benchmark.zh-CN.md)
 
 ## 使用场景与取舍
 

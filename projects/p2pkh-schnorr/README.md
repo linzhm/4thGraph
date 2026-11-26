@@ -1,12 +1,12 @@
 # P2PKH-Schnorr v0.6.0
 
-[简体中文](README.zh-CN.md) · [BSV Script Lab](../../README.md)
+[简体中文](README.zh-CN.md) · [4thGraph](../../README.md) · [Project index](../README.md)
 
 **Experimental payment template.** Pay to a BIP340 x-only public-key hash on BSV. A wallet fills one 20-byte owner field in a fixed locking script. Its external signer returns a standard 64-byte BIP340 signature.
 
 Two parties can use BIP327 MuSig2 to spend through the same signer interface. The existing lock accepts the aggregate x-only key and resulting BIP340 signature. The reference fixtures cover an interrupted signing session and compare the same all-participants policy against native `CHECKMULTISIG`. [MuSig2 and native 2-of-2](docs/threshold-comparison.en.md)
 
-**[Wallet SDK quickstart](docs/sdk.en.md#quickstart)** · [Payment protocol](docs/spec.en.md) · [BIP340](https://github.com/bitcoin/bips/blob/master/bip-0340.mediawiki)
+**[Wallet SDK quickstart](docs/sdk.en.md#quickstart)** · [Payment protocol](docs/spec.en.md) · [Validate](#validate-the-baseline) · [Transaction costs](#measured-sizes) · [BIP340](https://github.com/bitcoin/bips/blob/master/bip-0340.mediawiki)
 
 ## Build from Forth
 

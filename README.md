@@ -65,6 +65,7 @@ If regtest is available, demonstrate 0 → 1 → 2, then try jumping directly fr
 
 > [!TIP]
 > **Check the result**
+>
 > Inspect the Forth rule and the full lock. On regtest, both increments should be mined. BSV Node and chain-gang should both reject a spend that jumps directly from 0 to 2. [Counter source and replay](projects/pels-counter/README.md)
 
 <a name="4thg-quickstart"></a>
