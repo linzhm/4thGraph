@@ -52,6 +52,8 @@ PYTHONPATH=src:. python -m fourthgraph.workflow.protocol "projects/workflow-exam
 | BIP143 ALL | `hashPrevouts`、`hashSequence`、`hashOutputs` 和签名类型。链接固定 `scriptCode` 时，打包上下文为 56 B。 | 合约能构造全部输出。上一输出金额留在打包上下文，并由原像认证。 |
 | OTDA ALL | 输入记录、输出计数、有序输出序列和签名类型。链接固定 `scriptCode` 时，打包上下文为 48 B。 | 合约能构造全部输出，且约束不依赖原像未承诺的上一输出金额。 |
 
+Workflow 的双模式锁用打包上下文的长度选择签名模式，并将对应签名类型交给认证片段。两条分支消费同一份有序输出序列。若合约需要验证上一输出金额，构建时只选用 BIP143 路径。
+
 打包上下文字节只衡量一部分见证；评估收益时还应计入应用见证和新增重建代码。Counter 的自引用路径可以携带 `scriptCode`，并在链接验证两个位置的片段相同后省去其中一份。多输入、开放输出以及其他 SIGHASH 模式需要各自证明可重建字段，已有调用方按原有模板继续构建。[重建回归](../../tests/test_workflow.py) · [Counter 见证回归](../../tests/test_counter_optimization.py)
 
 ## 验证路径
