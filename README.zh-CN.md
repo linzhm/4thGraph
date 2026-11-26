@@ -1,16 +1,56 @@
 # 4thGraph
 
-[安装工具链](docs/install.md) · [SDL 语言文档](docs/language/README.md) · [项目](projects/README.md) · [成果](showcase/README.md) · [完整目录](docs/repository-layout.md)
+[English](README.md) · **简体中文**
 
-**4thGraph（4thG）把 Forth 编译成 BSV Script，也能编排多笔交易。** 仓库包含可运行的合约示例、钱包模板和 SDK。
+4thGraph 的目标是让开发者用一套可复现的工具，从 Forth 源码构建、优化和验证 BSV 锁定脚本与多笔交易工作流。项目提供基于 Forth 的 SDL、编译器和标准库，可以生成 Script、交易计划和受支持的 Circom 电路。仓库还提供可运行的合约和钱包项目、regtest 复放与基准、面向 TypeScript、Rust、Go 和 Python 的钱包 SDK，以及用于编写 Forth 和审查构建结果的 Codex skill。
 
-**[立即试用 4thG](#4thg-quickstart)** · [项目改造与对照](#4thg-comparisons) · [钱包 SDK 快速上手](sdk/README.zh-CN.md#quickstart) · [钱包项目](#project-index) · [交易成本](#transaction-costs) · [English](README.md)
+[为何需要 4thGraph](#why-4thgraph) · [架构](#architecture) · [快速上手](#4thg-quickstart) · [SDL 语言文档](docs/language/README.md) · [项目](projects/README.md) · [成果](showcase/README.md) · [钱包 SDK 快速上手](sdk/README.zh-CN.md#quickstart)
+
+<a name="why-4thgraph"></a>
+
+## 为什么需要 4thGraph？
+
+设计 BSV 合约时，既要定义每次花费的规则，也要决定各次花费如何依赖。两条分支的数据和签名如果能同时取得，可能一笔交易就能完成。如果参与者必须独立提交，就需要中间 UTXO 和后续交易来汇合结果。这个选择会影响锁定脚本、见证和整条路径的成本。4thGraph 将计算逻辑和交易约束写在同一份源码里，让开发者可以基于同一套规则编译并复放符合条件的布局。 [工作流示例](projects/workflow-examples/README.md)
+
+### 独特性
+
+- **带类型检查的 Forth，优化依据可查。** 编译器根据栈效果和数值范围检查词定义，并判断哪些 Script 改写适用。构建报告记录改写的源码位置、适用条件和字节变化。 [SDL 规范](docs/language/specification.md)
+- **交易边界由构建决定。** 对受支持的工作流，4thGraph 根据输入和签名角色的可用性、独立提交要求，比较融合和拆分布局。构建报告列出合格的候选和成本估算，并导出有序的交易图。 [候选搜索和交易图](docs/toolchain.md)
+- **同一状态关系可以选择不同验证路径。** 对受支持的 `relation:`，可根据策略和可用的证明材料选择直接 Script 或证明路径。生成的锁将选中的验证路径绑定到实际花费及其后继输出。 [验证路径](docs/language/stdlib.md#验证路径)
+
+<a name="architecture"></a>
+
+## 架构
+
+```mermaid
+flowchart TD
+    source["Forth SDL 和标准库"] --> frontend["解析词和声明，检查栈类型与范围"]
+    frontend --> script["优化并生成 BSV Script"]
+    frontend --> workflow["规划交易依赖和布局"]
+    frontend --> proof["生成电路并构建证明验证器"]
+    script --> artifacts["锁定脚本、交易计划和构建报告"]
+    workflow --> artifacts
+    proof --> artifacts
+    artifacts --> runtime["绑定实际 outpoint，向外部签名器请求签名"]
+    runtime --> replay["在 BSV Node regtest 复放，并用 chain-gang 核验"]
+```
+
+编译器、后端和打包的 Forth 标准库都在 `src/fourthgraph/` 中。交易运行器先将符号输出引用解析为实际 outpoint，再请求签名。复放报告将实际交易、验证引擎的判定和入块记录关联到所选构建。各项目提供用于复现结果的源码、夹具和命令。 [完整目录](docs/repository-layout.md) · [构建与复放手册](docs/toolchain.md) · [成果](showcase/README.md)
 
 <a name="4thg-quickstart"></a>
 
 ## 立即试用 4thG
 
-**[PELS Counter](#pels-counter)** · [P2PKH](#p2pkh-example) · [P2PK](#p2pk-example) · [安装 CLI](docs/install.md)
+使用 Python 3.11 或更新版本。从 4thGraph 检出的根目录运行以下命令，将 CLI 安装到本地工作空间，再编译 PELS 计数器的递增词。
+
+```sh
+bash tools/setup-workspaces.sh
+python3 tools/install.py --prefix workspace/toolchain
+workspace/toolchain/bin/4thgraph projects/pels-counter/pels-counter.fth \
+  --entry advance --optimize safe
+```
+
+JSON 输出列出 `advance` 入口、导入的 `std/u32` 和 8 字节的 Script 片段。接下来可以构建完整的计数器锁，或运行其他示例。 [安装指南](docs/install.md) · [PELS Counter](#pels-counter) · [P2PKH](#p2pkh-example) · [P2PK](#p2pk-example)
 
 <a name="pels-counter"></a>
 
@@ -18,30 +58,22 @@
 
 从 `0` 开始。每次花费把计数加一，并把同一套规则写入后继输出。
 
-**1. 获取源码。** 需要 Git 和 Python 3.11 或更新版本。
-
-```sh
-git clone https://github.com/linzhm/4thGraph.git
-cd 4thGraph
-export PYTHONPATH=src:.
-bash tools/setup-workspaces.sh
-counter=projects/pels-counter/pels_counter.py
-```
-
-**2. 编译锁脚本。** 4thG 编译下面的 Forth 状态转换。示例再把这段规则绑定到实际交易的后继输出。[Forth 源码](projects/pels-counter/pels-counter.fth)
+Forth 状态转换从标准库导入 `u32-inc`。完整示例会加上检查，把状态转换绑定到实际交易的后继输出。 [Forth 源码](projects/pels-counter/pels-counter.fth)
 
 ```forth
-bsv-effect: advance u32 -- u32 ;
-: advance 1 cell>u32 u32+ ;
+REQUIRE stdlib/u32.fth
+: advance ( u32 -- u32 ) u32-inc ;
 ```
 
 ```sh
+export PYTHONPATH=src:.
+counter=projects/pels-counter/pels_counter.py
 python3 "$counter" build
 ```
 
 输出的 `script_hex` 是完整锁脚本。构建只用 Python 标准库。
 
-**3. 花费并验证。** 在装有 `curl`、Rust/Cargo 和 C 编译工具链的 Linux x86-64 上，安装复放依赖并运行。
+在装有 `curl`、Rust/Cargo 和 C 编译工具链的 Linux x86-64 上，可以运行带入金的复放来验证花费。
 
 ```sh
 python3 -m venv workspace/venv
@@ -63,7 +95,7 @@ bash tools/verify_node.sh --profile default -- python "$counter" replay \
 python3 projects/p2pk-p2pkh-baseline/forth/payments.py --hash160 751e76e8199196d454941c45d1b3a323f1433bd6
 ```
 
-锁中写入公钥哈希。花费时压入签名和公钥。[Forth 源码](projects/p2pk-p2pkh-baseline/forth/payments.fth) · [签名交易示例](projects/p2pk-p2pkh-baseline/README.zh-CN.md)
+锁中写入公钥哈希。花费时压入签名和公钥。 [Forth 源码](projects/p2pk-p2pkh-baseline/forth/p2pkh.fth) · [签名交易示例](projects/p2pk-p2pkh-baseline/README.zh-CN.md)
 
 </details>
 
@@ -76,11 +108,17 @@ python3 projects/p2pk-p2pkh-baseline/forth/payments.py --hash160 751e76e8199196d
 python3 projects/p2pk-p2pkh-baseline/forth/payments.py --public-key 0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798
 ```
 
-锁中写入压缩公钥。花费时压入签名。[Forth 源码](projects/p2pk-p2pkh-baseline/forth/payments.fth) · [签名交易示例](projects/p2pk-p2pkh-baseline/README.zh-CN.md)
+锁中写入压缩公钥。花费时压入签名。 [Forth 源码](projects/p2pk-p2pkh-baseline/forth/p2pk.fth) · [签名交易示例](projects/p2pk-p2pkh-baseline/README.zh-CN.md)
 
 </details>
 
-4thG 还支持栈优化、交易边界候选搜索和编译决策报告，可将受支持的 Forth 词编译为 Circom。[工具链手册](docs/toolchain.md) · [Forth 语言规范](docs/language/specification.md)
+<a name="toolchain"></a>
+
+## 工具链与 SDL
+
+编译器检查栈效果和数值范围，优化 Script，并比较符合约束的交易布局。`4thgraph-circuit` 为受支持的关系生成 Circom，`4thgraph-verify` 构建验证路径，`4thgraph-report` 汇总编译决策和已记录的复放结果。 [工具链手册](docs/toolchain.md) · [语言规范](docs/language/specification.md) · [标准库](docs/language/stdlib.md)
+
+安装 Codex skill 后，可以编写 Forth、比较编译产物并审查复放证据。仓库目录说明了工具链、各项目工作空间和成果的存放位置。 [Codex skill](skills/4thgraph/SKILL.md) · [安装 skill](docs/install.md#codex-agent-skill) · [完整目录](docs/repository-layout.md)
 
 <a name="4thg-comparisons"></a>
 
@@ -89,7 +127,7 @@ python3 projects/p2pk-p2pkh-baseline/forth/payments.py --public-key 0279be667ef9
 | 项目 | 对照结果 |
 | --- | --- |
 | P2PKH-R1 Forth v0.3.0 探索版 | Forth 基线逐字节复现 v0.2.0 锁。优化后完整锁由 46,302 B 降到 **45,776 B**，两进两出 ForkID ALL 付款由 93,374 B 降到 **92,322 B**。复放还覆盖 OTDA，以及用 sCrypt 编译曲线内核的版本。[改造与复放](projects/p2pkh-r1/experiments/forth) |
-| BLS12-381 Groth16 验证器（开发中） | 用 Forth 编排链下证明的链上验证，支持全固定、混合以及花费时提供全部公开输入。与 nChain 的对照采用相同的公开输入域和配对预计算数据放置方式。 |
+| [BLS12-381 Groth16 验证器](docs/groth16-bls12-381.md)（开发中） | 用 Forth 编排链下证明的链上验证，支持全固定、混合以及花费时提供全部公开输入。[固定声明对照](projects/proof-counter/experiments/fixed-statement/README.md)使用相同的证明和公开声明测试 4thGraph 和 nChain。 |
 
 <a name="project-index"></a>
 

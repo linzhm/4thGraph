@@ -1,16 +1,54 @@
 # 4thGraph
 
-[Install](docs/install.md) · [SDL language](docs/language/README.md) · [Projects](projects/README.md) · [Results](showcase/README.md) · [Repository layout](docs/repository-layout.md)
+**English** · [简体中文](README.zh-CN.md)
 
-**4thGraph (4thG) compiles Forth to BSV Script and plans transaction workflows.** This repository includes runnable contract examples, wallet templates, and SDKs.
+4thGraph helps developers build, optimize, and verify BSV locking scripts and multi-transaction workflows from Forth source using a reproducible toolchain. It includes a Forth-based SDL, compiler, and standard library for generating Script, transaction plans, and Circom circuits for supported relations. The repository also offers runnable contract and wallet projects, regtest replays and benchmarks, a wallet SDK for TypeScript, Rust, Go, and Python, and a Codex skill for authoring Forth and reviewing build outputs.
 
-**[Try 4thG](#4thg-quickstart)** · [Project comparisons](#4thg-comparisons) · [Wallet SDK quickstart](sdk/README.md#quickstart) · [Wallet projects](#project-index) · [Transaction costs](#transaction-costs) · [简体中文](README.zh-CN.md)
+[Why 4thGraph](#why-4thgraph) · [Architecture](#architecture) · [Quickstart](#4thg-quickstart) · [SDL documentation](docs/language/README.md) · [Projects](projects/README.md) · [Results](showcase/README.md) · [Wallet SDK quickstart](sdk/README.md#quickstart)
+
+<a name="why-4thgraph"></a>
+
+## Why 4thGraph?
+
+A BSV contract needs both rules for each spend and a plan for how spends depend on one another. If two branches can obtain their data and signatures together, they may fit in a single transaction. If each participant must submit independently, the plan needs intermediate UTXOs and a later spend to join their results. That choice changes the locks, witnesses, and cost of the complete path. 4thGraph puts computation and transaction constraints in the same source so developers can build and replay eligible layouts from the same rules. [Workflow examples](projects/workflow-examples/README.md)
+
+### What sets it apart
+
+- **Typed Forth with inspectable optimizations.** Stack effects and numeric ranges let the compiler check definitions and justify Script rewrites. Build reports include the source locations, conditions, and byte changes behind those rewrites. [SDL specification](docs/language/specification.md)
+- **Transaction boundaries are a build decision.** For supported workflows, 4thGraph compares fused and split layouts against input and signer availability and independent submission requirements. It reports which candidates qualify, estimates their costs, and exports an ordered transaction graph. [Candidate search and transaction graphs](docs/toolchain.md)
+- **One state relation can use different verification paths.** A supported `relation:` can use direct Script or a proof-backed path, depending on policy and available proving inputs. The generated lock ties the chosen path to the actual spend and its successor outputs. [Verification paths](docs/language/stdlib.md#验证路径)
+
+## Architecture
+
+```mermaid
+flowchart TD
+    source["Forth SDL and standard library"] --> frontend["Parse words and declarations, check stack types and ranges"]
+    frontend --> script["Optimize and emit BSV Script"]
+    frontend --> workflow["Plan transaction dependencies and layouts"]
+    frontend --> proof["Emit circuits and build proof-backed verifiers"]
+    script --> artifacts["Locks, transaction plans, and build reports"]
+    workflow --> artifacts
+    proof --> artifacts
+    artifacts --> runtime["Bind actual outpoints and request external signatures"]
+    runtime --> replay["Replay on BSV Node regtest and check with chain-gang"]
+```
+
+The compiler and backends live in `src/fourthgraph/` with the bundled Forth standard library. The transaction runtime turns symbolic output references into actual outpoints before requesting signatures. Replay reports tie recorded transactions, engine verdicts, and block inclusion back to the selected build. The runnable projects provide the source, fixtures, and commands to reproduce those results. [Repository layout](docs/repository-layout.md) · [Build and replay guide](docs/toolchain.md) · [Results](showcase/README.md)
 
 <a name="4thg-quickstart"></a>
 
 ## Try 4thG
 
-**[PELS Counter](#pels-counter)** · [P2PKH](#p2pkh-example) · [P2PK](#p2pk-example) · [Install the CLI](docs/install.md)
+Use Python 3.11 or later. From the root of a 4thGraph checkout, install the CLI into the local workspace and compile the PELS counter's increment word.
+
+```sh
+bash tools/setup-workspaces.sh
+python3 tools/install.py --prefix workspace/toolchain
+workspace/toolchain/bin/4thgraph projects/pels-counter/pels-counter.fth \
+  --entry advance --optimize safe
+```
+
+The JSON result shows the `advance` entry, the `std/u32` import, and the eight-byte Script fragment. Continue to the full counter lock or choose another example. [Installation guide](docs/install.md) · [PELS Counter](#pels-counter) · [P2PKH](#p2pkh-example) · [P2PK](#p2pk-example)
 
 <a name="pels-counter"></a>
 
@@ -18,30 +56,22 @@
 
 Start at `0`. Every spend increments the counter and puts the same rules in the next output.
 
-**1. Get the source.** Use Git and Python 3.11 or later.
-
-```sh
-git clone https://github.com/linzhm/4thGraph.git
-cd 4thGraph
-export PYTHONPATH=src:.
-bash tools/setup-workspaces.sh
-counter=projects/pels-counter/pels_counter.py
-```
-
-**2. Compile the lock.** 4thG compiles the Forth transition below. The example adds the checks that bind it to the next transaction output. [Forth source](projects/pels-counter/pels-counter.fth)
+The Forth transition imports the standard library's `u32-inc` word. The complete example adds the checks that bind it to the next transaction output. [Forth source](projects/pels-counter/pels-counter.fth)
 
 ```forth
-bsv-effect: advance u32 -- u32 ;
-: advance 1 cell>u32 u32+ ;
+REQUIRE stdlib/u32.fth
+: advance ( u32 -- u32 ) u32-inc ;
 ```
 
 ```sh
+export PYTHONPATH=src:.
+counter=projects/pels-counter/pels_counter.py
 python3 "$counter" build
 ```
 
 The command prints the full lock as `script_hex`. Building uses the Python standard library.
 
-**3. Spend and verify.** On Linux x86-64 with `curl`, Rust/Cargo, and a C toolchain, install the replay dependencies and run the example.
+To spend and verify on Linux x86-64, use `curl`, Rust/Cargo, and a C toolchain to run the funded replay.
 
 ```sh
 python3 -m venv workspace/venv
@@ -63,7 +93,7 @@ The replay funds `0` and mines `0 → 1 → 2`, deducting **1,000 sat per spend*
 python3 projects/p2pk-p2pkh-baseline/forth/payments.py --hash160 751e76e8199196d454941c45d1b3a323f1433bd6
 ```
 
-The lock commits to a public-key hash. To spend, push the signature and public key. [Forth source](projects/p2pk-p2pkh-baseline/forth/payments.fth) · [Signed transaction examples](projects/p2pk-p2pkh-baseline/README.md)
+The lock commits to a public-key hash. To spend, push the signature and public key. [Forth source](projects/p2pk-p2pkh-baseline/forth/p2pkh.fth) · [Signed transaction examples](projects/p2pk-p2pkh-baseline/README.md)
 
 </details>
 
@@ -76,11 +106,17 @@ The lock commits to a public-key hash. To spend, push the signature and public k
 python3 projects/p2pk-p2pkh-baseline/forth/payments.py --public-key 0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798
 ```
 
-The lock contains the compressed public key. To spend, push the signature. [Forth source](projects/p2pk-p2pkh-baseline/forth/payments.fth) · [Signed transaction examples](projects/p2pk-p2pkh-baseline/README.md)
+The lock contains the compressed public key. To spend, push the signature. [Forth source](projects/p2pk-p2pkh-baseline/forth/p2pk.fth) · [Signed transaction examples](projects/p2pk-p2pkh-baseline/README.md)
 
 </details>
 
-4thG also supports stack optimization, candidate search across transaction boundaries, decision reports, and Circom generation for supported words. [Toolchain guide](docs/toolchain.md) · [Forth language reference](docs/language/specification.md)
+<a name="toolchain"></a>
+
+## Toolchain and SDL
+
+The compiler checks stack effects and numeric ranges, optimizes Script, and compares eligible transaction layouts. `4thgraph-circuit` emits Circom for supported relations, `4thgraph-verify` builds verification paths, and `4thgraph-report` summarizes compiler decisions and recorded replays. [Toolchain guide](docs/toolchain.md) · [Language specification](docs/language/specification.md) · [Standard library](docs/language/stdlib.md)
+
+Install the Codex skill to author Forth, compare compiler outputs, and review replay evidence. The repository layout shows where to find the toolchain, per-project workspaces, and results. [Codex skill](skills/4thgraph/SKILL.md) · [Skill installation](docs/install.md#codex-agent-skill) · [Repository layout](docs/repository-layout.md)
 
 <a name="4thg-comparisons"></a>
 
@@ -89,7 +125,7 @@ The lock contains the compressed public key. To spend, push the signature. [Fort
 | Project | What the comparison shows |
 | --- | --- |
 | P2PKH-R1 Forth v0.3.0 experiment | The Forth baseline reproduces the v0.2.0 lock byte for byte. The optimized lock goes from 46,302 to **45,776 B**, and the two-input, two-output ForkID ALL payment goes from 93,374 to **92,322 B**. The replay also covers OTDA and a build that uses sCrypt-compiled curve kernels. [Experiment and replay](projects/p2pkh-r1/experiments/forth) |
-| BLS12-381 Groth16 verifier (in development) | Forth defines the verification stages for off-chain proofs with fixed, mixed, or spend-time public inputs. The comparison with nChain matches the public-input domain and the placement of precomputed pairing data. |
+| [BLS12-381 Groth16 verifier](docs/groth16-bls12-381.md) (in development) | Forth defines the verification stages for off-chain proofs with fixed, mixed, or spend-time public inputs. The [fixed-statement comparison](projects/proof-counter/experiments/fixed-statement/README.md) uses the same proof and public statement for 4thGraph and nChain. |
 
 <a name="project-index"></a>
 
