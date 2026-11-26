@@ -47,6 +47,10 @@ REQUIRE BSV
 : sm2-pos ( script -- script )
     op-depth op-1sub op-pick op-tuck op-mod op-over op-add op-swap op-mod ;
 
+( The point formulas use bounded residues in Fp. Template 3 also permits negative residues. )
+: sm2-reduce-coordinate ( script -- script )
+    signed-residues? if sm2-f else sm2-pos then ;
+
 : sm2-check-sm2-fields ( script -- script )
     sm2-field op-fromaltstack op-fromaltstack op-fromaltstack op-fromaltstack op-fromaltstack
     4 bsv-num op-pick op-1 sm2-n op-within op-verify 3 bsv-num op-pick op-1 sm2-n op-within
@@ -154,9 +158,9 @@ REQUIRE BSV
     op-dup op-0notequal op-if 2 bsv-num op-pick op-over op-sub 3 bsv-num op-pick 2 bsv-num op-pick
     op-add op-mul 3 bsv-num op-mul 2 bsv-num op-pick 2 bsv-num op-pick op-mul op-dup op-add 3 bsv-num
     op-pick op-over op-mul 5 bsv-num op-pick op-over op-mul op-dup op-add 3 bsv-num op-pick op-dup
-    op-mul op-over op-dup op-add op-sub op-dup 4 bsv-num op-pick op-mul sm2-pos 2 bsv-num op-pick
+    op-mul op-over op-dup op-add op-sub op-dup 4 bsv-num op-pick op-mul sm2-reduce-coordinate 2 bsv-num op-pick
     2 bsv-num op-pick op-sub 6 bsv-num op-pick op-mul 4 bsv-num op-pick op-dup op-mul op-dup op-add
-    op-sub sm2-pos 5 bsv-num op-pick op-dup op-mul 6 bsv-num op-pick op-mul sm2-pos op-toaltstack
+    op-sub sm2-reduce-coordinate 5 bsv-num op-pick op-dup op-mul 6 bsv-num op-pick op-mul sm2-reduce-coordinate op-toaltstack
     op-toaltstack op-toaltstack bsv-empty sm2-drop-two 4 bsv-repeat-code bsv-cat-code op-fromaltstack
     op-fromaltstack op-fromaltstack op-endif ;
 
@@ -174,9 +178,9 @@ REQUIRE BSV
     op-sub 6 bsv-num op-pick 2 bsv-num op-pick op-add 6 bsv-num op-pick 3 bsv-num op-mul op-negate
     9 bsv-num op-pick 3 bsv-num op-mul 1 bsv-num op-pick op-add 6 bsv-num op-pick sm2-cached-b3 op-mul
     11 bsv-num op-pick 3 bsv-num op-pick op-sub 3 bsv-num op-mul op-sub 8 bsv-num op-pick 5 bsv-num
-    op-pick op-mul 7 bsv-num op-pick 2 bsv-num op-pick op-mul op-sub sm2-pos 5 bsv-num op-pick 5 bsv-num
-    op-pick op-mul 3 bsv-num op-pick 3 bsv-num op-pick op-mul op-add sm2-pos 8 bsv-num op-pick 6 bsv-num
-    op-pick op-mul 11 bsv-num op-pick 5 bsv-num op-pick op-mul op-add sm2-pos op-toaltstack
+    op-pick op-mul 7 bsv-num op-pick 2 bsv-num op-pick op-mul op-sub sm2-reduce-coordinate 5 bsv-num op-pick 5 bsv-num
+    op-pick op-mul 3 bsv-num op-pick 3 bsv-num op-pick op-mul op-add sm2-reduce-coordinate 8 bsv-num op-pick 6 bsv-num
+    op-pick op-mul 11 bsv-num op-pick 5 bsv-num op-pick op-mul op-add sm2-reduce-coordinate op-toaltstack
     op-toaltstack op-toaltstack bsv-empty sm2-drop-two 9 bsv-repeat-code bsv-cat-code op-fromaltstack
     op-fromaltstack op-fromaltstack ;
 
@@ -220,11 +224,15 @@ REQUIRE BSV
 : sm2-clear-points ( script -- script )
     bsv-empty sm2-drop-two 51 bsv-repeat-code bsv-cat-code ;
 
+( Canonicalize X and Z before comparing X to a nonnegative multiple of Z modulo p. )
+: sm2-normalize-result ( script -- script )
+    signed-residues? if op-rot sm2-pos op-rot op-rot sm2-pos then ;
+
 : sm2-verify-sm2-point ( script -- script )
     3 bsv-num op-pick op-toaltstack 4 bsv-num op-pick 4 bsv-num op-pick op-add sm2-n op-mod op-dup
     op-verify op-toaltstack op-negate 4 bsv-num op-pick op-add sm2-n op-mod sm2-n op-add sm2-n
     op-mod op-toaltstack 2 bsv-num op-roll op-drop 2 bsv-num op-roll op-drop op-fromaltstack op-swap
-    op-toaltstack op-swap op-toaltstack sm2-b3 op-swap sm2-window op-dup op-verify op-dup
+    op-toaltstack op-swap op-toaltstack sm2-b3 op-swap sm2-window op-dup op-verify sm2-normalize-result op-dup
     sm2-copy-r-low sm2-m 3 bsv-num op-pick op-numequal op-toaltstack sm2-copy-r-high sm2-n op-add
     op-dup sm2-field op-lessthan op-toaltstack 1 bsv-num op-pick sm2-m 3 bsv-num op-pick op-numequal
     op-fromaltstack op-booland op-fromaltstack op-boolor op-verify sm2-clear-points ;

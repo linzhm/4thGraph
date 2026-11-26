@@ -4,7 +4,7 @@
 
 ## Developer resources
 
-**[Wallet SDK quickstart](docs/sdk.en.md#quickstart)** · [v1.2.0 candidate](#v120) · [Unified wallet SDK](../../sdk/README.md#quickstart)
+**[Wallet SDK quickstart](docs/sdk.en.md#quickstart)** · [v1.3.0 candidate](#v130) · [Unified wallet SDK](../../sdk/README.md#quickstart)
 
 Choose a raw SM2 or SignedData signer. The wallet automatically selects a shorter OTDA unlocking script for eligible payments.
 
@@ -25,13 +25,13 @@ For payments that create other SM2 outputs, compare BIP143 and OTDA using the sa
 
 ## Project version and locking template
 
-Version 1.1.0 enables OTDA reconstruction by default for locking template `1` from the first public release, v1.0.0. The v1.2.0 candidate introduces opt-in template `2`. A wallet recognizes and spends either version from the previous output's exact bytes.
+Version 1.1.0 enables OTDA reconstruction by default for locking template `1` from the first public release, v1.0.0. Version 1.2.0 introduces template `2` and the v1.3.0 candidate adds template `3`. The wallet recognizes and spends all three templates from the previous output's exact bytes.
 
 | Property | Value |
 | --- | --- |
 | Recipient identifier | HASH160 of the 65-byte public key `04 \|\| X_BE32 \|\| Y_BE32` |
 | SM2 user ID | The fixed ASCII value `1234567812345678` |
-| Locking script | 144,925 bytes for template `1`, 131,565 bytes for template `2` |
+| Locking script | 144,925 bytes for template `1`, 131,565 for template `2`, and 125,616 for template `3` |
 | Unlocking script | 291 bytes with BIP143, 294 bytes with unpaired OTDA SINGLE, and transaction-dependent for other OTDA modes |
 | Unlocking stack | Signing preimage, uncompressed public key, and 64-byte `r \|\| s` signature |
 | Signature modes | BIP143 and Chronicle OTDA, each with ALL, NONE, or SINGLE and optional ANYONECANPAY |
@@ -41,11 +41,26 @@ The current source includes the [layout manifest](versions/v1.0.0/layout.json),
 [complete payment vector](versions/v1.0.0/spend-all.json), and
 [16 signing preimages](versions/v1.0.0/sighash-modes.json). [v1.0.0 release](https://github.com/linzhm/bsv-script-lab/releases/tag/p2pkh-sm2-v1.0.0)
 
+<a name="v130"></a>
+
+## v1.3.0 candidate
+
+The point-addition and doubling routines use one `OP_MOD` per coordinate and retain signed residues modulo the SM2 field prime. The verifier rejects a zero projective Z coordinate, then makes X and Z nonnegative before checking the two possible field x coordinates of the signature. This saves 5,949 bytes per output. The same OTDA ALL preimage can contain reconstructed outputs of all three templates.
+
+| Measured bytes | v1.2.0 | v1.3.0 | Change |
+| --- | ---: | ---: | ---: |
+| Locking script | 131,565 | 125,616 | −4.5% |
+| BIP143 ALL, 2×2 transaction | 263,834 | 251,936 | −4.5% |
+| OTDA ALL, 2×2 transaction with reconstruction | 287,524 | 275,608 | −4.1% |
+| OTDA ALL, unlocking script per input in that transaction | 12,136 | 12,127 | −0.1% |
+
+Select template `3` for a new output with `--version 3` or SDK `template: "v1.3.0"`. [Template fingerprint](versions/v1.3.0/layout.json) · [Recorded measurements](versions/v1.3.0/measurements.json) · [Forth lock](../../src/fourthgraph/stdlib/wallet/p2pkh-sm2.fth)
+
 <a name="v120"></a>
 
-## v1.2.0 candidate
+## v1.2.0
 
-The generator builds both templates from the Forth lock. Template `2` consumes SM3 operands at their last use and reuses the stack slots of surviving state words across rounds. This saves 13,360 bytes per output. Both versions apply the same SM2, ZA, sighash and transaction-binding rules. The wallet can reconstruct both lock versions in the same OTDA ALL preimage.
+Template `2` consumes SM3 operands at their last use and reuses the stack slots of surviving state words across rounds. This saves 13,360 bytes per output. All templates apply the same SM2, ZA, sighash and transaction-binding rules.
 
 | Measured bytes | v1.1.0 | v1.2.0 | Change |
 | --- | ---: | ---: | ---: |
@@ -136,7 +151,7 @@ Each marginal cell shows the **change in total bytes (output locks / input unloc
 
 ## Reconstruct OTDA outputs
 
-The constructor is part of `scriptSig`. It uses 12,703 bytes for template `1` and 11,816 bytes for template `2`. Template `2` selects reusable fragments from the copies used in the initial encoding and places frequently used fragments near the top of the stack. It reconstructs the exact signing preimage and fills each eligible output's HASH160 slot. The signing callback receives the same message and SM2 user ID as the literal encoding. Use the final signed transaction ID to build a child.
+The constructor is part of `scriptSig`. It uses 12,703 bytes for template `1`, 11,816 for template `2`, and 11,807 for template `3`. Templates `2` and `3` select reusable fragments from the initial encoding and place frequently used fragments near the top of the stack. The constructor reconstructs the exact signing preimage and fills each eligible output's HASH160 slot. The signing callback receives the same message and SM2 user ID as the literal encoding. Use the final signed transaction ID to build a child.
 
 After Chronicle activation, version-2 OTDA ALL can reconstruct matching outputs in their original order. Paired OTDA SINGLE can reconstruct the same-index output and preserve the preceding null outputs in the preimage. Both support `ANYONECANPAY`. Other output templates keep their literal bytes. BIP143, NONE, unpaired SINGLE, version 1 and non-smaller encodings continue with the literal unlocking script. [SDK options](docs/sdk.en.md) · [Constructor and generator](reference/README.md#otda-constructor)
 

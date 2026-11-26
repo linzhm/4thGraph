@@ -3,7 +3,7 @@ import argparse
 from collections import Counter, defaultdict
 from pathlib import Path
 
-from assemble import SCHEDULED_TEMPLATE_VERSION, TEMPLATE_VERSION, TEMPLATE_VERSIONS, forth_compiler, sm3_blocks
+from assemble import TEMPLATE_VERSION, TEMPLATE_VERSIONS, forth_compiler, sm3_blocks
 from p2pkh_sm2 import _canonical
 from fourthgraph.bsv.evaluate import evaluate
 from fourthgraph.bsv.script import asm, number, push
@@ -166,7 +166,7 @@ def generate(version=TEMPLATE_VERSION):
     lock, offset = _canonical(version)
     prefix, suffix = lock[:offset], lock[offset + 20:]
     program = push(prefix) + compile_suffix(
-        suffix, function_library(version), optimize_library=version == SCHEDULED_TEMPLATE_VERSION,
+        suffix, function_library(version), optimize_library=version != TEMPLATE_VERSION,
     )
     if evaluate(program) != ([prefix, suffix], []):
         raise ValueError("OTDA constructor does not reproduce the canonical SM2 template")

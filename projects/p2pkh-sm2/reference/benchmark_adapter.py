@@ -1,7 +1,7 @@
 """Benchmark fixtures for the canonical SM2 payment templates."""
 from functools import partial
 
-from assemble import SCHEDULED_TEMPLATE_VERSION, TEMPLATE_VERSION
+from assemble import TEMPLATE_PROFILES, TEMPLATE_VERSION
 from p2pkh_sm2 import locking_script_from_public_key, sign_input
 from sm2 import N, encode_public, fixture_sign, mul
 from fourthgraph.benchmark.cases import Coin, Template, seed
@@ -25,8 +25,8 @@ def sm2_coin(label, value, *, compress_otda=None, version=TEMPLATE_VERSION):
 TEMPLATES = {
     "v1.0.0": Template(partial(sm2_coin, compress_otda=False)),
     "v1.1.0": Template(sm2_coin),
-    "v1.2.0": Template(partial(sm2_coin, version=SCHEDULED_TEMPLATE_VERSION)),
-}
+} | {profile: Template(partial(sm2_coin, version=version))
+     for version, profile in TEMPLATE_PROFILES.items() if version != TEMPLATE_VERSION}
 
 
 def components(samples):

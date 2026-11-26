@@ -1,4 +1,4 @@
-from assemble import SCHEDULED_TEMPLATE_VERSION
+from assemble import SCHEDULED_TEMPLATE_VERSION, SIGNED_RESIDUE_TEMPLATE_VERSION, TEMPLATE_PROFILES
 from p2pkh_sm2 import locking_script_from_public_key
 from sm2 import USER_ID, encode_public, fixture_sign, mul
 
@@ -35,9 +35,11 @@ def cases():
     yield dict(public_key=encode_public(mul(2)), signer=raw_signer(2), profile="v1.0.0",
                bytes=144925, sighash=0x61, compress_otda=False, destination=destination, reconstructed=False)
 
-    destination = locking_script_from_public_key(encode_public(mul(9)), version=SCHEDULED_TEMPLATE_VERSION)
-    yield dict(public_key=encode_public(mul(2)), signer=raw_signer(2), profile="v1.2.0",
-               bytes=131565, sighash=0x41)
-    yield dict(public_key=encode_public(mul(3)), signer=signed_data_provider, profile="v1.2.0",
-               bytes=131565, sighash=0x61, destination=destination, reconstructed=True,
-               signer_identifier=ISSUER_AND_SERIAL)
+    for version, size in ((SCHEDULED_TEMPLATE_VERSION, 131565), (SIGNED_RESIDUE_TEMPLATE_VERSION, 125616)):
+        destination = locking_script_from_public_key(encode_public(mul(9)), version=version)
+        profile = TEMPLATE_PROFILES[version]
+        yield dict(public_key=encode_public(mul(2)), signer=raw_signer(2), profile=profile,
+                   bytes=size, sighash=0x41)
+        yield dict(public_key=encode_public(mul(3)), signer=signed_data_provider, profile=profile,
+                   bytes=size, sighash=0x61, destination=destination, reconstructed=True,
+                   signer_identifier=ISSUER_AND_SERIAL)

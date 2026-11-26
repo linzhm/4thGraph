@@ -3,7 +3,7 @@ from dataclasses import replace
 import unittest
 from unittest.mock import patch
 
-from assemble import SCHEDULED_TEMPLATE_VERSION, TEMPLATE_VERSIONS
+from assemble import SCHEDULED_TEMPLATE_VERSION, SIGNED_RESIDUE_TEMPLATE_VERSION, TEMPLATE_VERSIONS
 from generate_otda_constructor import generate
 from p2pkh_sm2 import _otda_pattern, current_input_unlock, locking_script_from_public_key, sign_input
 from fourthgraph.benchmark.validation import chain_verdict
@@ -130,6 +130,21 @@ class ConstructorTests(unittest.TestCase):
         oversized = replace(pattern, program=pattern.program + bytes(len(tx.serialize())))
         with patch('p2pkh_sm2._otda_pattern', return_value=oversized):
             self.sign_modes(tx, 0x61, (False, False))
+
+    def test_three_lock_versions_reconstruct_in_one_preimage(self):
+        versions = (SCHEDULED_TEMPLATE_VERSION, SIGNED_RESIDUE_TEMPLATE_VERSION)
+        funding = tuple(
+            replace(parent, outputs=(Output(10_000, locking_script_from_public_key(key, version=version)),))
+            for parent, key, version in zip(self.funding, self.keys, versions, strict=True)
+        )
+        inputs = tuple(Input(parent.txid_wire(), 0) for parent in funding)
+        outputs = (self.destinations[0], *(Output(1_000, parent.outputs[0].script) for parent in funding))
+        tx = Transaction(inputs, outputs)
+        signed = self.sign_modes(tx, 0x61, (True, True), funding=funding)
+        # Copying any complete output verbatim would exceed this bound.
+        self.assertLess(max(len(item.script) for item in signed.inputs), 40_000)
+        for index in range(len(inputs)):
+            check_node(signed, funding, index, old_output=True)
 
     def test_reconstruction_requires_chronicle_before_signing(self):
         tx = Transaction(self.inputs, self.destinations)

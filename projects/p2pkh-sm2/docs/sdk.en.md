@@ -2,7 +2,7 @@
 
 [简体中文](sdk.zh-CN.md) · [Developer guide](developer.en.md#sdk) · [Wallet quickstart](../../../sdk/README.md)
 
-Use a 65-byte uncompressed SM2 key or a 20-byte owner hash for the receive script. For new outputs, the default `template: "v1.0.0"` selects template `1`. Set `template: "v1.2.0"` to opt in to the smaller template `2`. Recognition and spending use the actual previous locking script. Pass the 32-byte transaction message and the supplied user ID to the SM2 signer. The raw response is a 64-byte `r ∥ s` signature. For a GB/T 35275-2026 provider, set `signerIdentifier` to the trusted DER issuer-and-serial hex and return the requested DER SignedData.
+Use a 65-byte uncompressed SM2 key or a 20-byte owner hash for the receive script. For new outputs, the default `template: "v1.0.0"` selects template `1`. Set `template: "v1.2.0"` for template `2` or `template: "v1.3.0"` for the smaller template `3`. Recognition and spending use the actual previous locking script. Pass the 32-byte transaction message and the supplied user ID to the SM2 signer. The raw response is a 64-byte `r ∥ s` signature. For a GB/T 35275-2026 provider, set `signerIdentifier` to the trusted DER issuer-and-serial hex and return the requested DER SignedData.
 
 Set `chronicleActive` from the actual spend context when using OTDA. The SDK automatically selects the shorter encoding for eligible version-2 OTDA ALL and paired SINGLE spends, including ANYONECANPAY. The signer receives the same message and user ID for both encodings. Use the final signed transaction ID when constructing a child.
 

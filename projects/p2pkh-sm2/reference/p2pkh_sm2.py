@@ -3,7 +3,7 @@ from functools import cache
 from hashlib import sha256
 import json
 from pathlib import Path
-from assemble import SCHEDULED_TEMPLATE_VERSION, TEMPLATE_VERSION, assemble
+from assemble import TEMPLATE_PROFILES, TEMPLATE_VERSION, assemble
 from sighash import authorization
 from sm2 import USER_ID,hash256,public_key_hash160,verify
 from fourthgraph.bsv.otda_reconstruction import Reconstruction, reconstruct_mixed
@@ -11,13 +11,10 @@ from fourthgraph.bsv.script import push
 from fourthgraph.bsv.transaction import Transaction,Input,Output,preimage_all,amount
 
 VERSIONS = Path(__file__).resolve().parents[1] / 'versions'
-LOCK_LAYOUTS = {
-    TEMPLATE_VERSION: VERSIONS / 'v1.0.0/layout.json',
-    SCHEDULED_TEMPLATE_VERSION: VERSIONS / 'v1.2.0/layout.json',
-}
-CONSTRUCTOR_LAYOUTS = {
+LOCK_LAYOUTS = {version: VERSIONS / profile / 'layout.json'
+                for version, profile in TEMPLATE_PROFILES.items()}
+CONSTRUCTOR_LAYOUTS = LOCK_LAYOUTS | {
     TEMPLATE_VERSION: VERSIONS / 'v1.1.0/layout.json',
-    SCHEDULED_TEMPLATE_VERSION: LOCK_LAYOUTS[SCHEDULED_TEMPLATE_VERSION],
 }
 RECONSTRUCT_ALL = frozenset((0x61, 0xe1))
 RECONSTRUCT_SINGLE = frozenset((0x63, 0xe3))

@@ -10,7 +10,8 @@ import subprocess
 import sys
 import tempfile
 import unittest
-from assemble import SCHEDULED_TEMPLATE_VERSION, TEMPLATE_VERSIONS, assemble, sm3_blocks
+from assemble import SIGNED_RESIDUE_TEMPLATE_VERSION, TEMPLATE_VERSION, TEMPLATE_VERSIONS
+from assemble import assemble, forth_compiler, sm3_blocks
 from p2pkh_sm2 import *
 from sm2 import *
 from sm3_script import hash_script,compress,IV
@@ -62,8 +63,8 @@ def native_checker(tx,index,value):
     return check
 
 
-def fixture(d=1,k=2):
-    key=encode_public(mul(d)); lock=locking_script_from_public_key(key)
+def fixture(d=1,k=2,*,template_version=TEMPLATE_VERSION):
+    key=encode_public(mul(d)); lock=locking_script_from_public_key(key, version=template_version)
     funding=Transaction((Input(b'\x22'*32,0),),(Output(1000,lock),))
     tx=Transaction((Input(funding.txid_wire(),0),),(Output(900,b'\x51'),))
     pre=preimage_all(tx,0,1000); sig=fixture_sign(d,hash256(pre),k)
@@ -157,21 +158,24 @@ class SM2Tests(unittest.TestCase):
 
     def test_forth_build_and_recognition(self):
         owner = bytes(range(20))
+        sizes = []
         for version in TEMPLATE_VERSIONS:
             with self.subTest(version=version):
                 lock = locking_script_from_owner_hash(owner, version=version)
                 self.assertEqual(lock, assemble(owner, version))
-                self.assertEqual(lock, assemble_blocks(ROOT/'reference/asm', owner, sm3_blocks(version=version)))
+                if version != SIGNED_RESIDUE_TEMPLATE_VERSION:
+                    self.assertEqual(lock, assemble_blocks(ROOT/'reference/asm', owner, sm3_blocks(version=version)))
                 self.assertEqual(identify(lock), (version, owner))
                 self.assertIsNone(identify(lock[:-1]))
                 self.assertIsNone(identify(lock[:-1] + b'\x51'))
-        self.assertLess(len(locking_script_from_owner_hash(owner, version=SCHEDULED_TEMPLATE_VERSION)),
-                        len(locking_script_from_owner_hash(owner)))
+                sizes.append(len(lock))
+        self.assertEqual(sizes, sorted(set(sizes), reverse=True))
 
     def test_full_script_random_keys(self):
-        for d,k in ((1,2),(7,19),(19,7),(N-2,N-1),(12345,67890)):
-            key,lock,parent,tx,pre,sig=fixture(d,k)
-            with self.subTest(d=d): self.assertTrue(valid_script(lock,[pre,key,sig],tx))
+        for version in (TEMPLATE_VERSION, SIGNED_RESIDUE_TEMPLATE_VERSION):
+            for d,k in ((1,2),(7,19),(19,7),(N-2,N-1),(12345,67890)):
+                key,lock,parent,tx,pre,sig=fixture(d,k,template_version=version)
+                with self.subTest(version=version,d=d): self.assertTrue(valid_script(lock,[pre,key,sig],tx))
 
     def test_script_rejects_invalid_signature_and_key(self):
         key,lock,parent,tx,pre,sig=fixture()
@@ -201,9 +205,11 @@ class SM2Tests(unittest.TestCase):
         # s=1, t=2, Q=-(1/2)G => sG+tQ=infinity.
         key=encode_public(mul(N-pow(2,-1,N)))
         self.assertFalse(verify_digest(key,bytes(32),be32(1)+be32(1)))
-        point_code=assemble_blocks(ROOT/'reference/asm',bytes(20),entry='VERIFY_SM2_POINT')
-        with self.assertRaises(ScriptError):
-            evaluate(b''.join(number(x) for x in (P,1,1,*parse_public(key),0))+point_code)
+        inputs=b''.join(number(x) for x in (P,1,1,*parse_public(key),0))
+        for version in (TEMPLATE_VERSION, SIGNED_RESIDUE_TEMPLATE_VERSION):
+            point_code=forth_compiler(bytes(20), version).emit("sm2-verify-sm2-point", b"")
+            with self.subTest(version=version), self.assertRaises(ScriptError):
+                evaluate(inputs+point_code)
 
     def test_high_x_candidate(self):
         # Construct a valid verification relation with x >= n (negligible random probability).
@@ -215,8 +221,11 @@ class SM2Tests(unittest.TestCase):
         e=123; r=(e+x)%N; s=456; t=(r+s)%N
         q=mul(pow(t,-1,N),add((x,y),mul(N-s)))
         self.assertTrue(verify_digest(encode_public(q),be32(e),be32(r)+be32(s)))
-        point_code=assemble_blocks(ROOT/'reference/asm',bytes(20),entry='VERIFY_SM2_POINT')
-        self.assertEqual(evaluate(b''.join(number(v) for v in (P,r,s,*q,e))+point_code),([],[]))
+        inputs=b''.join(number(v) for v in (P,r,s,*q,e))
+        for version in (TEMPLATE_VERSION, SIGNED_RESIDUE_TEMPLATE_VERSION):
+            point_code=forth_compiler(bytes(20), version).emit("sm2-verify-sm2-point", b"")
+            with self.subTest(version=version):
+                self.assertEqual(evaluate(inputs+point_code),([],[]))
 
     def test_payment_vector_and_consecutive_payments(self):
         v=json.loads((ROOT/'versions/v1.0.0/spend-all.json').read_text())
@@ -257,9 +266,10 @@ class SM2Tests(unittest.TestCase):
         self.assertEqual(result['script_sha256'], manifest['base_script_sha256'])
         self.assertEqual(subprocess.check_output([*cli, '--format', 'raw']), lock)
         self.assertEqual(subprocess.check_output([*cli, '--version', '1', '--format', 'raw']), lock)
-        candidate = assemble(base_owner, SCHEDULED_TEMPLATE_VERSION)
-        self.assertEqual(subprocess.check_output([*cli, '--version', '2', '--format', 'raw']), candidate)
-        for version in (0, 3, 4):
+        for version in TEMPLATE_VERSIONS[1:]:
+            candidate = assemble(base_owner, version)
+            self.assertEqual(subprocess.check_output([*cli, '--version', str(version), '--format', 'raw']), candidate)
+        for version in (0, 4, 5):
             with self.subTest(version=version):
                 for construct in (assemble, locking_script_from_owner_hash):
                     with self.assertRaisesRegex(ValueError, 'unsupported P2PKH-SM2 template'):
