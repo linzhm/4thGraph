@@ -123,10 +123,12 @@ lock: retain ( value:cell ) value 0 > dup IF 1 drop THEN ;
 """)
         decide = frontend.words["decide"]
         retain = frontend.words["retain"]
-        self.assertEqual(len(compile_word(decide).script), 9)
+        baseline = compile_word(decide).script
+        self.assertEqual(len(compile_word(decide, check_input_ranges=False).script), 9)
         for mode in ("safe", "stack"):
             compiled = compile_word(decide, mode)
-            self.assertEqual(compiled.script, asm("OP_0 OP_GREATERTHAN OP_IF OP_1 OP_ELSE OP_0 OP_ENDIF"))
+            self.assertEqual(len(baseline) - len(compiled.script), 2)
+            self.assertTrue(compiled.script.endswith(asm("OP_0 OP_GREATERTHAN OP_IF OP_1 OP_ELSE OP_0 OP_ENDIF")))
             rewrite, = compiled.rewrites
             self.assertEqual((rewrite.rule, rewrite.script_bytes), ("comparison-feeds-if", (3, 1)))
             retained = compile_word(retain, mode)

@@ -61,7 +61,12 @@ class InstallTests(unittest.TestCase):
             source = workspace / "library.fth"
             source.write_text("REQUIRE stdlib/p256.fth\n")
             p256 = json.loads(run("4thgraph", str(source), "--entry", "p256-double"))
-            self.assertEqual(p256["script_bytes"], 76)
+            fragment = json.loads(run("4thgraph", str(source), "--entry", "p256-double", "--assume-input-ranges"))
+            self.assertEqual(fragment["script_bytes"], 76)
+            self.assertEqual(p256["input_range_checks"], "emitted")
+            self.assertEqual(fragment["input_range_checks"], "assumed")
+            self.assertGreater(p256["script_bytes"], fragment["script_bytes"])
+            self.assertTrue(p256["script_hex"].endswith(fragment["script_hex"]))
             self.assertEqual({library["name"] for library in p256["libraries"]}, {"std/bsv", "std/p256"})
 
             catalog = json.loads(run("4thgraph", "--capabilities"))["libraries"]

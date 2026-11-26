@@ -112,6 +112,8 @@ def build_block(body, stack, rewrites, *, schedule=False):
                       + asm("OP_ELSE") + emit(no_code) + asm("OP_ENDIF"))
             code.append(Operation(source, (flag,), (), script, depth, arms=(yes_code, no_code)))
         else:
+            if node.location == "build":
+                require_script(node)
             argc = len(node.takes)
             start = len(stack) - argc
             args = tuple(stack[start:])
@@ -236,15 +238,17 @@ def emit_lock_block(block, inputs, rewrites, *, optimize):
     return emit_steps(inputs, steps, block.returns, compact=True)
 
 
-def compile_word(word, optimization=BASELINE, *, check_input_ranges=True, max_expansion=MAX_EXPANSION):
+def compile_word(word, optimization=BASELINE, *, check_input_ranges=True, spend_entry=False,
+                 max_expansion=MAX_EXPANSION):
     if optimization not in OPTIMIZATIONS:
         raise ValueError(f"unknown optimization {optimization!r}")
-    if optimization == BASELINE and word.lock is None:
-        return CompiledWord(lower(word, check_input_ranges=check_input_ranges, max_expansion=max_expansion))
     require_script(word)
+    if optimization == BASELINE and word.lock is None:
+        return CompiledWord(lower(word, check_input_ranges=check_input_ranges, spend_entry=spend_entry,
+                                  max_expansion=max_expansion))
     check_word_expansion(word, max_expansion)
     rewrites = []
-    prefix = entry_range_checks(word) if check_input_ranges else b""
+    prefix = entry_range_checks(word, spend_entry=spend_entry) if check_input_ranges else b""
     try:
         if word.lock is not None:
             script = emit_lock_block(word.lock, tuple(range(len(word.takes))), rewrites,

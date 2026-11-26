@@ -48,15 +48,19 @@ class Primitive:
     requires_checksig: bool = False
     expansion_cost: int = 1
     branch_code: bytes | None = None  # Emits canonical Script truth for OP_IF.
+    build_only: bool = False
 
     @property
     def location(self):
+        if self.build_only:
+            return "build"
         return "host" if self.code is None else "script"
 
 
-def script_word(takes, gives, code, run, *, may_fail=False):
-    return Primitive(tuple(takes.split()), (gives,), code, lambda *values: (run(*values),), "script execution",
-                     may_fail=may_fail)
+def script_word(takes, gives, code, run, *, may_fail=False, build_only=False):
+    evidence = "build-time Script construction" if build_only else "script execution"
+    return Primitive(tuple(takes.split()), (gives,), code, lambda *values: (run(*values),), evidence,
+                     may_fail=may_fail, build_only=build_only)
 
 
 def wrap_cell(value):

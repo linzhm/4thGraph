@@ -12,7 +12,7 @@ import re
 from fourthgraph import PROJECT_VERSION
 from fourthgraph.bsv.script import asm, number
 
-from fourthgraph.compiler.ranges import NUMERIC_TYPES, RangeType, Slot, primitive_outputs, range_bound
+from fourthgraph.compiler.ranges import NUMERIC_TYPES, RangeType, Slot, primitive_outputs, range_bound, script_num_checks
 from fourthgraph.stdlib import (
     WALLET_BACKEND, LibraryImport, interface_digest, p256_vocabulary, read_library, required_source,
 )
@@ -339,7 +339,7 @@ def body(tokens, stack, words, opener, ranges, *, native_opcodes=False):
             takes = tuple(map(Slot.of, instruction.takes))
             transform(stack, takes, (), token)
             stack.extend(primitive_outputs(instruction, args))
-            if instruction.location == "host":
+            if instruction.location in ("host", "build"):
                 host_uses[token] = None
         instructions.append(Located(instruction, token))
     raise opener.error(f"unterminated {opener.text!r}")
@@ -373,7 +373,9 @@ def resolve(tokens, token, words, ranges):
 
 def require_script(word):
     if word.location == "build":
-        raise CompileError(f"{word.name!r} is a build-time Script constructor")
+        if isinstance(word, Word) and word.name is not None:
+            raise CompileError(f"{word.name!r} is a build-time Script constructor")
+        raise CompileError("build-time Script constructors cannot compile to BSV Script")
     if word.location != "script":
         uses = ", ".join(f"{token.text} ({token.location})" for token in dict.fromkeys(word.host_uses))
         suffix = f": {uses}" if uses else ""
@@ -1167,29 +1169,31 @@ def check_word_expansion(word, max_expansion):
         raise CompileError(f"word {word.name!r} exceeds the {max_expansion}-operation expansion budget before lowering")
 
 
-def lower(word, *, check_input_ranges=True, max_expansion=MAX_EXPANSION):
+def lower(word, *, check_input_ranges=True, spend_entry=False, max_expansion=MAX_EXPANSION):
+    require_script(word)
     if word.lock is not None:
         from fourthgraph.compiler.lowering import compile_word
 
         return compile_word(word, check_input_ranges=check_input_ranges, max_expansion=max_expansion).script
-    require_script(word)
     check_word_expansion(word, max_expansion)
     try:
-        prefix = entry_range_checks(word) if check_input_ranges else b""
+        prefix = entry_range_checks(word, spend_entry=spend_entry) if check_input_ranges else b""
         return prefix + lower_body(word.body)
     except RecursionError as error:
         raise CompileError("expanded conditional nesting exceeds the compiler's recursion limit") from error
 
 
-def entry_range_checks(word):
-    refinements = {item.name: item for item in word.ranges}
+def entry_range_checks(word, *, spend_entry=False):
+    spend_entry = spend_entry or word.lock is not None
+    refinements = {item.name for item in word.ranges}
     code = bytearray()
-    for depth, kind in enumerate(reversed(word.takes)):
-        if kind not in refinements:
+    inputs = tuple(zip(word.takes, word.slots(word.takes), strict=True))
+    for depth, (kind, slot) in enumerate(reversed(inputs)):
+        if kind not in refinements and not (spend_entry and slot.kind in NUMERIC_TYPES):
             continue
         if depth:
             code.extend(asm("OP_OVER") if depth == 1 else number(depth) + asm("OP_PICK"))
-        code.extend(refinements[kind].check().code)
+        code.extend(script_num_checks(slot.bounds))
         if depth:
             code.extend(asm("OP_DROP"))
     return bytes(code)
@@ -1198,6 +1202,8 @@ def entry_range_checks(word):
 def lower_body(instructions):
     folded = []
     for instruction, _ in expanded(instructions):
+        if isinstance(instruction, Primitive) and instruction.location == "build":
+            require_script(instruction)
         if isinstance(instruction, Primitive) and not instruction.may_fail:
             count = len(instruction.takes)
             args = folded[-count:]
