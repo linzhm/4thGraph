@@ -7,6 +7,7 @@ from io import StringIO
 import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
@@ -23,6 +24,28 @@ from fourthgraph.replay.typed_workflow import SOURCE
 
 
 class WorkflowTests(unittest.TestCase):
+    def test_linked_context_preserves_output_vector_serialization(self):
+        script_code = b"\x51"
+        for flag, packed_size in ((FLAG, LINKED_CONTEXT_BYTES), (OTDA_ALL, LINKED_CONTEXT_BYTES - 8)):
+            for output_count in (1, 2, 16, 17, 252, 253):
+                labels = tuple(range(output_count))
+                template = SimpleNamespace(inputs=("state",), outputs=labels)
+                context = LinkedContext.for_template(template, flag, script_code, labels,
+                                                     requires_previous_amount=False)
+                script = asm("OP_SWAP OP_TOALTSTACK") + context.bind_outputs() + asm("OP_FROMALTSTACK")
+                outputs = tuple(Output(index, script_code) for index in labels)
+                serialized = b"".join(output.serialize() for output in outputs)
+                for version, sequence, locktime in ((1, 0xFFFFFFFE, 87), (2, 0xFFFFFFFF, 0)):
+                    with self.subTest(flag=hex(flag), output_count=output_count, version=version):
+                        tx = Transaction((Input(bytes(range(32)), 257, sequence=sequence),),
+                                         outputs, version=version, locktime=locktime)
+                        expected = (preimage_forkid(tx, 0, 1001, script_code, flag) if flag == FLAG
+                                    else preimage_otda(tx, 0, script_code, flag))
+                        packed = context.pack(expected)
+                        self.assertEqual(len(packed), packed_size)
+                        self.assertEqual(evaluate_script(script, [b"sentinel", packed, serialized]),
+                                         ([b"sentinel", expected], []))
+
     def test_cli_aliases_emit_identical_canonical_artifacts(self):
         keys = TestKeys().public
         with TemporaryDirectory() as scratch:
