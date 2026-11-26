@@ -13,7 +13,7 @@ from fourthgraph.compiler.wordsets import Literal, Primitive, script_word
 SOURCE = Path(__file__).with_name("deferred-activation.fth")
 DEFERRED_TEMPLATE_VERSION = "0.3.0"
 RELEASE_OPTIMIZATION = "stack"
-RELEASE_TEMPLATE = SOURCE.parents[1] / "template" / f"v{DEFERRED_TEMPLATE_VERSION}"
+RELEASE_TEMPLATE = SOURCE.parents[1] / "versions" / f"v{DEFERRED_TEMPLATE_VERSION}"
 FIELD_MARKERS = {
     "funding-owner": b"\xf1" * 20,
     "target-script-hash": b"\xf2" * 32,

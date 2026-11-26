@@ -4,7 +4,6 @@ import csv
 from dataclasses import replace
 from hashlib import sha256
 import os
-from pathlib import Path
 from random import Random
 import unittest
 
@@ -15,7 +14,7 @@ from coincurve.context import GLOBAL_CONTEXT
 from bip340 import FIELD, ORDER, lift_x, to_bytes, verify
 from payment import lock_for_public_key, sign_payment, sign_spend
 from schnorr_script import (
-    _contract, authorization_codes, compile_unlock, compiled_template, lock_for_owner, owner_hash, recognize, verifier,
+    TEMPLATE_DIR, _contract, authorization_codes, compile_unlock, compiled_template, lock_for_owner, owner_hash, recognize, verifier,
 )
 from fourthgraph.benchmark.validation import Node, chain_verdict
 from fourthgraph.bsv.evaluate import ScriptError, evaluate
@@ -23,7 +22,7 @@ from fourthgraph.bsv.script import decode_num, encode_num, number, push
 from fourthgraph.bsv.spend_authorization import SpendAuthorization, prepare_authorization
 from fourthgraph.bsv.transaction import CHRONICLE, Input, Output, Transaction
 
-VECTORS = Path(__file__).resolve().parents[1] / "template" / "bip340-vectors.csv"
+VECTORS = TEMPLATE_DIR / "bip340-vectors.csv"
 HALF_RADIX = 1 << 128
 LAMBDA = 0x5363AD4CC05C30E0A5261C028812645A122E22EA20816678DF02967C1B23BD72
 MODES = (0x41, 0x42, 0x43, 0x61, 0x62, 0x63, 0xC1, 0xC2, 0xC3, 0xE1, 0xE2, 0xE3)

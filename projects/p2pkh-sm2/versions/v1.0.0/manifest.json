@@ -1,0 +1,17 @@
+{
+  "version": "1.0.0",
+  "previous": null,
+  "artifacts": [
+    "layout.json"
+  ],
+  "fixtures": [
+    "sm2-standard.json",
+    "spend-all.json",
+    "sighash-modes.json",
+    "signed-data-appendix-a1.hex"
+  ],
+  "evidence": [],
+  "integration": "docs/sdk.en.md",
+  "build": "PYTHONPATH=src:. python projects/p2pkh-sm2/reference/generate_lock.py --owner-hash160 0000000000000000000000000000000000000000",
+  "verify": "bash projects/p2pkh-sm2/reference/verify.sh"
+}

@@ -1,0 +1,12 @@
+{
+  "version": "0.1.0",
+  "previous": null,
+  "artifacts": [
+    "build.json"
+  ],
+  "fixtures": [],
+  "evidence": [],
+  "integration": "README.md#build",
+  "build": "PYTHONPATH=src:. python projects/pels-counter/pels_counter.py build",
+  "verify": "PYTHONPATH=src:. bash tools/verify_node.sh --profile default -- python projects/pels-counter/pels_counter.py replay --output /tmp/pels-replay.json"
+}

@@ -18,8 +18,9 @@ from forth_lock import RELEASE_OPTIMIZATION, RELEASE_TEMPLATE, compile_template
 from fourthgraph.bsv.script import push
 from fourthgraph.bsv.transaction import CHRONICLE, SIGHASH_TYPES, Input, Transaction, hash256
 
-TEMPLATE = Path(__file__).resolve().parents[1] / 'template'
-ASSEMBLY_TEMPLATE = TEMPLATE / f'v{ASSEMBLY_TEMPLATE_VERSION}'
+VERSIONS = RELEASE_TEMPLATE.parent
+TEMPLATE = VERSIONS / f'v{LEGACY_TEMPLATE_VERSION}'
+ASSEMBLY_TEMPLATE = VERSIONS / f'v{ASSEMBLY_TEMPLATE_VERSION}'
 TEMPLATE_RECIPES = (
     (TEMPLATE, LEGACY_TEMPLATE_VERSION, None, None),
     (ASSEMBLY_TEMPLATE, TARGET_R1_VERSION, ASSEMBLY_TEMPLATE_VERSION, None),

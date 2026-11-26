@@ -1,0 +1,667 @@
+{
+  "schema_version": 2,
+  "payment_shape": {
+    "inputs": 2,
+    "outputs": 2
+  },
+  "source_sha256": "654e8130d49704c4a99961b2763216eebcd1c76e880ad65e284033491128a94f",
+  "dependencies": {
+    "r1.fth": "8acaf9f81bc367c98f9a42d561e302c6f27cc376ad3f3f8c8d49f5176cbaa7d9"
+  },
+  "workflow": "explicit",
+  "proposal": null,
+  "scans": {},
+  "budget": {
+    "local_candidates": 6,
+    "full_candidates": 5,
+    "point_vectors_per_candidate": 32,
+    "timing_samples": 7,
+    "full_acceptance_matrix": true
+  },
+  "candidates": {
+    "v0.6.0": {
+      "status": "verified",
+      "template_version": "0.6.0",
+      "construction": "split-5x4-affine-g",
+      "build_source": {
+        "source_sha256": "654e8130d49704c4a99961b2763216eebcd1c76e880ad65e284033491128a94f",
+        "dependencies": {
+          "r1.fth": "8acaf9f81bc367c98f9a42d561e302c6f27cc376ad3f3f8c8d49f5176cbaa7d9"
+        }
+      },
+      "reconstruction_byte_match": true,
+      "estimated": {
+        "window_sections_bytes": {
+          "table_setup": 3603,
+          "digit_extraction": 902,
+          "window_loop": 34451
+        },
+        "window_bytes": 38956,
+        "static_window_mul_opcodes": 5407,
+        "affine_g": {
+          "calls": 51,
+          "generic_kernel_bytes": 123,
+          "affine_kernel_bytes": 114,
+          "kernel_bytes_saved": 459,
+          "lookup_bytes_saved": 153,
+          "guard_bytes_added": 255,
+          "multiplications_removed_on_nonzero_path": 153,
+          "formula": {
+            "selected": "rewrite-and-schedule",
+            "candidates": {
+              "baseline": 393,
+              "schedule": 149,
+              "rewrite-and-schedule": 114
+            },
+            "rewrites": {
+              "multiply-by-one": 3,
+              "expand-cross-products": 3,
+              "fuse-cached-divisor-load": 3
+            },
+            "max_magnitude_bits": 1280
+          }
+        },
+        "lock_bytes": 41364,
+        "otda_program_bytes": 5658,
+        "payment_bytes": {
+          "bip143-all": 83498,
+          "otda-all": 94864,
+          "otda-single": 94793
+        },
+        "payment_peak_stack_payload_bytes": {
+          "bip143-all": 5384,
+          "otda-all": 165856,
+          "otda-single": 83128
+        }
+      },
+      "lock_sha256": "d4dc90255e60d8dff51e1f8464391304d4b0946457445e62f558c66e84edb27a",
+      "otda_program_sha256": "109b059b5e75bf888762397f8f58445d8c95d1c14727c8356c5bbb196b8f95bd",
+      "phase_seconds": {
+        "load_and_check": 0.000742,
+        "funded_replay": 3.385919,
+        "acceptance_matrix": 27.687181
+      },
+      "measured": {
+        "lock_bytes": 41364,
+        "otda_program_bytes": 5658,
+        "payment_bytes": {
+          "bip143-all": 83498,
+          "otda-all": 94864,
+          "otda-single": 94793
+        },
+        "payment_peak_stack_payload_bytes": {
+          "bip143-all": 4683,
+          "otda-all": 165862,
+          "otda-single": 83130
+        },
+        "unlock_bytes": {
+          "bip143-all": [
+            326,
+            326
+          ],
+          "otda-all": [
+            6009,
+            6009
+          ],
+          "otda-single": [
+            5969,
+            5978
+          ]
+        }
+      },
+      "acceptance": {
+        "node_payment_cases": 1296,
+        "chain_gang_payment_cases": 432,
+        "valid_witness_controls": 4,
+        "invalid_witness_controls": 24
+      },
+      "decision": {
+        "selected_for": [],
+        "reason": "verified; measured byte cost is higher for every objective"
+      }
+    },
+    "split-5x4-affine-g-ifdup": {
+      "status": "verified",
+      "point_vectors": 32,
+      "reconstruction_byte_match": true,
+      "estimated": {
+        "window_sections_bytes": {
+          "table_setup": 3603,
+          "digit_extraction": 902,
+          "window_loop": 34349
+        },
+        "window_bytes": 38854,
+        "static_window_mul_opcodes": 5407,
+        "affine_g": {
+          "calls": 51,
+          "generic_kernel_bytes": 123,
+          "affine_kernel_bytes": 114,
+          "kernel_bytes_saved": 459,
+          "lookup_bytes_saved": 153,
+          "guard_bytes_added": 153,
+          "multiplications_removed_on_nonzero_path": 153,
+          "formula": {
+            "selected": "rewrite-and-schedule",
+            "candidates": {
+              "baseline": 393,
+              "schedule": 149,
+              "rewrite-and-schedule": 114
+            },
+            "rewrites": {
+              "multiply-by-one": 3,
+              "expand-cross-products": 3,
+              "fuse-cached-divisor-load": 3
+            },
+            "max_magnitude_bits": 1280
+          }
+        },
+        "lock_bytes": 41262,
+        "otda_program_bytes": 5644,
+        "payment_bytes": {
+          "bip143-all": 83294,
+          "otda-all": 94632,
+          "otda-single": 94561
+        },
+        "payment_peak_stack_payload_bytes": {
+          "bip143-all": 5384,
+          "otda-all": 165448,
+          "otda-single": 82924
+        }
+      },
+      "lock_sha256": "f6eef6f8f51e50329f6174fba18728d021085fe5bba803da91de4cb0d0de521b",
+      "otda_program_sha256": "8d038efbbdac3d0310885dda63738d9da20d32e90fa1a1af23dd443debe4dacd",
+      "phase_seconds": {
+        "lower": 2.168233,
+        "local_vectors": 1.272474,
+        "link": 0.002398,
+        "funded_replay": 3.139775,
+        "acceptance_matrix": 27.739575
+      },
+      "measured": {
+        "lock_bytes": 41262,
+        "otda_program_bytes": 5644,
+        "payment_bytes": {
+          "bip143-all": 83294,
+          "otda-all": 94632,
+          "otda-single": 94561
+        },
+        "payment_peak_stack_payload_bytes": {
+          "bip143-all": 4682,
+          "otda-all": 165454,
+          "otda-single": 82926
+        },
+        "unlock_bytes": {
+          "bip143-all": [
+            326,
+            326
+          ],
+          "otda-all": [
+            5995,
+            5995
+          ],
+          "otda-single": [
+            5955,
+            5964
+          ]
+        }
+      },
+      "acceptance": {
+        "node_payment_cases": 1296,
+        "chain_gang_payment_cases": 432,
+        "valid_witness_controls": 4,
+        "invalid_witness_controls": 24
+      },
+      "decision": {
+        "selected_for": [
+          "lock_bytes",
+          "bip143-all"
+        ]
+      },
+      "payment_evidence": {
+        "bip143-all": {
+          "spend_txid": "41acd26e2cab19f772302b77b4ca5c3f017589d815daed4555eb9b29efb03aa7",
+          "locktime_mutation_rejected": true
+        },
+        "otda-all": {
+          "spend_txid": "3ba1f528ed5cd1d711d1fd8e9ca8cafb7b05883bcfafe94c6429404b93afbd74",
+          "locktime_mutation_rejected": true
+        },
+        "otda-single": {
+          "spend_txid": "8e5d7b7a9cf3e0c60311b80341cf6ad3037e493f01cd9af0743d1d560c154038",
+          "locktime_mutation_rejected": true
+        }
+      }
+    },
+    "split-4-affine-g-ifdup": {
+      "status": "verified",
+      "point_vectors": 32,
+      "reconstruction_byte_match": true,
+      "estimated": {
+        "window_sections_bytes": {
+          "table_setup": 2518,
+          "digit_extraction": 896,
+          "window_loop": 35614
+        },
+        "window_bytes": 39028,
+        "static_window_mul_opcodes": 5599,
+        "affine_g": {
+          "calls": 64,
+          "generic_kernel_bytes": 123,
+          "affine_kernel_bytes": 114,
+          "kernel_bytes_saved": 576,
+          "lookup_bytes_saved": 192,
+          "guard_bytes_added": 192,
+          "multiplications_removed_on_nonzero_path": 192,
+          "formula": {
+            "selected": "rewrite-and-schedule",
+            "candidates": {
+              "baseline": 393,
+              "schedule": 149,
+              "rewrite-and-schedule": 114
+            },
+            "rewrites": {
+              "multiply-by-one": 3,
+              "expand-cross-products": 3,
+              "fuse-cached-divisor-load": 3
+            },
+            "max_magnitude_bits": 1280
+          }
+        },
+        "lock_bytes": 41410,
+        "otda_program_bytes": 4064,
+        "payment_bytes": {
+          "bip143-all": 83590,
+          "otda-all": 91768,
+          "otda-single": 91697
+        },
+        "payment_peak_stack_payload_bytes": {
+          "bip143-all": 3824,
+          "otda-all": 166040,
+          "otda-single": 83220
+        }
+      },
+      "lock_sha256": "6505d33ad768f9165c0c9d52bfddf7268a8c515ff04bdd76af8028201e2b7a3a",
+      "otda_program_sha256": "a21b8d9070956fde40e457ddbcc668aad881cc99f90774086eda3ac5df1ba80b",
+      "phase_seconds": {
+        "lower": 8.9e-05,
+        "local_vectors": 1.313318,
+        "link": 0.001708,
+        "funded_replay": 2.94513,
+        "acceptance_matrix": 24.808007
+      },
+      "measured": {
+        "lock_bytes": 41410,
+        "otda_program_bytes": 4064,
+        "payment_bytes": {
+          "bip143-all": 83590,
+          "otda-all": 91768,
+          "otda-single": 91697
+        },
+        "payment_peak_stack_payload_bytes": {
+          "bip143-all": 3642,
+          "otda-all": 166046,
+          "otda-single": 83221
+        },
+        "unlock_bytes": {
+          "bip143-all": [
+            326,
+            326
+          ],
+          "otda-all": [
+            4415,
+            4415
+          ],
+          "otda-single": [
+            4375,
+            4384
+          ]
+        }
+      },
+      "acceptance": {
+        "node_payment_cases": 1296,
+        "chain_gang_payment_cases": 432,
+        "valid_witness_controls": 4,
+        "invalid_witness_controls": 24
+      },
+      "decision": {
+        "selected_for": [],
+        "reason": "verified; measured byte cost is higher for every objective"
+      }
+    },
+    "split-5-affine-g-ifdup": {
+      "status": "verified",
+      "point_vectors": 32,
+      "reconstruction_byte_match": true,
+      "estimated": {
+        "window_sections_bytes": {
+          "table_setup": 5331,
+          "digit_extraction": 932,
+          "window_loop": 32684
+        },
+        "window_bytes": 38947,
+        "static_window_mul_opcodes": 5396,
+        "affine_g": {
+          "calls": 52,
+          "generic_kernel_bytes": 123,
+          "affine_kernel_bytes": 114,
+          "kernel_bytes_saved": 468,
+          "lookup_bytes_saved": 156,
+          "guard_bytes_added": 156,
+          "multiplications_removed_on_nonzero_path": 156,
+          "formula": {
+            "selected": "rewrite-and-schedule",
+            "candidates": {
+              "baseline": 393,
+              "schedule": 149,
+              "rewrite-and-schedule": 114
+            },
+            "rewrites": {
+              "multiply-by-one": 3,
+              "expand-cross-products": 3,
+              "fuse-cached-divisor-load": 3
+            },
+            "max_magnitude_bits": 1280
+          }
+        },
+        "lock_bytes": 41379,
+        "otda_program_bytes": 5462,
+        "payment_bytes": {
+          "bip143-all": 83528,
+          "otda-all": 94502,
+          "otda-single": 94431
+        },
+        "payment_peak_stack_payload_bytes": {
+          "bip143-all": 6944,
+          "otda-all": 165916,
+          "otda-single": 83158
+        }
+      },
+      "lock_sha256": "f4ba27b697f38b40707b3543cb43e103649127812e069408aa5ce4f0a31eb550",
+      "otda_program_sha256": "7599e6ede050f4599b1d5bef51b0bf879a1590f7d153187f928927e49c8cb9bf",
+      "phase_seconds": {
+        "lower": 0.000168,
+        "local_vectors": 1.291601,
+        "link": 0.001707,
+        "funded_replay": 3.141711,
+        "acceptance_matrix": 23.391229
+      },
+      "measured": {
+        "lock_bytes": 41379,
+        "otda_program_bytes": 5462,
+        "payment_bytes": {
+          "bip143-all": 83528,
+          "otda-all": 94502,
+          "otda-single": 94431
+        },
+        "payment_peak_stack_payload_bytes": {
+          "bip143-all": 6231,
+          "otda-all": 165921,
+          "otda-single": 83160
+        },
+        "unlock_bytes": {
+          "bip143-all": [
+            326,
+            326
+          ],
+          "otda-all": [
+            5813,
+            5813
+          ],
+          "otda-single": [
+            5773,
+            5782
+          ]
+        }
+      },
+      "acceptance": {
+        "node_payment_cases": 1296,
+        "chain_gang_payment_cases": 432,
+        "valid_witness_controls": 4,
+        "invalid_witness_controls": 24
+      },
+      "decision": {
+        "selected_for": [],
+        "reason": "verified; measured byte cost is higher for every objective"
+      }
+    },
+    "split-4x5-affine-g-ifdup": {
+      "status": "local-only",
+      "point_vectors": 32,
+      "reconstruction_byte_match": true,
+      "estimated": {
+        "window_sections_bytes": {
+          "table_setup": 4246,
+          "digit_extraction": 926,
+          "window_loop": 34244
+        },
+        "window_bytes": 39416,
+        "static_window_mul_opcodes": 5624,
+        "affine_g": {
+          "calls": 64,
+          "generic_kernel_bytes": 123,
+          "affine_kernel_bytes": 114,
+          "kernel_bytes_saved": 576,
+          "lookup_bytes_saved": 192,
+          "guard_bytes_added": 192,
+          "multiplications_removed_on_nonzero_path": 192,
+          "formula": {
+            "selected": "rewrite-and-schedule",
+            "candidates": {
+              "baseline": 393,
+              "schedule": 149,
+              "rewrite-and-schedule": 114
+            },
+            "rewrites": {
+              "multiply-by-one": 3,
+              "expand-cross-products": 3,
+              "fuse-cached-divisor-load": 3
+            },
+            "max_magnitude_bits": 1280
+          }
+        },
+        "lock_bytes": 41824,
+        "otda_program_bytes": 4798,
+        "payment_bytes": {
+          "bip143-all": 84418,
+          "otda-all": 94064,
+          "otda-single": 93993
+        },
+        "payment_peak_stack_payload_bytes": {
+          "bip143-all": 5384,
+          "otda-all": 167696,
+          "otda-single": 84048
+        }
+      },
+      "lock_sha256": "8ef40020d31d2981a971a48d7156f90e9009b9f375cc7119efd2545090b6cefe",
+      "otda_program_sha256": "c2b0b76bd77ef5f19f6b0dc64465c43ca5e1329efca7294b069af6756465f2a4",
+      "phase_seconds": {
+        "lower": 0.000985,
+        "local_vectors": 1.306083,
+        "link": 0.002355
+      },
+      "reason": "full-payment replay budget exhausted"
+    },
+    "joint-2": {
+      "status": "verified",
+      "point_vectors": 32,
+      "reconstruction_byte_match": true,
+      "estimated": {
+        "window_sections_bytes": {
+          "table_setup": 1634,
+          "digit_extraction": 2048,
+          "window_loop": 36338
+        },
+        "window_bytes": 40020,
+        "static_window_mul_opcodes": 5938,
+        "lock_bytes": 42378,
+        "otda_program_bytes": 3058,
+        "payment_bytes": {
+          "bip143-all": 85526,
+          "otda-all": 91692,
+          "otda-single": 91621
+        },
+        "payment_peak_stack_payload_bytes": {
+          "bip143-all": 2240,
+          "otda-all": 169912,
+          "otda-single": 85156
+        }
+      },
+      "lock_sha256": "07a423aa01862ed7087878c5722d7b99d8148122f4a9c372127cf879cf316945",
+      "otda_program_sha256": "cdbad76082e6b3161d57396f3ce1cec2d2df34e08e8bd612197d8c7b646ee171",
+      "phase_seconds": {
+        "lower": 0.000149,
+        "local_vectors": 1.408069,
+        "link": 0.001697,
+        "funded_replay": 2.858009,
+        "acceptance_matrix": 25.756443
+      },
+      "measured": {
+        "lock_bytes": 42378,
+        "otda_program_bytes": 3058,
+        "payment_bytes": {
+          "bip143-all": 85526,
+          "otda-all": 91692,
+          "otda-single": 91621
+        },
+        "payment_peak_stack_payload_bytes": {
+          "bip143-all": 2555,
+          "otda-all": 169918,
+          "otda-single": 85158
+        },
+        "unlock_bytes": {
+          "bip143-all": [
+            326,
+            326
+          ],
+          "otda-all": [
+            3409,
+            3409
+          ],
+          "otda-single": [
+            3369,
+            3378
+          ]
+        }
+      },
+      "acceptance": {
+        "node_payment_cases": 1296,
+        "chain_gang_payment_cases": 432,
+        "valid_witness_controls": 4,
+        "invalid_witness_controls": 24
+      },
+      "decision": {
+        "selected_for": [
+          "otda-all",
+          "otda-single"
+        ]
+      }
+    }
+  },
+  "reference_sha256": "224a3dd474a90ce91bcd556d77caed97c4697621a90c8001c53d381a05b1c74b",
+  "engines": {
+    "bsv_node_version": 101020300,
+    "chain_gang": {
+      "version": "0.13.2",
+      "commit": "74676b9c002c452e7f21a9ed9265f4972bef03f6"
+    },
+    "regtest_profile": "raised"
+  },
+  "selected": {
+    "lock_bytes": "split-5x4-affine-g-ifdup",
+    "bip143-all": "split-5x4-affine-g-ifdup",
+    "otda-all": "joint-2",
+    "otda-single": "joint-2"
+  },
+  "calibration_selected": {
+    "lock_bytes": "joint-2",
+    "bip143-all": "joint-2",
+    "otda-all": "joint-2",
+    "otda-single": "joint-2"
+  },
+  "calibration": {
+    "joint-2": {
+      "lock_bytes": true,
+      "otda_program_bytes": true,
+      "payment_bytes": true
+    }
+  },
+  "cost_differences": [
+    {
+      "candidate": "split-5x4-affine-g-ifdup",
+      "baseline": "v0.6.0",
+      "lock_bytes": -102,
+      "otda_program_bytes": -14,
+      "window_sections_bytes": {
+        "table_setup": 0,
+        "digit_extraction": 0,
+        "window_loop": -102
+      },
+      "payment_bytes": {
+        "bip143-all": -204,
+        "otda-all": -232,
+        "otda-single": -232
+      }
+    },
+    {
+      "candidate": "split-4-affine-g-ifdup",
+      "baseline": "v0.6.0",
+      "lock_bytes": 46,
+      "otda_program_bytes": -1594,
+      "window_sections_bytes": {
+        "table_setup": -1085,
+        "digit_extraction": -6,
+        "window_loop": 1163
+      },
+      "payment_bytes": {
+        "bip143-all": 92,
+        "otda-all": -3096,
+        "otda-single": -3096
+      }
+    },
+    {
+      "candidate": "split-5-affine-g-ifdup",
+      "baseline": "v0.6.0",
+      "lock_bytes": 15,
+      "otda_program_bytes": -196,
+      "window_sections_bytes": {
+        "table_setup": 1728,
+        "digit_extraction": 30,
+        "window_loop": -1767
+      },
+      "payment_bytes": {
+        "bip143-all": 30,
+        "otda-all": -362,
+        "otda-single": -362
+      }
+    },
+    {
+      "candidate": "joint-2",
+      "baseline": "v0.6.0",
+      "lock_bytes": 1014,
+      "otda_program_bytes": -2600,
+      "window_sections_bytes": {
+        "table_setup": -1969,
+        "digit_extraction": 1146,
+        "window_loop": 1887
+      },
+      "payment_bytes": {
+        "bip143-all": 2028,
+        "otda-all": -3172,
+        "otda-single": -3172
+      }
+    }
+  ],
+  "novel_candidates_verified": [
+    "split-5x4-affine-g-ifdup",
+    "split-4-affine-g-ifdup",
+    "split-5-affine-g-ifdup"
+  ],
+  "timing": {
+    "frontend_and_scan_seconds": 0.011958,
+    "first_locally_verified_seconds": 0.012713,
+    "first_novel_locally_verified_seconds": 3.455991,
+    "first_dual_engine_seconds": 12.268973,
+    "first_novel_dual_engine_seconds": 15.408743,
+    "measured_decision_seconds": 153.736185
+  }
+}

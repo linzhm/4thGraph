@@ -1,0 +1,22 @@
+{
+  "version": "1.1.0",
+  "previous": "1.0.0",
+  "artifacts": [
+    "layout.json",
+    "otda-constructor.hex"
+  ],
+  "fixtures": [],
+  "evidence": [
+    "measurements.json"
+  ],
+  "integration": "docs/sdk.en.md",
+  "build": "PYTHONPATH=src:. python projects/p2pkh-sm2/reference/generate_otda_constructor.py /tmp/sm2-otda.hex",
+  "verify": "bash projects/p2pkh-sm2/reference/verify.sh",
+  "shared_data": [
+    "versions/v1.0.0/layout.json",
+    "versions/v1.0.0/sm2-standard.json",
+    "versions/v1.0.0/spend-all.json",
+    "versions/v1.0.0/sighash-modes.json",
+    "versions/v1.0.0/signed-data-appendix-a1.hex"
+  ]
+}

@@ -1,6 +1,6 @@
 # Lamport OTS (SHA-256)
 
-[简体中文](README.zh-CN.md) · [4thGraph](../../README.md) · [Project index](../README.md)
+[简体中文](README.zh-CN.md) · [4thGraph](../../README.md) · [Project index](../README.md) · [Versions](versions/index.json)
 
 ## Developer resources
 
@@ -10,7 +10,7 @@ Choose a full-key or committed-key output and connect a signer that records one-
 
 [Protocol](docs/developer.en.md#protocol) · [Security](docs/developer.en.md#security) · [Verify](#run) · [Transaction costs](#complete-transactions-and-stack-measurements)
 
-**Status** · v0.1 development baseline.
+**Status** · v0.1.0 development baseline.
 
 Experimental, directly unrolled 256-bit Lamport one-time signatures in BSV Script.
 Includes secure random key generation, digest signing/verification, an in-memory
@@ -55,7 +55,7 @@ system or a standardized “256-bit quantum security” level.
 The universal BIP143 ALL path totals 30.41 KiB. The original two-push
 BIP143 ALL lock and vector remain available. OTDA ordinary witness size
 varies with the serialized transaction. Full measurements are in
-[measurement.json](template/measurement.json).
+[measurements.json](versions/v0.1.0/measurements.json).
 
 ## Run
 
@@ -75,8 +75,8 @@ bash projects/lamport-ots/reference/verify.sh
 ```
 
 [Acceptance domain and coverage proof](docs/acceptance.md) · [Validation receipt](docs/validation.md) · [Protocol and layout](docs/spec.md) · [Reference usage](reference/README.md) ·
-[Original ALL vector](template/vector.json) ·
-[Universal sighash vectors](template/universal-vectors.json)
+[Original ALL vector](versions/v0.1.0/vector.json) ·
+[Universal sighash vectors](versions/v0.1.0/universal-vectors.json)
 
 ## Committed-key candidate
 

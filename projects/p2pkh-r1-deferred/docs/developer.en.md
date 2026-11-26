@@ -12,7 +12,7 @@ A short funding output commits to creating an equal-value P2PKH-R1 output during
 
 The short lock carries the recipient hash, target script SHA-256, value and the HASH256 of the complete target output. The activation input requires the committed, equal-value output at the same index. The direct BIP143 SINGLE witness is 160 bytes. The other ten sighash modes use a 197-byte two-check witness that also carries the selected mode's digest commitment. The full R1 target is serialized in the transaction output. Later spends use the ordinary R1 lock and signer.
 
-A v0.1.0 short lock activates to its original v0.1.0 target. Recognize the funding bytes with their committed target version before construction. [Specification](spec.en.md) · [v0.3.0 layout](../template/v0.3.0/layout.json) · [v0.2.0 layout](../template/v0.2.0/layout.json) · [Legacy layout](../template/layout.json)
+A v0.1.0 short lock activates to its original v0.1.0 target. Recognize the funding bytes with their committed target version before construction. [Specification](spec.en.md) · [v0.3.0 layout](../versions/v0.3.0/layout.json) · [v0.2.0 layout](../versions/v0.2.0/layout.json) · [Legacy layout](../versions/v0.1.0/layout.json)
 
 <a name="security"></a>
 
@@ -28,7 +28,7 @@ For existing funding, derive the target from the authenticated commitment. Using
 
 The matrix runs 2,592 node cases per build across both target versions, both funding layouts and all twelve modes. A mixed-version batch also activates both matching targets. The v0.3.0 short lock is 1,085 bytes. A three-input, two-output BIP143 ALL activation measures 93,260 bytes in the v0.3.0 benchmark.
 
-Install the pinned requirements and run `bash projects/p2pkh-r1-deferred/reference/verify.sh test_deferred`. [Requirements](../reference/requirements.txt) · [Acceptance matrix](../reference/acceptance.md) · [Twelve-mode vectors](../template/v0.3.0/sighash-modes.json) · [Marginals and lifecycle](../README.md#measured-transaction-costs)
+Install the pinned requirements and run `bash projects/p2pkh-r1-deferred/reference/verify.sh test_deferred`. [Requirements](../reference/requirements.txt) · [Acceptance matrix](../reference/acceptance.md) · [Twelve-mode vectors](../versions/v0.3.0/sighash-modes.json) · [Marginals and lifecycle](../README.md#measured-transaction-costs)
 
 <a name="sdk"></a>
 

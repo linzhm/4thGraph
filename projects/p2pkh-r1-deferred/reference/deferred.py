@@ -103,15 +103,24 @@ def funding_output_from_owner_hash(value: int, owner_hash160: bytes, *,
 def recognize(output: Output, *, expected_key: bytes | None = None,
               expected_owner_hash: bytes | None = None) -> Commitment | None:
     """Recognize only an exact canonical output, including both commitments and its value."""
+    script = output.script
+    if script.startswith(bytes([OWNER_HASH_SIZE])):
+        recipient_end = 1 + OWNER_HASH_SIZE
+    elif script.startswith(bytes([PUBLIC_KEY_SIZE, 4])):
+        recipient_end = 1 + PUBLIC_KEY_SIZE
+    else:
+        return None
+    hash_end = recipient_end + 33  # Direct push of the 32-byte script hash.
+    if (len(script) <= hash_end + 1 or script[recipient_end] != 32
+            or script[hash_end] != OPS['OP_2DROP']):
+        return None
+
     public_key = None
+    owner = script[1:recipient_end]
     try:
-        if output.script.startswith(bytes([OWNER_HASH_SIZE])):
-            owner = output.script[1:1 + OWNER_HASH_SIZE]
-        elif output.script.startswith(bytes([PUBLIC_KEY_SIZE, 4])):
-            public_key = output.script[1:1 + PUBLIC_KEY_SIZE]
+        if recipient_end == 1 + PUBLIC_KEY_SIZE:
+            public_key = owner
             owner = public_key_hash160(public_key)
-        else:
-            return None
         if expected_owner_hash is not None and expected_owner_hash != owner:
             return None
         if expected_key is not None and public_key_hash160(expected_key) != owner:
@@ -125,7 +134,7 @@ def recognize(output: Output, *, expected_key: bytes | None = None,
         )
         for build in (None, RELEASE_BUILD, *OPTIMIZATIONS):
             for commitment in commitments:
-                if output.script != _locking_script(output.value, commitment, build):
+                if script != _locking_script(output.value, commitment, build):
                     continue
                 if build == RELEASE_BUILD:
                     return replace(commitment, optimization=RELEASE_OPTIMIZATION,

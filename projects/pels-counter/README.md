@@ -1,6 +1,6 @@
 # PELS Counter
 
-[简体中文](README.zh-CN.md) · [Project index](../README.md)
+[简体中文](README.zh-CN.md) · [Project index](../README.md) · [Versions](versions/index.json)
 
 **[Build the lock](#build)** · [Fund and replay on regtest](#spend-and-verify-on-regtest) · [Compare fee rules](#declare-a-fee-constraint)
 

@@ -55,4 +55,4 @@ Store the short-lock outpoint, value, owner and `targetTemplate` with the invoic
 
 After confirmation, record the final activation txid and output index as the new R1 outpoint. If broadcast is delayed or a reorganization changes the parent, reconcile the short-lock and activated outpoints in the wallet's chain view before creating a child payment. [R1 spending workflow](../../p2pkh-r1/docs/sdk.en.md#quickstart)
 
-[Activation specification](spec.en.md) · [Twelve-mode vectors](../template/v0.3.0/sighash-modes.json) · [Reference transaction construction](../reference/README.md)
+[Activation specification](spec.en.md) · [Twelve-mode vectors](../versions/v0.3.0/sighash-modes.json) · [Reference transaction construction](../reference/README.md)

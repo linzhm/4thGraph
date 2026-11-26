@@ -181,8 +181,8 @@ class LamportTests(unittest.TestCase):
 
     def test_reproducible_vectors(self):
         from measure import universal_vector, vector
-        self.assertEqual(json.loads((ROOT/'template/vector.json').read_text()),vector())
-        self.assertEqual(json.loads((ROOT/'template/universal-vectors.json').read_text()),universal_vector())
+        self.assertEqual(json.loads((ROOT/'versions/v0.1.0/vector.json').read_text()),vector())
+        self.assertEqual(json.loads((ROOT/'versions/v0.1.0/universal-vectors.json').read_text()),universal_vector())
 
 
 if __name__ == '__main__': unittest.main()

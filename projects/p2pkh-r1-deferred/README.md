@@ -1,6 +1,6 @@
 # P2PKH-R1-Deferred v0.3.0
 
-[简体中文](README.zh-CN.md) · [4thGraph](../../README.md) · [Project index](../README.md)
+[简体中文](README.zh-CN.md) · [4thGraph](../../README.md) · [Project index](../README.md) · [Versions](versions/index.json)
 
 ## Developer resources
 
@@ -10,11 +10,11 @@ Create a short deposit lock, arrange its committed R1 target at the same index, 
 
 [Protocol](docs/spec.en.md) · [Security](docs/developer.en.md#security) · [Verify](#reproduce-and-integrate) · [Transaction costs](#measured-transaction-costs)
 
-Deferred moves the creation of a full R1 locking script from funding to activation. The v0.3.0 funding lock is 1,085 bytes and commits to an equal-value 46,302-byte P2PKH-R1 v0.2.0 output. Existing short locks activate to their originally committed target. [Deferred template](template/v0.3.0/template.hex) · [R1 target template](../p2pkh-r1/template/v0.2.0/template.hex)
+Deferred moves the creation of a full R1 locking script from funding to activation. The v0.3.0 funding lock is 1,085 bytes and commits to an equal-value 46,302-byte P2PKH-R1 v0.2.0 output. Existing short locks activate to their originally committed target. [Deferred template](versions/v0.3.0/template.hex) · [R1 target template](../p2pkh-r1/versions/v0.2.0/template.hex)
 
 ## 4thGraph Forth comparison
 
-The typed Forth lock implements the full activation check, including the BIP143 SINGLE output commitment, the optional selected BIP143 or OTDA digest, fixed-key signature construction, and both native signature checks. The `baseline`, `safe`, and `stack` builds use the same source with 4thGraph 0.2.7 from checkout `3133da7`. [Forth source](reference/deferred-activation.fth) · [Compiler report](reference/forth-results.json)
+The typed Forth lock implements the full activation check, including the BIP143 SINGLE output commitment, the optional selected BIP143 or OTDA digest, fixed-key signature construction, and both native signature checks. The `baseline`, `safe`, and `stack` builds use the same source with 4thGraph 0.2.7 from checkout `3133da7`. [Forth source](reference/deferred-activation.fth) · [Compiler report](versions/v0.3.0/forth-results.json)
 
 | Build | Funding lock | Funding transaction | Funding + BIP143 ALL activation | First activation input main / alt peak |
 | --- | ---: | ---: | ---: | ---: |
@@ -23,7 +23,7 @@ The typed Forth lock implements the full activation check, including the BIP143 
 | Forth `safe` | 1,087 B | 2,257 B | 95,420 B | 10 / 1 |
 | v0.3.0 Forth `stack` | **1,085 B** | **2,253 B** | **95,416 B** | 10 / 1 |
 
-The fixture funds two Deferred outputs and a sponsor, then activates both outputs into the same 46,302-byte R1 locks. The `stack` build saves 350 bytes per short lock and 700 bytes across funding and activation. The standalone activation measures 93,089 bytes with direct BIP143 SINGLE or 93,163 bytes with BIP143 ALL or OTDA ALL for every build. Stack peaks come from the development evaluator. Peak combined payload on the BIP143 ALL path is 359 bytes for assembly and 360 bytes for Forth. [Fixture and results](reference/forth-results.json)
+The fixture funds two Deferred outputs and a sponsor, then activates both outputs into the same 46,302-byte R1 locks. The `stack` build saves 350 bytes per short lock and 700 bytes across funding and activation. The standalone activation measures 93,089 bytes with direct BIP143 SINGLE or 93,163 bytes with BIP143 ALL or OTDA ALL for every build. Stack peaks come from the development evaluator. Peak combined payload on the BIP143 ALL path is 359 bytes for assembly and 360 bytes for Forth. [Fixture and results](versions/v0.3.0/forth-results.json)
 
 `safe` removes two 64-bit wrap sequences from DER length subtraction using nonnegative byte-length bounds. `stack` saves one more byte at each of those call sites. The Forth source reverses 32-byte values by splitting them into halves, which accounts for much of the size difference between assembly and the Forth baseline. BSV Node and pinned chain-gang matched the expected verdicts in the activation acceptance matrix. [Acceptance coverage](reference/acceptance.md)
 
@@ -52,7 +52,7 @@ The activation witness already carries the target commitment through BIP143 SING
 
 ## Reproduce and integrate
 
-See the [protocol specification](docs/spec.en.md), [SDK guide](docs/sdk.en.md), [layout](template/v0.3.0/layout.json), [activation vector](template/v0.3.0/activation-single.json), [twelve-mode vectors](template/v0.3.0/sighash-modes.json), and [acceptance matrix](reference/acceptance.md).
+See the [protocol specification](docs/spec.en.md), [SDK guide](docs/sdk.en.md), [layout](versions/v0.3.0/layout.json), [activation vector](versions/v0.3.0/activation-single.json), [twelve-mode vectors](versions/v0.3.0/sighash-modes.json), and [acceptance matrix](reference/acceptance.md).
 
 ```sh
 python -m pip install -r projects/p2pkh-r1-deferred/reference/requirements.txt

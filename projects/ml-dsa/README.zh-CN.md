@@ -1,6 +1,6 @@
 # 纯模式 ML-DSA-44
 
-[English](README.md) · [4thGraph](../../README.zh-CN.md) · [项目目录](../README.zh-CN.md)
+[English](README.md) · [4thGraph](../../README.zh-CN.md) · [项目目录](../README.zh-CN.md) · [版本](versions/index.json)
 
 ## 开发入口
 
@@ -10,7 +10,7 @@
 
 [协议规范](docs/developer.zh-CN.md#protocol) · [安全分析](docs/developer.zh-CN.md#security) · [复现与验证](#复现方法) · [交易成本](#完整交易与栈测量)
 
-ML-DSA-44 是 v0.1 开发基线，采用 FIPS 204 纯模式编码。公钥为 1,312 字节，签名为 2,420 字节。编译器预计算与公钥相关的矩阵和多项式，执行时校验签名编码、响应范数和提示值，再计算挑战和验证方程。 [FIPS 204](https://csrc.nist.gov/pubs/fips/204/final)
+ML-DSA-44 是 v0.1.0 开发基线，采用 FIPS 204 纯模式编码。公钥为 1,312 字节，签名为 2,420 字节。编译器预计算与公钥相关的矩阵和多项式，执行时校验签名编码、响应范数和提示值，再计算挑战和验证方程。 [FIPS 204](https://csrc.nist.gov/pubs/fips/204/final)
 
 | 入口 | 用途 |
 |---|---|
@@ -18,7 +18,7 @@ ML-DSA-44 是 v0.1 开发基线，采用 FIPS 204 纯模式编码。公钥为 1,
 | `script.verify_message_script(public_key, message_bytes, context=...)` | 生成固定公钥、消息长度和上下文的消息验签脚本 |
 | `script.locking_script(public_key)` | 生成绑定当前花费输入的付款锁 |
 
-挑战采样遵循 FIPS 204 附录 C 表 3 的 221 字节上限，耗尽时验签失败。消息验签和付款绑定分别有测试向量。 [采样实现](reference/challenge_script.py) · [确定性向量](template/deterministic.json)
+挑战采样遵循 FIPS 204 附录 C 表 3 的 221 字节上限，耗尽时验签失败。消息验签和付款绑定分别有测试向量。 [采样实现](reference/challenge_script.py) · [确定性向量](versions/v0.1.0/deterministic.json)
 
 ## 使用场景与取舍
 

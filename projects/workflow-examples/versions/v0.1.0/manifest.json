@@ -1,0 +1,12 @@
+{
+  "version": "0.1.0",
+  "previous": null,
+  "artifacts": [
+    "inc.json"
+  ],
+  "fixtures": [],
+  "evidence": [],
+  "integration": "README.md#compile-a-word",
+  "build": "PYTHONPATH=src:. python -m fourthgraph.workflow.protocol projects/workflow-examples/example.fth --entry inc",
+  "verify": "PYTHONPATH=src:. python -m unittest discover -s tests -p test_workflow_forth.py"
+}

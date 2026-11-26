@@ -12,7 +12,7 @@
 
 采用 RFC 8391 的 `WOTSP-SHA2_256` 哈希链，项目付款格式使用 64 字节公钥和 2,144 字节签名。锁同时验证哈希链证明及所选输入的交易授权，支持 BIP143 和 Chronicle OTDA 的十二种签名类型。在符合条件的版本 2 交易中，缓存步骤输出可以在 OTDA ALL 或配对 SINGLE 解锁内重建。
 
-[线格式与脚本规范（英文）](spec.md) · [RFC 8391](https://www.rfc-editor.org/rfc/rfc8391) · [缓存步骤布局](../template/cached-steps-layout.json)
+[线格式与脚本规范（英文）](spec.md) · [RFC 8391](https://www.rfc-editor.org/rfc/rfc8391) · [缓存步骤布局](../versions/v0.1.0/cached-steps-layout.json)
 
 <a name="security"></a>
 
@@ -28,7 +28,7 @@
 
 付款验收对每个布局定义 1,230 项判定，并在完整输入中覆盖全部 67 条签名链。缓存步骤锁占 33,956 字节。OTDA ALL 两进两出从 208,406 降至 79,090 字节；配对 SINGLE 从 140,473 降到 78,921 字节。配对样本执行时的两栈载荷峰值均是 70,280 字节。
 
-安装[固定依赖](../reference/requirements.txt)，运行 `bash projects/wots-plus/reference/verify.sh`。 [BSV Node、chain-gang 与 Lean 验证记录（英文）](validation.md) · [付款向量](../template/vectors.json) · [项目详细测量](../README.zh-CN.md)
+安装[固定依赖](../reference/requirements.txt)，运行 `bash projects/wots-plus/reference/verify.sh`。 [BSV Node、chain-gang 与 Lean 验证记录（英文）](validation.md) · [付款向量](../versions/v0.1.0/vectors.json) · [项目详细测量](../README.zh-CN.md)
 
 <a name="sdk"></a>
 

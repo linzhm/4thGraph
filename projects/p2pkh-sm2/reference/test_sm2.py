@@ -79,7 +79,7 @@ def valid_script(lock,witness,tx,value=1000,index=0):
 
 class SM2Tests(unittest.TestCase):
     def test_standard_vector(self):
-        v=json.loads((ROOT/'template/sm2-standard.json').read_text())
+        v=json.loads((ROOT/'versions/v1.0.0/sm2-standard.json').read_text())
         q=bytes.fromhex(v['public_key']); m=bytes.fromhex(v['message']); sig=bytes.fromhex(v['signature'])
         self.assertEqual(za(q).hex(),v['za'])
         self.assertEqual(message_digest(q,m).hex(),v['digest'])
@@ -121,7 +121,7 @@ class SM2Tests(unittest.TestCase):
 
     def test_openssl_standard_and_round_trip(self):
         self.assertIsNotNone(shutil.which('openssl'),'OpenSSL with SM2 is required')
-        v=json.loads((ROOT/'template/sm2-standard.json').read_text())
+        v=json.loads((ROOT/'versions/v1.0.0/sm2-standard.json').read_text())
         with tempfile.TemporaryDirectory() as directory:
             d=Path(directory)
             (d/'pub.pem').write_bytes(public_pem(bytes.fromhex(v['public_key'])))
@@ -142,7 +142,7 @@ class SM2Tests(unittest.TestCase):
 
     def test_canonical_recognition(self):
         key,lock,*_=fixture()
-        manifest=json.loads((ROOT/'template/layout.json').read_text())
+        manifest=json.loads((ROOT/'versions/v1.0.0/layout.json').read_text())
         self.assertEqual(len(lock),manifest['script_bytes'])
         self.assertEqual(identify(lock),(1,public_key_hash160(key)))
         self.assertEqual(recognize(lock),public_key_hash160(key))
@@ -205,7 +205,7 @@ class SM2Tests(unittest.TestCase):
         self.assertEqual(evaluate(b''.join(number(v) for v in (P,r,s,*q,e))+point_code),([],[]))
 
     def test_payment_vector_and_consecutive_payments(self):
-        v=json.loads((ROOT/'template/spend-all.json').read_text())
+        v=json.loads((ROOT/'versions/v1.0.0/spend-all.json').read_text())
         key,lock,parent,tx,pre,sig=fixture()
         self.assertEqual(key.hex(),v['public_key'])
         self.assertEqual(parent.txid(),v['parent_txid'])
@@ -229,7 +229,7 @@ class SM2Tests(unittest.TestCase):
         with self.assertRaises(ValueError): Transaction.parse(parent.serialize()+b'\0')
 
     def test_release_defaults_to_pinned_v1(self):
-        manifest = json.loads((ROOT/'template/layout.json').read_text())
+        manifest = json.loads((ROOT/'versions/v1.0.0/layout.json').read_text())
         base_owner = bytes.fromhex(manifest['base_owner_hash160'])
         lock = assemble(base_owner)
         self.assertEqual(len(lock), 144925)

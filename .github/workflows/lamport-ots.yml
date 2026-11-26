@@ -32,7 +32,7 @@ jobs:
       - name: Reproducible vectors and measured performance
         run: |
           python projects/lamport-ots/reference/measure.py --write-vector
-          git diff --exit-code -- projects/lamport-ots/template/
+          git diff --exit-code -- projects/lamport-ots/versions/v0.1.0/
           python projects/lamport-ots/reference/measure.py --benchmark > /tmp/lamport-measurement.json
       - uses: actions/upload-artifact@v4
         with:

@@ -1,6 +1,6 @@
 # WOTS+（SHA-256）
 
-[English](README.md) · [4thGraph](../../README.zh-CN.md) · [项目目录](../README.zh-CN.md)
+[English](README.md) · [4thGraph](../../README.zh-CN.md) · [项目目录](../README.zh-CN.md) · [版本](versions/index.json)
 
 ## 开发入口
 
@@ -10,7 +10,7 @@
 
 [协议规范](docs/developer.zh-CN.md#protocol) · [安全分析](docs/developer.zh-CN.md#security) · [复现与验证](#开发和钱包接入) · [交易成本](#完整交易与栈测量)
 
-WOTS+ 是 v0.1 开发基线，按 RFC 8391 的 `WOTSP-SHA2_256` 哈希链验证一次性签名。项目定义 64 字节的 BSV 公钥编码，原始签名为 2,144 字节。付款锁将证明绑定到实际花费的交易输入。 [编码规范](docs/spec.md) · [RFC 8391](https://www.rfc-editor.org/rfc/rfc8391)
+WOTS+ 是 v0.1.0 开发基线，按 RFC 8391 的 `WOTSP-SHA2_256` 哈希链验证一次性签名。项目定义 64 字节的 BSV 公钥编码，原始签名为 2,144 字节。付款锁将证明绑定到实际花费的交易输入。 [编码规范](docs/spec.md) · [RFC 8391](https://www.rfc-editor.org/rfc/rfc8391)
 
 ## 使用场景与取舍
 
@@ -30,7 +30,7 @@ WOTS+ 是 v0.1 开发基线，按 RFC 8391 的 `WOTSP-SHA2_256` 哈希链验证�
 
 ## 开发和钱包接入
 
-钱包确认 outpoint、锁定格式、金额和所需确认，再安排收款、找零和费用。单输入付款调用 `sign_payment`，已构造交易逐输入调用 `sign_spend`。外部签名器接收 32 字节摘要，返回 2,144 字节原始签名。每个 UTXO 都使用新密钥，必须先持久化消耗记录再返回签名。未广播或确认失败也要保留该记录。 [付款接口](reference/payment.py) · [已签名向量](template/vectors.json)
+钱包确认 outpoint、锁定格式、金额和所需确认，再安排收款、找零和费用。单输入付款调用 `sign_payment`，已构造交易逐输入调用 `sign_spend`。外部签名器接收 32 字节摘要，返回 2,144 字节原始签名。每个 UTXO 都使用新密钥，必须先持久化消耗记录再返回签名。未广播或确认失败也要保留该记录。 [付款接口](reference/payment.py) · [已签名向量](versions/v0.1.0/vectors.json)
 
 在仓库根目录的独立 Python 环境运行以下命令。Linux x86-64 节点复放用 `verify.sh`，macOS 可用 `verify_apple.sh`。
 
@@ -41,7 +41,7 @@ python projects/wots-plus/reference/generate_reconstruction.py --check
 bash projects/wots-plus/reference/verify.sh
 ```
 
-[验证记录](docs/validation.md)包含 1,230 项支付矩阵、67 条签名链的变更测试和已支持的重放环境。栈调度与重建产物见[模板布局](template/cached-steps-layout.json)。
+[验证记录](docs/validation.md)包含 1,230 项支付矩阵、67 条签名链的变更测试和已支持的重放环境。栈调度与重建产物见[模板布局](versions/v0.1.0/cached-steps-layout.json)。
 
 可选用 [Lean Script 求值器](https://github.com/Calhooon/bsv-script-lean#try-it)重放同一批合成输入。
 

@@ -1,0 +1,12 @@
+{
+  "version": "0.1.0",
+  "previous": null,
+  "artifacts": [],
+  "fixtures": [
+    "baseline.json"
+  ],
+  "evidence": [],
+  "integration": "docs/sdk.en.md",
+  "build": "PYTHONPATH=src:. python projects/p2pk-p2pkh-baseline/reference/script_lab.py",
+  "verify": "PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- python -m unittest discover -s projects/p2pk-p2pkh-baseline/reference -p test_acceptance.py"
+}

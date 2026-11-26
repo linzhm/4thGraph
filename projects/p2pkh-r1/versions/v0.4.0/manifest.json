@@ -1,0 +1,19 @@
+{
+  "version": "0.4.0",
+  "previous": "0.3.0",
+  "artifacts": [
+    "layout.json",
+    "template.hex",
+    "otda-reconstruct.hex"
+  ],
+  "fixtures": [],
+  "evidence": [
+    "measurements.json"
+  ],
+  "integration": "forth/history.md",
+  "build": "PYTHONPATH=src:.:projects/p2pkh-r1/reference python projects/p2pkh-r1/forth/compile_r1.py --optimize",
+  "verify": "PYTHONPATH=src:.:projects/p2pkh-r1/reference bash tools/verify_node.sh --profile raised -- python projects/p2pkh-r1/forth/replay_r1.py --matrix --output /tmp/r1-full-replay.json",
+  "shared_data": [
+    "versions/v0.2.0/payment-fixture.json"
+  ]
+}

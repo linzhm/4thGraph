@@ -1,6 +1,6 @@
 # PELS 计数器
 
-[English](README.md) · [项目目录](../README.zh-CN.md)
+[English](README.md) · [项目目录](../README.zh-CN.md) · [版本](versions/index.json)
 
 **[构建完整锁](#build)** · [Regtest 入金和复放](#spend-and-verify-on-regtest) · [调整手续费规则](#declare-a-fee-constraint)
 

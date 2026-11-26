@@ -1,0 +1,30 @@
+{
+  "template_version": "0.1.0",
+  "payment_shape": {
+    "inputs": 2,
+    "outputs": 2
+  },
+  "lock_sha256": "b3acd6b92a23120bd24432ada2b1cac013fe06381d7ea96ac6c5a73c493f4287",
+  "measured": {
+    "lock_bytes": 59582,
+    "payment_bytes": {
+      "bip143-all": 119934,
+      "otda-all": 358194
+    },
+    "payment_peak_stack_payload_bytes": {
+      "bip143-all": 4146,
+      "otda-all": 238734
+    },
+    "unlock_bytes": {
+      "bip143-all": [
+        326,
+        326
+      ],
+      "otda-all": [
+        119454,
+        119454
+      ]
+    }
+  },
+  "source": "forth/history.md"
+}

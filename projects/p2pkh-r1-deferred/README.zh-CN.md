@@ -1,6 +1,6 @@
 # P2PKH-R1-Deferred v0.3.0
 
-[English](README.md) · [4thGraph](../../README.zh-CN.md) · [项目目录](../README.zh-CN.md)
+[English](README.md) · [4thGraph](../../README.zh-CN.md) · [项目目录](../README.zh-CN.md) · [版本](versions/index.json)
 
 ## 开发入口
 
@@ -10,11 +10,11 @@
 
 [协议规范](docs/spec.zh-CN.md) · [安全分析](docs/developer.zh-CN.md#security) · [复现与验证](#开发与复现) · [交易成本](#实测交易成本)
 
-Deferred 将生成完整 R1 锁定脚本的成本推迟到启用阶段。v0.3.0 入金短锁为 1,085 字节，承诺等额的 46,302 字节 P2PKH-R1 v0.2.0 目标输出。已有短锁按原承诺启用。[Deferred 模板](template/v0.3.0/template.hex) · [R1 目标模板](../p2pkh-r1/template/v0.2.0/template.hex)
+Deferred 将生成完整 R1 锁定脚本的成本推迟到启用阶段。v0.3.0 入金短锁为 1,085 字节，承诺等额的 46,302 字节 P2PKH-R1 v0.2.0 目标输出。已有短锁按原承诺启用。[Deferred 模板](versions/v0.3.0/template.hex) · [R1 目标模板](../p2pkh-r1/versions/v0.2.0/template.hex)
 
 ## 4thGraph Forth 对照
 
-高阶 Forth 源码覆盖完整启用检查，包括 BIP143 SINGLE 同索引输出承诺、可选的 BIP143 或 OTDA 摘要、固定密钥签名构造和两处原生签名检查。三种构建使用同一份有栈类型声明的源码，编译器为 `3133da7` 基线上的 4thGraph 0.2.7。[Forth 源码](reference/deferred-activation.fth) · [编译报告](reference/forth-results.json)
+高阶 Forth 源码覆盖完整启用检查，包括 BIP143 SINGLE 同索引输出承诺、可选的 BIP143 或 OTDA 摘要、固定密钥签名构造和两处原生签名检查。三种构建使用同一份有栈类型声明的源码，编译器为 `3133da7` 基线上的 4thGraph 0.2.7。[Forth 源码](reference/deferred-activation.fth) · [编译报告](versions/v0.3.0/forth-results.json)
 
 | 构建 | 入金短锁 | 入金交易 | 入金及 BIP143 ALL 启用 | 首个启用输入主栈 / 备用栈峰值项数 |
 | --- | ---: | ---: | ---: | ---: |
@@ -23,7 +23,7 @@ Deferred 将生成完整 R1 锁定脚本的成本推迟到启用阶段。v0.3.0 
 | Forth `safe` | 1,087 B | 2,257 B | 95,420 B | 10 / 1 |
 | v0.3.0 Forth `stack` | **1,085 B** | **2,253 B** | **95,416 B** | 10 / 1 |
 
-样例入金含两个短锁和一个赞助输出，启用后得到相同的两个 46,302 字节 R1 目标锁。`stack` 每个短锁节省 350 字节，两笔交易合计节省 700 字节。四种构建的启用交易均为 BIP143 SINGLE 直接路径 93,089 字节、BIP143 ALL 或 OTDA ALL 路径 93,163 字节。开发求值器测得 BIP143 ALL 路径的两栈合计载荷峰值分别为汇编 359 字节、Forth 360 字节。[样例和数据](reference/forth-results.json)
+样例入金含两个短锁和一个赞助输出，启用后得到相同的两个 46,302 字节 R1 目标锁。`stack` 每个短锁节省 350 字节，两笔交易合计节省 700 字节。四种构建的启用交易均为 BIP143 SINGLE 直接路径 93,089 字节、BIP143 ALL 或 OTDA ALL 路径 93,163 字节。开发求值器测得 BIP143 ALL 路径的两栈合计载荷峰值分别为汇编 359 字节、Forth 360 字节。[样例和数据](versions/v0.3.0/forth-results.json)
 
 Forth 逐层分半并拼接来反转 32 字节数据，缩小了基础构建。`safe` 利用字节长度的非负范围，省去两处 DER 长度减法的 64 位回绕逻辑。`stack` 再通过栈调度在每处各省 1 字节。BSV Node 和固定版本的 chain-gang 均通过了适用的启用验收矩阵。[验证范围](reference/acceptance.md)
 
@@ -52,7 +52,7 @@ PYTHONPATH=src:. python projects/p2pkh-r1-deferred/reference/compare_forth.py \
 
 ## 开发与复现
 
-详见[协议规范](docs/spec.zh-CN.md)、[钱包 SDK](docs/sdk.zh-CN.md)、[模板布局](template/v0.3.0/layout.json)、[启用向量](template/v0.3.0/activation-single.json)、[十二种模式向量](template/v0.3.0/sighash-modes.json)和[验收矩阵](reference/acceptance.md)。
+详见[协议规范](docs/spec.zh-CN.md)、[钱包 SDK](docs/sdk.zh-CN.md)、[模板布局](versions/v0.3.0/layout.json)、[启用向量](versions/v0.3.0/activation-single.json)、[十二种模式向量](versions/v0.3.0/sighash-modes.json)和[验收矩阵](reference/acceptance.md)。
 
 ```sh
 python -m pip install -r projects/p2pkh-r1-deferred/reference/requirements.txt

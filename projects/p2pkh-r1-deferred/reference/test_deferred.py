@@ -18,6 +18,7 @@ from deferred import (
     funding_output_from_owner_hash, recognize, target_output, target_output_from_owner_hash,
 )
 from fixed_templates import LEGACY_TEMPLATE_VERSION
+from forth_lock import RELEASE_TEMPLATE
 from generate_vectors import TEMPLATE_RECIPES, artifacts
 from fourthgraph.bsv.script import asm, push
 from fourthgraph.bsv.transaction import CHRONICLE, SIGHASH_TYPES, Input, Output, Transaction, hash256, preimage_forkid
@@ -117,7 +118,7 @@ def zero_commitment_case(funding, unsigned):
 class DeferredTests(unittest.TestCase):
     def test_forth_comparison_reproduces_report_and_script_codes(self):
         report, scripts = comparison()
-        recorded = Path(__file__).with_name('forth-results.json').read_text(encoding='ascii')
+        recorded = (RELEASE_TEMPLATE / 'forth-results.json').read_text(encoding='ascii')
         self.assertEqual(json.dumps(report, indent=2) + '\n', recorded)
         for name, script in scripts.items():
             with self.subTest(build=name):
@@ -139,6 +140,16 @@ class DeferredTests(unittest.TestCase):
             self.assertEqual(funding.outputs[0], compiled)
             self.assertEqual(recognize(funding.outputs[0]).template_version, DEFERRED_TEMPLATE_VERSION)
             self.assertEqual(activation_fixture(funding, unsigned).outputs, unsigned.outputs)
+
+    def test_rejects_incomplete_metadata_without_building_templates(self):
+        _, public_key, _, funding, _ = fixture()
+        output = funding.outputs[0]
+        script_hash = output.script[22:54]
+        for recipient in (public_key_hash160(public_key), public_key):
+            header = push(recipient) + push(script_hash)
+            for raw in (push(recipient), header, header + asm('OP_1 OP_1')):
+                with patch("deferred._locking_script", side_effect=AssertionError("unexpected template build")):
+                    self.assertIsNone(recognize(replace(output, script=raw), expected_key=public_key))
 
     def test_public_metadata_and_canonical_recognition(self):
         _, public_key, second_key, funding, unsigned = fixture()

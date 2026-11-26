@@ -1,0 +1,64 @@
+{
+  "template_version": "0.4.0",
+  "engines": {
+    "bsv_node_version": 101020300,
+    "chain_gang": {
+      "version": "0.13.2",
+      "commit": "74676b9c002c452e7f21a9ed9265f4972bef03f6"
+    },
+    "regtest_profile": "raised"
+  },
+  "payment_shape": {
+    "inputs": 2,
+    "outputs": 2
+  },
+  "lock_sha256": "f091c57f22d2dd3dc6519055d8c0c7965c2e55c7cb365794989407487c5e3659",
+  "measured": {
+    "lock_bytes": 42536,
+    "otda_program_bytes": 3886,
+    "payment_bytes": {
+      "bip143-all": 85842,
+      "otda-all": 93664,
+      "otda-single": 93593
+    },
+    "payment_peak_stack_payload_bytes": {
+      "bip143-all": 3642,
+      "otda-all": 170549,
+      "otda-single": 85474
+    },
+    "unlock_bytes": {
+      "bip143-all": [
+        326,
+        326
+      ],
+      "otda-all": [
+        4237,
+        4237
+      ],
+      "otda-single": [
+        4197,
+        4206
+      ]
+    }
+  },
+  "payment_evidence": {
+    "bip143-all": {
+      "spend_txid": "43130d897d7a25d9d551314a181e4180e67e060cfd1fa2231b5349e56d9b5aa0",
+      "locktime_mutation_rejected": true
+    },
+    "otda-all": {
+      "spend_txid": "46b7eb08d3d1020d0ff85cff69e2b2c6ad3d72869c69eb78d0a86122041174b8",
+      "locktime_mutation_rejected": true
+    },
+    "otda-single": {
+      "spend_txid": "d6a648fa62d0ad95df46770dbc6407fc1f1846a198eaf86a99d50568c042a298",
+      "locktime_mutation_rejected": true
+    }
+  },
+  "acceptance": {
+    "node_payment_cases": 1296,
+    "chain_gang_payment_cases": 432,
+    "valid_witness_controls": 4,
+    "invalid_witness_controls": 24
+  }
+}
