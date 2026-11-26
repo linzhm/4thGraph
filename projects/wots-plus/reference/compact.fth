@@ -98,15 +98,32 @@ REQUIRE BSV
     compact-chain-prefix op-8 op-pick op-swap compact-step-count
 ;
 
-: compact-v4-hash-step ( script cell -- script )
-    ( Function prefix, chain address, selector mask, value. )
-    swap op-2over swap bsv-num op-pick op-cat
+: compact-local-hash-pair ( script -- script )
+    op-pick op-cat
     ( Keep the address below the copied prefix and key, then move it next to the value. )
     op-tuck op-sha256 op-2swap op-4 op-pick op-or op-sha256
     ( The copied prefix and key are already below the value and mask. )
     op-xor op-cat op-cat op-sha256
 ;
 
+: compact-local-hash-step ( script cell -- script )
+    ( Function prefix, chain address, selector mask, value. )
+    swap op-2over swap bsv-num compact-local-hash-pair
+;
+
 : compact-v4-chain-end ( script -- script )
     op-2swap op-2drop op-nip compact-append-endpoint op-bin2num op-1add
+;
+
+: compact-v5-chain-start ( script -- script )
+    ( PRF base, function prefix, selector mask, remaining signature, index, endpoints. )
+    op-2swap 32 bsv-num op-split op-2rot op-tuck
+    op-7 op-pick op-swap op-cat op-2rot
+    ( Endpoints, remaining signature and index sit below the four hash operands. )
+    op-fromaltstack
+;
+
+: compact-v5-chain-end ( script -- script )
+    ( Restore the frame while incrementing the index and appending the endpoint. )
+    op-swap op-2rot op-bin2num op-1add op-6 op-roll op-2rot op-nip op-cat
 ;

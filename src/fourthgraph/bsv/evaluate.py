@@ -107,6 +107,8 @@ def evaluate(raw, stack=None, checksig=None, *, observe_stack=None):
                     if value: value=value[:-1]+bytes([value[-1]&127])
                     value=value+bytes(size-len(value)); value=value[:-1]+bytes([value[-1]|sign])
                 stack.append(value)
+            elif name == 'INVERT':
+                stack.append(bytes(byte ^ 0xff for byte in pop()))
             elif name in ('XOR','AND','OR'):
                 y=pop(); x=pop()
                 if len(x)!=len(y): raise ScriptError('bitwise length')

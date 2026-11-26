@@ -32,6 +32,42 @@ def fixed_pattern():
     return Reconstruction(program, parts, (N, N))
 
 
+def _encode_repeated(raw, fragment, constructor=None):
+    """Leave one byte string assembled from literal gaps and a cached fragment."""
+    first, *gaps = raw.split(fragment)
+    load = push(fragment) if constructor is None else constructor
+    program = bytearray(load + push(first))
+    for gap in gaps:
+        program += asm("OP_OVER OP_CAT")
+        if gap:
+            program += push(gap) + asm("OP_CAT")
+    program += asm("OP_NIP")
+    return min((push(raw), bytes(program)), key=len)
+
+
+def _repeat_bytes(fragment, count):
+    """Emit a positive number of copies using binary doubling."""
+    literal = push(fragment)
+    program = literal
+    for bit in bin(count)[3:]:
+        program += asm("OP_DUP OP_CAT")
+        if bit == "1":
+            program += literal + asm("OP_CAT")
+    return program
+
+
+def _compact_fragment_programs(first, chain, last):
+    from fourthgraph.bsv.pushtx import REVERSE32_ON_STACK
+    from script import MESSAGE_BYTE_SUFFIX, _compact_builder
+
+    hash_suffix = _compact_builder().emit("compact-local-hash-pair", b"") + asm("OP_ENDIF")
+    reversal = (_repeat_bytes(asm("OP_1 OP_SPLIT"), N - 1)
+                + _repeat_bytes(asm("OP_SWAP OP_CAT"), N - 1) + asm("OP_CAT"))
+    return (_encode_repeated(first, MESSAGE_BYTE_SUFFIX),
+            _encode_repeated(chain, hash_suffix),
+            _encode_repeated(last, REVERSE32_ON_STACK, reversal))
+
+
 @cache
 def compact_pattern(profile="compact"):
     from script import _compact_chain, _payment_script
@@ -46,10 +82,14 @@ def compact_pattern(profile="compact"):
 
     # WOTSP-SHA2_256 uses 64 message chains and three checksum chains.
     # Keep one copy for the checksum and double the other six times.
-    program = push(first) + push(lead) + push(chain) + asm("OP_DUP")
+    if profile == "compact-v5":
+        first_program, chain_program, last_program = _compact_fragment_programs(first, chain, last)
+    else:
+        first_program, chain_program, last_program = map(push, (first, chain, last))
+    program = first_program + push(lead) + chain_program + asm("OP_DUP")
     program += asm("OP_DUP OP_CAT") * 6 + asm("OP_ROT OP_SWAP OP_CAT")
     program += push(gap) + asm("OP_CAT OP_SWAP OP_DUP OP_DUP OP_CAT OP_CAT OP_CAT")
-    program += push(end) + asm("OP_CAT") + push(last)
+    program += push(end) + asm("OP_CAT") + last_program
     return Reconstruction(program, (first, middle, last), (N, N))
 
 
