@@ -32,6 +32,7 @@ class _VerifierVersion(IntEnum):
     V03 = 3
     V04 = 4
     V05 = 5
+    V06 = 6
 
 
 def _shake_options(version):
@@ -39,12 +40,13 @@ def _shake_options(version):
         "compact": version >= _VerifierVersion.COMPACT,
         "optimize": version >= _VerifierVersion.V02,
         "packed_rows": version >= _VerifierVersion.V05,
+        "packed_state": version >= _VerifierVersion.V06,
     }
 
 
 def verify_message_script(public_key, message_bytes, *, context=b"", legacy=False):
     """Compile a verifier that consumes the message and signature from the stack."""
-    version = _VerifierVersion.ORIGINAL if legacy else _VerifierVersion.V05
+    version = _VerifierVersion.ORIGINAL if legacy else _VerifierVersion.V06
     challenges = _reconstruct_challenge(public_key, message_bytes, context=context, version=version)
     return challenges + asm("OP_EQUAL")
 
@@ -66,7 +68,8 @@ def _reconstruct_challenge(public_key, message_bytes, *, context=b"", version):
     # [message, c_tilde, z, hints] -> [message, c_tilde, c || z].
     code += asm("OP_TOALTSTACK OP_OVER") + sample_in_ball_script(**shake)
     if signed:
-        equation = checked_equation_script(public_key, packed=version >= _VerifierVersion.V03)
+        equation = checked_equation_script(public_key, packed=version >= _VerifierVersion.V03,
+                                           paired=version >= _VerifierVersion.V06)
     else:
         equation = verification_equation_script(public_key, compact=compact)
     code += asm("OP_SWAP OP_CAT") + equation
@@ -86,7 +89,7 @@ def locking_script(public_key, *, legacy=False):
     """Bind the Pure ML-DSA-44 verifier to the current transaction input."""
     if legacy:
         return _historical_lock(public_key, compact=False)
-    challenges = _reconstruct_challenge(public_key, DIGEST_BYTES, version=_VerifierVersion.V05)
+    challenges = _reconstruct_challenge(public_key, DIGEST_BYTES, version=_VerifierVersion.V06)
     return _compile_payment_lock(challenges, compact_binding=True)
 
 
@@ -120,16 +123,18 @@ def _historical_lock(public_key, *, compact):
 
 def _historical_forth_lock(public_key, *, version):
     challenges = _reconstruct_challenge(public_key, DIGEST_BYTES, version=version)
-    # The v0.2.0 through v0.4.0 Forth locks share this emitted wrapper.
+    # The historical Forth locks share this emitted digest and verifier wrapper.
     code = authorization_checks(ORDINARY_CODE, COMPANION_CODE)
     code += asm("OP_SWAP OP_HASH256 OP_DUP OP_ROT")
-    return code + challenges + asm("OP_EQUALVERIFY") + check_binding(COMPANION_CODE)
+    binding = check_binding(COMPANION_CODE, compact=version >= _VerifierVersion.V05)
+    return code + challenges + asm("OP_EQUALVERIFY") + binding
 
 
 def matches_lock(script, public_key):
     """Match any supported generation of the fixed-key payment template."""
     return (script == locking_script(public_key)
             or any(script == _historical_forth_lock(public_key, version=version)
-                   for version in (_VerifierVersion.V04, _VerifierVersion.V03, _VerifierVersion.V02))
+                   for version in (_VerifierVersion.V05, _VerifierVersion.V04,
+                                   _VerifierVersion.V03, _VerifierVersion.V02))
             or script == _historical_lock(public_key, compact=True)
             or script == _historical_lock(public_key, compact=False))

@@ -177,6 +177,8 @@ class PaymentTests(unittest.TestCase):
              '1be9cf198ad5fdb4ac6355ad6826b1eaca4390180f2d5b4d76510db34b2a4a8c'),
             (_historical_forth_lock(self.public_key, version=_VerifierVersion.V04),
              '5ce650cd40ac69c56016541b107328ff45e03d1bfbd9053ae499ecf5d9721799'),
+            (_historical_forth_lock(self.public_key, version=_VerifierVersion.V05),
+             '4d88ce30f46434e769bbd4ace945758079e881800f999c1b56e263706789bbce'),
         )
         for previous_lock, fingerprint in earlier:
             self.assertEqual(sha256(previous_lock).hexdigest(), fingerprint)

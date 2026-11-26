@@ -16,6 +16,7 @@ from fourthgraph.bsv.script import asm, number, push
 _LANE_BYTES = 8
 _ROW_BYTES = 5 * _LANE_BYTES
 _STATE_BYTES = 5 * _ROW_BYTES
+_LANE_LSB_MASK = (bytes(_LANE_BYTES - 1) + b'\x01') * 5
 _POSITIONS = tuple((x, y) for y in range(5) for x in range(5))
 
 # Indexed by x, then y. FIPS 202 Algorithms 2–7 and Table 2.
@@ -222,15 +223,9 @@ def _packed_theta():
     return code + _UNPACK_ROWS
 
 
-def _packed_keccak():
-    code = bytearray(asm('OP_SIZE') + number(_STATE_BYTES) + asm('OP_NUMEQUALVERIFY'))
-    lane_lsb = bytes(_LANE_BYTES - 1) + b'\x01'
-    code += push(lane_lsb * 5) + asm('OP_SWAP')
-    reverse = _reverse_bytes(_LANE_BYTES)
-    split_lane = asm('OP_8 OP_SPLIT OP_SWAP') + reverse + asm('OP_SWAP')
-    code += split_lane * 24 + reverse
-    code += (_PACK_ROW + asm('OP_TOALTSTACK')) * 4 + _PACK_ROW + asm('OP_FROMALTSTACK') * 4
-
+@cache
+def _keccak_rows():
+    code = bytearray()
     rho_pi = _Round(compact=True, rotate=_rotate_packed_lane)
     rho_pi.move_and_rotate(theta_done=True)
     theta = _packed_theta()
@@ -242,12 +237,39 @@ def _packed_keccak():
         code += asm('OP_8 OP_SPLIT OP_SWAP') + push(constant.to_bytes(_LANE_BYTES, 'big'))
         code += asm('OP_XOR OP_SWAP OP_CAT') + asm('OP_FROMALTSTACK') * 4
 
-    code += asm('OP_TOALTSTACK') * 4 + _UNPACK_ROWS
+    return bytes(code)
+
+
+def _packed_keccak():
+    code = bytearray(asm('OP_SIZE') + number(_STATE_BYTES) + asm('OP_NUMEQUALVERIFY'))
+    code += push(_LANE_LSB_MASK) + asm('OP_SWAP')
+    reverse = _reverse_bytes(_LANE_BYTES)
+    split_lane = asm('OP_8 OP_SPLIT OP_SWAP') + reverse + asm('OP_SWAP')
+    code += split_lane * 24 + reverse
+    code += (_PACK_ROW + asm('OP_TOALTSTACK')) * 4 + _PACK_ROW + asm('OP_FROMALTSTACK') * 4
+    code += _keccak_rows() + asm('OP_TOALTSTACK') * 4 + _UNPACK_ROWS
     concat_lane = asm('OP_SWAP') + reverse + asm('OP_SWAP OP_CAT')
     return bytes(code) + reverse + concat_lane * 24 + asm('OP_NIP')
 
 
-def _shake_script(message_bytes, output_bytes, rate, *, compact=True, optimize=True, packed_rows=True):
+@cache
+def _state_permutation():
+    """Permute an internal state whose lanes are already big-endian."""
+    return (push(_LANE_LSB_MASK) + asm('OP_SWAP') + (number(_ROW_BYTES) + asm('OP_SPLIT')) * 4
+            + _keccak_rows() + _PACK_ROW + asm('OP_NIP'))
+
+
+@cache
+def _reverse_lane_stream(lanes):
+    reverse = _reverse_bytes(_LANE_BYTES)
+    if lanes == 1:
+        return reverse
+    step = asm('OP_8 OP_SPLIT OP_SWAP') + reverse + asm('OP_ROT OP_SWAP OP_CAT OP_SWAP')
+    return asm('OP_0 OP_SWAP') + step * (lanes - 1) + reverse + asm('OP_CAT')
+
+
+def _shake_script(message_bytes, output_bytes, rate, *, compact=True, optimize=True,
+                  packed_rows=True, packed_state=True):
     if type(message_bytes) is not int or message_bytes < 0:
         raise ValueError('message length must be a nonnegative integer')
     if type(output_bytes) is not int or output_bytes < 1:
@@ -261,9 +283,17 @@ def _shake_script(message_bytes, output_bytes, rate, *, compact=True, optimize=T
 
     code = bytearray(asm('OP_SIZE') + number(message_bytes) + asm('OP_NUMEQUALVERIFY'))
     code += push(padding) + asm('OP_CAT') + push(bytes(_STATE_BYTES))
-    permutation = keccak_f1600_script(compact=compact, optimize=optimize, packed_rows=packed_rows)
+    packed_state = packed_state and compact and optimize and packed_rows
+    # Keep all state lanes big-endian across permutations. Convert only the
+    # bytes that cross the sponge boundary, in FIPS 202 little-endian order.
+    if packed_state:
+        permutation = _state_permutation()
+        rate_conversion = _reverse_lane_stream(rate // _LANE_BYTES)
+    else:
+        permutation = keccak_f1600_script(compact=compact, optimize=optimize, packed_rows=packed_rows)
+        rate_conversion = b''
     absorb = (
-        asm('OP_SWAP') + number(rate) + asm('OP_SPLIT OP_TOALTSTACK')
+        asm('OP_SWAP') + number(rate) + asm('OP_SPLIT OP_TOALTSTACK') + rate_conversion
         + push(bytes(_STATE_BYTES - rate)) + asm('OP_CAT OP_XOR')
         + permutation + asm('OP_FROMALTSTACK OP_SWAP')
     )
@@ -274,11 +304,21 @@ def _shake_script(message_bytes, output_bytes, rate, *, compact=True, optimize=T
     # still acts only on the state at the top of the stack.
     code += asm('OP_0 OP_SWAP')
     squeeze = (
-        asm('OP_DUP') + number(rate) + asm('OP_SPLIT OP_DROP OP_ROT OP_SWAP OP_CAT OP_SWAP')
+        asm('OP_DUP') + number(rate) + asm('OP_SPLIT OP_DROP') + rate_conversion
+        + asm('OP_ROT OP_SWAP OP_CAT OP_SWAP')
         + permutation
     )
     code += squeeze * extra_blocks
-    code += number(final_index + 1) + asm('OP_SPLIT OP_DROP OP_CAT')
+    final_size = final_index + 1
+    if packed_state:
+        lanes = (final_size + _LANE_BYTES - 1) // _LANE_BYTES
+        lane_bytes = lanes * _LANE_BYTES
+        code += number(lane_bytes) + asm('OP_SPLIT OP_DROP') + _reverse_lane_stream(lanes)
+        if final_size != lane_bytes:
+            code += number(final_size) + asm('OP_SPLIT OP_DROP')
+    else:
+        code += number(final_size) + asm('OP_SPLIT OP_DROP')
+    code += asm('OP_CAT')
     return bytes(code)
 
 
@@ -287,7 +327,7 @@ def shake128_script(message_bytes, output_bytes):
     return _shake_script(message_bytes, output_bytes, rate=168)
 
 
-def shake256_script(message_bytes, output_bytes, *, compact=True, optimize=True, packed_rows=True):
+def shake256_script(message_bytes, output_bytes, *, compact=True, optimize=True, packed_rows=True, packed_state=True):
     """Replace a byte vector of the specified length with a SHAKE256 XOF."""
     return _shake_script(message_bytes, output_bytes, rate=136, compact=compact, optimize=optimize,
-                         packed_rows=packed_rows)
+                         packed_rows=packed_rows, packed_state=packed_state)

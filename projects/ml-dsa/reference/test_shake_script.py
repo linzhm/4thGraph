@@ -43,7 +43,8 @@ class ShakeScriptTests(unittest.TestCase):
     def test_padding_and_squeezing_match_hashlib(self):
         modes = ((shake128_script, shake_128, 168), (shake256_script, shake_256, 136))
         for emitter, oracle, rate in modes:
-            lengths = ((0, 32), (34, 32), (rate - 1, 64), (rate, 64), (rate + 1, rate + 37))
+            lengths = ((0, 1), (0, 32), (34, 32), (rate - 1, 64), (rate, 64),
+                       (rate + 1, rate + 37), (2 * rate - 1, 2 * rate + 7))
             for input_bytes, output_bytes in lengths:
                 with self.subTest(xof=emitter.__name__, input_bytes=input_bytes, output_bytes=output_bytes):
                     message = bytes((index * 129 + 7) % 256 for index in range(input_bytes))

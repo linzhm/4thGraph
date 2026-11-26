@@ -51,7 +51,8 @@ def components(_samples):
         ("v0.2.0", _VerifierVersion.V02, _historical_forth_lock(payment_key, version=_VerifierVersion.V02)),
         ("v0.3.0", _VerifierVersion.V03, _historical_forth_lock(payment_key, version=_VerifierVersion.V03)),
         ("v0.4.0", _VerifierVersion.V04, _historical_forth_lock(payment_key, version=_VerifierVersion.V04)),
-        ("optimized", _VerifierVersion.V05, locking_script(payment_key)),
+        ("v0.5.0", _VerifierVersion.V05, _historical_forth_lock(payment_key, version=_VerifierVersion.V05)),
+        ("optimized", _VerifierVersion.V06, locking_script(payment_key)),
     )
     payment_sizes = {}
     for label, version, lock in profiles:
@@ -62,7 +63,8 @@ def components(_samples):
                                             sparse_hints=sparse)
         hints = apply_sparse_hints_script() if sparse else apply_hints_script(compact=compact)
         payment_sizes[label] = {
-            "keccak_f1600": len(keccak_f1600_script(**shake)),
+            "keccak_f1600": len(keccak_f1600_script(compact=compact, optimize=shake["optimize"],
+                                                   packed_rows=shake["packed_rows"])),
             "signature_decode": len(signature),
             "sample_in_ball": len(sample_in_ball_script(**shake)),
             "apply_hints": len(hints),
@@ -81,6 +83,7 @@ def components(_samples):
                                    ("compact", {"compact": True}))
         },
         "checked_equation_script_bytes": len(checked_equation_script(key)),
+        "v05_checked_equation_script_bytes": len(checked_equation_script(key, paired=False)),
         "v02_checked_equation_script_bytes": len(checked_equation_script(key, packed=False)),
         "forth_lock_with_previous_verifier_bytes": len(_compile_payment_lock(previous_challenges)),
         "shake256_832_to_32_script_bytes": len(shake256_script(832, 32)),

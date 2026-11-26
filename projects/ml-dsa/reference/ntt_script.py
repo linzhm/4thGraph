@@ -28,7 +28,9 @@ _LANE_RADIX = 1 << (8 * _LANE_BYTES)
 # all eight stages stay below q**9, which fits on either side of this offset.
 # The offset is a multiple of q, so decoding biased lanes preserves residues.
 _LANE_OFFSET = (_LANE_RADIX // 2 // MODULUS) * MODULUS
-_READ_LANE = number(_LANE_BYTES) + asm("OP_SPLIT OP_SWAP") + push(b"\x00") + asm("OP_CAT OP_BIN2NUM")
+_SPLIT_LANE = number(_LANE_BYTES) + asm("OP_SPLIT OP_SWAP")
+_READ_LANE = _SPLIT_LANE + push(b"\x00") + asm("OP_CAT OP_BIN2NUM")
+_READ_POSITIVE_LANE = _SPLIT_LANE + asm("OP_BIN2NUM")
 
 
 def _take(order, index, *, above=0, compact=False):
@@ -82,11 +84,14 @@ def _signed_inverse_butterfly(twiddle):
     return code + asm("OP_FROMALTSTACK")
 
 
+def _centered_twiddle(zeta):
+    return zeta - MODULUS if zeta > MODULUS // 2 else zeta
+
+
 def _compact_butterfly(zeta, *, inverse):
     # Reduce at serialization. All eight stages grow magnitudes by at most
     # 2q each, so even after inverse scaling they fit in 30 ScriptNum bytes.
-    signed_zeta = zeta - MODULUS if zeta > MODULUS // 2 else zeta
-    multiply = number(signed_zeta) + asm("OP_MUL")
+    multiply = number(_centered_twiddle(zeta)) + asm("OP_MUL")
     butterfly = asm("OP_2DUP OP_ADD OP_TOALTSTACK OP_SUB")
     return (butterfly + multiply if inverse else multiply + butterfly) + asm("OP_FROMALTSTACK")
 
@@ -96,24 +101,33 @@ def transform_script(*, inverse=False, signed_residues=False, compact=False):
     return _transform(inverse=inverse, signed_residues=signed_residues, compact=compact)
 
 
-def _butterflies(order, *, inverse, signed_residues=False, compact=False):
-    code = bytearray()
-    log_degree = DEGREE.bit_length() - 1
-    if inverse:
-        stages = range(log_degree)
-        next_twiddle = DEGREE
-        butterfly = _signed_inverse_butterfly if signed_residues else _inverse_butterfly
-    else:
-        stages = reversed(range(log_degree))
-        next_twiddle = 0
-        butterfly = _signed_forward_butterfly if signed_residues else _forward_butterfly
+@cache
+def _transform_stages(*, inverse):
+    stages = range(DEGREE.bit_length() - 1)
+    index = DEGREE if inverse else 0
+    layers = []
+    if not inverse:
+        stages = reversed(stages)
     for stage in stages:
         width = 1 << stage
-        for start in range(0, DEGREE, 2 * width):
-            next_twiddle += -1 if inverse else 1
-            zeta = twiddle(next_twiddle)
-            if inverse:
-                zeta = MODULUS - zeta
+        factors = []
+        for _ in range(DEGREE // (2 * width)):
+            index += -1 if inverse else 1
+            zeta = twiddle(index)
+            factors.append(MODULUS - zeta if inverse else zeta)
+        layers.append((width, tuple(factors)))
+    return tuple(layers)
+
+
+def _butterflies(order, *, inverse, signed_residues=False, compact=False):
+    code = bytearray()
+    if inverse:
+        butterfly = _signed_inverse_butterfly if signed_residues else _inverse_butterfly
+    else:
+        butterfly = _signed_forward_butterfly if signed_residues else _forward_butterfly
+    for width, factors in _transform_stages(inverse=inverse):
+        for group, zeta in enumerate(factors):
+            start = group * 2 * width
             operations = _compact_butterfly(zeta, inverse=inverse) if compact else butterfly(zeta)
             for left in range(start, start + width):
                 right = left + width
@@ -121,6 +135,58 @@ def _butterflies(order, *, inverse, signed_residues=False, compact=False):
                 code += _take(order, right, above=1, compact=compact) + operations
                 order.extend((right, left))
     return code
+
+
+def _paired_butterflies(order, *, inverse):
+    """Evaluate two dependent layers while each four-coefficient group is on top."""
+    code = bytearray()
+    layers = _transform_stages(inverse=inverse)
+    for (first_width, first), (second_width, second) in zip(layers[::2], layers[1::2], strict=True):
+        width = min(first_width, second_width)
+        for group, start in enumerate(range(0, DEGREE, 4 * width)):
+            if inverse:
+                first_pair, second_pair = first[2 * group:2 * group + 2], (second[group],) * 2
+            else:
+                first_pair, second_pair = (first[group],) * 2, second[2 * group:2 * group + 2]
+            first_left, first_right = (_compact_butterfly(zeta, inverse=inverse) for zeta in first_pair)
+            second_left, second_right = (_compact_butterfly(zeta, inverse=inverse) for zeta in second_pair)
+            # Staged as [a, b, c, d]. First combine (c, d) and (a, b),
+            # then (a, c) and (b, d), leaving [c, a, d, b].
+            block = first_right + asm("OP_2SWAP") + first_left
+            block += asm("OP_ROT") + second_left + asm("OP_2SWAP OP_SWAP") + second_right
+            for a in range(start, start + width):
+                b, c, d = a + first_width, a + second_width, a + 3 * width
+                for above, index in enumerate((a, b, c, d)):
+                    code += _take(order, index, above=above, compact=True)
+                code += block
+                order.extend((c, a, d, b))
+    return code
+
+
+@cache
+def _positive_lane_offset():
+    # Propagate absolute bounds through the same centered butterflies as the
+    # emitted code. Adding the offset changes none of the residues mod q.
+    maximum = 0
+    for inverse in (False, True):
+        bounds = [MODULUS - 1] * DEGREE
+        for width, factors in _transform_stages(inverse=inverse):
+            for group, zeta in enumerate(factors):
+                start = group * 2 * width
+                factor = abs(_centered_twiddle(zeta))
+                for left in range(start, start + width):
+                    right = left + width
+                    a, b = bounds[left], bounds[right]
+                    if inverse:
+                        bounds[left], bounds[right] = a + b, (a + b) * factor
+                    else:
+                        bounds[left] = bounds[right] = a + b * factor
+        maximum = max(maximum, max(bounds))
+    offset = (maximum // MODULUS + 1) * MODULUS
+    # The top bit of every lane stays clear, including the high lane of the
+    # whole packed integer, so the serialized values need no sign byte.
+    assert maximum + offset < _LANE_RADIX // 2
+    return offset
 
 
 @cache
@@ -192,7 +258,7 @@ def verification_equation_script(public_key, *, signed_residues=False, compact=F
     return bytes(code)
 
 
-def checked_equation_script(public_key, *, packed=True):
+def checked_equation_script(public_key, *, packed=True, paired=True):
     """Reconstruct rows from the sampler and the range-checked signed response."""
     # The inverse transform is linear. Fold its 1/256 factor into the public
     # coefficients so each unpacked output lane needs only reduction mod q.
@@ -200,7 +266,7 @@ def checked_equation_script(public_key, *, packed=True):
         [tuple(value * _INVERSE_SCALE % MODULUS for value in column) for column in row]
         for row in verification_key_rows(public_key)
     ]
-    return _packed_equation(rows) if packed else _compact_equation(rows, integrated=True)
+    return _packed_equation(rows, paired=paired) if packed else _compact_equation(rows, integrated=True)
 
 
 def _compact_equation(rows, *, integrated=False):
@@ -253,10 +319,13 @@ def _packed_bias(lanes, offset):
     return number(offset * sum(_LANE_RADIX ** index for index in range(lanes)))
 
 
-def _packed_equation(rows):
+def _packed_equation(rows, *, paired):
     input_count, row_count = len(rows[0]), len(rows)
+    offset = _positive_lane_offset() if paired else _LANE_OFFSET
+    read_lane = _READ_POSITIVE_LANE if paired else _READ_LANE
+    extra_byte = 0 if paired else 1
     code = bytearray(asm("OP_SIZE") + number(input_count * POLYNOMIAL_BYTES) + asm("OP_NUMEQUALVERIFY"))
-    code += asm("OP_TOALTSTACK") + number(_LANE_RADIX) + _packed_bias(input_count, _LANE_OFFSET)
+    code += asm("OP_TOALTSTACK") + number(_LANE_RADIX) + _packed_bias(input_count, offset)
     code += asm("OP_FROMALTSTACK")
     code += (number(POLYNOMIAL_BYTES) + asm("OP_SPLIT")) * (input_count - 1)
 
@@ -272,14 +341,15 @@ def _packed_equation(rows):
     code += restore
 
     order = list(reversed(range(DEGREE)))
-    code += _butterflies(order, inverse=False, compact=True)
+    code += (_paired_butterflies(order, inverse=False) if paired
+             else _butterflies(order, inverse=False, compact=True))
     for coefficient in range(DEGREE):
         code += _take(order, coefficient, compact=True)
         code += number(len(order) + 1) + asm("OP_PICK OP_ADD")
-        code += number(_LANE_BYTES * input_count + 1) + asm("OP_NUM2BIN")
+        code += number(_LANE_BYTES * input_count + extra_byte) + asm("OP_NUM2BIN")
         # The biased values are congruent to the forward NTT values mod q.
         # Reduce each row of the dot product before packing its inverse input.
-        code += (_READ_LANE + asm("OP_SWAP")) * input_count + asm("OP_DROP")
+        code += (read_lane + asm("OP_SWAP")) * input_count + asm("OP_DROP")
         for row_index, row in enumerate(rows):
             code += _dot_product(row, coefficient, consume=row_index == row_count - 1)
             code += _REDUCE + asm("OP_TOALTSTACK")
@@ -290,10 +360,11 @@ def _packed_equation(rows):
 
     # All forward coefficients have been consumed. The altstack holds one
     # packed coefficient per inverse butterfly input, with row zero low.
-    code += asm("OP_2DROP") + _packed_bias(row_count, _LANE_OFFSET) + restore
+    code += asm("OP_2DROP") + _packed_bias(row_count, offset) + restore
     order = list(reversed(range(DEGREE)))
-    code += _butterflies(order, inverse=True, compact=True)
-    return bytes(code) + _serialize_inverse_rows(order, row_count)
+    code += (_paired_butterflies(order, inverse=True) if paired
+             else _butterflies(order, inverse=True, compact=True))
+    return bytes(code) + _serialize_inverse_rows(order, row_count, positive=paired)
 
 
 @cache
@@ -314,13 +385,15 @@ def _packed_inverse():
     return bytes(code) + _serialize_inverse_rows(order, lanes, unbias=True)
 
 
-def _serialize_inverse_rows(order, lanes, *, unbias=False):
+def _serialize_inverse_rows(order, lanes, *, unbias=False, positive=False):
+    read_lane = _READ_POSITIVE_LANE if positive else _READ_LANE
     code = bytearray(asm("OP_0") * lanes)
     for index in range(DEGREE):
         code += _take(order, index, above=lanes, compact=True)
         depth = number(len(order) + lanes + 1 + int(unbias)) + asm("OP_PICK")
-        code += depth + asm("OP_ADD") + number(_LANE_BYTES * lanes + 1) + asm("OP_NUM2BIN")
+        width = _LANE_BYTES * lanes + (0 if positive else 1)
+        code += depth + asm("OP_ADD") + number(width) + asm("OP_NUM2BIN")
         residue = depth + asm("OP_SUB") + _REDUCE + _NORMALIZE if unbias else _REDUCE
         append = _COEFF + asm("OP_NUM2BIN") + number(lanes + 1) + asm("OP_ROLL OP_SWAP OP_CAT OP_SWAP")
-        code += (_READ_LANE + residue + append) * lanes + asm("OP_DROP")
+        code += (read_lane + residue + append) * lanes + asm("OP_DROP")
     return bytes(code) + asm("OP_CAT") * (lanes - 1) + asm("OP_NIP") * (1 + int(unbias))
