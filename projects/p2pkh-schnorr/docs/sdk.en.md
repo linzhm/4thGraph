@@ -6,9 +6,7 @@
 
 ## Receive and spend
 
-Select project `p2pkh-schnorr` in the unified SDK. The client uses template `v0.10.0` by default. Supply a 32-byte x-only public key or its 20-byte HASH160. The client fills the owner slot in the frozen Forth build and checks all fixed script bytes when recognizing an output. You can also supply the expected public key. The SDK identifies and spends UTXOs of all five versions from their prevout scripts. Set the wallet's `template` to a supported older version to create that output format. [Version catalog](../versions/index.json)
-
-The SDK automatically reconstructs eligible version-2 Chronicle OTDA preimages when the signed outputs include a v0.10.0 Schnorr lock and the resulting unlock is shorter. The option `compressOtda: false` selects a literal preimage. [OTDA reconstruction](spec.en.md#otda-reconstruction)
+Select project `p2pkh-schnorr` in the unified SDK. The client uses template `v0.10.0` by default. Supply a 32-byte x-only public key or its 20-byte HASH160. The client fills the owner slot in the frozen Forth build and checks all fixed script bytes when recognizing an output. You can also supply the expected public key. The SDK identifies and spends UTXOs of all five versions from their prevout scripts. Set the wallet's `template` to an earlier supported version to create that output format. [Version catalog](../versions/index.json)
 
 The signing request identifies the algorithm as `schnorr-secp256k1`, the payload kind as `message`, and the signature format as `bip340`. Give the 32-byte payload to the BIP340 signer as the message. Return the signer's original 64 bytes. The SDK verifies the signature, derives the public witness coordinates, and runs the Forth `schnorr-unlock` word to generate the input script. [Forth source](../reference/schnorr.fth)
 

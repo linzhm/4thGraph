@@ -10,8 +10,7 @@ SOURCE = Path(__file__).with_name("schnorr.fth")
 VERSIONS_DIR = SOURCE.resolve().parents[1] / "versions"
 TEMPLATE_VERSION = "v0.10.0"
 TEMPLATE_DIRS = {
-    version: VERSIONS_DIR / version
-    for version in (TEMPLATE_VERSION, "v0.9.0", "v0.8.0", "v0.7.0", "v0.6.0")
+    version: VERSIONS_DIR / version for version in (TEMPLATE_VERSION, "v0.9.0", "v0.8.0", "v0.7.0", "v0.6.0")
 }
 TEMPLATE_DIR = TEMPLATE_DIRS[TEMPLATE_VERSION]
 
@@ -34,12 +33,10 @@ def verifier():
     return ScriptBuilder("REQUIRE stdlib/bip340.fth\n").emit("bip340-verify", b"")
 
 
-def compile_unlock(preimage, companion, public_x, public_y, signature, nonce_y, *, preimage_script=None):
+def compile_unlock(preimage, companion, public_x, public_y, signature, nonce_y):
     """Instantiate the Forth unlocking word with approved, encoded witness data."""
-    witness = (int(companion), public_x, public_y, signature, nonce_y)
-    if preimage_script is None:
-        return _contract().emit("schnorr-unlock", preimage, *witness)
-    return preimage_script + _contract().emit("schnorr-unlock-witness", *witness)
+    return _contract().emit("schnorr-unlock", preimage, int(companion),
+                            public_x, public_y, signature, nonce_y)
 
 
 def compiled_template(owner=bytes(20)):

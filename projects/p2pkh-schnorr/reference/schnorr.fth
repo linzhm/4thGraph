@@ -98,11 +98,8 @@ REQUIRE stdlib/bip340.fth
 : push-number ( cell -- script ) bsv-empty swap bsv-num ;
 : pack-witness ( bytes bytes bytes bytes -- bytes ) bytes-cat bytes-cat bytes-cat ;
 
-: schnorr-unlock-witness ( cell bytes bytes bytes bytes -- script )
-    pack-witness push-data swap push-number bsv-cat-code
-;
-
 : schnorr-unlock ( bytes cell bytes bytes bytes bytes -- script )
     ( Arguments: preimage mode px py signature ry. Emit three pushes in lock input order. )
-    schnorr-unlock-witness swap push-data swap bsv-cat-code
+    pack-witness push-data swap push-number bsv-cat-code
+    swap push-data swap bsv-cat-code
 ;

@@ -82,26 +82,28 @@ REQUIRE stdlib/script-fragments.fth
     ( Complete addition with right-hand Z=1. Input: X1 Y1 Z1 x2 y2. )
     swap
 
-    ( Stage x1*y2 and compute yz = y1+z1*y2. )
-    4 script-pick-depth op-over op-mul op-over 4 script-pick-depth op-mul 5 script-pick-depth op-add
+    ( Form t = 3*x1*x2, xy = x1*y2+x2*y1 and zr = xy*t. )
+    op-over 5 script-pick-depth op-mul op-3 op-mul
+    op-over 6 script-pick-depth op-mul 3 script-pick-depth 6 script-pick-depth op-mul op-add
+    op-2dup op-mul
 
-    ( h = 21*z1, k = 21*xz, where xz = x1+z1*x2. )
-    21 bsv-num op-dup 6 script-pick-depth op-mul
-    5 script-pick-depth op-7 op-roll op-mul 8 script-pick-depth op-add op-rot op-mul
+    ( Form xz = x1+z1*x2 and k = 21*xz. )
+    21 bsv-num 6 script-pick-depth op-6 op-roll op-mul op-8 op-roll op-add op-over op-mul
 
-    ( t = 3*x1*x2, yr = t*k, xy = x1*y2+x2*y1 and zr = xy*t. )
-    op-7 op-roll 6 script-pick-depth op-mul op-3 op-mul op-2dup op-mul
-    op-7 op-roll 8 script-pick-depth op-mul op-6 op-roll op-add op-rot op-over op-mul
+    ( Combine yy = y1*y2 and h = 21*z1. Consume y and z to form yz = y1+z1*y2. )
+    7 script-pick-depth 6 script-pick-depth op-mul op-rot 7 script-pick-depth op-mul
+    op-2dup op-sub op-8 op-roll op-8 op-roll op-mul op-8 op-roll op-add
+    op-2swap op-add ( plus = yy+h, with minus = yy-h underneath yz. )
 
-    ( X = xy*minus-yz*k, where minus = yy-h. )
-    op-7 op-roll op-7 op-roll op-mul op-dup 6 script-pick-depth op-sub
-    op-3 op-roll op-over op-mul 7 script-pick-depth op-6 op-roll op-mul op-sub
+    ( Stage yz*plus for Z. Compute X = xy*minus-yz*k. )
+    op-2dup op-mul op-rot 4 script-pick-depth op-mul
+    op-6 op-roll 4 script-pick-depth op-mul op-swap op-sub
     over 7 secp256k1-reduce-point-coordinate
 
-    ( Y = minus*plus+yr, where plus = yy+h. Z = yz*plus+zr. )
-    op-rot op-5 op-roll op-add op-rot op-over op-mul op-4 op-roll op-add
-    over 5 secp256k1-reduce-point-coordinate
-    op-4 op-roll op-rot op-mul op-3 op-roll op-add swap 3 secp256k1-reduce-point-coordinate
+    ( Y = minus*plus+t*k. Z = yz*plus+zr. )
+    op-2swap op-mul op-5 op-roll op-4 op-roll op-mul op-add
+    over 4 secp256k1-reduce-point-coordinate
+    op-2swap op-add swap 3 secp256k1-reduce-point-coordinate
 ;
 
 : secp256k1-add-affine ( script -- script ) 0 secp256k1-add-affine-with-field ;

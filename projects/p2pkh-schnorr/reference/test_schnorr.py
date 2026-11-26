@@ -13,12 +13,12 @@ from coincurve._libsecp256k1 import ffi, lib
 from coincurve.context import GLOBAL_CONTEXT
 
 from bip340 import FIELD, ORDER, lift_x, to_bytes, verify
-from otda import compile_constructor
 from payment import lock_for_public_key, sign_payment, sign_spend
 from schnorr_script import (
     TEMPLATE_DIRS, TEMPLATE_VERSION, _contract, authorization_codes, compile_unlock, compiled_template,
     lock_for_owner, owner_hash, recognize, recognize_template, verifier,
 )
+from fourthgraph.benchmark.cases import native_coin
 from fourthgraph.benchmark.validation import Node, chain_verdict
 from fourthgraph.bsv.chain_gang import validate_at_heights
 from fourthgraph.bsv.evaluate import ScriptError, evaluate
@@ -154,13 +154,12 @@ class SchnorrTests(unittest.TestCase):
             with self.subTest(case=case):
                 self.check_detached(unlock, False)
 
-    def sign_two_inputs(self, tx, sighash, parents=None, *, compress_otda=None):
+    def sign_two_inputs(self, tx, sighash, parents=None):
         parents = self.parents if parents is None else parents
         for i, (parent, public, key) in enumerate(zip(parents, self.public_keys, self.keys, strict=True)):
             tx = sign_spend(tx, i, parent.serialize(), public,
                             lambda message: key.sign_schnorr(message, aux_randomness=bytes(32)),
-                            sighash=sighash, chronicle_active=bool(sighash & CHRONICLE),
-                            compress_otda=compress_otda)
+                            sighash=sighash, chronicle_active=bool(sighash & CHRONICLE))
         return tx
 
     def test_sighash_type_encoding(self):
@@ -189,6 +188,24 @@ class SchnorrTests(unittest.TestCase):
                     expected = {1: [False, False], 2: [True, True], 3: [False, True]}[sighash & 31]
                     self.check_spend(changed, self.parents, expected)
 
+    def test_payment_to_native_p2pkh_outputs(self):
+        recipients = tuple(native_coin(f"schnorr/recipient/{index}", 6_600).output for index in range(3))
+        for version, sighash in ((1, 0x41), (2, 0x61)):
+            with self.subTest(version=version, sighash=hex(sighash)):
+                unsigned = replace(self.unsigned, version=version, outputs=recipients)
+                signed = self.sign_two_inputs(unsigned, sighash)
+                self.assertEqual(signed.outputs, recipients)
+                ordinary, companion = authorization_codes()
+                for index, txin in enumerate(signed.inputs):
+                    auth = prepare_authorization(unsigned, index, 10_000, sighash,
+                                                 ordinary_code=ordinary, companion_code=companion)
+                    fields, alt = evaluate(txin.script)
+                    self.assertEqual(txin.script, auth.witness(fields[1]))
+                    self.assertFalse(alt)
+                self.check_spend(signed, self.parents, [True, True])
+                changed = replace(signed, outputs=(*recipients[:-1], replace(recipients[-1], value=6_599)))
+                self.check_spend(changed, self.parents, [False, False])
+
     def test_bip143_spend_before_chronicle(self):
         signed = self.sign_two_inputs(self.unsigned, 0x41)
         activation_height = int(os.environ.get("SCRIPT_LAB_CHRONICLE_HEIGHT", "2"))
@@ -198,35 +215,6 @@ class SchnorrTests(unittest.TestCase):
         validate_at_heights(signed, self.parents, **context)
         if self.node:
             self.assertEqual(self.node.verdicts(signed, self.parents, **context), [True, True])
-
-    def test_otda_reconstruction_matches_literal_unlock_stack(self):
-        mixed = replace(self.unsigned, outputs=(Output(9_900, b"\x51"), self.unsigned.outputs[1]))
-        older = lock_for_public_key(self.public_keys[0], version="v0.9.0")
-        legacy_outputs = replace(self.unsigned, outputs=(Output(9_900, older), Output(9_900, b"\x51")))
-        version_mix = replace(self.unsigned, outputs=(legacy_outputs.outputs[0], self.unsigned.outputs[1]))
-        cases = (
-            (self.unsigned, 0x61, (True, True)),
-            (mixed, 0xE1, (True, True)),
-            (version_mix, 0x61, (True, True)),
-            (mixed, 0x63, (False, True)),
-            (mixed, 0xE3, (False, True)),
-            (self.unsigned, 0x62, (False, False)),
-            (self.unsigned, 0x41, (False, False)),
-            (replace(self.unsigned, version=1), 0x61, (False, False)),
-            (legacy_outputs, 0x61, (False, False)),
-        )
-        for unsigned, flag, expected in cases:
-            with self.subTest(version=unsigned.version, sighash=hex(flag), compressed=expected):
-                automatic = self.sign_two_inputs(unsigned, flag)
-                literal = self.sign_two_inputs(unsigned, flag, compress_otda=False)
-                for actual, full, compressed in zip(automatic.inputs, literal.inputs, expected, strict=True):
-                    self.assertEqual(evaluate(actual.script), evaluate(full.script))
-                    if compressed:
-                        self.assertLess(len(actual.script), len(full.script))
-                    else:
-                        self.assertEqual(actual.script, full.script)
-                self.check_spend(automatic, self.parents, [True, True])
-                self.check_spend(literal, self.parents, [True, True])
 
     def test_payment_and_preflight(self):
         parent = self.parents[0].serialize()
@@ -249,10 +237,6 @@ class SchnorrTests(unittest.TestCase):
             sign_payment(parent, 1, (target,), 99, public, unexpected)
         with self.assertRaisesRegex(ValueError, "active spend context"):
             sign_spend(self.unsigned, 0, parent, public, unexpected, sighash=0x61)
-        with self.assertRaisesRegex(ValueError, "active Chronicle context"):
-            sign_spend(self.unsigned, 0, parent, public, unexpected, compress_otda=True)
-        with self.assertRaisesRegex(ValueError, "compress_otda must be a boolean"):
-            sign_spend(self.unsigned, 0, parent, public, unexpected, compress_otda=1)
         with self.assertRaisesRegex(ValueError, "same-index"):
             sign_spend(replace(self.unsigned, outputs=(target,)), 1, self.parents[1].serialize(),
                        self.public_keys[1], unexpected, sighash=0x43)
@@ -270,8 +254,6 @@ class SchnorrTests(unittest.TestCase):
         self.assertEqual(compiled_template(owner), (raw, offset))
         self.assertEqual(recognize_template(raw), (TEMPLATE_VERSION, owner))
         self.assertLess(len(raw), len(lock_for_owner(bytes(20), version="v0.9.0")))
-        constructor = compile_constructor(reference, offset)
-        self.assertEqual(evaluate(constructor), ([reference[:offset], reference[offset + 20:]], []))
 
     def test_mixed_template_spend(self):
         public = self.public_keys[0]

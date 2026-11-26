@@ -4,7 +4,7 @@
 
 The owner field is HASH160 of the 32-byte BIP340 x-only public key. The rest of the file is fixed. Fill the owner slot identified in the manifest when creating a receive output. When recognizing an output, compare its length and all fixed bytes before taking the owner hash. [Frozen template](../versions/v0.10.0/template.hex) · [Layout](../versions/v0.10.0/layout.json)
 
-Versions 0.6.0 through 0.10.0 use the same `scriptCode` fragments for the current-input binding and consume the same three stack items after unlocking. A wallet can spend outputs from different versions in one transaction. [Version catalog](../versions/index.json)
+Versions 0.6.0 through 0.10.0 use the same `scriptCode` fragments for the current-input binding and the same witness encoding. A wallet can spend outputs from different versions in one transaction. [Version catalog](../versions/index.json)
 
 The wallet builds the BSV sighash preimage for the current input. The external signer receives SHA256d of that preimage as the 32-byte BIP340 message and returns the standard signature bytes. The lock verifies the signature and binds the same message to the current input with PUSHTX. BIP143 ALL is the wallet default. A wallet must supply trusted Chronicle activation context for OTDA and a same-index output for SINGLE. [Forth contract](../reference/schnorr.fth)
 
@@ -19,12 +19,6 @@ The wallet derives both extra ordinates from public data after signing. They are
 The 32-byte conversion splits individual bytes onto the main stack and concatenates them in reverse. Input checks keep one copy of the field prime on the alternate stack for the coordinate bounds and curve equation. Challenge reduction reuses the group order when computing `n − e`. [Byte reversal](../../../src/fourthgraph/stdlib/script-fragments.fth) · [Challenge preparation](../../../src/fourthgraph/stdlib/bip340.fth)
 
 The detached verifier consumes message, public x, public y, signature, and nonce y. Use it for conformance tests. Use the fixed payment template to lock a UTXO. The copied official CSV fixture is pinned to the Bitcoin BIPs commit below. [Official test vectors](https://github.com/bitcoin/bips/blob/200f9b26fe0a2f235a2af8b30c4be9f12f6bc9cb/bip-0340/test-vectors.csv)
-
-## OTDA reconstruction
-
-After Chronicle activation, a version-2 transaction can build its OTDA preimage with the unlocking script. For ALL or a paired SINGLE, the wallet matches committed outputs against the fixed bytes of v0.10.0. It includes the two fixed parts of a matched output's script once. The constructor expands 63 copies of the repeated verifier window from one copy by doubling and appending byte ranges, then leaves the fixed parts on the stack. The unlocking script serializes outputs in signed order, inserting each matched output's owner hash between those parts and carrying other outputs verbatim. [Constructor generator](../reference/otda.py)
-
-Signing and current-input binding both use the complete reconstructed preimage. Reconstruction is selected when it produces a shorter unlock. Version-1 spends, other sighash modes, and transactions without a matching committed output use a literal preimage push. [Wallet integration](sdk.en.md#quickstart)
 
 <a name="compact-doubling"></a>
 
@@ -49,4 +43,4 @@ The verifier computes `s0*G + s1*H + k1*P + k2*φ(P)` in 64 two-bit windows. It 
 
 v0.8.0 packs the four 128-bit components into a 64-byte value on the alternate stack. For lane `ℓ` in `(s0, s1, |k1|, |k2|)` and two-bit digit `d = 4q + r` counted from the least significant end, the concatenated little-endian encoding places that digit at bit-pair position `j = 64ℓ + 4(15 − q) + r`. Six masked swaps implement `rotl8(j, 2) XOR 0xf0 = 4d + ℓ`. The swaps permute two-bit digits and resolve the little-endian byte order. Script consumes the resulting bytes from most to least significant, using the low nibble for the fixed-base table and the high nibble for the variable-base table. [Index packing](../../../src/fourthgraph/stdlib/bip340.fth)
 
-After constructing the point tables, v0.9.0 places the field prime directly below the accumulator. Doubling and addition consume their operands above the prime, so the compiler can emit a fixed stack depth for each coordinate reduction. The fixed-base table is pushed in descending index order. Counting the top accumulator coordinate as depth zero, the x-coordinate for index `i > 0` is at depth `2i + 3`. [Window loop](../../../src/fourthgraph/stdlib/bip340.fth) · [Point arithmetic](../../../src/fourthgraph/stdlib/secp256k1.fth)
+After constructing the point tables, the verifier places the field prime directly below the accumulator. Doubling and addition consume their operands above the prime, so the compiler can emit a fixed stack depth for each coordinate reduction. The fixed-base table is pushed in descending index order. Counting the top accumulator coordinate as depth zero, the x-coordinate for index `i > 0` is at depth `2i + 3`. [Window loop](../../../src/fourthgraph/stdlib/bip340.fth) · [Point arithmetic](../../../src/fourthgraph/stdlib/secp256k1.fth)

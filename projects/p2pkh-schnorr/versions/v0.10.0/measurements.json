@@ -10,7 +10,74 @@
     "verification_profile": "raised",
     "admission_profile": "default"
   },
-  "payment_shape": {
+  "verifier_comparison": {
+    "lock_bytes": {
+      "v0.9.0": 26857,
+      "v0.10.0": 25752
+    },
+    "detached_verifier_bytes": {
+      "v0.9.0": 25998,
+      "v0.10.0": 24942
+    },
+    "detached_verifier_sha256": {
+      "v0.9.0": "fbd7564088246acd22d8ae200f3620dae858c7d8fb49bd29577c0445cef338b3",
+      "v0.10.0": "cdce6df2ad8f617a282032d8f2184b8bf1fbead1fd75dc1521c6c7e8c2f98410"
+    },
+    "preimage_encoding": "literal",
+    "native_p2pkh_exit_shape": {
+      "inputs": 1,
+      "outputs": 1
+    },
+    "native_p2pkh_exit_both_versions": {
+      "bip143": {
+        "tx_bytes": 416,
+        "unlock_bytes": 329,
+        "output_lock_bytes": 25
+      },
+      "otda": {
+        "tx_bytes": 348,
+        "unlock_bytes": 261,
+        "output_lock_bytes": 25
+      }
+    },
+    "official_bip340_vectors": 19,
+    "paired_timings": {
+      "sampling": "rotate candidate order; use the same official BIP340 witnesses for detached verification and shared deterministic keys for payments",
+      "warmups_per_candidate": 8,
+      "timed_runs_per_candidate": 56,
+      "median_ms": {
+        "v0.9.0": {
+          "detached": {
+            "chain_gang": 3.015,
+            "bsv_node": 12.5
+          },
+          "bip143": {
+            "chain_gang": 3.182,
+            "bsv_node": 12.174
+          },
+          "otda": {
+            "chain_gang": 3.067,
+            "bsv_node": 12.738
+          }
+        },
+        "v0.10.0": {
+          "detached": {
+            "chain_gang": 2.99,
+            "bsv_node": 12.045
+          },
+          "bip143": {
+            "chain_gang": 3.03,
+            "bsv_node": 11.985
+          },
+          "otda": {
+            "chain_gang": 3.085,
+            "bsv_node": 12.272
+          }
+        }
+      }
+    }
+  },
+  "schnorr_payment_shape": {
     "inputs": 2,
     "outputs": 2
   },
@@ -41,20 +108,6 @@
             false
           ],
           "chain_gang_transaction": false
-        },
-        "default_regtest_admission": {
-          "funding": {
-            "mempool": true,
-            "mined": true
-          },
-          "turnover": {
-            "mempool": true,
-            "mined": true
-          },
-          "exit": {
-            "mempool": true,
-            "mined": true
-          }
         }
       },
       "otda-all": {
@@ -82,44 +135,30 @@
             false
           ],
           "chain_gang_transaction": false
-        },
-        "default_regtest_admission": {
-          "funding": {
-            "mempool": true,
-            "mined": true
-          },
-          "turnover": {
-            "mempool": true,
-            "mined": true
-          },
-          "exit": {
-            "mempool": true,
-            "mined": true
-          }
         }
       }
     },
     "v0.10.0": {
       "bip143-all": {
-        "spend_txid": "8b365801b9f3f7fc0624b7700d0bd4d1494fe609942e7069580114067e0ef2bc",
-        "lock_bytes_per_output": 26418,
+        "spend_txid": "b790e61ea20ff5a75ef45098d2bfc306c1298ddb0d39c1fdbeea178ac07f35eb",
+        "lock_bytes_per_output": 25752,
         "unlock_bytes_by_input": [
           329,
           329
         ],
-        "payment_bytes": 53612,
+        "payment_bytes": 52280,
         "extra_input_bytes": 372,
-        "extra_output_bytes": 26429,
-        "fund_and_exit_bytes": 53837,
-        "one_turnover_bytes": 107450,
-        "first_input_peak_stack_payload_bytes": 3341,
+        "extra_output_bytes": 25763,
+        "fund_and_exit_bytes": 52505,
+        "one_turnover_bytes": 104786,
+        "first_input_peak_stack_payload_bytes": 3338,
         "bsv_node_inputs": [
           true,
           true
         ],
         "chain_gang_transaction": true,
         "locktime_mutation": {
-          "txid": "72b6c3bcff667ffe580fb3c1f0035583bceb0319202704a3a2e6c028e63e7952",
+          "txid": "aeb4bbc45c4e799d3ab0106b53954b5f3c2ec2c3f9269ef667ae43d78ae70675",
           "bsv_node_inputs": [
             false,
             false
@@ -142,25 +181,25 @@
         }
       },
       "otda-all": {
-        "spend_txid": "ea19333e8295d0c8aa206e382afaca6b49d155064882f4403b7d499e506a1c13",
-        "lock_bytes_per_output": 26418,
+        "spend_txid": "2e47f40d7534d41980c36684025184af3144b638445febda0784a23bf325e693",
+        "lock_bytes_per_output": 25752,
         "unlock_bytes_by_input": [
-          6079,
-          6079
+          51795,
+          51795
         ],
-        "payment_bytes": 65112,
-        "extra_input_bytes": 6245,
-        "extra_output_bytes": 26509,
-        "fund_and_exit_bytes": 53852,
-        "one_turnover_bytes": 118963,
-        "first_input_peak_stack_payload_bytes": 106086,
+        "payment_bytes": 155212,
+        "extra_input_bytes": 51961,
+        "extra_output_bytes": 77297,
+        "fund_and_exit_bytes": 52519,
+        "one_turnover_bytes": 207731,
+        "first_input_peak_stack_payload_bytes": 103422,
         "bsv_node_inputs": [
           true,
           true
         ],
         "chain_gang_transaction": true,
         "locktime_mutation": {
-          "txid": "467a71a0c1302798af0494dbc14455f10b0a8e4559df8b85da9224e8cab46cf1",
+          "txid": "6db9dfec9187a84bee8c87a2c32537ef1f2af0dbc5ab6673af0c1d6f40267445",
           "bsv_node_inputs": [
             false,
             false
@@ -182,42 +221,6 @@
           }
         }
       }
-    }
-  },
-  "paired_timings": {
-    "workload_label": "schnorr-paired",
-    "warmup_pairs": 4,
-    "timed_pairs": 50,
-    "median_ms": {
-      "41": {
-        "chain_gang": {
-          "v0.9.0": 6.455,
-          "v0.10.0": 6.103
-        },
-        "bsv_node": {
-          "v0.9.0": 28.162,
-          "v0.10.0": 25.919
-        }
-      },
-      "61": {
-        "chain_gang": {
-          "v0.9.0": 6.471,
-          "v0.10.0": 6.438
-        },
-        "bsv_node": {
-          "v0.9.0": 32.344,
-          "v0.10.0": 26.626
-        }
-      }
-    },
-    "sampling": "alternating version order on two-input, two-output fixtures sharing deterministic keys",
-    "v0.10.0_literal_otda_all": {
-      "payment_bytes": 159208,
-      "unlock_bytes_by_input": [
-        53127,
-        53127
-      ],
-      "both_engines_verified": true
     }
   }
 }

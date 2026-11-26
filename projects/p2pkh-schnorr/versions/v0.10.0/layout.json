@@ -1,14 +1,10 @@
 {
   "template": "P2PKH-Schnorr",
   "version": "v0.10.0",
-  "script_bytes": 26418,
+  "script_bytes": 25752,
   "owner_hash160": {
     "offset": 189,
     "length": 20
   },
-  "base_script_sha256": "192705e388414e96c0bd7804dc5c4a8a0340021dc3ac029cf33eaba5d8d6f2c7",
-  "otda_constructor": {
-    "bytes": 5725,
-    "sha256": "446b27909165035d8637d184a7a369f96c59aac23807121848f311d08446c725"
-  }
+  "base_script_sha256": "48411a610a80dbeba846332ef28f78c7ee3dedeaa131e82faa89f6cd24b88f83"
 }
