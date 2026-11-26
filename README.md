@@ -2,7 +2,13 @@
 
 **English** · [简体中文](README.zh-CN.md)
 
-**Write Bitcoin contracts in Forth, from the first locked output to the final spend.** 4thGraph is a contract description language (SDL) and toolchain for BSV. Use it to define spending conditions, carry state in UTXOs, build transactions that depend on one another, and verify an off-chain computation with a zero-knowledge proof.
+> **Write Bitcoin contracts in Forth, from the first locked output to the final spend.**
+
+4thGraph is a contract description language (SDL) and toolchain for BSV. Use it to define spending conditions, carry state in UTXOs, build transactions that depend on one another, and verify an off-chain computation with a zero-knowledge proof.
+
+**[Start with an Agent](#start-with-agent)** · [Runnable projects](#project-index) · [Wallet SDK](sdk/README.md) · [Docs](docs/README.md) · [Results](#results)
+
+---
 
 <a name="why-4thgraph"></a>
 
@@ -10,7 +16,9 @@
 
 Script builders usually tell you whether a given witness satisfies a lock. A token wallet also has to follow the money across spends. How can the 275 tokens Alice pays Bob become a valid input to his next payment, while both transfers preserve the total supply?
 
-These two payments come from a token contract under development. Follow the **solid arrows** to see which output (`vout`) creates a coin and which input (`vin`) spends it. **Dashed arrows** show where the off-chain proof and holder signatures enter each verifier input.
+### Two connected token payments
+
+Follow the **solid arrows** from the output (`vout`) that creates a coin to the input (`vin`) that spends it. **Dashed arrows** show where the Groth16 proof and holder signatures enter each verifier input.
 
 ```mermaid
 flowchart LR
@@ -36,9 +44,11 @@ flowchart LR
     class proof1,proof2 proof
 ```
 
-Follow **Bob’s 275**. Alice spends two token outputs worth 300 and 200, pays Bob 275, and takes 225 in change. Bob then references `TX₁.vout[0]` at `TX₂.vin[2]`, adds another 150, pays Carol 350, and takes 75 in change. Each payment uses fresh companion and verifier outputs. The diagram expands that pair for the first payment.
+> **Follow Bob’s 275 tokens.** Alice spends 300 and 200 to pay Bob 275 and take 225 in change. Bob spends `TX₁.vout[0]` at `TX₂.vin[2]` and adds another 150 to pay Carol 350 and take 75 in change.
 
-The token locks require the settlement to spend a designated companion output. The companion lock checks which verifier the settlement actually spends. That verifier checks the proof and signatures supplied at `vin[1]`, binding conservation and authorization to the actual inputs and outputs.
+Each payment uses fresh companion and verifier outputs. The diagram expands that pair for the first payment. The token locks require the settlement to spend a designated companion output. The companion lock checks which verifier the settlement actually spends. That verifier checks the proof and signatures supplied at `vin[1]`, binding conservation and authorization to the actual inputs and outputs.
+
+---
 
 <a name="start-with-agent"></a><a name="start-with-ai"></a><a name="pels-counter"></a>
 
@@ -53,7 +63,9 @@ Save the source in the project workspace, build the full lock, and give me a com
 If regtest is available, demonstrate 0 → 1 → 2, then try jumping directly from 0 to 2.
 ```
 
-**How do you know it works?** Inspect the Forth rule and the full lock the agent builds. After a regtest replay, the report should show both increments mined and the skipped increment rejected by BSV Node and chain-gang. [Counter source and replay](projects/pels-counter/README.md)
+> [!TIP]
+> **Check the result**
+> Inspect the Forth rule and the full lock. On regtest, both increments should be mined. BSV Node and chain-gang should both reject a spend that jumps directly from 0 to 2. [Counter source and replay](projects/pels-counter/README.md)
 
 <a name="4thg-quickstart"></a>
 
@@ -92,3 +104,9 @@ If regtest is available, demonstrate 0 → 1 → 2, then try jumping directly fr
 | **Runtime and verification** | The runtime binds real parent outputs, requests signatures, and assembles witnesses. Replay reports connect a build to the actual transactions and the verdicts from BSV Node and chain-gang. [Repository layout](docs/repository-layout.md) · [Replay workflow](docs/toolchain.md#复放与编译) |
 
 **Recursive proofs are a research direction.** The token transfers above check direct parent outputs and the current transition at each spend. A recursive construction would also verify a predecessor proof inside the next proof and bind its authenticated state to the output being spent. [Verification paths available today](docs/language/stdlib.md#验证路径)
+
+---
+
+## License
+
+4thGraph is available under the [MIT License](LICENSE).
