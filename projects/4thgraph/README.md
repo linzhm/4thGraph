@@ -2,7 +2,7 @@
 
 A Forth compiler for BSV Script and multi-transaction workflows.
 
-当前构建版本为 **v0.1.4**。项目位于 BSV Script Lab 仓库内，编译与复放产物可写入 `projects/4thgraph/build/`。
+当前构建版本为 **v0.1.5**。项目位于 BSV Script Lab 仓库内，编译与复放产物可写入 `projects/4thgraph/build/`。
 
 同一份 Forth 源码可以生成融合版和拆分版。示例计算 `a = 2x`、`b = y + 1`，两支结果和汇合的和都按 `u32` 表示。回绕后的和小于 20 时走复核，其余走结算。两种后继各锁给一个配置的公钥。编译器以 Forth 2012 Core 为语义基线，`+` 使用 64 位 cell，`u32+` 固定按 32 位回绕。 [示例源码](example.fth) · [语言与 BSV 扩展规范](language.md)
 
@@ -196,6 +196,20 @@ PYTHONPATH=. bash shared/verify_node.sh --profile default -- \
 | 另一次真实拆分产生的结果，任务 ID 相同 | 全部父输出可花费，两个结果锁拒绝 | 拒绝 |
 | 选择错误的后继锁 | 全部父输出可花费，两个结果锁拒绝 | 拒绝 |
 | 用该目标未允许的交易版本提交汇合 | 全部父输出可花费，两个结果锁拒绝 | 拒绝 |
+
+## 链上验证算术证明
+
+`proof/counter.circom` 定义 32 位计数器。Circom 2.2.2 生成固定的 BN254 R1CS 和 WASM，snarkjs 0.7.5 生成并独立检查每条赋值证明。验证数据是导出的 R1CS 及其摘要。证明公开完整赋值，采用透明验证，无需可信设置。
+
+4thGraph 把 R1CS 约束和 `proof/counter.fth` 中的后继选择一起编译进锁。锁验证当前值与部署承诺一致，验证新值写入实际后继输出，并用认证的 ForkID 原像计算 `HASH256(outpoint || hashOutputs)`。给另一笔花费生成的原证明携带不同的公开绑定。优化版复用域模数，并简化零乘积、单位系数和可居中表示的系数。
+
+```sh
+PYTHONPATH=. bash shared/verify_node.sh --profile default -- \
+  python projects/4thgraph/proof_replay.py --target both \
+  --output projects/4thgraph/build/v0.1.5-proof-both-2.json
+```
+
+报告含基线与优化版的脚本、正向完整交易、两栈峰值、验证耗时，以及改动赋值、错误当前值、错误后继和跨花费重用的判定。复放会调用固定版本的 npm 工具生成验证数据。已有 snarkjs 的 R1CS JSON 时，也可用 `proof_contract.py --verification-key` 单独构建。
 
 ## 链上编译器里程碑
 
