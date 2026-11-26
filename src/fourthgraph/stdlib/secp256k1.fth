@@ -23,10 +23,13 @@ REQUIRE stdlib/script-fragments.fth
     swap 0= if drop secp256k1-reduce else script-pick-depth op-mod then
 ;
 
+: secp256k1-beta ( script -- script )
+    bytes-hex 7ae96a2b657c07106e64479eac3434e99cf0497512f58995c1396c28719501ee bsv-num-be
+;
+
 : secp256k1-endomorphism-x ( script -- script )
     ( X becomes beta*X mod p. The caller leaves Y and Z unchanged. )
-    bytes-hex 7ae96a2b657c07106e64479eac3434e99cf0497512f58995c1396c28719501ee bsv-num-be
-    op-mul secp256k1-reduce
+    secp256k1-beta op-mul secp256k1-reduce
 ;
 
 : secp256k1-lattice-a1 ( script -- script ) bytes-hex 3086d221a7d46bcde86c90e49284eb15 bsv-num-be ;

@@ -118,27 +118,40 @@ REQUIRE stdlib/secp256k1.fth
 ;
 
 : bip340-variable-bases ( script -- script )
-    ( px py s k -> signed P and Q. Save the magnitudes of k2 and k1, then s, on the altstack. )
+    ( px py s k -> signed P and Q. Save magnitudes k2 and k1, then s and beta, on the altstack. )
     secp256k1-lambda-split ( px py s k1 k2 )
     3 script-pick-depth 2 script-pick-depth op-0 op-lessthan op-if op-negate op-endif
     5 script-pick-depth op-swap op-1 ( signed P )
-    7 script-pick-depth secp256k1-endomorphism-x
-    7 script-pick-depth 5 script-pick-depth op-0 op-lessthan op-if op-negate op-endif
+    ( Retain beta between P and Q until the scalar magnitudes have been saved. )
+    7 script-pick-depth secp256k1-beta op-tuck op-mul secp256k1-reduce
+    8 script-pick-depth 6 script-pick-depth op-0 op-lessthan op-if op-negate op-endif
     op-1 ( signed Q )
-    7 script-pick-depth bip340-check-half 7 script-pick-depth bip340-check-half
-    op-toaltstack op-toaltstack 8 script-pick-depth op-toaltstack
+    8 script-pick-depth bip340-check-half 8 script-pick-depth bip340-check-half
+    op-toaltstack op-toaltstack 9 script-pick-depth op-toaltstack
+    op-3 op-roll op-toaltstack
     bsv-empty op-toaltstack 6 bsv-repeat-code bsv-cat-code
     op-2drop op-2drop op-drop 6 script-restore-items
 ;
 
+: bip340-map-variable-point ( script -- script )
+    ( Restore and retain the relative sign and beta. Map X to beta*X and Y to sign*Y. )
+    op-fromaltstack op-fromaltstack op-2dup op-toaltstack op-toaltstack
+    op-4 op-roll op-mul secp256k1-reduce
+    op-2swap op-3 op-roll op-rot op-mul op-swap
+;
+
 : bip340-variable-window-table ( script -- script )
-    ( Input: three coordinates each of signed P and Q. )
+    ( Input: three coordinates each of signed P and Q, with beta atop the altstack. )
+    ( The affine y coordinates agree when the scalar signs agree. Save +1 or -1. )
+    4 script-pick-depth 2 script-pick-depth op-numequal op-2 op-mul op-1sub op-toaltstack
     op-toaltstack op-toaltstack op-toaltstack
     op-3dup secp256k1-double 2 bip340-copy-point 8 bip340-copy-affine secp256k1-add-affine
     ( P, 2P, 3P. Restore Q to start its row. )
     3 script-restore-items 11 bip340-window-row
-    11 bip340-copy-point secp256k1-double 23 bip340-window-row
-    23 bip340-copy-point 14 bip340-copy-point secp256k1-add 35 bip340-window-row
+    ( The signed endomorphism maps 2P and 3P to the next row starts. )
+    17 bip340-copy-point bip340-map-variable-point 23 bip340-window-row
+    26 bip340-copy-point bip340-map-variable-point 35 bip340-window-row
+    op-fromaltstack op-fromaltstack op-2drop
 ;
 
 : bip340-uint128le ( script -- script )
@@ -223,10 +236,11 @@ REQUIRE stdlib/secp256k1.fth
 
 : bip340-window-addends ( script -- script )
     ( Read one depth from each stream. Save both tails below the fixed depth. )
+    ( A nonzero depth is a minimal positive ScriptNum, and a zero byte skips addition. )
     op-fromaltstack op-1 op-split op-fromaltstack op-1 op-split
     op-toaltstack op-swap op-toaltstack op-toaltstack
-    op-bin2num bip340-variable-window-add
-    op-fromaltstack op-bin2num bip340-fixed-window-add
+    bip340-variable-window-add
+    op-fromaltstack bip340-fixed-window-add
 ;
 
 : bip340-joint-window-step ( script -- script )

@@ -253,7 +253,7 @@ class SchnorrTests(unittest.TestCase):
         self.assertEqual(raw, reference[:offset] + owner + reference[offset + 20:])
         self.assertEqual(compiled_template(owner), (raw, offset))
         self.assertEqual(recognize_template(raw), (TEMPLATE_VERSION, owner))
-        self.assertLess(len(raw), len(lock_for_owner(bytes(20), version="v0.10.0")))
+        self.assertLess(len(raw), len(lock_for_owner(bytes(20), version="v0.11.0")))
 
     def test_mixed_template_spend(self):
         public = self.public_keys[0]
@@ -265,6 +265,7 @@ class SchnorrTests(unittest.TestCase):
             "v0.8.0": "eafc3937ba802a3fcfeae3bf7a814a747be3c797906c86e330cd68001f3509e5",
             "v0.9.0": "8c58eb80a5adb4aaf1256db2f12e0f4bbc551885e919200350621481a45de0a3",
             "v0.10.0": "48411a610a80dbeba846332ef28f78c7ee3dedeaa131e82faa89f6cd24b88f83",
+            "v0.11.0": "88b7b3a46548ca376a29fe04bb0deb11f2a503d9cf5de92e89604aa490660fdc",
         }
         for version, checksum in versions.items():
             raw = lock_for_public_key(public, version=version)
@@ -441,12 +442,19 @@ class SchnorrTests(unittest.TestCase):
         for windows in depth_vectors:
             self.assertEqual(evaluate(depths, [windows]), (depth_streams(windows), []))
 
-        for public_multiple, s, k in ((1, ORDER - 1, 13), (-1, HALF_RADIX, ORDER),
-                                      (2, 0, ORDER // 2), (11, HALF_RADIX + 17, ORDER // 3)):
+        cases = (
+            (1, ORDER - 1, 13), (-1, HALF_RADIX, ORDER),
+            (2, 0, ORDER // 2), (5, HALF_RADIX + 17, ORDER // 4),
+            (-7, HALF_RADIX - 1, ORDER // 7), (11, ORDER - 2, ORDER // 8),
+        )
+        signs = set()
+        for public_multiple, s, k in cases:
             px, py = affine_generator_multiple(public_multiple)
             original = [FIELD, 123, 456, px, py, s, k]
             scalars, _ = evaluate(split, [encode_num(k)])
             k1, k2 = map(decode_num, scalars)
+            if k1 and k2:
+                signs.add((k1 < 0, k2 < 0))
             p = -public_multiple if k1 < 0 else public_multiple
             q = LAMBDA * (-public_multiple if k2 < 0 else public_multiple)
             built, alt = evaluate(table, list(map(encode_num, original)))
@@ -477,6 +485,7 @@ class SchnorrTests(unittest.TestCase):
                     self.assertEqual(alt, remaining)
                     self.assertEqual(selected[:-3], built[:-3])
                     check_point(selected[-3:], high * HALF_RADIX + low + vhigh * q + vlow * p)
+        self.assertEqual(signs, set(product((False, True), repeat=2)))
 
     def test_joint_multiplication_scalar_edges(self):
         multiply = _contract().emit("bip340-joint-multiply", b"")
