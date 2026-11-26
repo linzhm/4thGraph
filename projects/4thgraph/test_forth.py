@@ -86,6 +86,26 @@ bsv-effect: branch u32 u32 cell -- u32 ;
             stack, alt = evaluate_script(compile_word(word, "stack").script, list(map(encode_num, args)))
             self.assertEqual((tuple(map(decode_num, stack)), alt), (evaluate(word, *args), []))
 
+    def test_local_operand_scheduling_keeps_subtraction_order_and_live_values(self):
+        source = """
+bsv-effect: direct u32 u32 -- u32 ;
+: direct SWAP SWAP u32+ ;
+bsv-effect: difference cell cell -- cell cell ;
+: difference OVER SWAP SWAP - ;
+bsv-effect: repeated cell -- cell cell ;
+: repeated DUP DUP - ;
+"""
+        words = SourceCompiler(source).words
+        compiled = compile_word(words["direct"], "stack")
+        rewrite, = [row for row in compiled.describe()["rewrites"]
+                    if row["rule"] == "stack-local-operand-scheduling"]
+        self.assertEqual(rewrite["script_bytes"], (10, 8))
+        self.assertIn("live-use counts", rewrite["basis"])
+        for name, args in (("direct", (U32 - 1, 4)), ("difference", (7, 3)), ("repeated", (11,))):
+            word = words[name]
+            stack, alt = evaluate_script(compile_word(word, "stack").script, list(map(encode_num, args)))
+            self.assertEqual((tuple(map(decode_num, stack)), alt), (evaluate(word, *args), []))
+
     def test_long_helper_chain_uses_source_semantics_in_every_backend(self):
         source = "bsv-effect: w0 cell -- cell ;\n: w0 1 + ;\n"
         source += "".join(f"bsv-effect: w{i} cell -- cell ;\n: w{i} w{i - 1} ;\n" for i in range(1, 1200))

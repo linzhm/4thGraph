@@ -5,6 +5,8 @@ from dataclasses import dataclass
 
 from shared.script import asm, number
 
+COMMUTATIVE = frozenset(map(asm, ("OP_ADD", "OP_MUL", "OP_MIN", "OP_MAX", "OP_NUMEQUAL", "OP_EQUAL")))
+
 
 @dataclass(frozen=True)
 class Value:
@@ -39,7 +41,7 @@ class Graph:
         self.common[key] = value
         return value
 
-    def emit(self, returns, *, last_use=True):
+    def emit(self, returns, *, last_use=True, compact=False):
         needed = set(returns)
         for value, node in reversed(self.definitions.items()):
             if value in needed:
@@ -49,8 +51,11 @@ class Graph:
         uses.update(arg for _, node in live for arg in node.args)
         stack = Layout(self.inputs, uses)
         for slot, node in live:
-            for staged, operand in enumerate(node.args):
-                stack.access(operand, staged, last_use=last_use)
+            if compact and last_use and 0 < len(node.args) <= 2:
+                stack.arrange(node.args, commutative=node.script in COMMUTATIVE)
+            else:
+                for staged, operand in enumerate(node.args):
+                    stack.access(operand, staged, last_use=last_use)
             if node.args:
                 del stack.slots[-len(node.args):]
             stack.code.extend(node.script)
@@ -81,6 +86,45 @@ class Layout:
         else:
             self.copy(depth)
         self.slots.append(value)
+
+    def arrange(self, args, *, commutative=False):
+        # Try reusing a suffix in place only when consuming those slots
+        # accounts for every remaining use of the staged values.
+        orders = (args, args[::-1]) if commutative and len(args) == 2 and args[0] != args[1] else (args,)
+        candidates = []
+        for order in orders:
+            for staged in range(len(order) + 1):
+                prefix = order[:staged]
+                if staged and (tuple(self.slots[-staged:]) != prefix
+                               or any(self.uses[value] != count for value, count in Counter(prefix).items())):
+                    continue
+                candidate = Layout(self.slots, self.uses.copy())
+                candidate.uses.subtract(prefix)
+                for index in range(staged, len(order)):
+                    candidate.access(order[index], index, last_use=True)
+                candidates.append(candidate)
+            if len(order) == 2:
+                paired = self.pair(order)
+                if paired is not None:
+                    candidates.append(paired)
+        best = min(candidates, key=lambda candidate: len(candidate.code))
+        self.slots = best.slots
+        self.uses = best.uses
+        self.code.extend(best.code)
+
+    def pair(self, args):
+        counts = Counter(args)
+        if tuple(self.slots[-2:]) == args and all(self.uses[value] > count for value, count in counts.items()):
+            candidate = Layout((*self.slots, *args), self.uses.copy())
+            candidate.code.extend(asm("OP_2DUP"))
+        elif (len(self.slots) >= 4 and tuple(self.slots[-4:-2]) == args
+              and all(self.uses[value] == count for value, count in counts.items())):
+            candidate = Layout((*self.slots[:-4], *self.slots[-2:], *args), self.uses.copy())
+            candidate.code.extend(asm("OP_2SWAP"))
+        else:
+            return None
+        candidate.uses.subtract(args)
+        return candidate
 
     def move(self, depth):
         if depth < 3:

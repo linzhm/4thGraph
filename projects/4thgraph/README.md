@@ -2,7 +2,7 @@
 
 A Forth compiler for BSV Script and multi-transaction workflows.
 
-当前构建版本为 **v0.1.2**。项目位于 BSV Script Lab 仓库内，编译与复放产物可写入 `projects/4thgraph/build/`。
+当前构建版本为 **v0.1.3**。项目位于 BSV Script Lab 仓库内，编译与复放产物可写入 `projects/4thgraph/build/`。
 
 同一份 Forth 源码可以生成融合版和拆分版。示例计算 `a = 2x`、`b = y + 1`，两支结果和汇合的和都按 `u32` 表示。回绕后的和小于 20 时走复核，其余走结算。两种后继各锁给一个配置的公钥。编译器以 Forth 2012 Core 为语义基线，`+` 使用 64 位 cell，`u32+` 固定按 32 位回绕。 [示例源码](example.fth) · [语言与 BSV 扩展规范](language.md)
 
@@ -139,6 +139,22 @@ flowchart LR
 v0.0.2 的可选 `safe` 后端将示例 `inc` 从 70 B 降到 8 B，`decide` 从 18 B 降到 16 B。v0.0.3 的匹配算术基准中，BIP340 循环中的点和从 216 B 降到 149 B。通用调度器生成的 P-256 点加与倍点为 170 B 和 98 B，专用参考分别为 147 B 和 76 B。通用后端仅在生成字节更少时替换基本块。
 
 `kernel_bench.py` 通过 `--schnorr-reference` 接收固定提交的 `reference` 目录，内置两个源文件的摘要。它对三组匹配内核做数据差分，再构造完整 regtest 交易，用两个引擎核对结果和记录两栈峰值。 [Schnorr 固定提交](https://github.com/linzhm/bsv-script-lab/tree/a1f4485ba84bbc2211be75316626f9ac76636197/projects/p2pkh-schnorr/reference)
+
+v0.1.3 在 `stack` 后端加入局部操作数调度。典型节省来自把已就位的末次使用槽直接交给运算，或用一条指令搬运成对槽位。相同算式和输入的对照如下。栈峰值在每组 153 个内核输入上测量，单位为实际字节载荷。
+
+| 内核 | 专用参考 B | 旧通用调度 B | 新通用调度 B | 新 / 旧主栈峰值 B | 新 / 旧 Alt 栈峰值 B |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| P-256 点加 | 147 | 170 | 142 | 869 / 869 | 0 / 0 |
+| P-256 倍点 | 76 | 98 | 85 | 714 / 714 | 0 / 0 |
+| BIP340 循环点加 | 216 | 149 | 129 | 682 / 682 | 0 / 0 |
+
+专用倍点可针对公式内嵌中间表达式及域常数读取，目前仍少 9 B。基准对每种实现各复放一笔完整正向花费，并测试零模数和缺少输入。JSON 记录源码摘要、内核与完整交易的两栈峰值，以及双引擎结果。
+
+```sh
+PYTHONPATH=. bash shared/verify_node.sh --profile default -- \
+  python projects/4thgraph/kernel_bench.py --schnorr-reference "$schnorr_reference" \
+  --output projects/4thgraph/build/v0.1.3-kernels.json
+```
 
 下表是 `chronicle-v2` 的一次样本，使用 BSV Node 1.2.3 默认 regtest 配置及 chain-gang `74676b9`。每笔正向交易重复验证 21 次，取中位数，再在路径上取最大值。Node 耗时含本地 RPC 往返，chain-gang 耗时含解析。栈峰值来自开发求值器对已通过两引擎的输入进行剖析，模拟原生签名检查并按字节值载荷计量。合计峰值取同一采样点的两栈之和。
 

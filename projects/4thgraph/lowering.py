@@ -53,6 +53,7 @@ class Rewrite:
     column: int | None
     inputs: tuple[Slot, ...]
     script_bytes: tuple[int, int] | None = None
+    basis: str | None = None
 
 
 @dataclass(frozen=True)
@@ -62,7 +63,13 @@ class CompiledWord:
     rewrites: tuple[Rewrite, ...] = ()
 
     def describe(self):
-        return {"script_bytes": len(self.script), "rewrites": [asdict(rewrite) for rewrite in self.rewrites]}
+        rewrites = []
+        for rewrite in self.rewrites:
+            row = asdict(rewrite)
+            if rewrite.basis is None:
+                del row["basis"]
+            rewrites.append(row)
+        return {"script_bytes": len(self.script), "rewrites": rewrites}
 
 
 def raw_interval(name, args):
@@ -199,11 +206,17 @@ def schedule_block(block, rewrites):
             slots[cut:] = [graph.define(op.script, operands, kind=op.gives[0].kind)]
     before = sum(len(op.script) for op in block)
     script = graph.emit(slots)
-    if len(script) >= before:
+    compact = graph.emit(slots, compact=True)
+    if min(len(script), len(compact)) >= before:
         return block
     source = start.source
-    rewrites.append(Rewrite("stack-last-use-and-sharing", source.line if source else None,
-                            source.column if source else None, (), (before, len(script))))
+    line, column = (source.line, source.column) if source else (None, None)
+    if len(script) < before:
+        rewrites.append(Rewrite("stack-last-use-and-sharing", line, column, (), (before, len(script))))
+    if len(compact) < min(before, len(script)):
+        rewrites.append(Rewrite("stack-local-operand-scheduling", line, column, (), (min(before, len(script)), len(compact)),
+                                "total basic block, live-use counts, exact commutative opcode, unchanged output order"))
+        script = compact
     return (Operation(source, (), (), script, start.depth),)
 
 

@@ -13,7 +13,7 @@ from wordsets import (
 
 PROJECT_NAME = "4thGraph"
 PROJECT_DESCRIPTION = "A Forth compiler for BSV Script and multi-transaction workflows."
-PROJECT_VERSION = "0.1.2"
+PROJECT_VERSION = "0.1.3"
 GATE_BOUNDARIES = ("auto", "merged", "separate")
 
 
