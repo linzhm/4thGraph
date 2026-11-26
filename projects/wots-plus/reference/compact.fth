@@ -11,10 +11,15 @@ REQUIRE BSV
     swap op-over swap bsv-num op-lessthan op-if
 ;
 
+: compact-prf-pair ( script cell -- script )
+    ( Build-time argument is the selector bit depth. )
+    ( Hash the address with selector zero. Set its last bit and hash for the mask. )
+    swap op-dup op-sha256 op-swap swap bsv-num op-pick op-or op-sha256
+;
+
 : compact-hash-address ( script cell cell -- script )
     ( Build-time arguments are the selector bit and function prefix depths. )
-    ( Hash the address with selector zero. Set its last bit and hash for the mask. )
-    rot op-dup op-sha256 op-swap rot bsv-num op-pick op-or op-sha256
+    rot rot compact-prf-pair
     op-rot op-xor op-cat
     ( Hash the zero function prefix, key and masked value. )
     swap bsv-num op-pick op-swap op-cat op-sha256
@@ -31,14 +36,21 @@ REQUIRE BSV
     op-rot op-drop op-nip op-3 op-roll op-swap op-cat op-swap op-rot op-1add
 ;
 
-: compact-v2-chain-start ( script -- script )
+: compact-chain-input ( script -- script )
     ( PRF base, endpoints, remaining signature, chain index. )
     op-swap 32 bsv-num op-split op-swap
-    op-4 op-pick op-3 op-pick op-1 op-num2bin op-cat
-    op-swap op-15 op-fromaltstack op-sub
+    op-4 op-pick op-3 op-pick
 ;
 
-: compact-v2-countdown-gate ( script -- script )
+: compact-step-count ( script -- script )
+    op-15 op-fromaltstack op-sub
+;
+
+: compact-v2-chain-start ( script -- script )
+    compact-chain-input op-1 op-num2bin op-cat op-swap compact-step-count
+;
+
+: compact-countdown-gate ( script -- script )
     ( A zero counter is consumed. A positive counter enters the next gate. )
     op-ifdup op-if op-1sub
 ;
@@ -49,6 +61,30 @@ REQUIRE BSV
     9 6 compact-hash-address
 ;
 
+: compact-append-endpoint ( script -- script )
+    op-3 op-roll op-swap op-cat op-swap op-rot
+;
+
 : compact-v2-chain-end ( script -- script )
-    op-nip op-3 op-roll op-swap op-cat op-swap op-rot op-1add
+    op-nip compact-append-endpoint op-1add
+;
+
+: compact-v3-chain-start ( script -- script )
+    ( The index is a raw byte, including the initial zero. )
+    compact-chain-input op-cat
+    ( Keep the zero function prefix immediately below the chain address. )
+    op-6 op-pick op-swap op-rot compact-step-count
+;
+
+: compact-v3-hash-step ( script cell -- script )
+    ( Zero function prefix, chain address, value. )
+    ( Copy the prefix and address together, then append the step suffix. )
+    bsv-num op-pick op-2over op-rot op-cat
+    11 compact-prf-pair
+    ( The copied prefix is already below the key and masked value. )
+    op-3 op-roll op-xor op-cat op-cat op-sha256
+;
+
+: compact-v3-chain-end ( script -- script )
+    op-rot op-drop op-nip compact-append-endpoint op-bin2num op-1add
 ;

@@ -39,6 +39,20 @@ reconstruction formats alongside a native output. Lean `spec@1c051ea`
 matched all 125 compact-v2 fixtures. The Python, TypeScript, Go and Rust
 wallet replays passed. [Measurements and replay commands](../README.md#compact-profile)
 
+## Compact v3 profile
+
+The compiler at `454456f` builds a 25,965-byte lock and a 1,979-byte
+reconstruction program. Focused tests check all 16 starting digits,
+all 256 sighash flag bytes, and DER construction around the ECDSA
+modulus and low-S boundary.
+
+BSV Node 1.2.3 and chain-gang at `74676b9` matched the 1,230 payment
+outcomes and rejected all 67 signature-chain mutations. They checked
+the measured transaction sizes and reconstructed mixed OTDA ALL
+outputs using all four dictionaries. Lean `spec@1c051ea` matched all 125
+fixtures. Python, TypeScript, Go and Rust wallet replays passed.
+[Measurements and replay commands](../README.md#compact-profile)
+
 ## Bounded coverage of complete payments
 
 The [acceptance fixture](../reference/test_acceptance.py) builds the expected key

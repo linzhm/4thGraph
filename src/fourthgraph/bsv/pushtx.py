@@ -1,6 +1,6 @@
 """Fixed-r PUSHTX transaction binding for signature verifiers."""
 from fourthgraph.bsv.script import asm, number, push
-from fourthgraph.bsv.transaction import SIGHASH_TYPES
+from fourthgraph.bsv.transaction import ANYONECANPAY, CHRONICLE, FORKID, SIGHASH_ALL, SIGHASH_SINGLE, SIGHASH_TYPES
 
 N = 0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141
 R = 0x79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798
@@ -68,7 +68,7 @@ def _check_bip143_shape(script_code):
             asm('OP_SPLIT OP_DROP') + push(bytes([len(script_code)])+script_code) + asm('OP_EQUALVERIFY'))
 
 
-def authorization_checks(ordinary_code, companion_code):
+def authorization_checks(ordinary_code, companion_code, *, compact=False):
     """Check the signed preimage shape and preserve its mode and type on altstack."""
     # Entry P S mode; alt: mode, then actual base binding's one-byte type.
     code = asm('OP_DEPTH OP_3 OP_NUMEQUALVERIFY OP_DUP OP_0 OP_EQUAL OP_OVER OP_1 OP_EQUAL OP_BOOLOR OP_VERIFY')
@@ -76,10 +76,17 @@ def authorization_checks(ordinary_code, companion_code):
     code += asm('OP_2 OP_PICK OP_SIZE OP_4 OP_SUB OP_SPLIT OP_NIP')
     # Check trailing three bytes are zero and validate the exact one-byte type.
     code += asm('OP_1 OP_SPLIT') + push(bytes(3)) + asm('OP_EQUALVERIFY OP_DUP')
-    for i, flag in enumerate(sorted(SIGHASH_TYPES)):
-        code += (asm('OP_OVER') if i else b'') + push(bytes([flag])) + asm('OP_EQUAL')
-        if i:
-            code += asm('OP_BOOLOR')
+    if compact:
+        # Remove only the two optional bits. The remaining type must be
+        # ForkID with one of the three defined base modes.
+        mask = 0xff ^ (ANYONECANPAY | CHRONICLE)
+        code += push(bytes([mask])) + asm('OP_AND OP_BIN2NUM')
+        code += number(FORKID | SIGHASH_ALL) + number((FORKID | SIGHASH_SINGLE) + 1) + asm('OP_WITHIN')
+    else:
+        for i, flag in enumerate(sorted(SIGHASH_TYPES)):
+            code += (asm('OP_OVER') if i else b'') + push(bytes([flag])) + asm('OP_EQUAL')
+            if i:
+                code += asm('OP_BOOLOR')
     code += asm('OP_VERIFY OP_TOALTSTACK OP_IF')
     # Reuse the authenticated type via altstack; only 0x43/c3 may take the companion branch.
     code += asm('OP_FROMALTSTACK OP_DUP OP_TOALTSTACK OP_DUP') + push(b'\x43') + asm('OP_EQUAL OP_SWAP')
@@ -92,10 +99,10 @@ def authorization_checks(ordinary_code, companion_code):
     return code + asm('OP_ENDIF OP_ENDIF')
 
 
-def check_binding(companion_code):
+def check_binding(companion_code, *, compact=False):
     """Consume the authorized digest and enforce the native current-input relation."""
     # Entry H; alt bottom-to-top mode, type. Both signatures are derived on chain.
-    code = binding_der() + asm('OP_FROMALTSTACK OP_CAT') + push(PUBLIC)
+    code = binding_der(compact=compact) + asm('OP_FROMALTSTACK OP_CAT') + push(PUBLIC)
     code += asm('OP_FROMALTSTACK OP_DUP OP_IF OP_TOALTSTACK OP_OVER OP_SIZE OP_1SUB OP_SPLIT OP_NIP')
     code += push(b'\x20') + asm('OP_OR') + push(ONE_DER) + asm('OP_SWAP OP_CAT') + push(PUBLIC)
     code += asm('OP_FROMALTSTACK OP_ENDIF OP_CODESEPARATOR') + companion_code

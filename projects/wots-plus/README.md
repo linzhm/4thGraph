@@ -6,7 +6,7 @@
 
 **[Wallet SDK quickstart](docs/sdk.en.md#quickstart)** · [Unified wallet SDK](../../sdk/README.md#quickstart)
 
-Choose a receive template and connect a durable one-time signer. The `compact-v2`, `compact`, and `cached-steps` profiles support eligible OTDA reconstruction.
+Choose a receive template and connect a durable one-time signer. The compact profiles and `cached-steps` support eligible OTDA reconstruction.
 
 [Protocol](docs/developer.en.md#protocol) · [Security](docs/developer.en.md#security) · [Verify](#run-the-checks) · [Transaction costs](#complete-transactions-and-stack-measurements)
 
@@ -114,19 +114,25 @@ The nested conditions consume the counter before hashing steps
 some stack lookups. Together these changes reduce each chain from 406 to
 374 bytes.
 
+`locking_script(key, cached_constants="compact-v3")` builds a 25,965-byte
+lock. It copies the zero function prefix and chain address together, carries
+the chain index as a byte, and generates the cached padding in Script.
+The chain body is 363 bytes. The transaction binding uses a masked sighash
+range check and the compact DER builder.
+
 In the synthetic two-input, two-output payments, the development evaluator
-measured a main stack peak of 27 items for `compact-v2` and 28 for
-`compact`. Both peaked at 67 alternate stack items.
+measured a main stack peak of 32 items for `compact-v3` and 27 for
+`compact-v2`. Both peaked at 67 alternate stack items.
 
-| Measured bytes | `cached-steps` | `compact` | `compact-v2` |
-| --- | ---: | ---: | ---: |
-| Payment lock | 33,956 | 29,217 | 27,070 |
-| OTDA reconstruction program | 3,097 | 2,395 | 2,358 |
-| 2×2 BIP143 ALL payment | 72,650 | 63,172 | 58,878 |
-| 2×2 OTDA ALL, reconstructed | 79,090 | 68,208 | 63,840 |
-| 2×2 paired OTDA SINGLE, reconstructed | 78,921 | 68,039 | 63,671 |
+| Measured bytes | `cached-steps` | `compact` | `compact-v2` | `compact-v3` |
+| --- | ---: | ---: | ---: | ---: |
+| Payment lock | 33,956 | 29,217 | 27,070 | 25,965 |
+| OTDA reconstruction program | 3,097 | 2,395 | 2,358 | 1,979 |
+| 2×2 BIP143 ALL payment | 72,650 | 63,172 | 58,878 | 56,668 |
+| 2×2 OTDA ALL, reconstructed | 79,090 | 68,208 | 63,840 | 60,872 |
+| 2×2 paired OTDA SINGLE, reconstructed | 78,921 | 68,039 | 63,671 | 60,703 |
 
-The wallet SDK selects the smaller lock with `template: "compact-v2"`. [SDK quickstart](docs/sdk.en.md#quickstart)
+The wallet SDK selects the smaller lock with `template: "compact-v3"`. [SDK quickstart](docs/sdk.en.md#quickstart)
 
 ### OTDA output reconstruction
 
@@ -134,7 +140,7 @@ Use `compress_otda=True` with `sign_spend` or `sign_payment` only when
 Chronicle functional unlocking is available. Version 2 OTDA ALL and paired
 OTDA SINGLE use the [prebuilt cached-steps program](versions/v0.1.0/cached-steps-layout.json)
 or a compact program generated from the chain body. An ALL transaction may
-use all three dictionaries. SINGLE covers only its same-index output.
+use all four dictionaries. SINGLE covers only its same-index output.
 Earlier null outputs stay in the signed prefix, and unpaired SINGLE
 uses the existing companion authorization. Mixed transactions copy
 unrecognized outputs literally. The wallet chooses the shorter encoding,
@@ -163,7 +169,7 @@ Build the [bsv-script-lean evaluator](https://github.com/Calhooon/bsv-script-lea
 and run the same synthetic spend fixtures through its complete-input API.
 
 ```sh
-python projects/wots-plus/reference/test_lean.py --compact-v2 /path/to/bsv-script-lean/eval/bsvs
+python projects/wots-plus/reference/test_lean.py --compact-v3 /path/to/bsv-script-lean/eval/bsvs
 ```
 
 The runner checks the transaction gate and the selected input's Script verdict

@@ -6,11 +6,12 @@ import json
 from pathlib import Path
 import unittest
 
-from fixtures import fixture_seeds, funding_transaction, vector_document
+from fixtures import fixture_seeds, funding_transaction, mode_fixture, vector_document
 from payment import sign_payment
-from script import CACHE_PROFILES, locking_script
+from script import CACHE_PROFILES, COMPANION_CODE, ORDINARY_CODE, locking_script
 from fourthgraph.bsv.evaluate import ScriptError, evaluate
-from fourthgraph.bsv.transaction import Output
+from fourthgraph.bsv.pushtx import N as CURVE_ORDER, R as BINDING_R, authorization_checks, binding_der
+from fourthgraph.bsv.transaction import SIGHASH_TYPES, Output
 from wots import (
     CHAINS,
     KEY_BYTES,
@@ -59,15 +60,40 @@ class WotsTests(unittest.TestCase):
         self.assertEqual(digits(b"\xff" * 32), (15,) * 64 + (0, 0, 0))
         self.assertEqual(digits(b"\xab" + bytes(31)), (10, 11) + (0,) * 62 + (3, 10, 11))
 
-    def test_compact_v2_countdown_for_each_digit(self):
+    def test_compact_countdown_for_each_digit(self):
         for digit in range(16):
             with self.subTest(digit=digit):
                 seeds = fixture_seeds(b"countdown/" + bytes([digit]))
                 key = public_key(*seeds)
                 digest = bytes([17 * digit]) * N
                 signature = sign_digest(*seeds, digest)
-                lock = locking_script(key, transaction=False, cached_constants="compact-v2")
-                self.assertEqual(evaluate(lock, [digest, signature]), ([b"\x01"], []))
+                for profile in ("compact-v2", "compact-v3"):
+                    lock = locking_script(key, transaction=False, cached_constants=profile)
+                    self.assertEqual(evaluate(lock, [digest, signature]), ([b"\x01"], []), profile)
+
+    def test_compact_authorization_for_every_flag_byte(self):
+        _, _, spend = mode_fixture(0x41)
+        (preimage, signature, selector), _ = evaluate(spend.inputs[1].script)
+        code = authorization_checks(ORDINARY_CODE, COMPANION_CODE, compact=True)
+        for flag in range(256):
+            with self.subTest(flag=flag):
+                flag_byte = bytes([flag])
+                candidate = preimage[:-4] + flag_byte + bytes(3)
+                if flag in SIGHASH_TYPES:
+                    self.assertEqual(evaluate(code, [candidate, signature, selector]),
+                                     ([candidate, signature], [selector, flag_byte]))
+                else:
+                    with self.assertRaises(ScriptError):
+                        evaluate(code, [candidate, signature, selector])
+
+    def test_compact_der_matches_at_modular_boundaries(self):
+        for scalar in (0, CURVE_ORDER // 2 - BINDING_R, CURVE_ORDER // 2 - BINDING_R + 1,
+                       CURVE_ORDER - BINDING_R - 1, CURVE_ORDER - BINDING_R + 1, 2**256 - 1):
+            digest = scalar.to_bytes(32, "big")
+            self.assertEqual(evaluate(binding_der(compact=True), [digest]), evaluate(binding_der(), [digest]))
+        zero = (CURVE_ORDER - BINDING_R).to_bytes(32, "big")
+        with self.assertRaises(ScriptError):
+            evaluate(binding_der(compact=True), [zero])
 
     def test_keys_and_malformed_values(self):
         secret, key = generate_keypair()

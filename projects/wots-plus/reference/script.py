@@ -13,7 +13,7 @@ from wots import CHAINS, KEY_BYTES, N, SIGNATURE_BYTES, W
 ORDINARY_CODE = asm('OP_NOP OP_ENDIF OP_CHECKSIG')
 COMPANION_CODE = asm('OP_NOP OP_IF OP_CHECKSIGVERIFY OP_ELSE OP_CODESEPARATOR') + ORDINARY_CODE
 
-COMPACT_PROFILES = ('compact', 'compact-v2')
+COMPACT_PROFILES = ('compact', 'compact-v2', 'compact-v3')
 CACHE_PROFILES = (False, True, 'steps', *COMPACT_PROFILES)
 
 
@@ -66,10 +66,10 @@ def _compact_chain(profile='compact'):
     builder = ScriptBuilder.from_file(Path(__file__).with_name('compact.fth'))
     # Open gates from step 14 to 0. The hashes run in order as the gates close.
     code = builder.emit(f'{profile}-chain-start', b'')
-    if profile == 'compact-v2':
+    if profile != 'compact':
         # The counter starts at 15 minus the signed digit. The first false
         # gate consumes zero, and the innermost gate consumes the final flag.
-        code += builder.emit('compact-v2-countdown-gate', b'') * (W - 2) + asm('OP_IF')
+        code += builder.emit('compact-countdown-gate', b'') * (W - 2) + asm('OP_IF')
         table_depth = 9
     else:
         for limit in reversed(range(2, W)):
@@ -89,17 +89,34 @@ def _checksum_digits(depth):
             + asm('OP_DUP OP_16 OP_MOD OP_TOALTSTACK OP_16 OP_DIV OP_TOALTSTACK'))
 
 
-def _compact_verifier(public_seed, commitment, *, profile):
-    # Cache the step/selector suffixes and a full-width mask for selector one.
-    suffixes = b''.join(push(step.to_bytes(4, 'big') + bytes(4)) for step in range(W - 1))
-    selector_bit = push(bytes(3 * N - 1) + b'\x01')
+def _compact_constants(public_seed, *, synthesize):
     # The chain appends its one-byte index to the first 23 address bytes.
     prf_base = push((3).to_bytes(N, 'big') + public_seed + bytes(23))
-    constants = suffixes + selector_bit + push(bytes(N)) + prf_base
+    if synthesize:
+        # Build each suffix as zero[3] || step || zero[4].
+        suffixes = asm('OP_0 OP_3 OP_NUM2BIN')
+        suffixes += b''.join(
+            asm('OP_DUP') + number(step) + asm('OP_5 OP_NUM2BIN OP_CAT OP_SWAP')
+            for step in range(W - 1)
+        )
+        suffixes += asm('OP_DROP')
+        selector_bit = asm('OP_0') + number(3 * N - 1) + asm('OP_NUM2BIN OP_1 OP_CAT')
+        zero_prefix = asm('OP_0') + number(N) + asm('OP_NUM2BIN')
+    else:
+        suffixes = b''.join(push(step.to_bytes(4, 'big') + bytes(4)) for step in range(W - 1))
+        selector_bit = push(bytes(3 * N - 1) + b'\x01')
+        zero_prefix = push(bytes(N))
+    return suffixes + selector_bit + zero_prefix + prf_base
+
+
+def _compact_verifier(public_seed, commitment, *, profile):
+    synthesize = profile == 'compact-v3'
+    constants = _compact_constants(public_seed, synthesize=synthesize)
     roll = number(W + 3) + asm('OP_ROLL')
-    if profile == 'compact-v2':
+    if profile != 'compact':
         # Keep the checksum below the cache so step table entries are closer.
-        prefix = _message_digits() + constants + roll + asm('OP_0 OP_SWAP OP_0')
+        index = push(b'\0') if synthesize else asm('OP_0')
+        prefix = _message_digits() + constants + roll + asm('OP_0 OP_SWAP') + index
         checksum_depth = W + 5
     else:
         prefix = constants + roll * 2 + _message_digits() + asm('OP_SWAP OP_0 OP_SWAP OP_0')
@@ -161,8 +178,9 @@ def locking_script(key, *, transaction=True, cached_constants=False):
 
 
 def _payment_script(key, *, cached_constants):
-    shape = authorization_checks(ORDINARY_CODE, COMPANION_CODE)
+    compact = cached_constants == 'compact-v3'
+    shape = authorization_checks(ORDINARY_CODE, COMPANION_CODE, compact=compact)
     shape += asm('OP_SIZE') + number(SIGNATURE_BYTES) + asm('OP_NUMEQUALVERIFY')
     shape += asm('OP_SWAP OP_HASH256 OP_DUP OP_TOALTSTACK')
     return (shape + verifier(key, cached_constants=cached_constants)
-            + asm('OP_FROMALTSTACK') + check_binding(COMPANION_CODE))
+            + asm('OP_FROMALTSTACK') + check_binding(COMPANION_CODE, compact=compact))

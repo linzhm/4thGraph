@@ -8,6 +8,7 @@ import subprocess
 from tempfile import TemporaryDirectory
 
 from fixtures import malformed_cases, mode_cases, mode_fixture
+from script import COMPACT_PROFILES
 
 
 def cases(*, profile=False):
@@ -48,10 +49,9 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("bsvs", type=Path, help="Path to the upstream eval/bsvs wrapper")
     templates = parser.add_mutually_exclusive_group()
-    templates.add_argument("--compact", dest="profile", action="store_const", const="compact",
-                           help="Replay the compact template")
-    templates.add_argument("--compact-v2", dest="profile", action="store_const", const="compact-v2",
-                           help="Replay the compact-v2 template")
+    for profile in COMPACT_PROFILES:
+        templates.add_argument(f"--{profile}", dest="profile", action="store_const", const=profile,
+                               help=f"Replay the {profile} template")
     parser.set_defaults(profile=False)
     args = parser.parse_args()
     binary = args.bsvs.resolve(strict=True)

@@ -2,7 +2,7 @@
 
 [English](sdk.en.md) · [开发指南](developer.zh-CN.md#sdk) · [统一钱包接入](../../../sdk/README.zh-CN.md)
 
-可选 `canonical`（默认）、`cached-constants`、`cached-steps`、`compact` 或 `compact-v2`。识别收款脚本时提供预期的 64 字节公钥。签名器接收 32 字节摘要，返回 2,144 字节签名。释放签名前持久记录密钥已使用，找零用新密钥，重试时保留已签交易。Chronicle 已激活时，可用 `compressOtda: true` 为符合条件的版本 2 交易选择更短的解锁编码。
+可选 `canonical`（默认）、`cached-constants`、`cached-steps`、`compact`、`compact-v2` 或 `compact-v3`。识别收款脚本时提供预期的 64 字节公钥。签名器接收 32 字节摘要，返回 2,144 字节签名。释放签名前持久记录密钥已使用，找零用新密钥，重试时保留已签交易。Chronicle 已激活时，可用 `compressOtda: true` 为符合条件的版本 2 交易选择更短的解锁编码。
 
 <a name="quickstart"></a>
 
@@ -21,7 +21,7 @@ python3.12 -m venv projects/wots-plus/workspace/venv
 ```ts
 import { WalletClient } from "./sdk/typescript/index.ts";
 
-const wallet = new WalletClient("wots-plus", { ...config, template: "compact-v2" });
+const wallet = new WalletClient("wots-plus", { ...config, template: "compact-v3" });
 const receiveScript = wallet.createLock({ publicKey: receiveKeyHex });
 const prevout = wallet.prevoutFromFunding(fundingTxHex, fundingVout);
 const recognized = wallet.recognize({ script: prevout.script, publicKey: spendKeyHex });
@@ -39,7 +39,7 @@ const signedHex = wallet.signPayment({
 
 ## 选择收款模板并演练重试
 
-版本 2 Chronicle 交易新建符合条件的 `compact-v2`、`compact` 或 `cached-steps` 输出时，可设置 `compressOtda: true` 验证重建。每个输出保留其规范编码的 64 字节公钥。[模板实测](../README.zh-CN.md#compact-模板实测)
+版本 2 Chronicle 交易新建符合条件的 Compact 系列或 `cached-steps` 输出时，可设置 `compressOtda: true` 验证重建。每个输出保留其规范编码的 64 字节公钥。[模板实测](../README.zh-CN.md#compact-模板实测)
 
 签名器持久记录密钥状态，每个输出使用新密钥。广播重试时重播已保存的交易字节。不同交易需要重新授权，发起请求前先核对密钥是否已经消耗。测试应覆盖签名进程重启后，同一密钥的二次请求被阻止。[持久签名器参考实现](../../../src/fourthgraph/bsv/one_time_signer.py)
 

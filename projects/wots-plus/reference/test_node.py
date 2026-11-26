@@ -109,6 +109,7 @@ class NodeTests(unittest.TestCase):
         for profile, lock_bytes, program_bytes, fingerprint in (
             ("compact", 29217, 2395, "b5de618ce7e3429a4f4b2f1d6c386a8841afb40c11dcf1eb57ee135765cea4ca"),
             ("compact-v2", 27070, 2358, "6325b2e472c95893b9d76cf95d3240c9c3ff5ec4f334f9f69784f905004dbd91"),
+            ("compact-v3", 25965, 1979, "a47457b71ef80921da0cc82d216e98331ea1365de0045854f8f2a37abd1dca7a"),
         ):
             with self.subTest(profile=profile):
                 pattern = compact_pattern(profile)
@@ -149,6 +150,15 @@ class NodeTests(unittest.TestCase):
             0xe3: (63587, 65945, 90668),
         })
 
+    def test_compact_v3_transactions_and_marginals(self):
+        self.check_transactions_and_marginals("compact-v3-reconstructed", compact_pattern("compact-v3"), {
+            0x41: (56668, 59021, 82644),
+            0x61: (60872, 65450, 87026),
+            0xe1: (60788, 65201, 86942),
+            0x63: (60703, 63143, 86679),
+            0xe3: (60619, 62977, 86595),
+        })
+
     def check_transactions_and_marginals(self, template, pattern, sizes):
         from benchmark_adapter import TEMPLATES
         from tempfile import TemporaryDirectory
@@ -185,10 +195,11 @@ class NodeTests(unittest.TestCase):
     def test_reconstruction_matches_signer_and_both_engines_across_modes(self):
         modes = (0x41, 0x42, 0x43, 0x61, 0x62, 0x63, 0xc1, 0xc2, 0xc3, 0xe1, 0xe2, 0xe3)
         self.assertEqual(SIGHASH_TYPES, set(modes))
-        recipients = [OneTimeSigner(*fixture_seeds(f"coverage/recipient/{i}".encode())) for i in range(3)]
+        recipients = [OneTimeSigner(*fixture_seeds(f"coverage/recipient/{i}".encode())) for i in range(4)]
         fixed = [locking_script(recipient.public_key, cached_constants="steps") for recipient in recipients]
         compact = [locking_script(recipient.public_key, cached_constants="compact") for recipient in recipients]
         v2 = [locking_script(recipient.public_key, cached_constants="compact-v2") for recipient in recipients]
+        v3 = [locking_script(recipient.public_key, cached_constants="compact-v3") for recipient in recipients]
         layouts = (
             ((False, True, "steps"), (fixed[0], b"\x51", fixed[1], fixed[2])),
             ((False, True, "steps"), (fixed[0], fixed[1])),
@@ -196,6 +207,8 @@ class NodeTests(unittest.TestCase):
             ((False, "steps", "compact"), (compact[0], compact[1])),
             (("steps", "compact", "compact-v2"), (v2[0], b"\x51", fixed[1], compact[2])),
             (("steps", "compact", "compact-v2"), (v2[0], v2[1])),
+            (("compact", "compact-v2", "compact-v3"), (v3[0], b"\x51", v2[1], compact[2], fixed[3])),
+            (("compact", "compact-v2", "compact-v3"), (v3[0], v3[1])),
         )
         for version in (1, 2):
             for profiles, locks in layouts:
@@ -240,9 +253,9 @@ class NodeTests(unittest.TestCase):
                 mode in (0x63, 0xe3) and i < len(locks) and locks[i] != b"\x51"
             )
             if version == 2 and compresses:
-                # The witness fits all three dictionaries. A literal WOTS+
+                # The witness fits all four dictionaries. A literal WOTS+
                 # lock alone exceeds this bound.
-                self.assertLess(len(witness), min(12_000, len(literal)), i)
+                self.assertLess(len(witness), min(14_000, len(literal)), i)
             else:
                 self.assertEqual(witness, literal, i)
         self.assertTrue(chain_valid(tx, parents))
