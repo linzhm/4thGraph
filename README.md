@@ -1,8 +1,6 @@
-# BSV Script Lab
+# 4thGraph
 
-**Compile Forth to BSV Script with 4thGraph (4thG). Replay the transactions to measure what you built.**
-
-BSV Script Lab builds tools for developing and testing BSV contracts. **4thGraph** is its Forth toolchain for compiling individual Script routines and planning multi-transaction workflows. The lab also provides wallet-ready locking templates, external-signer SDKs, and signed transaction vectors.
+**4thGraph (4thG) compiles Forth to BSV Script and plans transaction workflows.** This repository includes runnable contract examples, wallet templates, and SDKs.
 
 **[Try 4thG](#4thg-quickstart)** · [Project comparisons](#4thg-comparisons) · [Wallet SDK quickstart](shared/sdk/README.md#quickstart) · [Wallet projects](#project-index) · [Transaction costs](#transaction-costs) · [简体中文](README.zh-CN.md)
 
@@ -10,48 +8,76 @@ BSV Script Lab builds tools for developing and testing BSV contracts. **4thGraph
 
 ## Try 4thG
 
-Install Git and Python 3.12, then clone the `feat/4thgraph` branch. The compiler runs directly from the checkout with the Python standard library. You can compile the example below before setting up a node or installing any Python packages.
+**[PELS Counter](#pels-counter)** · [P2PKH](#p2pkh-example) · [P2PK](#p2pk-example) · [Install the CLI](https://github.com/linzhm/4thGraph/blob/feat/4thgraph/projects/4thgraph/INSTALL.md)
+
+<a name="pels-counter"></a>
+
+### PELS Counter
+
+Start at `0`. Every spend increments the counter and puts the same rules in the next output.
+
+**1. Get the source.** Use Git and Python 3.11 or later.
 
 ```sh
-git clone --branch feat/4thgraph https://github.com/linzhm/bsv-script-lab.git
-cd bsv-script-lab
-
-cat > add-one.fth <<'FORTH'
-bsv-effect: add-one u32 -- u32 ;
-: add-one 1 cell>u32 u32+ ;
-FORTH
-
-PYTHONPATH=. python3 projects/4thgraph/protocol.py add-one.fth \
-  --entry add-one --optimize safe
+git clone --branch feat/4thgraph https://github.com/linzhm/4thGraph.git
+cd 4thGraph
+export PYTHONPATH=.:projects/4thgraph
+counter=projects/4thgraph/examples/pels_counter.py
 ```
 
-`bsv-effect:` declares that `add-one` consumes and returns one `u32`. The word adds one with 32-bit wraparound. The compiler prints JSON with `script_hex` equal to `8b05000000000197`, `script_bytes` equal to `8`, the stack signature, and source and build digests. Change the `1` and rerun to see how the output changes.
+**2. Compile the lock.** 4thG compiles the Forth transition below. The example adds the checks that bind it to the next transaction output. [Forth source](https://github.com/linzhm/4thGraph/blob/feat/4thgraph/projects/4thgraph/examples/pels-counter.fth)
 
-### Replay a full workflow
+```forth
+bsv-effect: advance u32 -- u32 ;
+: advance 1 cell>u32 u32+ ;
+```
 
-From the same checkout on Linux x86-64, install the replay dependencies. `pip` builds the pinned chain-gang package from Git, so have Rust/Cargo and a C toolchain available. The launcher uses `curl` to fetch and verify BSV Node 1.2.3, then funds the example on an isolated regtest network.
+```sh
+python3 "$counter" build
+```
+
+The command prints the full lock as `script_hex`. Building uses the Python standard library.
+
+**3. Spend and verify.** On Linux x86-64 with `curl`, Rust/Cargo, and a C toolchain, install the replay dependencies and run the example.
 
 ```sh
 python3 -m venv .venv
 . .venv/bin/activate
 python -m pip install ecdsa -r shared/requirements-chronicle.txt
 
-project=projects/4thgraph
-PYTHONPATH=. bash shared/verify_node.sh --profile default -- \
-  python "$project/replay.py" --target both --optimize stack --samples 1 \
-  --output "$project/build/quickstart-replay.json"
-
-PYTHONPATH=. python "$project/decision_report.py" "$project/build/quickstart-replay.json" \
-  --output-dir "$project/build/quickstart-decision"
+bash shared/verify_node.sh --profile default -- python "$counter" replay \
+  --output projects/4thgraph/build/pels-counter.json
 ```
 
-Open `projects/4thgraph/build/quickstart-decision/decision-report.md` to see why a candidate was selected or excluded, transaction bytes for settlement and review, and the BSV Node and chain-gang results. [4thGraph guide](https://github.com/linzhm/bsv-script-lab/tree/feat/4thgraph/projects/4thgraph) · [Forth language reference](https://github.com/linzhm/bsv-script-lab/blob/feat/4thgraph/projects/4thgraph/language.md)
+The replay funds `0` and mines `0 → 1 → 2`, deducting **1,000 sat per spend**. Open the JSON report to see both engines' verdicts and the mined blocks. To construct an individual spend, use `spend --parent` with the raw parent transaction. [Spend and verification guide](https://github.com/linzhm/4thGraph/blob/feat/4thgraph/projects/4thgraph/examples/README.md#spend-and-verify-on-regtest)
 
-### What you can build
+<a name="p2pkh-example"></a>
 
-- **Script routines.** Compile a typed Forth word to Script, compare stack schedules, and inspect rewrites at their source locations.
-- **Transaction workflows.** Declare inputs, signer roles, parallel work, and a join. 4thG can fuse the work into one spend or split it across UTXOs for independent submission. The bounded search compares supported transaction boundaries and witness layouts under the declared availability and authorization constraints. The host runner binds transaction templates to actual outpoints and prepares signing requests. [Parallel example](https://github.com/linzhm/bsv-script-lab/blob/feat/4thgraph/projects/4thgraph/example.fth) · [Gated example](https://github.com/linzhm/bsv-script-lab/blob/feat/4thgraph/projects/4thgraph/gated.fth)
-- **Circuits.** A bounded circuit backend emits Circom for supported Forth words. The counter example checks that host evaluation, Script, and circuit constraints agree at wraparound and branch boundaries. [Circuit example](https://github.com/linzhm/bsv-script-lab/blob/feat/4thgraph/projects/4thgraph/proof/workflow.fth)
+<details>
+<summary>P2PKH · 25-byte lock</summary>
+
+```sh
+python3 projects/4thgraph/examples/payments.py --hash160 751e76e8199196d454941c45d1b3a323f1433bd6
+```
+
+The lock commits to a public-key hash. To spend, push the signature and public key. [Forth source](https://github.com/linzhm/4thGraph/blob/feat/4thgraph/projects/4thgraph/examples/payments.fth) · [Signed transaction examples](projects/p2pk-p2pkh-baseline/README.md)
+
+</details>
+
+<a name="p2pk-example"></a>
+
+<details>
+<summary>P2PK · 35-byte lock</summary>
+
+```sh
+python3 projects/4thgraph/examples/payments.py --public-key 0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798
+```
+
+The lock contains the compressed public key. To spend, push the signature. [Forth source](https://github.com/linzhm/4thGraph/blob/feat/4thgraph/projects/4thgraph/examples/payments.fth) · [Signed transaction examples](projects/p2pk-p2pkh-baseline/README.md)
+
+</details>
+
+4thG also supports stack optimization, candidate search across transaction boundaries, decision reports, and Circom generation for supported words. [Toolchain guide](https://github.com/linzhm/4thGraph/tree/feat/4thgraph/projects/4thgraph) · [Forth language reference](https://github.com/linzhm/4thGraph/blob/feat/4thgraph/projects/4thgraph/language.md)
 
 <a name="4thg-comparisons"></a>
 
@@ -59,7 +85,7 @@ Open `projects/4thgraph/build/quickstart-decision/decision-report.md` to see why
 
 | Project | What the comparison shows |
 | --- | --- |
-| P2PKH-R1 Forth v0.3.0 experiment | The Forth baseline reproduces the v0.2.0 lock byte for byte. The optimized lock goes from 46,302 to **45,776 B**, and the two-input, two-output ForkID ALL payment goes from 93,374 to **92,322 B**. The replay also covers OTDA and a build that uses sCrypt-compiled curve kernels. [Experiment and replay](https://github.com/linzhm/bsv-script-lab/tree/feat/4thgraph/projects/p2pkh-r1/experiments/forth) |
+| P2PKH-R1 Forth v0.3.0 experiment | The Forth baseline reproduces the v0.2.0 lock byte for byte. The optimized lock goes from 46,302 to **45,776 B**, and the two-input, two-output ForkID ALL payment goes from 93,374 to **92,322 B**. The replay also covers OTDA and a build that uses sCrypt-compiled curve kernels. [Experiment and replay](https://github.com/linzhm/4thGraph/tree/feat/4thgraph/projects/p2pkh-r1/experiments/forth) |
 | BLS12-381 Groth16 verifier (in development) | Forth defines the verification stages for off-chain proofs with fixed, mixed, or spend-time public inputs. The comparison with nChain matches the public-input domain and the placement of precomputed pairing data. |
 | CCTP transaction layouts (in development) | Compares the same Groth16 verification workload in a fused spend, an atomic two-input spend, and two serial spends. The comparison measures total transaction bytes and the slowest spend’s validation time. |
 
