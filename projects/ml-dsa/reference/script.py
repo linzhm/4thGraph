@@ -6,7 +6,7 @@ from pathlib import Path
 
 from challenge_script import sample_in_ball_script
 from fips204 import CHALLENGE_BYTES, PUBLIC_KEY_BYTES
-from hint_script import apply_hints_script, apply_sparse_hints_script
+from hint_script import apply_hints_before_rounding_script, apply_hints_script, apply_sparse_hints_script
 from mldsa import DIGEST_BYTES
 from ntt_script import checked_equation_script, verification_equation_script
 from shake_script import shake256_script
@@ -33,6 +33,7 @@ class _VerifierVersion(IntEnum):
     V04 = 4
     V05 = 5
     V06 = 6
+    V07 = 7
 
 
 def _shake_options(version):
@@ -41,12 +42,21 @@ def _shake_options(version):
         "optimize": version >= _VerifierVersion.V02,
         "packed_rows": version >= _VerifierVersion.V05,
         "packed_state": version >= _VerifierVersion.V06,
+        "stream_rows": version >= _VerifierVersion.V07,
     }
+
+
+def _hints_script(version):
+    if version >= _VerifierVersion.V07:
+        return apply_hints_before_rounding_script()
+    if version >= _VerifierVersion.V04:
+        return apply_sparse_hints_script()
+    return apply_hints_script(compact=version >= _VerifierVersion.COMPACT)
 
 
 def verify_message_script(public_key, message_bytes, *, context=b"", legacy=False):
     """Compile a verifier that consumes the message and signature from the stack."""
-    version = _VerifierVersion.ORIGINAL if legacy else _VerifierVersion.V06
+    version = _VerifierVersion.ORIGINAL if legacy else _VerifierVersion.V07
     challenges = _reconstruct_challenge(public_key, message_bytes, context=context, version=version)
     return challenges + asm("OP_EQUAL")
 
@@ -63,18 +73,20 @@ def _reconstruct_challenge(public_key, message_bytes, *, context=b"", version):
     compact = shake["compact"]
     signed = version >= _VerifierVersion.V02
     sparse_hints = version >= _VerifierVersion.V04
+    signed_challenge = version >= _VerifierVersion.V07
     code = bytearray(asm("OP_OVER OP_SIZE") + number(message_bytes) + asm("OP_NUMEQUALVERIFY OP_DROP"))
     code += signature_decode_script(compact=compact, signed_response=signed, sparse_hints=sparse_hints)
     # [message, c_tilde, z, hints] -> [message, c_tilde, c || z].
-    code += asm("OP_TOALTSTACK OP_OVER") + sample_in_ball_script(**shake)
+    code += asm("OP_TOALTSTACK OP_OVER") + sample_in_ball_script(**shake, signed=signed_challenge)
     if signed:
         equation = checked_equation_script(public_key, packed=version >= _VerifierVersion.V03,
-                                           paired=version >= _VerifierVersion.V06)
+                                           paired=version >= _VerifierVersion.V06,
+                                           signed_challenge=signed_challenge)
     else:
         equation = verification_equation_script(public_key, compact=compact)
     code += asm("OP_SWAP OP_CAT") + equation
     code += asm("OP_FROMALTSTACK")
-    code += apply_sparse_hints_script() if sparse_hints else apply_hints_script(compact=compact)
+    code += _hints_script(version)
 
     # Compute mu from the approved message and append the reconstructed w1.
     prefix = shake_256(public_key).digest(64) + bytes((0, len(context))) + context
@@ -89,7 +101,7 @@ def locking_script(public_key, *, legacy=False):
     """Bind the Pure ML-DSA-44 verifier to the current transaction input."""
     if legacy:
         return _historical_lock(public_key, compact=False)
-    challenges = _reconstruct_challenge(public_key, DIGEST_BYTES, version=_VerifierVersion.V06)
+    challenges = _reconstruct_challenge(public_key, DIGEST_BYTES, version=_VerifierVersion.V07)
     return _compile_payment_lock(challenges, compact_binding=True)
 
 
@@ -134,7 +146,7 @@ def matches_lock(script, public_key):
     """Match any supported generation of the fixed-key payment template."""
     return (script == locking_script(public_key)
             or any(script == _historical_forth_lock(public_key, version=version)
-                   for version in (_VerifierVersion.V05, _VerifierVersion.V04,
+                   for version in (_VerifierVersion.V06, _VerifierVersion.V05, _VerifierVersion.V04,
                                    _VerifierVersion.V03, _VerifierVersion.V02))
             or script == _historical_lock(public_key, compact=True)
             or script == _historical_lock(public_key, compact=False))

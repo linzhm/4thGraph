@@ -258,7 +258,7 @@ def verification_equation_script(public_key, *, signed_residues=False, compact=F
     return bytes(code)
 
 
-def checked_equation_script(public_key, *, packed=True, paired=True):
+def checked_equation_script(public_key, *, packed=True, paired=True, signed_challenge=False):
     """Reconstruct rows from the sampler and the range-checked signed response."""
     # The inverse transform is linear. Fold its 1/256 factor into the public
     # coefficients so each unpacked output lane needs only reduction mod q.
@@ -266,7 +266,9 @@ def checked_equation_script(public_key, *, packed=True, paired=True):
         [tuple(value * _INVERSE_SCALE % MODULUS for value in column) for column in row]
         for row in verification_key_rows(public_key)
     ]
-    return _packed_equation(rows, paired=paired) if packed else _compact_equation(rows, integrated=True)
+    if packed:
+        return _packed_equation(rows, paired=paired, signed_challenge=signed_challenge)
+    return _compact_equation(rows, integrated=True)
 
 
 def _compact_equation(rows, *, integrated=False):
@@ -319,20 +321,24 @@ def _packed_bias(lanes, offset):
     return number(offset * sum(_LANE_RADIX ** index for index in range(lanes)))
 
 
-def _packed_equation(rows, *, paired):
+def _packed_equation(rows, *, paired, signed_challenge):
     input_count, row_count = len(rows[0]), len(rows)
     offset = _positive_lane_offset() if paired else _LANE_OFFSET
     read_lane = _READ_POSITIVE_LANE if paired else _READ_LANE
     extra_byte = 0 if paired else 1
-    code = bytearray(asm("OP_SIZE") + number(input_count * POLYNOMIAL_BYTES) + asm("OP_NUMEQUALVERIFY"))
+    challenge_bytes = DEGREE if signed_challenge else POLYNOMIAL_BYTES
+    code = bytearray(asm("OP_SIZE") + number(challenge_bytes + (input_count - 1) * POLYNOMIAL_BYTES)
+                     + asm("OP_NUMEQUALVERIFY"))
     code += asm("OP_TOALTSTACK") + number(_LANE_RADIX) + _packed_bias(input_count, offset)
     code += asm("OP_FROMALTSTACK")
-    code += (number(POLYNOMIAL_BYTES) + asm("OP_SPLIT")) * (input_count - 1)
+    code += number(challenge_bytes) + asm("OP_SPLIT")
+    code += (number(POLYNOMIAL_BYTES) + asm("OP_SPLIT")) * (input_count - 2)
 
     # The packed challenge and signed responses were checked upstream. Read
     # each coefficient across the five polynomial tails in Horner order.
     read = _SPLIT_COEFFICIENT + asm("OP_BIN2NUM")
-    first = number(input_count - 1) + asm("OP_ROLL") + read
+    challenge_read = asm("OP_1 OP_SPLIT OP_SWAP OP_BIN2NUM") if signed_challenge else read
+    first = number(input_count - 1) + asm("OP_ROLL") + challenge_read
     next_lane = number(input_count + 2) + asm("OP_PICK OP_MUL")
     next_lane += number(input_count) + asm("OP_ROLL") + read + asm("OP_ROT OP_ADD")
     code += (first + next_lane * (input_count - 1) + asm("OP_TOALTSTACK")) * DEGREE

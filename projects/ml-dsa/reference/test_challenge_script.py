@@ -10,7 +10,9 @@ from fourthgraph.bsv.script import asm, push
 from fourthgraph.bsv.transaction import Input, Output, Transaction
 
 
-def pack(polynomial):
+def pack(polynomial, *, signed=False):
+    if signed:
+        return bytes(abs(value) | (0x80 if value < 0 else 0) for value in polynomial)
     return b''.join((value % MODULUS).to_bytes(3, 'little') for value in polynomial)
 
 
@@ -30,9 +32,9 @@ class ChallengeScriptTests(unittest.TestCase):
             validate_at_heights(spend, (parent,), **args)
 
     def test_challenge_matches_fips_204_across_chronicle(self):
-        script = sample_in_ball_script()
+        script = sample_in_ball_script(signed=True)
         for challenge in (bytes(32), bytes(range(32)), b'\xff' * 32):
-            expected = pack(sample_challenge(challenge))
+            expected = pack(sample_challenge(challenge), signed=True)
             for version in (1, 2):
                 for creation, height in ((1, 2), (1, 4), (3, 4)):
                     with self.subTest(version=version, creation=creation, height=height, challenge=challenge.hex()):
@@ -40,13 +42,15 @@ class ChallengeScriptTests(unittest.TestCase):
 
     def test_appendix_c_limit_can_consume_the_last_byte(self):
         self.assertEqual(SAMPLE_IN_BALL_BYTES, 221)
-        script = sample_from_stream_script()
         stream = b'\xff' * (SAMPLE_IN_BALL_BYTES - CHALLENGE_WEIGHT) + bytes(range(CHALLENGE_WEIGHT))
-        expected = pack([-1] * CHALLENGE_WEIGHT + [0] * (256 - CHALLENGE_WEIGHT))
-        self.check(script, stream, expected)
-        self.check(script, b'\xff' + stream[:-1], None)
-        self.check(script, b'\xff' * SAMPLE_IN_BALL_BYTES, None)
-        self.check(script, stream[:-1], None)
+        for signed in (False, True):
+            script = sample_from_stream_script(signed=signed)
+            expected = pack([-1] * CHALLENGE_WEIGHT + [0] * (256 - CHALLENGE_WEIGHT), signed=signed)
+            with self.subTest(signed=signed):
+                self.check(script, stream, expected)
+                self.check(script, b'\xff' + stream[:-1], None)
+                self.check(script, b'\xff' * SAMPLE_IN_BALL_BYTES, None)
+                self.check(script, stream[:-1], None)
 
 
 if __name__ == '__main__':

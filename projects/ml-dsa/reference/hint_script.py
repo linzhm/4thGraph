@@ -116,3 +116,36 @@ def apply_sparse_hints_script():
     hint += _PACK_W1_GROUP + asm("OP_SWAP OP_CAT OP_CAT OP_SWAP OP_ENDIF")
     code += hint * HINT_WEIGHT_LIMIT
     return code + asm("OP_SIZE OP_0 OP_NUMEQUALVERIFY OP_DROP OP_NIP OP_NIP")
+
+
+@cache
+def apply_hints_before_rounding_script():
+    """Patch the hinted residues, then round and encode all four rows."""
+    code = asm("OP_OVER OP_SIZE") + number(_ROWS * POLYNOMIAL_BYTES) + asm("OP_NUMEQUALVERIFY OP_DROP")
+    period = MODULUS - 1
+    # The high digit is periodic modulo q-1 and changes by one for a
+    # shift of 2*gamma2. The sign of the original low part selects the
+    # direction. At q-1 the special low part is -1, so the zero remainder
+    # correctly selects the downward shift.
+    hint = asm("OP_SIZE OP_0NOTEQUAL OP_IF OP_2 OP_SPLIT OP_SWAP OP_BIN2NUM")
+    hint += asm("OP_3 OP_MUL OP_ROT OP_SWAP OP_SPLIT OP_3 OP_SPLIT OP_SWAP OP_BIN2NUM OP_DUP")
+    hint += number(_LOW_MODULUS) + asm("OP_MOD OP_1") + number(_GAMMA2 + 1) + asm("OP_WITHIN OP_IF")
+    hint += number(_LOW_MODULUS) + asm("OP_ELSE") + number(period - _LOW_MODULUS) + asm("OP_ENDIF OP_ADD")
+    hint += number(period) + asm("OP_MOD OP_3 OP_NUM2BIN OP_SWAP OP_CAT OP_CAT OP_SWAP OP_ENDIF")
+    code += hint * HINT_WEIGHT_LIMIT + asm("OP_SIZE OP_0 OP_NUMEQUALVERIFY OP_DROP")
+
+    # Keep the rounding constants beneath the output buffer and input tail.
+    code += asm("OP_TOALTSTACK") + number(_GAMMA2 - 1) + number(_LOW_MODULUS) + number(_HIGH_MODULUS)
+    code += asm("OP_0 OP_FROMALTSTACK")
+
+    def rounded(depth):
+        return asm(f"OP_{depth} OP_PICK OP_ADD OP_{depth - 1} OP_PICK OP_DIV OP_{depth - 2} OP_PICK OP_MOD")
+
+    shift = number(64) + asm("OP_MUL OP_SWAP")
+    group = asm("OP_12 OP_SPLIT OP_SWAP OP_9 OP_SPLIT OP_BIN2NUM") + rounded(6)
+    for offset in (6, 3):
+        group += shift + number(offset) + asm("OP_SPLIT OP_BIN2NUM") + rounded(7) + asm("OP_ROT OP_ADD")
+    group += shift + asm("OP_BIN2NUM") + rounded(6) + asm("OP_ADD")
+    group += _PACK_W1_GROUP + asm("OP_ROT OP_SWAP OP_CAT OP_SWAP")
+    code += group * (_ROWS * DEGREE // 4)
+    return code + asm("OP_DROP OP_TOALTSTACK OP_2DROP OP_DROP OP_FROMALTSTACK")

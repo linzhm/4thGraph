@@ -7,7 +7,7 @@ import random
 import unittest
 
 from fips204 import PUBLIC_KEY_BYTES, _GAMMA2, _pack, _use_hint, verification_equation, verify
-from hint_script import apply_hints_script, apply_sparse_hints_script
+from hint_script import apply_hints_before_rounding_script, apply_hints_script, apply_sparse_hints_script
 from mldsa import authorize_digest, test_only_vector as deterministic_test_vector, verify_openssl
 from ntt_script import checked_equation_script, ring_product_script, transform_script, verification_equation_script
 from polynomial import DEGREE, MODULUS, ROOT_OF_UNITY, inverse_ntt, ntt
@@ -102,8 +102,8 @@ class ArithmeticTests(unittest.TestCase):
                 sparse = b"".join(index.to_bytes(2, "little") for index in hints)
                 expected = _pack([_use_hint(value, index in hints)
                                   for index, value in enumerate(residues)], 6)
-                self.assertEqual(evaluate(apply_sparse_hints_script(), [kept, rows, sparse]),
-                                 ([kept, expected], []))
+                for compiler in (apply_sparse_hints_script, apply_hints_before_rounding_script):
+                    self.assertEqual(evaluate(compiler(), [kept, rows, sparse]), ([kept, expected], []))
 
     def test_fixed_key_verification_equation(self):
         key, witness, expected = equation_fixture()
@@ -119,12 +119,13 @@ class ArithmeticTests(unittest.TestCase):
         limit = RESPONSE_NORM_LIMIT - 1
         challenge = [-1, 1] + [0] * (DEGREE - 2)
         response = ([limit] * DEGREE, [-limit] * DEGREE, [0] * DEGREE, [1, -1] * (DEGREE // 2))
-        witness = pack([value % MODULUS for value in challenge])
-        for row in response:
-            witness += pack([abs(value) | (0x800000 if value < 0 else 0) for value in row])
+        responses = b"".join(pack([abs(value) | (0x800000 if value < 0 else 0) for value in row])
+                             for row in response)
+        signed_challenge = bytes(abs(value) | (0x80 if value < 0 else 0) for value in challenge)
         expected = b"".join(pack(row) for row in verification_equation(public_key, challenge, response))
         kept = b"caller stack item"
-        self.assertEqual(evaluate(checked_equation_script(public_key), [kept, witness]), ([kept, expected], []))
+        kernel = checked_equation_script(public_key, signed_challenge=True)
+        self.assertEqual(evaluate(kernel, [kept, signed_challenge + responses]), ([kept, expected], []))
 
     def test_forward_and_inverse_ntt(self):
         batch = ([0] * DEGREE, [0] * (DEGREE - 1) + [MODULUS - 1], *synthetic_polynomials())

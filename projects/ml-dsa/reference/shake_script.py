@@ -224,16 +224,31 @@ def _packed_theta():
 
 
 @cache
-def _keccak_rows():
+def _keccak_rows(*, stream_rows=False):
     code = bytearray()
-    rho_pi = _Round(compact=True, rotate=_rotate_packed_lane)
-    rho_pi.move_and_rotate(theta_done=True)
     theta = _packed_theta()
     # Chi uses the whole row and its rotations by one and two lanes.
     chi = _PACK_ROW + asm('OP_DUP') + _rotate_bytes(_LANE_BYTES) + asm('OP_INVERT OP_OVER')
     chi += _rotate_bytes(2 * _LANE_BYTES) + asm('OP_AND OP_XOR')
+    rho_pi = _Round(compact=True, rotate=_rotate_packed_lane)
+    if stream_rows:
+        # After rho and pi produce each row, apply chi immediately and
+        # move the row off the main stack before selecting more lanes.
+        for y in reversed(range(5)):
+            for x in range(5):
+                source_x, source_y = _PI_SOURCES[x, y]
+                rho_pi.roll(('a', source_x, source_y))
+                rho_pi.code += rho_pi.rotate(_ROTATION[source_x][source_y])
+            del rho_pi.lanes[-5:]
+            rho_pi.code += chi
+            if y:
+                rho_pi.code += asm('OP_TOALTSTACK')
+        round_body = theta + rho_pi.code
+    else:
+        rho_pi.move_and_rotate(theta_done=True)
+        round_body = theta + rho_pi.code + (chi + asm('OP_TOALTSTACK')) * 4 + chi
     for constant in _ROUND_CONSTANTS:
-        code += theta + rho_pi.code + (chi + asm('OP_TOALTSTACK')) * 4 + chi
+        code += round_body
         code += asm('OP_8 OP_SPLIT OP_SWAP') + push(constant.to_bytes(_LANE_BYTES, 'big'))
         code += asm('OP_XOR OP_SWAP OP_CAT') + asm('OP_FROMALTSTACK') * 4
 
@@ -253,10 +268,10 @@ def _packed_keccak():
 
 
 @cache
-def _state_permutation():
+def _state_permutation(*, stream_rows=False):
     """Permute an internal state whose lanes are already big-endian."""
     return (push(_LANE_LSB_MASK) + asm('OP_SWAP') + (number(_ROW_BYTES) + asm('OP_SPLIT')) * 4
-            + _keccak_rows() + _PACK_ROW + asm('OP_NIP'))
+            + _keccak_rows(stream_rows=stream_rows) + _PACK_ROW + asm('OP_NIP'))
 
 
 @cache
@@ -269,7 +284,7 @@ def _reverse_lane_stream(lanes):
 
 
 def _shake_script(message_bytes, output_bytes, rate, *, compact=True, optimize=True,
-                  packed_rows=True, packed_state=True):
+                  packed_rows=True, packed_state=True, stream_rows=True):
     if type(message_bytes) is not int or message_bytes < 0:
         raise ValueError('message length must be a nonnegative integer')
     if type(output_bytes) is not int or output_bytes < 1:
@@ -287,7 +302,7 @@ def _shake_script(message_bytes, output_bytes, rate, *, compact=True, optimize=T
     # Keep all state lanes big-endian across permutations. Convert only the
     # bytes that cross the sponge boundary, in FIPS 202 little-endian order.
     if packed_state:
-        permutation = _state_permutation()
+        permutation = _state_permutation(stream_rows=stream_rows)
         rate_conversion = _reverse_lane_stream(rate // _LANE_BYTES)
     else:
         permutation = keccak_f1600_script(compact=compact, optimize=optimize, packed_rows=packed_rows)
@@ -327,7 +342,8 @@ def shake128_script(message_bytes, output_bytes):
     return _shake_script(message_bytes, output_bytes, rate=168)
 
 
-def shake256_script(message_bytes, output_bytes, *, compact=True, optimize=True, packed_rows=True, packed_state=True):
+def shake256_script(message_bytes, output_bytes, *, compact=True, optimize=True, packed_rows=True,
+                    packed_state=True, stream_rows=True):
     """Replace a byte vector of the specified length with a SHAKE256 XOF."""
     return _shake_script(message_bytes, output_bytes, rate=136, compact=compact, optimize=optimize,
-                         packed_rows=packed_rows, packed_state=packed_state)
+                         packed_rows=packed_rows, packed_state=packed_state, stream_rows=stream_rows)
