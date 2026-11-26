@@ -7,13 +7,15 @@ import unittest
 
 import requests
 
-from deferred import funding_output, recognize, target_output
+from deferred import (
+    OPTIMIZATIONS, activation_preimages, activate_input, funding_output, recognize, target_output,
+)
 from fixed_templates import LEGACY_TEMPLATE_VERSION
 from test_deferred import (
     activation_fixture, engine_script, engine_tx, fixture, fixture_signature, mode_activations,
     wrong_activations, zero_commitment_case,
 )
-from fourthgraph.bsv.script import asm
+from fourthgraph.bsv.script import asm, push
 from fourthgraph.bsv.transaction import CHRONICLE, Transaction
 from tx_engine import TxOut
 from wallet import sign_payment
@@ -42,16 +44,20 @@ class NodeTests(unittest.TestCase):
         self.assertEqual(result['result'], expected, result)
 
     def test_activation_and_r1_spend(self):
-        key, public_key, _, funding, unsigned = fixture()
-        activation = activation_fixture(funding, unsigned)
-        for index in range(3):
-            self.assert_node_result(activation, funding, index, 'ok')
-        with TemporaryDirectory() as tmp:
-            payment = sign_payment(
-                engine_tx(activation), 0, [TxOut(99_000, engine_script(asm('OP_1')))], 1_000,
-                public_key, lambda digest: fixture_signature(key, digest), Path(tmp) / 'wallet.sqlite',
-            )
-        self.assert_node_result(Transaction.parse(payment.serialize()), activation, 0, 'ok')
+        for optimization in (None, *OPTIMIZATIONS):
+            with self.subTest(optimization=optimization):
+                key, public_key, _, funding, unsigned = fixture(optimization=optimization)
+                activation = activation_fixture(funding, unsigned)
+                for index in range(3):
+                    self.assert_node_result(activation, funding, index, 'ok')
+                engine_tx(activation).validate([engine_tx(funding)])
+                with TemporaryDirectory() as tmp:
+                    payment = sign_payment(
+                        engine_tx(activation), 0, [TxOut(99_000, engine_script(asm('OP_1')))], 1_000,
+                        public_key, lambda digest: fixture_signature(key, digest), Path(tmp) / 'wallet.sqlite',
+                    )
+                self.assert_node_result(Transaction.parse(payment.serialize()), activation, 0, 'ok')
+                payment.validate([engine_tx(activation)])
 
     def test_two_target_versions_activate_together(self):
         _, key, _, funding, unsigned = fixture()
@@ -84,6 +90,46 @@ class NodeTests(unittest.TestCase):
                 self.assert_node_result(tx, funding, 1, 'ok', funding_height=1)
                 self.assert_node_result(tx, funding, 1, 'error' if flag & CHRONICLE else 'ok',
                                         chronicle=False, funding_height=1)
+
+    def test_forth_witness_guards(self):
+        _, _, key, funding, unsigned = fixture()
+        for optimization in (None, *OPTIMIZATIONS):
+            candidate = funding_output(funding.outputs[1].value, key, optimization=optimization)
+            parent = replace(funding, outputs=(funding.outputs[0], candidate, funding.outputs[2]))
+            tx = replace(unsigned, inputs=tuple(replace(item, txid=parent.txid_wire()) for item in unsigned.inputs))
+            tx = activate_input(tx, 0, parent.serialize())
+            value = candidate.value
+            direct, _ = activation_preimages(tx, 1, value, 0x43)
+            bound, selected = activation_preimages(tx, 1, value, 0x41)
+            _, other_acp = activation_preimages(tx, 1, value, 0xc1)
+            _, other_base = activation_preimages(tx, 1, value, 0x42)
+            self.assert_node_result(tx.with_script(1, push(direct)), parent, 1, 'ok')
+            self.assert_node_result(tx.with_script(1, push(selected) + push(bound)), parent, 1, 'ok')
+            cases = {
+                'empty witness': b'',
+                'truncated preimage': push(direct[:-1]),
+                'nonzero high sighash byte': push(direct[:-1] + b'\x01'),
+                'direct scriptCode in dual path': push(selected) + push(direct),
+                'dual scriptCode in direct path': push(bound),
+                'short auxiliary': push(selected[:-1]) + push(bound),
+                'long auxiliary': push(selected + b'\x00') + push(bound),
+                'different ACP bits': push(other_acp) + push(bound),
+                'unsupported auxiliary type': push(b'\x44' + selected[1:]) + push(bound),
+                'direct auxiliary type': push(b'\x43' + selected[1:]) + push(bound),
+                'stale auxiliary digest for selected mode': push(selected[:1] + other_base[1:]) + push(bound),
+            }
+            for label, witness in cases.items():
+                with self.subTest(optimization=optimization, case=label):
+                    malformed = tx.with_script(1, witness)
+                    self.assert_node_result(malformed, parent, 1, 'error')
+                    with self.assertRaises((ValueError, RuntimeError)):
+                        engine_tx(malformed).validate([engine_tx(parent)])
+
+            malformed, orphan = zero_commitment_case(parent, tx.with_script(0, b''))
+            with self.subTest(optimization=optimization, case='zero output commitment'):
+                self.assert_node_result(orphan, malformed, 1, 'error')
+                with self.assertRaises((ValueError, RuntimeError)):
+                    engine_tx(orphan).validate([engine_tx(malformed)])
 
 
 if __name__ == '__main__':

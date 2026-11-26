@@ -2,10 +2,12 @@
 from dataclasses import replace
 from itertools import product
 from math import prod
+from pathlib import Path
 import unittest
 
-from deferred import activation_preimages, activate_input, funding_output, target_output
+from deferred import OPTIMIZATIONS, activation_preimages, activate_input, funding_output, recognize, target_output
 from fixed_templates import TEMPLATE_VERSIONS
+from fourthgraph.bsv.differential import require_chain_gang_pin
 from fourthgraph.bsv.script import asm, push
 from fourthgraph.bsv.transaction import Input, Output, Transaction
 from test_deferred import engine_tx, fixture_key
@@ -27,12 +29,16 @@ def fresh_witness(tx, mode, amount):
 
 
 class ActivationAcceptanceTests(unittest.TestCase):
-    def test_complete_input_activation_domain(self):
-        for target_r1_version in TEMPLATE_VERSIONS:
-            with self.subTest(target_r1_version=target_r1_version):
-                self.check_complete_input_activation_domain(target_r1_version)
+    @classmethod
+    def setUpClass(cls):
+        require_chain_gang_pin(Path(__file__).resolve().parents[2] / "p2pkh-r1/reference/requirements.txt")
 
-    def check_complete_input_activation_domain(self, target_r1_version):
+    def test_complete_input_activation_domain(self):
+        for optimization, target_r1_version in product((None, *OPTIMIZATIONS), TEMPLATE_VERSIONS):
+            with self.subTest(optimization=optimization, target_r1_version=target_r1_version):
+                self.check_complete_input_activation_domain(target_r1_version, optimization)
+
+    def check_complete_input_activation_domain(self, target_r1_version, optimization):
         _, public_key = fixture_key(1)
         _, different_key = fixture_key(2)
         true_script = asm("OP_1")
@@ -40,8 +46,14 @@ class ActivationAcceptanceTests(unittest.TestCase):
         wrong_recipient = target_output(120_000, different_key, target_r1_version=target_r1_version)
         (other_version,) = (version for version in TEMPLATE_VERSIONS if version != target_r1_version)
         other_target = target_output(120_000, public_key, target_r1_version=other_version)
-        current = funding_output(120_000, public_key, target_r1_version=target_r1_version)
+        current = funding_output(120_000, public_key, target_r1_version=target_r1_version,
+                                 optimization=optimization)
         funding_locks = (current, replace(current, script=push(public_key) + current.script[21:]))
+        for lock in funding_locks:
+            commitment = recognize(lock, expected_key=public_key)
+            self.assertIsNotNone(commitment)
+            self.assertEqual(commitment.target_r1_version, target_r1_version)
+            self.assertEqual(commitment.optimization, optimization)
         dimensions = (FUNDING_LAYOUTS, VERSIONS, SIGHASH_TYPES, CONTEXTS, ACTIVATION_CASES)
         expected_size = 1296
         self.assertTrue(all(len(set(dimension)) == len(dimension) for dimension in dimensions))

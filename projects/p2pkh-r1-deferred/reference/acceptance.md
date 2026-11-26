@@ -1,13 +1,14 @@
 # P2PKH-R1-Deferred activation acceptance
 
 The fixture activates input 1 of a two-input transaction into its corresponding
-R1 output, with a sponsor input at index 0. It evaluates both canonical hash-only
-funding locks and the earlier full-key format against both R1 target versions. The expected decisions follow the
+R1 output, with a sponsor input at index 0. It evaluates both hash-only and full-key
+funding layouts against both R1 target versions for the released assembly and each
+of the three Forth builds. The expected decisions follow the
 [activation specification](../docs/spec.en.md#spending-the-short-lock).
 
 | Axis | Values |
 | --- | --- |
-| Funding layout | 1,435-byte hash-only lock, 1,480-byte full-key lock |
+| Funding layout | Hash-only and full-key header |
 | Target R1 version | v0.1.0, v0.2.0 |
 | Transaction version | 1, 2 |
 | Sighash | ALL, NONE or SINGLE × BIP143 or OTDA × with or without ANYONECANPAY |
@@ -24,13 +25,15 @@ its selected digest. The remaining mutations must all fail.
 
 The test rejects duplicated axis values, asserts that each visited tuple
 belongs to the product and occurs once, then checks the exact product size
-`2 × 2 × 2 × 12 × 3 × 9 = 2,592`. A subset of a finite set with the same cardinality
-equals the entire set. The [ordinary R1 acceptance matrix](../../p2pkh-r1/reference/acceptance.md)
+`2 × 2 × 2 × 12 × 3 × 9 = 2,592` per build. The [ordinary R1 acceptance matrix](../../p2pkh-r1/reference/acceptance.md)
 covers the subsequent recipient signature on the activated output.
 
-BSV Node 1.2.3 matched all 2,592 results, with 80 accepts in Genesis and
-160 accepts in each Chronicle context. The pinned chain-gang build matched the
-864-row Chronicle UTXO subset, with 160 accepts and 704 rejects.
+BSV Node 1.2.3 matched all 10,368 results. Each build had 80 accepts in Genesis
+and 160 accepts in each Chronicle context. The pinned chain-gang build
+`8b60b71a` matched the 3,456-row Chronicle UTXO subset, with 160 accepts and
+704 rejects per build. Additional cases cover malformed preimage and auxiliary
+encodings, mismatched ANYONECANPAY bits, stale selected digests, and a zero
+target commitment.
 
 From the repository root, run the [standard verification entry point](verify.sh).
 
@@ -39,6 +42,4 @@ python -m pip install -r projects/p2pkh-r1-deferred/reference/requirements.txt
 bash projects/p2pkh-r1-deferred/reference/verify.sh
 ```
 
-The proof covers the declared two-input product across both funding layouts and both R1 target versions.
-Arbitrary activation transactions, blanket validation of untrusted funding
-locks, and network admission policy require separate evidence.
+The replay uses explicit previous outputs and the declared two-input fixtures.

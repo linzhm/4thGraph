@@ -1,5 +1,5 @@
 """Create and recognize deferred P-256 payment outputs, and prepare activation inputs."""
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from functools import cache
 from hashlib import sha256
 from pathlib import Path
@@ -10,6 +10,9 @@ from fourthgraph.bsv.transaction import (
     ANYONECANPAY, CHRONICLE, FORKID, SIGHASH_SINGLE, SIGHASH_TYPES,
     Output, Transaction, amount, hash256, preimage_forkid, preimage_otda,
 )
+from fourthgraph.compiler.lowering import OPTIMIZATIONS
+
+from forth_lock import compile_template
 
 R1_REFERENCE = Path(__file__).resolve().parents[2] / 'p2pkh-r1/reference'
 sys.path.append(str(R1_REFERENCE))
@@ -33,6 +36,7 @@ class Commitment:
     output_hash: bytes
     target_r1_version: str
     public_key: bytes | None = None
+    optimization: str | None = None
 
 
 def target_output(value: int, public_key: bytes, *, target_r1_version: str = TEMPLATE_VERSION) -> Output:
@@ -56,9 +60,14 @@ def _binder_blocks() -> dict[str, bytes]:
 
 
 def _locking_script(value: int, commitment: Commitment) -> bytes:
+    owner = commitment.public_key or commitment.owner_hash160
+    if commitment.optimization is not None:
+        return compile_template(commitment.optimization).bind(
+            owner, commitment.script_hash, amount(value), commitment.output_hash,
+        )
     return assemble(ASM, bytes(20), injected={
         **_binder_blocks(),
-        'HEADER': push(commitment.public_key or commitment.owner_hash160) + push(commitment.script_hash),
+        'HEADER': push(owner) + push(commitment.script_hash),
         'VALUE': push(amount(value)),
         'TARGET_HASH': push(commitment.output_hash),
     })
@@ -72,18 +81,20 @@ def _commitment(owner_hash160: bytes, target: Output, target_r1_version: str,
     return Commitment(owner_hash160, sha256(target.script).digest(), output_hash, target_r1_version, public_key)
 
 
-def funding_output(value: int, public_key: bytes, *, target_r1_version: str = TEMPLATE_VERSION) -> Output:
+def funding_output(value: int, public_key: bytes, *, target_r1_version: str = TEMPLATE_VERSION,
+                   optimization: str | None = None) -> Output:
     """Construct a hash-only output from a validated uncompressed P-256 key."""
     return funding_output_from_owner_hash(value, public_key_hash160(public_key),
-                                          target_r1_version=target_r1_version)
+                                          target_r1_version=target_r1_version, optimization=optimization)
 
 
 def funding_output_from_owner_hash(value: int, owner_hash160: bytes, *,
-                                   target_r1_version: str = TEMPLATE_VERSION) -> Output:
+                                   target_r1_version: str = TEMPLATE_VERSION,
+                                   optimization: str | None = None) -> Output:
     """Construct a short output from the same owner hash as ordinary P2PKH-R1."""
     target = target_output_from_owner_hash(value, owner_hash160, target_r1_version=target_r1_version)
     commitment = _commitment(owner_hash160, target, target_r1_version)
-    return Output(value, _locking_script(value, commitment))
+    return Output(value, _locking_script(value, replace(commitment, optimization=optimization)))
 
 
 def recognize(output: Output, *, expected_key: bytes | None = None,
@@ -107,8 +118,10 @@ def recognize(output: Output, *, expected_key: bytes | None = None,
         for version in TEMPLATE_VERSIONS:
             target = target_output_from_owner_hash(output.value, owner, target_r1_version=version)
             commitment = _commitment(owner, target, version, public_key)
-            if output.script == _locking_script(output.value, commitment):
-                return commitment
+            for optimization in (None, *OPTIMIZATIONS):
+                candidate = replace(commitment, optimization=optimization)
+                if output.script == _locking_script(output.value, candidate):
+                    return candidate
     except ValueError:
         return None
     return None

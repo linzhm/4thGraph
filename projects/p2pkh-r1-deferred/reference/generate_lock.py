@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 import sys
 
-from deferred import funding_output, funding_output_from_owner_hash, recognize
+from deferred import OPTIMIZATIONS, funding_output, funding_output_from_owner_hash, recognize
 from fourthgraph.bsv.transaction import Output
 
 
@@ -16,12 +16,16 @@ def main() -> None:
     source.add_argument('--owner-hash160', metavar='HEX')
     source.add_argument('--script-file', type=Path, metavar='RAW_SCRIPT')
     parser.add_argument('--format', choices=('json', 'raw'), default='json')
+    parser.add_argument('--optimize', choices=OPTIMIZATIONS, help='generate a Forth lock in this compiler mode')
     args = parser.parse_args()
+    if args.script_file is not None and args.optimize is not None:
+        parser.error('--optimize is available when generating a lock')
     try:
         if args.public_key is not None:
-            output = funding_output(args.value, bytes.fromhex(args.public_key))
+            output = funding_output(args.value, bytes.fromhex(args.public_key), optimization=args.optimize)
         elif args.owner_hash160 is not None:
-            output = funding_output_from_owner_hash(args.value, bytes.fromhex(args.owner_hash160))
+            output = funding_output_from_owner_hash(args.value, bytes.fromhex(args.owner_hash160),
+                                                    optimization=args.optimize)
         else:
             output = Output(args.value, args.script_file.read_bytes())
         commitment = recognize(output)
@@ -43,6 +47,8 @@ def main() -> None:
         }
         if commitment.public_key is not None:
             fields['public_key_x963'] = commitment.public_key.hex()
+        if commitment.optimization is not None:
+            fields['optimization'] = commitment.optimization
         print(json.dumps(fields, indent=2))
 
 

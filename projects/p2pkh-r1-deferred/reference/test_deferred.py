@@ -1,6 +1,7 @@
 """Reference and chain-gang checks. Fixture scalars are public test keys."""
 from dataclasses import replace
 from hashlib import sha256
+import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
@@ -9,8 +10,9 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec, utils
 from tx_engine import Script, Tx, TxIn, TxOut
 
+from compare_forth import comparison
 from deferred import (
-    ACTIVATION_SIGHASH, DIRECT_TYPES, SCRIPT_CODE, activate_input, funding_output,
+    ACTIVATION_SIGHASH, COMPANION_CODE, DIRECT_TYPES, SCRIPT_CODE, activate_input, funding_output,
     funding_output_from_owner_hash, recognize, target_output, target_output_from_owner_hash,
 )
 from fixed_templates import LEGACY_TEMPLATE_VERSION, TEMPLATE_VERSION
@@ -50,11 +52,12 @@ def engine_tx(tx):
     return converted
 
 
-def fixture(*, target_r1_version=TEMPLATE_VERSION):
+def fixture(*, target_r1_version=TEMPLATE_VERSION, optimization=None):
     key, public_key = fixture_key(1)
     _, second_public_key = fixture_key(2)
-    recipients = (funding_output(100_000, public_key, target_r1_version=target_r1_version),
-                  funding_output(120_000, second_public_key, target_r1_version=target_r1_version))
+    recipients = (funding_output(100_000, public_key, target_r1_version=target_r1_version, optimization=optimization),
+                  funding_output(120_000, second_public_key, target_r1_version=target_r1_version,
+                                 optimization=optimization))
     target_outputs = (target_output(100_000, public_key, target_r1_version=target_r1_version),
                       target_output(120_000, second_public_key, target_r1_version=target_r1_version))
     sponsor = Output(10_000, asm('OP_1'))
@@ -110,6 +113,16 @@ def zero_commitment_case(funding, unsigned):
 
 
 class DeferredTests(unittest.TestCase):
+    def test_forth_comparison_reproduces_report_and_script_codes(self):
+        report, scripts = comparison()
+        recorded = Path(__file__).with_name('forth-results.json').read_text(encoding='ascii')
+        self.assertEqual(json.dumps(report, indent=2) + '\n', recorded)
+        for name, script in scripts.items():
+            with self.subTest(build=name):
+                separator = asm('OP_CODESEPARATOR')
+                self.assertTrue(script.endswith(separator + COMPANION_CODE))
+                self.assertTrue(script.endswith(separator + SCRIPT_CODE))
+
     def test_reproduce_public_artifacts(self):
         for path, version in ((TEMPLATE, LEGACY_TEMPLATE_VERSION), (RELEASE_TEMPLATE, TEMPLATE_VERSION)):
             for name, content in artifacts(target_r1_version=version).items():

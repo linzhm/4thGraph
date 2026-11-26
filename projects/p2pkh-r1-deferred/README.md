@@ -12,6 +12,30 @@ Create a short deposit lock, arrange its committed R1 target at the same index, 
 
 Deferred moves the creation of a full R1 locking script from funding to activation. A [1,435-byte funding lock](template/v0.2.0/template.hex) commits to a [46,302-byte P2PKH-R1 v0.2.0 target](../p2pkh-r1/template/v0.2.0/template.hex) at the same value. Existing short locks keep the target version they originally committed to.
 
+## 4thGraph Forth comparison
+
+The typed Forth lock implements the full activation check, including the BIP143 SINGLE output commitment, the optional selected BIP143 or OTDA digest, fixed-key signature construction, and both native signature checks. The `baseline`, `safe`, and `stack` builds use the same source with 4thGraph 0.2.7 from checkout `3133da7`. [Forth source](reference/deferred-activation.fth) · [Compiler report](reference/forth-results.json)
+
+| Build | Funding lock | Funding transaction | Funding + BIP143 ALL activation | First activation input main / alt peak |
+| --- | ---: | ---: | ---: | ---: |
+| Published v0.2.0 assembly | 1,435 B | 2,953 B | 96,116 B | 7 / 34 |
+| Forth `baseline` | 1,185 B | 2,453 B | 95,616 B | 10 / 1 |
+| Forth `safe` | 1,087 B | 2,257 B | 95,420 B | 10 / 1 |
+| Forth `stack` | **1,085 B** | **2,253 B** | **95,416 B** | 10 / 1 |
+
+The fixture funds two Deferred outputs and a sponsor, then activates both outputs into the same 46,302-byte R1 locks. The `stack` build saves 350 bytes per short lock and 700 bytes across funding and activation. The standalone activation measures 93,089 bytes with direct BIP143 SINGLE or 93,163 bytes with BIP143 ALL or OTDA ALL for every build. Stack peaks come from the development evaluator. Peak combined payload on the BIP143 ALL path is 359 bytes for assembly and 360 bytes for Forth. [Fixture and results](reference/forth-results.json)
+
+`safe` removes two 64-bit wrap sequences from DER length subtraction using nonnegative byte-length bounds. `stack` saves one more byte at each of those call sites. The Forth source reverses 32-byte values by splitting them into halves, which accounts for much of the size difference between assembly and the Forth baseline. BSV Node and pinned chain-gang matched the expected verdicts in the activation acceptance matrix. [Acceptance coverage](reference/acceptance.md)
+
+Use `generate_lock.py --optimize stack` or pass `optimization="stack"` to the Python funding helpers to create a Forth lock. Omit the option to issue the released lock. Both use the usual recognition and activation path.
+
+Run the comparison from the repository root to regenerate the report and all four fixture locks.
+
+```sh
+PYTHONPATH=src:. python projects/p2pkh-r1-deferred/reference/compare_forth.py \
+  --output-dir projects/p2pkh-r1-deferred/workspace/forth
+```
+
 ## Use cases and trade-offs
 
 Evaluate Deferred for a deposit queue where customers receive many small locking scripts and the operator can schedule activation before withdrawals. Each short lock commits to the target R1 owner, template and full value. Any party with the data and a funded transaction can assemble that transition. Spending the resulting R1 output still requires the owner's signature.
