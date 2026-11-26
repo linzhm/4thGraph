@@ -4,6 +4,7 @@ from dataclasses import replace
 import unittest
 
 from shared.benchmark_validation import chain_verdict
+from shared.chain_gang import validate_at_heights
 from shared.evaluate import evaluate as evaluate_script
 from shared.script import decode_num, encode_num
 from shared.transaction import Input, Transaction
@@ -97,9 +98,21 @@ class ProtocolTests(unittest.TestCase):
         self.assertFalse(chain_verdict(fake_proof.seal(self.keys.sign), join.parents))
 
     def test_exact_version(self):
-        a = self.contracts.prepare("a", self.done, {"x": 10})
-        v1 = replace(a, tx=replace(a.tx, version=1))
-        self.assertFalse(chain_verdict(v1.seal(self.keys.sign), v1.parents))
+        cases = (("forkid-v1", 1, 5, 2), ("chronicle-v2", 2, 2, 1))
+        self.assertEqual(self.contracts.version, 2)
+        for target, version, activation, wrong_version in cases:
+            with self.subTest(target=target):
+                contracts = Contracts(self.plan, self.keys.public, TASK_ID, target=target)
+                deploy = Transaction((Input(bytes(32), 0),), (contracts.root,), version=version)
+                split = contracts.prepare("split", {"deploy": deploy}).seal(self.keys.sign)
+                a = contracts.prepare("a", {"split": split}, {"x": 10})
+                self.assertEqual(a.tx.version, version)
+                self.assertEqual(a.signing_requests()[0].sighash, 0x41)
+                context = dict(spend_height=4, activation_height=activation, utxo_heights=(3,))
+                validate_at_heights(a.seal(self.keys.sign), a.parents, **context)
+                changed = replace(a, tx=replace(a.tx, version=wrong_version))
+                with self.assertRaisesRegex(ValueError, "OP_EQUALVERIFY"):
+                    validate_at_heights(changed.seal(self.keys.sign), changed.parents, **context)
 
 
 if __name__ == "__main__":

@@ -21,7 +21,11 @@ CORE_PIN = "8b60b71a12a69fdcb465d3e627dbf6f43d6ed081"
 ACTIVATION_HEIGHT = 2
 UTXO_HEIGHT = 3
 SPEND_HEIGHT = 4
-NODE_FLAGS = sum(1 << bit for bit in (1, 2, 3, 16, 18, 19, 20, 21))
+# These regtest fixtures are post-Genesis at both creation and spend.
+NODE_GENESIS_FLAGS = sum(1 << bit for bit in (1, 2, 3, 16, 18, 19))
+NODE_CHRONICLE = 1 << 20
+NODE_UTXO_AFTER_CHRONICLE = 1 << 21
+NODE_FLAGS = NODE_GENESIS_FLAGS | NODE_CHRONICLE | NODE_UTXO_AFTER_CHRONICLE
 
 
 class RPCError(ValueError):
@@ -59,19 +63,25 @@ class Node:
             raise RPCError(method, reply["error"])
         return reply["result"]
 
-    def verdicts(self, tx, parents):
+    def verdicts(self, tx, parents, *, spend_height=SPEND_HEIGHT, activation_height=ACTIVATION_HEIGHT,
+                 utxo_heights=None):
         raw = tx.serialize().hex()
+        if utxo_heights is None:
+            utxo_heights = (UTXO_HEIGHT,) * len(tx.inputs)
         inputs = []
-        for index, (txin, parent) in enumerate(zip(tx.inputs, parents, strict=True)):
+        for index, (txin, parent, height) in enumerate(zip(tx.inputs, parents, utxo_heights, strict=True)):
             prevout = parent.outputs[txin.vout]
-            inputs.append(dict(tx=raw, n=index, flags=NODE_FLAGS, reportflags=True,
-                               txo=dict(lock=prevout.script.hex(), value=prevout.value, height=UTXO_HEIGHT)))
+            flags = NODE_GENESIS_FLAGS
+            if spend_height >= activation_height:
+                flags |= NODE_CHRONICLE
+            if height >= activation_height:
+                flags |= NODE_UTXO_AFTER_CHRONICLE
+            inputs.append(dict(tx=raw, n=index, flags=flags, reportflags=True,
+                               txo=dict(lock=prevout.script.hex(), value=prevout.value, height=height)))
         result = self.call("verifyscript", [inputs, False, 5000])
-        for row in result:
-            if row["flags"] != NODE_FLAGS or row["result"] not in {"ok", "error"}:
+        for row, request in zip(result, inputs, strict=True):
+            if row["flags"] != request["flags"] or row["result"] not in {"ok", "error"}:
                 raise ValueError(f"unexpected BSV Node result: {row}")
-        if len(result) != len(inputs):
-            raise ValueError("BSV Node returned a different number of input results")
         return [row["result"] == "ok" for row in result]
 
 

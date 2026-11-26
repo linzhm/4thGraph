@@ -1,4 +1,4 @@
-"""Chronicle v2 transaction templates and covenants for the two-branch program."""
+"""ForkID transaction templates and covenants for the two-branch program."""
 
 import argparse
 from collections.abc import Callable
@@ -12,8 +12,8 @@ from shared.transaction import FORKID, SIGHASH_ALL, Input, Output, Transaction, 
 
 from compiler import U32, Plan, Template, evaluate, lower, parse, push_value, schedule
 
-VERSION = 2
-VERSION_BYTES = VERSION.to_bytes(4, "little")
+DEFAULT_TARGET = "chronicle-v2"
+TARGETS = {"forkid-v1": (1, "genesis"), DEFAULT_TARGET: (2, "chronicle")}
 FLAG = FORKID | SIGHASH_ALL
 FLAG_BYTES = FLAG.to_bytes(4, "little")
 BINDING_CODE = asm("OP_CHECKSIG")
@@ -34,10 +34,10 @@ def copy_preimage():
     return asm("OP_FROMALTSTACK OP_DUP OP_TOALTSTACK")
 
 
-def begin():
+def begin(version):
     # Fixed BIP143 shape: the executed CODESEPARATOR leaves a one-byte scriptCode.
     return (asm("OP_SIZE") + number(158) + asm("OP_NUMEQUALVERIFY OP_DUP OP_TOALTSTACK OP_DUP")
-            + field(0, 4) + push(VERSION_BYTES) + asm("OP_EQUALVERIFY")
+            + field(0, 4) + push(version.to_bytes(4, "little")) + asm("OP_EQUALVERIFY")
             + field(154, 4) + push(FLAG_BYTES) + asm("OP_EQUALVERIFY"))
 
 
@@ -79,9 +79,9 @@ def p2pk(public):
     return push(public) + asm("OP_CHECKSIG")
 
 
-def proof(index, data_prefix):
+def proof(index, data_prefix, version):
     # Entry rawWork splitTxid. The first input must spend the indicated split slot.
-    bound_prefix = (push(VERSION_BYTES + b"\x01") + asm("OP_SWAP OP_CAT")
+    bound_prefix = (push(version.to_bytes(4, "little") + b"\x01") + asm("OP_SWAP OP_CAT")
                     + push(index.to_bytes(4, "little")) + asm("OP_CAT OP_OVER")
                     + field(0, 41) + asm("OP_EQUALVERIFY"))
     # The branch covenant fixes both outputs and the exact last output layout.
@@ -92,23 +92,24 @@ def proof(index, data_prefix):
     return bound_prefix + tail
 
 
-def join_lock(code, terminals, data_prefix):
+def join_lock(code, terminals, data_prefix, version):
     # Lock prefix pushes splitTxid above witness rawA rawB P.
-    read_results = (asm("OP_2 OP_PICK OP_OVER") + proof(0, data_prefix) + asm("OP_TOALTSTACK OP_OVER OP_OVER")
-                    + proof(1, data_prefix) + asm("OP_FROMALTSTACK OP_SWAP"))
+    read_results = (asm("OP_2 OP_PICK OP_OVER") + proof(0, data_prefix, version)
+                    + asm("OP_TOALTSTACK OP_OVER OP_OVER") + proof(1, data_prefix, version)
+                    + asm("OP_FROMALTSTACK OP_SWAP"))
     bind_prevouts = (asm("OP_DROP OP_HASH256") + push(ZERO_INDEX) + asm("OP_CAT OP_SWAP OP_HASH256")
                      + push(ZERO_INDEX) + asm("OP_CAT OP_SWAP OP_CAT OP_HASH256") + check_field(PREVOUTS_HASH))
-    return asm("OP_SWAP") + begin() + read_results + code + route_check(terminals) + bind_prevouts + finish()
+    return asm("OP_SWAP") + begin(version) + read_results + code + route_check(terminals) + bind_prevouts + finish()
 
 
-def work_lock(index, code, owner, join_code, data_prefix):
+def work_lock(index, code, owner, join_code, data_prefix, version):
     example = Output(RESULT_VALUE, push(bytes(32)) + join_code)
     result_prefix = example.serialize()[:-(32 + len(join_code))]
     # From the branch result, build the whole output vector as it must appear on wire.
     output_vector = (number(RESULT_WIDTH) + asm("OP_NUM2BIN") + push(data_prefix) + asm("OP_SWAP OP_CAT")
                      + copy_preimage() + field(CURRENT_OUTPOINT, 32) + push(result_prefix) + asm("OP_SWAP OP_CAT")
                      + push(join_code) + asm("OP_CAT OP_SWAP OP_CAT OP_HASH256"))
-    return (begin() + single_input() + push(index.to_bytes(4, "little")) + check_field(CURRENT_OUTPOINT + 32, 4)
+    return (begin(version) + single_input() + push(index.to_bytes(4, "little")) + check_field(CURRENT_OUTPOINT + 32, 4)
             + authorize(owner) + validate_u32() + code + output_vector + check_field(OUTPUTS_HASH) + finish())
 
 
@@ -210,7 +211,11 @@ class Host:
 
 
 class Contracts:
-    def __init__(self, plan: Plan, keys, task_id):
+    def __init__(self, plan: Plan, keys, task_id, *, target=DEFAULT_TARGET):
+        if target not in TARGETS:
+            raise ValueError(f"unknown compilation target {target!r}")
+        self.target = target
+        self.version, self.era = TARGETS[target]
         if len(task_id) != 32:
             raise ValueError("task id must be 32 bytes")
         required = {name for step in plan.templates for name in step.authorizers} | {"settle", "review"}
@@ -229,16 +234,17 @@ class Contracts:
         select_route = lower(plan.program.join)
         if plan.mode == "fused":
             # Entry x y sigB sigA P. Both values remain in the same Script stack.
-            code = (begin() + single_input() + authorize(keys[a.owner]) + authorize(keys[b.owner])
+            code = (begin(self.version) + single_input() + authorize(keys[a.owner]) + authorize(keys[b.owner])
                     + validate_u32() + asm("OP_SWAP") + validate_u32() + lower(a.word)
                     + asm("OP_SWAP") + lower(b.word) + select_route + route_check(self.terminals) + finish())
         else:
-            self.join_code = join_lock(select_route, self.terminals, self.data_prefix)
+            self.join_code = join_lock(select_route, self.terminals, self.data_prefix, self.version)
             self.work_outputs = tuple(
-                Output(WORK_VALUE, work_lock(i, lower(step.word), keys[step.owner], self.join_code, self.data_prefix))
+                Output(WORK_VALUE, work_lock(i, lower(step.word), keys[step.owner], self.join_code,
+                                             self.data_prefix, self.version))
                 for i, step in enumerate(plan.program.work)
             )
-            code = (begin() + single_input() + authorize(keys[plan.program.operator])
+            code = (begin(self.version) + single_input() + authorize(keys[plan.program.operator])
                     + push(output_hash(self.work_outputs)) + check_field(OUTPUTS_HASH) + finish())
         self.root = Output(ROOT_VALUE, code)
 
@@ -247,8 +253,9 @@ class Contracts:
             return {"satoshis": output.value, "script_hex": output.script.hex()}
 
         spec = {
-            "era": "chronicle",
-            "transaction_version": VERSION,
+            "target": self.target,
+            "era": self.era,
+            "transaction_version": self.version,
             "sighash": f"{FLAG:02x}",
             "schedule": self.plan.mode,
             "fusion_blockers": self.plan.fusion_blockers,
@@ -303,7 +310,7 @@ class Contracts:
             result, = evaluate(step.word, value)
             outputs = (self.result_output(previous[0].parent), self.data_output(result))
             payload = ((encode_num(value),),)
-        return Draft(template, Transaction(inputs, outputs, version=VERSION), previous, payload, self.keys)
+        return Draft(template, Transaction(inputs, outputs, version=self.version), previous, payload, self.keys)
 
 
 def input_value(data, name):
@@ -319,6 +326,7 @@ def main():
     cli = argparse.ArgumentParser(description="Compile Forth source to Script and symbolic transaction templates.")
     cli.add_argument("source", type=Path)
     cli.add_argument("--mode", choices=("auto", "fused", "split"), default="auto")
+    cli.add_argument("--target", choices=TARGETS, default=DEFAULT_TARGET, help="Script era and transaction version")
     cli.add_argument("--keys", type=Path, required=True, help="JSON map of role to compressed public key hex")
     cli.add_argument("--task-id", required=True, help="32-byte hex data identifier")
     cli.add_argument("--available-data", nargs="*")
@@ -328,7 +336,7 @@ def main():
         plan = schedule(parse(args.source.read_text()), args.mode, available_data=args.available_data,
                         available_authorizers=args.available_authorizers)
         keys = {name: bytes.fromhex(key) for name, key in json.loads(args.keys.read_text()).items()}
-        contracts = Contracts(plan, keys, bytes.fromhex(args.task_id))
+        contracts = Contracts(plan, keys, bytes.fromhex(args.task_id), target=args.target)
     except (OSError, ValueError) as error:
         cli.error(str(error))
     print(json.dumps(contracts.describe(), indent=2))

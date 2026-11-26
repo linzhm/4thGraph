@@ -15,6 +15,15 @@ PYTHONPATH=. bash shared/verify_node.sh --profile default -- \
   python projects/forth-multi-tx/replay.py --output /tmp/forth-replay.json --samples 21
 ```
 
+编译和复放都用 `--target` 选目标。默认 `chronicle-v2` 生成版本 2 交易，`forkid-v1` 生成版本 1 交易。两者均使用原始 ForkID ALL（`0x41`），各自的锁都验证原像中的精确版本，汇合锁也验证两笔结果父交易的版本。部署时选定目标，切换目标需要重新编译和部署。
+
+v1 适用的脚本环境从 BSV Genesis 开始。要在 Chronicle 激活前复放，可把 regtest 激活高度设到样本区块之后：
+
+```sh
+REGTEST_CHRONICLE_HEIGHT=1000 PYTHONPATH=. bash shared/verify_node.sh --profile default -- \
+  python projects/forth-multi-tx/replay.py --target forkid-v1 --output /tmp/forth-replay-v1.json --samples 21
+```
+
 复放 JSON 保存源码、两套脚本和符号模板、每笔交易的原始字节与真实 outpoint、每个输入的 BSV Node 脚本判定、Node 入池及挖块结果，以及 chain-gang 的整笔交易判定。启动时使用钱包矿工奖励建立共享资金夹具。报告从各路径自己的部署交易开始计量。
 
 可用复放报告里的测试公钥离线编译。换用自己的公钥时，`keys.json` 的格式为角色名到压缩 secp256k1 公钥十六进制字符串的映射。
@@ -54,11 +63,11 @@ flowchart LR
 
 **汇合。** 两个输入的锁都接收完整的两笔结果父交易。各自检查它们花费了同一笔拆分的输出 0 和 1，再将两笔父交易的哈希和结果 vout 0 拼成有序的 outpoint 向量，与真实交易原像的 `hashPrevouts` 核对。两个锁都从已核验的交易字节取结果，并检查有且仅有一个正确后继输出。任务 ID 只标识结果数据。活动 UTXO 集决定实际可花费的结果。
 
-各锁通过固定 `OP_CODESEPARATOR` 后缀的 PUSHTX 验证 ForkID ALL 原像。绑定依赖哈希抗碰撞和原像抗性。脚本读取经过认证的交易版本四字节 `02000000`。所有业务输出都在 Chronicle 激活后创建。原型使用普通压栈见证和单值成功栈。签名覆盖交易效果，见证里的原始 `x/y` 可由导出同一已签效果的等价输入替换。拆分后任一方可以独立提交自己的分支，最终资金仍要等两支结果。当前模板没有超时和退款交易。
+各锁通过固定 `OP_CODESEPARATOR` 后缀的 PUSHTX 验证 ForkID ALL 原像。绑定依赖哈希抗碰撞和原像抗性。脚本读取经过认证的交易版本四字节，v1 对应 `01000000`，v2 对应 `02000000`。原型使用普通压栈见证和单值成功栈。签名覆盖交易效果，见证里的原始 `x/y` 可由导出同一已签效果的等价输入替换。拆分后任一方可以独立提交自己的分支，最终资金仍要等两支结果。当前模板没有超时和退款交易。
 
 ## 测量
 
-BSV Node 1.2.3 默认 regtest 配置及 chain-gang `74676b9`。每笔正向交易重复验证 21 次，取中位数，再在路径上取最大值。Node 耗时含本地 RPC 往返，chain-gang 耗时含解析。栈峰值来自开发求值器对已通过两引擎的输入进行剖析，模拟原生签名检查并按字节值载荷计量。合计峰值取同一采样点的两栈之和。
+下表是 `chronicle-v2` 的一次样本，使用 BSV Node 1.2.3 默认 regtest 配置及 chain-gang `74676b9`。每笔正向交易重复验证 21 次，取中位数，再在路径上取最大值。Node 耗时含本地 RPC 往返，chain-gang 耗时含解析。栈峰值来自开发求值器对已通过两引擎的输入进行剖析，模拟原生签名检查并按字节值载荷计量。合计峰值取同一采样点的两栈之和。
 
 | 路径 | 整条路径 B | 部署后 B | 交易数 | 依赖深度含部署 | 中间 UTXO | 主栈 / Alt / 合计峰值 B | 最大单笔 Node RPC ms | 最大单笔 chain-gang ms |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
@@ -77,6 +86,7 @@ BSV Node 1.2.3 默认 regtest 配置及 chain-gang `74676b9`。每笔正向交�
 | 汇合少一个输入 | 输入脚本拒绝，整笔交易也违反金额守恒 | 拒绝 |
 | 另一次真实拆分产生的结果，任务 ID 相同 | 全部父输出可花费，两个结果锁拒绝 | 拒绝 |
 | 选择错误的后继锁 | 全部父输出可花费，两个结果锁拒绝 | 拒绝 |
+| 用另一目标的交易版本提交汇合 | 全部父输出可花费，两个结果锁拒绝 | 拒绝 |
 
 ## 链上编译器里程碑
 

@@ -9,12 +9,13 @@ from pathlib import Path
 
 from shared.benchmark_admission import submit_and_mine
 from shared.benchmark_cases import native_coin, seed
-from shared.benchmark_validation import CONTEXT_PIN, Node, chain_metadata, chain_verdict, timed
+from shared.benchmark_validation import ACTIVATION_HEIGHT, CONTEXT_PIN, Node, chain_metadata, timed
+from shared.chain_gang import validate_at_heights
 from shared.evaluate import evaluate as evaluate_script
 from shared.transaction import Input, Transaction
 
 from compiler import CompileError, HOST_WORDS, Word, evaluate, parse, schedule
-from protocol import Contracts, FLAG, Host, ROOT_VALUE, UTXO, invalidated
+from protocol import DEFAULT_TARGET, TARGETS, Contracts, FLAG, Host, ROOT_VALUE, UTXO, invalidated
 
 EXAMPLE = Path(__file__).with_name("example.fth")
 TASK_ID = seed("forth/task-id")
@@ -65,9 +66,12 @@ def stack_peaks(tx, previous):
 
 
 class Replay:
-    def __init__(self, node, samples):
+    def __init__(self, node, samples, target, activation_height):
         self.node = node
         self.samples = samples
+        self.target = target
+        self.version, _ = TARGETS[target]
+        self.activation_height = activation_height
         self.keys = TestKeys()
         self.known = {}
         self.host = Host(self.lookup, self.keys.sign, self.submit)
@@ -91,19 +95,19 @@ class Replay:
     def fund(self, cells):
         self.node.call("generate", [101])
         outputs = (SOURCE.output,) * cells
-        raw = Transaction((), outputs).serialize().hex()
+        raw = Transaction((), outputs, version=self.version).serialize().hex()
         funded = self.node.call("fundrawtransaction", [raw, {"changePosition": cells, "feeRate": 0.00002}])
         signed = self.node.call("signrawtransaction", [funded["hex"]])
         if not signed["complete"]:
             raise ValueError("regtest could not sign the shared bootstrap transaction")
         bootstrap = Transaction.parse(bytes.fromhex(signed["hex"]))
-        if bootstrap.outputs[:cells] != outputs or not self.submit(bootstrap):
+        if bootstrap.version != self.version or bootstrap.outputs[:cells] != outputs or not self.submit(bootstrap):
             raise ValueError(f"regtest could not mine the shared bootstrap: {self.traces.get(bootstrap.txid())}")
         return bootstrap
 
     def deploy(self, contracts, bootstrap, slot):
         utxo = UTXO(bootstrap, slot)
-        tx = Transaction((Input(utxo.outpoint.txid, slot),), (contracts.root,))
+        tx = Transaction((Input(utxo.outpoint.txid, slot),), (contracts.root,), version=contracts.version)
         tx = SOURCE.unlock(tx, 0, bootstrap, FLAG, None)
         return tx, self.record(tx, (utxo,))
 
@@ -121,20 +125,34 @@ class Replay:
         if expected:
             for utxo in previous:
                 host_call("lookup-utxo", self.host, utxo.outpoint)
-        node, node_ms = timed(lambda: self.node.verdicts(tx, parents), self.samples if expected else 0)
+        spend_height = self.node.call("getblockcount", []) + 1
+        # Give the hypothetical parent in the missing-UTXO control the next block height.
+        heights = tuple(self.traces.get(parent.txid(), {}).get("height", spend_height) for parent in parents)
+        context = dict(spend_height=spend_height, activation_height=self.activation_height, utxo_heights=heights)
         chain_parents = parents[:1] if live_only else parents
-        chain, chain_ms = timed(lambda: chain_verdict(tx, chain_parents), self.samples if expected else 0)
+
+        def chain_check():
+            try:
+                validate_at_heights(tx, chain_parents, **context)
+            except (ValueError, RuntimeError) as error:
+                return False, str(error)
+            return True, None
+
+        samples = self.samples if expected else 0
+        node, node_ms = timed(lambda: self.node.verdicts(tx, parents, **context), samples)
+        (chain, chain_error), chain_ms = timed(chain_check, samples)
         mined = bool(host_call("submit", self.host, tx))
         if (all(node), chain, mined) != (expected or live_only, expected, expected):
             raise ValueError(f"unexpected verdict for {tx.txid()}: scripts={node}, chain-gang={chain}, "
                              f"admission={self.traces[tx.txid()]}")
         return {
-            "txid": tx.txid(), "raw": tx.serialize().hex(),
+            "txid": tx.txid(), "raw": tx.serialize().hex(), "transaction_version": tx.version,
             "previous": [utxo.outpoint.text() for utxo in previous],
             "output_scripts": [output.script.hex() for output in tx.outputs],
             "bytes": len(tx.serialize()),
+            "validation_context": context,
             "bsv_node": {"input_scripts": node, "verify_rpc_median_ms": node_ms, **self.traces[tx.txid()]},
-            "chain_gang": {"transaction": chain, "median_ms": chain_ms},
+            "chain_gang": {"transaction": chain, "median_ms": chain_ms, "error": chain_error},
             "stack": stack_peaks(tx, previous) if expected else None,
         }
 
@@ -164,11 +182,14 @@ class Replay:
         wrong_output, = (item for item in contracts.terminals if item != join.tx.outputs[0])
         bad_route = replace(join, tx=replace(join.tx, outputs=(wrong_output,)))
         wrong_successor = self.record(self.sign(bad_route), bad_route.previous, expected=False)
+        other_version = 1 if join.tx.version == 2 else 2
+        bad_version = replace(join, tx=replace(join.tx, version=other_version))
+        wrong_version = self.record(self.sign(bad_version), bad_version.previous, expected=False)
         return {"missing_input": missing_input, "wrong_split_same_task_id": wrong_split,
-                "wrong_successor": wrong_successor}
+                "wrong_successor": wrong_successor, "wrong_version": wrong_version}
 
     def path(self, plan, bootstrap, slot, data, route, *, foreign=None):
-        c = Contracts(plan, self.keys.public, TASK_ID)
+        c = Contracts(plan, self.keys.public, TASK_ID, target=self.target)
         root, funding = self.deploy(c, bootstrap, slot)
         done = {"deploy": root}
         records = {"deploy": funding}
@@ -230,6 +251,7 @@ def main():
     cli = argparse.ArgumentParser(description=__doc__)
     cli.add_argument("--output", type=Path, required=True)
     cli.add_argument("--samples", type=int, default=7)
+    cli.add_argument("--target", choices=TARGETS, default=DEFAULT_TARGET)
     args = cli.parse_args()
     if args.samples < 1:
         cli.error("--samples must be positive")
@@ -241,7 +263,8 @@ def main():
     node = Node(os.environ["REGTEST_URL"], os.environ["REGTEST_COOKIE"])
     if node.call("getconnectioncount", []) or node.call("getblockcount", []):
         raise ValueError("replay requires an empty peerless regtest")
-    replay = Replay(node, args.samples)
+    activation = int(os.environ.get("SCRIPT_LAB_CHRONICLE_HEIGHT", ACTIVATION_HEIGHT))
+    replay = Replay(node, args.samples, args.target, activation)
     source = EXAMPLE.read_text()
     pp = parse(source)
     fused, split = schedule(pp, "fused"), schedule(pp, "split")
@@ -254,7 +277,7 @@ def main():
     else:
         raise ValueError("hard independent submission boundary did not block fusion")
     bootstrap = replay.fund(5)
-    c = Contracts(split, replay.keys.public, TASK_ID)
+    c = Contracts(split, replay.keys.public, TASK_ID, target=args.target)
     other, deployment = replay.deploy(c, bootstrap, 4)
     foreign = {"deploy": other}
     split_row = replay.branch(c, "split", foreign, None)
@@ -269,10 +292,12 @@ def main():
     args.output.write_text(json.dumps({
         "schema_version": 1, "sample_count": args.samples, "bsv_node_version": node.version, "chain_gang": engine,
         "regtest_profile": os.environ.get("SCRIPT_LAB_REGTEST_PROFILE"),
+        "target": args.target, "chronicle_activation_height": activation,
         "task_id": TASK_ID.hex(), "bootstrap_raw": bootstrap.serialize().hex(),
         "fixture_public_keys": {name: key.hex() for name, key in replay.keys.public.items()},
         "source": source, "constrained_source": source + "\na independent-submit\n",
-        "plans": {plan.mode: Contracts(plan, replay.keys.public, TASK_ID).describe() for plan in (fused, split)},
+        "plans": {plan.mode: Contracts(plan, replay.keys.public, TASK_ID, target=args.target).describe()
+                  for plan in (fused, split)},
         "constrained_auto_schedule": constrained.mode, "constrained_fused_error": rejected,
         "foreign_same_task_id": {"deploy": deployment, "split": split_row, "b": b_row},
         "cases": cases,
