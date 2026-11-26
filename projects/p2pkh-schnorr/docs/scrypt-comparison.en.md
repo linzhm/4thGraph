@@ -28,7 +28,21 @@ The pinned compiler's `-O` applies to its ASM output. The runner assembles that 
 
 Both sCrypt builds contain 769 nonoverlapping copies of the 2,544-byte `modInverseBranchlessP` body, starting at opcode boundaries. That accounts for **1,956,336 bytes**, or about 89.8% of the optimized lock. Any binary retaining those 769 intact copies has a lower bound of 1,956,336 bytes for its lock. This bound allows arbitrary improvements to the rest of the script. It applies only while the count and encoding of those copies are preserved. [Pinned inversion routine](https://github.com/sCrypt-Inc/boilerplate/blob/7b2cd79d005b2fcdc3c992d039efd619fb47abf7/contracts/ec.scrypt#L61-L66) · [Byte count implementation](../reference/comparison/scrypt_legacy.cjs)
 
-Even if a rewrite uses a different inversion routine, retaining 769 disjoint inline inversions leaves an average budget of less than 163 bytes per inversion to fit in the Script Lab verifier's 125,035 bytes, before accounting for everything else. An sCrypt implementation can also replace the affine arithmetic with joint projective multiplication. To isolate the compiler's contribution, compile that same BIP340 algorithm from high-level sCrypt and compare it with the current generator using the same acceptance vectors and witness layout.
+Even if a rewrite uses a different inversion routine, retaining 769 disjoint inline inversions leaves an average budget of less than 163 bytes per inversion to fit in the Script Lab verifier's 125,035 bytes, before accounting for everything else. Porting joint projective multiplication to sCrypt removes that assumption, as the comparison below shows.
+
+## Matched BIP340 verifier
+
+The high-level sCrypt port uses the same complete homogeneous point addition, joint multiplication, tagged hash, x-only key rules, and five witness fields as the Script Lab verifier. The port keeps the field modulus on the stack across the arithmetic loop. The assembly driver gives the sCrypt outputs the same three-byte guard against surplus stack items. [sCrypt source](../reference/comparison/bip340.scrypt) · [Matched runner](../reference/compare_bip340.py)
+
+| BIP340 verifier | Lock bytes | Witness bytes | Peak stack payload | chain-gang median | BSV Node RPC median |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| High-level sCrypt, default | 131,479 | 197 | 2,235 B | 7.0 ms | 34.8 ms |
+| High-level sCrypt, `--asm -O` | 122,710 | 197 | 2,235 B | 7.2 ms | 35.1 ms |
+| Script Lab | 125,035 | 197 | 3,310 B | 7.4 ms | 35.4 ms |
+
+All three builds accept the same nine valid BIP340 vectors and reject all ten invalid vectors plus eight malformed witness cases on both engines. The local tests also regenerate the eight published signatures that include private keys. The stack figures are development evaluator peaks for the same official vector 0, counting the data payload on both stacks. Timing uses 15 replays after one warmup on the same host as the legacy comparison.
+
+The optimized sCrypt port is 2,325 bytes smaller and shows a lower stack payload in this matched fixture. The timings are close on both engines. The much larger byte gap against `legacy` measures a different arithmetic and signature format. For on-chain payment and two-party costs, see the measured comparison with native multisig. [MuSig2 and native CHECKMULTISIG](threshold-comparison.en.md)
 
 ## Reproduce
 
@@ -46,4 +60,7 @@ export SCRYPTC="$scratch/scryptc-1.19.1-Linux-x86_64" GHCRTS=-N2
 PYTHONPATH=. bash shared/verify_node.sh -- \
   .venv/p2pkh-schnorr/bin/python projects/p2pkh-schnorr/reference/compare_scrypt.py \
   "$scratch/boilerplate" --compiler-study --samples 15
+PYTHONPATH=. bash shared/verify_node.sh -- \
+  .venv/p2pkh-schnorr/bin/python projects/p2pkh-schnorr/reference/compare_bip340.py \
+  --compiler "$SCRYPTC" --samples 15
 ```

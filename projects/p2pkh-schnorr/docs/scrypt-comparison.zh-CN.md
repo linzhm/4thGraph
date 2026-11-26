@@ -28,7 +28,21 @@ Script Lab 使用 BIP340 带标签的挑战哈希和 32 字节的公钥横坐标
 
 两种 sCrypt 构建产物都有 769 段互不重叠的 `modInverseBranchlessP` 指令，每段从操作码边界开始，占 2,544 字节，合计 **1,956,336 字节**，约为优化后锁定脚本的 89.8%。只要编译产物保留这 769 段指令及其编码，即使其余脚本全部消除，锁定脚本也至少有 1,956,336 字节。[固定版本的求逆实现](https://github.com/sCrypt-Inc/boilerplate/blob/7b2cd79d005b2fcdc3c992d039efd619fb47abf7/contracts/ec.scrypt#L61-L66) · [字节统计实现](../reference/comparison/scrypt_legacy.cjs)
 
-即使允许改写求逆例程，只要仍保留 769 个互不重叠的内联求逆，要把总大小压到 Script Lab 的 125,035 字节以内，每段求逆的平均预算也不到 163 字节，还未计入其他指令。sCrypt 也可以改用射影坐标和联合点乘。要单独衡量编译器的差异，可以将同一 BIP340 射影验签算法用高级 sCrypt 表达，在相同的验收向量与见证布局下和当前生成器对照。
+即使允许改写求逆例程，只要仍保留 769 个互不重叠的内联求逆，要把总大小压到 Script Lab 的 125,035 字节以内，每段求逆的平均预算也不到 163 字节，还未计入其他指令。把联合射影点乘移植到 sCrypt 后，这个下界的前提就消失了。下面是同算法实测。
+
+## 同算法 BIP340 对照
+
+用高级 sCrypt 表达与 Script Lab 验签器相同的完备齐次坐标点加、联合点乘、带标签的挑战哈希和 x-only 公钥规则。两份实现使用相同的五个见证字段。sCrypt 版把域模数保留在栈上，供循环里的点运算复用，并在汇编时补上相同的三字节栈深度检查。[sCrypt 源码](../reference/comparison/bip340.scrypt) · [对照程序](../reference/compare_bip340.py)
+
+| BIP340 验签器 | 锁定脚本字节 | 见证字节 | 栈载荷峰值 | chain-gang 中位耗时 | BSV Node RPC 中位耗时 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 高级 sCrypt 默认构建 | 131,479 | 197 | 2,235 B | 7.0 ms | 34.8 ms |
+| 高级 sCrypt `--asm -O` | 122,710 | 197 | 2,235 B | 7.2 ms | 35.1 ms |
+| Script Lab | 125,035 | 197 | 3,310 B | 7.4 ms | 35.4 ms |
+
+三份产物在两套引擎上均接受 9 条有效 BIP340 向量，拒绝 10 条无效 BIP340 向量和 8 条错误见证。本地测试还逐字节复算了 8 条附有私钥的官方签名。栈载荷取官方第 0 条向量在开发求值器中的主栈与备用栈数据总量峰值。耗时在同一主机预热一次后取 15 次复放的中位数。
+
+同算法下，优化后的 sCrypt 锁小 2,325 字节，栈载荷也更低，两种引擎的实测耗时接近。上面对 `legacy` 的大幅缩减对应不同的点运算和签名格式。完整付款和双方签名成本见另一份实测。[MuSig2 和原生 CHECKMULTISIG](threshold-comparison.zh-CN.md)
 
 ## 复现
 
@@ -46,4 +60,7 @@ export SCRYPTC="$scratch/scryptc-1.19.1-Linux-x86_64" GHCRTS=-N2
 PYTHONPATH=. bash shared/verify_node.sh -- \
   .venv/p2pkh-schnorr/bin/python projects/p2pkh-schnorr/reference/compare_scrypt.py \
   "$scratch/boilerplate" --compiler-study --samples 15
+PYTHONPATH=. bash shared/verify_node.sh -- \
+  .venv/p2pkh-schnorr/bin/python projects/p2pkh-schnorr/reference/compare_bip340.py \
+  --compiler "$SCRYPTC" --samples 15
 ```

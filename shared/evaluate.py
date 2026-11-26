@@ -58,6 +58,9 @@ def evaluate(raw, stack=None, checksig=None, *, observe_stack=None):
                 require_stack(3)
                 stack.extend(stack[-3:])
             elif name=='OVER': stack.append(stack[-2])
+            elif name=='2OVER':
+                require_stack(4)
+                stack.extend(stack[-4:-2])
             elif name=='2SWAP':
                 require_stack(4)
                 stack[-4:] = stack[-2:] + stack[-4:-2]
@@ -92,6 +95,21 @@ def evaluate(raw, stack=None, checksig=None, *, observe_stack=None):
                 y=pop(); x=pop()
                 if len(x)!=len(y): raise ScriptError('bitwise length')
                 stack.append(bytes((a^b if name=='XOR' else a&b if name=='AND' else a|b) for a,b in zip(x,y)))
+            elif name == 'LSHIFT':
+                shift = num()
+                data = pop()
+                if shift < 0:
+                    raise ScriptError('negative shift')
+                width = 8 * len(data)
+                if shift >= width:
+                    stack.append(bytes(len(data)))
+                else:
+                    value = int.from_bytes(data, 'big')
+                    shifted = (value << shift) % (1 << width)
+                    stack.append(shifted.to_bytes(len(data), 'big'))
+            elif name in ('NUMNOTEQUAL', 'GREATERTHANOREQUAL'):
+                right, left = num(), num()
+                put(int(left != right if name == 'NUMNOTEQUAL' else left >= right))
             elif name in ('NEGATE','1ADD','1SUB','NOT','0NOTEQUAL'):
                 x=num(); put(-x if name=='NEGATE' else x+1 if name=='1ADD' else x-1 if name=='1SUB' else int(x==0) if name=='NOT' else int(x!=0))
             elif name in ('ADD','SUB','MUL','DIV','MOD','MIN','MAX','BOOLAND','BOOLOR','NUMEQUAL','NUMEQUALVERIFY','LESSTHAN','GREATERTHAN'):

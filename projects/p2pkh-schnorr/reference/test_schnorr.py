@@ -8,6 +8,8 @@ from pathlib import Path
 import unittest
 
 from coincurve import PrivateKey, PublicKeyXOnly
+from coincurve._libsecp256k1 import ffi, lib
+from coincurve.context import GLOBAL_CONTEXT
 
 from bip340 import FIELD, lift_x, to_bytes, verify
 from payment import lock_for_public_key, sign_payment, sign_spend
@@ -21,6 +23,15 @@ VECTORS = Path(__file__).resolve().parents[1] / "template" / "bip340-vectors.csv
 MODES = (0x41, 0x42, 0x43, 0x61, 0x62, 0x63, 0xC1, 0xC2, 0xC3, 0xE1, 0xE2, 0xE3)
 
 
+def official_vectors():
+    raw = VECTORS.read_bytes()
+    vectors = list(csv.DictReader(raw.decode("ascii").splitlines()))
+    if (sha256(raw).hexdigest() != "01c8cabba63b4c9b2f44c975902990086a4fe56eee9d265b187d1e2c1d98ccfb"
+            or [int(row["index"]) for row in vectors] != list(range(19))):
+        raise ValueError("expected all 19 pinned official BIP340 vectors")
+    return vectors
+
+
 def detached_unlock(message, public_key, signature, *, y=None, nonce_y=None):
     point = lift_x(public_key)
     nonce = lift_x(signature[:32])
@@ -31,6 +42,21 @@ def detached_unlock(message, public_key, signature, *, y=None, nonce_y=None):
         signature,
         to_bytes((nonce[1] if nonce else 0) if nonce_y is None else nonce_y),
     )))
+
+
+def malformed_witnesses(public, message, signature):
+    y = lift_x(public)[1]
+    nonce_y = lift_x(signature[:32])[1]
+    return (
+        ("odd public ordinate", detached_unlock(message, public, signature, y=FIELD - y)),
+        ("off-curve public ordinate", detached_unlock(message, public, signature, y=(y + 2) % FIELD)),
+        ("noncanonical public ordinate", detached_unlock(message, public, signature, y=FIELD)),
+        ("odd nonce ordinate", detached_unlock(message, public, signature, nonce_y=FIELD - nonce_y)),
+        ("off-curve nonce ordinate", detached_unlock(message, public, signature, nonce_y=(nonce_y + 2) % FIELD)),
+        ("noncanonical nonce ordinate", detached_unlock(message, public, signature, nonce_y=FIELD)),
+        ("short signature", detached_unlock(message, public, signature[:-1])),
+        ("extra stack item", push(b"extra") + detached_unlock(message, public, signature)),
+    )
 
 
 class SchnorrTests(unittest.TestCase):
@@ -69,12 +95,7 @@ class SchnorrTests(unittest.TestCase):
                 evaluate(unlock + lock)
 
     def test_bip340_official_vectors(self):
-        self.assertEqual(sha256(VECTORS.read_text(encoding="ascii").encode("ascii")).hexdigest(),
-                         "01c8cabba63b4c9b2f44c975902990086a4fe56eee9d265b187d1e2c1d98ccfb")
-        with VECTORS.open(newline="") as file:
-            rows = list(csv.DictReader(file))
-        self.assertEqual([int(row["index"]) for row in rows], list(range(19)))
-        for row in rows:
+        for row in official_vectors():
             with self.subTest(index=row["index"], purpose=row["comment"]):
                 public_key, message, signature = (
                     bytes.fromhex(row[field]) for field in ("public key", "message", "signature")
@@ -88,21 +109,34 @@ class SchnorrTests(unittest.TestCase):
                 self.assertIs(verify(public_key, message, signature), expected)
                 self.check_detached(detached_unlock(message, public_key, signature), expected)
 
+    def test_bip340_official_signing_vectors(self):
+        vectors = [row for row in official_vectors() if row["secret key"]]
+        self.assertEqual([int(row["index"]) for row in vectors], [0, 1, 2, 3, 15, 16, 17, 18])
+        for row in vectors:
+            with self.subTest(index=row["index"]):
+                secret, public, aux, message, expected = (bytes.fromhex(row[field]) for field in (
+                    "secret key", "public key", "aux_rand", "message", "signature",
+                ))
+                self.assertEqual(PrivateKey(secret).public_key_xonly.format(), public)
+                ctx = GLOBAL_CONTEXT.ctx
+                keypair = ffi.new("secp256k1_keypair *")
+                self.assertEqual(lib.secp256k1_keypair_create(ctx, keypair, secret), 1)
+                # sign_custom accepts the empty and variable-length BIP340 vectors.
+                entropy = ffi.new("unsigned char[32]", aux)
+                params = ffi.new("secp256k1_schnorrsig_extraparams *", {
+                    "magic": [0xda, 0x6f, 0xb3, 0x8c], "ndata": entropy,
+                })
+                signature = ffi.new("unsigned char[64]")
+                self.assertEqual(lib.secp256k1_schnorrsig_sign_custom(
+                    ctx, signature, message, len(message), keypair, params,
+                ), 1)
+                self.assertEqual(bytes(ffi.buffer(signature)), expected)
+
     def test_untrusted_coordinates_and_exact_encodings(self):
         public = self.public_keys[0]
         message = bytes(32)
         signature = self.keys[0].sign_schnorr(message, aux_randomness=bytes(32))
-        y = lift_x(public)[1]
-        nonce_y = lift_x(signature[:32])[1]
-        for case, unlock in (
-            ("odd public ordinate", detached_unlock(message, public, signature, y=FIELD - y)),
-            ("off-curve public ordinate", detached_unlock(message, public, signature, y=(y + 2) % FIELD)),
-            ("noncanonical public ordinate", detached_unlock(message, public, signature, y=FIELD)),
-            ("odd nonce ordinate", detached_unlock(message, public, signature, nonce_y=FIELD - nonce_y)),
-            ("wrong even nonce ordinate", detached_unlock(message, public, signature, nonce_y=(nonce_y + 2) % FIELD)),
-            ("short signature", detached_unlock(message, public, signature[:-1])),
-            ("extra stack item", push(b"extra") + detached_unlock(message, public, signature)),
-        ):
+        for case, unlock in malformed_witnesses(public, message, signature):
             with self.subTest(case=case):
                 self.check_detached(unlock, False)
 

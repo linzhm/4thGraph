@@ -31,6 +31,12 @@ const signedHex = wallet.signPayment({
 
 签署已组装的交易时，用 `signInput` 传入当前输入索引和已核验的上一输出。使用 Chronicle OTDA 时，根据实际链上下文填写 `chronicleActive`。SINGLE 需要同索引输出。Python、Rust 和 Go 也提供对应的接口。[统一调用表](../../../shared/sdk/README.zh-CN.md#调用与数据)
 
+<a name="integrate-musig2"></a>
+
+## 接入 MuSig2
+
+钱包策略保存两把压缩参与者公钥及其约定顺序，在入金前按 BIP327 得到聚合公钥横坐标。收款、识别上一输出和花费都把聚合公钥传为 `publicKey`。签名时，外部协调器把已审批的输入及 `payload` 交给双方，交换公有 nonce 并核验两份部分签名，再通过现有回调返回最终的 64 字节 BIP340 签名。某个输入需要另开会话时，重新生成 nonce 和部分签名。参与者审批、通信和 nonce 状态由外部签名器管理。[2-of-2 验收与成本](threshold-comparison.zh-CN.md) · [BIP327](https://github.com/bitcoin/bips/blob/master/bip-0327.mediawiki)
+
 ## 复放公开向量
 
 按项目首页安装依赖，再运行离线示例。其中使用的密钥和辅助随机数均为公开测试数据。

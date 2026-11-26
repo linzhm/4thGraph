@@ -4,7 +4,7 @@
 
 **Experimental payment template.** Pay to a BIP340 x-only public-key hash on BSV. A wallet fills one 20-byte owner field in a fixed locking script. Its external signer returns a standard 64-byte BIP340 signature.
 
-The first use case is a baseline for cooperative spending. A future BIP327 MuSig2 integration can pass an aggregate key and an aggregate signature through the same signer interface. The eventual comparison should use the same all-participants policy as native CHECKMULTISIG and include funding, spending, and interactive signing costs. [BIP327](https://github.com/bitcoin/bips/blob/master/bip-0327.mediawiki)
+Two parties can use BIP327 MuSig2 to spend through the same signer interface. The existing lock accepts the aggregate x-only key and resulting BIP340 signature. The reference fixtures cover an interrupted signing session and compare the same all-participants policy against native `CHECKMULTISIG`. [MuSig2 and native 2-of-2](docs/threshold-comparison.en.md)
 
 **[Wallet SDK quickstart](docs/sdk.en.md#quickstart)** · [Payment protocol](docs/spec.en.md) · [BIP340](https://github.com/bitcoin/bips/blob/master/bip-0340.mediawiki)
 
@@ -18,11 +18,11 @@ python3.12 -m venv .venv/p2pkh-schnorr
 export SCRIPT_LAB_SDK_PYTHON="$PWD/.venv/p2pkh-schnorr/bin/python"
 PYTHONPATH=. "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/reference/generate_template.py --check
 PYTHONPATH="$PWD:$PWD/projects/p2pkh-schnorr/reference" \
-  bash shared/verify_node.sh -- "$SCRIPT_LAB_SDK_PYTHON" -m unittest -v test_schnorr
+  bash shared/verify_node.sh -- "$SCRIPT_LAB_SDK_PYTHON" -m unittest -v test_schnorr test_musig2
 bash shared/verify_node.sh -- bash shared/sdk/verify_wallet.sh p2pkh-schnorr
 ```
 
-The acceptance suite checks 19 official BIP340 vectors, including empty and variable-length messages, through libsecp256k1 and both Script engines. The payment matrix covers all 12 paired ForkID and Chronicle OTDA modes for transaction versions 1 and 2. It rejects locktime changes and checks the expected output commitments for ALL, NONE, and SINGLE. Separate cases cover malformed coordinates, key ownership, fee balance, and inactive Chronicle.
+The acceptance suite checks all 19 official BIP340 verification vectors, including empty and variable-length messages, through libsecp256k1 and both Script engines. It also regenerates the eight official signing vectors with test keys and auxiliary randomness. The payment matrix covers all 12 paired ForkID and Chronicle OTDA modes for transaction versions 1 and 2. It rejects locktime changes and checks the expected output commitments for ALL, NONE, and SINGLE. Separate cases cover malformed coordinates, key ownership, fee balance, and inactive Chronicle.
 
 ## Measured sizes
 
@@ -47,6 +47,4 @@ bash shared/verify_node.sh --profile default -- "$SCRIPT_LAB_SDK_PYTHON" -m shar
   p2pkh-schnorr --output /tmp/p2pkh-schnorr-admission.json
 ```
 
-The [sCrypt comparison](docs/scrypt-comparison.en.md) replays the verifier linked from the 2021 article alongside our standalone BIP340 verifier. The two fixtures use the same message and public-key x-coordinate.
-
-The next milestone is a two-party MuSig2 spend and a measured native 2-of-2 baseline, including the cost of a signing session interrupted before all parties respond.
+The [sCrypt comparison](docs/scrypt-comparison.en.md) includes the 2021 article's linked verifier and a new sCrypt implementation of the same BIP340 algorithm and witness layout. The [native 2-of-2 comparison](docs/threshold-comparison.en.md) measures the full transaction lifecycle and the amount of signing data produced off-chain.

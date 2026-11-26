@@ -31,6 +31,10 @@ const signedHex = wallet.signPayment({
 
 For a prepared transaction, use `signInput` and supply the current input index and its authenticated prevout. For Chronicle OTDA, supply `chronicleActive` from the actual chain context. SINGLE requires a same-index output. The same methods are available in Python, Rust, and Go. [Shared API table](../../../shared/sdk/README.md#calls-and-data)
 
+## Integrate MuSig2
+
+Keep the ordered compressed participant keys in the wallet's policy. Derive their BIP327 aggregate x-only key before funding. Pass that aggregate key as `publicKey` for receiving, recognizing a previous output, and spending. For signing, the external coordinator gives both participants the approved input and `payload`, exchanges public nonces, verifies both partial signatures, and returns the final 64-byte BIP340 signature through the existing callback. A replacement session uses fresh nonces and partial signatures for that input. Participant approval, transport, and nonce persistence belong to the external signer. [2-of-2 acceptance and costs](threshold-comparison.en.md) · [BIP327](https://github.com/bitcoin/bips/blob/master/bip-0327.mediawiki)
+
 ## Replay with public keys and fixtures
 
 Install the project requirements shown on the project overview, then run the offline example. Its public keys and auxiliary randomness are test data.

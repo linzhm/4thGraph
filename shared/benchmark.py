@@ -23,7 +23,7 @@ PROJECTS = {
     "p2pkh-r1-deferred": (CORE_PIN, ("test_activation_acceptance", "test_node")),
     "p2pkh-sm2": (CORE_PIN, ("test_sm2", "test_sighash", "test_node", "test_otda_constructor", "test_signed_data",
                             "test_signed_data_acceptance")),
-    "p2pkh-schnorr": (CONTEXT_PIN, ("test_schnorr",)),
+    "p2pkh-schnorr": (CONTEXT_PIN, ("test_schnorr", "test_musig2")),
     "lamport-ots": (CORE_PIN, ("test_acceptance", "test_node", "test_lamport")),
     "wots-plus": (CONTEXT_PIN, ("test_acceptance", "test_node", "test_wots")),
     "ml-dsa": (CONTEXT_PIN, ("test_payment", "test_mldsa", "test_shake_script",

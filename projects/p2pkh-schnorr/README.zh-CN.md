@@ -4,7 +4,7 @@
 
 **实验付款模板。** 在 BSV 上向 BIP340 x-only 公钥的哈希付款。钱包只需在固定锁定脚本中填入 20 字节的所有者哈希，外部签名器返回标准 64 字节 BIP340 签名。
 
-第一个应用场景是多方共同出款。后续接入 BIP327 MuSig2 后，聚合公钥和聚合签名可走同一套钱包接口。对比应采用与原生 CHECKMULTISIG 相同的全员签名策略，并计算入金、花费和交互签名的成本。[BIP327](https://github.com/bitcoin/bips/blob/master/bip-0327.mediawiki)
+两方可以通过 BIP327 MuSig2 共同出款。现有锁接收聚合公钥的横坐标和最终的 BIP340 签名，沿用现有钱包接口。参考夹具覆盖签名中断，并与要求双方都签字的原生 `CHECKMULTISIG` 实测对照。[MuSig2 与原生 2-of-2](docs/threshold-comparison.zh-CN.md)
 
 **[钱包 SDK 接入](docs/sdk.zh-CN.md#quickstart)** · [付款协议](docs/spec.zh-CN.md) · [BIP340](https://github.com/bitcoin/bips/blob/master/bip-0340.mediawiki)
 
@@ -18,11 +18,11 @@ python3.12 -m venv .venv/p2pkh-schnorr
 export SCRIPT_LAB_SDK_PYTHON="$PWD/.venv/p2pkh-schnorr/bin/python"
 PYTHONPATH=. "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/reference/generate_template.py --check
 PYTHONPATH="$PWD:$PWD/projects/p2pkh-schnorr/reference" \
-  bash shared/verify_node.sh -- "$SCRIPT_LAB_SDK_PYTHON" -m unittest -v test_schnorr
+  bash shared/verify_node.sh -- "$SCRIPT_LAB_SDK_PYTHON" -m unittest -v test_schnorr test_musig2
 bash shared/verify_node.sh -- bash shared/sdk/verify_wallet.sh p2pkh-schnorr
 ```
 
-验收夹具在 libsecp256k1 和两套脚本引擎上核对了 19 条 BIP340 官方向量，包括空消息与变长消息。付款矩阵覆盖交易版本 1 和 2，以及有同索引输出的全部 12 种 ForkID 和 Chronicle OTDA 组合。测试核对锁定时间变化后的拒绝结果，以及 ALL、NONE、SINGLE 对输出变化的各自约束。其他用例覆盖错误坐标、所有者校验、手续费平衡和 Chronicle 未激活的情况。
+验收夹具在 libsecp256k1 和两套脚本引擎上核对全部 19 条 BIP340 官方验签向量，包括空消息与变长消息，并用公开测试密钥和辅助随机数复算了 8 条官方签名向量。付款矩阵覆盖交易版本 1 和 2，以及有同索引输出的全部 12 种 ForkID 和 Chronicle OTDA 组合。测试核对锁定时间变化后的拒绝结果，以及 ALL、NONE、SINGLE 对输出变化的各自约束。其他用例覆盖错误坐标、所有者校验、手续费平衡和 Chronicle 未激活的情况。
 
 ## 交易实测
 
@@ -47,6 +47,4 @@ bash shared/verify_node.sh --profile default -- "$SCRIPT_LAB_SDK_PYTHON" -m shar
   p2pkh-schnorr --output /tmp/p2pkh-schnorr-admission.json
 ```
 
-[sCrypt 对照](docs/scrypt-comparison.zh-CN.md)复放了 2021 年文章当前链接的实现。它与本项目的独立 BIP340 验签器使用相同消息和相同的公钥横坐标。
-
-下一里程碑是跑通双方 MuSig2 花费，再与原生 2-of-2 实测对照，同时检验签名会话在参与方未全部响应时的处理方式。
+[sCrypt 对照](docs/scrypt-comparison.zh-CN.md)包括 2021 年文章链接的验签器，以及用 sCrypt 编写的同算法、同见证布局的 BIP340 实现。[原生 2-of-2 对照](docs/threshold-comparison.zh-CN.md)包含完整交易生命周期和链下签名材料的实测数据。
