@@ -1,9 +1,11 @@
+REQUIRE BSV
+
 ( P-256 projective kernels. Inputs and outputs are ordered bottom to top. )
 ( p is the positive field modulus, b3 is three times the curve coefficient b. )
 ( Coordinates and temporary integers use ScriptNum, with signed output residues. )
 
-bsv-effect: p256-add script-int script-int script-int script-int script-int script-int script-int script-int -- script-int script-int script-int script-int script-int ;
-: p256-add  ( p b3 x1 y1 z1 x2 y2 z2 -- p b3 X Y Z )
+: p256-add ( script-int script-int script-int script-int script-int script-int script-int script-int -- script-int script-int script-int script-int script-int )
+    ( p b3 x1 y1 z1 x2 y2 z2 -- p b3 X Y Z )
     int-pick-4 int-pick-2 int*                              ( yy = y1*y2 )
     int-pick-4 int-pick-2 int*                              ( zz = z1*z2 )
     -3 cell>int over int*                                   ( azz = -3*zz )
@@ -31,8 +33,8 @@ bsv-effect: p256-add script-int script-int script-int script-int script-int scri
     int+ int-pick-4 int-rem                                  ( Z = yz*plus+xy*t mod p )
 ;
 
-bsv-effect: p256-double script-int script-int script-int script-int script-int -- script-int script-int script-int script-int script-int ;
-: p256-double  ( p b3 x y z -- p b3 X Y Z )
+: p256-double ( script-int script-int script-int script-int script-int -- script-int script-int script-int script-int script-int )
+    ( p b3 x y z -- p b3 X Y Z )
     dup int-nonzero? if                                     ( z = 0 preserves the input point )
         2dup int* dup int+                                  ( s = 2*y*z )
         dup over int* over int* int-pick-6 int-rem           ( Z = s^3 mod p )

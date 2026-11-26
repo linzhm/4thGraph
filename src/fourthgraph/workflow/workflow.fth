@@ -30,16 +30,17 @@ REQUIRE ./rule-words.fth
 97 CONSTANT otda-all
 
 : context: ( sighash-list amount-policy "name" -- ) CREATE , , ;
-: selector: ( kind min max first limit "name" -- ) CREATE , , , , , ;
+5 CONSTANT selector-fields
+: selector: ( kind min max first limit "name" -- ) CREATE selector-fields 0 DO , LOOP ;
 : ordered: ( min max "name" -- ) 0 -ROT 0 0 selector: ;
 : at-range: ( min max first limit "name" -- ) 2>R 1 -ROT 2R> selector: ;
 : current: ( min max "name" -- ) 2 -ROT 0 0 selector: ;
 : paired: ( min max "name" -- ) 3 -ROT 0 0 selector: ;
 : unselected: ( "name" -- ) 4 0 -1 0 0 selector: ;
-: selector. ( selector -- ) 5 0 DO DUP 4 I - slot@ . LOOP DROP ;
+: selector. ( selector -- ) selector-fields 0 DO DUP selector-fields 1- I - slot@ . LOOP DROP ;
 
 : stage: ( inputs outputs in-selector out-selector relation role context policy "name" -- )
-  named-create , , , , , , , , ;
+  named-create 8 0 DO , LOOP ;
 
 : emit-roots ( resources -- )
   BASE @ >R DECIMAL S" roots " TYPE list. CR R> BASE ! ;
@@ -55,5 +56,7 @@ REQUIRE ./rule-words.fth
   DUP 5 slot@ selector. DUP 4 slot@ selector.
   DUP 7 slot@ list. 6 slot@ list. CR
   R> BASE ! ;
+
+: emit-stages ( stage1 ... stage-n n -- ) 0 ?DO emit-stage LOOP ;
 
 BASE !

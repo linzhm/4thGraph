@@ -1,4 +1,4 @@
-"""Evaluate the Forth constructors for native P2PK and P2PKH locks."""
+"""Compile the Forth spending conditions for native P2PK and P2PKH locks."""
 
 import argparse
 import json

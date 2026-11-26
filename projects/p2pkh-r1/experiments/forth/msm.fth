@@ -1,3 +1,5 @@
+REQUIRE BSV
+
 ( P-256 MSM. Compute u*G + v*Q with the standard fixed generator G. )
 ( The enclosing verifier checks that runtime Q is finite and on P-256. )
 REQUIRE r1.fth

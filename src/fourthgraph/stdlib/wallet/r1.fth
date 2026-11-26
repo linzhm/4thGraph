@@ -1,3 +1,5 @@
+REQUIRE BSV
+
 ( P2PKH-R1 v0.2.0. Script construction runs at compile time. )
 ( op-* words emit one Script opcode. The R1 words combine them into a full lock. )
 ( The runtime data-stack conventions are those of the original v0.2.0 template. )
@@ -410,6 +412,17 @@
     r1-native-binding
 ;
 
+: r1-check-owner ( script -- script )
+    op-depth 3 bsv-num op-numequalverify
+    op-over op-size 65 bsv-num op-numequalverify op-drop
+    op-size 64 bsv-num op-numequalverify
+    op-over op-hash160 bsv-owner bsv-push op-equalverify ;
+
+: r1-prepare-signature-check ( script -- script )
+    r1-p-type op-1 op-split op-drop op-toaltstack
+    2 bsv-num op-pick op-hash256 r1-uint256be op-dup op-toaltstack op-toaltstack
+    r1-unpack-r1-inputs op-drop r1-check-r1-fields ;
+
 : r1-lock ( script -- script )
     ( Runtime stack: preimage public-key signature inverse companion-selector. )
     op-dup op-0 op-2 op-within op-verify op-dup op-toaltstack op-swap
@@ -417,12 +430,7 @@
     ( main: P Q sig mode. alt: mode inverse. )
     r1-select-authorization
     r1-check-type
-    op-depth 3 bsv-num op-numequalverify
-    op-over op-size 65 bsv-num op-numequalverify op-drop
-    op-size 64 bsv-num op-numequalverify
-    op-over op-hash160 bsv-owner bsv-push op-equalverify
-    r1-p-type op-1 op-split op-drop op-toaltstack
-    2 bsv-num op-pick op-hash256 r1-uint256be op-dup op-toaltstack op-toaltstack
-    r1-unpack-r1-inputs op-drop r1-check-r1-fields
+    r1-check-owner
+    r1-prepare-signature-check
     r1-finish-r1-binding
 ;

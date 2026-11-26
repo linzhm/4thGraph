@@ -18,7 +18,7 @@ from fourthgraph.verification.proof_contract import FIELD, ProofContract, Verifi
 from fourthgraph.workflow.protocol import ROOT_VALUE, UTXO
 from fourthgraph.replay.workflow import GATED_EXAMPLE, Replay, TestKeys
 from fourthgraph.benchmark.validation import Node
-from fourthgraph.bsv.evaluate import evaluate as evaluate_script
+from fourthgraph.bsv.evaluate import ScriptError, evaluate as evaluate_script
 from fourthgraph.bsv.native_payments import p2pk_lock, p2pkh_lock
 from fourthgraph.bsv.script import asm, encode_num, number, push
 from fourthgraph.bsv.transaction import Input, Output, Transaction
@@ -36,9 +36,92 @@ NATIVE_LOCK = bytes.fromhex("76a914") + OWNER + bytes.fromhex("88ac")
 
 
 class LibraryTests(unittest.TestCase):
+    def test_named_p2pkh_preserves_native_lock_and_verification_order(self):
+        source = LIBRARIES["std/native-p2pkh"].source.read_text()
+        word = SourceCompiler(source, bindings={"owner-hash": OWNER}).words["p2pkh"]
+        signature = b"test signature"
+        checksig = Mock(side_effect=lambda sig, key: (sig, key) == (signature, COMPRESSED))
+        self.assertEqual(evaluate(word, signature, COMPRESSED, checksig=checksig), (1,))
+        self.assertEqual(evaluate(word, b"", COMPRESSED, checksig=checksig), (0,))
+        for mode in ("baseline", "safe", "stack"):
+            script = compile_word(word, mode).script
+            self.assertEqual(script, NATIVE_LOCK)
+            self.assertEqual(evaluate_script(script, [signature, COMPRESSED], checksig), ([b"\x01"], []))
+            self.assertEqual(evaluate_script(script, [b"", COMPRESSED], checksig), ([b""], []))
+            checksig.reset_mock()
+            with self.assertRaisesRegex(ScriptError, "EQUALVERIFY"):
+                evaluate_script(script, [signature, b"other key"], checksig)
+            checksig.assert_not_called()
+        with self.assertRaisesRegex(CompileError, "missing binding"):
+            SourceCompiler(source)
+        with self.assertRaisesRegex(CompileError, "requires exactly 20 bytes"):
+            SourceCompiler(source, bindings={"owner-hash": OWNER[:-1]})
+        with self.assertRaisesRegex(CompileError, "check-signature.*expected stack suffix"):
+            SourceCompiler(source.replace("public-key dup", "public-key"), bindings={"owner-hash": OWNER})
+
+    def test_named_lock_schedules_multi_result_words_and_unused_inputs(self):
+        source = """
+REQUIRE bsv
+: halves ( bytes -- bytes bytes ) 1 OP_SPLIT ;
+lock: match ( unused:bytes data:bytes )
+    data halves bytes-hex 62 OP_EQUALVERIFY bytes-hex 61 OP_EQUAL ;
+"""
+        word = SourceCompiler(source).words["match"]
+        self.assertEqual(evaluate(word, b"ignored", b"ab"), (1,))
+        for mode in ("baseline", "safe", "stack"):
+            self.assertEqual(evaluate_script(compile_word(word, mode).script, [b"ignored", b"ab"]), ([b"\x01"], []))
+        with self.assertRaisesRegex(CompileError, "one cell"):
+            SourceCompiler("lock: invalid ( data:bytes ) data ;")
+
+    def test_named_lock_fuses_verify_only_when_its_flag_is_consumed(self):
+        for predicate, fused in (("OP_EQUAL", "OP_EQUALVERIFY"), ("OP_CHECKSIG", "OP_CHECKSIGVERIFY")):
+            with self.subTest(predicate=predicate):
+                body = f"lock: verify-once ( a:bytes b:bytes ) a b {predicate} verify"
+                word = SourceCompiler(f"REQUIRE bsv\n{body} ;").words["verify-once"]
+                self.assertEqual(compile_word(word).script, asm(predicate))
+
+                source = f"REQUIRE bsv\n{body} 1 ;"
+                word = SourceCompiler(source).words["verify-once"]
+                self.assertEqual(compile_word(word).script, asm(f"{fused} OP_1"))
+
+                source = f"REQUIRE bsv\nlock: retain-flag ( a:bytes b:bytes ) a b {predicate} dup verify ;"
+                word = SourceCompiler(source).words["retain-flag"]
+                self.assertEqual(compile_word(word).script, asm(f"{predicate} OP_DUP OP_VERIFY"))
+
+    def test_require_bsv_enables_typed_native_opcodes(self):
+        source = ": hash ( bytes -- bytes ) OP_HASH160 ;"
+        with self.assertRaisesRegex(CompileError, "OP_HASH160.*requires REQUIRE BSV"):
+            SourceCompiler(source)
+        frontend = SourceCompiler(f"REQUIRE BSV\nREQUIRE bsv\n{source}")
+        self.assertEqual(compile_word(frontend.words["hash"]).script, b"\xa9")
+        self.assertEqual(tuple(item.name for item in frontend.library_imports), ("std/bsv",))
+        with self.assertRaisesRegex(CompileError, "OP_HASH160.*expected stack suffix"):
+            SourceCompiler(f"REQUIRE bsv\n{source.replace('bytes --', 'cell --')}")
+
+    def test_named_lock_uses_forth_branches_with_shared_stack_values(self):
+        source = """
+REQUIRE bsv
+lock: match ( value:bytes switch:cell inner:cell )
+    value switch IF
+        inner IF bytes-hex aa ELSE bytes-hex bb THEN
+    ELSE bytes-hex cc THEN
+    OP_EQUAL verify ;
+"""
+        word = SourceCompiler(source).words["match"]
+        for mode in ("baseline", "safe", "stack"):
+            script = compile_word(word, mode).script
+            for switch, inner, expected in ((0, 0, b"\xcc"), (1, 0, b"\xbb"), (-1, 1, b"\xaa")):
+                for value in (expected, b"wrong"):
+                    accepted = int(value == expected)
+                    self.assertEqual(evaluate(word, value, switch, inner), (accepted,))
+                    self.assertEqual(evaluate_script(script, [value, encode_num(switch), encode_num(inner)]),
+                                     ([encode_num(accepted)], []))
+        with self.assertRaisesRegex(CompileError, "equal stack types"):
+            SourceCompiler(source.replace("bytes-hex cc", "0"))
+
     def test_composition_preserves_native_lock_bytes_and_wraps(self):
         frontend = SourceCompiler(COMPOSITION + "\nrequire stdlib/./u32.fth\n")
-        self.assertEqual(tuple(item.name for item in frontend.library_imports), ("std/p2pkh", "std/u32"))
+        self.assertEqual(tuple(item.name for item in frontend.library_imports), ("std/bsv", "std/p2pkh", "std/u32"))
         word = frontend.words["advance-and-pay"]
         self.assertEqual(evaluate(word, U32 - 1, OWNER), (0, NATIVE_LOCK))
         self.assertEqual(p2pkh_lock(OWNER), NATIVE_LOCK)
@@ -97,18 +180,21 @@ class LibraryTests(unittest.TestCase):
 
     def test_public_interface_catalog_matches_loaded_forth(self):
         catalog = capabilities()
-        for module, entry in (("std/u32", "u32-inc"), ("std/p2pk", "p2pk-lock"), ("std/p2pkh", "p2pkh-lock")):
+        for module, entry in (("std/bsv", "verify"), ("std/u32", "u32-inc"), ("std/p2pk", "p2pk-lock"),
+                              ("std/p2pkh", "p2pkh-lock")):
             frontend = SourceCompiler(f"REQUIRE stdlib/{module.removeprefix('std/')}.fth")
-            evidence, = frontend.library_imports
+            imports = {item.name: item for item in frontend.library_imports}
+            self.assertEqual(set(imports), {"std/bsv", module})
+            evidence = imports[module]
             self.assertEqual(evidence.interface_sha256, catalog[module]["interface_sha256"])
-            self.assertEqual(set(frontend.imported_words), {entry})
+            self.assertEqual(set(frontend.imported_words), {"verify", entry})
             for name, descriptor in catalog[module]["interfaces"].items():
                 word = frontend.words[name]
                 self.assertEqual((word.takes, word.gives), (descriptor["takes"], descriptor["gives"]))
                 self.assertEqual(descriptor["module"], module)
                 self.assertTrue(descriptor["runtime_inputs"] and descriptor["backends"] and descriptor["failure"])
         payments = SourceCompiler("REQUIRE stdlib/p2pk.fth\nREQUIRE stdlib/p2pkh.fth\n")
-        self.assertEqual(set(payments.imported_words), {"p2pk-lock", "p2pkh-lock"})
+        self.assertEqual(set(payments.imported_words), {"verify", "p2pk-lock", "p2pkh-lock"})
         groth = catalog["std/groth16-bls12-381"]["interfaces"]["groth16-bls12-381-verify"]
         self.assertEqual(groth["build_parameters"][0]["name"], "verification-key")
         self.assertEqual(groth["aliases"], ("groth16-verify",))
@@ -137,7 +223,7 @@ class LibraryTests(unittest.TestCase):
             "p256-add": "76d4ff0d4125590a058c3ad89c32634ae95e17feddd50d6fc49b16fed02344d9",
             "p256-double": "cc1ee9c2fe0526c3bc0a6c54d42f73b0600fb43300d2fbb774c6acabf7653d7e",
         }
-        self.assertEqual({name: sha256(compile_word(word).script).hexdigest() for name, word in frontend.words.items()},
+        self.assertEqual({name: sha256(compile_word(frontend.words[name]).script).hexdigest() for name in expected},
                          expected)
 
     def test_verification_policy_filters_before_ranking(self):

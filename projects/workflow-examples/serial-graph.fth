@@ -1,9 +1,13 @@
+REQUIRE BSV
+
 ( Two u32 transitions followed by a route decision. )
-: u32-inc ( u32 -- u32 ) 1 cell>u32 u32+ ;
+REQUIRE stdlib/u32.fth
 
 : double ( u32 -- u32 ) dup u32+ ;
 
-: decide ( u32 -- route ) 20 cell>u32 u32< if route-review else route-settle then ;
+: needs-review ( u32 -- cell ) 20 cell>u32 u32< ;
+
+: decide ( u32 -- route ) needs-review if route-review else route-settle then ;
 
 workflow-input: current u32 ;
 stage: increment u32-inc current next operator ;

@@ -62,7 +62,7 @@ class InstallTests(unittest.TestCase):
             source.write_text("REQUIRE stdlib/p256.fth\n")
             p256 = json.loads(run("4thgraph", str(source), "--entry", "p256-double"))
             self.assertEqual(p256["script_bytes"], 76)
-            self.assertEqual(p256["libraries"][0]["name"], "std/p256")
+            self.assertEqual({library["name"] for library in p256["libraries"]}, {"std/bsv", "std/p256"})
 
             catalog = json.loads(run("4thgraph", "--capabilities"))["libraries"]
             for module, entry in (("std/p2pk", "p2pk-lock"), ("std/p2pkh", "p2pkh-lock")):
@@ -72,8 +72,9 @@ class InstallTests(unittest.TestCase):
                     self.assertEqual(build_upper, run("4thgraph", str(source), "--entry", entry))
                     payment = json.loads(build_upper)
                     descriptor = catalog[module]
-                    evidence, = payment["libraries"]
-                    self.assertEqual(evidence["name"], module)
+                    imports = {library["name"]: library for library in payment["libraries"]}
+                    self.assertEqual(set(imports), {"std/bsv", module})
+                    evidence = imports[module]
                     self.assertEqual(evidence["interface_sha256"], descriptor["interface_sha256"])
                     self.assertEqual(payment["library_export"], descriptor["interfaces"][entry])
 
@@ -85,6 +86,15 @@ class InstallTests(unittest.TestCase):
             application.write_text("REQUIRE recipient.fth\n: amount ( -- cell ) recipient ;\n")
             local_build = json.loads(run("4thgraph", str(application), "--entry", "amount"))
             self.assertEqual(local_build["script_hex"], "57")
+
+            payment_source = local / "p2pkh.fth"
+            payment_source.write_bytes((ROOT / "projects/p2pk-p2pkh-baseline/forth" / payment_source.name).read_bytes())
+            owner_hash = "751e76e8199196d454941c45d1b3a323f1433bd6"
+            payment = json.loads(run("4thgraph", str(payment_source), "--entry", "p2pkh",
+                                     "--bind-bytes", f"owner-hash={owner_hash}"))
+            self.assertEqual(payment["script_hex"], f"76a914{owner_hash}88ac")
+            self.assertEqual([library["name"] for library in payment["libraries"]],
+                             ["std/bsv", "std/native-p2pkh"])
             self.assertEqual(local_build["libraries"][0]["name"], "recipient.fth")
 
             source = workspace / "proof-counter" / "verify-state.fth"

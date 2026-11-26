@@ -102,7 +102,7 @@ In these comparisons, **BIP143 / OTDA** names the two BSV signature digest forma
 
 | Layer | What you write and what you get |
 | --- | --- |
-| **Language and standard library** | Typed Forth words express computations. Contract declarations describe roles, transaction dependencies, and state transitions. The compiler checks stack effects and numeric ranges. [SDL specification](docs/language/specification.md) · [Syntax](docs/language/syntax.md) · [Standard library](docs/language/stdlib.md) |
+| **Language and standard library** | Typed Forth words express computations. Contract declarations describe roles, transaction dependencies, and state transitions. The compiler checks stack effects and numeric ranges. [SDL specification](docs/language/specification.md) · [Syntax in English](docs/language/syntax.en.md) · [中文语法](docs/language/syntax.md) · [Standard library](docs/language/stdlib.md) |
 | **Compiler and planner** | The compiler emits BSV Script. The planner compares eligible transaction layouts and their costs. For supported relations, the proof backend builds circuits and verifiers. [Toolchain guide](docs/toolchain.md) |
 | **Runtime and verification** | The runtime binds real parent outputs, requests signatures, and assembles witnesses. Replay reports connect a build to the actual transactions and the verdicts from BSV Node and chain-gang. [Repository layout](docs/repository-layout.md) · [Replay workflow](docs/toolchain.md#复放与编译) |
 

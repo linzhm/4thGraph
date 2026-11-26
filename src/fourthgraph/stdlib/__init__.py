@@ -116,14 +116,20 @@ GROTH16_VERIFY = Export(
 
 
 LIBRARIES = {
+    "std/bsv": Library(ROOT / "stdlib/bsv.fth", (
+        Export("verify", ("cell",), (), ("host", "script"), (Parameter("flag", "cell", "Assertion result"),),
+               "A zero result aborts verification."),
+    )),
     "std/u32": Library(ROOT / "stdlib/u32.fth", (
         Export("u32-inc", ("u32",), ("u32",), ("host", "script", "circom"),
                (Parameter("value", "u32", "Unsigned 32-bit integer"),),
                "Returns value plus one modulo 2^32 for every u32 input.", failure_mode="total"),
     )),
+    "std/native-p2pk": Library(ROOT / "stdlib/native-p2pk.fth", declarations=("bytes-param:", "lock:")),
     "std/p2pk": Library(ROOT / "stdlib/p2pk.fth", (
         lock_export("p2pk-lock", "compressed-public-key", 33),
     )),
+    "std/native-p2pkh": Library(ROOT / "stdlib/native-p2pkh.fth", declarations=("bytes-param:", "lock:")),
     "std/p2pkh": Library(ROOT / "stdlib/p2pkh.fth", (
         lock_export("p2pkh-lock", "public-key-hash", 20),
     )),
@@ -211,6 +217,9 @@ def read_library(name):
 
 
 def required_source(filename, directory):
+    if filename.casefold() == "bsv":
+        library = LIBRARIES["std/bsv"]
+        return library.source.resolve(), "std/bsv", library
     libraries = {library.source.resolve(): (name, library) for name, library in LIBRARIES.items()}
     path = (directory / filename).resolve()
     if path in libraries or path.is_file():

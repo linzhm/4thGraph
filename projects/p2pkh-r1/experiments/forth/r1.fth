@@ -1,3 +1,5 @@
+REQUIRE BSV
+
 ( P2PKH-R1 payment lock. Script construction runs at compile time. )
 ( op-* words emit one Script opcode. The R1 words combine them into a full lock. )
 ( The runtime data-stack conventions are those of the original v0.2.0 template. )

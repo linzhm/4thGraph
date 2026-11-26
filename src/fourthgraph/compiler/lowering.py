@@ -114,7 +114,7 @@ def build_block(body, stack, rewrites, *, schedule=False):
             start = len(stack) - argc
             args = tuple(stack[start:])
             pushes = code[-argc:] if argc else ()
-            if (node.code is not None and not node.may_fail and argc and len(pushes) == argc
+            if (node.code is not None and not node.may_fail and len(node.gives) == 1 and argc and len(pushes) == argc
                     and all(op.literal is not None for op in pushes)):
                 value, = node.run(*(op.literal.value for op in pushes))
                 literal = Literal(node.gives[0], value)

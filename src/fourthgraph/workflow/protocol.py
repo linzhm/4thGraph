@@ -1011,6 +1011,8 @@ def main():
     action.add_argument("--cpn", action="store_true", help="render the selected transaction graph as Mermaid")
     action.add_argument("--cpn-plan", action="store_true", help="emit the selected canonical transaction plan")
     cli.add_argument("--version", action="version", version=f"%(prog)s {PROJECT_VERSION}")
+    cli.add_argument("--bind-bytes", metavar="NAME=HEX", action="append", default=[],
+                     help="bind a declared byte parameter at compile time (repeatable)")
     cli.add_argument("--assume-input-ranges", action="store_true",
                      help="for --entry, rely on the caller to validate declared input ranges and encodings")
     cli.add_argument("--mode", choices=("auto", "split", *WORKFLOW_MODES), default="auto")
@@ -1056,7 +1058,19 @@ def main():
         cli.error("a Forth source file is required")
     try:
         source_bytes = args.source.read_bytes()
-        source = SourceCompiler(source_bytes.decode(), source_path=args.source)
+        bindings = {}
+        for binding in args.bind_bytes:
+            name, separator, hexadecimal = binding.partition("=")
+            if not name or not separator:
+                cli.error("--bind-bytes requires NAME=HEX")
+            name = name.casefold()
+            if name in bindings:
+                cli.error(f"duplicate byte binding {name!r}")
+            try:
+                bindings[name] = bytes.fromhex(hexadecimal)
+            except ValueError:
+                cli.error(f"byte binding {name!r} requires hexadecimal byte pairs")
+        source = SourceCompiler(source_bytes.decode(), source_path=args.source, bindings=bindings)
         if args.entry is not None:
             entry = args.entry.casefold()
             word = source.words.get(entry)

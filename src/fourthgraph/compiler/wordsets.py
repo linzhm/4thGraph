@@ -2,7 +2,7 @@
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from hashlib import sha256
+from hashlib import new, sha1, sha256
 from operator import add, mul, sub
 import re
 
@@ -45,6 +45,8 @@ class Primitive:
     comparison: bool = False
     may_fail: bool = False
     checked_bounds: tuple[int, int] | None = None
+    requires_checksig: bool = False
+    expansion_cost: int = 1
 
     @property
     def location(self):
@@ -135,7 +137,57 @@ BSV_PRIMITIVES = {
     "bytes-sha256": script_word("bytes", "bytes", asm("OP_SHA256"), lambda x: sha256(x).digest()),
     "bytes=": cell_comparison("bytes bytes", asm("OP_EQUAL"), lambda x, y: x == y),
 }
-PRIMITIVES = CORE_PRIMITIVES | CORE_EXT_PRIMITIVES | BSV_PRIMITIVES
+
+
+def ripemd160(data):
+    return new("ripemd160", data).digest()
+
+
+def verify(condition):
+    if not condition:
+        raise ValueError("Script verification failed")
+    return ()
+
+
+def split_bytes(data, index):
+    if not 0 <= index <= len(data):
+        raise ValueError("Script split index out of bounds")
+    return data[:index], data[index:]
+
+
+def check_signature(checksig, signature, public_key):
+    if checksig is None:
+        raise ValueError("native checksig callback required")
+    return int(bool(checksig(signature, public_key)))
+
+
+NATIVE_PRIMITIVES = {
+    "op_add": BSV_PRIMITIVES["int+"],
+    "op_sub": BSV_PRIMITIVES["int-"],
+    "op_mul": BSV_PRIMITIVES["int*"],
+    "op_mod": BSV_PRIMITIVES["int-rem"],
+    "op_cat": BSV_PRIMITIVES["bytes-cat"],
+    "op_split": Primitive(("bytes", "cell"), ("bytes", "bytes"), asm("OP_SPLIT"), split_bytes,
+                          "script execution", may_fail=True),
+    "op_size": Primitive(("bytes",), ("bytes", "cell"), asm("OP_SIZE"), lambda data: (data, len(data)),
+                         "script execution"),
+    "op_equal": script_word("bytes bytes", "cell", asm("OP_EQUAL"), lambda x, y: int(x == y)),
+    "op_equalverify": Primitive(("bytes", "bytes"), (), asm("OP_EQUALVERIFY"), lambda x, y: verify(x == y),
+                                "script execution", may_fail=True),
+    "op_verify": Primitive(("cell",), (), asm("OP_VERIFY"), verify, "script execution", may_fail=True),
+    "op_ripemd160": script_word("bytes", "bytes", asm("OP_RIPEMD160"), ripemd160),
+    "op_sha1": script_word("bytes", "bytes", asm("OP_SHA1"), lambda data: sha1(data).digest()),
+    "op_sha256": BSV_PRIMITIVES["bytes-sha256"],
+    "op_hash160": script_word("bytes", "bytes", asm("OP_HASH160"), lambda data: ripemd160(sha256(data).digest())),
+    "op_hash256": script_word("bytes", "bytes", asm("OP_HASH256"), lambda data: sha256(sha256(data).digest()).digest()),
+    "op_checksig": Primitive(("bytes", "bytes"), ("cell",), asm("OP_CHECKSIG"),
+                             lambda *args: (check_signature(*args),), "native CHECKSIG", may_fail=True,
+                             requires_checksig=True),
+    "op_checksigverify": Primitive(("bytes", "bytes"), (), asm("OP_CHECKSIGVERIFY"),
+                                   lambda *args: verify(check_signature(*args)), "native CHECKSIG", may_fail=True,
+                                   requires_checksig=True),
+}
+PRIMITIVES = NATIVE_PRIMITIVES | CORE_PRIMITIVES | CORE_EXT_PRIMITIVES | BSV_PRIMITIVES
 
 CORE_SHUFFLES = {
     "dup": (1, (0, 0), "OP_DUP"),
@@ -152,7 +204,12 @@ CORE_EXT_SHUFFLES = {
     "nip": (2, (1,), "OP_NIP"),
     "tuck": (2, (1, 0, 1), "OP_TUCK"),
 }
-SHUFFLES = CORE_SHUFFLES | CORE_EXT_SHUFFLES
+NATIVE_SHUFFLES = {f"op_{name}": (count, order, f"OP_{name.upper()}")
+                   for name, (count, order, _) in (CORE_SHUFFLES | CORE_EXT_SHUFFLES).items()}
+NATIVE_SHUFFLES.update(op_3dup=(3, (0, 1, 2, 0, 1, 2), "OP_3DUP"),
+                       op_2rot=(6, (2, 3, 4, 5, 0, 1), "OP_2ROT"))
+SHUFFLES = CORE_SHUFFLES | CORE_EXT_SHUFFLES | NATIVE_SHUFFLES
+NATIVE_OPCODES = NATIVE_PRIMITIVES.keys() | NATIVE_SHUFFLES.keys()
 
 CORE_EXT_LITERALS = {"true": Literal("cell", -1), "false": Literal("cell", 0)}
 ROUTES = {"route-review": Literal("route", 0), "route-settle": Literal("route", 1)}
@@ -197,6 +254,8 @@ FILE_EXT_WORDS = set(r'include require required refill rename-file restore-input
 CORE_SCRIPT = CORE_PRIMITIVES.keys() | CORE_SHUFFLES.keys() | {"if", "else", "then"}
 CORE_EXT_SCRIPT = CORE_EXT_PRIMITIVES.keys() | CORE_EXT_SHUFFLES.keys() | CORE_EXT_LITERALS.keys()
 DECLARATIONS = {
+    "bytes-param:": "<name> <size> ;",
+    "lock:": "<name> ( <input-name>:<type> ... ) <verification> ;",
     "range:": "<name> <base> <lower> <upper> ;",
     "work:": "<step> <input> <word> <signer-role> ;",
     "join:": "<step> <left-work> <right-work> <word> ;",
@@ -230,6 +289,8 @@ def capabilities():
             "file-ext": wordset(FILE_EXT_WORDS, FILE_EXT_SOURCE, set(), True),
         },
         "bsv": {"source": sorted(BSV_SOURCE), "script": sorted(BSV_SCRIPT),
+                "native_opcodes": sorted(name.upper() for name in NATIVE_OPCODES),
+                "native_opcode_import": "REQUIRE BSV",
                 "source_syntax": {
                     "position": "top-level",
                     "reserved_word_prefix": "bsv-",

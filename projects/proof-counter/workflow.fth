@@ -1,3 +1,5 @@
+REQUIRE BSV
+
 REQUIRE counter.fth
 
 workflow-input: current u32 ;

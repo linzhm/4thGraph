@@ -11,11 +11,12 @@ from fourthgraph import PROJECT_VERSION
 from fourthgraph.bsv.script import asm, number
 
 from fourthgraph.compiler.ranges import NUMERIC_TYPES, RangeType, Slot, primitive_outputs, range_bound
+from fourthgraph.compiler.stack_schedule import emit_steps
 from fourthgraph.stdlib import LibraryImport, interface_digest, p256_vocabulary, read_library, required_source
 from fourthgraph.workflow.transaction_graph import CompileError, ParentOutput, Port, StageGraph, StageNode, Template, TransactionGraph
 from fourthgraph.compiler.wordsets import (
     BSV_SOURCE, CORE_EXT_WORDS, CORE_WORDS, FILE_EXT_SOURCE, FILE_EXT_WORDS, HOST_WORDS,
-    LEGACY_IMPLICIT_END, NAMED_LITERALS, OPTIONAL_WORDSETS, PRIMITIVES, SHUFFLES, TYPES, WRAP_U32,
+    LEGACY_IMPLICIT_END, NAMED_LITERALS, NATIVE_OPCODES, OPTIONAL_WORDSETS, PRIMITIVES, SHUFFLES, TYPES, WRAP_U32,
     Literal, Primitive, cell_literal,
 )
 
@@ -86,7 +87,7 @@ class Tokens:
         self.offset += name.end()
         return name[1]
 
-    def stack_effect(self):
+    def stack_effect(self, *, require_separator=True):
         opening = re.match(r"\s*\((?=\s)", self.source[self.offset:])
         if opening is None:
             return None
@@ -95,7 +96,7 @@ class Tokens:
         if end < 0:
             return None
         terms = self.source[start:end].casefold().split()
-        if "--" not in terms:
+        if require_separator and "--" not in terms:
             return None
         self.offset = end + 1
         return terms
@@ -107,12 +108,19 @@ class Tokens:
 
 TOKEN = re.compile(r"'[ -~]'(?=\s|$)|\S+")
 CONTROL = {":", ";", "if", "else", "then"}
+BUILTIN_WORDS = (CONTROL | BSV_SOURCE | FILE_EXT_SOURCE | PRIMITIVES.keys() | SHUFFLES.keys()
+                 | NAMED_LITERALS.keys() | HOST_WORDS.keys() | {"bytes-hex", "check-range"})
 RESERVED_STEPS = {"deploy", "split", "fused"}
 
 
 @dataclass(frozen=True)
 class Shuffle:
     name: str
+
+
+@dataclass(frozen=True)
+class NamedInput:
+    index: int
 
 
 @dataclass(frozen=True)
@@ -282,7 +290,7 @@ def unavailable(token):
     return token.error(f"unknown Forth word {token.text!r}")
 
 
-def body(tokens, stack, words, opener, ranges):
+def body(tokens, stack, words, opener, ranges, *, native_opcodes=False):
     instructions = []
     host_uses = {}
     for token in tokens:
@@ -292,16 +300,18 @@ def body(tokens, stack, words, opener, ranges):
         if name == "if":
             transform(stack, (Slot.of("cell"),), (), token)
             other = list(stack)
-            yes, yes_host, stop = body(tokens, stack, words, token, ranges)
+            yes, yes_host, stop = body(tokens, stack, words, token, ranges, native_opcodes=native_opcodes)
             no, no_host = (), ()
             if stop.name == "else":
-                no, no_host, stop = body(tokens, other, words, token, ranges)
+                no, no_host, stop = body(tokens, other, words, token, ranges, native_opcodes=native_opcodes)
             if stop.name != "then" or [slot.kind for slot in stack] != [slot.kind for slot in other]:
                 raise token.error("IF must end in THEN and leave equal stack types on both branches")
             stack[:] = [a.merge(b) for a, b in zip(stack, other, strict=True)]
             instructions.append(Located(Conditional(yes, no), token))
             host_uses.update(dict.fromkeys((*yes_host, *no_host)))
             continue
+        if not native_opcodes and name in NATIVE_OPCODES and name not in words:
+            raise token.error(f"{token.text!r} requires REQUIRE BSV")
         if name in SHUFFLES and name not in words:
             count, order, _ = SHUFFLES[name]
             entries = stack[-count:]
@@ -375,7 +385,7 @@ def check_word(words, at, takes, gives):
 
 
 class SourceCompiler:
-    def __init__(self, source, *, vocabulary=None, stack_types=TYPES, backend=None, source_path=None):
+    def __init__(self, source, *, vocabulary=None, stack_types=TYPES, backend=None, source_path=None, bindings=None):
         self.source = source
         self.tokens = None
         self.words = dict(vocabulary or {})
@@ -390,6 +400,7 @@ class SourceCompiler:
         self.stack_types = stack_types
         self.ranges = {}
         self.effects = {}
+        self.bindings = {name.casefold(): value for name, value in (bindings or {}).items()}
         self.work = {}
         self.gate = None
         self.join = None
@@ -400,6 +411,8 @@ class SourceCompiler:
         self.stages = []
         self.relation = None
         self.read_source(source, self.root_source)
+        if self.bindings:
+            raise CompileError(f"unknown byte parameters: {', '.join(sorted(self.bindings))}")
         if self.effects:
             at, _, _ = next(iter(self.effects.values()))
             raise at.error(f"stack effect for {at.text!r} has no following definition")
@@ -411,6 +424,10 @@ class SourceCompiler:
     @property
     def library_imports(self):
         return tuple(self.libraries[name] for name in sorted(self.libraries))
+
+    @property
+    def native_opcodes(self):
+        return "std/bsv" in self.libraries or getattr(self.tokens, "module", None) == "std/bsv"
 
     def read_source(self, source, path, label=None):
         previous_tokens, previous_path = self.tokens, self.source_path
@@ -520,6 +537,65 @@ class SourceCompiler:
             raise base.error(f"range {name!r} exceeds the value range of {base.name}")
         self.ranges[name] = spec
 
+    def declare_bytes_param(self, at):
+        name = named_token(self.tokens, at, "byte parameter name")
+        if name.name.startswith("bsv-") or name.name in self.words or name.name in BUILTIN_WORDS:
+            raise name.error(f"invalid or duplicate byte parameter {name.text!r}")
+        width = required(self.tokens, at, "byte parameter size")
+        try:
+            size = range_bound(width.text)
+        except ValueError as error:
+            raise width.error(str(error)) from error
+        if not 0 <= size < 1 << 32:
+            raise width.error("byte parameter size must be an unsigned 32-bit integer")
+        end = required(self.tokens, at, "';'")
+        if end.name != ";":
+            raise end.error("expected ';' after byte parameter size")
+        value = self.bindings.pop(name.name, None)
+        if value is None:
+            raise name.error(f"missing binding for byte parameter {name.text!r}")
+        if not isinstance(value, bytes) or len(value) != size:
+            raise name.error(f"byte parameter {name.text!r} requires exactly {size} bytes")
+        body = (Located(Literal("bytes", value), name),)
+        self.words[name.name] = Word((), ("bytes",), body, "script", name=name.name)
+        self.definitions[name.name] = name
+
+    def define_lock(self, at):
+        name = named_token(self.tokens, at, "lock name")
+        if name.name.startswith("bsv-") or name.name in CONTROL | BSV_SOURCE | FILE_EXT_SOURCE:
+            raise name.error(f"invalid or reserved lock name {name.text!r}")
+        terms = self.tokens.stack_effect(require_separator=False)
+        if terms is None:
+            raise name.error("expected named lock inputs in parentheses")
+        inputs = {}
+        takes = []
+        for index, term in enumerate(terms):
+            label, _, kind = term.partition(":")
+            if (not re.fullmatch(r"[a-z][a-z0-9_-]*", label) or label in inputs or label in BUILTIN_WORDS
+                    or label.startswith("bsv-") or label in self.words
+                    or kind not in self.stack_types and kind not in self.ranges):
+                raise name.error(f"invalid or duplicate named lock input {term!r}")
+            ranges = (self.ranges[kind],) if kind in self.ranges else ()
+            inputs[label] = Word((), (kind,), (Located(NamedInput(index), name),), "script", ranges=ranges)
+            takes.append(kind)
+        stack = []
+        instructions, host_uses, stop = body(self.tokens, stack, self.words | inputs, at, self.ranges,
+                                            native_opcodes=self.native_opcodes)
+        if stop.name != ";":
+            raise stop.error(f"unexpected {stop.text!r}, expected ';'")
+        if host_uses:
+            token = host_uses[0]
+            raise token.error(f"host-only word {token.text!r} cannot run in a lock")
+        if stack and [slot.kind for slot in stack] != ["cell"]:
+            raise name.error("a lock must leave one cell or end with verify")
+        takes = tuple(takes)
+        ranges = tuple(self.ranges[kind] for kind in dict.fromkeys(takes) if kind in self.ranges)
+        operation = lower_lock(instructions, takes, name)
+        self.words[name.name] = Word(takes, ("cell",), (Located(operation, name),), "script", name=name.name,
+                                     ranges=ranges)
+        self.definitions[name.name] = name
+        self.imported_words.pop(name.name, None)
+
     def define(self, at):
         name = required(self.tokens, at, "definition name")
         declaration = self.effects.pop(name.name, None)
@@ -539,7 +615,8 @@ class SourceCompiler:
         ranges = tuple(self.ranges[kind] for kind in dict.fromkeys((*takes, *gives)) if kind in self.ranges)
         signature = Word(takes, gives, (), "script", ranges=ranges)
         stack = list(signature.slots(takes))
-        instructions, host_uses, stop = body(self.tokens, stack, self.words, at, self.ranges)
+        instructions, host_uses, stop = body(self.tokens, stack, self.words, at, self.ranges,
+                                            native_opcodes=self.native_opcodes)
         if stop.name != ";":
             raise stop.error(f"unexpected {stop.text!r}, expected ';'")
         outputs = signature.slots(gives)
@@ -561,6 +638,10 @@ class SourceCompiler:
                 self.effect(token)
             case "range:":
                 self.declare_range(token)
+            case "bytes-param:":
+                self.declare_bytes_param(token)
+            case "lock:":
+                self.define_lock(token)
             case ":":
                 self.define(token)
             case "work:":
@@ -894,7 +975,15 @@ def schedule(program, mode="auto", *, available_data=None, available_authorizers
     return Plan(mode, program, templates, tuple(blockers), tuple(reasons), stage_graph=graph)
 
 
-def evaluate(word, *values, context=None):
+def run_primitive(instruction, args, *, context=None, checksig=None):
+    if instruction.location == "host":
+        return instruction.run(context, *args)
+    if instruction.requires_checksig:
+        return instruction.run(checksig, *args)
+    return instruction.run(*args)
+
+
+def evaluate(word, *values, context=None, checksig=None):
     if len(values) != len(word.takes):
         raise ValueError("incorrect argument count for Forth word")
     for kind, slot, value in zip(word.takes, word.slots(word.takes), values, strict=True):
@@ -922,10 +1011,7 @@ def evaluate(word, *values, context=None):
             stack[-count:] = [entries[i] for i in order]
         else:
             start = len(stack) - len(instruction.takes)
-            args = stack[start:]
-            if instruction.location == "host":
-                args = [context, *args]
-            stack[start:] = instruction.run(*args)
+            stack[start:] = run_primitive(instruction, stack[start:], context=context, checksig=checksig)
     return tuple(stack)
 
 
@@ -965,8 +1051,101 @@ def bounded_expansion(*roots, limit):
             pending.append((body, children))
             pending.extend((child, None) for child in children if id(child) not in sizes)
         else:
-            sizes[id(body)] = min(limit + 1, len(body) + sum(sizes[id(child)] for child in children))
+            nodes = (item.instruction if isinstance(item, Located) else item for item in body)
+            cost = sum(node.expansion_cost if isinstance(node, Primitive) else 1 for node in nodes)
+            sizes[id(body)] = min(limit + 1, cost + sum(sizes[id(child)] for child in children))
     return min(limit + 1, sum(sizes[id(body)] for body in roots))
+
+
+@dataclass(frozen=True)
+class LockBlock:
+    steps: tuple
+    returns: tuple
+
+    def uses_before(self, slot):
+        values = {*self.returns, *(arg for _, args, _ in self.steps for arg in args)}
+        return {value for value in values if value < slot}
+
+    def lower(self, inputs):
+        steps = [(node.lower() if isinstance(node, Literal) else node.code, args, results)
+                 for node, args, results in self.steps]
+        return emit_steps(inputs, steps, self.returns, compact=True)
+
+    def run(self, inputs, values, checksig):
+        slots = dict(zip(inputs, values, strict=True))
+        for node, args, results in self.steps:
+            outputs = ((node.value,) if isinstance(node, Literal)
+                       else run_primitive(node, (slots[index] for index in args), checksig=checksig))
+            slots.update(zip(results, outputs, strict=True))
+        return tuple(slots[index] for index in self.returns)
+
+
+@dataclass(frozen=True)
+class LockBranch:
+    inputs: tuple
+    yes: LockBlock
+    no: LockBlock
+    code: bytes
+
+    location = "script"
+    requires_checksig = True
+
+    def run(self, checksig, *values):
+        branch = self.yes if values[-1] else self.no
+        return branch.run(self.inputs, values[:-1], checksig)
+
+
+def plan_lock_block(instructions, stack, next_slot):
+    steps = []
+    for node, _ in expanded(instructions):
+        if isinstance(node, Conditional):
+            flag = stack.pop()
+            before_branch = next_slot
+            yes, next_slot = plan_lock_block(node.yes, list(stack), next_slot)
+            no, next_slot = plan_lock_block(node.no, list(stack), next_slot)
+            inputs = tuple(sorted(yes.uses_before(before_branch) | no.uses_before(before_branch)))
+            code = (asm("OP_0NOTEQUAL OP_IF") + yes.lower(inputs)
+                    + asm("OP_ELSE") + no.lower(inputs) + asm("OP_ENDIF"))
+            results = tuple(range(next_slot, next_slot + len(yes.returns)))
+            steps.append((LockBranch(inputs, yes, no, code), (*inputs, flag), results))
+            stack[:] = results
+            next_slot += len(results)
+            continue
+        if isinstance(node, NamedInput):
+            stack.append(node.index)
+            continue
+        if isinstance(node, Shuffle):
+            count, order, _ = SHUFFLES[node.name]
+            entries = stack[-count:]
+            stack[-count:] = [entries[i] for i in order]
+            continue
+        arity, outputs = (0, 1) if isinstance(node, Literal) else (len(node.takes), len(node.gives))
+        start = len(stack) - arity
+        results = tuple(range(next_slot, next_slot + outputs))
+        steps.append((node, tuple(stack[start:]), results))
+        stack[start:] = results
+        next_slot += outputs
+    return LockBlock(tuple(steps), tuple(stack)), next_slot
+
+
+def lower_lock(instructions, takes, at):
+    cost = bounded_expansion(instructions, limit=MAX_EXPANSION)
+    if cost > MAX_EXPANSION:
+        raise at.error(f"lock {at.text!r} exceeds the {MAX_EXPANSION}-operation expansion budget")
+    inputs = tuple(range(len(takes)))
+    block, _ = plan_lock_block(instructions, [], len(inputs))
+    if not block.returns:
+        if not block.steps or block.steps[-1][0] is not PRIMITIVES["op_verify"]:
+            raise at.error("a lock must leave one cell or end with verify")
+        # Script uses the terminal assertion's operand as the final result.
+        _, returns, _ = block.steps[-1]
+        block = LockBlock(block.steps[:-1], returns)
+
+    def run(checksig, *values):
+        return block.run(inputs, values, checksig)
+
+    return Primitive(takes, ("cell",), block.lower(inputs), run, "named Script verification", may_fail=True,
+                     requires_checksig=True, expansion_cost=cost)
 
 
 def check_word_expansion(word, max_expansion):

@@ -7,6 +7,12 @@ from heapq import nsmallest
 from fourthgraph.bsv.script import asm, number
 
 COMMUTATIVE = frozenset(map(asm, ("OP_ADD", "OP_MUL", "OP_MIN", "OP_MAX", "OP_NUMEQUAL", "OP_EQUAL")))
+VERIFY = asm("OP_VERIFY")
+# These pairs have the same pass/fail behavior in Genesis and Chronicle.
+VERIFY_FORMS = {
+    asm("OP_EQUAL"): asm("OP_EQUALVERIFY"),
+    asm("OP_CHECKSIG"): asm("OP_CHECKSIGVERIFY"),
+}
 
 
 @dataclass(frozen=True)
@@ -55,7 +61,7 @@ class Graph:
         uses.update(arg for _, node in live for arg in node.args)
         stack = Layout(self.inputs, uses)
         for slot, node in live:
-            stack.execute(slot, node, last_use=last_use, compact=compact)
+            stack.execute(node.script, node.args, (slot,), last_use=last_use, compact=compact)
         return stack.finish(returns, last_use=last_use)
 
     def search_order(self, returns, *, width=96):
@@ -77,7 +83,7 @@ class Graph:
                     if done & flag or dependencies & ~done:
                         continue
                     candidate = Layout(stack.slots, stack.uses.copy())
-                    candidate.execute(value, node, last_use=True, compact=True)
+                    candidate.execute(node.script, node.args, (value,), last_use=True, compact=True)
                     candidate.code = stack.code + candidate.code
                     state = done | flag, tuple(candidate.slots)
                     previous = candidates.get(state)
@@ -89,22 +95,44 @@ class Graph:
         return min((source_order, *(stack.finish(returns, last_use=True) for _, stack in beam)), key=len)
 
 
+def fuse_verifications(steps, uses):
+    fused = []
+    for script, args, results in steps:
+        if script == VERIFY and len(args) == 1 and not results and fused:
+            previous, operands, flag = fused[-1]
+            if flag == args and uses[args[0]] == 1 and previous in VERIFY_FORMS:
+                fused[-1] = (VERIFY_FORMS[previous], operands, ())
+                continue
+        fused.append((script, args, results))
+    return fused
+
+
+def emit_steps(inputs, steps, returns, *, last_use=True, compact=False):
+    """Schedule already ordered operations with any number of results."""
+    uses = Counter(returns)
+    uses.update(arg for _, args, _ in steps for arg in args)
+    stack = Layout(inputs, uses)
+    for script, args, results in fuse_verifications(steps, uses):
+        stack.execute(script, args, results, last_use=last_use, compact=compact)
+    return stack.finish(returns, last_use=last_use)
+
+
 class Layout:
     def __init__(self, inputs, uses):
         self.slots = list(inputs)
         self.uses = uses
         self.code = bytearray()
 
-    def execute(self, slot, node, *, last_use, compact):
-        if compact and last_use and 0 < len(node.args) <= 2:
-            self.arrange(node.args, commutative=node.script in COMMUTATIVE)
+    def execute(self, script, args, results, *, last_use, compact):
+        if compact and last_use and 0 < len(args) <= 2:
+            self.arrange(args, commutative=script in COMMUTATIVE)
         else:
-            for staged, operand in enumerate(node.args):
+            for staged, operand in enumerate(args):
                 self.access(operand, staged, last_use=last_use)
-        if node.args:
-            del self.slots[-len(node.args):]
-        self.code.extend(node.script)
-        self.slots.append(slot)
+        if args:
+            del self.slots[-len(args):]
+        self.code.extend(script)
+        self.slots.extend(results)
 
     def finish(self, returns, *, last_use):
         if tuple(self.slots) != tuple(returns):

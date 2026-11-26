@@ -24,6 +24,5 @@ pending-resources terminal-resources one-item two-items
   relation-ref decide bob forkid-context direct-script stage: settle
 
 root-resources emit-roots
-settle emit-stage
-prepare emit-stage
+prepare settle 2 emit-stages
 BASE !
