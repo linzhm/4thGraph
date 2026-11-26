@@ -3,6 +3,7 @@
 import argparse
 from collections.abc import Callable
 from dataclasses import asdict, dataclass
+from hashlib import sha256
 import json
 from pathlib import Path
 
@@ -10,7 +11,9 @@ from shared.pushtx import PUBLIC, binding_der
 from shared.script import asm, decode_num, encode_num, number, push
 from shared.transaction import FORKID, SIGHASH_ALL, Input, Output, Transaction, hash256, preimage_forkid
 
-from compiler import PROJECT_DESCRIPTION, PROJECT_NAME, CompileError, Plan, SourceCompiler, Template, evaluate, schedule
+from compiler import (
+    PROJECT_DESCRIPTION, PROJECT_NAME, PROJECT_VERSION, CompileError, Plan, SourceCompiler, Template, evaluate, schedule,
+)
 from lowering import BASELINE, OPTIMIZATIONS, compile_word
 from wordsets import U32, capabilities, push_value
 
@@ -22,6 +25,7 @@ FLAG_BYTES = FLAG.to_bytes(4, "little")
 BINDING_CODE = asm("OP_CHECKSIG")
 ZERO_INDEX = bytes(4)
 ROOT_VALUE, WORK_VALUE, RESULT_VALUE, TERMINAL_VALUE = 1_020_000, 507_500, 502_500, 1_000_000
+GATED_FORK_VALUE = ROOT_VALUE - 1_000
 RESULT_WIDTH = 5  # Four unsigned payload bytes plus a zero sign byte.
 PREVOUTS_HASH = 4
 CURRENT_OUTPOINT = 68
@@ -263,9 +267,15 @@ class Contracts:
         self.words = {step.name: compile_word(step.word, optimization) for step in (a, b)}
         self.words[plan.program.join_name] = compile_word(plan.program.join, optimization)
         select_route = self.words[plan.program.join_name].script
+        gate = plan.program.gate
+        guard = b""
+        if gate is not None:
+            self.words[gate.name] = compile_word(gate.word, optimization)
+            guard = validate_u32() + self.words[gate.name].script + asm("OP_VERIFY")
         if plan.mode == "fused":
-            # Entry x y sigB sigA P. Both values remain in the same Script stack.
-            code = (begin(self.versions) + single_input() + authorize(keys[a.owner]) + authorize(keys[b.owner])
+            # Optional z is above x/y, and its authorization follows both workers.
+            authorizations = b"".join(authorize(keys[owner]) for owner in self.templates["fused"].authorizers)
+            code = (begin(self.versions) + single_input() + authorizations + guard
                     + validate_u32() + asm("OP_SWAP") + validate_u32() + self.words[a.name].script
                     + asm("OP_SWAP") + self.words[b.name].script + select_route + route_check(self.terminals) + finish())
         else:
@@ -275,8 +285,14 @@ class Contracts:
                                              self.data_prefix, self.versions))
                 for i, step in enumerate(plan.program.work)
             )
-            code = (begin(self.versions) + single_input() + authorize(keys[plan.program.operator])
+            separate_gate = gate is not None and gate.name in self.templates
+            fork_guard = b"" if separate_gate else guard
+            code = (begin(self.versions) + single_input() + authorize(keys[plan.program.operator]) + fork_guard
                     + push(output_hash(self.work_outputs)) + check_field(OUTPUTS_HASH) + finish())
+            if separate_gate:
+                self.fork_output = Output(GATED_FORK_VALUE, code)
+                code = (begin(self.versions) + single_input() + authorize(keys[gate.owner]) + guard
+                        + push(output_hash((self.fork_output,))) + check_field(OUTPUTS_HASH) + finish())
         self.root = Output(ROOT_VALUE, code)
 
     def describe(self):
@@ -285,6 +301,8 @@ class Contracts:
 
         spec = {
             "project": PROJECT_NAME,
+            "compiler_version": PROJECT_VERSION,
+            "schema_version": 1,
             "target": self.target,
             "optimization": self.optimization,
             "join_witness": self.join_witness,
@@ -296,6 +314,8 @@ class Contracts:
             "enabled_optional_wordsets": self.plan.program.optional_wordsets,
             "schedule": self.plan.mode,
             "fusion_blockers": self.plan.fusion_blockers,
+            "boundary_reasons": self.plan.boundary_reasons,
+            "topology": "gated-parallel" if self.plan.program.gate is not None else "parallel",
             "estimated_cost": estimate_cost(self),
             "templates": [asdict(template) for template in self.plan.templates],
             "deploy_output": describe_output(self.root),
@@ -310,6 +330,8 @@ class Contracts:
                 data_output={"satoshis": 0, "script_prefix_hex": self.data_script_prefix.hex(),
                              "suffix": "u32 ScriptNum encoded in five bytes"},
             )
+            if self.plan.program.gate is not None and self.plan.program.gate.name in self.templates:
+                spec["gated_fork_output"] = describe_output(self.fork_output)
         return spec
 
     def result_output(self, split):
@@ -345,14 +367,20 @@ class Contracts:
         previous = tuple(UTXO(completed[ref.step], ref.vout) for ref in template.inputs)
         inputs = tuple(Input(utxo.outpoint.txid, utxo.outpoint.vout) for utxo in previous)
         a, b = self.plan.program.work
+        gate = self.plan.program.gate
+        gate_payload = ()
+        if gate is not None and gate.name in template.executes:
+            gate_payload = (encode_num(input_value(data, gate.input)),)
         if name == "fused":
             x, y = input_value(data, a.input), input_value(data, b.input)
             result_a, = evaluate(a.word, x)
             result_b, = evaluate(b.word, y)
             route, = evaluate(self.plan.program.join, result_a, result_b)
-            outputs, payload = (self.terminals[route],), ((encode_num(x), encode_num(y)),)
+            outputs, payload = (self.terminals[route],), ((encode_num(x), encode_num(y), *gate_payload),)
         elif name == "split":
-            outputs, payload = self.work_outputs, ((),)
+            outputs, payload = self.work_outputs, (gate_payload,)
+        elif gate is not None and name == gate.name:
+            outputs, payload = (self.fork_output,), (gate_payload,)
         elif name == self.plan.program.join_name:
             parents = tuple(utxo.parent for utxo in previous)
             route, = evaluate(self.plan.program.join, *(self.result_value(parent) for parent in parents))
@@ -385,7 +413,10 @@ def estimate_cost(contracts):
     depths = {"deploy": 1}
     rows = {"deploy": {"bytes": len(deploy.serialize()), "signature_checks": 1,
                        "depends_on": [], "decision": "fund the first lock"}}
-    data = {step.input: 0 for step in contracts.plan.program.work}
+    program = contracts.plan.program
+    data = {step.input: 0 for step in program.work}
+    if program.gate is not None:
+        data[program.gate.input] = 0
     for step in contracts.plan.templates:
         draft = contracts.prepare(step.name, done, data)
         tx = draft.seal(lambda _: fake_der)
@@ -395,11 +426,13 @@ def estimate_cost(contracts):
             ("terminal",): "choose the terminal under the verified route",
             ("work", "work"): "create separately spendable work outputs",
             ("result", "data"): "materialize a result for the join",
+            ("split-lock",): "verify the gate before creating a separately authorized fork",
         }[step.outputs]
         rows[step.name] = {
             "bytes": len(tx.serialize()),
             "signature_checks": len(step.inputs) + len(step.authorizers),
             "depends_on": [asdict(ref) for ref in step.inputs],
+            "executes": step.executes,
             "decision": decision,
         }
     return {
@@ -441,6 +474,7 @@ def main():
     action = cli.add_mutually_exclusive_group()
     action.add_argument("--capabilities", action="store_true", help="list the supported Forth and BSV words")
     action.add_argument("--entry", help="compile one annotated Forth word to Script without a transaction plan")
+    cli.add_argument("--version", action="version", version=f"%(prog)s {PROJECT_VERSION}")
     cli.add_argument("--mode", choices=("auto", "fused", "split"), default="auto")
     cli.add_argument("--target", choices=TARGETS, default=DEFAULT_TARGET, help="permitted transaction versions")
     cli.add_argument("--optimize", choices=OPTIMIZATIONS, default=BASELINE)
@@ -452,7 +486,9 @@ def main():
     cli.add_argument("--available-authorizers", nargs="*")
     args = cli.parse_args()
     if args.capabilities:
-        print(json.dumps({"project": PROJECT_NAME, "description": PROJECT_DESCRIPTION, **capabilities(), "targets": {
+        print(json.dumps({"project": PROJECT_NAME, "compiler_version": PROJECT_VERSION, "description": PROJECT_DESCRIPTION,
+                          **capabilities(), "optimizations": OPTIMIZATIONS, "join_witnesses": JOIN_WITNESSES,
+                          "topologies": ("parallel", "gated-parallel"), "targets": {
             name: {"transaction_versions": versions, "era": era} for name, (versions, era) in TARGETS.items()
         }}, indent=2))
         return
@@ -461,13 +497,15 @@ def main():
     if args.entry is None and (args.keys is None or args.task_id is None):
         cli.error("transaction builds require --keys and --task-id")
     try:
-        source = SourceCompiler(args.source.read_text())
+        source_bytes = args.source.read_bytes()
+        source = SourceCompiler(source_bytes.decode())
         if args.entry is not None:
             word = source.words.get(args.entry.casefold())
             if word is None:
                 raise CompileError(f"undefined entry word {args.entry!r}")
             compiled = compile_word(word, args.optimize)
-            result = {"project": PROJECT_NAME, "entry": args.entry, "takes": word.takes, "gives": word.gives,
+            result = {"project": PROJECT_NAME, "compiler_version": PROJECT_VERSION, "schema_version": 1,
+                      "entry": args.entry, "takes": word.takes, "gives": word.gives,
                       "enabled_optional_wordsets": source.optional_wordsets, "optimization": args.optimize,
                       "script_hex": compiled.script.hex(), **compiled.describe()}
         else:
@@ -480,11 +518,14 @@ def main():
             result = contract.describe()
             if args.explain:
                 result["schedule_explanation"] = explanation
+        result["source_sha256"] = sha256(source_bytes).hexdigest()
+        canonical = json.dumps(result, sort_keys=True, separators=(",", ":")).encode()
+        result["artifact_sha256"] = sha256(canonical).hexdigest()
     except CompileError as error:
         cli.error(f"{args.source}: {error}")
     except (OSError, ValueError) as error:
         cli.error(str(error))
-    print(json.dumps(result, indent=2))
+    print(json.dumps(result, indent=2, sort_keys=True))
 
 
 if __name__ == "__main__":

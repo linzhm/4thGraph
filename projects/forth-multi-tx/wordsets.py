@@ -169,7 +169,7 @@ CORE_SOURCE = {":", ";", "("}
 CORE_EXT_SOURCE = {"\\"}
 CORE_SCRIPT = CORE_PRIMITIVES.keys() | CORE_SHUFFLES.keys() | {"if", "else", "then"}
 CORE_EXT_SCRIPT = CORE_EXT_PRIMITIVES.keys() | CORE_EXT_SHUFFLES.keys() | CORE_EXT_LITERALS.keys()
-BSV_SOURCE = {"bsv-use", "bsv-effect:", "work:", "join:", "split-authority:", "independent-submit"}
+BSV_SOURCE = {"bsv-use", "bsv-effect:", "work:", "join:", "gate:", "split-authority:", "independent-submit"}
 BSV_SCRIPT = BSV_PRIMITIVES.keys() | ROUTES.keys() | {"bytes-hex"}
 OPTIONAL_WORDSETS = {"core-ext"}
 

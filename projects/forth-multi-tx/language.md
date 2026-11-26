@@ -35,13 +35,15 @@ bsv-use <optional-wordset>
 bsv-effect: <word> <input-types...> -- <output-types...> ;
 work: <step> <input> <word> <signer-role>
 join: <step> <left-work> <right-work> <word>
+gate: <step> <input> <word> <signer-role>
 split-authority: <signer-role>
-independent-submit <work-step>
+independent-submit <gate-or-work-step>
 ```
 
 - `bsv-effect:` 为随后同名的冒号定义声明静态栈效果。输入和输出的顺序均从栈底写到栈顶。
 - `work:` 声明外部数据名、计算词和分支签名角色。计算词必须具有 `u32 -- u32` 效果，并能编译成 Script。
 - `join:` 按顺序消费两个不同的工作步骤。汇合词具有 `u32 u32 -- route` 效果。声明次序决定结果的逻辑次序，以及拆分的工作输出索引与汇合的输入次序。
+- `gate:` 可选。其词具有 `u32 -- cell` 效果，只有非零结果允许继续。完整融合先验证条件，再运行分支和汇合。拆分时，如果门和拆分的授权角色相同、数据和签名可同时取得且没有独立边界，则同一笔交易执行两步。独立门只创建已承诺的拆分锁，拆分随后绑定 `gate-step:0`。同一规则适用于两个版本的交易。
 - `split-authority:` 指定创建工作输出的签名角色。拆分完成后，每支只需对应的签名角色即可提交。
 - `independent-submit` 将工作步骤声明为可独立提交的交易边界。存在该约束时，自动调度选择拆分，强制融合报告源码行号。编译器也接受原型曾使用的后缀写法 `<work-step> independent-submit`。
 
@@ -49,7 +51,9 @@ independent-submit <work-step>
 
 ## 构建接口
 
-`--explain` 报告候选的约束、选择和每笔交易的符号父输出。成本估算使用报告中列出的固定见证长度和数据样本，比较整条路径字节、单笔最大签名验证次数及依赖深度。双引擎复放另行测量真实交易。
+v0.1.0 构建 JSON 采用 `schema_version` 1，记录编译器版本、目标交易版本集合、优化规则、符号输入、被每笔交易执行的源码步骤和脚本字节。`source_sha256` 为源文件原始字节的 SHA-256。核对 `artifact_sha256` 时移除该字段，按键排序，保留数组顺序，将非 ASCII 字符写为 JSON 转义并移除分隔符两侧的空白，再对这些 UTF-8 字节计算 SHA-256。构建结果可在签名前复现，真实父交易和签名仍由实例化阶段绑定。
+
+`--explain` 报告候选的约束、选择和每笔交易的符号父输出。成本估算使用报告中列出的固定见证长度和数据样本。自动选择先排除不符合约束的候选，再依次按整条路径字节、单笔最大签名验证次数和依赖深度排序。双引擎复放另行测量真实交易。
 
 `--join-witness shared` 每个汇合输入只放一次两笔结果交易共用的锁脚本后缀。Script 先按原顺序拼回两笔完整交易，再核对两者实际 outpoint、同一拆分来源和后继输出。`full` 使用原始见证布局。
 

@@ -14,7 +14,7 @@ from shared.transaction import Input, Transaction
 from compiler import CompileError, SourceCompiler, evaluate, lower, parse, schedule
 from lowering import compile_word
 from protocol import Contracts, compile_candidates, invalidated
-from replay import EXAMPLE, TASK_ID, TestKeys
+from replay import EXAMPLE, GATED_EXAMPLE, TASK_ID, TestKeys
 from wordsets import CELL_SIGN, U32, capabilities
 
 SOURCE = EXAMPLE.read_text()
@@ -216,6 +216,33 @@ class ProtocolTests(unittest.TestCase):
         _, report = compile_candidates(constrained, self.keys.public, TASK_ID, **options)
         self.assertEqual(report["selected"], "split")
         self.assertIn("independent-submit a", report["candidates"]["fused"]["reason"])
+
+    def test_gated_topology_local_fusion_and_rebinding(self):
+        source = GATED_EXAMPLE.read_text()
+        plan = schedule(parse(source), "split")
+        self.assertEqual(plan.templates[0].executes, ("qualify", "split"))
+        self.assertEqual(schedule(parse(source), "fused").templates[0].executes, ("qualify", "a", "b", "route"))
+        delayed = schedule(parse(source), "split", available_data=("x", "y"))
+        self.assertEqual(delayed.templates[0].executes, ("qualify",))
+        self.assertIn("unavailable at split", delayed.boundary_reasons[0])
+        plan = schedule(parse(source + "\nindependent-submit qualify\n"), "split")
+        self.assertEqual(plan.templates[1].inputs[0].step, "qualify")
+        contracts = Contracts(plan, self.keys.public, TASK_ID, target="both", optimization="stack")
+        done = {"deploy": Transaction((Input(bytes(32), 0),), (contracts.root,))}
+        gate = contracts.prepare("qualify", done, {"z": 2}, version=1)
+        done["qualify"] = gate.seal(self.keys.sign)
+        self.assertTrue(chain_verdict(done["qualify"], gate.parents))
+        wrong = contracts.prepare("qualify", done, {"z": 5}, version=1)
+        self.assertFalse(chain_verdict(wrong.seal(self.keys.sign), wrong.parents))
+        prior = contracts.prepare("split", done, version=2)
+        replacement = replace(gate, tx=replace(gate.tx, locktime=1)).seal(self.keys.sign)
+        self.assertEqual(invalidated(plan, "qualify", done["qualify"], replacement),
+                         {"split": ("operator",), "a": ("alice",), "b": ("bob",), "route": ()})
+        changed = contracts.prepare("split", {**done, "qualify": replacement}, version=2)
+        self.assertNotEqual(prior.signing_requests()[0].outpoint, changed.signing_requests()[0].outpoint)
+        signature = self.keys.sign(prior.signing_requests()[0])
+        self.assertFalse(chain_verdict(changed.seal(lambda _: signature), changed.parents))
+        self.assertTrue(chain_verdict(changed.seal(self.keys.sign), changed.parents))
 
     def test_exact_version(self):
         cases = (("forkid-v1", 1, 5, 2), ("chronicle-v2", 2, 2, 1))

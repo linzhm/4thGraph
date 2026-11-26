@@ -2,6 +2,8 @@
 
 A Forth compiler for BSV Script and multi-transaction workflows.
 
+当前构建版本为 **v0.1.0**。项目位于 BSV Script Lab 仓库内，编译与复放产物可写入 `projects/forth-multi-tx/build/`。
+
 同一份 Forth 源码可以生成融合版和拆分版。示例计算 `a = 2x`、`b = y + 1`，两支结果和汇合的和都按 `u32` 表示。回绕后的和小于 20 时走复核，其余走结算。两种后继各锁给一个配置的公钥。编译器以 Forth 2012 Core 为语义基线，`+` 使用 64 位 cell，`u32+` 固定按 32 位回绕。 [示例源码](example.fth) · [语言与 BSV 扩展规范](language.md)
 
 ## 复放与编译
@@ -59,6 +61,14 @@ PYTHONPATH=. python projects/forth-multi-tx/protocol.py --capabilities
 
 ## 交易与验证
 
+`example.fth` 是并行双分支。`gated.fth` 在分支前有一道授权条件。后者可以完整融合、把条件与拆分合并，或将条件交易独立提交后由拆分绑定其输出。`independent-submit qualify` 强制最后一种计划。两个示例共用汇合验证和版本选择。 [带门的源码](gated.fth)
+
+```sh
+PYTHONPATH=. bash shared/verify_node.sh --profile default -- \
+  python projects/forth-multi-tx/replay.py --topology gated-parallel --target both \
+  --optimize stack --join-witness shared --output projects/forth-multi-tx/build/gated.json
+```
+
 ```mermaid
 flowchart LR
     D1[部署] --> F[双签 → 计算 a 和 b → 选择后继]
@@ -80,6 +90,10 @@ flowchart LR
 各锁通过固定 `OP_CODESEPARATOR` 后缀的 PUSHTX 验证 ForkID ALL 原像。绑定依赖哈希抗碰撞和原像抗性。脚本读取经过认证的交易版本四字节，v1 对应 `01000000`，v2 对应 `02000000`。原型使用普通压栈见证和单值成功栈。签名覆盖交易效果，见证里的原始 `x/y` 可由导出同一已签效果的等价输入替换。拆分后任一方可以独立提交自己的分支，最终资金仍要等两支结果。当前模板没有超时和退款交易。
 
 ## 测量
+
+v0.0.2 的可选 `safe` 后端将示例 `inc` 从 70 B 降到 8 B，`decide` 从 18 B 降到 16 B。v0.0.3 的匹配算术基准中，BIP340 循环中的点和从 216 B 降到 149 B。通用调度器生成的 P-256 点加与倍点为 170 B 和 98 B，专用参考分别为 147 B 和 76 B。通用后端仅在生成字节更少时替换基本块。
+
+`kernel_bench.py` 通过 `--schnorr-reference` 接收固定提交的 `reference` 目录，内置两个源文件的摘要。它对三组匹配内核做数据差分，再构造完整 regtest 交易，用两个引擎核对结果和记录两栈峰值。 [Schnorr 固定提交](https://github.com/linzhm/bsv-script-lab/tree/a1f4485ba84bbc2211be75316626f9ac76636197/projects/p2pkh-schnorr/reference)
 
 下表是 `chronicle-v2` 的一次样本，使用 BSV Node 1.2.3 默认 regtest 配置及 chain-gang `74676b9`。每笔正向交易重复验证 21 次，取中位数，再在路径上取最大值。Node 耗时含本地 RPC 往返，chain-gang 耗时含解析。栈峰值来自开发求值器对已通过两引擎的输入进行剖析，模拟原生签名检查并按字节值载荷计量。合计峰值取同一采样点的两栈之和。
 

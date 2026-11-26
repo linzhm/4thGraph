@@ -14,12 +14,13 @@ from shared.chain_gang import validate_at_heights
 from shared.evaluate import evaluate as evaluate_script
 from shared.transaction import Input, Transaction
 
-from compiler import PROJECT_NAME, CompileError, Word, evaluate, parse, schedule
+from compiler import PROJECT_NAME, PROJECT_VERSION, CompileError, Word, evaluate, parse, schedule
 from lowering import BASELINE, OPTIMIZATIONS
 from protocol import DEFAULT_TARGET, JOIN_WITNESSES, TARGETS, Contracts, FLAG, Host, ROOT_VALUE, UTXO, invalidated
 from wordsets import HOST_WORDS
 
 EXAMPLE = Path(__file__).with_name("example.fth")
+GATED_EXAMPLE = Path(__file__).with_name("gated.fth")
 TASK_ID = seed("forth/task-id")
 SOURCE = native_coin("forth/deployment", ROOT_VALUE + 10_000, p2pk=True)
 
@@ -183,6 +184,11 @@ class Replay:
         done[name] = tx
         return {**self.record(tx, draft.previous), "authorizers": list(draft.template.authorizers)}
 
+    def false_gate(self, contracts, name, done, data, version):
+        gate = contracts.plan.program.gate
+        draft = contracts.prepare(name, done, {**data, gate.input: (1 << 32) - 1}, version=version)
+        return self.record(self.sign(draft), draft.previous, expected=False)
+
     def controls(self, contracts, done, join, foreign_result):
         one = replace(join, tx=replace(join.tx, inputs=join.tx.inputs[:1]), previous=join.previous[:1],
                       payload=join.payload[:1])
@@ -208,11 +214,19 @@ class Replay:
         records = {"deploy": funding}
         controls = {}
         rebinding = {}
+        gate = plan.program.gate
         if plan.mode == "fused":
+            if gate is not None:
+                controls["false_gate"] = self.false_gate(c, "fused", done, data, first_version)
             records["fused"] = self.branch(c, "fused", done, data, version=first_version)
         else:
             a, b = plan.program.work
-            records["split"] = self.branch(c, "split", done, None, version=second_version)
+            if gate is not None:
+                gate_tx = gate.name if gate.name in c.templates else "split"
+                controls["false_gate"] = self.false_gate(c, gate_tx, done, data, second_version)
+                if gate_tx != "split":
+                    records[gate.name] = self.branch(c, gate.name, done, data, version=second_version)
+            records["split"] = self.branch(c, "split", done, data, version=second_version)
             left, right = (b, a) if route == "review" else (a, b)
             versions = {a.name: first_version, b.name: second_version}
             records[left.name] = self.branch(c, left.name, done, {left.input: data[left.input]},
@@ -231,7 +245,7 @@ class Replay:
                 controls.update(self.controls(c, done, join, foreign))
             records[join.template.name] = self.record(self.sign(join), join.previous)
             split = done["split"]
-            split_draft = c.prepare("split", done, version=split.version)
+            split_draft = c.prepare("split", done, data, version=split.version)
             replacement = replace(split_draft, tx=replace(split_draft.tx, locktime=split.locktime + 1))
             rebound = self.sign(replacement)
             rebinding = {"old_split_txid": split.txid(), "replacement_split_txid": rebound.txid(),
@@ -269,6 +283,7 @@ def main():
     cli.add_argument("--target", choices=TARGETS, default=DEFAULT_TARGET)
     cli.add_argument("--optimize", choices=OPTIMIZATIONS, default=BASELINE)
     cli.add_argument("--join-witness", choices=JOIN_WITNESSES, default="full")
+    cli.add_argument("--topology", choices=("parallel", "gated-parallel"), default="parallel")
     args = cli.parse_args()
     if args.samples < 1:
         cli.error("--samples must be positive")
@@ -282,10 +297,12 @@ def main():
         raise ValueError("replay requires an empty peerless regtest")
     activation = int(os.environ.get("SCRIPT_LAB_CHRONICLE_HEIGHT", ACTIVATION_HEIGHT))
     replay = Replay(node, args.samples, args.target, activation, args.optimize, args.join_witness)
-    source = EXAMPLE.read_text()
+    example = GATED_EXAMPLE if args.topology == "gated-parallel" else EXAMPLE
+    source = example.read_text()
     pp = parse(source)
     fused, split = schedule(pp, "fused"), schedule(pp, "split")
-    constrained_source = source + "\nindependent-submit a\n"
+    constrained_step = pp.gate.name if pp.gate is not None else "a"
+    constrained_source = source + f"\nindependent-submit {constrained_step}\n"
     independent = parse(constrained_source)
     constrained = schedule(independent)
     try:
@@ -298,25 +315,28 @@ def main():
     c = replay.contracts(split)
     other, deployment = replay.deploy(c, bootstrap, 4)
     foreign = {"deploy": other}
-    split_row = replay.branch(c, "split", foreign, None)
+    gate_input = {pp.gate.input: 2} if pp.gate is not None else {}
+    split_row = replay.branch(c, "split", foreign, gate_input)
     b_row = replay.branch(c, "b", foreign, {"y": 5})
     cases = {
-        "fused_settle": replay.path(fused, bootstrap, 0, {"x": 10, "y": 5}, "settle"),
-        "fused_review": replay.path(fused, bootstrap, 1, {"x": (1 << 32) - 1, "y": 2}, "review"),
-        "split_settle": replay.path(split, bootstrap, 2, {"x": 10, "y": 5}, "settle", foreign=foreign["b"]),
-        "split_review": replay.path(constrained, bootstrap, 3, {"x": (1 << 32) - 1, "y": 2}, "review"),
+        "fused_settle": replay.path(fused, bootstrap, 0, {"x": 10, "y": 5, **gate_input}, "settle"),
+        "fused_review": replay.path(fused, bootstrap, 1, {"x": (1 << 32) - 1, "y": 2, **gate_input}, "review"),
+        "split_settle": replay.path(split, bootstrap, 2, {"x": 10, "y": 5, **gate_input},
+                                    "settle", foreign=foreign["b"]),
+        "split_review": replay.path(constrained, bootstrap, 3, {"x": (1 << 32) - 1, "y": 2, **gate_input}, "review"),
     }
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps({
-        "project": PROJECT_NAME, "schema_version": 1, "sample_count": args.samples,
+        "project": PROJECT_NAME, "compiler_version": PROJECT_VERSION, "schema_version": 1, "sample_count": args.samples,
         "bsv_node_version": node.version, "chain_gang": engine,
         "regtest_profile": os.environ.get("SCRIPT_LAB_REGTEST_PROFILE"),
-        "target": args.target, "optimization": args.optimize, "join_witness": args.join_witness,
+        "target": args.target, "topology": args.topology, "optimization": args.optimize, "join_witness": args.join_witness,
         "chronicle_activation_height": activation,
         "task_id": TASK_ID.hex(), "bootstrap_raw": bootstrap.serialize().hex(),
         "fixture_public_keys": {name: key.hex() for name, key in replay.keys.public.items()},
         "source": source, "constrained_source": constrained_source,
-        "plans": {plan.mode: replay.contracts(plan).describe() for plan in (fused, split)},
+        "plans": {**{plan.mode: replay.contracts(plan).describe() for plan in (fused, split)},
+                  "constrained": replay.contracts(constrained).describe()},
         "constrained_auto_schedule": constrained.mode, "constrained_fused_error": rejected,
         "foreign_same_task_id": {"deploy": deployment, "split": split_row, "b": b_row},
         "cases": cases,

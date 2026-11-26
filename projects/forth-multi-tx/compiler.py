@@ -13,6 +13,7 @@ from wordsets import (
 
 PROJECT_NAME = "4thGraph"
 PROJECT_DESCRIPTION = "A Forth compiler for BSV Script and multi-transaction workflows."
+PROJECT_VERSION = "0.1.0"
 
 
 class CompileError(ValueError):
@@ -111,6 +112,7 @@ class Program:
     operator: str
     independent: tuple[tuple[str, int], ...]
     optional_wordsets: tuple[str, ...]
+    gate: Work | None = None
 
 
 @dataclass(frozen=True)
@@ -125,6 +127,7 @@ class Template:
     inputs: tuple[ParentOutput, ...]
     authorizers: tuple[str, ...]
     outputs: tuple[str, ...]
+    executes: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -133,6 +136,7 @@ class Plan:
     program: Program
     templates: tuple[Template, ...]
     fusion_blockers: tuple[str, ...]
+    boundary_reasons: tuple[str, ...] = ()
 
 
 def required(tokens, at, field):
@@ -256,6 +260,7 @@ class SourceCompiler:
         self.words = {}
         self.effects = {}
         self.work = {}
+        self.gate = None
         self.join = None
         self.operator = None
         self.independent = []
@@ -321,6 +326,14 @@ class SourceCompiler:
                 word = check_word(self.words, required(tokens, token, "worker word"), ("u32",), ("u32",))
                 owner = identifier(tokens, token, "signer role")
                 self.work[name] = Work(name, input_name, word, owner)
+            case "gate:":
+                if self.gate is not None:
+                    raise token.error("expected at most one gate")
+                name = identifier(tokens, token, "gate step")
+                input_name = identifier(tokens, token, "input name")
+                word = check_word(self.words, required(tokens, token, "gate word"), ("u32",), ("cell",))
+                owner = identifier(tokens, token, "signer role")
+                self.gate = Work(name, input_name, word, owner)
             case "join:":
                 if self.join is not None:
                     raise token.error("expected one join")
@@ -334,8 +347,8 @@ class SourceCompiler:
                     raise token.error("expected one split authority")
                 self.operator = identifier(tokens, token, "signer role")
             case "independent-submit":
-                self.independent.append((identifier(tokens, token, "work step"), token.line))
-            case name if name in self.work:
+                self.independent.append((identifier(tokens, token, "gate or work step"), token.line))
+            case name if name in self.work or self.gate is not None and name == self.gate.name:
                 # The original prototype spelled this declaration "<step> independent-submit".
                 directive = required(tokens, token, "independent-submit")
                 if directive.name != "independent-submit":
@@ -355,11 +368,16 @@ class SourceCompiler:
         at, name, left, right, word = self.join
         if left == right or set((left, right)) != self.work.keys() or name in self.work or name in RESERVED_STEPS:
             raise at.error("join must consume both work steps once and have a distinct step name")
+        step_names = set(self.work)
+        if self.gate is not None:
+            if self.gate.name in step_names | RESERVED_STEPS | {name}:
+                raise CompileError(f"invalid or duplicate gate step {self.gate.name!r}")
+            step_names.add(self.gate.name)
         for step, line in self.independent:
-            if step not in self.work:
-                raise CompileError(f"line {line}: unknown work step {step!r}")
+            if step not in step_names:
+                raise CompileError(f"line {line}: unknown gate or work step {step!r}")
         return Program(self.words, (self.work[left], self.work[right]), word, name, self.operator,
-                       tuple(self.independent), self.optional_wordsets)
+                       tuple(self.independent), self.optional_wordsets, self.gate)
 
 
 def parse(source):
@@ -370,11 +388,13 @@ def schedule(program, mode="auto", *, available_data=None, available_authorizers
     if mode not in {"auto", "fused", "split"}:
         raise CompileError(f"unknown schedule {mode!r}")
     a, b = program.work
-    data = {a.input, b.input} if available_data is None else set(available_data)
-    authorizers = {a.owner, b.owner} if available_authorizers is None else set(available_authorizers)
+    gate = program.gate
+    stages = (*program.work, gate) if gate is not None else program.work
+    data = {step.input for step in stages} if available_data is None else set(available_data)
+    authorizers = {step.owner for step in stages} if available_authorizers is None else set(available_authorizers)
     blockers = [f"line {line}: independent-submit {step} requires a separate transaction for {step}"
                 for step, line in program.independent]
-    for work in program.work:
+    for work in stages:
         if work.input not in data:
             blockers.append(f"{work.name}: input {work.input} is unavailable at fusion")
         if work.owner not in authorizers:
@@ -383,16 +403,39 @@ def schedule(program, mode="auto", *, available_data=None, available_authorizers
         raise CompileError("fusion excluded: " + "; ".join(blockers))
     if mode == "auto":
         mode = "split" if blockers else "fused"
+    reasons = []
     if mode == "fused":
-        templates = (Template("fused", (ParentOutput("deploy", 0),), (a.owner, b.owner), ("terminal",)),)
+        owners = (a.owner, b.owner, gate.owner) if gate is not None else (a.owner, b.owner)
+        order = (gate.name, a.name, b.name) if gate is not None else (a.name, b.name)
+        templates = (Template("fused", (ParentOutput("deploy", 0),), owners, ("terminal",),
+                              (*order, program.join_name)),)
     else:
+        prefix, fork_parent, fork_steps = (), "deploy", ("split",)
+        if gate is not None:
+            reasons.extend(f"line {line}: independent-submit requires its own transaction for {step}"
+                           for step, line in program.independent if step == gate.name)
+            if gate.owner != program.operator:
+                reasons.append(f"{gate.name}: gate and split have different authorities")
+            if gate.input not in data:
+                reasons.append(f"{gate.name}: input {gate.input} is unavailable at split")
+            if gate.owner not in authorizers:
+                reasons.append(f"{gate.name}: authorizer {gate.owner} is unavailable at split")
+            if reasons:
+                prefix = (Template(gate.name, (ParentOutput("deploy", 0),), (gate.owner,),
+                                   ("split-lock",), (gate.name,)),)
+                fork_parent = gate.name
+            else:
+                fork_steps = (gate.name, "split")
+                reasons.append(f"{gate.name}: guard and split are executed together under {program.operator}")
         templates = (
-            Template("split", (ParentOutput("deploy", 0),), (program.operator,), ("work", "work")),
-            Template(a.name, (ParentOutput("split", 0),), (a.owner,), ("result", "data")),
-            Template(b.name, (ParentOutput("split", 1),), (b.owner,), ("result", "data")),
-            Template(program.join_name, (ParentOutput(a.name, 0), ParentOutput(b.name, 0)), (), ("terminal",)),
+            *prefix,
+            Template("split", (ParentOutput(fork_parent, 0),), (program.operator,), ("work", "work"), fork_steps),
+            Template(a.name, (ParentOutput("split", 0),), (a.owner,), ("result", "data"), (a.name,)),
+            Template(b.name, (ParentOutput("split", 1),), (b.owner,), ("result", "data"), (b.name,)),
+            Template(program.join_name, (ParentOutput(a.name, 0), ParentOutput(b.name, 0)), (), ("terminal",),
+                     (program.join_name,)),
         )
-    return Plan(mode, program, templates, tuple(blockers))
+    return Plan(mode, program, templates, tuple(blockers), tuple(reasons))
 
 
 def evaluate(word, *values, context=None):
