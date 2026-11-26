@@ -18,6 +18,10 @@ v0.2.0 is the current development version. Its [46,302-byte fixed lock](template
 
 Ordinary payments use ForkID ALL (`0x41`) and a 326-byte unlock. The v0.2.0 two-input, two-output fixture is 93,374 bytes, compared with 119,934 bytes for v0.1.0. OTDA is available after Chronicle activation. On version 2 transactions, the reference wallet can reconstruct recognized outputs for OTDA ALL and same-index outputs for paired SINGLE. An unpaired SINGLE uses the companion path.
 
+## Forth experiment
+
+The Forth experiment `0.1.0-alpha.2` under `experiments/forth/` builds the entire v0.2.0 R1 lock from `r1.fth`. Its baseline reproduces the published lock byte for byte. The same source enables optional size optimizations and uses the original generator and payment fixtures under `reference/` for comparison. The earlier point-kernel experiment is also available there. [Forth source and reproduction](experiments/forth/README.md)
+
 ## Wallet integration
 
 Use the [TypeScript, Rust and Go SDK guide](docs/sdk.en.md) for receiving and ordinary ForkID ALL payments. The [Python reference wallet](reference/README.md) supports selecting a sighash per input, including mixed spends and Chronicle OTDA. Authenticate the funding outpoint, amount and script before asking an external signer to approve the intended outputs and fee.
