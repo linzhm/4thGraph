@@ -222,7 +222,7 @@ class SchnorrTests(unittest.TestCase):
         self.assertEqual(raw, reference[:offset] + owner + reference[offset + 20:])
         self.assertEqual(compiled_template(owner), (raw, offset))
         self.assertEqual(recognize_template(raw), (TEMPLATE_VERSION, owner))
-        self.assertLess(len(raw), len(lock_for_owner(bytes(20), version="v0.7.0")))
+        self.assertLess(len(raw), len(lock_for_owner(bytes(20), version="v0.8.0")))
 
     def test_mixed_template_spend(self):
         public = self.public_keys[0]
@@ -231,6 +231,7 @@ class SchnorrTests(unittest.TestCase):
         versions = {
             "v0.6.0": "12c75b80b65e983369998e8c2ba581979bb1d4cc67c99a4f8694394447a6a877",
             "v0.7.0": "b1aff80ac6a66e83cf915f6636b54fd7853b2803543d2410a19840efb50ad966",
+            "v0.8.0": "eafc3937ba802a3fcfeae3bf7a814a747be3c797906c86e330cd68001f3509e5",
         }
         for version, checksum in versions.items():
             raw = lock_for_public_key(public, version=version)
@@ -257,6 +258,13 @@ class SchnorrTests(unittest.TestCase):
                     self.assertEqual(compile_unlock(preimage, companion, *witness),
                                      auth.witness(b"".join(witness)))
 
+    def test_fixed_width_byte_reversal(self):
+        reverse = _contract().emit("script-reverse32", b"")
+        setup = push(b"saved") + asm("OP_TOALTSTACK")
+        for value in (bytes(range(32)), bytes(32), b"\xff" + bytes(31)):
+            self.assertEqual(evaluate(setup + reverse, [b"prefix", value]),
+                             ([b"prefix", value[::-1]], [b"saved"]))
+
     def test_forth_lock_accepts_unpaired_otda_companion(self):
         unsigned = replace(self.unsigned, outputs=self.unsigned.outputs[:1])
         tx = sign_spend(unsigned, 0, self.parents[0].serialize(), self.public_keys[0],
@@ -279,6 +287,7 @@ class SchnorrTests(unittest.TestCase):
         contract = _contract()
         double = contract.emit("secp256k1-double", b"")
         pair = contract.emit("secp256k1-double-pair", b"")
+        pair_adjacent = contract.emit("secp256k1-double-pair-with-field", b"", 1)
         add = contract.emit("secp256k1-add", b"")
         points = [(0, 1, 0)]
         for scalar in range(1, 17):
@@ -301,6 +310,8 @@ class SchnorrTests(unittest.TestCase):
                 self.assertEqual((separate_alt, combined_alt), ([], []))
                 self.assertEqual([decode_num(item) % FIELD for item in separate],
                                  [decode_num(item) % FIELD for item in combined])
+                adjacent = [b"outer", encode_num(FIELD), *map(encode_num, point)]
+                self.assertEqual(evaluate(pair_adjacent, adjacent), ([b"outer", *combined], []))
 
     def test_lambda_scalar_split(self):
         split = _contract().emit("secp256k1-lambda-split", b"")
@@ -321,8 +332,11 @@ class SchnorrTests(unittest.TestCase):
         self.assertEqual(len(signs), 4)
 
     def test_affine_add_matches_complete_addition(self):
-        full = _contract().emit("secp256k1-add", b"")
-        mixed = _contract().emit("secp256k1-add-affine", b"")
+        contract = _contract()
+        full = contract.emit("secp256k1-add", b"")
+        mixed = contract.emit("secp256k1-add-affine", b"")
+        full_adjacent = contract.emit("secp256k1-add-with-field", b"", 1)
+        mixed_adjacent = contract.emit("secp256k1-add-affine-with-field", b"", 1)
         for a in (0, 1, -1, 7):
             for b in (1, -1, 7):
                 with self.subTest(a=a, b=b):
@@ -334,7 +348,12 @@ class SchnorrTests(unittest.TestCase):
                     else:
                         left = (0, 1, 0)
                     stack = [encode_num(FIELD), b"outer", *map(encode_num, (*left, bx, by))]
-                    self.assertEqual(evaluate(mixed, stack), evaluate(full, [*stack, encode_num(1)]))
+                    expected, alt = evaluate(mixed, stack)
+                    self.assertEqual((expected, alt), evaluate(full, [*stack, encode_num(1)]))
+                    adjacent = [stack[1], stack[0], *stack[2:]]
+                    expected_adjacent = ([expected[1], expected[0], *expected[2:]], alt)
+                    self.assertEqual(evaluate(mixed_adjacent, adjacent), expected_adjacent)
+                    self.assertEqual(evaluate(full_adjacent, [*adjacent, encode_num(1)]), expected_adjacent)
 
     @staticmethod
     def window_stream(scalars):
@@ -385,13 +404,14 @@ class SchnorrTests(unittest.TestCase):
             scalar_lanes = (s % HALF_RADIX, s // HALF_RADIX, abs(k1), abs(k2))
             self.assertEqual(alt, [self.window_stream(scalar_lanes)])
             self.assertEqual(len(built), 81)
-            self.assertEqual(list(map(decode_num, built[:3])), original[:3])
-            self.assertEqual(list(map(decode_num, built[-3:])), [0, 1, 0])
+            self.assertEqual(list(map(decode_num, built[:2])), original[1:3])
+            self.assertEqual(list(map(decode_num, built[-4:])), [FIELD, 0, 1, 0])
             for index in range(1, 16):
                 with self.subTest(public_multiple=public_multiple, table_index=index):
                     high, low = divmod(index, 4)
-                    check_point(built[3 * index:3 * index + 3], high * q + low * p)
-                    start = 48 + 2 * (index - 1)
+                    start = 2 + 3 * (index - 1)
+                    check_point(built[start:start + 3], high * q + low * p)
+                    start = 47 + 2 * (15 - index)
                     self.assertEqual(tuple(map(decode_num, built[start:start + 2])),
                                      affine_generator_multiple(high * HALF_RADIX + low))
 

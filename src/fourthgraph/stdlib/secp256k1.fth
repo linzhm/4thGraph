@@ -17,6 +17,12 @@ REQUIRE stdlib/script-fragments.fth
 ;
 : secp256k1-reduce ( script -- script ) op-depth op-1sub op-pick op-mod ;
 
+: secp256k1-reduce-point-coordinate ( script cell cell -- script )
+    ( Build arguments: field placement and its depth at this reduction. )
+    ( Placement 0 uses the bottom of the main stack. Placement 1 uses the item below the point operands. )
+    swap 0= if drop secp256k1-reduce else script-pick-depth op-mod then
+;
+
 : secp256k1-endomorphism-x ( script -- script )
     ( X becomes beta*X mod p. The caller leaves Y and Z unchanged. )
     bytes-hex 7ae96a2b657c07106e64479eac3434e99cf0497512f58995c1396c28719501ee bsv-num-be
@@ -45,9 +51,9 @@ REQUIRE stdlib/script-fragments.fth
     2 script-restore-items
 ;
 
-: secp256k1-add ( script -- script )
+: secp256k1-add-with-field ( script cell -- script )
     ( Complete homogeneous addition. Preserve the stack below the two points. )
-    ( The caller places the field prime at the bottom of the main stack. )
+    swap
     ( zz = z1*z2 and k = 21*xz, with xz = x1*z2+x2*z1. )
     3 script-pick-depth op-over op-mul
     op-over 7 script-pick-depth op-mul 4 script-pick-depth 6 script-pick-depth op-mul op-add
@@ -62,20 +68,22 @@ REQUIRE stdlib/script-fragments.fth
 
     ( X = xy*minus-yz*k. )
     op-dup 7 script-pick-depth op-mul op-2swap op-add
-    op-dup 4 script-pick-depth op-mul op-rot op-sub secp256k1-reduce
+    op-dup 4 script-pick-depth op-mul op-rot op-sub over 9 secp256k1-reduce-point-coordinate
 
     ( t = 3*x1*x2, zr = xy*t, plus = yy+h. )
     op-8 op-roll op-8 op-roll op-mul op-3 op-mul op-rot op-over op-mul
     op-6 op-roll op-6 op-roll op-add
 
     ( Y = minus*plus+t*k. Z = yz*plus+zr. )
-    op-rot op-6 op-roll op-mul op-over op-6 op-roll op-mul op-add secp256k1-reduce
-    op-4 op-roll op-rot op-mul op-rot op-add secp256k1-reduce
+    op-rot op-6 op-roll op-mul op-over op-6 op-roll op-mul op-add over 5 secp256k1-reduce-point-coordinate
+    op-4 op-roll op-rot op-mul op-rot op-add swap 3 secp256k1-reduce-point-coordinate
 ;
 
-: secp256k1-add-affine ( script -- script )
+: secp256k1-add ( script -- script ) 0 secp256k1-add-with-field ;
+
+: secp256k1-add-affine-with-field ( script cell -- script )
     ( Complete addition with right-hand Z=1. Input: X1 Y1 Z1 x2 y2. )
-    ( The caller places the field prime at the bottom of the main stack. )
+    swap
 
     ( Stage x1*y2 and compute yz = y1+z1*y2. )
     4 script-pick-depth op-over op-mul op-over 4 script-pick-depth op-mul 5 script-pick-depth op-add
@@ -90,12 +98,16 @@ REQUIRE stdlib/script-fragments.fth
 
     ( X = xy*minus-yz*k, where minus = yy-h. )
     op-7 op-roll op-7 op-roll op-mul op-dup 6 script-pick-depth op-sub
-    op-3 op-roll op-over op-mul 7 script-pick-depth op-6 op-roll op-mul op-sub secp256k1-reduce
+    op-3 op-roll op-over op-mul 7 script-pick-depth op-6 op-roll op-mul op-sub
+    over 7 secp256k1-reduce-point-coordinate
 
     ( Y = minus*plus+yr, where plus = yy+h. Z = yz*plus+zr. )
-    op-rot op-5 op-roll op-add op-rot op-over op-mul op-4 op-roll op-add secp256k1-reduce
-    op-4 op-roll op-rot op-mul op-3 op-roll op-add secp256k1-reduce
+    op-rot op-5 op-roll op-add op-rot op-over op-mul op-4 op-roll op-add
+    over 5 secp256k1-reduce-point-coordinate
+    op-4 op-roll op-rot op-mul op-3 op-roll op-add swap 3 secp256k1-reduce-point-coordinate
 ;
+
+: secp256k1-add-affine ( script -- script ) 0 secp256k1-add-affine-with-field ;
 
 : secp256k1-double-x ( script -- script )
     ( Specialize complete addition using X^3 = Y^2*Z - 7*Z^3. )
@@ -111,20 +123,27 @@ REQUIRE stdlib/script-fragments.fth
     op-7 op-roll op-7 op-roll op-mul op-2 op-mul op-mul
 ;
 
-: secp256k1-double-yz ( script -- script )
+: secp256k1-double-yz-with-field ( script cell -- script )
     ( Y' is yy times the saved sum minus q*t. )
-    4 script-pick-depth op-rot op-mul op-2swap op-mul op-sub secp256k1-reduce
+    swap 4 script-pick-depth op-rot op-mul op-2swap op-mul op-sub
+    over 4 secp256k1-reduce-point-coordinate
 
     ( Z' = 8*Y^3*Z. )
-    op-2swap op-mul op-8 op-mul secp256k1-reduce
+    op-2swap op-mul op-8 op-mul swap 3 secp256k1-reduce-point-coordinate
 ;
 
-: secp256k1-double ( script -- script )
-    secp256k1-double-x secp256k1-reduce secp256k1-double-yz
+: secp256k1-double-with-field ( script cell -- script )
+    swap secp256k1-double-x over 6 secp256k1-reduce-point-coordinate
+    swap secp256k1-double-yz-with-field
 ;
 
-: secp256k1-double-pair ( script -- script )
+: secp256k1-double ( script -- script ) 0 secp256k1-double-with-field ;
+
+: secp256k1-double-pair-with-field ( script cell -- script )
     ( The second doubling uses X' only as a linear factor. Reduce it once, after both doublings. )
     ( Starting with reduced coordinates, both doublings keep X within 226 ScriptNum bytes. )
-    secp256k1-double-x secp256k1-double-yz secp256k1-double
+    swap secp256k1-double-x over secp256k1-double-yz-with-field
+    swap secp256k1-double-with-field
 ;
+
+: secp256k1-double-pair ( script -- script ) 0 secp256k1-double-pair-with-field ;

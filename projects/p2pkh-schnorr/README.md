@@ -1,4 +1,4 @@
-# P2PKH-Schnorr v0.8.0
+# P2PKH-Schnorr v0.9.0
 
 [简体中文](README.zh-CN.md) · [4thGraph](../../README.md) · [Project index](../README.md) · [Versions](versions/index.json)
 
@@ -12,11 +12,11 @@ Two parties can use BIP327 MuSig2 to spend through the same signer interface. Th
 
 The payment example imports the 4thGraph standard-library verifier with `REQUIRE stdlib/bip340.fth`. Its `schnorr-lock` word combines the library verifier with the owner check and the current-input binding. Its `schnorr-unlock` word builds the unlocking script for each spend. [Payment example source](reference/schnorr.fth) · [4thGraph BIP340 library](../../src/fourthgraph/stdlib/bip340.fth)
 
-From the repository root, run `PYTHONPATH=src:. python projects/p2pkh-schnorr/reference/generate_template.py --check` to verify the current lock and layout. Use `--write` to regenerate them. The wallet creates v0.8.0 outputs by default and also recognizes and spends v0.6.0 and v0.7.0 outputs. [Version catalog](versions/index.json)
+From the repository root, run `PYTHONPATH=src:. python projects/p2pkh-schnorr/reference/generate_template.py --check` to verify the current lock and layout. Use `--write` to regenerate them. The wallet creates v0.9.0 outputs by default and also recognizes and spends v0.6.0 through v0.8.0 outputs. [Version catalog](versions/index.json)
 
 The wallet uses libsecp256k1 to verify the external signature, then supplies the approved preimage and public witness to `schnorr-unlock` to construct the unlocking script. [Wallet SDK](docs/sdk.en.md#quickstart)
 
-The verifier uses 64 two-bit windows over four 128-bit components. v0.8.0 interleaves the components once into 64 bytes, with the two point-table indices for each window in one byte. The scalar loop consumes those bytes from the alternate stack. The detached verifier shrinks from 28,677 to 27,380 bytes. [Scalar decomposition and window construction](docs/spec.en.md#joint-scalar-multiplication)
+The verifier uses 64 packed two-bit windows over four 128-bit components. v0.9.0 reuses the field prime during input checks and positions it beside the accumulator for point arithmetic. It also shortens the 32-byte reversal and fixed-base table lookups. The detached verifier shrinks from 27,380 to 25,998 bytes. [Scalar decomposition and window construction](docs/spec.en.md#joint-scalar-multiplication)
 
 ## Validate the baseline
 
@@ -37,14 +37,14 @@ The acceptance suite checks all 19 official BIP340 verification vectors, includi
 
 ## Measured sizes
 
-Each v0.8.0 output lock is **28,363 bytes**, saving 1,297 bytes over v0.7.0. Its owner field starts at byte offset **238**. These two-input, two-output fixtures create two Schnorr outputs. The unlocking scripts include the signing preimage, BIP340 signature, and coordinate witnesses.
+Each v0.9.0 output lock is **26,857 bytes**, saving 1,506 bytes over v0.8.0. Its owner field starts at byte offset **238**. These two-input, two-output fixtures create two Schnorr outputs. The unlocking scripts include the signing preimage, BIP340 signature, and coordinate witnesses.
 
 | Mode | Each output lock | Each input unlock | Complete transaction | Extra input | Extra output | Fund and exit | One turnover | Peak stack payload |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| BIP143 ALL | 28,363 | 329 | 57,502 | 372 | 28,374 | 57,728 | 115,229 | 3,315 |
-| Chronicle OTDA ALL | 28,363 | 57,017 | 170,878 | 57,183 | 85,130 | 57,742 | 228,620 | 113,866 |
+| BIP143 ALL | 26,857 | 329 | 54,490 | 372 | 26,868 | 54,716 | 109,206 | 3,298 |
+| Chronicle OTDA ALL | 26,857 | 54,005 | 161,842 | 54,171 | 80,612 | 54,730 | 216,572 | 107,842 |
 
-All sizes are in bytes. Stack payload is the approximate combined main and alternate stack payload for the first input from the development evaluator. BSV Node 1.2.3 and chain-gang verify each complete input with supplied prevouts. OTDA ALL includes the literal signed outputs in each preimage. [Layout and fingerprint](versions/v0.8.0/layout.json) · [Replayed measurements](versions/v0.8.0/measurements.json) · [Benchmark method](../../docs/benchmark.md)
+All sizes are in bytes. Stack payload is the approximate combined main and alternate stack payload for the first input from the development evaluator. BSV Node 1.2.3 and chain-gang verify each complete input with supplied prevouts. OTDA ALL includes the literal signed outputs in each preimage. [Layout and fingerprint](versions/v0.9.0/layout.json) · [Replayed measurements](versions/v0.9.0/measurements.json) · [Benchmark method](../../docs/benchmark.md)
 
 ```sh
 PYTHONPATH=src:. bash tools/verify_node.sh -- "$SCRIPT_LAB_SDK_PYTHON" -m fourthgraph.benchmark.run \

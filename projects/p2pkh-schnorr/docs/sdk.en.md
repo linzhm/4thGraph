@@ -6,7 +6,7 @@
 
 ## Receive and spend
 
-Select project `p2pkh-schnorr` in the unified SDK. The client uses template `v0.8.0` by default. Supply a 32-byte x-only public key or its 20-byte HASH160. The client fills the owner slot in the frozen Forth build and checks all fixed script bytes when recognizing an output. You can also supply the expected public key. The SDK identifies and spends UTXOs of all three versions from their prevout scripts. Set the wallet's `template` to `v0.6.0` or `v0.7.0` to create an earlier output format.
+Select project `p2pkh-schnorr` in the unified SDK. The client uses template `v0.9.0` by default. Supply a 32-byte x-only public key or its 20-byte HASH160. The client fills the owner slot in the frozen Forth build and checks all fixed script bytes when recognizing an output. You can also supply the expected public key. The SDK identifies and spends UTXOs of all four versions from their prevout scripts. Set the wallet's `template` to `v0.6.0`, `v0.7.0`, or `v0.8.0` to create an earlier output format.
 
 The signing request identifies the algorithm as `schnorr-secp256k1`, the payload kind as `message`, and the signature format as `bip340`. Give the 32-byte payload to the BIP340 signer as the message. Return the signer's original 64 bytes. The SDK verifies the signature, derives the public witness coordinates, and runs the Forth `schnorr-unlock` word to generate the input script. [Forth source](../reference/schnorr.fth)
 
