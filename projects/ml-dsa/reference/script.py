@@ -8,7 +8,7 @@ from challenge_script import sample_in_ball_script
 from fips204 import CHALLENGE_BYTES, PUBLIC_KEY_BYTES
 from hint_script import apply_hints_before_rounding_script, apply_hints_script, apply_sparse_hints_script
 from mldsa import DIGEST_BYTES
-from ntt_script import checked_equation_script, verification_equation_script
+from ntt_script import checked_equation_script, packed_response_equation_script, verification_equation_script
 from shake_script import shake256_script
 from signature_script import signature_decode_script
 from fourthgraph.bsv.pushtx import authorization_checks, check_binding
@@ -34,6 +34,7 @@ class _VerifierVersion(IntEnum):
     V05 = 5
     V06 = 6
     V07 = 7
+    V08 = 8
 
 
 def _shake_options(version):
@@ -56,7 +57,7 @@ def _hints_script(version):
 
 def verify_message_script(public_key, message_bytes, *, context=b"", legacy=False):
     """Compile a verifier that consumes the message and signature from the stack."""
-    version = _VerifierVersion.ORIGINAL if legacy else _VerifierVersion.V07
+    version = _VerifierVersion.ORIGINAL if legacy else _VerifierVersion.V08
     challenges = _reconstruct_challenge(public_key, message_bytes, context=context, version=version)
     return challenges + asm("OP_EQUAL")
 
@@ -74,11 +75,15 @@ def _reconstruct_challenge(public_key, message_bytes, *, context=b"", version):
     signed = version >= _VerifierVersion.V02
     sparse_hints = version >= _VerifierVersion.V04
     signed_challenge = version >= _VerifierVersion.V07
+    packed_response = version >= _VerifierVersion.V08
     code = bytearray(asm("OP_OVER OP_SIZE") + number(message_bytes) + asm("OP_NUMEQUALVERIFY OP_DROP"))
-    code += signature_decode_script(compact=compact, signed_response=signed, sparse_hints=sparse_hints)
+    code += signature_decode_script(compact=compact, signed_response=signed, sparse_hints=sparse_hints,
+                                    packed_response=packed_response)
     # [message, c_tilde, z, hints] -> [message, c_tilde, c || z].
     code += asm("OP_TOALTSTACK OP_OVER") + sample_in_ball_script(**shake, signed=signed_challenge)
-    if signed:
+    if packed_response:
+        equation = packed_response_equation_script(public_key)
+    elif signed:
         equation = checked_equation_script(public_key, packed=version >= _VerifierVersion.V03,
                                            paired=version >= _VerifierVersion.V06,
                                            signed_challenge=signed_challenge)
@@ -101,7 +106,7 @@ def locking_script(public_key, *, legacy=False):
     """Bind the Pure ML-DSA-44 verifier to the current transaction input."""
     if legacy:
         return _historical_lock(public_key, compact=False)
-    challenges = _reconstruct_challenge(public_key, DIGEST_BYTES, version=_VerifierVersion.V07)
+    challenges = _reconstruct_challenge(public_key, DIGEST_BYTES, version=_VerifierVersion.V08)
     return _compile_payment_lock(challenges, compact_binding=True)
 
 
@@ -146,7 +151,7 @@ def matches_lock(script, public_key):
     """Match any supported generation of the fixed-key payment template."""
     return (script == locking_script(public_key)
             or any(script == _historical_forth_lock(public_key, version=version)
-                   for version in (_VerifierVersion.V06, _VerifierVersion.V05, _VerifierVersion.V04,
+                   for version in (_VerifierVersion.V07, _VerifierVersion.V06, _VerifierVersion.V05, _VerifierVersion.V04,
                                    _VerifierVersion.V03, _VerifierVersion.V02))
             or script == _historical_lock(public_key, compact=True)
             or script == _historical_lock(public_key, compact=False))

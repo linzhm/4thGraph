@@ -9,7 +9,7 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "src"))
 from fourthgraph.bsv.script import asm, number, push
-from fips204 import verification_key_rows
+from fips204 import GAMMA1, RESPONSE_BITS, verification_key_rows
 from polynomial import DEGREE, MODULUS, twiddle
 
 COEFFICIENT_BYTES = 3
@@ -260,15 +260,24 @@ def verification_equation_script(public_key, *, signed_residues=False, compact=F
 
 def checked_equation_script(public_key, *, packed=True, paired=True, signed_challenge=False):
     """Reconstruct rows from the sampler and the range-checked signed response."""
-    # The inverse transform is linear. Fold its 1/256 factor into the public
-    # coefficients so each unpacked output lane needs only reduction mod q.
-    rows = [
-        [tuple(value * _INVERSE_SCALE % MODULUS for value in column) for column in row]
-        for row in verification_key_rows(public_key)
-    ]
+    rows = _scaled_key_rows(public_key)
     if packed:
         return _packed_equation(rows, paired=paired, signed_challenge=signed_challenge)
     return _compact_equation(rows, integrated=True)
+
+
+def packed_response_equation_script(public_key):
+    """Reconstruct rows from one-byte c and an already range-checked wire z."""
+    return _packed_equation(_scaled_key_rows(public_key), paired=True, signed_challenge=True, packed_response=True)
+
+
+def _scaled_key_rows(public_key):
+    # The inverse transform is linear. Fold its 1/256 factor into the public
+    # coefficients so each unpacked output lane needs only reduction mod q.
+    return [
+        [tuple(value * _INVERSE_SCALE % MODULUS for value in column) for column in row]
+        for row in verification_key_rows(public_key)
+    ]
 
 
 def _compact_equation(rows, *, integrated=False):
@@ -321,28 +330,21 @@ def _packed_bias(lanes, offset):
     return number(offset * sum(_LANE_RADIX ** index for index in range(lanes)))
 
 
-def _packed_equation(rows, *, paired, signed_challenge):
+def _packed_equation(rows, *, paired, signed_challenge, packed_response=False):
     input_count, row_count = len(rows[0]), len(rows)
     offset = _positive_lane_offset() if paired else _LANE_OFFSET
     read_lane = _READ_POSITIVE_LANE if paired else _READ_LANE
     extra_byte = 0 if paired else 1
     challenge_bytes = DEGREE if signed_challenge else POLYNOMIAL_BYTES
-    code = bytearray(asm("OP_SIZE") + number(challenge_bytes + (input_count - 1) * POLYNOMIAL_BYTES)
+    response_bytes = DEGREE * RESPONSE_BITS // 8 if packed_response else POLYNOMIAL_BYTES
+    code = bytearray(asm("OP_SIZE") + number(challenge_bytes + (input_count - 1) * response_bytes)
                      + asm("OP_NUMEQUALVERIFY"))
     code += asm("OP_TOALTSTACK") + number(_LANE_RADIX) + _packed_bias(input_count, offset)
     code += asm("OP_FROMALTSTACK")
-    code += number(challenge_bytes) + asm("OP_SPLIT")
-    code += (number(POLYNOMIAL_BYTES) + asm("OP_SPLIT")) * (input_count - 2)
-
-    # The packed challenge and signed responses were checked upstream. Read
-    # each coefficient across the five polynomial tails in Horner order.
-    read = _SPLIT_COEFFICIENT + asm("OP_BIN2NUM")
-    challenge_read = asm("OP_1 OP_SPLIT OP_SWAP OP_BIN2NUM") if signed_challenge else read
-    first = number(input_count - 1) + asm("OP_ROLL") + challenge_read
-    next_lane = number(input_count + 2) + asm("OP_PICK OP_MUL")
-    next_lane += number(input_count) + asm("OP_ROLL") + read + asm("OP_ROT OP_ADD")
-    code += (first + next_lane * (input_count - 1) + asm("OP_TOALTSTACK")) * DEGREE
-    code += asm("OP_2DROP") * (input_count // 2) + asm("OP_DROP") * (input_count % 2)
+    if packed_response:
+        code += _pack_wire_response(input_count, response_bytes)
+    else:
+        code += _pack_signed_response(input_count, challenge_bytes, signed_challenge=signed_challenge)
     restore = asm("OP_FROMALTSTACK") * DEGREE
     code += restore
 
@@ -353,16 +355,18 @@ def _packed_equation(rows, *, paired, signed_challenge):
         code += _take(order, coefficient, compact=True)
         code += number(len(order) + 1) + asm("OP_PICK OP_ADD")
         code += number(_LANE_BYTES * input_count + extra_byte) + asm("OP_NUM2BIN")
-        # The biased values are congruent to the forward NTT values mod q.
-        # Reduce each row of the dot product before packing its inverse input.
-        code += (read_lane + asm("OP_SWAP")) * input_count + asm("OP_DROP")
-        for row_index, row in enumerate(rows):
-            code += _dot_product(row, coefficient, consume=row_index == row_count - 1)
-            code += _REDUCE + asm("OP_TOALTSTACK")
-        multiply = number(len(order) + 2) + asm("OP_PICK OP_MUL")
-        code += asm("OP_FROMALTSTACK")
-        code += (multiply + asm("OP_FROMALTSTACK OP_ADD")) * (row_count - 1)
-        code += asm("OP_TOALTSTACK")
+        if packed_response:
+            code += _pack_pointwise_rows(rows, coefficient, input_count)
+        else:
+            # The biased values are congruent to the forward NTT values mod q.
+            code += (read_lane + asm("OP_SWAP")) * input_count + asm("OP_DROP")
+            for row_index, row in enumerate(rows):
+                code += _dot_product(row, coefficient, consume=row_index == row_count - 1)
+                code += _REDUCE + asm("OP_TOALTSTACK")
+            multiply = number(len(order) + 2) + asm("OP_PICK OP_MUL")
+            code += asm("OP_FROMALTSTACK")
+            code += (multiply + asm("OP_FROMALTSTACK OP_ADD")) * (row_count - 1)
+            code += asm("OP_TOALTSTACK")
 
     # All forward coefficients have been consumed. The altstack holds one
     # packed coefficient per inverse butterfly input, with row zero low.
@@ -370,7 +374,69 @@ def _packed_equation(rows, *, paired, signed_challenge):
     order = list(reversed(range(DEGREE)))
     code += (_paired_butterflies(order, inverse=True) if paired
              else _butterflies(order, inverse=True, compact=True))
+    if packed_response:
+        return bytes(code) + _serialize_positive_rows(order, row_count)
     return bytes(code) + _serialize_inverse_rows(order, row_count, positive=paired)
+
+
+def _pack_signed_response(input_count, challenge_bytes, *, signed_challenge):
+    code = number(challenge_bytes) + asm("OP_SPLIT")
+    code += (number(POLYNOMIAL_BYTES) + asm("OP_SPLIT")) * (input_count - 2)
+    # The packed challenge and signed responses were checked upstream. Read
+    # each coefficient across the five polynomial tails in Horner order.
+    read = _SPLIT_COEFFICIENT + asm("OP_BIN2NUM")
+    challenge_read = asm("OP_1 OP_SPLIT OP_SWAP OP_BIN2NUM") if signed_challenge else read
+    first = number(input_count - 1) + asm("OP_ROLL") + challenge_read
+    next_lane = number(input_count + 2) + asm("OP_PICK OP_MUL")
+    next_lane += number(input_count) + asm("OP_ROLL") + read + asm("OP_ROT OP_ADD")
+    code += (first + next_lane * (input_count - 1) + asm("OP_TOALTSTACK")) * DEGREE
+    return code + asm("OP_2DROP") * (input_count // 2) + asm("OP_DROP") * (input_count % 2)
+
+
+def _pack_wire_response(input_count, response_bytes):
+    unsigned = push(b"\x00") + asm("OP_CAT OP_BIN2NUM")
+    code = asm("OP_TOALTSTACK") + number(GAMMA1) + number(1 << RESPONSE_BITS) + asm("OP_FROMALTSTACK")
+    code += number(DEGREE) + asm("OP_SPLIT")
+    split = number(response_bytes) + asm("OP_SPLIT OP_SWAP") + unsigned + asm("OP_SWAP")
+    code += split * (input_count - 2) + unsigned
+
+    # The top five items are the challenge tail and the four z tails.
+    # Each z tail is an unsigned little-endian integer. Pull its low 18 bits
+    # and advance the tail while forming the wide NTT input lane.
+    challenge = asm("OP_4 OP_ROLL OP_1 OP_SPLIT OP_SWAP OP_BIN2NUM")
+    response = asm("OP_5 OP_ROLL OP_DUP OP_7 OP_PICK OP_MOD OP_8 OP_PICK OP_SWAP OP_SUB")
+    response += asm("OP_SWAP OP_7 OP_PICK OP_DIV OP_ROT OP_10 OP_PICK OP_MUL OP_ROT OP_ADD")
+    code += (challenge + response * (input_count - 1) + asm("OP_TOALTSTACK")) * DEGREE
+    return code + asm("OP_2DROP OP_2DROP OP_2DROP OP_DROP")
+
+
+def _pack_pointwise_rows(rows, coefficient, input_count):
+    # Keep q below the forward lanes for all four dot products. Serialize
+    # the reduced rows to fixed-width lanes and concatenate them for INTT.
+    code = _Q + asm("OP_SWAP")
+    code += (_READ_POSITIVE_LANE + asm("OP_SWAP")) * (input_count - 1) + asm("OP_BIN2NUM")
+    for row_index, row in enumerate(reversed(rows)):
+        last = row_index == len(rows) - 1
+        code += _dot_product(row, coefficient, consume=last)
+        code += asm("OP_SWAP") if last else number(input_count + 1) + asm("OP_PICK")
+        code += asm("OP_MOD") + number(_LANE_BYTES) + asm("OP_NUM2BIN OP_TOALTSTACK")
+    code += asm("OP_FROMALTSTACK") + asm("OP_FROMALTSTACK OP_CAT") * (len(rows) - 1)
+    return code + asm("OP_BIN2NUM OP_TOALTSTACK")
+
+
+def _serialize_positive_rows(order, lanes):
+    # q stays just below the row accumulators, at a fixed depth for each lane.
+    code = bytearray(_Q + asm("OP_0") * lanes)
+    with_tail = number(lanes + 2) + asm("OP_PICK OP_MOD OP_3 OP_NUM2BIN")
+    with_tail += number(lanes + 1) + asm("OP_ROLL OP_SWAP OP_CAT OP_SWAP")
+    last = asm("OP_BIN2NUM") + number(lanes + 1) + asm("OP_PICK OP_MOD OP_3 OP_NUM2BIN")
+    last += number(lanes) + asm("OP_ROLL OP_SWAP OP_CAT")
+    for index in range(DEGREE):
+        code += _take(order, index, above=lanes + 1, compact=True)
+        depth = number(len(order) + lanes + 2) + asm("OP_PICK")
+        code += depth + asm("OP_ADD") + number(_LANE_BYTES * lanes) + asm("OP_NUM2BIN")
+        code += (_READ_POSITIVE_LANE + with_tail) * (lanes - 1) + last
+    return bytes(code) + asm("OP_CAT") * (lanes - 1) + asm("OP_NIP OP_NIP")
 
 
 @cache

@@ -10,7 +10,7 @@ from polynomial import DEGREE, MODULUS
 from signature_script import (
     CHALLENGE_BYTES, GAMMA1, HINT_WEIGHT_LIMIT, RESPONSE_BITS, RESPONSE_COUNT,
     RESPONSE_NORM_LIMIT, RESPONSE_PACKED_BYTES, hint_decode_script,
-    response_decode_script, signature_decode_script,
+    packed_response_check_script, response_decode_script, signature_decode_script,
 )
 from fourthgraph.bsv.script import asm, push
 from fourthgraph.bsv.transaction import Input, Output, Transaction, hash256
@@ -119,6 +119,21 @@ class SignatureScriptTests(unittest.TestCase):
         for signature in (self.signature[:-1], self.signature + b'\x00'):
             code = push(signature) + signature_decode_script() + asm('OP_2DROP OP_DROP OP_1')
             self.assertFalse(_context(code).evaluate(quiet=True))
+
+    def test_packed_response_norm_at_lane_and_chunk_boundaries(self):
+        check = packed_response_check_script()
+        smallest = GAMMA1 - RESPONSE_NORM_LIMIT + 1
+        largest = GAMMA1 + RESPONSE_NORM_LIMIT - 1
+        values = [smallest, largest] * (RESPONSE_COUNT * DEGREE // 2)
+        packed = _pack(values, RESPONSE_BITS)
+        self.assertTrue(_context(push(packed) + check + push(packed) + asm('OP_EQUAL')).evaluate())
+        for position in (0, 1, 2, 3, 63, 64, len(values) - 1):
+            for invalid in (0, smallest - 1, largest + 1, (1 << RESPONSE_BITS) - 1):
+                with self.subTest(position=position, invalid=invalid):
+                    candidate = values.copy()
+                    candidate[position] = invalid
+                    code = push(_pack(candidate, RESPONSE_BITS)) + check + asm('OP_DROP OP_1')
+                    self.assertFalse(_context(code).evaluate(quiet=True))
 
     def test_explicit_chronicle_context(self):
         decoded = _context(push(self.signature) + signature_decode_script())

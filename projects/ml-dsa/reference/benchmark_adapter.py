@@ -31,7 +31,9 @@ TEMPLATES = {"pure-ml-dsa-44": Template(coin)}
 
 def components(_samples):
     from challenge_script import sample_in_ball_script
-    from ntt_script import checked_equation_script, transform_script, verification_equation_script
+    from ntt_script import (
+        checked_equation_script, packed_response_equation_script, transform_script, verification_equation_script,
+    )
     from script import (
         COMPANION_CODE, _VerifierVersion, _compile_payment_lock, _hints_script, _historical_forth_lock,
         _historical_lock, _reconstruct_challenge, _shake_options,
@@ -52,7 +54,8 @@ def components(_samples):
         ("v0.4.0", _VerifierVersion.V04, _historical_forth_lock(payment_key, version=_VerifierVersion.V04)),
         ("v0.5.0", _VerifierVersion.V05, _historical_forth_lock(payment_key, version=_VerifierVersion.V05)),
         ("v0.6.0", _VerifierVersion.V06, _historical_forth_lock(payment_key, version=_VerifierVersion.V06)),
-        ("optimized", _VerifierVersion.V07, locking_script(payment_key)),
+        ("v0.7.0", _VerifierVersion.V07, _historical_forth_lock(payment_key, version=_VerifierVersion.V07)),
+        ("optimized", _VerifierVersion.V08, locking_script(payment_key)),
     )
     payment_sizes = {}
     for label, version, lock in profiles:
@@ -60,7 +63,7 @@ def components(_samples):
         compact = shake["compact"]
         sparse = version >= _VerifierVersion.V04
         signature = signature_decode_script(compact=compact, signed_response=version >= _VerifierVersion.V02,
-                                            sparse_hints=sparse)
+                                            sparse_hints=sparse, packed_response=version >= _VerifierVersion.V08)
         payment_sizes[label] = {
             "keccak_f1600": len(keccak_f1600_script(compact=compact, optimize=shake["optimize"],
                                                    packed_rows=shake["packed_rows"])),
@@ -81,7 +84,8 @@ def components(_samples):
             for label, options in (("canonical", {}), ("signed_residues", {"signed_residues": True}),
                                    ("compact", {"compact": True}))
         },
-        "checked_equation_script_bytes": len(checked_equation_script(key, signed_challenge=True)),
+        "checked_equation_script_bytes": len(packed_response_equation_script(key)),
+        "v07_checked_equation_script_bytes": len(checked_equation_script(key, signed_challenge=True)),
         "v06_checked_equation_script_bytes": len(checked_equation_script(key)),
         "v05_checked_equation_script_bytes": len(checked_equation_script(key, paired=False)),
         "v02_checked_equation_script_bytes": len(checked_equation_script(key, packed=False)),

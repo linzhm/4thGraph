@@ -11,21 +11,18 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "src"))
 
-from fips204 import SIGNATURE_BYTES
+from fips204 import GAMMA1, RESPONSE_BITS, RESPONSE_NORM_LIMIT, SIGNATURE_BYTES
 from ntt_script import COEFFICIENT_BYTES
 from polynomial import DEGREE, MODULUS
 from fourthgraph.bsv.script import asm, number, push
 
 CHALLENGE_BYTES = 32
 RESPONSE_COUNT = HINT_ROWS = 4
-RESPONSE_BITS = 18
 RESPONSE_PACKED_BYTES = RESPONSE_COUNT * DEGREE * RESPONSE_BITS // 8
 RESPONSE_RESIDUE_BYTES = RESPONSE_COUNT * DEGREE * COEFFICIENT_BYTES
 HINT_WEIGHT_LIMIT = 80
 HINT_PACKED_BYTES = HINT_WEIGHT_LIMIT + HINT_ROWS
 HINT_BITMAP_BYTES = HINT_ROWS * DEGREE // 8
-GAMMA1 = 1 << 17
-RESPONSE_NORM_LIMIT = GAMMA1 - 78
 
 _UNSIGNED = push(b'\x00') + asm('OP_CAT OP_BIN2NUM')
 
@@ -69,6 +66,33 @@ def _signed_response_with_constants():
     group = begin + low * 3 + checked_coefficient(4)
     code += group * (RESPONSE_COUNT * DEGREE // 4)
     return code + asm('OP_2DROP OP_2DROP OP_FROMALTSTACK')
+
+
+@cache
+def packed_response_check_script():
+    """Verify the strict norm bound while preserving the wire encoding."""
+    coefficients = 64
+    width = coefficients * RESPONSE_BITS // 8
+    repeated_lane = sum(1 << (RESPONSE_BITS * i) for i in range(coefficients))
+    guard = push((GAMMA1 * repeated_lane).to_bytes(width, 'little'))
+    minimum = GAMMA1 - RESPONSE_NORM_LIMIT + 1
+    upper_exclusive = RESPONSE_NORM_LIMIT
+    trim = number(width + 1) + asm('OP_NUM2BIN') + number(width) + asm('OP_SPLIT OP_DROP')
+
+    code = asm('OP_SIZE') + number(RESPONSE_PACKED_BYTES) + asm('OP_NUMEQUALVERIFY OP_DUP OP_TOALTSTACK')
+    code += guard + number(minimum * repeated_lane) + number(upper_exclusive * repeated_lane)
+    code += asm('OP_FROMALTSTACK')
+
+    # [original response, guard bits, lower bound, upper bound, unread bytes].
+    # Setting bit 17 in every 18-bit lane prevents cross-lane borrows.
+    chunk = number(width) + asm('OP_SPLIT OP_SWAP OP_DUP OP_5 OP_PICK OP_OR') + _UNSIGNED
+    # A lane with bit 17 clear must have its low part at least minimum.
+    chunk += asm('OP_DUP OP_5 OP_PICK OP_SUB') + trim
+    chunk += asm('OP_2 OP_PICK OP_OR OP_6 OP_PICK OP_AND OP_6 OP_PICK OP_EQUALVERIFY')
+    # A lane with bit 17 set must have its low part below the upper bound.
+    chunk += asm('OP_3 OP_PICK OP_SUB') + trim + asm('OP_AND OP_4 OP_PICK OP_AND')
+    chunk += _UNSIGNED + asm('OP_0 OP_NUMEQUALVERIFY')
+    return code + chunk * (RESPONSE_PACKED_BYTES // width) + asm('OP_2DROP OP_2DROP')
 
 
 @cache
@@ -155,12 +179,12 @@ def _compact_hint_decode(*, sparse):
 
 
 @cache
-def signature_decode_script(*, compact=True, signed_response=False, sparse_hints=False):
-    """Replace a signature with [c-tilde, z residues, decoded hints]."""
+def signature_decode_script(*, compact=True, signed_response=False, sparse_hints=False, packed_response=False):
+    """Split a signature into c-tilde, checked z, and decoded hints."""
     code = asm('OP_SIZE') + number(SIGNATURE_BYTES) + asm('OP_NUMEQUALVERIFY')
     code += number(CHALLENGE_BYTES) + asm('OP_SPLIT')
     code += number(RESPONSE_PACKED_BYTES) + asm('OP_SPLIT')
-    return (
-        code + hint_decode_script(compact=compact, sparse=sparse_hints) + asm('OP_TOALTSTACK')
-        + response_decode_script(signed=signed_response, reuse_constants=sparse_hints) + asm('OP_FROMALTSTACK')
-    )
+    response = (packed_response_check_script() if packed_response else
+                response_decode_script(signed=signed_response, reuse_constants=sparse_hints))
+    return (code + hint_decode_script(compact=compact, sparse=sparse_hints) + asm('OP_TOALTSTACK')
+            + response + asm('OP_FROMALTSTACK'))

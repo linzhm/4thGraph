@@ -1,0 +1,15 @@
+{
+  "version": "0.8.0",
+  "previous": "0.7.0",
+  "artifacts": [],
+  "fixtures": [],
+  "evidence": [
+    "measurements.json"
+  ],
+  "shared_data": [
+    "versions/v0.1.0/deterministic.json"
+  ],
+  "integration": "docs/sdk.en.md",
+  "build": "PYTHONPATH=src:.:projects/ml-dsa/reference python -c 'from benchmark_adapter import components; print(components(None))'",
+  "verify": "PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- python -m unittest discover -s projects/ml-dsa/reference"
+}

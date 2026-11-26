@@ -6,10 +6,13 @@ from pathlib import Path
 import random
 import unittest
 
-from fips204 import PUBLIC_KEY_BYTES, _GAMMA2, _pack, _use_hint, verification_equation, verify
+from fips204 import GAMMA1, PUBLIC_KEY_BYTES, RESPONSE_BITS, _GAMMA2, _pack, _use_hint, verification_equation, verify
 from hint_script import apply_hints_before_rounding_script, apply_hints_script, apply_sparse_hints_script
 from mldsa import authorize_digest, test_only_vector as deterministic_test_vector, verify_openssl
-from ntt_script import checked_equation_script, ring_product_script, transform_script, verification_equation_script
+from ntt_script import (
+    checked_equation_script, packed_response_equation_script, ring_product_script, transform_script,
+    verification_equation_script,
+)
 from polynomial import DEGREE, MODULUS, ROOT_OF_UNITY, inverse_ntt, ntt
 from signature_script import RESPONSE_NORM_LIMIT
 from fourthgraph.bsv.evaluate import ScriptError, evaluate
@@ -126,6 +129,9 @@ class ArithmeticTests(unittest.TestCase):
         kept = b"caller stack item"
         kernel = checked_equation_script(public_key, signed_challenge=True)
         self.assertEqual(evaluate(kernel, [kept, signed_challenge + responses]), ([kept, expected], []))
+        packed = _pack([GAMMA1 - value for row in response for value in row], RESPONSE_BITS)
+        kernel = packed_response_equation_script(public_key)
+        self.assertEqual(evaluate(kernel, [kept, signed_challenge + packed]), ([kept, expected], []))
 
     def test_forward_and_inverse_ntt(self):
         batch = ([0] * DEGREE, [0] * (DEGREE - 1) + [MODULUS - 1], *synthetic_polynomials())
