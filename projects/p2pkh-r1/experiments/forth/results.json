@@ -1,4 +1,5 @@
 {
+  "schema_version": 2,
   "source_sha256": "654e8130d49704c4a99961b2763216eebcd1c76e880ad65e284033491128a94f",
   "dependencies": {
     "r1.fth": "8acaf9f81bc367c98f9a42d561e302c6f27cc376ad3f3f8c8d49f5176cbaa7d9"
@@ -26,32 +27,6 @@
       "lock_sha256": "10f1708ea2c38c34f4d6779c8584485a514835b885dd3e2169d6b7aa9afdd399",
       "otda_program_sha256": "b057589c36d9596a61812d1edbb546841def951fd1b2f5516844d0a082428379",
       "point_vectors": 32,
-      "lock_bytes": 41986,
-      "otda_program_bytes": 3940,
-      "payment_bytes": {
-        "bip143-all": 84742,
-        "otda-all": 92672,
-        "otda-single": 92601
-      },
-      "payment_peak_stack_payload_bytes": {
-        "bip143-all": 3644,
-        "otda-all": 168350,
-        "otda-single": 84374
-      },
-      "unlock_bytes": {
-        "bip143-all": [
-          326,
-          326
-        ],
-        "otda-all": [
-          4291,
-          4291
-        ],
-        "otda-single": [
-          4251,
-          4260
-        ]
-      },
       "payment_evidence": {
         "bip143-all": {
           "spend_txid": "1801e51b21bb771646a221e68d77df9d73fe6b033bfb04e17e583dc884104c55",
@@ -71,38 +46,41 @@
         "chain_gang_payment_cases": 432,
         "valid_witness_controls": 4,
         "invalid_witness_controls": 24
-      }
+      },
+      "measured": {
+        "lock_bytes": 41986,
+        "otda_program_bytes": 3940,
+        "payment_bytes": {
+          "bip143-all": 84742,
+          "otda-all": 92672,
+          "otda-single": 92601
+        },
+        "payment_peak_stack_payload_bytes": {
+          "bip143-all": 3644,
+          "otda-all": 168350,
+          "otda-single": 84374
+        },
+        "unlock_bytes": {
+          "bip143-all": [
+            326,
+            326
+          ],
+          "otda-all": [
+            4291,
+            4291
+          ],
+          "otda-single": [
+            4251,
+            4260
+          ]
+        }
+      },
+      "status": "verified"
     },
     "split-4-affine-g": {
       "lock_sha256": "4fe3fab2cdb0418da7f6cf025464cb7104a693fe41f8ac7726eca920d0823ec2",
       "otda_program_sha256": "09abbce8ab527690c783216808c7a4c9b8cbbacff59e43182c3d2d44ffdc3b8f",
       "point_vectors": 32,
-      "lock_bytes": 41538,
-      "otda_program_bytes": 4068,
-      "payment_bytes": {
-        "bip143-all": 83846,
-        "otda-all": 92032,
-        "otda-single": 91961
-      },
-      "payment_peak_stack_payload_bytes": {
-        "bip143-all": 3642,
-        "otda-all": 166557,
-        "otda-single": 83478
-      },
-      "unlock_bytes": {
-        "bip143-all": [
-          326,
-          326
-        ],
-        "otda-all": [
-          4419,
-          4419
-        ],
-        "otda-single": [
-          4379,
-          4388
-        ]
-      },
       "payment_evidence": {
         "bip143-all": {
           "spend_txid": "a55f58cd30ab9e815c739b2f6fe725f996c8cb8ce7d82910ce4f7d6c2d605836",
@@ -122,38 +100,41 @@
         "chain_gang_payment_cases": 432,
         "valid_witness_controls": 4,
         "invalid_witness_controls": 24
-      }
+      },
+      "measured": {
+        "lock_bytes": 41538,
+        "otda_program_bytes": 4068,
+        "payment_bytes": {
+          "bip143-all": 83846,
+          "otda-all": 92032,
+          "otda-single": 91961
+        },
+        "payment_peak_stack_payload_bytes": {
+          "bip143-all": 3642,
+          "otda-all": 166557,
+          "otda-single": 83478
+        },
+        "unlock_bytes": {
+          "bip143-all": [
+            326,
+            326
+          ],
+          "otda-all": [
+            4419,
+            4419
+          ],
+          "otda-single": [
+            4379,
+            4388
+          ]
+        }
+      },
+      "status": "verified"
     },
     "joint-2": {
       "lock_sha256": "07a423aa01862ed7087878c5722d7b99d8148122f4a9c372127cf879cf316945",
       "otda_program_sha256": "cdbad76082e6b3161d57396f3ce1cec2d2df34e08e8bd612197d8c7b646ee171",
       "point_vectors": 32,
-      "lock_bytes": 42378,
-      "otda_program_bytes": 3058,
-      "payment_bytes": {
-        "bip143-all": 85526,
-        "otda-all": 91692,
-        "otda-single": 91621
-      },
-      "payment_peak_stack_payload_bytes": {
-        "bip143-all": 2550,
-        "otda-all": 169918,
-        "otda-single": 85158
-      },
-      "unlock_bytes": {
-        "bip143-all": [
-          326,
-          326
-        ],
-        "otda-all": [
-          3409,
-          3409
-        ],
-        "otda-single": [
-          3369,
-          3378
-        ]
-      },
       "payment_evidence": {
         "bip143-all": {
           "spend_txid": "5c607e2c1a93e62c0b5a81fe71dff8567144965233d38476d63cc16a1fcf905e",
@@ -173,38 +154,41 @@
         "chain_gang_payment_cases": 432,
         "valid_witness_controls": 4,
         "invalid_witness_controls": 24
-      }
+      },
+      "measured": {
+        "lock_bytes": 42378,
+        "otda_program_bytes": 3058,
+        "payment_bytes": {
+          "bip143-all": 85526,
+          "otda-all": 91692,
+          "otda-single": 91621
+        },
+        "payment_peak_stack_payload_bytes": {
+          "bip143-all": 2550,
+          "otda-all": 169918,
+          "otda-single": 85158
+        },
+        "unlock_bytes": {
+          "bip143-all": [
+            326,
+            326
+          ],
+          "otda-all": [
+            3409,
+            3409
+          ],
+          "otda-single": [
+            3369,
+            3378
+          ]
+        }
+      },
+      "status": "verified"
     },
     "split-5x4": {
       "lock_sha256": "c1b6236400f19031ced904c29ac6ccdea57ee209d2fe7f4069ab3ae8be5a0c51",
       "otda_program_sha256": "aac67720278b32cd95e39a4144489e420204f62ac0ec0aa25c2db3c108f84113",
       "point_vectors": 32,
-      "lock_bytes": 41721,
-      "otda_program_bytes": 5510,
-      "payment_bytes": {
-        "bip143-all": 84212,
-        "otda-all": 95282,
-        "otda-single": 95211
-      },
-      "payment_peak_stack_payload_bytes": {
-        "bip143-all": 4683,
-        "otda-all": 167289,
-        "otda-single": 83844
-      },
-      "unlock_bytes": {
-        "bip143-all": [
-          326,
-          326
-        ],
-        "otda-all": [
-          5861,
-          5861
-        ],
-        "otda-single": [
-          5821,
-          5830
-        ]
-      },
       "payment_evidence": {
         "bip143-all": {
           "spend_txid": "b04ffae255a029cb4f752084dc3d386614f47e5ffa681308a5f659f835a43493",
@@ -224,7 +208,36 @@
         "chain_gang_payment_cases": 432,
         "valid_witness_controls": 4,
         "invalid_witness_controls": 24
-      }
+      },
+      "measured": {
+        "lock_bytes": 41721,
+        "otda_program_bytes": 5510,
+        "payment_bytes": {
+          "bip143-all": 84212,
+          "otda-all": 95282,
+          "otda-single": 95211
+        },
+        "payment_peak_stack_payload_bytes": {
+          "bip143-all": 4683,
+          "otda-all": 167289,
+          "otda-single": 83844
+        },
+        "unlock_bytes": {
+          "bip143-all": [
+            326,
+            326
+          ],
+          "otda-all": [
+            5861,
+            5861
+          ],
+          "otda-single": [
+            5821,
+            5830
+          ]
+        }
+      },
+      "status": "verified"
     }
   }
 }
