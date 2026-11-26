@@ -5,7 +5,10 @@ from hashlib import sha256
 import json
 from pathlib import Path
 
-from protocol import CANDIDATE_ORDER, PROJECT_NAME, RANK_ORDER, artifact_digest, candidate_rank, select_candidate
+from protocol import (
+    CANDIDATE_ORDER, OBJECTIVES, PROJECT_NAME, RANK_ORDER, artifact_digest, candidate_rank, search_selection,
+    select_candidate,
+)
 from shared.transaction import Transaction
 
 SCENARIOS = {
@@ -72,13 +75,17 @@ def measure_case(case, artifact, bootstrap):
             or deploy.inputs[0].vout >= len(bootstrap.outputs) or len(deploy.outputs) != 1
             or not output_matches(deploy.outputs[0], artifact["deploy_output"])):
         raise ValueError("deployment does not match the bootstrap and candidate output")
+    script_bytes = [len(deploy.inputs[0].script) + len(bootstrap.outputs[deploy.inputs[0].vout].script)]
     for step in templates:
         expected = [(txs[ref["step"]], ref["vout"]) for ref in step["inputs"]]
-        actual = [(item.txid, item.vout) for item in txs[step["name"]].inputs]
+        inputs = txs[step["name"]].inputs
+        actual = [(item.txid, item.vout) for item in inputs]
         if actual != [(parent.txid_wire(), vout) for parent, vout in expected] or any(
             vout >= len(parent.outputs) for parent, vout in expected
         ):
             raise ValueError(f"{step['name']} does not spend its bound parents")
+        script_bytes.append(sum(len(item.script) + len(parent.outputs[vout].script)
+                                for item, (parent, vout) in zip(inputs, expected, strict=True)))
     terminal = txs[names[-1]].outputs
     if len(terminal) != 1 or not output_matches(terminal[0], artifact["terminal_outputs"][case["route"]]):
         raise ValueError("terminal output does not match the reported route")
@@ -98,7 +105,7 @@ def measure_case(case, artifact, bootstrap):
             "node_rpc_code": row["bsv_node"].get("rpc_code"),
         }
     passed = all(positive_passed(row) for row in steps.values()) and all(row["passed"] for row in controls.values())
-    return {
+    result = {
         "status": "passed" if passed else "failed",
         "artifact_sha256": case["artifact_sha256"],
         "inputs": case["data"], "metrics": metrics,
@@ -107,26 +114,46 @@ def measure_case(case, artifact, bootstrap):
         "measured_minus_estimated_bytes": metrics["whole_path_bytes"] - artifact["estimated_cost"]["whole_path_bytes"],
         "controls": controls,
     }
+    if "max_input_script_bytes" in artifact["estimated_cost"]:
+        result["metrics"] = {**metrics, "max_input_script_bytes": max(script_bytes)}
+        result["measured_minus_estimated_peak_input_script_bytes"] = (
+            max(script_bytes) - artifact["estimated_cost"]["max_input_script_bytes"]
+        )
+    return result
 
 
-def present_candidate(replay, scenario, name, candidate, source_digest, bootstrap, used_cases):
+def present_candidate(replay, scenario, name, candidate, source_digest, bootstrap, used_cases, objective=None):
     routes = dict.fromkeys(ROUTES, {"status": "not_run"})
     if not candidate["eligible"]:
         return {**candidate, "static_status": "excluded", "replay": routes}
-    plan_id = SCENARIOS[scenario][name]
+    plan_id = name if objective else SCENARIOS[scenario][name]
     artifact = replay["plans"][plan_id]
     digest = artifact["artifact_sha256"]
+    schedule = candidate["schedule"] if objective else name
+    witness = replay["join_witness"]
+    if objective and witness == "all":
+        witness = candidate["join_witness"] or "full"
     if (artifact_digest(artifact) != digest or candidate["artifact_sha256"] != digest
-            or artifact["source_sha256"] != source_digest or artifact["schedule"] != name
+            or artifact["source_sha256"] != source_digest or artifact["schedule"] != schedule
+            or artifact["join_witness"] != witness
             or artifact["compiler_version"] != replay["compiler_version"]
-            or any(artifact[key] != replay[key] for key in ("target", "topology", "optimization", "join_witness"))):
+            or any(artifact[key] != replay[key] for key in ("target", "topology", "optimization"))):
         raise ValueError(f"{scenario}/{name} artifact digest, source, or build settings do not match")
+    if objective:
+        if (schedule == "split" and candidate["join_witness"] != witness
+                or schedule == "fused" and candidate["join_witness"] is not None):
+            raise ValueError(f"{scenario}/{name} witness layout does not match the artifact")
+        gated = artifact["topology"] == "gated-parallel" and schedule == "split"
+        boundary = ("separate" if "gated_fork_output" in artifact else "merged") if gated else None
+        if boundary != candidate["gate_boundary"]:
+            raise ValueError(f"{scenario}/{name} gate boundary does not match the artifact")
     graph = [{key: row[key] for key in template} for row, template in
              zip(candidate["graph"], artifact["templates"], strict=True)]
     words = {step: {key: value for key, value in build.items() if key != "word"}
              for step, build in candidate["words"].items()}
     if (graph != artifact["templates"] or candidate["cost"] != artifact["estimated_cost"]
-            or words != artifact["word_builds"] or tuple(candidate["rank"]) != candidate_rank(candidate["cost"])):
+            or words != artifact["word_builds"]
+            or tuple(candidate["rank"]) != candidate_rank(candidate["cost"], OBJECTIVES[objective] if objective else RANK_ORDER)):
         raise ValueError(f"{scenario}/{name} decision does not match the compiled artifact")
     for route in ROUTES:
         case_id = f"{plan_id}_{route}"
@@ -170,20 +197,33 @@ def historical_record(path):
 
 def decision_report(replay_path, baselines=()):
     replay, provenance = read_replay(replay_path)
-    if replay["project"] != PROJECT_NAME or replay["schema_version"] != 2:
-        raise ValueError("a 4thGraph replay with schema_version 2 is required")
+    if replay["project"] != PROJECT_NAME or replay["schema_version"] not in (2, 3):
+        raise ValueError("a 4thGraph replay with schema_version 2 or 3 is required")
     bootstrap = Transaction.parse(bytes.fromhex(replay["bootstrap_raw"]))
     used_cases = set()
     scenarios = {}
-    for name, source in (("original", replay["source"]), ("constrained", replay["constrained_source"])):
+    search = replay["schema_version"] == 3
+    sources = {"original": replay["source"]}
+    if not search:
+        sources["constrained"] = replay["constrained_source"]
+    for name, source in sources.items():
         decision = replay["decisions"][name]
-        if decision["candidates"].keys() != SCENARIOS[name].keys():
+        objective = decision["objective"] if search else None
+        if not search and decision["candidates"].keys() != SCENARIOS[name].keys():
             raise ValueError(f"{name} does not contain the expected candidates")
         source_digest = sha256(source.encode()).hexdigest()
-        candidates = {key: present_candidate(replay, name, key, candidate, source_digest, bootstrap, used_cases)
+        candidates = {key: present_candidate(replay, name, key, candidate, source_digest, bootstrap, used_cases, objective)
                       for key, candidate in decision["candidates"].items()}
-        if (select_candidate(candidates, decision["requested"]) != (decision["selected"], decision["selection_basis"])
-                or tuple(decision["rank_order"]) != RANK_ORDER or tuple(decision["tie_break_order"]) != CANDIDATE_ORDER):
+        if search:
+            selection = search_selection(candidates, objective)
+            rank_order, ties = OBJECTIVES[objective], tuple(sorted(candidates))
+            if decision["objective_winners"] != {goal: search_selection(candidates, goal)[0] for goal in OBJECTIVES}:
+                raise ValueError(f"{name} objective winners do not match the static ranking")
+        else:
+            selection = select_candidate(candidates, decision["requested"])
+            rank_order, ties = RANK_ORDER, CANDIDATE_ORDER
+        if (selection != (decision["selected"], decision["selection_basis"])
+                or tuple(decision["rank_order"]) != rank_order or tuple(decision["tie_break_order"]) != ties):
             raise ValueError(f"{name} selection does not match the static ranking")
         scenarios[name] = {**decision, "source_sha256": source_digest, "candidates": candidates}
     if used_cases != replay["cases"].keys():
@@ -223,12 +263,20 @@ def markdown(report):
     ]
 
     for name, scenario in report["scenarios"].items():
-        picked = CANDIDATE_LABELS[scenario["selected"]]
+        search = "objective" in scenario
+        picked = candidate_label(scenario["selected"])
         available = scenario["availability"]
         basis = BASIS_LABELS[scenario["selection_basis"]]
         rows.extend([
             "", f"## {SCENARIO_LABELS[name]}", "",
-            f"选择**{picked}**，依据为{basis}。排序依次比较整路字节、单笔最大签名检查次数和依赖深度。",
+            f"选择**{picked}**，依据为{basis}。",
+        ])
+        if search:
+            winners = "、".join(f"{mark(goal)} 选择 {candidate_label(candidate)}"
+                               for goal, candidate in scenario["objective_winners"].items())
+            rows.append(f"{winners}。峰值验证目标按静态签名检查次数和输入脚本字节排序。")
+        rows.extend([
+            f"当前排序字段为 {listed(scenario['rank_order'])}。",
             "当前同时可用的数据为 " + listed(available["data"]) + "，授权角色为 " + listed(available["authorizers"]) + "。",
             f"源码 SHA-256 为 {mark(scenario['source_sha256'])}。", "",
             "| 候选 | 路由 | 静态 | 复放 | 估算 / 实测 / 偏差 B | 最大单笔 B | Node / chain-gang ms | 主栈 / Alt / 合计 B | 深度 / 中间 UTXO |",
@@ -236,7 +284,7 @@ def markdown(report):
         ])
         for candidate, info in scenario["candidates"].items():
             for route, result in info["replay"].items():
-                cells = [CANDIDATE_LABELS[candidate], ROUTE_LABELS[route], info["static_status"], result["status"]]
+                cells = [candidate_label(candidate), ROUTE_LABELS[route], info["static_status"], result["status"]]
                 estimate = info["cost"]["whole_path_bytes"] if info["eligible"] else "—"
                 metrics = result.get("metrics")
                 if metrics is None:
@@ -253,7 +301,7 @@ def markdown(report):
                     ])
                 rows.append("| " + " | ".join(cells) + " |")
         for candidate, info in scenario["candidates"].items():
-            rows.extend(["", f"### {CANDIDATE_LABELS[candidate]}", ""])
+            rows.extend(["", f"### {candidate_label(candidate)}", ""])
             for step in info["graph"]:
                 inputs = [f"{ref['step']}:{ref['vout']}" for ref in step["inputs"]]
                 external = listed(step.get("external_inputs", ()))
@@ -272,6 +320,14 @@ def markdown(report):
                     f"- 静态估算使用 {listed(values)}、{assumptions['ecdsa_der_bytes']} B DER、"
                     f"{assumptions['deployment_inputs']} 个部署输入。排序值为 {list(info['rank'])}。",
                 ])
+                if search:
+                    rows.append(f"- 最大单笔原生签名检查为 {cost['max_signature_checks']} 次。"
+                                f"估算峰值输入脚本为 {cost['max_input_script_bytes']} B。")
+                    for route, outcome in info["replay"].items():
+                        if "metrics" in outcome:
+                            peak = outcome["metrics"]["max_input_script_bytes"]
+                            delta = outcome["measured_minus_estimated_peak_input_script_bytes"]
+                            rows.append(f"- {ROUTE_LABELS[route]}实测峰值输入脚本为 {peak} B，偏差 {delta:+d} B。")
                 for step, word in info["words"].items():
                     rules = [f"{rewrite['rule']} L{rewrite['line']}:{rewrite['column']}" for rewrite in word["rewrites"]]
                     rows.append(f"- {mark(step)} 使用 {mark(word['word'])}，Script 为 {word['script_bytes']} B。"
@@ -292,6 +348,11 @@ def markdown(report):
 
 def mark(value):
     return chr(96) + str(value) + chr(96)
+
+
+def candidate_label(name):
+    labels = {**CANDIDATE_LABELS, "merged": "合并门", "separate": "独立门"}
+    return " / ".join(labels.get(part, part) for part in name.split("-"))
 
 
 def listed(values):

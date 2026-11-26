@@ -13,8 +13,9 @@ from shared.script import asm, encode_num, number, push
 from shared.transaction import FORKID, SIGHASH_ALL, Input, Output, Transaction, hash256, preimage_forkid
 
 from compiler import (
-    PROJECT_DESCRIPTION, PROJECT_NAME, PROJECT_VERSION, CompileError, Plan, SourceCompiler, Template, availability,
-    evaluate, fused_template, fusion_constraints, schedule,
+    GATE_BOUNDARIES, PROJECT_DESCRIPTION, PROJECT_NAME, PROJECT_VERSION, CompileError, ParentOutput, Plan,
+    SourceCompiler, Template, availability, evaluate, fused_template, fusion_constraints, gate_constraints,
+    schedule, split_templates,
 )
 from lowering import BASELINE, OPTIMIZATIONS, compile_word
 from stack_schedule import Graph
@@ -36,6 +37,11 @@ OUTPUTS_HASH = 118
 JOIN_WITNESSES = ("full", "shared")
 CANDIDATE_ORDER = ("fused", "split")
 RANK_ORDER = ("whole_path_bytes", "max_signature_checks", "dependency_depth_including_deploy")
+OBJECTIVES = {
+    "path-bytes": RANK_ORDER,
+    "peak-validation": ("max_signature_checks", "max_input_script_bytes", "whole_path_bytes",
+                        "dependency_depth_including_deploy"),
+}
 SECP256K1_FIELD = (1 << 256) - (1 << 32) - 977
 
 
@@ -318,6 +324,23 @@ class Host:
         return utxo.output.script
 
 
+def template_external_inputs(program, template):
+    gate = program.gate
+    shared = program.shared_input
+    if template.name == "fused":
+        return tuple(dict.fromkeys(program.input_order))
+    if template.name == "split":
+        inputs = (shared,) if shared is not None else ()
+        if gate is None:
+            return inputs
+        if gate.name not in template.executes:
+            return () if gate.input == shared else inputs
+        return inputs if gate.input == shared else (*inputs, gate.input)
+    if gate and template.name == gate.name:
+        return (gate.input,)
+    return tuple(step.input for step in program.work if step.name == template.name and step.input != shared)
+
+
 class Contracts:
     def __init__(self, plan: Plan, keys, task_id, *, target=DEFAULT_TARGET, optimization=BASELINE,
                  join_witness="full"):
@@ -415,22 +438,7 @@ class Contracts:
         return None
 
     def external_inputs(self, template):
-        gate = self.plan.program.gate
-        if template.name == "fused":
-            return self.unique_inputs
-        if template.name == "split":
-            shared = (self.shared_input,) if self.shared_input else ()
-            if self.separate_gate:
-                return () if self.fork_layout.committed else shared
-            if gate and gate.input != self.shared_input:
-                return (*shared, gate.input)
-            return shared
-        if gate and template.name == gate.name:
-            return (gate.input,)
-        for step in self.plan.program.work:
-            if template.name == step.name and step.input != self.shared_input:
-                return (step.input,)
-        return ()
+        return template_external_inputs(self.plan.program, template)
 
     def describe(self, *, cost=None):
         def describe_output(output):
@@ -610,6 +618,7 @@ def estimate_cost(contracts):
     done = {"deploy": deploy}
     depths = {"deploy": 1}
     rows = {"deploy": {"bytes": len(deploy.serialize()), "signature_checks": 1,
+                       "input_script_bytes": len(deploy.inputs[0].script) + 35,  # P2PK funding lock
                        "depends_on": [], "decision": "fund the first lock"}}
     program = contracts.plan.program
     data = {step.input: 0 for step in program.work}
@@ -629,6 +638,8 @@ def estimate_cost(contracts):
         rows[step.name] = {
             "bytes": len(tx.serialize()),
             "signature_checks": len(step.inputs) + len(step.authorizers),
+            "input_script_bytes": sum(len(txin.script) + len(utxo.output.script)
+                                      for txin, utxo in zip(tx.inputs, draft.previous, strict=True)),
             "depends_on": [asdict(ref) for ref in step.inputs],
             "executes": step.executes,
             "decision": decision,
@@ -638,6 +649,7 @@ def estimate_cost(contracts):
         "whole_path_bytes": sum(step["bytes"] for step in rows.values()),
         "max_transaction_bytes": max(step["bytes"] for step in rows.values()),
         "max_signature_checks": max(step["signature_checks"] for step in rows.values()),
+        "max_input_script_bytes": max(step["input_script_bytes"] for step in rows.values()),
         "dependency_depth_including_deploy": max(depths.values()),
         "steps": rows,
     }
@@ -653,8 +665,8 @@ def build_artifact(document, source_bytes):
     return {**artifact, "artifact_sha256": artifact_digest(artifact)}
 
 
-def candidate_rank(cost):
-    return tuple(cost[metric] for metric in RANK_ORDER)
+def candidate_rank(cost, order=RANK_ORDER):
+    return tuple(cost[metric] for metric in order)
 
 
 def select_candidate(candidates, mode):
@@ -669,42 +681,62 @@ def select_candidate(candidates, mode):
     return selected, basis
 
 
-def compile_decision(program, keys, task_id, *, mode, available_data=None, available_authorizers=None,
-                     source_bytes=None, **options):
-    data, authorizers = availability(program, available_data, available_authorizers)
-    if mode != "auto":
-        schedule(program, mode, available_data=data, available_authorizers=authorizers)
-    blockers = fusion_constraints(program, data, authorizers)
-    viable, artifacts, evidence = {}, {}, {}
+def availability_report(data, authorizers, available_data, available_authorizers):
+    return {"data": sorted(data), "authorizers": sorted(authorizers),
+            "data_defaulted": available_data is None, "authorizers_defaulted": available_authorizers is None}
+
+
+def candidate_evidence(contract, spec, order):
+    plan = contract.plan
+    program = plan.program
     words = {step.name: step.word.name for step in program.work}
     words[program.join_name] = program.join.name
     if program.gate is not None:
         words[program.gate.name] = program.gate.word.name
+    cost = spec["estimated_cost"]
+    return {
+        "eligible": True, "cost": cost, "boundary_reasons": plan.boundary_reasons,
+        "graph": describe_graph(program, plan.templates),
+        "words": {step: {"word": words[step], **build} for step, build in spec["word_builds"].items()},
+        "rank": candidate_rank(cost, order),
+    }
+
+
+def describe_graph(program, templates):
+    return [{**asdict(step), "external_inputs": template_external_inputs(program, step)} for step in templates]
+
+
+def compile_decision(program, keys, task_id, *, mode, available_data=None, available_authorizers=None,
+                     source_bytes=None, gate_boundary="auto", **options):
+    data, authorizers = availability(program, available_data, available_authorizers)
+    if gate_boundary != "auto":
+        schedule(program, mode, available_data=data, available_authorizers=authorizers, gate_boundary=gate_boundary)
+        mode = "split"
+    elif mode != "auto":
+        schedule(program, mode, available_data=data, available_authorizers=authorizers)
+    blockers = fusion_constraints(program, data, authorizers)
+    viable, artifacts, evidence = {}, {}, {}
     for candidate in CANDIDATE_ORDER:
         if candidate == "fused" and blockers:
-            graph = {**asdict(fused_template(program)), "external_inputs": tuple(dict.fromkeys(program.input_order))}
             evidence[candidate] = {
                 "eligible": False, "reason": "fusion excluded: " + "; ".join(row["message"] for row in blockers),
-                "exclusions": blockers, "graph": [graph], "boundary_reasons": [],
+                "exclusions": blockers, "graph": describe_graph(program, (fused_template(program),)),
+                "boundary_reasons": [],
             }
             continue
-        plan = schedule(program, candidate, available_data=data, available_authorizers=authorizers)
+        plan = schedule(program, candidate, available_data=data, available_authorizers=authorizers,
+                        gate_boundary=gate_boundary if candidate == "split" else "auto")
         try:
             contract = Contracts(plan, keys, task_id, **options)
             cost = estimate_cost(contract)
         except ValueError as error:
             evidence[candidate] = {
                 "eligible": False, "reason": str(error), "exclusions": [{"code": "build_error", "message": str(error)}],
-                "graph": [asdict(step) for step in plan.templates], "boundary_reasons": plan.boundary_reasons,
+                "graph": describe_graph(program, plan.templates), "boundary_reasons": plan.boundary_reasons,
             }
             continue
         spec = contract.describe(cost=cost)
-        evidence[candidate] = {
-            "eligible": True, "cost": cost, "boundary_reasons": plan.boundary_reasons,
-            "graph": [{**asdict(step), "external_inputs": contract.external_inputs(step)} for step in plan.templates],
-            "words": {step: {"word": words[step], **build} for step, build in spec["word_builds"].items()},
-            "rank": candidate_rank(cost),
-        }
+        evidence[candidate] = candidate_evidence(contract, spec, RANK_ORDER)
         if source_bytes is not None:
             artifacts[candidate] = build_artifact(spec, source_bytes)
             evidence[candidate]["artifact_sha256"] = artifacts[candidate]["artifact_sha256"]
@@ -713,8 +745,7 @@ def compile_decision(program, keys, task_id, *, mode, available_data=None, avail
     explanation = {
         "requested": mode, "selected": selected, "selection_basis": basis, "rank_order": RANK_ORDER,
         "tie_break_order": CANDIDATE_ORDER,
-        "availability": {"data": sorted(data), "authorizers": sorted(authorizers),
-                         "data_defaulted": available_data is None, "authorizers_defaulted": available_authorizers is None},
+        "availability": availability_report(data, authorizers, available_data, available_authorizers),
         "candidates": evidence,
     }
     return viable, artifacts, explanation
@@ -723,6 +754,87 @@ def compile_decision(program, keys, task_id, *, mode, available_data=None, avail
 def compile_candidates(program, keys, task_id, **options):
     viable, _, explanation = compile_decision(program, keys, task_id, **options)
     return viable[explanation["selected"]], explanation
+
+
+def search_selection(candidates, objective):
+    eligible = sorted(name for name, row in candidates.items() if row["eligible"])
+    if not eligible:
+        reasons = ", ".join(f"{name}: {row['reason']}" for name, row in candidates.items())
+        raise CompileError(f"no eligible transaction plan ({reasons})")
+    selected = min(eligible, key=lambda name: candidate_rank(candidates[name]["cost"], OBJECTIVES[objective]))
+    return selected, "lowest_rank" if len(eligible) > 1 else "only_eligible_candidate"
+
+
+def check_result_sources(plan):
+    if plan.mode == "fused":
+        return
+    a, b = plan.program.work
+    steps = {step.name: step for step in plan.templates}
+    join = steps[plan.program.join_name]
+    if (steps["split"].outputs != ("work", "work")
+            or join.inputs != (ParentOutput(a.name, 0), ParentOutput(b.name, 0))
+            or any(steps[work.name].inputs != (ParentOutput("split", slot),)
+                   or steps[work.name].outputs != ("result", "data")
+                   for slot, work in enumerate((a, b)))):
+        raise CompileError("join must consume the two ordered results of the same split")
+
+
+def compile_search(program, keys, task_id, *, source_bytes, mode="auto", gate_boundary="auto", join_witness=None,
+                   objective="path-bytes", available_data=None, available_authorizers=None, **options):
+    if objective not in OBJECTIVES or mode not in ("auto", "fused", "split"):
+        raise CompileError("unknown search objective or schedule")
+    if join_witness is not None and join_witness not in JOIN_WITNESSES:
+        raise CompileError(f"unknown join witness layout {join_witness!r}")
+    if gate_boundary not in GATE_BOUNDARIES or (
+        gate_boundary != "auto" and (program.gate is None or mode == "fused")
+    ):
+        raise CompileError("an explicit gate boundary requires a gated split schedule")
+    data, authorizers = availability(program, available_data, available_authorizers)
+    modes = CANDIDATE_ORDER if mode == "auto" else (mode,)
+    boundaries = ((None,) if program.gate is None else
+                  ("merged", "separate") if gate_boundary == "auto" else (gate_boundary,))
+    witnesses = JOIN_WITNESSES if join_witness is None else (join_witness,)
+    viable, artifacts, candidates = {}, {}, {}
+    for kind in modes:
+        if kind == "fused" and gate_boundary != "auto":
+            continue
+        layouts = ((None, None),) if kind == "fused" else (
+            (boundary, witness) for boundary in boundaries for witness in witnesses
+        )
+        for boundary, witness in layouts:
+            name = "-".join(part for part in (kind, boundary, witness) if part is not None)
+            dimensions = {"schedule": kind, "gate_boundary": boundary, "join_witness": witness}
+            blockers = fusion_constraints(program, data, authorizers) if kind == "fused" else (
+                gate_constraints(program, data, authorizers) if boundary == "merged" else []
+            )
+            templates = ((fused_template(program),) if kind == "fused" else split_templates(program, boundary == "separate"))
+            if not blockers:
+                plan = schedule(program, kind, available_data=data, available_authorizers=authorizers,
+                                gate_boundary=boundary or "auto")
+                try:
+                    check_result_sources(plan)
+                    contract = Contracts(plan, keys, task_id, join_witness=witness or join_witness or "full", **options)
+                    spec = contract.describe()
+                except ValueError as error:
+                    blockers = [{"code": "build_error", "message": str(error)}]
+            if blockers:
+                candidates[name] = {**dimensions, "eligible": False, "exclusions": blockers,
+                                    "reason": "; ".join(row["message"] for row in blockers),
+                                    "graph": describe_graph(program, templates), "boundary_reasons": []}
+                continue
+            artifact = build_artifact(spec, source_bytes)
+            viable[name], artifacts[name] = contract, artifact
+            candidates[name] = {**dimensions, **candidate_evidence(contract, spec, OBJECTIVES[objective]),
+                                "artifact_sha256": artifact["artifact_sha256"]}
+    selected, basis = search_selection(candidates, objective)
+    return viable, artifacts, {
+        "requested": mode, "selected": selected, "selection_basis": basis, "objective": objective,
+        "objective_winners": {goal: search_selection(candidates, goal)[0] for goal in OBJECTIVES},
+        "rank_order": OBJECTIVES[objective], "tie_break_order": sorted(candidates),
+        "search_space": {"gate_boundary": gate_boundary, "join_witness": join_witness or "all"},
+        "availability": availability_report(data, authorizers, available_data, available_authorizers),
+        "candidates": candidates,
+    }
 
 
 def main():
@@ -735,17 +847,25 @@ def main():
     cli.add_argument("--mode", choices=("auto", "fused", "split"), default="auto")
     cli.add_argument("--target", choices=TARGETS, default=DEFAULT_TARGET, help="permitted transaction versions")
     cli.add_argument("--optimize", choices=OPTIMIZATIONS, default=BASELINE)
-    cli.add_argument("--join-witness", choices=JOIN_WITNESSES, default="full")
+    cli.add_argument("--join-witness", choices=JOIN_WITNESSES)
+    cli.add_argument("--gate-boundary", choices=GATE_BOUNDARIES, default="auto")
+    cli.add_argument("--search", action="store_true", help="enumerate permitted transaction boundaries and witness layouts")
+    cli.add_argument("--objective", choices=OBJECTIVES)
     cli.add_argument("--explain", action="store_true", help="show both candidates and how the plan was chosen")
     cli.add_argument("--keys", type=Path, help="JSON map of role to compressed public key hex")
     cli.add_argument("--task-id", help="32-byte hex data identifier")
     cli.add_argument("--available-data", nargs="*")
     cli.add_argument("--available-authorizers", nargs="*")
     args = cli.parse_args()
+    if args.objective and not args.search:
+        cli.error("--objective requires --search")
+    if args.entry and (args.search or args.gate_boundary != "auto"):
+        cli.error("transaction search and boundaries require a transaction build")
     if args.capabilities:
         print(json.dumps({"project": PROJECT_NAME, "compiler_version": PROJECT_VERSION, "description": PROJECT_DESCRIPTION,
                           **capabilities(), "optimizations": OPTIMIZATIONS, "join_witnesses": JOIN_WITNESSES,
-                          "topologies": ("parallel", "gated-parallel"), "targets": {
+                          "topologies": ("parallel", "gated-parallel"), "search_objectives": OBJECTIVES,
+                          "gate_boundaries": GATE_BOUNDARIES, "targets": {
             name: {"transaction_versions": versions, "era": era} for name, (versions, era) in TARGETS.items()
         }}, indent=2))
         return
@@ -770,11 +890,17 @@ def main():
             if not isinstance(raw_keys, dict) or any(not isinstance(key, str) for key in raw_keys.values()):
                 raise ValueError("keys must be a JSON object mapping roles to public key hex strings")
             keys = {name: bytes.fromhex(key) for name, key in raw_keys.items()}
-            _, artifacts, explanation = compile_decision(
-                source.program(), keys, bytes.fromhex(args.task_id), mode=args.mode, available_data=args.available_data,
-                available_authorizers=args.available_authorizers, target=args.target, optimization=args.optimize,
-                join_witness=args.join_witness, source_bytes=source_bytes,
-            )
+            params = dict(mode=args.mode, available_data=args.available_data, available_authorizers=args.available_authorizers,
+                          target=args.target, optimization=args.optimize, gate_boundary=args.gate_boundary,
+                          source_bytes=source_bytes)
+            task_id = bytes.fromhex(args.task_id)
+            if args.search:
+                _, artifacts, explanation = compile_search(source.program(), keys, task_id,
+                                                           join_witness=args.join_witness,
+                                                           objective=args.objective or "path-bytes", **params)
+            else:
+                _, artifacts, explanation = compile_decision(source.program(), keys, task_id,
+                                                             join_witness=args.join_witness or "full", **params)
             result = artifacts[explanation["selected"]]
             if args.explain:
                 result = {**result, "schedule_explanation": explanation}

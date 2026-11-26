@@ -13,7 +13,8 @@ from wordsets import (
 
 PROJECT_NAME = "4thGraph"
 PROJECT_DESCRIPTION = "A Forth compiler for BSV Script and multi-transaction workflows."
-PROJECT_VERSION = "0.1.1"
+PROJECT_VERSION = "0.1.2"
+GATE_BOUNDARIES = ("auto", "merged", "separate")
 
 
 class CompileError(ValueError):
@@ -432,50 +433,80 @@ def fused_template(program):
     return Template("fused", (ParentOutput("deploy", 0),), owners, ("terminal",), (*order, program.join_name))
 
 
-def schedule(program, mode="auto", *, available_data=None, available_authorizers=None):
-    if mode not in {"auto", "fused", "split"}:
-        raise CompileError(f"unknown schedule {mode!r}")
+def gate_constraints(program, data, authorizers):
+    gate = program.gate
+    if gate is None:
+        return []
+    reasons = [
+        {"code": "independent_submit", "step": step, "line": line,
+         "message": f"line {line}: independent-submit requires its own transaction for {step}"}
+        for step, line in program.independent if step == gate.name
+    ]
+    if gate.owner != program.operator:
+        reasons.append({"code": "different_authorities", "step": gate.name,
+                        "message": f"{gate.name}: gate and split have different authorities"})
+    if gate.input not in data:
+        reasons.append({"code": "unavailable_input", "step": gate.name, "input": gate.input,
+                        "message": f"{gate.name}: input {gate.input} is unavailable at split"})
+    if gate.owner not in authorizers:
+        reasons.append({"code": "unavailable_authorizer", "step": gate.name, "authorizer": gate.owner,
+                        "message": f"{gate.name}: authorizer {gate.owner} is unavailable at split"})
+    return reasons
+
+
+def split_templates(program, separate_gate):
     a, b = program.work
     gate = program.gate
+    prefix, fork_parent, fork_steps = (), "deploy", ("split",)
+    if separate_gate:
+        prefix = (Template(gate.name, (ParentOutput("deploy", 0),), (gate.owner,), ("split-lock",), (gate.name,)),)
+        fork_parent = gate.name
+    elif gate is not None:
+        fork_steps = (gate.name, "split")
+    return (
+        *prefix,
+        Template("split", (ParentOutput(fork_parent, 0),), (program.operator,), ("work", "work"), fork_steps),
+        Template(a.name, (ParentOutput("split", 0),), (a.owner,), ("result", "data"), (a.name,)),
+        Template(b.name, (ParentOutput("split", 1),), (b.owner,), ("result", "data"), (b.name,)),
+        Template(program.join_name, (ParentOutput(a.name, 0), ParentOutput(b.name, 0)), (), ("terminal",),
+                 (program.join_name,)),
+    )
+
+
+def schedule(program, mode="auto", *, available_data=None, available_authorizers=None, gate_boundary="auto"):
+    if mode not in {"auto", "fused", "split"}:
+        raise CompileError(f"unknown schedule {mode!r}")
+    gate = program.gate
+    if gate_boundary not in GATE_BOUNDARIES:
+        raise CompileError(f"unknown gate boundary {gate_boundary!r}")
+    if gate_boundary != "auto" and (gate is None or mode == "fused"):
+        raise CompileError("an explicit gate boundary requires a gated split schedule")
     data, authorizers = availability(program, available_data, available_authorizers)
     blockers = [row["message"] for row in fusion_constraints(program, data, authorizers)]
     if mode == "fused" and blockers:
         raise CompileError("fusion excluded: " + "; ".join(blockers))
     if mode == "auto":
-        mode = "split" if blockers else "fused"
+        mode = "split" if blockers or gate_boundary != "auto" else "fused"
     reasons = []
     if mode == "fused":
         templates = (fused_template(program),)
     else:
-        prefix, fork_parent, fork_steps = (), "deploy", ("split",)
+        separate = False
         if gate is not None:
-            reasons.extend(f"line {line}: independent-submit requires its own transaction for {step}"
-                           for step, line in program.independent if step == gate.name)
-            if gate.owner != program.operator:
-                reasons.append(f"{gate.name}: gate and split have different authorities")
-            if gate.input not in data:
-                reasons.append(f"{gate.name}: input {gate.input} is unavailable at split")
-            if gate.owner not in authorizers:
-                reasons.append(f"{gate.name}: authorizer {gate.owner} is unavailable at split")
-            if reasons:
-                prefix = (Template(gate.name, (ParentOutput("deploy", 0),), (gate.owner,),
-                                   ("split-lock",), (gate.name,)),)
-                fork_parent = gate.name
+            reasons = [row["message"] for row in gate_constraints(program, data, authorizers)]
+            if gate_boundary == "merged" and reasons:
+                raise CompileError("merged gate excluded: " + "; ".join(reasons))
+            separate = bool(reasons) or gate_boundary == "separate"
+            if separate:
+                if not reasons:
+                    reasons.append(f"{gate.name}: selected a separate gate transaction")
             else:
-                fork_steps = (gate.name, "split")
                 reasons.append(f"{gate.name}: guard and split are executed together under {program.operator}")
         shared = program.shared_input
         if shared is not None:
-            first = gate.name if prefix and gate.input == shared else "split"
+            first = gate.name if separate and gate.input == shared else "split"
             reasons.append(f"{first}: input {shared} must be available here to bind it for all consuming steps")
-        templates = (
-            *prefix,
-            Template("split", (ParentOutput(fork_parent, 0),), (program.operator,), ("work", "work"), fork_steps),
-            Template(a.name, (ParentOutput("split", 0),), (a.owner,), ("result", "data"), (a.name,)),
-            Template(b.name, (ParentOutput("split", 1),), (b.owner,), ("result", "data"), (b.name,)),
-            Template(program.join_name, (ParentOutput(a.name, 0), ParentOutput(b.name, 0)), (), ("terminal",),
-                     (program.join_name,)),
-        )
+        templates = split_templates(program, separate)
     return Plan(mode, program, templates, tuple(blockers), tuple(reasons))
 
 

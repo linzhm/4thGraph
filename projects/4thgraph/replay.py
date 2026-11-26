@@ -18,7 +18,7 @@ from shared.transaction import Input, Transaction
 from compiler import PROJECT_NAME, PROJECT_VERSION, CompileError, Word, evaluate, parse, schedule
 from lowering import BASELINE, OPTIMIZATIONS
 from protocol import DEFAULT_TARGET, JOIN_WITNESSES, TARGETS, Contracts, FLAG, Host, ROOT_VALUE, UTXO
-from protocol import compile_decision, invalidated
+from protocol import OBJECTIVES, compile_decision, compile_search, invalidated
 from wordsets import HOST_WORDS
 
 EXAMPLE = Path(__file__).with_name("example.fth")
@@ -311,17 +311,60 @@ def metrics(plan, records):
     }
 
 
+def search_replay(replay, source, *, join_witness, objective, available_data=None, available_authorizers=None):
+    program = parse(source.decode())
+    contracts, plans, decision = compile_search(
+        program, replay.keys.public, TASK_ID, source_bytes=source, target=replay.target,
+        optimization=replay.optimization, join_witness=join_witness, objective=objective,
+        available_data=available_data, available_authorizers=available_authorizers,
+    )
+    # Every split layout gets a foreign result with exactly the same covenant.
+    # Dedicate separate funding outputs to all distinct paths.
+    bootstrap = replay.fund(2 * len(contracts) + sum(c.plan.mode == "split" for c in contracts.values()))
+    gate_data = {program.gate.input: 2} if program.gate is not None else {}
+    cases, foreign = {}, {}
+    spare = 2 * len(contracts)
+    for name, contract in contracts.items():
+        foreign_result = None
+        if contract.plan.mode == "split":
+            deploy, deployment = replay.deploy(contract, bootstrap, spare)
+            spare += 1
+            done = {"deploy": deploy}
+            records = {"deploy": deployment}
+            if contract.separate_gate:
+                gate = program.gate.name
+                records[gate] = replay.branch(contract, gate, done, gate_data)
+            records["split"] = replay.branch(contract, "split", done, gate_data)
+            right = program.work[1]
+            records[right.name] = replay.branch(contract, right.name, done, {right.input: 5})
+            foreign_result = done[right.name]
+            foreign[name] = records
+        for route, data in (("settle", {"x": 10, "y": 5}), ("review", {"x": (1 << 32) - 1, "y": 2})):
+            row = replay.path(contract, bootstrap, len(cases), {**data, **gate_data}, route, foreign=foreign_result)
+            cases[f"{name}_{route}"] = {"scenario": "original", "candidate": name,
+                                       "source_sha256": plans[name]["source_sha256"],
+                                       "artifact_sha256": plans[name]["artifact_sha256"], **row}
+    return {"schema_version": 3, "bootstrap_raw": bootstrap.serialize().hex(), "source": source.decode(),
+            "plans": plans, "decisions": {"original": decision}, "foreign_same_task_id": foreign, "cases": cases}
+
+
 def main():
     cli = argparse.ArgumentParser(description=__doc__)
     cli.add_argument("--output", type=Path, required=True)
     cli.add_argument("--samples", type=int, default=7)
     cli.add_argument("--target", choices=TARGETS, default=DEFAULT_TARGET)
     cli.add_argument("--optimize", choices=OPTIMIZATIONS, default=BASELINE)
-    cli.add_argument("--join-witness", choices=JOIN_WITNESSES, default="full")
+    cli.add_argument("--join-witness", choices=JOIN_WITNESSES)
     cli.add_argument("--topology", choices=("parallel", "gated-parallel"), default="parallel")
+    cli.add_argument("--search", action="store_true", help="replay both routes for every eligible candidate")
+    cli.add_argument("--objective", choices=OBJECTIVES)
+    cli.add_argument("--available-data", nargs="*")
+    cli.add_argument("--available-authorizers", nargs="*")
     args = cli.parse_args()
     if args.samples < 1:
         cli.error("--samples must be positive")
+    if not args.search and (args.objective or args.available_data is not None or args.available_authorizers is not None):
+        cli.error("--objective and availability options require --search")
     from tx_engine import Tx
 
     engine = chain_metadata()
@@ -331,14 +374,34 @@ def main():
     if node.call("getconnectioncount", []) or node.call("getblockcount", []):
         raise ValueError("replay requires an empty peerless regtest")
     activation = int(os.environ.get("SCRIPT_LAB_CHRONICLE_HEIGHT", ACTIVATION_HEIGHT))
-    replay = Replay(node, args.samples, args.target, activation, args.optimize, args.join_witness)
+    replay = Replay(node, args.samples, args.target, activation, args.optimize, args.join_witness or "full")
     example = GATED_EXAMPLE if args.topology == "gated-parallel" else EXAMPLE
     source = example.read_bytes()
+    if args.search:
+        result = search_replay(replay, source, join_witness=args.join_witness, objective=args.objective or "path-bytes",
+                               available_data=args.available_data, available_authorizers=args.available_authorizers)
+    else:
+        result = baseline_replay(replay, source)
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    args.output.write_text(json.dumps({
+        "project": PROJECT_NAME, "compiler_version": PROJECT_VERSION, "sample_count": args.samples,
+        "bsv_node_version": node.version, "chain_gang": engine,
+        "regtest_profile": os.environ.get("SCRIPT_LAB_REGTEST_PROFILE"),
+        "target": args.target, "topology": args.topology, "optimization": args.optimize,
+        "join_witness": args.join_witness or ("all" if args.search else "full"),
+        "chronicle_activation_height": activation,
+        "task_id": TASK_ID.hex(),
+        "fixture_public_keys": {name: key.hex() for name, key in replay.keys.public.items()},
+        **result,
+    }, indent=2) + "\n")
+
+
+def baseline_replay(replay, source):
     pp = parse(source.decode())
     constrained_step = pp.gate.name if pp.gate is not None else "a"
     constrained_source = source + f"\nindependent-submit {constrained_step}\n".encode()
     independent = parse(constrained_source.decode())
-    options = dict(mode="auto", target=args.target, optimization=args.optimize, join_witness=args.join_witness)
+    options = dict(mode="auto", target=replay.target, optimization=replay.optimization, join_witness=replay.join_witness)
     fused_and_split, original_plans, original_decision = compile_decision(
         pp, replay.keys.public, TASK_ID, source_bytes=source, **options,
     )
@@ -370,21 +433,14 @@ def main():
                 "source_sha256": plans[plan_id]["source_sha256"], "artifact_sha256": plans[plan_id]["artifact_sha256"],
                 **row,
             }
-    args.output.parent.mkdir(parents=True, exist_ok=True)
-    args.output.write_text(json.dumps({
-        "project": PROJECT_NAME, "compiler_version": PROJECT_VERSION, "schema_version": 2, "sample_count": args.samples,
-        "bsv_node_version": node.version, "chain_gang": engine,
-        "regtest_profile": os.environ.get("SCRIPT_LAB_REGTEST_PROFILE"),
-        "target": args.target, "topology": args.topology, "optimization": args.optimize, "join_witness": args.join_witness,
-        "chronicle_activation_height": activation,
-        "task_id": TASK_ID.hex(), "bootstrap_raw": bootstrap.serialize().hex(),
-        "fixture_public_keys": {name: key.hex() for name, key in replay.keys.public.items()},
+    return {
+        "schema_version": 2, "bootstrap_raw": bootstrap.serialize().hex(),
         "source": source.decode(), "constrained_source": constrained_source.decode(),
         "plans": plans, "decisions": {"original": original_decision, "constrained": constrained_decision},
         "constrained_auto_schedule": constrained_decision["selected"], "constrained_fused_error": rejected,
         "foreign_same_task_id": {"deploy": deployment, "split": split_row, "b": b_row},
         "cases": cases,
-    }, indent=2) + "\n")
+    }
 
 
 if __name__ == "__main__":

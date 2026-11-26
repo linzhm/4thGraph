@@ -2,7 +2,7 @@
 
 A Forth compiler for BSV Script and multi-transaction workflows.
 
-当前构建版本为 **v0.1.1**。项目位于 BSV Script Lab 仓库内，编译与复放产物可写入 `projects/4thgraph/build/`。
+当前构建版本为 **v0.1.2**。项目位于 BSV Script Lab 仓库内，编译与复放产物可写入 `projects/4thgraph/build/`。
 
 同一份 Forth 源码可以生成融合版和拆分版。示例计算 `a = 2x`、`b = y + 1`，两支结果和汇合的和都按 `u32` 表示。回绕后的和小于 20 时走复核，其余走结算。两种后继各锁给一个配置的公钥。编译器以 Forth 2012 Core 为语义基线，`+` 使用 64 位 cell，`u32+` 固定按 32 位回绕。 [示例源码](example.fth) · [语言与 BSV 扩展规范](language.md)
 
@@ -62,7 +62,7 @@ PYTHONPATH=. python projects/4thgraph/protocol.py --capabilities
 project=projects/4thgraph
 PYTHONPATH=. bash shared/verify_node.sh --profile default -- \
   python "$project/replay.py" --target both --optimize stack --join-witness shared \
-  --output "$project/build/v0.1.1-parallel-both-height2.json"
+  --output "$project/build/decision-replay.json"
 
 archives=()
 for path in "$project"/build/v0.1.0-*parallel-*.json; do
@@ -70,8 +70,8 @@ for path in "$project"/build/v0.1.0-*parallel-*.json; do
     archives+=(--baseline "$path")
   fi
 done
-PYTHONPATH=. python "$project/decision_report.py" "$project/build/v0.1.1-parallel-both-height2.json" \
-  --output-dir "$project/build/v0.1.1-decision" "${archives[@]}"
+PYTHONPATH=. python "$project/decision_report.py" "$project/build/decision-replay.json" \
+  --output-dir "$project/build/decision" "${archives[@]}"
 ```
 
 报告器离线生成 `decision-report.json` 和 `decision-report.md`。评估另一拓扑时，为复放加上 `--topology gated-parallel`。复审相关的有资金回归可以在独立的 regtest 实例运行。
@@ -79,6 +79,21 @@ PYTHONPATH=. python "$project/decision_report.py" "$project/build/v0.1.1-paralle
 ```sh
 PYTHONPATH=. bash shared/verify_node.sh --profile default -- \
   python -m unittest discover -v -s projects/4thgraph -p test_regtest.py
+```
+
+## 有界候选搜索
+
+`protocol.py --search --explain` 对同一份源码与可用性假设生成候选和选择。带门拓扑最多有五个候选。融合占一个，拆分将门合并或单独提交的两种边界与 `full`、`shared` 两种汇合见证交叉比较。可用 `--mode split`、`--gate-boundary merged|separate` 或 `--join-witness full|shared` 缩小范围。显式门边界也可用于普通构建，便于复现对应候选的摘要。
+
+`--objective path-bytes` 默认按整路字节排序。`--objective peak-validation` 优先降低单笔最大原生签名检查次数，再比较峰值输入脚本字节。报告同时列出结算和复核在 BSV Node 与 chain-gang 的实测耗时。
+
+```sh
+project=projects/4thgraph
+PYTHONPATH=. bash shared/verify_node.sh --profile default -- \
+  python "$project/replay.py" --search --topology gated-parallel --target both \
+  --optimize stack --samples 7 --output "$project/build/search-replay.json"
+PYTHONPATH=. python "$project/decision_report.py" "$project/build/search-replay.json" \
+  --output-dir "$project/build/search-decision"
 ```
 
 ## 语言与运行器
