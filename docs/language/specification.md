@@ -65,7 +65,7 @@ range: r1-q-depth script-int 5 51 ;
 
 `cell>int` 保留数值并转换为 ScriptNum 类型。 `int+`、`int-`、`int*` 按 Script 整数运算，`int-rem` 保留被除数的余数符号并拒绝零除数。编译器跟踪字面量、计算结果和分支汇合的区间。调用及返回值必须满足相应签名。证明不足时报源码位置。
 
-直接导出的词默认检查所有带范围类型的入口参数，验证规范 ScriptNum 编码和区间。已由调用方验证的入口可用 `--entry <word> --assume-input-ranges` 省去自动检查。产物 JSON 给出范围及入口检查状态。显式的 `check-range <name>` 校验栈顶值并保留它，支持在词内缩小区间，两种入口模式都执行这条检查。原始字节须先解码为相应基类型。
+独立的 `lock:` 和 CLI 的 `--entry` 默认校验数值见证的规范 ScriptNum 编码，并检查 `cell`、`u32`、`route` 和显式 `range:` 的取值区间。普通词通过 Python 面向见证编译时，使用 `compile_word(word, spend_entry=True)`。已由调用方完成相同校验的片段可用 `--entry <word> --assume-input-ranges` 省去自动检查。产物 JSON 给出范围及入口检查状态。显式的 `check-range <name>` 校验栈顶值并保留它，支持在词内缩小区间，两种入口模式都执行这条检查。原始字节须先解码为相应基类型。
 
 `--optimize safe` 和 `stack` 在证明除数为正、操作数符合数值长度约束且被除数的绝对值小于除数后省掉 `int-rem`。编译报告记录位置信息、参与证明的区间和字节差值。 [R1 窗口示例](../../projects/p2pkh-r1/forth/window-ranges.fth)
 
