@@ -10,10 +10,11 @@ const { join } = require("node:path");
 const sourceCommit = "7b2cd79d005b2fcdc3c992d039efd619fb47abf7";
 const compilerSha256 = "889b8797ed04412e2ea6c0cc56ef5bfcdfb54451c162bcfbc12a6dd43325777b";
 
-if (process.argv.length !== 3 || !process.env.SCRYPTC) {
-  throw new Error("usage: SCRYPTC=/path/to/scryptc node scrypt_legacy.cjs UPSTREAM_CHECKOUT");
+const [checkout, mode, ...extraArgs] = process.argv.slice(2);
+if (!checkout || (mode && mode !== "--compiler-study") || extraArgs.length || !process.env.SCRYPTC) {
+  throw new Error("usage: SCRYPTC=/path/to/scryptc node scrypt_legacy.cjs UPSTREAM_CHECKOUT [--compiler-study]");
 }
-const source = realpathSync(process.argv[2]);
+const source = realpathSync(checkout);
 const compiler = realpathSync(process.env.SCRYPTC);
 const contractPath = "contracts/schnorr.scrypt";
 const arithmeticPath = "contracts/ec.scrypt";
@@ -28,6 +29,34 @@ process.env.SCRYPTC = compiler;
 const load = createRequire(join(source, "package.json"));
 if (load("scryptlib/package.json").version !== "2.1.36") throw new Error("run npm ci in the pinned checkout");
 const { bsv, buildContractClass, compileContract, PubKey, Bytes, Sig, Int, DEFAULT_FLAGS } = load("scryptlib");
+
+function compileAsm(output, optimize) {
+  const flags = optimize ? ["--asm", "-O"] : ["--asm"];
+  execFileSync(compiler, ["compile", ...flags, "-o", output, contractPath], { cwd: source });
+  const asm = JSON.parse(readFileSync(join(output, "schnorr_asm.json"), "utf8"));
+  return bsv.Script.fromASM(asm.output.map(({ opcode }) => opcode).join(" "));
+}
+
+function inverseFootprint(script) {
+  const arithmetic = readFileSync(join(source, arithmeticPath), "utf8");
+  const body = arithmetic.match(/function modInverseBranchlessP\b[^]*?asm\s*\{([^]*?)\}/)[1];
+  const inverse = bsv.Script.fromASM(body.trim().replace(/\s+/g, " ")).toBuffer();
+  const binary = script.toBuffer();
+  const pushLengthBytes = { 76: 1, 77: 2, 78: 4 };
+  let offset = 0;
+  let copies = 0;
+  let match = binary.indexOf(inverse);
+  for (const { opcodenum, buf } of script.chunks) {
+    while (match >= 0 && match < offset) match = binary.indexOf(inverse, match + 1);
+    if (match < 0) break;
+    if (match === offset) {
+      copies++;
+      match = binary.indexOf(inverse, offset + inverse.length);
+    }
+    offset += 1 + (pushLengthBytes[opcodenum] ?? 0) + (buf?.length ?? 0);
+  }
+  return { inverse_bytes: inverse.length, static_copies: copies, preserved_bytes: inverse.length * copies };
+}
 
 // Deterministic public test fixture for the linked legacy implementation,
 // with the same message and public-key x as official BIP340 test vector zero.
@@ -51,6 +80,15 @@ try {
   const unlock = contract.verify(Sig(signature), PubKey(publicKey), Bytes(message), noncePoint).unlockingScript;
   const interpreter = new bsv.Script.Interpreter();
   const sdkVerdict = interpreter.verify(unlock, lock, new bsv.Transaction(), 0, DEFAULT_FLAGS, new bsv.crypto.BN(10_000));
+  const compilerStudy = {};
+  if (mode === "--compiler-study") {
+    const plain = compileAsm(scratch, false);
+    if (plain.toHex() !== lock.toHex()) throw new Error("unoptimized ASM and hex builds disagree");
+    const optimized = compileAsm(scratch, true);
+    compilerStudy.plainInverse = inverseFootprint(plain);
+    compilerStudy.optimizedInverse = inverseFootprint(optimized);
+    compilerStudy.optimizedLock = optimized.toHex();
+  }
   process.stdout.write(JSON.stringify({
     sourceCommit,
     compilerSha256,
@@ -60,6 +98,7 @@ try {
     unlock: unlock.toHex(),
     sdkVerdict,
     sdkError: interpreter.errstr,
+    ...compilerStudy,
   }) + "\n");
 } finally {
   rmSync(scratch, { recursive: true, force: true });

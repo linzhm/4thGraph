@@ -10,41 +10,49 @@ import subprocess
 
 from bip340 import lift_x, to_bytes
 from schnorr_script import TEMPLATE_DIR, verifier
-from shared.benchmark_validation import CONTEXT_PIN, Node, chain_metadata, chain_verdict
+from shared.benchmark_validation import CONTEXT_PIN, Node, chain_metadata, chain_verdict, timed
 from shared.script import push
 from shared.transaction import Input, Output, Transaction
 
 
-def measure(lock, unlock, node):
+def measure(lock, unlock, node, samples):
     # Synthetic detached verifier case. The surrounding transaction supplies
     # execution context and framing, while the script's message is a fixture.
     parent = Transaction((Input(bytes(32), 0),), (Output(10_000, lock),))
     spend = Transaction((Input(parent.txid_wire(), 0, unlock),), (Output(9_900, b"\x51"),))
-    return {
+    chain_ok, chain_ms = timed(lambda: chain_verdict(spend, (parent,)), samples)
+    node_ok, node_ms = timed(lambda: node.verdicts(spend, (parent,))[0], samples)
+    result = {
         "verifier_bytes": len(lock),
         "verifier_sha256": sha256(lock).hexdigest(),
         "witness_bytes": len(unlock),
         "combined_script_bytes": len(lock) + len(unlock),
-        "chain_gang": chain_verdict(spend, (parent,)),
-        "bsv_node": node.verdicts(spend, (parent,))[0],
+        "chain_gang": chain_ok,
+        "bsv_node": node_ok,
     }
+    if samples:
+        result["median_ms"] = {"chain_gang": chain_ms, "bsv_node_rpc": node_ms}
+    return result
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("upstream_checkout", type=Path)
+    parser.add_argument("--compiler-study", action="store_true", help="compile and replay official scryptc -O output")
+    parser.add_argument("--samples", type=int, default=0, help="timed replays per engine and verifier")
     args = parser.parse_args()
+    if args.samples < 0:
+        parser.error("sample count must be nonnegative")
     if chain_metadata()["commit"] != CONTEXT_PIN:
         parser.error("install the pinned chain-gang revision from the project requirements")
     if not os.environ.get("REGTEST_URL") or not os.environ.get("REGTEST_COOKIE"):
         parser.error("run through shared/verify_node.sh")
     node = Node(os.environ["REGTEST_URL"], os.environ["REGTEST_COOKIE"])
     probe = Path(__file__).with_name("comparison") / "scrypt_legacy.cjs"
-    result = subprocess.run(
-        ["node", "--max-old-space-size=8192", str(probe), str(args.upstream_checkout)],
-        stdout=subprocess.PIPE,
-        check=True,
-    )
+    command = ["node", "--max-old-space-size=8192", str(probe), str(args.upstream_checkout)]
+    if args.compiler_study:
+        command.append("--compiler-study")
+    result = subprocess.run(command, stdout=subprocess.PIPE, check=True)
     upstream = json.loads(result.stdout)
     with (TEMPLATE_DIR / "bip340-vectors.csv").open(newline="", encoding="ascii") as vectors:
         vector = next(csv.DictReader(vectors))
@@ -54,16 +62,24 @@ def main():
     key_y = to_bytes(lift_x(key)[1])
     nonce_y = to_bytes(lift_x(signature[:32])[1])
     witness = b"".join(map(push, (message, key, key_y, signature, nonce_y)))
-    legacy = measure(bytes.fromhex(upstream["lock"]), bytes.fromhex(upstream["unlock"]), node)
-    baseline = measure(verifier(), witness, node)
+    legacy_witness = bytes.fromhex(upstream["unlock"])
+    rows = {
+        "scrypt_legacy": measure(bytes.fromhex(upstream["lock"]), legacy_witness, node, args.samples),
+        "script_lab_bip340": measure(verifier(), witness, node, args.samples),
+    }
+    if args.compiler_study:
+        rows["scrypt_legacy"]["inline_field_inverses"] = upstream["plainInverse"]
+        optimized = measure(bytes.fromhex(upstream["optimizedLock"]), legacy_witness, node, args.samples)
+        optimized["inline_field_inverses"] = upstream["optimizedInverse"]
+        rows["scrypt_legacy_optimized"] = optimized
     print(json.dumps({
         "scrypt_source": upstream["sourceCommit"],
         "scrypt_compiler_sha256": upstream["compilerSha256"],
         "scrypt_sdk": {"verdict": upstream["sdkVerdict"], "error": upstream["sdkError"]},
-        "scrypt_legacy": legacy,
-        "script_lab_bip340": baseline,
+        "samples_per_verifier_and_engine": args.samples,
+        **rows,
     }, indent=2))
-    if not all(row[engine] for row in (legacy, baseline) for engine in ("chain_gang", "bsv_node")):
+    if not all(row[engine] for row in rows.values() for engine in ("chain_gang", "bsv_node")):
         raise SystemExit(1)
 
 
