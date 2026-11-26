@@ -1,4 +1,4 @@
-"""Compile a fixed-statement BLS12-381 Groth16 verifier to BSV Script."""
+"""Compile a BLS12-381 Groth16 verifier specialized by public input source."""
 
 import argparse
 from dataclasses import dataclass
@@ -12,12 +12,18 @@ from compiler import PROJECT_NAME
 from proof.bls12_381 import (
     BETA, HOST, ONE12, PSI_X, PSI_Y, Q, R, U, HostField, ScriptField, Tower,
 )
-from protocol import FLAG, artifact_digest, authorize, is_compressed_public_key
+from protocol import (
+    FLAG, OUTPUTS_HASH, artifact_digest, authorize, begin, check_field, finish, is_compressed_public_key,
+)
 from shared.script import asm, number, push
+from shared.transaction import Output
 
 FIELD_BYTES = 48
 PACKET_BYTES = (8 + 12) * FIELD_BYTES
 SEED_BITS = bin(U)[3:]
+AFFINE_BYTES = 2 * FIELD_BYTES
+INFINITY = (0, 1, 0)
+_FIXED_WITNESS = object()
 
 # In Fp12*/Fp6*, f has trivial final exponentiation iff it is an R-th power.
 # Q + U has gcd R with Q**6 + 1. A valid f admits nonzero z with f*z**(Q+U)
@@ -40,6 +46,25 @@ class Proof:
     a: tuple
     b: tuple
     c: tuple
+
+
+@dataclass(frozen=True)
+class Dynamic:
+    """An unsigned spend-time scalar, optionally restricted below Fr."""
+
+    bits: int = R.bit_length()
+
+    def __post_init__(self):
+        if type(self.bits) is not int or not 1 <= self.bits <= R.bit_length():
+            raise ValueError(f"dynamic scalar width must be in [1, {R.bit_length()}]")
+
+    @property
+    def width(self):
+        return (self.bits + 7) // 8
+
+    @property
+    def limit(self):
+        return min(1 << self.bits, R)
 
 
 def element(value, modulus):
@@ -97,6 +122,43 @@ def public_signals(raw):
     if not isinstance(values, list):
         raise ValueError("expected an array of public scalars")
     return tuple(element(value, R) for value in values)
+
+
+def input_sources(raw):
+    """Decode an ordered JSON array of fixed values, nulls, or bit bounds."""
+    values = json.loads(raw)
+    if not isinstance(values, list):
+        raise ValueError("expected an array of public input sources")
+    sources = []
+    for value in values:
+        if value is None:
+            sources.append(Dynamic())
+        elif isinstance(value, dict) and value.keys() == {"bits"}:
+            sources.append(Dynamic(value["bits"]))
+        else:
+            sources.append(element(value, R))
+    return tuple(sources)
+
+
+def dynamic_slots(sources):
+    return tuple((index, source) for index, source in enumerate(sources) if isinstance(source, Dynamic))
+
+
+def public_packet(sources, signals):
+    """Validate slot order and encode just the spend-time values."""
+    if len(sources) != len(signals):
+        raise ValueError("public signals do not match the configured input count")
+    encoded = bytearray()
+    for index, (source, value) in enumerate(zip(sources, signals, strict=True)):
+        if type(value) is not int or not 0 <= value < R:
+            raise ValueError(f"noncanonical public scalar at index {index}")
+        if isinstance(source, Dynamic):
+            if value >= source.limit:
+                raise ValueError(f"public scalar at index {index} exceeds the configured bound")
+            encoded.extend(value.to_bytes(source.width, "little"))
+        elif value != source:
+            raise ValueError(f"public scalar at index {index} differs from the fixed value")
+    return bytes(encoded)
 
 
 class Curve:
@@ -207,22 +269,35 @@ def fixed_miller(point, lines):
 
 
 @lru_cache(maxsize=8)
-def prepare(key, signals):
-    if len(key.ic) != len(signals) + 1 or any(type(x) is not int or not 0 <= x < R for x in signals):
-        raise ValueError("public signals do not match the BLS12-381 verification key")
+def prepare_key(key):
     g1_host, g2_host = Curve(HOST), Curve(HOST, twist=True)
     for point in (key.alpha, *key.ic):
         if point is not None:
             g1_host.require_host(point)
     for point in (key.beta, key.gamma, key.delta):
         g2_host.require_host(point)
-    vk_x = key.ic[0]
-    for scalar, point in zip(signals, key.ic[1:], strict=True):
-        vk_x = g1_host.add_host(vk_x, g1_host.mul_host(point, scalar))
     fixed = fixed_miller(g1_host.negate(key.alpha), affine_lines(key.beta))
+    return fixed, tuple(affine_lines(key.delta)), tuple(affine_lines(key.gamma))
+
+
+def fold_msm(key, sources):
+    g1_host = Curve(HOST)
+    vk_x = key.ic[0]
+    for source, point in zip(sources, key.ic[1:], strict=True):
+        if not isinstance(source, Dynamic):
+            vk_x = g1_host.add_host(vk_x, g1_host.mul_host(point, source))
+    return vk_x
+
+
+@lru_cache(maxsize=8)
+def prepare(key, signals):
+    if len(key.ic) != len(signals) + 1 or any(type(x) is not int or not 0 <= x < R for x in signals):
+        raise ValueError("public signals do not match the BLS12-381 verification key")
+    fixed, delta, gamma = prepare_key(key)
+    vk_x = fold_msm(key, signals)
     if vk_x is not None:
-        fixed = HOST.mul12(fixed, fixed_miller(g1_host.negate(vk_x), affine_lines(key.gamma)))
-    return fixed, tuple(affine_lines(key.delta))
+        fixed = HOST.mul12(fixed, fixed_miller(Curve(HOST).negate(vk_x), gamma))
+    return fixed, delta
 
 
 def require_affine(tower, curve, jacobian, point):
@@ -253,13 +328,13 @@ def check_g1(tower, point):
     require_affine(tower, curve, current, (f.mul(BETA, x), f.sub(0, y)))
 
 
-def script_miller(tower, a, b, minus_c, delta, z):
+def script_miller(tower, a, b, minus_c, delta, z, gamma=None):
     curve = Curve(tower, twist=True)
     f = tower.fp
     f.all(tuple(f.equal(limb, 0) for limb in curve.equation(b)))
     current = (*b, curve.one)
     acc = z
-    for bit, lines in zip(SEED_BITS, delta, strict=True):
+    for step, (bit, lines) in enumerate(zip(SEED_BITS, delta, strict=True)):
         acc = tower.square12(acc)
         for index, fixed in enumerate(lines):
             x, y, point_z = current
@@ -277,6 +352,18 @@ def script_miller(tower, a, b, minus_c, delta, z):
                 intercept = curve.sub(curve.mul(slope, b[0]), curve.mul(factor, b[1]))
             line = intercept, tower.scale2(slope, f.sub(0, a[0])), tower.scale2(factor, a[1])
             acc = tower.mul_line(tower.mul_line(acc, line), evaluated_line(tower, minus_c, fixed))
+            if gamma is not None:
+                point, coefficients, finite = gamma
+                gamma_line = evaluated_line(tower, point, coefficients[step][index])
+                if coefficients[step][index][0] == (0, 0):
+                    gamma_line = tuple(
+                        tuple(f.select(finite, limb, identity) for limb, identity in zip(pair, unit, strict=True))
+                        for pair, unit in zip(gamma_line, ((1, 0), (0, 0), (0, 0)), strict=True)
+                    )
+                # With a nonzero intercept, the enforced (0,0) encoding of
+                # infinity contributes a nonzero Fp2 factor. It vanishes in
+                # the Fp12*/Fp6* residue test.
+                acc = tower.mul_line(acc, gamma_line)
         if bit == "1":
             acc = tower.mul12(acc, z)
     # The same loop computed [U]B. The untwisted Frobenius acts as -U on G2.
@@ -286,34 +373,115 @@ def script_miller(tower, a, b, minus_c, delta, z):
     return acc
 
 
-def unpack_packet():
+def unpack_packet(elements=PACKET_BYTES // FIELD_BYTES):
     decode = push(b"\x00") + asm("OP_CAT OP_BIN2NUM OP_DUP OP_0")
     take = (number(FIELD_BYTES) + asm("OP_SPLIT OP_SWAP") + decode
             + asm("OP_FROMALTSTACK OP_DUP OP_TOALTSTACK OP_WITHIN OP_VERIFY OP_SWAP"))
-    count = PACKET_BYTES // FIELD_BYTES - 1
-    return (asm("OP_SIZE") + number(PACKET_BYTES) + asm("OP_NUMEQUALVERIFY")
+    count = elements - 1
+    return (asm("OP_SIZE") + number(elements * FIELD_BYTES) + asm("OP_NUMEQUALVERIFY")
             + number(Q) + asm("OP_TOALTSTACK") + take * count + decode
             + asm("OP_FROMALTSTACK OP_WITHIN OP_VERIFY"))
 
 
+def unpack_public(slots):
+    code = asm("OP_SIZE") + number(sum(source.width for _, source in slots)) + asm("OP_NUMEQUALVERIFY")
+    for offset, (_, source) in enumerate(slots):
+        if offset < len(slots) - 1:
+            code += number(source.width) + asm("OP_SPLIT OP_SWAP")
+        code += push(b"\x00") + asm("OP_CAT OP_BIN2NUM OP_DUP") + number(source.limit)
+        code += asm("OP_LESSTHAN OP_VERIFY")
+        if offset < len(slots) - 1:
+            code += asm("OP_SWAP")
+    return code
+
+
+def choose_point(f, condition, yes, no):
+    return tuple(f.select(condition, a, b) for a, b in zip(yes, no, strict=True))
+
+
+def add_complete(curve, point, affine):
+    f = curve.tower.fp
+    x, y, z = point
+    ax, ay = affine
+    zz = f.mul(z, z)
+    h = f.sub(f.mul(ax, zz), x)
+    dy = f.sub(f.mul(ay, f.mul(zz, z)), y)
+    (mx, my, mz), _ = curve.add_mixed(point, affine)
+    mixed = mx, my, f.reduce(mz)
+    doubled, _, _ = curve.double(point)
+    same_x = choose_point(f, f.nonzero(dy), INFINITY, doubled)
+    finite = choose_point(f, f.nonzero(h), mixed, same_x)
+    return choose_point(f, f.nonzero(z), finite, (*affine, 1))
+
+
+def msm_claim(tower, key, sources, values, claim):
+    """Check the claimed affine VK point without an inversion in Script."""
+    f, curve, host = tower.fp, Curve(tower), Curve(HOST)
+    fixed = fold_msm(key, sources)
+    acc = INFINITY if fixed is None else (*fixed, 1)
+    for (index, source), scalar in zip(dynamic_slots(sources), values, strict=True):
+        base = key.ic[index + 1]
+        if base is None:
+            continue
+        for offset in range(0, source.bits, 2):
+            remaining = source.bits - offset
+            quotient = f.op("OP_DIV", scalar, 4) if remaining > 2 else 0
+            digit = f.sub(scalar, f.mul(quotient, 4))
+            point = base
+            if remaining > 1:
+                twice = host.add_host(base, base)
+                thrice = host.add_host(twice, base)
+                upper = f.op("OP_DIV", digit, 2)
+                odd = f.sub(digit, f.mul(upper, 2))
+                point = choose_point(f, upper, choose_point(f, odd, thrice, twice), base)
+            added = add_complete(curve, acc, point)
+            acc = choose_point(f, f.nonzero(digit), added, acc)
+            scalar = quotient
+            if remaining > 2:
+                base = host.add_host(twice, twice)
+
+    x, y, z = acc
+    finite = f.nonzero(z)
+    zz = f.mul(z, z)
+    gx, gy = claim
+    dx = f.sub(x, f.mul(gx, zz))
+    dy = f.sub(y, f.mul(gy, f.mul(zz, z)))
+    f.all((f.equal(f.select(finite, dx, gx), 0), f.equal(f.select(finite, dy, gy), 0)))
+    return finite
+
+
 @lru_cache(maxsize=8)
-def verification_script(key, signals):
-    fixed, delta = prepare(key, signals)
-    field = ScriptField(PACKET_BYTES // FIELD_BYTES)
+def verification_script(key, sources, *, compact=True):
+    slots = dynamic_slots(sources)
+    proof_elements = PACKET_BYTES // FIELD_BYTES
+    if slots:
+        fixed, delta, gamma_lines = prepare_key(key)
+        field = ScriptField(proof_elements + 2 + len(slots))
+        setup = (asm("OP_TOALTSTACK") + unpack_packet(proof_elements + 2)
+                 + asm("OP_FROMALTSTACK") + unpack_public(slots))
+    else:
+        fixed, delta = prepare(key, sources)
+        field = ScriptField(proof_elements)
+        setup = unpack_packet()
     tower = Tower(field)
-    a0, a1, b0, b1, b2, b3, c0, c1, *limbs = field.graph.inputs
+    a0, a1, b0, b1, b2, b3, c0, c1, *limbs = field.graph.inputs[:proof_elements]
     a, b, c = (a0, a1), ((b0, b1), (b2, b3)), (c0, c1)
     z = tuple(tuple(zip(limbs[i:i + 6:2], limbs[i + 1:i + 6:2], strict=True)) for i in (0, 6))
+    gamma = None
+    if slots:
+        gx, gy, *values = field.graph.inputs[proof_elements:]
+        finite = msm_claim(tower, key, sources, values, (gx, gy))
+        gamma = (gx, field.sub(0, gy)), gamma_lines, finite
     check_g1(tower, a)
     check_g1(tower, c)
-    result = script_miller(tower, a, b, Curve(tower).negate(c), delta, z)
+    result = script_miller(tower, a, b, Curve(tower).negate(c), delta, z, gamma)
     result = tower.mul12(tower.mul12(result, fixed), tower.frobenius12(z))
     field.all(tuple(field.equal(limb, 0) for limb in chain.from_iterable(result[1])))
     nonzero = 0
     for limb in chain.from_iterable(result[0]):
         nonzero = field.op("OP_BOOLOR", nonzero, field.nonzero(limb))
     field.all((nonzero,))
-    return unpack_packet() + field.compile()
+    return setup + field.compile(compact=compact and bool(slots))
 
 
 def proof_packet(key, signals, proof):
@@ -333,56 +501,124 @@ def proof_packet(key, signals, proof):
     z = HOST.power12(product, RESIDUE_EXPONENT)
     check = HOST.mul12(product, HOST.mul12(HOST.power12(z, U), HOST.frobenius12(z)))
     if any(chain.from_iterable(check[1])) or not any(chain.from_iterable(check[0])):
-        raise ValueError("Groth16 proof does not match the fixed BLS12-381 statement")
+        raise ValueError("Groth16 proof does not match the BLS12-381 statement")
     limbs = (*proof.a, *proof.b[0], *proof.b[1], *proof.c, *chain.from_iterable(chain.from_iterable(z)))
     return b"".join(limb.to_bytes(FIELD_BYTES, "little") for limb in limbs)
 
 
 class ScriptVerifier:
     def __init__(self, verification_key):
+        if isinstance(verification_key, str):
+            verification_key = verification_key.encode()
         self.key = read_key(verification_key)
         self.key_digest = sha256(verification_key).hexdigest()
 
-    def compile(self, signals, owner):
-        if not is_compressed_public_key(owner):
+    def sources(self, signals):
+        if signals is None:
+            return (Dynamic(),) * (len(self.key.ic) - 1)
+        if isinstance(signals, (str, bytes)):
+            raise ValueError("expected an ordered sequence of public input sources")
+        signals = tuple(signals)
+        if len(signals) + 1 != len(self.key.ic):
+            raise ValueError("public sources do not match the verification key")
+        return tuple(source if isinstance(source, Dynamic) else Dynamic() if source is None else element(source, R)
+                     for source in signals)
+
+    def compile(self, signals=None, owner=None, *, compact=True):
+        """Build the proof predicate, with optional ForkID ALL owner authorization."""
+        if owner is not None and not is_compressed_public_key(owner):
             raise ValueError("owner must be a valid compressed secp256k1 public key")
-        return authorize(owner) + verification_script(self.key, signals)
+        script = verification_script(self.key, self.sources(signals), compact=compact)
+        return script if owner is None else authorize(owner) + script
 
-    def witness(self, signals, proof):
-        return push(proof_packet(self.key, signals, read_proof(proof)))
+    def witness(self, signals, proof, *, sources=_FIXED_WITNESS):
+        signals = tuple(signals)
+        config = self.sources(signals if sources is _FIXED_WITNESS else sources)
+        public = public_packet(config, signals)
+        packet = proof_packet(self.key, signals, read_proof(proof))
+        if public:
+            vk_x = fold_msm(self.key, signals) or (0, 0)
+            packet += b"".join(coord.to_bytes(FIELD_BYTES, "little") for coord in vk_x)
+            return push(packet) + push(public)
+        return push(packet)
 
-    def artifact(self, signals, owner, script):
+    def artifact(self, signals, owner, script, *, compact=True):
+        sources = self.sources(signals)
+        slots = dynamic_slots(sources)
         artifact = {
             "project": PROJECT_NAME, "schema_version": 1, "proof_system": "groth16", "curve": "bls12-381",
             "minimum_era": "genesis", "transaction_versions": [1, 2],
-            "verification_key_sha256": self.key_digest, "public_signals": tuple(map(str, signals)),
-            "owner_public_key": owner.hex(), "sighash": f"{FLAG:02x}",
+            "verification_key_sha256": self.key_digest,
             "script_hex": script.hex(), "script_bytes": len(script), "script_sha256": sha256(script).hexdigest(),
             "proof_packet_bytes": PACKET_BYTES,
         }
+        if slots:
+            artifact.update(
+                schema_version=2,
+                public_input_sources=tuple(
+                    {"bits": source.bits} if isinstance(source, Dynamic) else str(source) for source in sources
+                ),
+                public_packet_bytes=sum(source.width for _, source in slots),
+                proof_packet_bytes=PACKET_BYTES + AFFINE_BYTES,
+                vk_claim_bytes=AFFINE_BYTES,
+                stack_schedule="compact" if compact else "baseline",
+            )
+        else:
+            artifact["public_signals"] = tuple(map(str, sources))
+        if owner is not None:
+            artifact.update(owner_public_key=owner.hex(), sighash=f"{FLAG:02x}")
         return {**artifact, "artifact_sha256": artifact_digest(artifact)}
+
+
+def public_output(value, packet):
+    """Example application state with a version byte and a canonical public packet."""
+    return Output(value, push(b"\x00" + packet) + asm("OP_DROP OP_1"))
+
+
+def bind_public_output(verifier_script, sources, value, versions=(1, 2)):
+    """Authenticate a sole successor output built from the verifier's same public packet.
+
+    Stack on entry: proof packet, public packet, 158-byte ForkID ALL preimage.
+    The verifier is the signature-free proof predicate from ScriptVerifier.compile.
+    """
+    width = sum(source.width for _, source in dynamic_slots(sources))
+    if not width:
+        raise ValueError("public output binding needs spend-time inputs")
+    suffix = asm("OP_DROP OP_1")
+    prefix = public_output(value, bytes(width)).serialize()[:-(width + len(suffix))]
+    return (begin(versions) + asm("OP_DUP") + push(prefix) + asm("OP_SWAP OP_CAT")
+            + push(suffix) + asm("OP_CAT OP_HASH256") + check_field(OUTPUTS_HASH)
+            + verifier_script + asm("OP_VERIFY") + finish())
 
 
 def main():
     cli = argparse.ArgumentParser(description=__doc__)
     cli.add_argument("--verification-key", type=Path, required=True)
-    cli.add_argument("--public", type=Path, required=True, help="trusted expected public signals as a JSON array")
-    cli.add_argument("--owner", required=True, help="compressed secp256k1 public key in hex")
+    cli.add_argument("--public", type=Path, help="fixed statement or actual signals for the proof witness")
+    cli.add_argument("--input-sources", type=Path, help="JSON array of fixed scalars, nulls, or bit bounds")
+    cli.add_argument("--stack-schedule", choices=("compact", "baseline"), default="compact",
+                     help="stack scheduling for dynamic and mixed public inputs")
+    cli.add_argument("--owner", help="optional compressed secp256k1 public key in hex")
     cli.add_argument("--output", type=Path, required=True)
     cli.add_argument("--proof", type=Path, help="snarkjs proof.json for the pinned public signals")
     cli.add_argument("--witness-output", type=Path, help="write the push-only witness prefix in hex")
     args = cli.parse_args()
     if bool(args.proof) != bool(args.witness_output):
         cli.error("--proof and --witness-output must be supplied together")
+    if args.proof and not args.public:
+        cli.error("--proof needs --public with the proof's full public statement")
     if args.witness_output and args.witness_output.resolve() == args.output.resolve():
         cli.error("artifact and witness need separate output paths")
     try:
         verifier = ScriptVerifier(args.verification_key.read_bytes())
-        signals, owner = public_signals(args.public.read_bytes()), bytes.fromhex(args.owner)
-        lock = verifier.compile(signals, owner)
-        witness = verifier.witness(signals, args.proof.read_bytes()) if args.proof else None
+        signals = public_signals(args.public.read_bytes()) if args.public else None
+        sources = input_sources(args.input_sources.read_bytes()) if args.input_sources else signals
+        owner = bytes.fromhex(args.owner) if args.owner is not None else None
+        compact = args.stack_schedule == "compact"
+        lock = verifier.compile(sources, owner, compact=compact)
+        witness = verifier.witness(signals, args.proof.read_bytes(), sources=sources) if args.proof else None
         args.output.parent.mkdir(parents=True, exist_ok=True)
-        args.output.write_text(json.dumps(verifier.artifact(signals, owner, lock), indent=2) + "\n")
+        args.output.write_text(json.dumps(verifier.artifact(sources, owner, lock, compact=compact), indent=2) + "\n")
         if witness is not None:
             args.witness_output.parent.mkdir(parents=True, exist_ok=True)
             args.witness_output.write_text(witness.hex() + "\n")

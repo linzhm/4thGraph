@@ -82,6 +82,13 @@ class ScriptField:
     def reduce(self, a):
         return a % Q if type(a) is int else self.op("OP_MOD", a, Q)
 
+    def select(self, condition, yes, no):
+        if type(condition) is int:
+            return yes if condition else no
+        if yes == no:
+            return yes
+        return self.op("OP_IF OP_NIP OP_ELSE OP_DROP OP_ENDIF", no, yes, condition)
+
     def all(self, conditions):
         for passed in conditions:
             self.valid = passed if self.valid == 1 else self.op("OP_BOOLAND", self.valid, passed)
@@ -92,8 +99,8 @@ class ScriptField:
     def nonzero(self, a):
         return self.op("OP_0NOTEQUAL", self.reduce(a))
 
-    def compile(self):
-        return self.graph.emit((self.value(self.valid),))
+    def compile(self, *, compact=False):
+        return self.graph.emit((self.value(self.valid),), compact=compact)
 
 
 class Tower:

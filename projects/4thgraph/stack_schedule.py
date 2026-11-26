@@ -92,34 +92,39 @@ class Layout:
         # accounts for every remaining use of the staged values.
         orders = (args, args[::-1]) if commutative and len(args) == 2 and args[0] != args[1] else (args,)
         candidates = []
+        # Trying an operand arrangement only consumes these operands. Copying
+        # the full liveness table for each attempt makes large kernels
+        # quadratic in the number of operations.
+        uses = Counter({operand: self.uses[operand] for operand in args})
         for order in orders:
             for staged in range(len(order) + 1):
                 prefix = order[:staged]
                 if staged and (tuple(self.slots[-staged:]) != prefix
                                or any(self.uses[value] != count for value, count in Counter(prefix).items())):
                     continue
-                candidate = Layout(self.slots, self.uses.copy())
+                candidate = Layout(self.slots, uses.copy())
                 candidate.uses.subtract(prefix)
                 for index in range(staged, len(order)):
                     candidate.access(order[index], index, last_use=True)
                 candidates.append(candidate)
             if len(order) == 2:
-                paired = self.pair(order)
+                paired = self.pair(order, uses)
                 if paired is not None:
                     candidates.append(paired)
         best = min(candidates, key=lambda candidate: len(candidate.code))
         self.slots = best.slots
-        self.uses = best.uses
+        for operand in uses:
+            self.uses[operand] = best.uses[operand]
         self.code.extend(best.code)
 
-    def pair(self, args):
+    def pair(self, args, uses):
         counts = Counter(args)
-        if tuple(self.slots[-2:]) == args and all(self.uses[value] > count for value, count in counts.items()):
-            candidate = Layout((*self.slots, *args), self.uses.copy())
+        if tuple(self.slots[-2:]) == args and all(uses[value] > count for value, count in counts.items()):
+            candidate = Layout((*self.slots, *args), uses.copy())
             candidate.code.extend(asm("OP_2DUP"))
         elif (len(self.slots) >= 4 and tuple(self.slots[-4:-2]) == args
-              and all(self.uses[value] == count for value, count in counts.items())):
-            candidate = Layout((*self.slots[:-4], *self.slots[-2:], *args), self.uses.copy())
+              and all(uses[value] == count for value, count in counts.items())):
+            candidate = Layout((*self.slots[:-4], *self.slots[-2:], *args), uses.copy())
             candidate.code.extend(asm("OP_2SWAP"))
         else:
             return None

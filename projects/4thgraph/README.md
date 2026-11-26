@@ -228,13 +228,17 @@ PYTHONPATH=. bash shared/verify_node.sh --profile default -- \
 
 ## Groth16 链上验证器
 
-[同一份 BLS12-381 Groth16 证明的 nChain 对照实测与复现](benchmarks/nchain-fixed/README.md)
+[固定声明的 nChain 对照](benchmarks/nchain-fixed/README.md) · [动态、混合和固定输入的同基线对照](benchmarks/groth16-inputs/README.md)
 
 ### BLS12-381
 
-`groth16_bls12381.py` 从 snarkjs 验证密钥和部署时已知的公开信号生成 BSV 锁。宿主预计算固定配对项及 `IC` 线性组合。Script 检查证明的坐标范围、曲线方程、素数阶子群和配对关系。Miller 循环用 Jacobian 坐标，将余数幂合入循环。余数检查替代最终指数运算，见证省去斜率和逆元。
+`groth16_bls12381.py` 从 snarkjs 验证密钥和公开输入配置生成 BSV 锁。对每个公开输入，JSON 配置用十进制标量固定部署时的值，用 `null` 表示完整 Fr 范围的花费时输入，也可用 `{"bits":128}` 限定为无符号 128 位。混合配置把固定项折叠进 `IC` 累加器，Script 使用两位固定基点窗口计算其余项并校验所声明的仿射 MSM 点。全固定配置预计算完整的公开输入配对项。
 
-解锁前缀是一个 960 B 的数据包加 3 B push 编码。数据包按顺序包含 `A.x, A.y, B.x0, B.x1, B.y0, B.y1, C.x, C.y`，接着是 Fp12 余数。每个 Fp 元素用 48 B 无符号小端编码。余数先编码 w 的偶次幂系数，再编码奇次幂系数，每个 Fp2 系数按实部、虚部顺序。追加对完整锁签出的 DER 签名和 `0x41`。公开信号由锁固定，交易输入与后继输出由 ForkID ALL 签名授权。单独的 `verification_script` 可供拥有自身交易约束的锁组合使用。
+Script 检查坐标范围、曲线方程、素数阶子群和配对关系。Miller 循环用 Jacobian 坐标，并将余数幂合入循环。余数检查替代最终指数运算，见证省去斜率和逆元。全固定配置使用 960 B 证明数据包加 3 B push 编码。数据包包含 `A.x, A.y, B.x0, B.x1, B.y0, B.y1, C.x, C.y` 及 Fp12 余数。每个 Fp 元素用 48 B 无符号小端编码。余数先编码 w 的偶次幂系数，再编码奇次幂系数，每个 Fp2 系数按实部、虚部顺序。
+
+动态和混合路径在证明包末尾追加 96 B 的 MSM 声明，接着单独 push 一个公开输入包。公开输入包按验证密钥槽顺序编码花费时提供的标量，每项是按所声明位宽向上取整到整字节的无符号小端数。范围是 `[0, min(2^bits, R))`。无穷远 MSM 点用两个零坐标表示。
+
+原始验证锁可直接组合应用检查。示例 `bind_public_output` 用 ForkID ALL 原像验证真实后继输出的金额和状态字节，再把同一个公开输入包交给证明谓词。选择 `--owner` 时，在见证后追加对完整锁签出的 DER 签名和 `0x41`，由该签名授权交易。
 
 同一份字节码支持 Genesis 和 Chronicle 下的 v1、v2 交易。用 BLS12-381 格式的 snarkjs 文件构建锁和见证。
 
@@ -245,6 +249,8 @@ PYTHONPATH=. python "$project/groth16_bls12381.py" \
   --owner "$owner_public_key_hex" --output lock.json \
   --proof proof.json --witness-output witness.hex
 ```
+
+`--public` 单独使用时编译固定声明。动态或混合构建使用 `--input-sources input-sources.json`，生成见证时再传 `--public` 和 `--proof`。省略两种公开输入选项会生成完整 Fr 范围的动态锁。动态和混合路径可用 `--stack-schedule baseline` 对照默认的紧凑栈调度。
 
 测试夹具来自 `proof/workflow.fth`，使用 `circom2@0.2.22 --prime bls12381` 和 `snarkjs@0.7.5` 的本地测试专用设置。签名密钥也是测试专用。已导出的夹具让完整复放无需重新出证，同一个程序可分别复放 v1 和 v2。
 

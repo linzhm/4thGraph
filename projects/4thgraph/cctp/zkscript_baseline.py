@@ -36,24 +36,26 @@ def revision(value):
 class ZkScript:
     """The native affine-lock and projective-lock upstream profiles."""
 
-    def __init__(self, key):
+    def __init__(self, key, *, modulo_threshold=1, gradients_in_witness=False):
         vk = VerifyingKeyBls12381(g1(key.alpha), g2(key.beta), g2(key.gamma), g2(key.delta),
                                   [g1(point) for point in key.ic])
         self.cache = vk.prepare()
         self.key = vk.prepare_for_zkscript(self.cache)
         self.max_multipliers = [1 << 128] * 2
+        self.modulo_threshold = modulo_threshold
+        self.gradients_in_witness = gradients_in_witness
         self.revisions = {"zkscript_package": revision(bls12_381), "elliptic_curves_package": revision(BLS12_381)}
 
     def lock(self, mode):
         key = self.key
         args = dict(alpha_beta=key.alpha_beta, minus_gamma=key.minus_gamma,
                     minus_delta=key.minus_delta, gamma_abc=key.gamma_abc)
-        options = dict(modulo_threshold=1, max_multipliers=self.max_multipliers,
+        options = dict(modulo_threshold=self.modulo_threshold, max_multipliers=self.max_multipliers,
                        extractable_inputs=0, check_constant=True, clean_constant=True)
         if mode == "zkscript-affine":
             lock = bls12_381.groth16_verifier(Groth16LockingKey(
                 **args, gradients_pairings=[key.gradients_minus_gamma, key.gradients_minus_delta],
-                has_precomputed_gradients=True,
+                has_precomputed_gradients=not self.gradients_in_witness,
             ), **options)
         else:
             lock = bls12_381.groth16_verifier_proj(Groth16ProjLockingKey(**args), **options)
@@ -72,7 +74,7 @@ class ZkScript:
                 gradients_multiplications=prepared.gradients_multiplications,
                 gradients_additions=prepared.gradients_additions,
                 gradient_gamma_abc_zero=prepared.gradient_gamma_abc_zero,
-                has_precomputed_gradients=False,
+                has_precomputed_gradients=self.gradients_in_witness,
             )
         else:
             key = Groth16ProjUnlockingKey.from_data(**args)
