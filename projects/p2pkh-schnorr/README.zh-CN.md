@@ -1,4 +1,4 @@
-# P2PKH-Schnorr v0.9.0
+# P2PKH-Schnorr v0.10.0
 
 [English](README.md) · [4thGraph](../../README.zh-CN.md) · [项目目录](../README.zh-CN.md) · [版本](versions/index.json)
 
@@ -12,11 +12,13 @@
 
 付款示例通过 `REQUIRE stdlib/bip340.fth` 引入 4thGraph 标准库。`schnorr-lock` 将库里的验签词与所有者校验、当前输入绑定组合成付款锁。`schnorr-unlock` 为每次花费构造解锁脚本。[付款示例源码](reference/schnorr.fth) · [4thGraph 验签库](../../src/fourthgraph/stdlib/bip340.fth)
 
-在仓库根目录运行 `PYTHONPATH=src:. python projects/p2pkh-schnorr/reference/generate_template.py --check` 核对当前锁和布局。用 `--write` 重新生成。钱包默认创建 v0.9.0 输出，也支持识别和花费 v0.6.0 至 v0.8.0 的输出。[版本目录](versions/index.json)
+在仓库根目录运行 `PYTHONPATH=src:. python projects/p2pkh-schnorr/reference/generate_template.py --check` 核对当前锁、布局和 OTDA 构造器。用 `--write` 重新生成。钱包默认创建 v0.10.0 输出，也支持识别和花费 v0.6.0 至 v0.9.0 的输出。[版本目录](versions/index.json)
 
 钱包用 libsecp256k1 验证外部签名，再将审批过的预映像和公开见证交给 `schnorr-unlock` 生成解锁脚本。[钱包 SDK](docs/sdk.zh-CN.md#quickstart)
 
-验签器用 64 个打包的两位窗口联合累加四个 128 位分量。v0.9.0 在输入校验中复用域素数，并在点运算时将它放在累加点下方。新版还缩短了 32 字节反转和固定基点表查找。独立验签器从 27,380 字节缩至 25,998 字节。[标量分解和窗口构造](docs/spec.zh-CN.md#联合标量乘法)
+验签器用 64 个打包的两位窗口联合累加四个 128 位分量。v0.10.0 减少完备点加中的栈操作，独立验签器从 25,998 字节缩至 25,608 字节。付款锁也用更短的位掩码检查 sighash 类型。[标量分解和窗口构造](docs/spec.zh-CN.md#联合标量乘法)
+
+符合条件的 Chronicle v2 交易使用 5,725 字节的构造器重建 v0.10.0 输出锁的固定字节。构造器只携带一份重复窗口字节码，解锁时再展开。签名器仍审批完整 OTDA 预映像的摘要。[OTDA 重建](docs/spec.zh-CN.md#otda-重建) · [构造器](versions/v0.10.0/otda-constructor.hex)
 
 ## 复现验收
 
@@ -37,25 +39,25 @@ bash tools/verify_node.sh -- bash sdk/verify_wallet.sh p2pkh-schnorr
 
 ## 交易实测
 
-每个 v0.9.0 锁定脚本为 **26,857 字节**，比 v0.8.0 少 1,506 字节。所有者槽位从字节偏移 **238** 开始。下表的两进两出场景都新建两个 Schnorr 输出。解锁脚本包含签名预映像、BIP340 签名和坐标见证。
+每个 v0.10.0 锁定脚本为 **26,418 字节**，比 v0.9.0 少 439 字节。所有者槽位从字节偏移 **189** 开始。下表的两进两出场景都新建两个 Schnorr 输出。
 
 | 签名模式 | 每个锁定脚本 | 每个解锁脚本 | 整笔交易 | 新增输入 | 新增输出 | 入金与退出 | 一次周转 | 两栈载荷峰值 |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| BIP143 ALL | 26,857 | 329 | 54,490 | 372 | 26,868 | 54,716 | 109,206 | 3,298 |
-| Chronicle OTDA ALL | 26,857 | 54,005 | 161,842 | 54,171 | 80,612 | 54,730 | 216,572 | 107,842 |
+| BIP143 ALL | 26,418 | 329 | 53,612 | 372 | 26,429 | 53,837 | 107,450 | 3,341 |
+| Chronicle OTDA ALL（重建） | 26,418 | 6,079 | 65,112 | 6,245 | 26,509 | 53,852 | 118,963 | 106,086 |
 
-单位均为字节。栈载荷取开发求值器测得的第一个输入的主栈和备用栈合计峰值。完整输入在 BSV Node 1.2.3 和 chain-gang 上用显式提供的上一输出验证。OTDA ALL 的每份预映像都包含完整输出字节。[模板布局及指纹](versions/v0.9.0/layout.json) · [复放实测记录](versions/v0.9.0/measurements.json) · [基准口径](../../docs/benchmark.zh-CN.md)
+单位均为字节。栈载荷取开发求值器测得的第一个输入的主栈和备用栈合计峰值。完整输入在 BSV Node 1.2.3 和 chain-gang 上用显式提供的上一输出验证。重建后的 OTDA 预映像包含完整的序列化输出。[模板布局及指纹](versions/v0.10.0/layout.json) · [复放实测记录](versions/v0.10.0/measurements.json) · [基准口径](../../docs/benchmark.zh-CN.md)
 
 ```sh
 PYTHONPATH=src:. bash tools/verify_node.sh -- "$SCRIPT_LAB_SDK_PYTHON" -m fourthgraph.benchmark.run \
   --project p2pkh-schnorr --venvs-dir projects/p2pkh-schnorr/workspace --output projects/p2pkh-schnorr/workspace/build/benchmark
 ```
 
-在 BSV Node 1.2.3 的默认 regtest 策略下，BIP143 ALL 和 OTDA ALL 两组带 UTXO 的入金与退出交易均进入内存池并出块。
+在 BSV Node 1.2.3 的默认 regtest 策略下，两种模式的入金、同模板周转和退出交易均进入内存池并出块。
 
 ```sh
 PYTHONPATH=src:. bash tools/verify_node.sh --profile default -- "$SCRIPT_LAB_SDK_PYTHON" -m fourthgraph.benchmark.admission \
-  p2pkh-schnorr --output projects/p2pkh-schnorr/workspace/build/admission.json
+  p2pkh-schnorr --template v0.10.0 --turnover --output projects/p2pkh-schnorr/workspace/build/admission.json
 ```
 
 [sCrypt 对照](docs/scrypt-comparison.zh-CN.md)包括 2021 年文章链接的验签器，以及用 sCrypt 编写的同见证布局 BIP340 实现。[原生 2-of-2 对照](docs/threshold-comparison.zh-CN.md)包含完整交易生命周期和链下签名材料的实测数据。

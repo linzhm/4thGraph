@@ -4,6 +4,7 @@ import argparse
 from hashlib import sha256
 import json
 
+from otda import compile_constructor
 from schnorr_script import TEMPLATE_DIR, TEMPLATE_VERSION, compiled_template
 
 
@@ -15,15 +16,18 @@ def main():
     options = parser.parse_args()
 
     raw, offset = compiled_template()
+    constructor = compile_constructor(raw, offset)
     layout = {
         "template": "P2PKH-Schnorr",
         "version": TEMPLATE_VERSION,
         "script_bytes": len(raw),
         "owner_hash160": {"offset": offset, "length": 20},
         "base_script_sha256": sha256(raw).hexdigest(),
+        "otda_constructor": {"bytes": len(constructor), "sha256": sha256(constructor).hexdigest()},
     }
     files = {
         TEMPLATE_DIR / "template.hex": raw.hex() + "\n",
+        TEMPLATE_DIR / "otda-constructor.hex": constructor.hex() + "\n",
         TEMPLATE_DIR / "layout.json": json.dumps(layout, indent=2) + "\n",
     }
     for path, expected in files.items():

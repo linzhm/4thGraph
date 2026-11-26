@@ -1,0 +1,223 @@
+{
+  "template_version": "0.10.0",
+  "compiler_base": "889ff6e5d37e0e0215fba306353a8a22795c327a",
+  "engines": {
+    "bsv_node_version": 101020300,
+    "chain_gang": {
+      "version": "0.13.2",
+      "commit": "74676b9c002c452e7f21a9ed9265f4972bef03f6"
+    },
+    "verification_profile": "raised",
+    "admission_profile": "default"
+  },
+  "payment_shape": {
+    "inputs": 2,
+    "outputs": 2
+  },
+  "templates": {
+    "v0.9.0": {
+      "bip143-all": {
+        "spend_txid": "8f6979914f98c584b7d62523ca8e579bf1e44e817129d85f6a31044d7e179a33",
+        "lock_bytes_per_output": 26857,
+        "unlock_bytes_by_input": [
+          329,
+          329
+        ],
+        "payment_bytes": 54490,
+        "extra_input_bytes": 372,
+        "extra_output_bytes": 26868,
+        "fund_and_exit_bytes": 54716,
+        "one_turnover_bytes": 109206,
+        "first_input_peak_stack_payload_bytes": 3298,
+        "bsv_node_inputs": [
+          true,
+          true
+        ],
+        "chain_gang_transaction": true,
+        "locktime_mutation": {
+          "txid": "8b6adaa55182fbcf1a4fea6a2564d34bf9763be36b1fb76fa63ecadab532f46d",
+          "bsv_node_inputs": [
+            false,
+            false
+          ],
+          "chain_gang_transaction": false
+        },
+        "default_regtest_admission": {
+          "funding": {
+            "mempool": true,
+            "mined": true
+          },
+          "turnover": {
+            "mempool": true,
+            "mined": true
+          },
+          "exit": {
+            "mempool": true,
+            "mined": true
+          }
+        }
+      },
+      "otda-all": {
+        "spend_txid": "2c975aef9fc69b58ebba2eba414056624a0bdadd6c0e4fba9f68bc915a224984",
+        "lock_bytes_per_output": 26857,
+        "unlock_bytes_by_input": [
+          54005,
+          54005
+        ],
+        "payment_bytes": 161842,
+        "extra_input_bytes": 54171,
+        "extra_output_bytes": 80612,
+        "fund_and_exit_bytes": 54730,
+        "one_turnover_bytes": 216572,
+        "first_input_peak_stack_payload_bytes": 107842,
+        "bsv_node_inputs": [
+          true,
+          true
+        ],
+        "chain_gang_transaction": true,
+        "locktime_mutation": {
+          "txid": "b377c33d22e936f5bb3c10db21128dfdacb2cd7e4c7d02b6fb7123a7de227849",
+          "bsv_node_inputs": [
+            false,
+            false
+          ],
+          "chain_gang_transaction": false
+        },
+        "default_regtest_admission": {
+          "funding": {
+            "mempool": true,
+            "mined": true
+          },
+          "turnover": {
+            "mempool": true,
+            "mined": true
+          },
+          "exit": {
+            "mempool": true,
+            "mined": true
+          }
+        }
+      }
+    },
+    "v0.10.0": {
+      "bip143-all": {
+        "spend_txid": "8b365801b9f3f7fc0624b7700d0bd4d1494fe609942e7069580114067e0ef2bc",
+        "lock_bytes_per_output": 26418,
+        "unlock_bytes_by_input": [
+          329,
+          329
+        ],
+        "payment_bytes": 53612,
+        "extra_input_bytes": 372,
+        "extra_output_bytes": 26429,
+        "fund_and_exit_bytes": 53837,
+        "one_turnover_bytes": 107450,
+        "first_input_peak_stack_payload_bytes": 3341,
+        "bsv_node_inputs": [
+          true,
+          true
+        ],
+        "chain_gang_transaction": true,
+        "locktime_mutation": {
+          "txid": "72b6c3bcff667ffe580fb3c1f0035583bceb0319202704a3a2e6c028e63e7952",
+          "bsv_node_inputs": [
+            false,
+            false
+          ],
+          "chain_gang_transaction": false
+        },
+        "default_regtest_admission": {
+          "funding": {
+            "mempool": true,
+            "mined": true
+          },
+          "turnover": {
+            "mempool": true,
+            "mined": true
+          },
+          "exit": {
+            "mempool": true,
+            "mined": true
+          }
+        }
+      },
+      "otda-all": {
+        "spend_txid": "ea19333e8295d0c8aa206e382afaca6b49d155064882f4403b7d499e506a1c13",
+        "lock_bytes_per_output": 26418,
+        "unlock_bytes_by_input": [
+          6079,
+          6079
+        ],
+        "payment_bytes": 65112,
+        "extra_input_bytes": 6245,
+        "extra_output_bytes": 26509,
+        "fund_and_exit_bytes": 53852,
+        "one_turnover_bytes": 118963,
+        "first_input_peak_stack_payload_bytes": 106086,
+        "bsv_node_inputs": [
+          true,
+          true
+        ],
+        "chain_gang_transaction": true,
+        "locktime_mutation": {
+          "txid": "467a71a0c1302798af0494dbc14455f10b0a8e4559df8b85da9224e8cab46cf1",
+          "bsv_node_inputs": [
+            false,
+            false
+          ],
+          "chain_gang_transaction": false
+        },
+        "default_regtest_admission": {
+          "funding": {
+            "mempool": true,
+            "mined": true
+          },
+          "turnover": {
+            "mempool": true,
+            "mined": true
+          },
+          "exit": {
+            "mempool": true,
+            "mined": true
+          }
+        }
+      }
+    }
+  },
+  "paired_timings": {
+    "workload_label": "schnorr-paired",
+    "warmup_pairs": 4,
+    "timed_pairs": 50,
+    "median_ms": {
+      "41": {
+        "chain_gang": {
+          "v0.9.0": 6.455,
+          "v0.10.0": 6.103
+        },
+        "bsv_node": {
+          "v0.9.0": 28.162,
+          "v0.10.0": 25.919
+        }
+      },
+      "61": {
+        "chain_gang": {
+          "v0.9.0": 6.471,
+          "v0.10.0": 6.438
+        },
+        "bsv_node": {
+          "v0.9.0": 32.344,
+          "v0.10.0": 26.626
+        }
+      }
+    },
+    "sampling": "alternating version order on two-input, two-output fixtures sharing deterministic keys",
+    "v0.10.0_literal_otda_all": {
+      "payment_bytes": 159208,
+      "unlock_bytes_by_input": [
+        53127,
+        53127
+      ],
+      "both_engines_verified": true
+    }
+  }
+}

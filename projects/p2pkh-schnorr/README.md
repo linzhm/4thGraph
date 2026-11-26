@@ -1,4 +1,4 @@
-# P2PKH-Schnorr v0.9.0
+# P2PKH-Schnorr v0.10.0
 
 [简体中文](README.zh-CN.md) · [4thGraph](../../README.md) · [Project index](../README.md) · [Versions](versions/index.json)
 
@@ -12,11 +12,13 @@ Two parties can use BIP327 MuSig2 to spend through the same signer interface. Th
 
 The payment example imports the 4thGraph standard-library verifier with `REQUIRE stdlib/bip340.fth`. Its `schnorr-lock` word combines the library verifier with the owner check and the current-input binding. Its `schnorr-unlock` word builds the unlocking script for each spend. [Payment example source](reference/schnorr.fth) · [4thGraph BIP340 library](../../src/fourthgraph/stdlib/bip340.fth)
 
-From the repository root, run `PYTHONPATH=src:. python projects/p2pkh-schnorr/reference/generate_template.py --check` to verify the current lock and layout. Use `--write` to regenerate them. The wallet creates v0.9.0 outputs by default and also recognizes and spends v0.6.0 through v0.8.0 outputs. [Version catalog](versions/index.json)
+From the repository root, run `PYTHONPATH=src:. python projects/p2pkh-schnorr/reference/generate_template.py --check` to verify the current lock, layout, and OTDA constructor. Use `--write` to regenerate them. The wallet creates v0.10.0 outputs by default and also recognizes and spends v0.6.0 through v0.9.0 outputs. [Version catalog](versions/index.json)
 
 The wallet uses libsecp256k1 to verify the external signature, then supplies the approved preimage and public witness to `schnorr-unlock` to construct the unlocking script. [Wallet SDK](docs/sdk.en.md#quickstart)
 
-The verifier uses 64 packed two-bit windows over four 128-bit components. v0.9.0 reuses the field prime during input checks and positions it beside the accumulator for point arithmetic. It also shortens the 32-byte reversal and fixed-base table lookups. The detached verifier shrinks from 27,380 to 25,998 bytes. [Scalar decomposition and window construction](docs/spec.en.md#joint-scalar-multiplication)
+The verifier uses 64 packed two-bit windows over four 128-bit components. v0.10.0 schedules complete point addition with fewer stack operations, shrinking the detached verifier from 25,998 to 25,608 bytes. The payment lock also checks the sighash type with a shorter bit mask. [Scalar decomposition and window construction](docs/spec.en.md#joint-scalar-multiplication)
+
+For eligible Chronicle v2 transactions, the wallet uses a 5,725-byte constructor to reconstruct the fixed portions of v0.10.0 output locks. The constructor carries one copy of the repeated window and expands it during unlocking. The signer still approves the digest of the complete OTDA preimage. [OTDA reconstruction](docs/spec.en.md#otda-reconstruction) · [Constructor](versions/v0.10.0/otda-constructor.hex)
 
 ## Validate the baseline
 
@@ -37,25 +39,25 @@ The acceptance suite checks all 19 official BIP340 verification vectors, includi
 
 ## Measured sizes
 
-Each v0.9.0 output lock is **26,857 bytes**, saving 1,506 bytes over v0.8.0. Its owner field starts at byte offset **238**. These two-input, two-output fixtures create two Schnorr outputs. The unlocking scripts include the signing preimage, BIP340 signature, and coordinate witnesses.
+Each v0.10.0 output lock is **26,418 bytes**, saving 439 bytes over v0.9.0. Its owner field starts at byte offset **189**. These two-input, two-output fixtures create two Schnorr outputs.
 
 | Mode | Each output lock | Each input unlock | Complete transaction | Extra input | Extra output | Fund and exit | One turnover | Peak stack payload |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| BIP143 ALL | 26,857 | 329 | 54,490 | 372 | 26,868 | 54,716 | 109,206 | 3,298 |
-| Chronicle OTDA ALL | 26,857 | 54,005 | 161,842 | 54,171 | 80,612 | 54,730 | 216,572 | 107,842 |
+| BIP143 ALL | 26,418 | 329 | 53,612 | 372 | 26,429 | 53,837 | 107,450 | 3,341 |
+| Chronicle OTDA ALL, reconstructed | 26,418 | 6,079 | 65,112 | 6,245 | 26,509 | 53,852 | 118,963 | 106,086 |
 
-All sizes are in bytes. Stack payload is the approximate combined main and alternate stack payload for the first input from the development evaluator. BSV Node 1.2.3 and chain-gang verify each complete input with supplied prevouts. OTDA ALL includes the literal signed outputs in each preimage. [Layout and fingerprint](versions/v0.9.0/layout.json) · [Replayed measurements](versions/v0.9.0/measurements.json) · [Benchmark method](../../docs/benchmark.md)
+All sizes are in bytes. Stack payload is the approximate combined main and alternate stack payload for the first input from the development evaluator. BSV Node 1.2.3 and chain-gang verify each complete input with supplied prevouts. The reconstructed OTDA preimage includes the complete serialized outputs. [Layout and fingerprints](versions/v0.10.0/layout.json) · [Replayed measurements](versions/v0.10.0/measurements.json) · [Benchmark method](../../docs/benchmark.md)
 
 ```sh
 PYTHONPATH=src:. bash tools/verify_node.sh -- "$SCRIPT_LAB_SDK_PYTHON" -m fourthgraph.benchmark.run \
   --project p2pkh-schnorr --venvs-dir projects/p2pkh-schnorr/workspace --output projects/p2pkh-schnorr/workspace/build/benchmark
 ```
 
-Under BSV Node 1.2.3's default regtest policy, funding and exit transactions entered the mempool and were mined in both BIP143 ALL and OTDA ALL runs.
+Under BSV Node 1.2.3's default regtest policy, funding, same-template turnover, and exit entered the mempool and were mined for both modes.
 
 ```sh
 PYTHONPATH=src:. bash tools/verify_node.sh --profile default -- "$SCRIPT_LAB_SDK_PYTHON" -m fourthgraph.benchmark.admission \
-  p2pkh-schnorr --output projects/p2pkh-schnorr/workspace/build/admission.json
+  p2pkh-schnorr --template v0.10.0 --turnover --output projects/p2pkh-schnorr/workspace/build/admission.json
 ```
 
 The [sCrypt comparison](docs/scrypt-comparison.en.md) includes the 2021 article's linked verifier and a sCrypt BIP340 implementation with a common witness layout. The [native 2-of-2 comparison](docs/threshold-comparison.en.md) measures the full transaction lifecycle and the amount of signing data produced off-chain.

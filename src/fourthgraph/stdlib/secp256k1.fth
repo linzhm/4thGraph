@@ -54,29 +54,26 @@ REQUIRE stdlib/script-fragments.fth
 : secp256k1-add-with-field ( script cell -- script )
     ( Complete homogeneous addition. Preserve the stack below the two points. )
     swap
-    ( zz = z1*z2 and k = 21*xz, with xz = x1*z2+x2*z1. )
-    3 script-pick-depth op-over op-mul
-    op-over 7 script-pick-depth op-mul 4 script-pick-depth 6 script-pick-depth op-mul op-add
-    21 bsv-num op-dup op-rot op-mul
+    ( Compute xy = x1*y2+x2*y1, t = 3*x1*x2 and zr = xy*t. )
+    op-over 6 script-pick-depth op-mul 3 script-pick-depth 6 script-pick-depth op-mul op-add
+    op-3 7 script-pick-depth 5 script-pick-depth op-mul op-mul op-2dup op-mul
 
-    ( yy = y1*y2, h = 21*zz and minus = yy-h. )
-    7 script-pick-depth 5 script-pick-depth op-mul op-2swap op-mul op-2dup op-sub
+    ( Consume both X coordinates to compute xz = x1*z2+x2*z1 and k = 21*xz. )
+    21 bsv-num op-9 op-roll 5 script-pick-depth op-mul
+    op-7 op-roll 8 script-pick-depth op-mul op-add op-over op-mul
 
-    ( Stage the terms of xy. Consume y and z to form yz = y1*z2+y2*z1. )
-    6 script-pick-depth 9 script-pick-depth op-mul 10 script-pick-depth 7 script-pick-depth op-mul
-    op-7 op-roll op-9 op-roll op-mul op-9 op-roll op-8 op-roll op-mul op-add
+    ( h = 21*z1*z2. Form plus = y1*y2+h and minus = y1*y2-h. )
+    7 script-pick-depth 6 script-pick-depth op-mul op-rot op-mul
+    8 script-pick-depth 7 script-pick-depth op-mul op-2dup op-add op-swap op-rot op-sub
 
-    ( X = xy*minus-yz*k. )
-    op-dup 7 script-pick-depth op-mul op-2swap op-add
-    op-dup 4 script-pick-depth op-mul op-rot op-sub over 9 secp256k1-reduce-point-coordinate
+    ( Compute Y = minus*plus+t*k, then consume y and z to get yz. )
+    op-2dup op-mul op-5 op-roll 4 script-pick-depth op-mul op-add
+    op-9 op-roll op-7 op-roll op-mul op-7 op-roll op-8 op-roll op-mul op-add
 
-    ( t = 3*x1*x2, zr = xy*t, plus = yy+h. )
-    op-8 op-roll op-8 op-roll op-mul op-3 op-mul op-rot op-over op-mul
-    op-6 op-roll op-6 op-roll op-add
-
-    ( Y = minus*plus+t*k. Z = yz*plus+zr. )
-    op-rot op-6 op-roll op-mul op-over op-6 op-roll op-mul op-add over 5 secp256k1-reduce-point-coordinate
-    op-4 op-roll op-rot op-mul op-rot op-add swap 3 secp256k1-reduce-point-coordinate
+    ( Reduce X = xy*minus-yz*k and the staged Y. Compute Z = yz*plus+zr. )
+    op-rot op-6 op-roll op-mul op-over op-5 op-roll op-mul op-sub
+    over 5 secp256k1-reduce-point-coordinate op-rot over 5 secp256k1-reduce-point-coordinate
+    op-2swap op-mul op-3 op-roll op-add swap 3 secp256k1-reduce-point-coordinate
 ;
 
 : secp256k1-add ( script -- script ) 0 secp256k1-add-with-field ;

@@ -13,6 +13,7 @@ from coincurve._libsecp256k1 import ffi, lib
 from coincurve.context import GLOBAL_CONTEXT
 
 from bip340 import FIELD, ORDER, lift_x, to_bytes, verify
+from otda import compile_constructor
 from payment import lock_for_public_key, sign_payment, sign_spend
 from schnorr_script import (
     TEMPLATE_DIRS, TEMPLATE_VERSION, _contract, authorization_codes, compile_unlock, compiled_template,
@@ -153,13 +154,26 @@ class SchnorrTests(unittest.TestCase):
             with self.subTest(case=case):
                 self.check_detached(unlock, False)
 
-    def sign_two_inputs(self, tx, sighash, parents=None):
+    def sign_two_inputs(self, tx, sighash, parents=None, *, compress_otda=None):
         parents = self.parents if parents is None else parents
         for i, (parent, public, key) in enumerate(zip(parents, self.public_keys, self.keys, strict=True)):
             tx = sign_spend(tx, i, parent.serialize(), public,
                             lambda message: key.sign_schnorr(message, aux_randomness=bytes(32)),
-                            sighash=sighash, chronicle_active=bool(sighash & CHRONICLE))
+                            sighash=sighash, chronicle_active=bool(sighash & CHRONICLE),
+                            compress_otda=compress_otda)
         return tx
+
+    def test_sighash_type_encoding(self):
+        check = _contract().emit("check-sighash", b"")
+        for flag in range(256):
+            packed = bytes([flag]) + bytes(3)
+            if flag in MODES:
+                self.assertEqual(evaluate(check, [packed]), ([bytes([flag])], []))
+            else:
+                with self.subTest(flag=flag), self.assertRaises(ScriptError):
+                    evaluate(check, [packed])
+        with self.assertRaises(ScriptError):
+            evaluate(check, [b"\x41\x01\x00\x00"])
 
     def test_all_twelve_paired_payment_modes(self):
         for version in (1, 2):
@@ -185,6 +199,35 @@ class SchnorrTests(unittest.TestCase):
         if self.node:
             self.assertEqual(self.node.verdicts(signed, self.parents, **context), [True, True])
 
+    def test_otda_reconstruction_matches_literal_unlock_stack(self):
+        mixed = replace(self.unsigned, outputs=(Output(9_900, b"\x51"), self.unsigned.outputs[1]))
+        older = lock_for_public_key(self.public_keys[0], version="v0.9.0")
+        legacy_outputs = replace(self.unsigned, outputs=(Output(9_900, older), Output(9_900, b"\x51")))
+        version_mix = replace(self.unsigned, outputs=(legacy_outputs.outputs[0], self.unsigned.outputs[1]))
+        cases = (
+            (self.unsigned, 0x61, (True, True)),
+            (mixed, 0xE1, (True, True)),
+            (version_mix, 0x61, (True, True)),
+            (mixed, 0x63, (False, True)),
+            (mixed, 0xE3, (False, True)),
+            (self.unsigned, 0x62, (False, False)),
+            (self.unsigned, 0x41, (False, False)),
+            (replace(self.unsigned, version=1), 0x61, (False, False)),
+            (legacy_outputs, 0x61, (False, False)),
+        )
+        for unsigned, flag, expected in cases:
+            with self.subTest(version=unsigned.version, sighash=hex(flag), compressed=expected):
+                automatic = self.sign_two_inputs(unsigned, flag)
+                literal = self.sign_two_inputs(unsigned, flag, compress_otda=False)
+                for actual, full, compressed in zip(automatic.inputs, literal.inputs, expected, strict=True):
+                    self.assertEqual(evaluate(actual.script), evaluate(full.script))
+                    if compressed:
+                        self.assertLess(len(actual.script), len(full.script))
+                    else:
+                        self.assertEqual(actual.script, full.script)
+                self.check_spend(automatic, self.parents, [True, True])
+                self.check_spend(literal, self.parents, [True, True])
+
     def test_payment_and_preflight(self):
         parent = self.parents[0].serialize()
         public = self.public_keys[0]
@@ -206,6 +249,10 @@ class SchnorrTests(unittest.TestCase):
             sign_payment(parent, 1, (target,), 99, public, unexpected)
         with self.assertRaisesRegex(ValueError, "active spend context"):
             sign_spend(self.unsigned, 0, parent, public, unexpected, sighash=0x61)
+        with self.assertRaisesRegex(ValueError, "active Chronicle context"):
+            sign_spend(self.unsigned, 0, parent, public, unexpected, compress_otda=True)
+        with self.assertRaisesRegex(ValueError, "compress_otda must be a boolean"):
+            sign_spend(self.unsigned, 0, parent, public, unexpected, compress_otda=1)
         with self.assertRaisesRegex(ValueError, "same-index"):
             sign_spend(replace(self.unsigned, outputs=(target,)), 1, self.parents[1].serialize(),
                        self.public_keys[1], unexpected, sighash=0x43)
@@ -222,7 +269,9 @@ class SchnorrTests(unittest.TestCase):
         self.assertEqual(raw, reference[:offset] + owner + reference[offset + 20:])
         self.assertEqual(compiled_template(owner), (raw, offset))
         self.assertEqual(recognize_template(raw), (TEMPLATE_VERSION, owner))
-        self.assertLess(len(raw), len(lock_for_owner(bytes(20), version="v0.8.0")))
+        self.assertLess(len(raw), len(lock_for_owner(bytes(20), version="v0.9.0")))
+        constructor = compile_constructor(reference, offset)
+        self.assertEqual(evaluate(constructor), ([reference[:offset], reference[offset + 20:]], []))
 
     def test_mixed_template_spend(self):
         public = self.public_keys[0]
@@ -232,6 +281,7 @@ class SchnorrTests(unittest.TestCase):
             "v0.6.0": "12c75b80b65e983369998e8c2ba581979bb1d4cc67c99a4f8694394447a6a877",
             "v0.7.0": "b1aff80ac6a66e83cf915f6636b54fd7853b2803543d2410a19840efb50ad966",
             "v0.8.0": "eafc3937ba802a3fcfeae3bf7a814a747be3c797906c86e330cd68001f3509e5",
+            "v0.9.0": "8c58eb80a5adb4aaf1256db2f12e0f4bbc551885e919200350621481a45de0a3",
         }
         for version, checksum in versions.items():
             raw = lock_for_public_key(public, version=version)

@@ -3,6 +3,7 @@
 from coincurve import PublicKeyXOnly
 
 from bip340 import lift_x, to_bytes
+from otda import compressed_preimage
 from schnorr_script import authorization_codes, compile_unlock, lock_for_owner, owner_hash, recognize
 from fourthgraph.bsv.spend_authorization import DEFAULT_SIGHASH, prepare_authorization
 from fourthgraph.bsv.transaction import CHRONICLE, SIGHASH_SINGLE, SIGHASH_TYPES, Input, Transaction, amount
@@ -14,7 +15,8 @@ def lock_for_public_key(public_key, *, version=None):
     return lock_for_owner(owner_hash(public_key), version=version)
 
 
-def sign_spend(tx, index, funding_raw, public_key, signer, *, sighash=DEFAULT_SIGHASH, chronicle_active=False):
+def sign_spend(tx, index, funding_raw, public_key, signer, *, sighash=DEFAULT_SIGHASH,
+               chronicle_active=False, compress_otda=None):
     """Request one signature over the approved BSV digest from signer(message32)."""
     if type(index) is not int or not 0 <= index < len(tx.inputs):
         raise ValueError("input index out of range")
@@ -23,10 +25,11 @@ def sign_spend(tx, index, funding_raw, public_key, signer, *, sighash=DEFAULT_SI
     if current.txid != funding.txid_wire() or not 0 <= current.vout < len(funding.outputs):
         raise ValueError("select an unsigned input matching the funding outpoint")
     return sign_previous(tx, index, funding.outputs[current.vout], public_key, signer,
-                         sighash=sighash, chronicle_active=chronicle_active)
+                         sighash=sighash, chronicle_active=chronicle_active, compress_otda=compress_otda)
 
 
-def sign_previous(tx, index, previous, public_key, signer, *, sighash=DEFAULT_SIGHASH, chronicle_active=False):
+def sign_previous(tx, index, previous, public_key, signer, *, sighash=DEFAULT_SIGHASH,
+                  chronicle_active=False, compress_otda=None):
     """Sign a prepared input after its outpoint and previous output are matched."""
     if type(index) is not int or not 0 <= index < len(tx.inputs) or tx.inputs[index].script:
         raise ValueError("select an unsigned input")
@@ -34,6 +37,10 @@ def sign_previous(tx, index, previous, public_key, signer, *, sighash=DEFAULT_SI
         raise ValueError("unsupported sighash")
     if sighash & CHRONICLE and chronicle_active is not True:
         raise ValueError("Chronicle authorization requires an active spend context")
+    if compress_otda is not None and type(compress_otda) is not bool:
+        raise ValueError("compress_otda must be a boolean")
+    if compress_otda is True and chronicle_active is not True:
+        raise ValueError("OTDA reconstruction requires an active Chronicle context")
     if not tx.outputs:
         raise ValueError("payment requires outputs")
     if sighash & 31 == SIGHASH_SINGLE and index >= len(tx.outputs):
@@ -48,6 +55,7 @@ def sign_previous(tx, index, previous, public_key, signer, *, sighash=DEFAULT_SI
     auth = prepare_authorization(tx, index, previous.value, sighash,
                                  ordinary_code=ordinary_code, companion_code=companion_code)
     message = auth.checked_digest()
+    preimage_script = None if compress_otda is False else compressed_preimage(tx, index, auth)
     signature = signer(message)
     if (not isinstance(signature, bytes) or len(signature) != 64
             or not PublicKeyXOnly(public_key).verify(signature, message)):
@@ -55,7 +63,7 @@ def sign_previous(tx, index, previous, public_key, signer, *, sighash=DEFAULT_SI
 
     nonce_point = lift_x(signature[:32])
     unlock = compile_unlock(auth.preimage, auth.companion, public_key, to_bytes(point[1]),
-                            signature, to_bytes(nonce_point[1]))
+                            signature, to_bytes(nonce_point[1]), preimage_script=preimage_script)
     return tx.with_script(index, unlock)
 
 

@@ -6,7 +6,9 @@
 
 ## 收款和花费
 
-在统一 SDK 中选择项目 `p2pkh-schnorr`，默认使用 `v0.9.0` 模板。创建收款脚本时传入 32 字节 x-only 公钥或其 20 字节 HASH160。客户端在 Forth 编译产物中填入所有者哈希，识别时核对实际脚本的全部固定字节，也可以提供预期公钥。SDK 根据上一输出的脚本识别并花费四个版本的 UTXO。如需创建旧版输出，可将钱包的 `template` 设为 `v0.6.0`、`v0.7.0` 或 `v0.8.0`。
+在统一 SDK 中选择项目 `p2pkh-schnorr`，默认使用 `v0.10.0` 模板。创建收款脚本时传入 32 字节 x-only 公钥或其 20 字节 HASH160。客户端在 Forth 编译产物中填入所有者哈希，识别时核对实际脚本的全部固定字节，也可以提供预期公钥。SDK 根据上一输出的脚本识别并花费五个版本的 UTXO。如需创建旧版输出，可将钱包的 `template` 设为相应版本。[版本目录](../versions/index.json)
+
+版本 2 的 Chronicle OTDA 交易若承诺了 v0.10.0 Schnorr 输出，且重建能缩短解锁脚本，SDK 会自动重建预映像。设置 `compressOtda: false` 可直接压入预映像。[OTDA 重建](spec.zh-CN.md#otda-重建)
 
 签名请求的算法为 `schnorr-secp256k1`，数据类型为 `message`，签名格式为 `bip340`。把 32 字节载荷作为消息交给 BIP340 签名器，直接返回签名器给出的 64 字节。SDK 验证签名并推导见证所需的公开坐标，再调用 Forth 的 `schnorr-unlock` 生成解锁脚本。[Forth 源码](../reference/schnorr.fth)
 
