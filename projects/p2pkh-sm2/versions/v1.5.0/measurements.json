@@ -1,0 +1,66 @@
+{
+  "payment_shape": {
+    "inputs": 2,
+    "outputs": 2
+  },
+  "lock_bytes": 110747,
+  "otda_program_bytes": 11549,
+  "baseline": "1.4.0",
+  "bsv_node_version": "1.2.3",
+  "chain_gang_commit": "8b60b71a12a69fdcb465d3e627dbf6f43d6ed081",
+  "validation": "Peerless regtest script replay with supplied prevouts",
+  "point_kernel_bytes": {
+    "v1.4.0": {
+      "add": 176,
+      "double": 89
+    },
+    "v1.5.0": {
+      "add": 123,
+      "double": 74
+    }
+  },
+  "payments": {
+    "bip143-all": {
+      "v1.4.0": {
+        "txid": "a4c545843a207bc305c0340d70964545604b14eddd9d986accc8163c1bb40dde",
+        "transaction_bytes": 244398,
+        "unlock_bytes": [
+          291,
+          291
+        ],
+        "peak_stack_payload_bytes": 4148
+      },
+      "v1.5.0": {
+        "txid": "bfa999346896d7d4185d066fd41a4cd3c094de43e7ec041f86e3f9462dbd25b1",
+        "transaction_bytes": 222198,
+        "unlock_bytes": [
+          291,
+          291
+        ],
+        "peak_stack_payload_bytes": 3643
+      }
+    },
+    "otda-all": {
+      "v1.4.0": {
+        "txid": "d8a500599fda83c17e0fefdc414b26330eab41fa89596f47ae17662107eae78f",
+        "transaction_bytes": 267692,
+        "unlock_bytes": [
+          11938,
+          11938
+        ],
+        "peak_stack_payload_bytes": 487768
+      },
+      "v1.5.0": {
+        "txid": "14cc3639992d39b85c8a73578d11fefef08f8b36ec793783434605b682e3a174",
+        "transaction_bytes": 245354,
+        "unlock_bytes": [
+          11869,
+          11869
+        ],
+        "peak_stack_payload_bytes": 443368
+      }
+    }
+  },
+  "source": "README.md#v150",
+  "compiler_commit": "889ff6e5d37e0e0215fba306353a8a22795c327a"
+}

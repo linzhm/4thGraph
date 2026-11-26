@@ -28,7 +28,8 @@ The unified benchmark measured **260 complete transactions** across seven projec
 | P2PKH-SM2 v1.1.0 | 2 × 2 | 144,925 | 291 | 290,554 | 316,018 | 4,152 |
 | P2PKH-SM2 v1.2.0 | 2 × 2 | 131,565 | 291 | 263,834 | 287,524 | 4,158 |
 | P2PKH-SM2 v1.3.0 | 2 × 2 | 125,616 | 291 | 251,936 | 275,608 | 4,161 |
-| P2PKH-SM2 v1.4.0 candidate | 2 × 2 | 121,847 | 291 | 244,398 | 267,692 | 4,148 |
+| P2PKH-SM2 v1.4.0 | 2 × 2 | 121,847 | 291 | 244,398 | 267,692 | 4,148 |
+| P2PKH-SM2 v1.5.0 candidate | 2 × 2 | 110,747 | 291 | 222,198 | 245,354 | 3,643 |
 | Lamport OTS, committed key | 2 × 2 | 7,746 | 16,549 | 48,708 | 79,616 | 16,707 |
 | WOTS+, cached steps with reconstruction | 2 × 2 | 33,956 | 2,310 | 72,650 | 79,090 | 2,701 |
 | Pure ML-DSA-44 | 2 × 2 | 926,412 | 2,588 | 1,858,122 | 5,563,725 | — |
@@ -37,7 +38,7 @@ All sizes are in bytes. Lock, unlock, and stack measurements use the first BIP14
 
 The OTDA ALL measurements for R1 v0.2.0 and cached-steps WOTS+ use explicit reconstruction.
 
-With SM2 template `1`, automatic reconstruction reduced the 2×2 OTDA ALL transaction from 870,194 to 316,018 bytes. Template `2` reduces it to 287,524 bytes with smaller output locks and a shorter reconstruction program. Template `3` uses signed residues during point arithmetic to reach 275,608 bytes. Template `4` reaches 267,692 bytes by reducing SM3 word conversions and shortening the reconstruction program. [SM2 measurements](../projects/p2pkh-sm2/versions/v1.4.0/measurements.json)
+With SM2 template `1`, automatic reconstruction reduced the 2×2 OTDA ALL transaction from 870,194 to 316,018 bytes. Template `2` reduces it to 287,524 bytes with smaller output locks and a shorter reconstruction program. Template `3` uses signed residues during point arithmetic to reach 275,608 bytes. Template `4` reaches 267,692 bytes by reducing SM3 word conversions and shortening the reconstruction program. Template `5` compiles shorter point addition and doubling kernels, bringing the transaction to 245,354 bytes. [SM2 measurements](../projects/p2pkh-sm2/versions/v1.5.0/measurements.json)
 
 ## Run
 

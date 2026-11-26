@@ -4,7 +4,7 @@
 | --- | --- |
 | **Native payments** | [P2PK and P2PKH measurements](../projects/p2pk-p2pkh-baseline/README.md) and [Forth builds](../projects/p2pk-p2pkh-baseline/forth/README.md) |
 | **P-256 lock optimization** | P2PKH-R1 v0.6.0 measures 41,364 B per lock and 83,498 B per two-input, two-output BIP143 ALL payment. [P2PKH-R1 results](../projects/p2pkh-r1/README.md#measured-results) |
-| **SM2 lock and reconstruction** | P2PKH-SM2 v1.4.0 measures 121,847 B per lock and 267,692 B per two-input, two-output OTDA ALL payment. [SM2 measurements](../projects/p2pkh-sm2/README.md#v140) |
+| **SM2 lock and reconstruction** | P2PKH-SM2 v1.5.0 measures 110,747 B per lock and 245,354 B per two-input, two-output OTDA ALL payment. [SM2 measurements](../projects/p2pkh-sm2/README.md#v150) |
 | **Deferred R1 activation** | [Deferred v0.3.0](../projects/p2pkh-r1-deferred/README.md#4thgraph-forth-comparison) uses a 1,085 B funding lock built with `stack` optimization |
 | **PELS Counter** | [Build and replay](../projects/pels-counter/README.md) covers the funded `0 → 1 → 2` sequence and rejected mutations |
 | **BIP340** | P2PKH-Schnorr v0.7.0 measures 29,660 B per lock and 178,660 B per two-input, two-output Chronicle OTDA ALL payment. [Schnorr results](../projects/p2pkh-schnorr/README.md#measured-sizes) · [Measurements](../projects/p2pkh-schnorr/versions/v0.7.0/measurements.json) · [BIP340 vectors](../projects/p2pkh-schnorr/versions/v0.6.0/bip340-vectors.csv) |

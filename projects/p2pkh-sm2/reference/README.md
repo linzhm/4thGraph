@@ -69,11 +69,24 @@ isolate the effect of the activation flags.
 
 [Standard vector](../versions/v1.0.0/sm2-standard.json) · [BSV Node source](https://github.com/bitcoin-sv/bitcoin-sv/tree/6504a3aff65ba97c0f6c80962b033e35ecbfed4b) · [chain-gang source](https://github.com/linzhm/chain-gang/tree/8b60b71a12a69fdcb465d3e627dbf6f43d6ed081)
 
+<a name="point-kernels"></a>
+
+## Reproduce the point kernels
+
+Template `5` compiles the homogeneous point formulas with the optimizing Forth compiler. The compiled kernels preserve the signed residues and infinity handling of templates `3` and `4`. Rebuild the frozen kernels from the repository root.
+
+```sh
+PYTHONPATH=src:. python projects/p2pkh-sm2/reference/point_kernels.py /tmp/sm2-point-kernels.json
+cmp /tmp/sm2-point-kernels.json projects/p2pkh-sm2/versions/v1.5.0/point-kernels.json
+```
+
+[Point formulas](point-formulas.fth) · [Kernel compiler](point_kernels.py)
+
 <a name="otda-constructor"></a>
 
 ## Reproduce the OTDA constructor
 
-The wallet loads the frozen program and checks its byte length and SHA-256 against the layout manifest. The offline generator starts with named SM3 ranges and point arithmetic blocks. For templates `2` through `4` it evaluates which copied fragments are worth caching, tries a dictionary ordered by reuse frequency and selects the smallest serialized encoding. Rebuild the programs from the repository root and compare them with the checked-in files.
+The wallet loads the frozen program and checks its byte length and SHA-256 against the layout manifest. The offline generator starts with named SM3 ranges and point arithmetic blocks. For templates `2` through `5` it evaluates which copied fragments are worth caching, tries a dictionary ordered by reuse frequency and selects the smallest serialized encoding. Rebuild the programs from the repository root and compare them with the checked-in files.
 
 ```sh
 python projects/p2pkh-sm2/reference/generate_otda_constructor.py /tmp/sm2-otda.hex
@@ -84,6 +97,8 @@ python projects/p2pkh-sm2/reference/generate_otda_constructor.py --version 3 /tm
 cmp /tmp/sm2-otda-v3.hex projects/p2pkh-sm2/versions/v1.3.0/otda-constructor.hex
 python projects/p2pkh-sm2/reference/generate_otda_constructor.py --version 4 /tmp/sm2-otda-v4.hex
 cmp /tmp/sm2-otda-v4.hex projects/p2pkh-sm2/versions/v1.4.0/otda-constructor.hex
+python projects/p2pkh-sm2/reference/generate_otda_constructor.py --version 5 /tmp/sm2-otda-v5.hex
+cmp /tmp/sm2-otda-v5.hex projects/p2pkh-sm2/versions/v1.5.0/otda-constructor.hex
 ```
 
 The constructor tests compare exact preimage, public key, and signature stack values, then verify complete spends against BSV Node and chain-gang. [Layout and fingerprint](../versions/v1.1.0/layout.json) · [Wallet integration](../docs/sdk.en.md)

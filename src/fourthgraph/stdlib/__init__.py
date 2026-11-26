@@ -195,6 +195,7 @@ LIBRARIES = {
     "std/wallet/p2pkh-sm2": wallet_library("p2pkh-sm2", ("sm2-lock",), accumulator="script", parameters=(
         ("owner-hash", "20-byte SM2 public-key hash"), ("sm3", "ZA prefix and SM3 Script fragments"),
         ("signed-residues?", "Select signed intermediate point coordinates"),
+        ("compiled-points?", "Select the supplied compiled point kernels"),
     )),
     "std/wallet/lamport-ots": wallet_library("lamport-ots", ("lamport-full-key", "lamport-committed-key"), parameters=(
         ("key", "Lamport public-key commitment or full-key verifier fragment"),

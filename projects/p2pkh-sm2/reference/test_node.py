@@ -4,7 +4,7 @@ import os
 from pathlib import Path
 import unittest
 import requests
-from assemble import PACKED_SM3_TEMPLATE_VERSION, SIGNED_RESIDUE_TEMPLATE_VERSION, TEMPLATE_VERSION, TEMPLATE_VERSIONS
+from assemble import TEMPLATE_VERSION, TEMPLATE_VERSIONS
 from test_sm2 import fixture
 from test_sighash import chain_check, mode_cases, activation_cases
 from p2pkh_sm2 import *
@@ -90,7 +90,7 @@ class NodeTests(unittest.TestCase):
                     check(signed, parents, index)
 
     def test_rejects_mutations(self):
-        for version in (TEMPLATE_VERSION, SIGNED_RESIDUE_TEMPLATE_VERSION, PACKED_SM3_TEMPLATE_VERSION):
+        for version in TEMPLATE_VERSIONS:
             with self.subTest(version=version):
                 self.check_mutations(version)
 

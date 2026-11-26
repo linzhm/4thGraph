@@ -154,7 +154,7 @@ REQUIRE BSV
 : sm2-drop-two ( script -- script )
     op-2drop ;
 
-: sm2-double-point ( script -- script )
+: sm2-double-point-unrolled ( script -- script )
     op-dup op-0notequal op-if 2 bsv-num op-pick op-over op-sub 3 bsv-num op-pick 2 bsv-num op-pick
     op-add op-mul 3 bsv-num op-mul 2 bsv-num op-pick 2 bsv-num op-pick op-mul op-dup op-add 3 bsv-num
     op-pick op-over op-mul 5 bsv-num op-pick op-over op-mul op-dup op-add 3 bsv-num op-pick op-dup
@@ -167,7 +167,7 @@ REQUIRE BSV
 : sm2-cached-b3 ( script -- script )
     op-depth op-2 op-sub op-pick ;
 
-: sm2-add-points ( script -- script )
+: sm2-add-points-unrolled ( script -- script )
     5 bsv-num op-pick 3 bsv-num op-pick op-mul 5 bsv-num op-pick 3 bsv-num op-pick op-mul 5 bsv-num
     op-pick 3 bsv-num op-pick op-mul 8 bsv-num op-pick 8 bsv-num op-pick op-add 6 bsv-num op-pick
     6 bsv-num op-pick op-add op-mul 3 bsv-num op-pick op-sub 2 bsv-num op-pick op-sub 9 bsv-num op-pick
@@ -183,6 +183,12 @@ REQUIRE BSV
     op-pick op-mul 11 bsv-num op-pick 5 bsv-num op-pick op-mul op-add sm2-reduce-coordinate op-toaltstack
     op-toaltstack op-toaltstack bsv-empty sm2-drop-two 9 bsv-repeat-code bsv-cat-code op-fromaltstack
     op-fromaltstack op-fromaltstack ;
+
+: sm2-double-point ( script -- script )
+    compiled-points? if sm2-double-kernel bsv-cat-code else sm2-double-point-unrolled then ;
+
+: sm2-add-points ( script -- script )
+    compiled-points? if sm2-add-kernel bsv-cat-code else sm2-add-points-unrolled then ;
 
 : sm2-digits-split4 ( script -- script )
     op-over 16 bsv-num op-mod op-toaltstack op-dup 16 bsv-num op-mod op-toaltstack 16 bsv-num op-div
