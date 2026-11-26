@@ -9,11 +9,11 @@ from shared.benchmark_validation import chain_verdict
 from shared.chain_gang import validate_at_heights
 from shared.evaluate import evaluate as evaluate_script
 from shared.script import decode_num, encode_num
-from shared.transaction import Input, Transaction
+from shared.transaction import Input, Output, Transaction
 
 from compiler import CompileError, SourceCompiler, evaluate, lower, parse, schedule
 from lowering import compile_word
-from protocol import Contracts, compile_candidates, invalidated
+from protocol import Contracts, OutputLayout, compile_candidates, invalidated, output_hash
 from replay import EXAMPLE, GATED_EXAMPLE, TASK_ID, TestKeys
 from wordsets import CELL_SIGN, U32, capabilities
 
@@ -171,6 +171,14 @@ bsv-effect: numerals -- cell ;
             schedule(constrained, "fused")
         self.assertEqual(schedule(parse(SOURCE + "\na independent-submit\n")).mode, "split")
 
+    def test_source_line_endings_and_core_right_bracket_diagnostic(self):
+        lines = ["bsv-use core-ext \\ enable comments", "bsv-effect: n -- cell ;", ": n 3 ;"]
+        for separator in ("\n", "\r", "\r\n"):
+            source = separator.join(lines)
+            self.assertEqual(evaluate(SourceCompiler(source).words["n"]), (3,))
+            with self.assertRaisesRegex(CompileError, r"line 4, column 1: Forth 2012 CORE word ']' cannot compile"):
+                SourceCompiler(source + separator + "]")
+
 
 class ProtocolTests(unittest.TestCase):
     def setUp(self):
@@ -200,6 +208,68 @@ class ProtocolTests(unittest.TestCase):
         for payload in (bytes(32), b"\xff" * 32):
             with self.subTest(payload=payload), self.assertRaisesRegex(ValueError, "settle requires a valid"):
                 Contracts(self.plan, {**self.keys.public, "settle": b"\x02" + payload}, TASK_ID)
+
+    def test_shared_external_input_follows_the_same_value_across_schedules(self):
+        source = GATED_EXAMPLE.read_text().replace("5 cell>u32 u32<", "u32>cell 0< 0=")
+        for right, gate in (("x", None), ("x", "z"), ("y", "x"), ("y", "y"), ("x", "x")):
+            text = (source if gate else SOURCE).replace("work: b y ", f"work: b {right} ")
+            if gate:
+                text = text.replace("gate: qualify z ", f"gate: qualify {gate} ")
+            for mode, separate in (("fused", False), ("split", False), ("split", True)):
+                if separate and not gate:
+                    continue
+                plan = schedule(parse(text + ("\nindependent-submit qualify" if separate else "")), mode)
+                contracts = Contracts(plan, self.keys.public, TASK_ID, target="both", optimization="stack",
+                                      join_witness="shared")
+                shared = plan.program.shared_input
+                artifact = contracts.describe()
+                self.assertEqual((artifact["schema_version"], artifact["shared_input"]), (2, shared))
+                for x in (0, 10, U32 - 1):
+                    with self.subTest(right=right, gate=gate, mode=mode, separate=separate, x=x):
+                        data = {"x": x, "y": 2, "z": 3}
+                        done = {"deploy": Transaction((Input(bytes(32), 0),), (contracts.root,))}
+                        reads = 0
+                        for i, step in enumerate(plan.templates):
+                            names = contracts.external_inputs(step)
+                            reads += names.count(shared)
+                            draft = contracts.prepare(step.name, done, {n: data[n] for n in names}, version=1 + i % 2)
+                            layout = contracts.output_layout(step.name)
+                            if layout is not None and layout.committed and x == 10:
+                                outputs = list(draft.tx.outputs)
+                                slot = layout.committed[-1]
+                                outputs[slot] = layout.bind(data[shared] ^ 1)[slot]
+                                changed = replace(draft, tx=replace(draft.tx, outputs=tuple(outputs)))
+                                self.assertFalse(chain_verdict(changed.seal(self.keys.sign), draft.parents))
+                            if step.name in {w.name for w in plan.program.work if w.input == shared}:
+                                self.assertEqual(draft.payload, ((),))
+                                with self.assertRaisesRegex(ValueError, "differs from the bound previous output"):
+                                    contracts.prepare(step.name, done, {shared: data[shared] ^ 1})
+                            done[step.name] = draft.seal(self.keys.sign)
+                            self.assertTrue(chain_verdict(done[step.name], draft.parents))
+                        self.assertEqual(reads, 1)
+                        settle = (2 * x + data[right] + 1) % U32 >= 20
+                        self.assertEqual(done[plan.templates[-1].name].outputs, (contracts.terminals[settle],))
+
+    def test_committed_output_hash_includes_lengths_and_every_copy(self):
+        for width in (246, 247, 65529, 65530):
+            base = (Output(2, bytes(width)), Output(3, b"\x51"), Output(5, b"\x52"))
+            layout = OutputLayout(base, (0, 2))
+            for value in (0, 128, U32 - 1):
+                outs = layout.bind(value)
+                stack, alt = evaluate_script(layout.hash_script(), [encode_num(value)])
+                self.assertEqual((stack, alt), ([output_hash(outs)], []))
+                self.assertTrue(layout.matches(outs))
+                self.assertFalse(layout.matches((outs[0], outs[1], layout.bind(value ^ 1)[2])))
+
+    def test_worker_checks_shared_input_against_supplied_gate(self):
+        source = GATED_EXAMPLE.read_text().replace("qualify z", "qualify x") + "\nindependent-submit qualify"
+        contracts = Contracts(schedule(parse(source)), self.keys.public, TASK_ID)
+        done = {"deploy": Transaction((Input(bytes(32), 0),), (contracts.root,))}
+        done["qualify"] = contracts.prepare("qualify", done, {"x": 2}).seal(self.keys.sign)
+        split = contracts.prepare("split", done)
+        done["split"] = replace(split.tx, outputs=contracts.work_layout.bind(3))
+        with self.assertRaisesRegex(ValueError, "split outputs do not match"):
+            contracts.prepare("a", done)
 
     def test_rejects_inconsistent_inputs_before_calling_a_signer(self):
         foreign = replace(self.done["deploy"], outputs=(replace(self.contracts.root, script=b"\x51"),))

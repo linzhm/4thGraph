@@ -36,9 +36,9 @@ class Token:
 
 class Tokens:
     def __init__(self, source):
-        self.source = source
+        self.source = source.replace("\r\n", "\n").replace("\r", "\n")
         self.offset = 0
-        self.lines = [0, *(match.end() for match in re.finditer("\n", source))]
+        self.lines = [0, *(match.end() for match in re.finditer("\n", self.source))]
         self.wordsets = set()
 
     def __iter__(self):
@@ -113,6 +113,16 @@ class Program:
     independent: tuple[tuple[str, int], ...]
     optional_wordsets: tuple[str, ...]
     gate: Work | None = None
+
+    @property
+    def input_order(self):
+        return tuple(step.input for step in self.work) + ((self.gate.input,) if self.gate else ())
+
+    @property
+    def shared_input(self):
+        # Two workers and at most one gate can repeat at most one distinct input.
+        order = self.input_order
+        return next((name for name in order if order.count(name) > 1), None)
 
 
 @dataclass(frozen=True)
@@ -430,6 +440,10 @@ def schedule(program, mode="auto", *, available_data=None, available_authorizers
             else:
                 fork_steps = (gate.name, "split")
                 reasons.append(f"{gate.name}: guard and split are executed together under {program.operator}")
+        shared = program.shared_input
+        if shared is not None:
+            first = gate.name if prefix and gate.input == shared else "split"
+            reasons.append(f"{first}: input {shared} must be available here to bind it for all consuming steps")
         templates = (
             *prefix,
             Template("split", (ParentOutput(fork_parent, 0),), (program.operator,), ("work", "work"), fork_steps),

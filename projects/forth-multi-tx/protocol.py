@@ -16,6 +16,7 @@ from compiler import (
     PROJECT_DESCRIPTION, PROJECT_NAME, PROJECT_VERSION, CompileError, Plan, SourceCompiler, Template, evaluate, schedule,
 )
 from lowering import BASELINE, OPTIMIZATIONS, compile_word
+from stack_schedule import Graph
 from wordsets import U32, capabilities, push_value
 
 DEFAULT_TARGET = "chronicle-v2"
@@ -99,6 +100,55 @@ def validate_u32():
 
 def output_hash(outputs):
     return hash256(b"".join(output.serialize() for output in outputs))
+
+
+@dataclass(frozen=True)
+class OutputLayout:
+    """Outputs whose designated locks begin with the same fixed-width u32."""
+
+    base: tuple[Output, ...]
+    committed: tuple[int, ...] = ()
+
+    def bind(self, value=None):
+        if not self.committed:
+            return self.base
+        if type(value) is not int or not 0 <= value < U32:
+            raise ValueError("shared input must be a u32")
+        prefix = push(value.to_bytes(RESULT_WIDTH, "little"))
+        return tuple(Output(out.value, prefix + out.script) if i in self.committed else out
+                     for i, out in enumerate(self.base))
+
+    @staticmethod
+    def read(output):
+        data = output.script[:1 + RESULT_WIDTH]
+        if len(data) != 1 + RESULT_WIDTH or data[0] != RESULT_WIDTH or data[-1] != 0:
+            raise ValueError("invalid shared input in previous output")
+        return int.from_bytes(data[1:], "little")
+
+    def matches(self, outputs):
+        if len(outputs) != len(self.base):
+            return False
+        value = self.read(outputs[self.committed[0]]) if self.committed else None
+        return self.bind(value) == outputs
+
+    def hash_script(self):
+        if not self.committed:
+            return push(output_hash(self.base))
+        # Split the canonical serialization exactly at the u32 fields. This
+        # includes amounts, CompactSize lengths, and the fixed-width push opcodes.
+        parts = [bytearray()]
+        for i, out in enumerate(self.bind(0)):
+            raw = out.serialize()
+            if i in self.committed:
+                offset = len(raw) - len(out.script) + 1
+                parts[-1].extend(raw[:offset])
+                parts.append(bytearray(raw[offset + RESULT_WIDTH:]))
+            else:
+                parts[-1].extend(raw)
+        code = number(RESULT_WIDTH) + asm("OP_NUM2BIN") + push(bytes(parts[0]))
+        for tail in parts[1:]:
+            code += asm("OP_OVER OP_CAT") + push(bytes(tail)) + asm("OP_CAT")
+        return code + asm("OP_NIP OP_HASH256")
 
 
 def route_check(terminals):
@@ -298,41 +348,100 @@ class Contracts:
         self.words[plan.program.join_name] = compile_word(plan.program.join, optimization)
         select_route = self.words[plan.program.join_name].script
         gate = plan.program.gate
-        guard = b""
+        self.unique_inputs = tuple(dict.fromkeys(plan.program.input_order))
+        self.shared_input = plan.program.shared_input
+        self.separate_gate = gate is not None and gate.name in self.templates
+        gate_code = b""
         if gate is not None:
             self.words[gate.name] = compile_word(gate.word, optimization)
-            guard = validate_u32() + self.words[gate.name].script + asm("OP_VERIFY")
+            gate_code = self.words[gate.name].script + asm("OP_VERIFY")
+        guard = validate_u32() + gate_code if gate is not None else b""
         if plan.mode == "fused":
             # Optional z is above x/y, and its authorization follows both workers.
             authorizations = b"".join(authorize(keys[owner]) for owner in self.templates["fused"].authorizers)
-            code = (begin(self.versions) + single_input() + authorizations + guard
+            graph = Graph(len(self.unique_inputs))
+            slots = dict(zip(self.unique_inputs, graph.inputs, strict=True))
+            distribute = graph.emit([slots[name] for name in plan.program.input_order])
+            code = (begin(self.versions) + single_input() + authorizations + distribute + guard
                     + validate_u32() + asm("OP_SWAP") + validate_u32() + self.words[a.name].script
                     + asm("OP_SWAP") + self.words[b.name].script + select_route + route_check(self.terminals) + finish())
         else:
             self.join_code = join_lock(select_route, self.terminals, self.data_prefix, self.versions, join_witness)
-            self.work_outputs = tuple(
-                Output(WORK_VALUE, work_lock(i, self.words[step.name].script, keys[step.owner], self.join_code,
-                                             self.data_prefix, self.versions))
-                for i, step in enumerate(plan.program.work)
-            )
-            separate_gate = gate is not None and gate.name in self.templates
-            fork_guard = b"" if separate_gate else guard
-            code = (begin(self.versions) + single_input() + authorize(keys[plan.program.operator]) + fork_guard
-                    + push(output_hash(self.work_outputs)) + check_field(OUTPUTS_HASH) + finish())
-            if separate_gate:
-                self.fork_output = Output(GATED_FORK_VALUE, code)
+            # A committed prefix leaves [signature preimage fixed-u32]. Move its
+            # canonical ScriptNum into the old input position before verification.
+            from_lock = asm("OP_BIN2NUM OP_ROT OP_ROT")
+            committed = tuple(i for i, step in enumerate(plan.program.work) if step.input == self.shared_input)
+            work_outputs = []
+            for i, step in enumerate(plan.program.work):
+                script = work_lock(i, self.words[step.name].script, keys[step.owner], self.join_code,
+                                   self.data_prefix, self.versions)
+                work_outputs.append(Output(WORK_VALUE, (from_lock if i in committed else b"") + script))
+            self.work_layout = OutputLayout(tuple(work_outputs), committed)
+            gate_shares = gate is not None and gate.input == self.shared_input
+            if gate_shares:
+                guard = validate_u32() + asm("OP_DUP") + gate_code
+            split_code = begin(self.versions) + single_input() + authorize(keys[plan.program.operator])
+            if not self.separate_gate:
+                split_code += guard
+            if committed and (self.separate_gate or not gate_shares):
+                split_code += validate_u32()
+            code = split_code + self.work_layout.hash_script() + check_field(OUTPUTS_HASH) + finish()
+            if self.separate_gate:
+                # With a shared input both transactions carry the work locks.
+                # Divide the existing 5,000 sat fixture fee between gate and split.
+                fork_value = (ROOT_VALUE + 2 * WORK_VALUE) // 2 if committed else GATED_FORK_VALUE
+                fork = Output(fork_value, (from_lock if gate_shares else b"") + code)
+                self.fork_layout = OutputLayout((fork,), (0,) if gate_shares else ())
                 code = (begin(self.versions) + single_input() + authorize(keys[gate.owner]) + guard
-                        + push(output_hash((self.fork_output,))) + check_field(OUTPUTS_HASH) + finish())
+                        + self.fork_layout.hash_script() + check_field(OUTPUTS_HASH) + finish())
         self.root = Output(ROOT_VALUE, code)
+
+    @property
+    def work_outputs(self):
+        return self.work_layout.bind()
+
+    @property
+    def fork_output(self):
+        return self.fork_layout.bind()[0]
+
+    def output_layout(self, step):
+        if step == "split":
+            return self.work_layout
+        if self.separate_gate and step == self.plan.program.gate.name:
+            return self.fork_layout
+        return None
+
+    def external_inputs(self, template):
+        gate = self.plan.program.gate
+        if template.name == "fused":
+            return self.unique_inputs
+        if template.name == "split":
+            shared = (self.shared_input,) if self.shared_input else ()
+            if self.separate_gate:
+                return () if self.fork_layout.committed else shared
+            if gate and gate.input != self.shared_input:
+                return (*shared, gate.input)
+            return shared
+        if gate and template.name == gate.name:
+            return (gate.input,)
+        for step in self.plan.program.work:
+            if template.name == step.name and step.input != self.shared_input:
+                return (step.input,)
+        return ()
 
     def describe(self):
         def describe_output(output):
             return {"satoshis": output.value, "script_hex": output.script.hex()}
 
+        def describe_layout(layout):
+            return [{"satoshis": out.value, "prefix_u32_input": self.shared_input,
+                     "script_suffix_hex": out.script.hex()} if i in layout.committed else describe_output(out)
+                    for i, out in enumerate(layout.base)]
+
         spec = {
             "project": PROJECT_NAME,
             "compiler_version": PROJECT_VERSION,
-            "schema_version": 1,
+            "schema_version": 2 if self.shared_input is not None else 1,
             "target": self.target,
             "optimization": self.optimization,
             "join_witness": self.join_witness,
@@ -354,14 +463,18 @@ class Contracts:
         }
         if self.plan.mode == "split":
             spec.update(
-                work_outputs=[describe_output(output) for output in self.work_outputs],
+                work_outputs=describe_layout(self.work_layout),
                 result_output={"satoshis": RESULT_VALUE, "first_push": "split txid in wire order",
                                "script_suffix_hex": self.join_code.hex()},
                 data_output={"satoshis": 0, "script_prefix_hex": self.data_script_prefix.hex(),
                              "suffix": "u32 ScriptNum encoded in five bytes"},
             )
-            if self.plan.program.gate is not None and self.plan.program.gate.name in self.templates:
-                spec["gated_fork_output"] = describe_output(self.fork_output)
+            if self.separate_gate:
+                spec["gated_fork_output"], = describe_layout(self.fork_layout)
+        if self.shared_input is not None:
+            spec["shared_input"] = self.shared_input
+            for row, template in zip(spec["templates"], self.plan.templates, strict=True):
+                row["external_inputs"] = self.external_inputs(template)
         return spec
 
     def result_output(self, split):
@@ -410,17 +523,22 @@ class Contracts:
         for txin, dependency in zip(parent.inputs, template.inputs, strict=True):
             ancestor = completed.get(dependency.step)
             if (txin.vout != dependency.vout or dependency.step in completed
-                    and (not isinstance(ancestor, Transaction) or txin.txid != ancestor.txid_wire())):
+                    and (not isinstance(ancestor, Transaction) or dependency.vout >= len(ancestor.outputs)
+                         or txin.txid != ancestor.txid_wire())):
                 raise ValueError(f"{reference.step} does not spend its bound {dependency.step}:{dependency.vout}")
-        if template.outputs == ("split-lock",):
-            expected = (self.fork_output,)
-        elif template.outputs == ("work", "work"):
-            expected = self.work_outputs
+        layout = self.output_layout(reference.step)
+        if layout is not None:
+            matches = layout.matches(parent.outputs)
+            if matches and reference.step == "split" and self.separate_gate and self.fork_layout.committed:
+                gate_tx = completed.get(self.plan.program.gate.name)
+                if gate_tx is not None:
+                    matches = parent.outputs == layout.bind(self.fork_layout.read(gate_tx.outputs[0]))
         elif template.outputs == ("result", "data"):
-            expected = (self.result_output_for(parent.inputs[0].txid), self.data_output(self.result_value(parent)))
+            matches = parent.outputs == (self.result_output_for(parent.inputs[0].txid),
+                                         self.data_output(self.result_value(parent)))
         else:
             raise ValueError(f"{reference.step} cannot be used as a parent of another contract step")
-        if parent.outputs != expected:
+        if not matches:
             raise ValueError(f"{reference.step} outputs do not match this contract")
         return utxo
 
@@ -436,24 +554,28 @@ class Contracts:
         inputs = tuple(Input(utxo.outpoint.txid, utxo.outpoint.vout) for utxo in previous)
         a, b = self.plan.program.work
         gate = self.plan.program.gate
-        gate_payload = ()
-        if gate is not None and gate.name in template.executes:
-            value = input_value(data, gate.input)
-            if not estimate:
-                accepted, = evaluate(gate.word, value)
-                if not accepted:
-                    raise ValueError(f"gate {gate.name} rejected input {gate.input}")
-            gate_payload = (encode_num(value),)
+        values = {key: input_value(data, key) for key in self.external_inputs(template)}
+        payload = (tuple(map(encode_num, values.values())),)
+        first_input = template.inputs[0]
+        layout = self.output_layout(first_input.step)
+        if layout is not None and first_input.vout in layout.committed:
+            committed = OutputLayout.read(previous[0].output)
+            if data is not None and self.shared_input in data and input_value(data, self.shared_input) != committed:
+                raise ValueError(f"input {self.shared_input} differs from the bound previous output")
+            values[self.shared_input] = committed
+        if gate is not None and gate.name in template.executes and not estimate:
+            accepted, = evaluate(gate.word, values[gate.input])
+            if not accepted:
+                raise ValueError(f"gate {gate.name} rejected input {gate.input}")
         if name == "fused":
-            x, y = input_value(data, a.input), input_value(data, b.input)
-            result_a, = evaluate(a.word, x)
-            result_b, = evaluate(b.word, y)
+            result_a, = evaluate(a.word, values[a.input])
+            result_b, = evaluate(b.word, values[b.input])
             route, = evaluate(self.plan.program.join, result_a, result_b)
-            outputs, payload = (self.terminals[route],), ((encode_num(x), encode_num(y), *gate_payload),)
+            outputs = (self.terminals[route],)
         elif name == "split":
-            outputs, payload = self.work_outputs, (gate_payload,)
+            outputs = self.work_layout.bind(values.get(self.shared_input))
         elif gate is not None and name == gate.name:
-            outputs, payload = (self.fork_output,), (gate_payload,)
+            outputs = self.fork_layout.bind(values.get(self.shared_input))
         elif name == self.plan.program.join_name:
             parents = tuple(utxo.parent for utxo in previous)
             if parents[0].inputs[0].txid != parents[1].inputs[0].txid:
@@ -462,10 +584,8 @@ class Contracts:
             outputs, payload = (self.terminals[route],), (self.join_payload(parents),) * 2
         else:
             step = a if name == a.name else b
-            value = input_value(data, step.input)
-            result, = evaluate(step.word, value)
+            result, = evaluate(step.word, values[step.input])
             outputs = (self.result_output(previous[0].parent), self.data_output(result))
-            payload = ((encode_num(value),),)
         return Draft(template, Transaction(inputs, outputs, version=version), previous, payload, self.keys)
 
 

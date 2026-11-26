@@ -56,6 +56,7 @@ PYTHONPATH=. python projects/forth-multi-tx/protocol.py --capabilities
 
 - `bsv-effect: name cell -- cell ;` 声明静态栈效果。 `: name ( optional comment ) 1 + ;` 按 Forth 语义定义词。通过 `bsv-use core-ext` 启用受支持的 Core Extension 词。构建会报告无法编译到 Script 的用法及源码位置。
 - `work: a x double alice` 将输入、计算和签名角色连到工作步骤。 `join: route a b decide` 按指定顺序声明汇合依赖。 `split-authority: operator` 声明启动拆分的签名角色。当前调度器识别一对并行分支和一个汇合。选择交易边界后，后端再内联、折叠字面量和选择 Script 指令。
+- 若把第二支改为 `work: b x inc bob`，两支都使用同一个 `x`。融合版只需提供一次。拆分版在创建工作输出时锁定 `x`，Alice 和 Bob 之后可各自提交，其签名请求绑定包含该值的实际前输出。若独立的门也使用 `x`，提供它的时点提前到门交易。共享值以明文进入相应的锁脚本。
 - 词库声明执行位置和验证依据。Script 词由链上执行。宿主词通过 `Host` 的注入接口查询 UTXO、请求签名和提交交易，并可从 UTXO 取得脚本和 outpoint。测试签名器使用公开可复现的私钥，仅供 regtest。
 - `Contracts.prepare` 把符号引用如 `split:0` 解析为已封装父交易的真实 outpoint，核对前输出、已提供的父交易关系，以及汇合结果的槽位、同次拆分来源和编码。含门条件的步骤会先在宿主检查条件。 `Draft.signing_requests` 给外部签名器提供角色、前输出、待签交易、见证输入及 ForkID ALL 摘要。 `Draft.seal` 校验草稿绑定并装配签名和当前交易原像。实际可花费性仍由 UTXO 集和链上脚本验证。父 txid 改变时，`invalidated` 沿依赖图列出需重新绑定的交易和需更新的授权。
 

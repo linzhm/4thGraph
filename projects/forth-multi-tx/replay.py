@@ -134,14 +134,20 @@ class Replay:
         if any(txin.outpoint() != Input(utxo.outpoint.txid, utxo.vout).outpoint()
                for txin, utxo in zip(tx.inputs, previous, strict=True)):
             raise ValueError("replay input does not match its recorded previous output")
-        if expected:
-            for utxo in previous:
+        chain_parents = []
+        missing = []
+        for utxo in previous:
+            if live_only and self.node.call("gettxout", [utxo.parent.txid(), utxo.vout]) is None:
+                missing.append(utxo.outpoint.text())
+            else:
                 host_call("bsv-lookup-utxo", self.host, utxo.outpoint)
+                chain_parents.append(utxo.parent)
+        if live_only and len(missing) != 1:
+            raise ValueError(f"missing-result control expected one absent outpoint, found {missing}")
         spend_height = self.node.call("getblockcount", []) + 1
         # Give the hypothetical parent in the missing-UTXO control the next block height.
         heights = tuple(self.traces.get(parent.txid(), {}).get("height", spend_height) for parent in parents)
         context = dict(spend_height=spend_height, activation_height=self.activation_height, utxo_heights=heights)
-        chain_parents = parents[:1] if live_only else parents
 
         def chain_check():
             try:
@@ -154,17 +160,21 @@ class Replay:
         node, node_ms = timed(lambda: self.node.verdicts(tx, parents, timeout_us=50_000, **context), samples)
         (chain, chain_error), chain_ms = timed(chain_check, samples)
         mined = bool(host_call("bsv-submit", self.host, tx))
-        if (all(node), chain, mined) != (expected or live_only, expected, expected):
+        admission = self.traces[tx.txid()]
+        expected_code = None if expected else (-25 if live_only else -26)
+        if (node != [expected or live_only] * len(tx.inputs) or chain != expected or mined != expected
+                or admission["mempool"] != expected or admission.get("rpc_code") != expected_code):
             raise ValueError(f"unexpected verdict for {tx.txid()}: scripts={node}, chain-gang={chain}, "
-                             f"admission={self.traces[tx.txid()]}")
+                             f"admission={admission}")
         return {
             "txid": tx.txid(), "raw": tx.serialize().hex(), "transaction_version": tx.version,
             "previous": [utxo.outpoint.text() for utxo in previous],
             "output_scripts": [output.script.hex() for output in tx.outputs],
             "bytes": len(tx.serialize()),
             "validation_context": context,
-            "bsv_node": {"input_scripts": node, "verify_rpc_median_ms": node_ms, **self.traces[tx.txid()]},
-            "chain_gang": {"transaction": chain, "median_ms": chain_ms, "error": chain_error},
+            "bsv_node": {"input_scripts": node, "verify_rpc_median_ms": node_ms, **admission},
+            "chain_gang": {"transaction": chain, "median_ms": chain_ms, "error": chain_error,
+                           "missing_outpoints": missing},
             "stack": stack_peaks(tx, previous) if expected else None,
         }
 
@@ -178,8 +188,17 @@ class Replay:
 
         return self.sign(draft, replace(self.host, sign=owner_only))
 
-    def branch(self, contracts, name, done, data, *, version=None):
+    def branch(self, contracts, name, done, data, *, version=None, controls=None):
         draft = contracts.prepare(name, done, data, version=version)
+        layout = contracts.output_layout(name)
+        if controls is not None and layout is not None and layout.committed:
+            outputs = list(draft.tx.outputs)
+            slot = layout.committed[-1]
+            value = layout.read(outputs[slot])
+            outputs[slot] = layout.bind(value ^ 1)[slot]
+            inconsistent = replace(draft, tx=replace(draft.tx, outputs=tuple(outputs)))
+            controls[name + "_wrong_shared_input"] = self.record(self.sign(inconsistent), draft.previous,
+                                                                 expected=False)
         work = draft.template.outputs == ("result", "data")
         tx = self.sign_work(draft) if work else self.sign(draft)
         done[name] = tx
@@ -187,8 +206,10 @@ class Replay:
 
     def false_gate(self, contracts, name, done, data, version):
         draft = contracts.prepare(name, done, data, version=version)
-        fields, = draft.payload
-        invalid = replace(draft, payload=((*fields[:-1], encode_num((1 << 32) - 1)),))
+        fields = list(draft.payload[0])
+        gate_input = contracts.plan.program.gate.input
+        fields[contracts.external_inputs(draft.template).index(gate_input)] = encode_num((1 << 32) - 1)
+        invalid = replace(draft, payload=(tuple(fields),))
         return self.record(self.sign(invalid), invalid.previous, expected=False)
 
     def controls(self, contracts, join, foreign_result):
@@ -232,13 +253,14 @@ class Replay:
                 gate_tx = gate.name if gate.name in c.templates else "split"
                 controls["false_gate"] = self.false_gate(c, gate_tx, done, data, second_version)
                 if gate_tx != "split":
-                    records[gate.name] = self.branch(c, gate.name, done, data, version=second_version)
-            records["split"] = self.branch(c, "split", done, data, version=second_version)
+                    records[gate.name] = self.branch(c, gate.name, done, data, version=second_version, controls=controls)
+            records["split"] = self.branch(c, "split", done, data, version=second_version, controls=controls)
             left, right = (b, a) if route == "review" else (a, b)
             versions = {a.name: first_version, b.name: second_version}
-            records[left.name] = self.branch(c, left.name, done, {left.input: data[left.input]},
-                                              version=versions[left.name])
-            right_draft = c.prepare(right.name, done, {right.input: data[right.input]}, version=versions[right.name])
+            left_data = {key: data[key] for key in c.external_inputs(c.templates[left.name])}
+            right_data = {key: data[key] for key in c.external_inputs(c.templates[right.name])}
+            records[left.name] = self.branch(c, left.name, done, left_data, version=versions[left.name])
+            right_draft = c.prepare(right.name, done, right_data, version=versions[right.name])
             done[right.name] = self.sign_work(right_draft)
             join = c.prepare(plan.program.join_name, done, version=first_version)
             if foreign:
@@ -330,7 +352,8 @@ def main():
         "fused_review": replay.path(fused, bootstrap, 1, {"x": (1 << 32) - 1, "y": 2, **gate_input}, "review"),
         "split_settle": replay.path(split, bootstrap, 2, {"x": 10, "y": 5, **gate_input},
                                     "settle", foreign=foreign["b"]),
-        "split_review": replay.path(constrained, bootstrap, 3, {"x": (1 << 32) - 1, "y": 2, **gate_input}, "review"),
+        "split_review": replay.path(constrained, bootstrap, 3, {"x": (1 << 32) - 1, "y": 2, **gate_input},
+                                    "review", foreign=foreign["b"]),
     }
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps({
