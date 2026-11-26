@@ -85,6 +85,15 @@ def evaluate(raw, stack=None, checksig=None, *, observe_stack=None):
                 n=num(); x=pop()
                 if not 0<=n<=len(x): raise ScriptError('split bounds')
                 stack.extend((x[:n],x[n:]))
+            elif name=='SUBSTR':
+                length=num(); start=num(); x=pop()
+                if not 0<=start<len(x) or not 0<=length<=len(x)-start:
+                    raise ScriptError('substring bounds')
+                stack.append(x[start:start+length])
+            elif name=='LEFT':
+                length=num(); x=pop()
+                if not 0<=length<=len(x): raise ScriptError('left bounds')
+                stack.append(x[:length])
             elif name=='BIN2NUM': put(num())
             elif name=='NUM2BIN':
                 size=num(); x=num(); value=encode_num(x)
@@ -100,6 +109,10 @@ def evaluate(raw, stack=None, checksig=None, *, observe_stack=None):
                 stack.append(bytes((a^b if name=='XOR' else a&b if name=='AND' else a|b) for a,b in zip(x,y)))
             elif name in ('NEGATE','1ADD','1SUB','NOT','0NOTEQUAL'):
                 x=num(); put(-x if name=='NEGATE' else x+1 if name=='1ADD' else x-1 if name=='1SUB' else int(x==0) if name=='NOT' else int(x!=0))
+            elif name=='2MUL': put(2*num())
+            elif name=='2DIV':
+                x=num(); half=abs(x)//2
+                put(-half if x<0 else half)
             elif name in ('ADD','SUB','MUL','DIV','MOD','MIN','MAX','BOOLAND','BOOLOR','NUMEQUAL','NUMEQUALVERIFY','LESSTHAN','GREATERTHAN'):
                 y=num(); x=num()
                 if name in ('DIV','MOD'):

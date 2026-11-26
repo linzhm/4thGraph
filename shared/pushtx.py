@@ -6,17 +6,48 @@ N = 0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141
 R = 0x79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798
 PUBLIC = bytes.fromhex('02' + f'{R:064x}')
 REVERSE32 = asm('OP_1 OP_SPLIT OP_SWAP OP_TOALTSTACK')*31 + asm('OP_FROMALTSTACK OP_CAT')*31
+REVERSE32_ON_STACK = asm('OP_1 OP_SPLIT')*31 + asm('OP_SWAP OP_CAT')*31
 
 
-def binding_der():
+def _binding_der_parts(compact):
     # H -> positive big-endian integer -> s=min((H+r)%n,n-(H+r)%n).
     # Construct strict DER in Script; no supplied ECDSA signature is trusted.
-    return (REVERSE32 + push(b'\0') + asm('OP_CAT OP_BIN2NUM') + number(R) + asm('OP_ADD') +
-            number(N) + asm('OP_MOD OP_DUP OP_VERIFY OP_DUP') + number(N) +
-            asm('OP_SWAP OP_SUB OP_MIN OP_SIZE OP_TOALTSTACK') + number(32) + asm('OP_NUM2BIN') +
-            REVERSE32 + number(32) + asm('OP_FROMALTSTACK OP_SUB OP_SPLIT OP_NIP OP_SIZE OP_TUCK OP_TOALTSTACK OP_CAT') +
-            push(bytes.fromhex('0220'+f'{R:064x}'+'02')) + asm('OP_SWAP OP_CAT OP_FROMALTSTACK') + number(36) +
-            asm('OP_ADD') + push(b'\x30') + asm('OP_SWAP OP_CAT OP_SWAP OP_CAT'))
+    reverse = REVERSE32_ON_STACK if compact else REVERSE32
+    if compact:
+        # Keep one copy of n for both the modulus and low-S subtraction.
+        low_s = number(N) + asm('OP_TUCK OP_MOD OP_DUP OP_VERIFY OP_TUCK OP_SUB OP_MIN')
+    else:
+        low_s = (number(N) + asm('OP_MOD OP_DUP OP_VERIFY OP_DUP') + number(N) +
+                 asm('OP_SWAP OP_SUB OP_MIN'))
+    normalize = (push(b'\0') + asm('OP_CAT OP_BIN2NUM') + number(R) + asm('OP_ADD') +
+                 low_s + asm('OP_SIZE OP_TOALTSTACK') + number(32) + asm('OP_NUM2BIN'))
+    der = (number(32) + asm('OP_FROMALTSTACK OP_SUB OP_SPLIT OP_NIP OP_SIZE OP_TUCK OP_TOALTSTACK OP_CAT') +
+           push(bytes.fromhex('0220'+f'{R:064x}'+'02')) + asm('OP_SWAP OP_CAT OP_FROMALTSTACK') + number(36) +
+           asm('OP_ADD') + push(b'\x30') + asm('OP_SWAP OP_CAT OP_SWAP OP_CAT'))
+    return reverse, normalize, reverse, der
+
+
+def binding_der(*, compact=False):
+    return b''.join(_binding_der_parts(compact))
+
+
+def fixed_key_checksig_parts(sighash, *, compact=False, reuse_r=False):
+    """Emit the fixed-key authentication as linkable code fragments."""
+    der = _binding_der_parts(compact)
+    flag = push(bytes([sighash])) + asm('OP_CAT')
+    if not reuse_r:
+        check = flag + push(PUBLIC) + asm('OP_CHECKSIG')
+    else:
+        # The fixed r starts at byte four of DER and is the x coordinate of the key.
+        public = (asm('OP_DUP OP_4 OP_SPLIT OP_NIP') + number(32)
+                  + asm('OP_SPLIT OP_DROP OP_2 OP_SWAP OP_CAT'))
+        check = public + asm('OP_SWAP') + flag + asm('OP_SWAP OP_CHECKSIG')
+    return (*der, check)
+
+
+def fixed_key_checksig(sighash, *, compact=False, reuse_r=False):
+    """Authenticate a digest with the fixed PUSHTX key and flag."""
+    return b''.join(fixed_key_checksig_parts(sighash, compact=compact, reuse_r=reuse_r))
 
 
 # Lamport suffixes. Other verifiers can provide their own suffixes.

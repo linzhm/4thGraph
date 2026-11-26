@@ -163,20 +163,24 @@ bsv-effect: numerals -- cell ;
         manifest = capabilities()
         self.assertIn("+", manifest["wordsets"]["core"]["script"])
         self.assertIn("execute", manifest["wordsets"]["core"]["unsupported"])
-        self.assertFalse(manifest["wordsets"]["core-ext"]["enabled_by_default"])
+        self.assertTrue(manifest["wordsets"]["core-ext"]["enabled_by_default"])
         self.assertIn("true", manifest["wordsets"]["core-ext"]["script"])
-        source = "bsv-effect: flag -- cell ;\n: flag TRUE ;"
-        with self.assertRaisesRegex(CompileError, r"line 2, column 8: .*CORE EXT word 'TRUE' requires"):
-            SourceCompiler(source)
-        self.assertEqual(evaluate(SourceCompiler("bsv-use core-ext \\ enabled\n" + source).words["flag"]), (-1,))
-        with self.assertRaisesRegex(CompileError, r"line 2, column 8: .*CORE word 'EXECUTE' cannot compile"):
+        self.assertEqual(manifest["wordsets"]["file-ext"]["source"], ["require"])
+        source = ": flag ( -- cell ) TRUE ;"
+        self.assertEqual(evaluate(SourceCompiler(source).words["flag"]), (-1,))
+        with self.assertRaisesRegex(CompileError, r"line 1, column 20: .*CORE word 'EXECUTE' cannot compile"):
             SourceCompiler(source.replace("TRUE", "EXECUTE"))
         with self.assertRaisesRegex(CompileError, "unknown Forth word 'TYPO'"):
             SourceCompiler(source.replace("TRUE", "TYPO"))
-        with self.assertRaisesRegex(CompileError, "optional Forth word set 'search' is unavailable"):
-            SourceCompiler("bsv-use search")
-        with self.assertRaisesRegex(CompileError, "preceding 'bsv-effect:"):
-            SourceCompiler(": ordinary ( cell -- cell ) 1 + ;")
+        with self.assertRaisesRegex(CompileError, "expected a stack effect comment"):
+            SourceCompiler(": ordinary ( ordinary comment ) 1 + ;")
+        with self.assertRaisesRegex(CompileError, "stack effect requires declared types"):
+            SourceCompiler(": ordinary ( source -- destination ) 1 + ;")
+        with self.assertRaisesRegex(CompileError, "body leaves"):
+            SourceCompiler(": ordinary ( -- cell ) ;")
+        canonical = SourceCompiler(": ordinary ( cell -- cell ) ( increment ) 1 + ;").words["ordinary"]
+        legacy = SourceCompiler("bsv-effect: ordinary cell -- cell ;\n: ordinary 1 + ;").words["ordinary"]
+        self.assertEqual(lower(canonical), lower(legacy))
 
     def test_schedule_constraints(self):
         program = parse(SOURCE)
@@ -192,7 +196,7 @@ bsv-effect: numerals -- cell ;
         self.assertEqual(schedule(parse(SOURCE + "\na independent-submit\n")).mode, "split")
 
     def test_source_line_endings_and_core_right_bracket_diagnostic(self):
-        lines = ["bsv-use core-ext \\ enable comments", "bsv-effect: n -- cell ;", ": n 3 ;"]
+        lines = ["\\ comment", "bsv-effect: n -- cell ;", ": n 3 ;"]
         for separator in ("\n", "\r", "\r\n"):
             source = separator.join(lines)
             self.assertEqual(evaluate(SourceCompiler(source).words["n"]), (3,))

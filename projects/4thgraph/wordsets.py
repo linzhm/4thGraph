@@ -3,6 +3,7 @@
 from collections.abc import Callable
 from dataclasses import dataclass
 from hashlib import sha256
+from operator import add, mul, sub
 import re
 
 from shared.script import asm, number, push
@@ -11,7 +12,7 @@ CELL_BITS = 64
 CELL_MODULUS = 1 << CELL_BITS
 CELL_SIGN = CELL_MODULUS // 2
 U32 = 1 << 32
-TYPES = {"cell", "u32", "route", "bytes", "script", "transaction", "outpoint", "utxo", "request"}
+TYPES = {"cell", "u32", "script-int", "route", "bytes", "script", "transaction", "outpoint", "utxo", "request"}
 NUMERIC_RANGES = {"cell": (-CELL_SIGN, CELL_SIGN - 1), "u32": (0, U32 - 1), "route": (0, 1)}
 
 
@@ -42,14 +43,17 @@ class Primitive:
     run: Callable[..., tuple]
     evidence: str
     comparison: bool = False
+    may_fail: bool = False
+    checked_bounds: tuple[int, int] | None = None
 
     @property
     def location(self):
         return "host" if self.code is None else "script"
 
 
-def script_word(takes, gives, code, run):
-    return Primitive(tuple(takes.split()), (gives,), code, lambda *values: (run(*values),), "script execution")
+def script_word(takes, gives, code, run, *, may_fail=False):
+    return Primitive(tuple(takes.split()), (gives,), code, lambda *values: (run(*values),), "script execution",
+                     may_fail=may_fail)
 
 
 def wrap_cell(value):
@@ -102,12 +106,32 @@ CORE_EXT_PRIMITIVES = {
     "0>": cell_comparison("cell", asm("OP_0 OP_GREATERTHAN"), lambda x: x > 0),
     "<>": cell_comparison("cell cell", asm("OP_NUMEQUAL OP_NOT"), lambda x, y: x != y),
 }
+
+
+def signed_remainder(value, divisor):
+    magnitude = abs(value) % abs(divisor)
+    return -magnitude if value < 0 else magnitude
+
+
+def check_byte_size(value, size):
+    if len(value) != size:
+        raise ValueError(f"expected {size} bytes, got {len(value)}")
+    return value
+
+
 BSV_PRIMITIVES = {
+    "cell>int": script_word("cell", "script-int", b"", int),
+    "int+": script_word("script-int script-int", "script-int", asm("OP_ADD"), add),
+    "int-": script_word("script-int script-int", "script-int", asm("OP_SUB"), sub),
+    "int*": script_word("script-int script-int", "script-int", asm("OP_MUL"), mul),
+    "int-rem": script_word("script-int script-int", "script-int", asm("OP_MOD"), signed_remainder, may_fail=True),
     "u32+": script_word("u32 u32", "u32", asm("OP_ADD") + WRAP_U32, lambda x, y: (x + y) % U32),
     "u32<": cell_comparison("u32 u32", asm("OP_LESSTHAN"), lambda x, y: x < y),
     "cell>u32": script_word("cell", "u32", residue(U32), lambda x: x % U32),
     "u32>cell": script_word("u32", "cell", b"", lambda x: x),
     "bytes-cat": script_word("bytes bytes", "bytes", asm("OP_CAT"), lambda x, y: x + y),
+    "bytes-check-size": script_word("bytes cell", "bytes", asm("OP_OVER OP_SIZE OP_NIP OP_NUMEQUALVERIFY"),
+                                     check_byte_size, may_fail=True),
     "bytes-sha256": script_word("bytes", "bytes", asm("OP_SHA256"), lambda x: sha256(x).digest()),
     "bytes=": cell_comparison("bytes bytes", asm("OP_EQUAL"), lambda x, y: x == y),
 }
@@ -168,11 +192,28 @@ UNUSED VALUE WITHIN [COMPILE] \
 """.lower().split())
 CORE_SOURCE = {":", ";", "("}
 CORE_EXT_SOURCE = {"\\"}
+FILE_EXT_SOURCE = {"require"}
+FILE_EXT_WORDS = set(r'include require required refill rename-file restore-input save-input source-id s\"'.split())
 CORE_SCRIPT = CORE_PRIMITIVES.keys() | CORE_SHUFFLES.keys() | {"if", "else", "then"}
 CORE_EXT_SCRIPT = CORE_EXT_PRIMITIVES.keys() | CORE_EXT_SHUFFLES.keys() | CORE_EXT_LITERALS.keys()
-BSV_SOURCE = {"bsv-use", "bsv-effect:", "work:", "join:", "gate:", "split-authority:", "recovery:", "independent-submit"}
-BSV_SCRIPT = BSV_PRIMITIVES.keys() | ROUTES.keys() | {"bytes-hex"}
-OPTIONAL_WORDSETS = {"core-ext"}
+DECLARATIONS = {
+    "range:": "<name> <base> <lower> <upper> ;",
+    "work:": "<step> <input> <word> <signer-role> ;",
+    "join:": "<step> <left-work> <right-work> <word> ;",
+    "gate:": "<step> <input> <word> <signer-role> ;",
+    "split-authority:": "<signer-role> ;",
+    "recovery:": "<block-height> <signer-role> ;",
+    "independent-submit:": "<step> ;",
+    "workflow-input:": "<value> u32 ;",
+    "stage:": "<stage> <word> <input-value> <output-value> <signer-role> ;",
+    "relation:": "<transition-word> <route-word> ;",
+}
+LEGACY_DECLARATIONS = {"independent-submit": "independent-submit:", "verify:": "relation:",
+                       "bsv-effect:": "stack-effect comment after the definition name"}
+LEGACY_IMPLICIT_END = ("work:", "join:", "gate:", "split-authority:", "recovery:")
+BSV_SOURCE = DECLARATIONS.keys() | LEGACY_DECLARATIONS.keys()
+BSV_SCRIPT = BSV_PRIMITIVES.keys() | ROUTES.keys() | {"bytes-hex", "check-range"}
+OPTIONAL_WORDSETS = ("core-ext", "file-ext")
 
 
 def capabilities():
@@ -185,9 +226,19 @@ def capabilities():
         "cell": {"bits": CELL_BITS, "encoding": "signed canonical ScriptNum", "overflow": "wrap"},
         "wordsets": {
             "core": wordset(CORE_WORDS, CORE_SOURCE, CORE_SCRIPT, True),
-            "core-ext": wordset(CORE_EXT_WORDS, CORE_EXT_SOURCE, CORE_EXT_SCRIPT, False),
+            "core-ext": wordset(CORE_EXT_WORDS, CORE_EXT_SOURCE, CORE_EXT_SCRIPT, True),
+            "file-ext": wordset(FILE_EXT_WORDS, FILE_EXT_SOURCE, set(), True),
         },
         "bsv": {"source": sorted(BSV_SOURCE), "script": sorted(BSV_SCRIPT),
+                "source_syntax": {
+                    "position": "top-level",
+                    "reserved_word_prefix": "bsv-",
+                    "stack_effect": ": <word> ( <input-types...> -- <output-types...> ) <body> ;",
+                    "declarations": DECLARATIONS,
+                    "legacy_aliases": LEGACY_DECLARATIONS,
+                    "legacy_implicit_end": LEGACY_IMPLICIT_END,
+                    "legacy_postfix": "<work-or-gate-step> independent-submit",
+                },
                 "host": {name: {"takes": word.takes, "gives": word.gives, "evidence": word.evidence}
                          for name, word in HOST_WORDS.items()}},
     }
