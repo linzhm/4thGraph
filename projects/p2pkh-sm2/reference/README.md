@@ -40,7 +40,8 @@ witness items.
 | --- | --- |
 | [`sm2.py`](sm2.py) | Curve parameters, ZA, signature verification, and a test signer that takes an explicit nonce |
 | [`sm3_script.py`](sm3_script.py) | Emits SM3 as unrolled Script bytecode |
-| [`asm/`](asm/) | Curve arithmetic, verification, and PUSHTX transaction binding |
+| [`p2pkh-sm2.fth`](../../../src/fourthgraph/stdlib/wallet/p2pkh-sm2.fth) | Lock construction, curve arithmetic, verification and PUSHTX transaction binding |
+| [`asm/`](asm/) | Reference assembly for byte-for-byte comparisons and isolated curve tests |
 | [`p2pkh_sm2.py`](p2pkh_sm2.py) | Wallet API and external signing callback |
 | [`signed_data.py`](signed_data.py) | SignedData payment adapter, structural validation, and signature verification |
 
@@ -77,6 +78,8 @@ The wallet loads the frozen program and checks its byte length and SHA-256 again
 ```sh
 python projects/p2pkh-sm2/reference/generate_otda_constructor.py /tmp/sm2-otda.hex
 cmp /tmp/sm2-otda.hex projects/p2pkh-sm2/versions/v1.1.0/otda-constructor.hex
+python projects/p2pkh-sm2/reference/generate_otda_constructor.py --version 2 /tmp/sm2-otda-v2.hex
+cmp /tmp/sm2-otda-v2.hex projects/p2pkh-sm2/versions/v1.2.0/otda-constructor.hex
 ```
 
 The constructor tests compare exact preimage, public key, and signature stack values, then verify complete spends against BSV Node and chain-gang. [Layout and fingerprint](../versions/v1.1.0/layout.json) · [Wallet integration](../docs/sdk.en.md)

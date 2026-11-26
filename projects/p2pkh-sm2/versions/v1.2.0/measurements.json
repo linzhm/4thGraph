@@ -1,0 +1,55 @@
+{
+  "payment_shape": {
+    "inputs": 2,
+    "outputs": 2
+  },
+  "lock_bytes": 131565,
+  "otda_program_bytes": 13883,
+  "baseline": "1.1.0",
+  "bsv_node_version": "1.2.3",
+  "chain_gang_commit": "8b60b71a12a69fdcb465d3e627dbf6f43d6ed081",
+  "validation": "Peerless regtest script replay with supplied prevouts",
+  "payments": {
+    "bip143-all": {
+      "v1.1.0": {
+        "txid": "0434813f012ec404c9fa860ff0e1b26742b4985ab8cbe5658d34f95501af4876",
+        "transaction_bytes": 290554,
+        "unlock_bytes": [
+          291,
+          291
+        ],
+        "peak_stack_payload_bytes": 4152
+      },
+      "v1.2.0": {
+        "txid": "a6f01a2d1dfe259392c2486ed5b56ed13af5e69c20969730bc2de4526d7d812b",
+        "transaction_bytes": 263834,
+        "unlock_bytes": [
+          291,
+          291
+        ],
+        "peak_stack_payload_bytes": 4158
+      }
+    },
+    "otda-all": {
+      "v1.1.0": {
+        "txid": "acf37c4ef0fede14aede3d9aa7065d81f4dfc6de62d6a09702f731f3eb9d3eec",
+        "transaction_bytes": 316018,
+        "unlock_bytes": [
+          13023,
+          13023
+        ],
+        "peak_stack_payload_bytes": 580080
+      },
+      "v1.2.0": {
+        "txid": "204b0d84e6329872d916d645fb749e3a405952c8b4197400472ca6e07870d2ec",
+        "transaction_bytes": 291658,
+        "unlock_bytes": [
+          14203,
+          14203
+        ],
+        "peak_stack_payload_bytes": 526640
+      }
+    }
+  },
+  "source": "README.md#v120"
+}

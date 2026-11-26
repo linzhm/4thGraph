@@ -36,7 +36,8 @@ bash verify.sh
 | --- | --- |
 | [`sm2.py`](sm2.py) | 曲线参数、ZA、签名验证，以及需要显式指定随机数的测试签名函数 |
 | [`sm3_script.py`](sm3_script.py) | 将 SM3 各轮运算展开为 Script 字节码 |
-| [`asm/`](asm/) | 曲线运算、SM2 验签和基于 PUSHTX 的交易绑定 |
+| [`p2pkh-sm2.fth`](../../../src/fourthgraph/stdlib/wallet/p2pkh-sm2.fth) | 构建锁定脚本，包含曲线运算、SM2 验签和基于 PUSHTX 的交易绑定 |
+| [`asm/`](asm/) | 用于字节级比对和独立曲线测试的参考汇编 |
 | [`p2pkh_sm2.py`](p2pkh_sm2.py) | 钱包接口和外部签名回调 |
 | [`signed_data.py`](signed_data.py) | SignedData 付款适配、结构检查和签名验证 |
 
@@ -69,6 +70,8 @@ OTDA，包括混用签名模式的输入、全 SM2 的两进两出付款、由�
 ```sh
 python projects/p2pkh-sm2/reference/generate_otda_constructor.py /tmp/sm2-otda.hex
 cmp /tmp/sm2-otda.hex projects/p2pkh-sm2/versions/v1.1.0/otda-constructor.hex
+python projects/p2pkh-sm2/reference/generate_otda_constructor.py --version 2 /tmp/sm2-otda-v2.hex
+cmp /tmp/sm2-otda-v2.hex projects/p2pkh-sm2/versions/v1.2.0/otda-constructor.hex
 ```
 
 构造器测试逐字节比对预映像、公钥和签名三项栈值，并由 BSV Node 和 chain-gang 验证完整花费。[布局与指纹](../versions/v1.1.0/layout.json) · [钱包接入](../docs/sdk.zh-CN.md)

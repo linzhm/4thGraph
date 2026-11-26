@@ -1,14 +1,12 @@
-"""Rebuild the frozen OTDA constructor for the published v1.0.0 lock."""
+"""Rebuild the frozen OTDA constructor for a canonical P2PKH-SM2 lock."""
 import argparse
 from collections import defaultdict
 from pathlib import Path
 
-from assemble import sm3_blocks
+from assemble import TEMPLATE_VERSION, TEMPLATE_VERSIONS, forth_compiler, sm3_blocks
 from p2pkh_sm2 import _canonical
 from fourthgraph.bsv.evaluate import evaluate
-from fourthgraph.bsv.script import asm, assemble, number, push
-
-ASM_DIRECTORY = Path(__file__).with_name("asm")
+from fourthgraph.bsv.script import asm, number, push
 
 # (SM3 function, emitted instance, byte offset, width). These ranges
 # parameterize the shared instruction sequences extracted by the SM3 emitter.
@@ -24,17 +22,18 @@ SM3_FRAGMENTS = (
 )
 
 
-def function_library():
+def function_library(version=TEMPLATE_VERSION):
     fragments = {}
-    sm3_blocks(fragments=fragments)
+    sm3_blocks(version=version, fragments=fragments)
     library = []
     for name, instance, offset, width in SM3_FRAGMENTS:
         fragment = fragments[name][instance][offset:offset + width]
         if len(fragment) != width:
             raise ValueError(f"SM3 constructor fragment changed: {name}")
         library.append(fragment)
-    for name in ("DOUBLE_POINT", "ADD_POINTS"):
-        library.append(assemble(ASM_DIRECTORY, bytes(20), entry=name))
+    compiler = forth_compiler(bytes(20), version)
+    for name in ("sm2-double-point", "sm2-add-points"):
+        library.append(compiler.emit(name, b""))
     return library
 
 
@@ -133,10 +132,10 @@ def compile_suffix(raw, library):
     return bytes(program)
 
 
-def generate():
-    lock, offset = _canonical()
+def generate(version=TEMPLATE_VERSION):
+    lock, offset = _canonical(version)
     prefix, suffix = lock[:offset], lock[offset + 20:]
-    program = push(prefix) + compile_suffix(suffix, function_library())
+    program = push(prefix) + compile_suffix(suffix, function_library(version))
     if evaluate(program) != ([prefix, suffix], []):
         raise ValueError("OTDA constructor does not reproduce the canonical SM2 template")
     return program
@@ -145,4 +144,6 @@ def generate():
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("output", type=Path, help="destination for the hexadecimal constructor")
-    parser.parse_args().output.write_text(generate().hex() + "\n", encoding="ascii")
+    parser.add_argument("--version", type=int, choices=TEMPLATE_VERSIONS, default=TEMPLATE_VERSION)
+    args = parser.parse_args()
+    args.output.write_text(generate(args.version).hex() + "\n", encoding="ascii")

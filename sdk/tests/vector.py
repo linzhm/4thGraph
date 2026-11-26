@@ -70,7 +70,9 @@ def generate(project, node):
         recognized = adapter.recognize(lock, key)
         assert client.recognize(lock, public_key=key) == recognized
         if owner := recognized.get("ownerHash160"):
-            assert client.lock_for_owner(bytes.fromhex(owner)) == lock
+            owner_hash = bytes.fromhex(owner)
+            assert adapter.lock_owner(owner_hash, profile) == lock
+            assert client.lock_for_owner(owner_hash) == adapter.lock_owner(owner_hash)
         assert client.sign_spend(tx.serialize(), funding.serialize(), 0, key, replay_signer,
                                  **callback_options) == signed.serialize()
         assert client.sign_payment(funding.serialize(), 0, [(out.value, out.script) for out in outputs],
