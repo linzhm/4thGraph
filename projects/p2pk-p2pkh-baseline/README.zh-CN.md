@@ -8,11 +8,76 @@
 
 生成 P2PK 或 P2PKH 收款脚本，再用自己的 secp256k1 签名器完成付款。
 
-[协议规范](docs/developer.zh-CN.md#protocol) · [安全分析](docs/developer.zh-CN.md#security) · [复现与验证](#复现与验收) · [交易成本](#完整交易与栈测量)
+[协议规范](docs/developer.zh-CN.md#protocol) · [Forth 源码与编译结果](#forth-源码与编译结果) · [安全分析](docs/developer.zh-CN.md#security) · [复现与验证](#复现与验收) · [交易成本](#完整交易与栈测量)
 
 原生 P2PKH 是 4thGraph 的第一个钱包接入示例，也是对照其他签名方案的交易成本基准。P2PK 使用同一个 secp256k1 签名器，把公钥放在输出锁中，供对照输入和输出的成本。两种模板都有可复放的公开向量。
 
 [从 Forth 构建脚本](forth/README.md) · [复现基准](../../docs/benchmark.zh-CN.md)
+
+## Forth 源码与编译结果
+
+Forth 构造词检查收款字段的长度，再拼接锁定脚本字节。两个示例都使用仓库公开夹具中的公钥。
+
+### P2PK
+
+构造词接收 33 字节压缩 secp256k1 公钥。解锁输入提供 `<signature>`。[示例入口](forth/p2pk.fth) · [标准库](../../src/fourthgraph/stdlib/p2pk.fth)
+
+```forth
+: p2pk-lock ( bytes -- bytes )
+    33 bytes-check-size
+    bytes-hex 21 swap bytes-cat bytes-hex ac bytes-cat ;
+
+: p2pk ( bytes -- bytes ) p2pk-lock ;
+```
+
+锁定脚本共 35 字节，将公钥压栈后执行 `OP_CHECKSIG`。
+
+```text
+0x0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798 OP_CHECKSIG
+```
+
+```text
+210279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798ac
+```
+
+### P2PKH
+
+构造词接收 20 字节公钥 HASH160。解锁输入提供 `<signature> <public key>`。[示例入口](forth/p2pkh.fth) · [标准库](../../src/fourthgraph/stdlib/p2pkh.fth)
+
+```forth
+: p2pkh-lock ( bytes -- bytes )
+    20 bytes-check-size
+    bytes-hex 76a914 swap bytes-cat bytes-hex 88ac bytes-cat ;
+
+: p2pkh ( bytes -- bytes ) p2pkh-lock ;
+```
+
+锁定脚本共 25 字节，先核对公钥哈希，再验证签名。
+
+```text
+OP_DUP OP_HASH160 0x751e76e8199196d454941c45d1b3a323f1433bd6 OP_EQUALVERIFY OP_CHECKSIG
+```
+
+```text
+76a914751e76e8199196d454941c45d1b3a323f1433bd688ac
+```
+
+### 优化与复现
+
+在 4thGraph 0.2.7 中，每个构造词在 `baseline`、`safe` 和 `stack` 模式下都生成相同的字节码。传入夹具数据求值后，得到上面的 35 字节 P2PK 和 25 字节 P2PKH 锁定脚本，与现有的 `lock_hex` 逐字节一致。钱包在链下执行 Forth 构造词，把得到的字节用作交易输出的锁定脚本。[基准夹具](template/baseline.json)
+
+从仓库根目录运行以下命令，打印两种锁定脚本并查看构造词的 `stack` 优化报告。
+
+```sh
+export PYTHONPATH=src:.
+forth=projects/p2pk-p2pkh-baseline/forth
+python3 "$forth/payments.py" --public-key 0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798
+python3 "$forth/payments.py" --hash160 751e76e8199196d454941c45d1b3a323f1433bd6
+
+for entry in p2pk p2pkh; do
+  python3 -m fourthgraph.workflow.protocol "$forth/$entry.fth" --entry "$entry" --optimize stack
+done
+```
 
 ## 使用场景与取舍
 
