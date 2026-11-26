@@ -140,6 +140,8 @@ Use `REQUIRE BSV` at the top of a Script source to load `verify` and the support
 
 `REQUIRE` resolves a file in the caller's dictionary and loads it once per build. A subsequent definition of the same name applies to later calls. Earlier definitions keep the words they resolved when compiled. The standard library catalog records public interfaces and backend requirements. Build diagnostics cover relative dependencies, cyclic imports, stack signature errors, and unsupported backends.
 
+When a project file's relative path matches a standard library catalog name, build reports prefix the project path with `./`. The bundled library and the project file then have separate digests under names such as `std/bsv` and `./std/bsv`.
+
 | Spelling | Contract |
 | --- | --- |
 | Type and operation | The type identifies the operand domain. `u32+` wraps at 32 bits, and `bytes-cat` concatenates byte strings |
