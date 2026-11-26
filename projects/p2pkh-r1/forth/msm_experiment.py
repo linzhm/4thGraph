@@ -425,7 +425,10 @@ def main():
         else:
             print(scan_text(scan), end="")
         return 0
-    (lock, pattern), report = local_build(compiler, plan, args.vectors)
+    try:
+        (lock, pattern), report = local_build(compiler, plan, args.vectors)
+    except ValueError as error:
+        parser.error(str(error))
     if args.command == "build":
         if len(args.owner_hash160) != 20:
             parser.error("--owner-hash160 must be 20 bytes")
