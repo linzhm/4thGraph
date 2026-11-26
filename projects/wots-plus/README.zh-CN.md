@@ -6,7 +6,7 @@
 
 **[钱包 SDK 快速上手](docs/sdk.zh-CN.md#quickstart)** · [统一钱包 SDK](../../sdk/README.zh-CN.md#quickstart)
 
-选择收款模板并接入有持久化记录的一次性签名器。缓存步骤模板支持符合条件的 OTDA 重建。
+选择收款模板并接入有持久化记录的一次性签名器。`compact` 和 `cached-steps` 支持符合条件的 OTDA 重建。
 
 [协议规范](docs/developer.zh-CN.md#protocol) · [安全分析](docs/developer.zh-CN.md#security) · [复现与验证](#开发和钱包接入) · [交易成本](#完整交易与栈测量)
 
@@ -14,7 +14,7 @@ WOTS+ 是 v0.1.0 开发基线，按 RFC 8391 的 `WOTSP-SHA2_256` 哈希链验�
 
 ## 使用场景与取舍
 
-当研究重点是 SHA‑256 一次性签名的见证体积时，可以评估 WOTS+。WOTS+ 的原始签名为 2,144 字节，本仓库的 Lamport 签名为 8,192 字节。比较整笔交易时，要把付款锁和解锁脚本都算上。WOTS+ 提供标准锁和两种缓存模板。可对照实测结果，查看缓存步骤模板及适用的 OTDA 重建如何影响入金、周转和退出。[交易实测](#完整交易与栈测量)
+当研究重点是 SHA‑256 一次性签名的见证体积时，可以评估 WOTS+。WOTS+ 的原始签名为 2,144 字节，本仓库的 Lamport 签名为 8,192 字节。比较整笔交易时，要把付款锁和解锁脚本都算上。WOTS+ 提供标准锁和三种可选模板。[交易实测](#完整交易与栈测量)
 
 每个 UTXO 使用新密钥，找零也一样。签名返回前要持久记录密钥已消耗。评估连续周转时，除了脚本验证，还应演练密钥保留和已签交易重播。[钱包接入](docs/sdk.zh-CN.md)
 
@@ -25,8 +25,9 @@ WOTS+ 是 v0.1.0 开发基线，按 RFC 8391 的 `WOTSP-SHA2_256` 哈希链验�
 | 默认 `locking_script(key)` | 42,266 字节 | 交易绑定模板 |
 | `cached_constants=True` | 36,283 字节 | 在栈上保存复用的常量 |
 | `cached_constants="steps"` | 33,956 字节 | 再缓存 15 个四字节步骤索引 |
+| `cached_constants="compact"` | 29,217 字节 | 复用 Forth 生成的哈希链指令，缓存完整地址后缀和选择位 |
 
-三种锁的普通 BIP143 解锁都为 2,310 字节。启用 Chronicle 并采用版本 2 交易时，可为缓存步骤输出显式启用 `compress_otda=True`。OTDA ALL 重建签名原文里的相关输出，配对 SINGLE 只重建同索引输出。未知输出原样处理，无配对 SINGLE 采用伴随验签。仅验证给定摘要的 `transaction=False` 模板用于算法测试。
+四种锁的普通 BIP143 解锁都为 2,310 字节。启用 Chronicle 并采用版本 2 交易时，可用 `compress_otda=True` 重建 `compact` 和 `cached-steps` 输出。OTDA ALL 可在同一笔交易中重建两种输出，配对 SINGLE 只重建同索引输出。未知输出原样处理，无配对 SINGLE 采用伴随验签。仅验证给定摘要的 `transaction=False` 模板用于算法测试。
 
 ## 开发和钱包接入
 
@@ -46,12 +47,28 @@ bash projects/wots-plus/reference/verify.sh
 可选用 [Lean Script 求值器](https://github.com/Calhooon/bsv-script-lean#try-it)重放同一批合成输入。
 
 ```sh
-python projects/wots-plus/reference/test_lean.py /path/to/bsv-script-lean/eval/bsvs
+python projects/wots-plus/reference/test_lean.py --compact /path/to/bsv-script-lean/eval/bsvs
 ```
 
 该入口单独检查交易激活规则和指定输入的 Script 判定。
 
 ## 输入输出取舍
+
+### Compact 模板实测
+
+`compact` 比 `cached-steps` 每个锁少 4,739 字节（14.0%）。67 条哈希链共用同一段编译后的指令，OTDA 重建时只需携带一份。在两进两出夹具中，两种模板的主栈和备用栈峰值都是 28 项和 67 项。BIP143 ALL 路径的两栈载荷峰值增加了 190 字节，源于缓存的地址常量。栈载荷由开发求值器测量。[Forth 实现](reference/compact.fth)
+
+| 实测项目 | `cached-steps` | `compact` |
+| --- | ---: | ---: |
+| 锁定脚本 | 33,956 B | 29,217 B |
+| OTDA 重建程序 | 3,097 B | 2,395 B |
+| 两进两出 BIP143 ALL | 72,650 B | 63,172 B |
+| 两进两出 OTDA ALL，启用重建 | 79,090 B | 68,208 B |
+| 两进两出配对 OTDA SINGLE，启用重建 | 78,921 B | 68,039 B |
+
+钱包 SDK 用 `template: "compact"` 选择此模板。[接入示例](docs/sdk.zh-CN.md#quickstart)
+
+### 缓存步骤模板实测
 
 缓存步骤把每个锁从 42,266 降到 33,956 字节，降低入金及新建输出的成本。OTDA ALL 的重建再把同类两进两出从 208,406 降到 79,090 字节。配对 SINGLE 从 140,473 降到 78,921 字节，而重建前后的两栈载荷峰值都是 70,280 字节。新增第三个输入与前两个输出无配对，边际仍是 2,440 字节。
 

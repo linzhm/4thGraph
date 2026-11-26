@@ -10,13 +10,14 @@ from tempfile import TemporaryDirectory
 from fixtures import malformed_cases, mode_cases, mode_fixture
 
 
-def cases():
-    _, parents, signed = mode_fixture(0x41)
+def cases(*, compact=False):
+    profile = "compact" if compact else False
+    _, parents, signed = mode_fixture(0x41, cached_constants=profile)
     yield "genesis_41_paired", signed, parents, 1, True, 1, 2
     yield "genesis_41_locktime", replace(signed, locktime=1), parents, 1, False, 1, 2
-    for fixture in mode_cases():
+    for fixture in mode_cases(cached_constants=profile):
         yield (*fixture, 3, 4)
-    for fixture in malformed_cases():
+    for fixture in malformed_cases(cached_constants=profile):
         yield (*fixture, 3, 4)
 
 
@@ -47,12 +48,14 @@ def check(binary, directory, tx, parents, index, funding_height, spend_height):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("bsvs", type=Path, help="Path to the upstream eval/bsvs wrapper")
-    binary = parser.parse_args().bsvs.resolve(strict=True)
+    parser.add_argument("--compact", action="store_true", help="Replay the compact template")
+    args = parser.parse_args()
+    binary = args.bsvs.resolve(strict=True)
     total = 0
     mismatches = 0
     versions = set()
     with TemporaryDirectory(prefix="wots-plus-lean-") as scratch:
-        for label, tx, parents, index, valid, funding_height, spend_height in cases():
+        for label, tx, parents, index, valid, funding_height, spend_height in cases(compact=args.compact):
             result = check(binary, Path(scratch), tx, parents, index, funding_height, spend_height)
             verdict = "valid" if valid else "invalid"
             total += 1

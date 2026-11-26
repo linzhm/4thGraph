@@ -1,4 +1,5 @@
 """Emit the RFC 8391 verifier and a transaction-bound BSV payment lock."""
+from functools import cache
 from pathlib import Path
 import sys
 
@@ -11,6 +12,8 @@ from wots import CHAINS, KEY_BYTES, N, SIGNATURE_BYTES, W
 # ScriptCode suffixes differ from Lamport; the extra OP_NOPs are domain tags.
 ORDINARY_CODE = asm('OP_NOP OP_ENDIF OP_CHECKSIG')
 COMPANION_CODE = asm('OP_NOP OP_IF OP_CHECKSIGVERIFY OP_ELSE OP_CODESEPARATOR') + ORDINARY_CODE
+
+CACHE_PROFILES = (False, True, 'steps', 'compact')
 
 
 def _message_digits():
@@ -55,11 +58,53 @@ def _chain(index, *, cached_constants):
     return bytes(code)
 
 
+@cache
+def _compact_chain():
+    from fourthgraph.compiler.script_builder import ScriptBuilder
+
+    builder = ScriptBuilder.from_file(Path(__file__).with_name('compact.fth'))
+    code = builder.emit('compact-chain-start', b'')
+    # Open the gates from step 14 to 0. On the way back out the hashes run
+    # from the signed digit to 14, and a digit of 15 executes no hashes.
+    for limit in reversed(range(2, W)):
+        code = builder.emit('compact-if-digit-below', code, limit)
+    code += asm('OP_OVER OP_NOTIF')
+    for step in range(W - 1):
+        # Eleven items above the table, with the highest step nearest the top.
+        code = builder.emit('compact-hash-step', code, 11 + W - 2 - step)
+        code += asm('OP_ENDIF')
+    return builder.emit('compact-chain-end', code)
+
+
+def _checksum_digits(depth):
+    # Three checksum nibbles, most significant first when popped from altstack.
+    return (number(depth) + asm('OP_PICK OP_DUP OP_16 OP_MOD OP_TOALTSTACK OP_16 OP_DIV')
+            + asm('OP_DUP OP_16 OP_MOD OP_TOALTSTACK OP_16 OP_DIV OP_TOALTSTACK'))
+
+
+def _compact_verifier(public_seed, commitment):
+    # Cache the step/selector suffixes and a full-width mask for selector one.
+    suffixes = b''.join(push(step.to_bytes(4, 'big') + bytes(4)) for step in range(W - 1))
+    selector_bit = push(bytes(3 * N - 1) + b'\x01')
+    # The chain appends its one-byte index to the first 23 address bytes.
+    prf_base = push((3).to_bytes(N, 'big') + public_seed + bytes(23))
+    restore_input = (number(W + 3) + asm('OP_ROLL')) * 2
+    chain = _compact_chain()
+    cleanup = asm('OP_2DROP') * ((W - 1) // 2) + asm('OP_DROP')
+    return (suffixes + selector_bit + push(bytes(N)) + prf_base + restore_input
+            + _message_digits() + asm('OP_SWAP OP_0 OP_SWAP OP_0') + chain * (2 * N)
+            + _checksum_digits(3) + chain * (CHAINS - 2 * N)
+            + asm('OP_DROP OP_0 OP_EQUALVERIFY OP_SHA256') + push(commitment)
+            + asm('OP_EQUALVERIFY OP_2DROP OP_2DROP') + cleanup)
+
+
 def verifier(key, *, cached_constants=False):
     """Consume packed signature and digest, preserving existing altstack items."""
     if not isinstance(key, bytes) or len(key) != KEY_BYTES:
         raise ValueError('WOTS+ public key must be 64 bytes')
     public_seed, commitment = key[:N], key[N:]
+    if cached_constants == 'compact':
+        return _compact_verifier(public_seed, commitment)
     prf_prefix = (3).to_bytes(N, 'big') + public_seed + bytes(20)
     if type(cached_constants) is not bool and cached_constants != 'steps':
         raise ValueError('unknown WOTS+ constant cache profile')
@@ -75,9 +120,7 @@ def verifier(key, *, cached_constants=False):
     code += _message_digits() + asm('OP_SWAP OP_0 OP_SWAP')
     for index in range(2 * N):
         code += _chain(index, cached_constants=cached_constants)
-    # Three checksum nibbles, most significant first when popped from altstack.
-    code += asm('OP_2 OP_PICK OP_DUP OP_16 OP_MOD OP_TOALTSTACK OP_16 OP_DIV')
-    code += asm('OP_DUP OP_16 OP_MOD OP_TOALTSTACK OP_16 OP_DIV OP_TOALTSTACK')
+    code += _checksum_digits(2)
     for index in range(2 * N, CHAINS):
         code += _chain(index, cached_constants=cached_constants)
     code += asm('OP_0 OP_EQUALVERIFY OP_SHA256') + push(commitment)
@@ -96,10 +139,10 @@ def locking_script(key, *, transaction=True, cached_constants=False):
         shape += number(N) + asm('OP_NUMEQUALVERIFY OP_DROP OP_SIZE')
         shape += number(SIGNATURE_BYTES) + asm('OP_NUMEQUALVERIFY OP_SWAP')
         return shape + verifier(key, cached_constants=cached_constants) + asm('OP_1')
-    if cached_constants == 'steps':
+    if cached_constants in ('steps', 'compact'):
         from fixed_template import lock_for_key
 
-        return lock_for_key(key)
+        return lock_for_key(key, profile=cached_constants)
     return _payment_script(key, cached_constants=cached_constants)
 
 

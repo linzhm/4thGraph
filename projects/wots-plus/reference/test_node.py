@@ -1,6 +1,7 @@
 """Check complete WOTS+ inputs with BSV Node 1.2.3 and pinned chain-gang."""
 
 from dataclasses import replace
+from hashlib import sha256
 from itertools import chain
 import os
 from pathlib import Path
@@ -11,12 +12,12 @@ from tx_engine import Script, Tx, TxIn, TxOut, sig_hash_preimage
 
 from fixtures import fixture_seeds, funding_transaction, malformed_cases, mode_cases
 from payment import authorization, current_input_unlock, sign_payment, sign_spend
-from script import ORDINARY_CODE, locking_script
+from script import ORDINARY_CODE, _payment_script, locking_script
 from fourthgraph.benchmark.cases import SHAPES, batch
 from fourthgraph.bsv.evaluate import evaluate
 from fourthgraph.bsv.transaction import SIGHASH_TYPES, Input, Output, Transaction, hash256
 from wots import OneTimeSigner
-from fixed_template import TEMPLATE_DIRECTORY, fixed_pattern
+from fixed_template import TEMPLATE_DIRECTORY, compact_pattern, fixed_pattern
 from generate_reconstruction import build_artifacts
 
 
@@ -104,22 +105,46 @@ class NodeTests(unittest.TestCase):
         self.assertEqual(pattern.match(sample), (key[:32], key[32:]))
         self.assertIsNone(pattern.match(sample[:-1] + bytes([sample[-1] ^ 1])))
 
-    def test_reconstructed_wots_transactions_and_marginals(self):
-        from benchmark_adapter import TEMPLATES
-        from tempfile import TemporaryDirectory
+    def test_compact_reconstruction_matches_compiled_lock(self):
+        pattern = compact_pattern()
+        self.assertEqual(len(pattern.program), 2395)
+        self.assertEqual(evaluate(pattern.program), (list(pattern.fixed_parts), []))
+        zero_key_lock = locking_script(bytes(64), cached_constants="compact")
+        self.assertEqual(sha256(zero_key_lock).hexdigest(),
+                         "b5de618ce7e3429a4f4b2f1d6c386a8841afb40c11dcf1eb57ee135765cea4ca")
+        for key in (bytes(64), bytes(range(64)), b"\xff" * 64):
+            lock = locking_script(key, cached_constants="compact")
+            self.assertEqual(len(lock), 29217)
+            self.assertEqual(lock, _payment_script(key, cached_constants="compact"))
+            self.assertEqual(pattern.match(lock), (key[:32], key[32:]))
+            self.assertIsNone(pattern.match(lock[:-1] + bytes([lock[-1] ^ 1])))
 
-        template = TEMPLATES["cached-steps-reconstructed"]
-        sizes = {
+    def test_reconstructed_wots_transactions_and_marginals(self):
+        self.check_transactions_and_marginals("cached-steps-reconstructed", fixed_pattern(), {
             0x61: (79090, 84786, 113235),
             0xe1: (79006, 84537, 113151),
             0x63: (78921, 81361, 112888),
             0xe3: (78837, 81195, 112804),
-        }
+        })
+
+    def test_compact_transactions_and_marginals(self):
+        self.check_transactions_and_marginals("compact-reconstructed", compact_pattern(), {
+            0x41: (63172, 65525, 92400),
+            0x61: (68208, 73202, 97614),
+            0xe1: (68124, 72953, 97530),
+            0x63: (68039, 70479, 97267),
+            0xe3: (67955, 70313, 97183),
+        })
+
+    def check_transactions_and_marginals(self, template, pattern, sizes):
+        from benchmark_adapter import TEMPLATES
+        from tempfile import TemporaryDirectory
+
         with TemporaryDirectory() as temp:
             for mode, expected_sizes in sizes.items():
                 for shape, expected in zip(SHAPES, expected_sizes, strict=True):
                     with self.subTest(mode=hex(mode), shape=shape):
-                        leg = batch(template, mode, shape, f"test/{mode:02x}/{shape}", Path(temp))
+                        leg = batch(TEMPLATES[template], mode, shape, f"test/{mode:02x}/{shape}", Path(temp))
                         tx = leg.tx
                         self.assertEqual(len(tx.serialize()), expected)
                         self.assertTrue(chain_valid(tx, leg.parents))
@@ -128,10 +153,10 @@ class NodeTests(unittest.TestCase):
                             witness, alt = evaluate(tx.inputs[index].script)
                             preimage, signature, _ = witness
                             expected_auth = authorization(tx, index, parent.outputs[0].value, mode)
-                            key = b"".join(fixed_pattern().match(parent.outputs[0].script))
+                            key = b"".join(pattern.match(parent.outputs[0].script))
                             literal = current_input_unlock(expected_auth, key, signature)
                             self.assertEqual((witness, alt), evaluate(literal))
-                            if expected_auth.companion:
+                            if expected_auth.companion or mode == 0x41:
                                 self.assertEqual(tx.inputs[index].script, literal)
                             else:
                                 self.assertLess(len(tx.inputs[index].script), len(literal))
@@ -149,17 +174,25 @@ class NodeTests(unittest.TestCase):
         self.assertEqual(SIGHASH_TYPES, set(modes))
         recipients = [OneTimeSigner(*fixture_seeds(f"coverage/recipient/{i}".encode())) for i in range(3)]
         fixed = [locking_script(recipient.public_key, cached_constants="steps") for recipient in recipients]
+        compact = [locking_script(recipient.public_key, cached_constants="compact") for recipient in recipients]
+        layouts = (
+            ((False, True, "steps"), (fixed[0], b"\x51", fixed[1], fixed[2])),
+            ((False, True, "steps"), (fixed[0], fixed[1])),
+            ((False, "steps", "compact"), (compact[0], b"\x51", fixed[1], compact[2])),
+            ((False, "steps", "compact"), (compact[0], compact[1])),
+        )
         for version in (1, 2):
-            for locks in ((fixed[0], b"\x51", fixed[1], fixed[2]), (fixed[0], fixed[1])):
+            for profiles, locks in layouts:
                 for mode in modes:
-                    with self.subTest(version=version, mode=hex(mode), shape=(3, len(locks))):
-                        self.check_reconstruction_case(version, mode, locks)
+                    with self.subTest(version=version, mode=hex(mode), profiles=profiles, shape=(3, len(locks))):
+                        self.check_reconstruction_case(version, mode, profiles, locks)
 
-    def check_reconstruction_case(self, version, mode, locks):
+    def check_reconstruction_case(self, version, mode, profiles, locks):
         # Each of these public fixture keys is used for exactly one signature.
-        keys = [OneTimeSigner(*fixture_seeds(bytes((version, mode, len(locks), i)))) for i in range(3)]
+        label = f"coverage/{version}/{mode}/{profiles}/{len(locks)}".encode()
+        keys = [OneTimeSigner(*fixture_seeds(label + bytes([i]))) for i in range(3)]
         parents = tuple(funding_transaction(key.public_key, cached_constants=profile)
-                        for key, profile in zip(keys, (False, True, "steps"), strict=True))
+                        for key, profile in zip(keys, profiles, strict=True))
         tx = Transaction(tuple(Input(parent.txid_wire(), 0, sequence=0xfffffffe - i)
                                for i, parent in enumerate(parents)),
                          tuple(Output(5000 - i, lock) for i, lock in enumerate(locks)),
@@ -191,7 +224,9 @@ class NodeTests(unittest.TestCase):
                 mode in (0x63, 0xe3) and i < len(locks) and locks[i] != b"\x51"
             )
             if version == 2 and compresses:
-                self.assertLess(len(witness), len(literal), i)
+                # Both WOTS+ dictionaries must be used for mixed ALL. A single
+                # literal WOTS+ lock would exceed this bound by over 19 kB.
+                self.assertLess(len(witness), min(10_000, len(literal)), i)
             else:
                 self.assertEqual(witness, literal, i)
         self.assertTrue(chain_valid(tx, parents))

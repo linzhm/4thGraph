@@ -9,6 +9,22 @@
 | BSV Node 1.2.3 | All 1,230 declared payment rows matched on isolated Linux x86-64 regtest. Every response returned the supplied script flags. |
 | bsv-script-lean | The existing replay matched 125 of 125 fixtures, including two pre-Chronicle spends. The executable from the `1c051eaef1077cc95e5d1618686d5efacc4aa097` checkout reported `spec@unknown` and had SHA-256 `e0451889b7259997aceaaf119c3d1075b2336ecd7004f3a37f13a5d18061d699`. |
 
+## Compact profile
+
+Starting at PR #68 commit `bc6fe95`, the compact lock reduced the
+`cached-steps` size from 33,956 to 29,217 bytes. BSV Node 1.2.3 and
+chain-gang at `74676b9` matched all 1,230 rows for each of the four
+profiles, including 442 accepted and 788 rejected rows per profile.
+Both engines rejected each of the 67 signature-chain mutations for
+each profile.
+
+The complete transaction tests pin the compact sizes for 2×2, 3×2 and
+2×3 payments in BIP143 ALL and the four reconstructible OTDA modes.
+They compare the literal and reconstructed witness stacks and exercise
+mixed compact, cached-steps and native outputs. Lean `spec@1c051ea`
+matched all 125 compact fixtures. The wallet replay passed in Python,
+TypeScript, Go and Rust. [Measurements and replay commands](../README.md#compact-profile)
+
 ## Bounded coverage of complete payments
 
 The [acceptance fixture](../reference/test_acceptance.py) builds the expected key

@@ -1,4 +1,4 @@
-"""Compare the standard and cached-constants WOTS+ payment templates."""
+"""Compare WOTS+ payment templates and OTDA reconstruction."""
 from payment import sign_spend
 from script import locking_script
 from wots import OneTimeSigner
@@ -23,4 +23,8 @@ TEMPLATES = {"canonical": Template(coin),
              "cached-steps": Template(lambda label, value: coin(label, value, cached="steps")),
              "cached-steps-reconstructed": Template(
                  lambda label, value: coin(label, value, cached="steps", compress=True),
+             ),
+             "compact": Template(lambda label, value: coin(label, value, cached="compact")),
+             "compact-reconstructed": Template(
+                 lambda label, value: coin(label, value, cached="compact", compress=True),
              )}

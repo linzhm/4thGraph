@@ -6,7 +6,7 @@
 
 **[Wallet SDK quickstart](docs/sdk.en.md#quickstart)** · [Unified wallet SDK](../../sdk/README.md#quickstart)
 
-Choose a receive template and connect a durable one-time signer. The cached-step profile supports eligible OTDA reconstruction.
+Choose a receive template and connect a durable one-time signer. The `compact` and `cached-steps` profiles support eligible OTDA reconstruction.
 
 [Protocol](docs/developer.en.md#protocol) · [Security](docs/developer.en.md#security) · [Verify](#run-the-checks) · [Transaction costs](#complete-transactions-and-stack-measurements)
 
@@ -30,7 +30,7 @@ BIP143 and Chronicle OTDA modes, with BIP143 `ALL` (`0x41`) as the wallet defaul
 
 ## Use cases and trade-offs
 
-Use WOTS+ to compare SHA-256 one-time signatures when witness size matters. The raw signature is 2,144 bytes, while a Lamport signature here is 8,192 bytes. A fair transaction comparison includes both the payment locks and the unlocking scripts. WOTS+ offers a canonical lock and two cache presets. Use the published measurements to examine how the smaller cached-step lock and eligible OTDA reconstruction affect funding, turnover and exit. [Measured costs](#complete-transactions-and-stack-measurements)
+Use WOTS+ to compare SHA-256 one-time signatures when witness size matters. The raw signature is 2,144 bytes, while a Lamport signature here is 8,192 bytes. A fair transaction comparison includes both the payment locks and the unlocking scripts. WOTS+ offers a canonical lock and three optional profiles. [Measured costs](#complete-transactions-and-stack-measurements)
 
 The payment workflow requires a fresh key per UTXO, including change. Reserve that key durably before returning a signature. A wallet investigating repeated turnover should test key reservation and rebroadcast alongside script verification. [Wallet integration](docs/sdk.en.md)
 
@@ -99,12 +99,36 @@ Use a fresh key across all formats.
 The [benchmark guide](../../docs/benchmark.md) describes the optional
 durable signer wrapper used for the synthetic keys.
 
+### Compact profile
+
+`locking_script(key, cached_constants="compact")` builds a 29,217-byte
+lock, 4,739 bytes smaller than `cached-steps`. The verifier compiles a
+single [Forth chain body](reference/compact.fth) for all 67 chains. It
+uses a running chain index and a cached bit to form both key-and-mask
+addresses. The BIP143 unlocking script is 2,310 bytes.
+
+In the synthetic two-input, two-output payments, the main and alternate
+stack peaks are 28 and 67 items for both profiles. With BIP143 ALL,
+the combined stack payload peak increases by 190 bytes for the larger
+cached constants. These payload measurements use the development evaluator.
+
+| Measured bytes | `cached-steps` | `compact` |
+| --- | ---: | ---: |
+| Payment lock | 33,956 | 29,217 |
+| OTDA reconstruction program | 3,097 | 2,395 |
+| 2×2 BIP143 ALL payment | 72,650 | 63,172 |
+| 2×2 OTDA ALL, reconstructed | 79,090 | 68,208 |
+| 2×2 paired OTDA SINGLE, reconstructed | 78,921 | 68,039 |
+
+The wallet SDK selects the profile with `template: "compact"`. [SDK quickstart](docs/sdk.en.md#quickstart)
+
 ### OTDA output reconstruction
 
 Use `compress_otda=True` with `sign_spend` or `sign_payment` only when
 Chronicle functional unlocking is available. Version 2 OTDA ALL and paired
-OTDA SINGLE use the [prebuilt reconstruction program](versions/v0.1.0/cached-steps-layout.json)
-to recreate cached-steps outputs. SINGLE covers only its same-index output.
+OTDA SINGLE use the [prebuilt cached-steps program](versions/v0.1.0/cached-steps-layout.json)
+or the compact program generated from the chain body. An ALL transaction may
+use both dictionaries. SINGLE covers only its same-index output.
 Earlier null outputs stay in the signed prefix, and unpaired SINGLE
 uses the existing companion authorization. Mixed transactions copy
 unrecognized outputs literally. The wallet chooses the shorter encoding,
@@ -133,7 +157,7 @@ Build the [bsv-script-lean evaluator](https://github.com/Calhooon/bsv-script-lea
 and run the same synthetic spend fixtures through its complete-input API.
 
 ```sh
-python projects/wots-plus/reference/test_lean.py /path/to/bsv-script-lean/eval/bsvs
+python projects/wots-plus/reference/test_lean.py --compact /path/to/bsv-script-lean/eval/bsvs
 ```
 
 The runner checks the transaction gate and the selected input's Script verdict

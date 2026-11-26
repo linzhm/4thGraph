@@ -8,7 +8,7 @@ import unittest
 
 from fixtures import fixture_seeds, funding_transaction, vector_document
 from payment import sign_payment
-from script import locking_script
+from script import CACHE_PROFILES, locking_script
 from fourthgraph.bsv.evaluate import ScriptError, evaluate
 from fourthgraph.bsv.transaction import Output
 from wots import (
@@ -38,7 +38,7 @@ class WotsTests(unittest.TestCase):
         self.assertEqual(key[32:].hex(), "f3888f471037ef42994f1bcbef0d98f6373ea20cb61cf3d1b4360e68179b4fed")
 
         locks = [locking_script(key, transaction=False, cached_constants=cache)
-                 for cache in (False, True)]
+                 for cache in CACHE_PROFILES]
         self.assertEqual(len(locking_script(key)), 42266)
         self.assertEqual(len(locking_script(key, cached_constants=True)), 36283)
         for digest, signature_hash in (
@@ -137,6 +137,8 @@ class WotsTests(unittest.TestCase):
             (0, [Output(9_900, locking_script(key, transaction=False, cached_constants=True))]),
             (0, [Output(9_900, locking_script(key, cached_constants="steps"))]),
             (0, [Output(9_900, locking_script(key, transaction=False, cached_constants="steps"))]),
+            (0, [Output(9_900, locking_script(key, cached_constants="compact"))]),
+            (0, [Output(9_900, locking_script(key, transaction=False, cached_constants="compact"))]),
         ):
             with self.subTest(vout=vout, output_bytes=len(outputs[0].script)):
                 with self.assertRaises(ValueError):

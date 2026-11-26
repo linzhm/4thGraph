@@ -1,9 +1,9 @@
-"""WOTS+ payment formats, including the cached-steps OTDA option."""
+"""WOTS+ payment formats and OTDA reconstruction options."""
 from payment import sign_previous as authorize_previous
 from payment import sign_spend as authorize
 from script import locking_script
 
-TEMPLATES = {"canonical": False, "cached-constants": True, "cached-steps": "steps"}
+TEMPLATES = {"canonical": False, "cached-constants": True, "cached-steps": "steps", "compact": "compact"}
 
 
 def lock(public_key, profile):
