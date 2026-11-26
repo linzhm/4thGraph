@@ -3,6 +3,7 @@ from dataclasses import replace
 import unittest
 from unittest.mock import patch
 
+from assemble import SCHEDULED_TEMPLATE_VERSION, TEMPLATE_VERSIONS
 from generate_otda_constructor import generate
 from p2pkh_sm2 import _otda_pattern, current_input_unlock, locking_script_from_public_key, sign_input
 from fourthgraph.benchmark.validation import chain_verdict
@@ -29,19 +30,24 @@ class ConstructorTests(unittest.TestCase):
         cls.native = Output(9_800, b'\x51')
 
     def test_frozen_program_is_reproducible_and_matches_lock(self):
-        pattern = _otda_pattern()
-        self.assertEqual(generate(), pattern.program)
-        self.assertEqual(evaluate(pattern.program), (list(pattern.fixed_parts), []))
-        for lock in self.locks:
-            fields = pattern.match(lock)
-            self.assertEqual(len(fields), 1)
-            self.assertEqual(b''.join((pattern.fixed_parts[0], *fields, pattern.fixed_parts[1])), lock)
-            self.assertIsNone(pattern.match(lock[:-1]))
-            self.assertIsNone(pattern.match(lock[:-1] + b'\x51'))
+        for version in TEMPLATE_VERSIONS:
+            with self.subTest(version=version):
+                pattern = _otda_pattern(version)
+                self.assertEqual(generate(version), pattern.program)
+                self.assertEqual(evaluate(pattern.program), (list(pattern.fixed_parts), []))
+                for key in self.keys:
+                    lock = locking_script_from_public_key(key, version=version)
+                    fields = pattern.match(lock)
+                    self.assertEqual(len(fields), 1)
+                    self.assertEqual(b''.join((pattern.fixed_parts[0], *fields, pattern.fixed_parts[1])), lock)
+                    self.assertIsNone(pattern.match(lock[:-1]))
+                    self.assertIsNone(pattern.match(lock[:-1] + b'\x51'))
+        self.assertLess(len(_otda_pattern(SCHEDULED_TEMPLATE_VERSION).program), len(_otda_pattern().program))
 
-    def sign_modes(self, tx, flag, expected):
+    def sign_modes(self, tx, flag, expected, *, funding=None):
+        funding = self.funding if funding is None else funding
         tx_raw, tx_compact = tx, tx
-        for index, (parent, key, scalar) in enumerate(zip(self.funding, self.keys, self.scalars, strict=True)):
+        for index, (parent, key, scalar) in enumerate(zip(funding, self.keys, self.scalars, strict=True)):
             auth = authorization(tx, index, parent.outputs[0].value, flag)
             signature = fixture_sign(scalar, auth.message, 71 + index)
 
@@ -62,11 +68,11 @@ class ConstructorTests(unittest.TestCase):
                 compact, current_input_unlock(tx, index, parent.outputs[0].value, key, signature,
                                               flag),
             )
-        self.assertTrue(chain_verdict(tx_raw, self.funding))
-        self.assertTrue(chain_verdict(tx_compact, self.funding))
+        self.assertTrue(chain_verdict(tx_raw, funding))
+        self.assertTrue(chain_verdict(tx_compact, funding))
         for index in range(len(tx.inputs)):
-            check_node(tx_raw, self.funding, index)
-            check_node(tx_compact, self.funding, index)
+            check_node(tx_raw, funding, index)
+            check_node(tx_compact, funding, index)
         return tx_compact
 
     def test_all_single_and_literal_fallbacks(self):
@@ -101,6 +107,22 @@ class ConstructorTests(unittest.TestCase):
         check_node(changed, self.funding, 0)
         check_node(changed, self.funding, 1, False)
         chain_check(changed, self.funding, 1, False)
+
+    def test_two_lock_versions_can_be_spent_and_rebuilt_together(self):
+        new_lock = locking_script_from_public_key(self.keys[1], version=SCHEDULED_TEMPLATE_VERSION)
+        funding = (self.funding[0], replace(self.funding[1], outputs=(Output(10_000, new_lock),)))
+        inputs = tuple(Input(parent.txid_wire(), 0) for parent in funding)
+        tx = Transaction(inputs, (self.destinations[1], Output(9_800, new_lock), Output(1, b'\x51')))
+        for flag in (0x61, 0xe1, 0x63, 0xe3):
+            with self.subTest(flag=hex(flag)):
+                signed = self.sign_modes(tx, flag, (True, True), funding=funding)
+                self.assertLess(max(len(item.script) for item in signed.inputs), 30_000)
+                for index in range(len(inputs)):
+                    check_node(signed, funding, index, old_output=True)
+                changed = replace(signed, outputs=tuple(reversed(signed.outputs)))
+                check_node(changed, funding, 1, flag in (0x63, 0xe3))
+                if flag in (0x61, 0xe1):
+                    chain_check(changed, funding, 1, False)
 
     def test_larger_constructor_falls_back_to_literal_encoding(self):
         tx = Transaction(self.inputs, self.destinations)

@@ -1,14 +1,12 @@
-"""Rebuild the frozen OTDA constructor for the published v1.0.0 lock."""
+"""Rebuild the frozen OTDA constructor for a canonical P2PKH-SM2 lock."""
 import argparse
-from collections import defaultdict
+from collections import Counter, defaultdict
 from pathlib import Path
 
-from assemble import sm3_blocks
+from assemble import SCHEDULED_TEMPLATE_VERSION, TEMPLATE_VERSION, TEMPLATE_VERSIONS, forth_compiler, sm3_blocks
 from p2pkh_sm2 import _canonical
 from fourthgraph.bsv.evaluate import evaluate
-from fourthgraph.bsv.script import asm, assemble, number, push
-
-ASM_DIRECTORY = Path(__file__).with_name("asm")
+from fourthgraph.bsv.script import asm, number, push
 
 # (SM3 function, emitted instance, byte offset, width). These ranges
 # parameterize the shared instruction sequences extracted by the SM3 emitter.
@@ -24,17 +22,18 @@ SM3_FRAGMENTS = (
 )
 
 
-def function_library():
+def function_library(version=TEMPLATE_VERSION):
     fragments = {}
-    sm3_blocks(fragments=fragments)
+    sm3_blocks(version=version, fragments=fragments)
     library = []
     for name, instance, offset, width in SM3_FRAGMENTS:
         fragment = fragments[name][instance][offset:offset + width]
         if len(fragment) != width:
             raise ValueError(f"SM3 constructor fragment changed: {name}")
         library.append(fragment)
-    for name in ("DOUBLE_POINT", "ADD_POINTS"):
-        library.append(assemble(ASM_DIRECTORY, bytes(20), entry=name))
+    compiler = forth_compiler(bytes(20), version)
+    for name in ("sm2-double-point", "sm2-add-points"):
+        library.append(compiler.emit(name, b""))
     return library
 
 
@@ -92,17 +91,19 @@ def earlier_spans(raw, options):
         matches.append(cursor)
 
 
-def compile_suffix(raw, library):
-    """Encode the suffix as literal runs, cached functions and earlier spans."""
+def encode_suffix(raw, references, library):
+    """Serialize one compression plan and count its selected fragments."""
     cat = asm("OP_CAT")
-    options = [{} for _ in raw]
-    earlier_spans(raw, options)
+    options = [entry.copy() for entry in references]
+    cached = {}
     for index, fragment in enumerate(library):
         depth = len(library) - index
         copy = asm("OP_OVER") if depth == 1 else number(depth) + asm("OP_PICK")
+        code = copy + cat
+        cached[code] = fragment
         position = raw.find(fragment)
         while position != -1:
-            keep_shorter(options[position], len(fragment), copy + cat)
+            keep_shorter(options[position], len(fragment), code)
             position = raw.find(fragment, position + 1)
     # Score unframed literal bytes here, then serialize contiguous literals
     # as a single push. The release fixture pins the resulting exact bytes.
@@ -117,6 +118,8 @@ def compile_suffix(raw, library):
                 choices[cursor] = width, code
 
     program = bytearray(b"".join(map(push, library)) + asm("OP_0"))
+    uses = Counter()
+    copy_savings = Counter()
     cursor = 0
     while cursor < len(raw):
         start = cursor
@@ -126,17 +129,45 @@ def compile_suffix(raw, library):
             program.extend(push(raw[start:cursor]) + cat)
         if cursor < len(raw):
             width, code = choices[cursor]
+            if code in cached:
+                uses[cached[code]] += 1
+            elif len(code) > 3 and width <= 256:
+                # At a shallow depth a cached fragment needs a three-byte
+                # PICK-and-append sequence. Measure savings on selected copies.
+                copy_savings[raw[cursor:cursor + width]] += len(code) - 3
             program.extend(code)
             cursor += width
     program.extend(asm("OP_TOALTSTACK") + asm("OP_2DROP") * (len(library) // 2))
     program.extend(asm("OP_DROP") * (len(library) % 2) + asm("OP_FROMALTSTACK"))
-    return bytes(program)
+    return bytes(program), uses, copy_savings
 
 
-def generate():
-    lock, offset = _canonical()
+def compile_suffix(raw, library, *, optimize_library=False):
+    """Encode literal runs, cached fragments and copies of earlier bytes."""
+    references = [{} for _ in raw]
+    earlier_spans(raw, references)
+    baseline, uses, _ = encode_suffix(raw, references, library)
+    if not optimize_library:
+        return baseline
+
+    reused = [fragment for fragment in library if uses[fragment] > 1]
+    reduced, _, savings = encode_suffix(raw, references, reused)
+    gains = {fragment: saving - len(push(fragment)) for fragment, saving in savings.items()
+             if fragment not in reused and saving > len(push(fragment))}
+    expanded = reused + sorted(gains, key=gains.get, reverse=True)
+    augmented, uses, _ = encode_suffix(raw, references, expanded)
+    # Place frequently used entries nearest the top, where picking is cheaper.
+    ordered = sorted(expanded, key=uses.__getitem__)
+    reordered, _, _ = encode_suffix(raw, references, ordered)
+    return min((baseline, reduced, augmented, reordered), key=len)
+
+
+def generate(version=TEMPLATE_VERSION):
+    lock, offset = _canonical(version)
     prefix, suffix = lock[:offset], lock[offset + 20:]
-    program = push(prefix) + compile_suffix(suffix, function_library())
+    program = push(prefix) + compile_suffix(
+        suffix, function_library(version), optimize_library=version == SCHEDULED_TEMPLATE_VERSION,
+    )
     if evaluate(program) != ([prefix, suffix], []):
         raise ValueError("OTDA constructor does not reproduce the canonical SM2 template")
     return program
@@ -145,4 +176,6 @@ def generate():
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("output", type=Path, help="destination for the hexadecimal constructor")
-    parser.parse_args().output.write_text(generate().hex() + "\n", encoding="ascii")
+    parser.add_argument("--version", type=int, choices=TEMPLATE_VERSIONS, default=TEMPLATE_VERSION)
+    args = parser.parse_args()
+    args.output.write_text(generate(args.version).hex() + "\n", encoding="ascii")

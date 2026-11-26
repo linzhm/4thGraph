@@ -36,7 +36,8 @@ bash verify.sh
 | --- | --- |
 | [`sm2.py`](sm2.py) | 曲线参数、ZA、签名验证，以及需要显式指定随机数的测试签名函数 |
 | [`sm3_script.py`](sm3_script.py) | 将 SM3 各轮运算展开为 Script 字节码 |
-| [`asm/`](asm/) | 曲线运算、SM2 验签和基于 PUSHTX 的交易绑定 |
+| [`p2pkh-sm2.fth`](../../../src/fourthgraph/stdlib/wallet/p2pkh-sm2.fth) | 构建锁定脚本，包含曲线运算、SM2 验签和基于 PUSHTX 的交易绑定 |
+| [`asm/`](asm/) | 用于字节级比对和独立曲线测试的参考汇编 |
 | [`p2pkh_sm2.py`](p2pkh_sm2.py) | 钱包接口和外部签名回调 |
 | [`signed_data.py`](signed_data.py) | SignedData 付款适配、结构检查和签名验证 |
 
@@ -64,11 +65,13 @@ OTDA，包括混用签名模式的输入、全 SM2 的两进两出付款、由�
 
 ## 复现 OTDA 构造器
 
-钱包加载固定构造器，并按布局清单核对字节数和 SHA-256。离线生成器从 SM3 编译器收集具名的指令范围，再从中提取固定片段，与点运算块组合。在仓库根目录生成并比对文件。
+钱包加载固定构造器，并按布局清单核对字节数和 SHA-256。离线生成器先使用 SM3 的具名片段和点运算块。为模板 `2` 生成构造器时，它评估复制片段的缓存收益，尝试按使用频率排列缓存，并选择序列化后最短的编码。在仓库根目录生成并比对文件。
 
 ```sh
 python projects/p2pkh-sm2/reference/generate_otda_constructor.py /tmp/sm2-otda.hex
 cmp /tmp/sm2-otda.hex projects/p2pkh-sm2/versions/v1.1.0/otda-constructor.hex
+python projects/p2pkh-sm2/reference/generate_otda_constructor.py --version 2 /tmp/sm2-otda-v2.hex
+cmp /tmp/sm2-otda-v2.hex projects/p2pkh-sm2/versions/v1.2.0/otda-constructor.hex
 ```
 
 构造器测试逐字节比对预映像、公钥和签名三项栈值，并由 BSV Node 和 chain-gang 验证完整花费。[布局与指纹](../versions/v1.1.0/layout.json) · [钱包接入](../docs/sdk.zh-CN.md)

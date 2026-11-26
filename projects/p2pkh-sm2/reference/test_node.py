@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 import unittest
 import requests
+from assemble import SCHEDULED_TEMPLATE_VERSION, TEMPLATE_VERSION, TEMPLATE_VERSIONS
 from test_sm2 import fixture
 from test_sighash import chain_check, mode_cases, activation_cases
 from p2pkh_sm2 import *
@@ -37,17 +38,22 @@ def check(tx, parents, index, valid=True):
 
 class NodeTests(unittest.TestCase):
     def test_sighash_coverage(self):
-        mode_cases(check_node)
+        for template_version in TEMPLATE_VERSIONS:
+            with self.subTest(template_version=template_version):
+                mode_cases(check_node, template_version=template_version)
 
     def test_chronicle_flags(self):
-        activation_cases(check_node)
+        for template_version in TEMPLATE_VERSIONS:
+            with self.subTest(template_version=template_version):
+                activation_cases(check_node, template_version=template_version)
 
     def test_consecutive_payments(self):
         qa=encode_public(mul(1)); qb=encode_public(mul(7))
         start=locking_script_from_public_key(qa)
         parent=Transaction((Input(b'\x22'*32,0),),(Output(10000,start),))
-        for hop,(d,q,destination) in enumerate(zip((1,7,1),(qa,qb,qa),(qb,qa,qb))):
-            dest=locking_script_from_public_key(destination)
+        versions = (SCHEDULED_TEMPLATE_VERSION, SCHEDULED_TEMPLATE_VERSION, TEMPLATE_VERSION)
+        for hop,(d,q,destination,version) in enumerate(zip((1,7,1),(qa,qb,qa),(qb,qa,qb),versions,strict=True)):
+            dest=locking_script_from_public_key(destination, version=version)
             signed=sign_payment(parent.serialize(),0,[Output(parent.outputs[0].value-100,dest)],100,q,lambda m,uid: fixture_sign(d,m,hop+2,uid))
             check(signed,[parent],0)
             self.assertEqual(len(signed.inputs[0].script),291)

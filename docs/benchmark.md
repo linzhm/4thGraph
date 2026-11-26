@@ -25,7 +25,8 @@ The unified benchmark measured **260 complete transactions** across seven projec
 | P2PKH-R1 Forth v0.3.0 experiment | 2 × 2 | 45,776 | 326 | 92,322 | 100,192 | 3,478 |
 | P2PKH-R1-Deferred v0.2.0 activation | 3 × 2 | 1,435 | 197 | 93,259 | 93,260 | 359 |
 | P2PKH-R1-Deferred v0.3.0 activation | 3 × 2 | 1,085 | 197 | 93,260 | 93,260 | 360 |
-| P2PKH-SM2 v1.1.0 candidate | 2 × 2 | 144,925 | 291 | 290,554 | 316,018 | 4,147 |
+| P2PKH-SM2 v1.1.0 | 2 × 2 | 144,925 | 291 | 290,554 | 316,018 | 4,152 |
+| P2PKH-SM2 v1.2.0 candidate | 2 × 2 | 131,565 | 291 | 263,834 | 287,524 | 4,158 |
 | Lamport OTS, committed key | 2 × 2 | 7,746 | 16,549 | 48,708 | 79,616 | 16,707 |
 | WOTS+, cached steps with reconstruction | 2 × 2 | 33,956 | 2,310 | 72,650 | 79,090 | 2,701 |
 | Pure ML-DSA-44 | 2 × 2 | 926,412 | 2,588 | 1,858,122 | 5,563,725 | — |
@@ -34,7 +35,7 @@ All sizes are in bytes. Lock, unlock, and stack measurements use the first BIP14
 
 The OTDA ALL measurements for R1 v0.2.0 and cached-steps WOTS+ use explicit reconstruction.
 
-The SM2 candidate uses locking template `1` from v1.0.0 and automatically selects a shorter OTDA unlocking script when available. In the measured OTDA ALL transaction, reconstruction reduces the unlock from 290,109 to 13,023 bytes per input. The complete transaction drops from 870,194 to 316,018 bytes, a 63.7% reduction. [SM2 reconstruction results](../projects/p2pkh-sm2/README.md#otda-constructor)
+With SM2 template `1`, automatic reconstruction reduced the 2×2 OTDA ALL transaction from 870,194 to 316,018 bytes. Template `2` reduces it to 287,524 bytes with smaller output locks and a shorter reconstruction program. The v1.1.0 and v1.2.0 stack figures use their respective fixtures from the same replay. [SM2 measurements](../projects/p2pkh-sm2/versions/v1.2.0/measurements.json)
 
 ## Run
 
