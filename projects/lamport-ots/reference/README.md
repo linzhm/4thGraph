@@ -8,7 +8,7 @@ Git revision. Negative cases require a known script rejection or the expected
 prevout error for a deliberately invalid outpoint.
 
 - `lamport.py`: random key generation, strict digest API, process-local one-time guard.
-- `script.py`: full-key, legacy and committed-key lock factories with fixed-r PUSHTX binding.
+- `script.py`: full-key, legacy and committed-key lock factories with fixed-r PUSHTX binding. `compact_forth_committed_locking_script(public_key)` adds the 6,830-byte profile.
 - `committed-verifier.fth`, `forth_verifier.py`: typed reconstruction and lowering for `forth_committed_locking_script(public_key)`.
 - `payment.py`: prepared-input and single-input wallet APIs, external signer, fresh-change guard.
 - `fixtures.py`: public deterministic secrets for tests only, adversarial case matrix.

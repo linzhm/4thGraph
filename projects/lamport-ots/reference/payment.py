@@ -3,8 +3,8 @@ from dataclasses import dataclass
 
 from lamport import bits, verify_digest
 from script import (
-    COMPANION_CODE, ORDINARY_CODE, N, R, committed_locking_script, forth_committed_locking_script,
-    legacy_locking_script, locking_script,
+    COMPANION_CODE, ORDINARY_CODE, N, R, committed_locking_script, compact_forth_committed_locking_script,
+    forth_committed_locking_script, legacy_locking_script, locking_script,
 )
 from fourthgraph.bsv.script import number, push
 from fourthgraph.bsv.transaction import (
@@ -97,7 +97,8 @@ def sign_previous(tx, index, previous, public_key, signer, *, sighash=DEFAULT_SI
     """Authorize an input with its already matched previous output."""
     universal = locking_script(public_key)
     legacy = legacy_locking_script(public_key)
-    committed = (committed_locking_script(public_key), forth_committed_locking_script(public_key))
+    committed = (committed_locking_script(public_key), forth_committed_locking_script(public_key),
+                 compact_forth_committed_locking_script(public_key))
     if previous.script not in (universal, legacy, *committed):
         raise ValueError('funding output does not match public key and canonical template')
     own_scripts = (universal, legacy, *committed, locking_script(public_key, transaction=False))

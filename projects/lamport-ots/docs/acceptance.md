@@ -6,7 +6,8 @@ test keys. [Wire and payment rules](spec.md)
 
 ## Transaction-bound payment profiles
 
-The same domain runs for `full-key`, `committed-key` and `committed-key-forth`.
+The same domain runs for `full-key`, `committed-key`, `committed-key-forth` and
+`committed-key-forth-compact`.
 It fixes the input being signed at index one of a two-input transaction
 with one or two outputs. The fixture crosses all twelve advertised sighash
 bytes, versions 1 and 2, and both output shapes. It keeps the initial witness
@@ -34,8 +35,8 @@ set, and compares each chain-gang and BSV Node result with the expected
 verdict. [Fixture](../reference/test_acceptance.py)
 
 Each committed profile also checks a valid proof, 512 one-bit mutations covering
-every selected-secret and sibling-hash block, and short and long proofs. Both
-profiles run 96 BSV Node activation cases across the supported modes, transaction
+every selected-secret and sibling-hash block, and short and long proofs. Each
+committed profile runs 96 BSV Node activation cases across modes, transaction
 versions and creation/spend eras. A development evaluator test checks all 256
 possible byte values and one mixed digest for the Forth reconstruction word.
 [Current execution record](validation.md)

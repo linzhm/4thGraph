@@ -74,7 +74,7 @@ the same input outpoints and ordered outputs can confirm under a different txid.
 Any valid replacement that confirms under a different txid affects an existing child
 that spends a Lamport output. The child references the original `txid:vout`, and
 moving the spend to the confirmed outpoint changes the required signing digest.
-This applies to the legacy, full-key and both committed payment profiles. If a
+This applies to the legacy, full-key and all committed payment profiles. If a
 replacement also changes transaction contents, verify that it still makes the
 intended payment.
 [Transaction serialization](../../../src/fourthgraph/bsv/transaction.py)
@@ -160,5 +160,5 @@ Both the development interpreter and the pinned independent chain-gang engine
 run the complete-input matrix. BSV Node checks the same matrix through verifyscript
 with explicit synthetic prevouts; it also demonstrates the detached-proof replay.
 The funded regtest covers local mempool admission and mining for direct exits
-and for one same-template turnover before exit on the Forth profile.
+and for one same-template turnover before exit on both Forth profiles.
 Both suites use test keys and local regtest data. [Validation receipts](validation.md)

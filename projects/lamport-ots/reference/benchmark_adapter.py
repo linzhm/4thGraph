@@ -4,7 +4,9 @@ from functools import partial
 from fixtures import test_secret
 from lamport import OneTimeSigner
 from payment import sign_spend
-from script import committed_locking_script, forth_committed_locking_script, locking_script
+from script import (
+    committed_locking_script, compact_forth_committed_locking_script, forth_committed_locking_script, locking_script,
+)
 from fourthgraph.benchmark.cases import Coin, Template
 from fourthgraph.bsv.transaction import Output
 from fourthgraph.bsv.one_time_signer import durable_signer
@@ -24,4 +26,5 @@ TEMPLATES = {
     "full-key": Template(coin),
     "committed-key": Template(partial(coin, factory=committed_locking_script)),
     "committed-key-forth": Template(partial(coin, factory=forth_committed_locking_script)),
+    "committed-key-forth-compact": Template(partial(coin, factory=compact_forth_committed_locking_script)),
 }

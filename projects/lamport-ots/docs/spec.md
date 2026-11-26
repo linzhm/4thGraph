@@ -27,11 +27,12 @@ the proof length before evaluating the Lamport verifier.
 | `full-key` | 512 ordered public hashes | 256 selected secrets, 8,192 bytes |
 | `committed-key` | SHA-256 of the ordered public key | 256 pairs of selected secret and sibling hash, 16,384 bytes |
 | `committed-key-forth` | Same 32-byte commitment | Same 16,384-byte proof |
+| `committed-key-forth-compact` | Same 32-byte commitment | Same 16,384-byte proof |
 
 For committed profiles, record i is `x[i][b[i]] || y[i][1-b[i]]`. The lock
 hashes the secret and orders the two hashes as `y[i][0] || y[i][1]` according to
 digest bit i. The hash of the concatenated pairs must match the commitment. The
-wallet needs the full ordered public key to construct this proof. All three
+wallet needs the full ordered public key to construct this proof. All four
 profiles enforce the same preimage and selector rules and leave one true item
 and an empty altstack on success. [Forth implementation and costs](optimization.md)
 

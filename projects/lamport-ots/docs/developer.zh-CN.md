@@ -16,6 +16,8 @@
 
 相较原承诺模板，每个输出锁减少 704 字节。BIP143 ALL 的解锁尺寸相同，OTDA ALL 的解锁会随同笔交易的输出一起缩短。相较全公钥模板，每个 Forth 承诺输出节省 15,738 字节，每个普通 BIP143 输入多 8,192 字节。在费率及其他编码相同的前提下，输出数除以输入数超过约 0.521 时，Forth 承诺模板占用的交易字节更少。入金和花费费率不同时，按两阶段分别计费。[边际及生命周期测量（英文）](optimization.md#transaction-and-lifecycle-costs)
 
+第二轮的 `committed-key-forth-compact` 沿用同一重建片段，并压缩固定 r 交易绑定。锁进一步降至 6,830 字节，主栈峰值从 8 项升至 32 项，备用栈峰值从 34 项降至 5 项。[交易绑定优化（英文）](optimization.md#compact-transaction-binding)
+
 <a name="security"></a>
 
 ## 签名与恢复

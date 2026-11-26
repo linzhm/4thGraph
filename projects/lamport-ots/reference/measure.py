@@ -8,7 +8,9 @@ from statistics import median
 from time import perf_counter_ns
 from lamport import generate_keypair, public_key, sign_digest, verify_digest
 from fixtures import fixture, mode_fixture, test_secret
-from script import committed_locking_script, forth_committed_locking_script, locking_script, binding
+from script import (
+    binding, committed_locking_script, compact_forth_committed_locking_script, forth_committed_locking_script, locking_script,
+)
 from payment import authorization, sign_spend
 from engines import chain_valid, development_valid
 from fourthgraph.bsv.script import push
@@ -127,7 +129,8 @@ def committed_costs(iterations=30):
     """Measure serialized payments and local chain-gang time across Lamport formats."""
     report = {}
     sample_key = public_key(test_secret(b'lock-size'))
-    for lock_factory in (locking_script, committed_locking_script, forth_committed_locking_script):
+    for lock_factory in (locking_script, committed_locking_script, forth_committed_locking_script,
+                         compact_forth_committed_locking_script):
         modes = {}
         for flag in (0x41, 0x61):
             sizes = {}

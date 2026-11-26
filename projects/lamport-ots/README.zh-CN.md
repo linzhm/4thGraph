@@ -2,7 +2,7 @@
 
 [English](README.md) · [4thGraph](../../README.zh-CN.md) · [项目目录](../README.zh-CN.md) · [版本](versions/index.json)
 
-Lamport OTS 将 8,192 字节的一次性签名绑定到 BSV 当前交易输入。v0.1.0 开发基线包含全公钥和公钥承诺付款锁。Forth 实验新增一个显式选择的公钥承诺模板，锁缩短 704 字节，沿用现有证明编码。[协议规范（英文）](docs/spec.md) · [Forth 设计与测量（英文）](docs/optimization.md)
+Lamport OTS 将 8,192 字节的一次性签名绑定到 BSV 当前交易输入。v0.1.0 开发基线包含全公钥和公钥承诺付款锁。Forth 重建先把公钥承诺锁从 7,746 字节降至 7,042 字节，再通过压缩交易绑定降至 6,830 字节。[协议规范（英文）](docs/spec.md) · [Forth 设计与测量（英文）](docs/optimization.md)
 
 <a name="输入输出取舍"></a>
 <a name="完整交易与栈测量"></a>
@@ -17,8 +17,9 @@ Lamport OTS 将 8,192 字节的一次性签名绑定到 BSV 当前交易输入�
 | `full-key`（默认） | 22,780 | 8,357 | 62,392 | 153,436 |
 | `committed-key` | 7,746 | 16,549 | 48,708 | 79,616 |
 | `committed-key-forth`（实验） | 7,042 | 16,549 | 47,300 | 75,392 |
+| `committed-key-forth-compact`（实验） | 6,830 | 16,549 | 46,876 | 74,120 |
 
-全公钥格式花费到普通输出时，每个输入的成本较低。两种承诺格式只在锁中保存有序公钥的 SHA-256，每个输入多携带 8,192 字节以重建公钥。OTDA ALL 还会在每个输入的签名原文中序列化本笔交易的输出，缩短输出锁同时也缩短签名原文。[边际成本与生命周期（英文）](docs/optimization.md#transaction-and-lifecycle-costs)
+全公钥格式花费到普通输出时，每个输入的成本较低。承诺格式只在锁中保存有序公钥的 SHA-256，每个输入多携带 8,192 字节以重建公钥。OTDA ALL 还会在每个输入的签名原文中序列化本笔交易的输出，缩短输出锁同时也缩短签名原文。[边际成本与生命周期（英文）](docs/optimization.md#transaction-and-lifecycle-costs)
 
 参考实现支持 BIP143 与 Chronicle OTDA 的 ALL、NONE、SINGLE 及 ANYONECANPAY 共十二种组合，默认使用 BIP143 ALL。无配对 SINGLE 不承诺任何输出，参考 API 要求调用方显式批准。旧版两项见证的 BIP143 ALL 付款锁仍可花费。分离摘要验证器仅供测试，同一证明可以被复制到另一笔交易。[线格式与脚本规范（英文）](docs/spec.md) · [验收范围（英文）](docs/acceptance.md)
 
@@ -41,4 +42,4 @@ python projects/lamport-ots/reference/measure.py --committed-costs
 
 macOS 用 Apple Container 运行 `bash projects/lamport-ots/reference/verify_apple.sh`，Linux 运行 `bash projects/lamport-ots/reference/verify.sh` 进行 BSV Node 复放。[验证记录（英文）](docs/validation.md) · [原始 ALL 向量](versions/v0.1.0/vector.json) · [通用签名模式向量](versions/v0.1.0/universal-vectors.json) · [v0.1.0 测量清单](versions/v0.1.0/measurements.json)
 
-在 BSV Node 默认 regtest 交易策略下，`committed-key-forth` 的入金、一次周转和退出均已入池并入块，周转和退出分别覆盖 BIP143 ALL 和 Chronicle OTDA ALL。[逐阶段结果与复现命令（英文）](docs/validation.md#funded-regtest)
+在 BSV Node 默认 regtest 交易策略下，两种 Forth 模板的入金、一次周转和退出均已入池并入块，周转和退出分别覆盖 BIP143 ALL 和 Chronicle OTDA ALL。[逐阶段结果与复现命令（英文）](docs/validation.md#funded-regtest)

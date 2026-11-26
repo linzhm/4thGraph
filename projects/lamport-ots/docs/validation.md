@@ -21,9 +21,28 @@ The Script replay ran `verifyscript` with synthetic prevouts. Use the
 [project README](../README.md) and [shared benchmark guide](../../../docs/benchmark.md)
 for reproduction.
 
+### Compact binding replay on latest main
+
+The rebuild used `454456f`, which merged compiler PR #71. The comparison
+reproduced 25 existing script fragments and locks byte for byte, along with the
+two v0.1.0 vectors. The 48 existing benchmark transactions kept their txids and
+sizes. The compact iteration retained the 6,088-byte core and reduced the
+complete lock from 7,042 to 6,830 bytes. [Compiler PR #71](https://github.com/linzhm/4thGraph/pull/71)
+
+| Compact iteration check | Result |
+| --- | --- |
+| Local Lamport suite | 14 tests passed, including identical DER bytes at boundary digests, zero-scalar rejection and the native signature/key sequence for both paths |
+| Independent Script replay | 408 authorization decisions and 512 proof-block mutations for the compact profile agreed on BSV Node and pinned chain-gang. The 96 activation cases passed on BSV Node |
+| Transaction benchmark | 64 transactions passed both engines across the four profiles, including 16 for the compact profile |
+| Wallet SDK | Four profiles replayed in Python, TypeScript, Go and Rust. Both engines verified the reference spends |
+
+The Script RPC replay used the project's dedicated verification launcher and
+its validation time budget. The funded runs below used default transaction
+policy on a separate node instance for each replay.
+
 ### Funded regtest
 
-The full `committed-key-forth` lifecycle ran on fresh, peerless BSV Node 1.2.3
+Both Forth profiles ran their full lifecycle on fresh, peerless BSV Node 1.2.3
 with default transaction policy and the repository's regtest consensus settings.
 After 101 bootstrap blocks, the native wallet funded two Lamport outputs. The
 turnover spent both into two fresh Forth-profile outputs, then the exit spent
@@ -32,31 +51,36 @@ listed mode applied to both Lamport inputs in the turnover and the exit. Each
 of those transactions paid a 250,000 sat fixture fee.
 
 Each transaction was observed in `getrawmempool` after `sendrawtransaction`,
-then found by txid in a generated block. All six transactions passed both checks.
+then found by txid in a generated block. All 12 transactions in the table
+passed both checks.
 
-| Lamport spend mode | Funding bytes / block height | Turnover bytes / block height | Exit bytes / block height |
-| --- | ---: | ---: | ---: |
-| BIP143 ALL (`0x41`) | 14,263 / 102 | 47,300 / 103 | 33,262 / 104 |
-| Chronicle OTDA ALL (`0x61`) | 14,298 / 105 | 75,392 / 106 | 33,276 / 107 |
+| Profile | Lamport spend mode | Funding bytes / height | Turnover bytes / height | Exit bytes / height |
+| --- | --- | ---: | ---: | ---: |
+| `committed-key-forth` | BIP143 ALL (`0x41`) | 14,263 / 102 | 47,300 / 103 | 33,262 / 104 |
+| `committed-key-forth` | Chronicle OTDA ALL (`0x61`) | 14,297 / 105 | 75,392 / 106 | 33,276 / 107 |
+| `committed-key-forth-compact` | BIP143 ALL (`0x41`) | 13,839 / 102 | 46,876 / 103 | 33,262 / 104 |
+| `committed-key-forth-compact` | Chronicle OTDA ALL (`0x61`) | 13,873 / 105 | 74,120 / 106 | 33,276 / 107 |
 
 The funded sizes include wallet change and native signatures, so funding sizes
 can vary between runs. The default direct-exit replay also passed all 12
-transactions across the three Lamport profiles. These results describe local
-regtest behavior. Mainnet relay and mining policy remain unverified.
+transactions across the three earlier Lamport profiles under #71. These results
+describe local regtest behavior. Mainnet relay and mining policy remain unverified.
 
 Reproduce the funded check on Linux from the repository root with the same
 Python environment.
 
 ```sh
-bash tools/verify_node.sh --profile default -- \
-  projects/lamport-ots/workspace/venv/bin/python -m fourthgraph.benchmark.admission lamport-ots \
-  --template committed-key-forth --turnover \
-  --output projects/lamport-ots/workspace/node-turnover.json
+for lamport_profile in committed-key-forth committed-key-forth-compact; do
+  bash tools/verify_node.sh --profile default -- \
+    projects/lamport-ots/workspace/venv/bin/python -m fourthgraph.benchmark.admission lamport-ots \
+    --template "$lamport_profile" --turnover \
+    --output "projects/lamport-ots/workspace/node-$lamport_profile.json"
+done
 ```
 
 The report records txids, block hashes, heights, byte counts and admission
-verdicts for all three phases. Omit `--template` and `--turnover` to replay the
-three profiles' direct exits.
+verdicts for all three phases. Omit `--template` and `--turnover` to replay
+direct exits for every profile.
 
 ## Original v0.1.0 receipt · 2026-11-19 (Asia/Shanghai)
 

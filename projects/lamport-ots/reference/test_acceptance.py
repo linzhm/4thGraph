@@ -10,7 +10,9 @@ from fixtures import INVALID_PREVOUT_CASES, cases, mode_fixture, test_secret
 from forth_verifier import committed_verifier_code
 from lamport import OneTimeSigner, public_key, sign_digest, verify_digest
 from payment import sign_spend
-from script import committed_locking_script, forth_committed_locking_script, locking_script
+from script import (
+    committed_locking_script, compact_forth_committed_locking_script, forth_committed_locking_script, locking_script,
+)
 from fourthgraph.bsv.evaluate import evaluate, ScriptError
 from fourthgraph.bsv.script import number, push
 from fourthgraph.bsv.transaction import Input, Output, Transaction
@@ -19,7 +21,7 @@ from test_node import node_check
 
 VERSIONS = (1, 2)
 PAIRING = (False, True)
-COMMITTED_FACTORIES = (committed_locking_script, forth_committed_locking_script)
+COMMITTED_FACTORIES = (committed_locking_script, forth_committed_locking_script, compact_forth_committed_locking_script)
 # The twelve byte values and commitment groups are specified in docs/spec.md.
 ALL = {0x41, 0x61, 0xc1, 0xe1}
 NONE = {0x42, 0x62, 0xc2, 0xe2}
