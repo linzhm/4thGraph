@@ -96,7 +96,7 @@ python3 projects/4thgraph/examples/payments.py --public-key 0279be667ef9dcbbac55
 | 项目 | 使用场景 | 版本 | 钱包接入 |
 | --- | --- | --- | --- |
 | [原生 P2PK 与 P2PKH](projects/p2pk-p2pkh-baseline/README.zh-CN.md) | 以原生 secp256k1 脚本建立体积和签名基准 | v0.1 开发版 | [接入指南](projects/p2pk-p2pkh-baseline/docs/sdk.zh-CN.md#quickstart) |
-| [P2PKH-R1](projects/p2pkh-r1/README.zh-CN.md) | 用固定模板向 P‑256 公钥哈希付款 | v0.2.0 开发版 | [接入指南](projects/p2pkh-r1/docs/sdk.zh-CN.md#quickstart) |
+| [P2PKH-R1](projects/p2pkh-r1/README.zh-CN.md) | 向 P‑256 公钥哈希付款，对照 Forth 编译的锁 | [v0.3.0 Forth 探索版](projects/p2pkh-r1/README.zh-CN.md#version-history) | [v0.2.0 SDK 指南](projects/p2pkh-r1/docs/sdk.zh-CN.md#quickstart) |
 | [P2PKH-R1-Deferred](projects/p2pkh-r1-deferred/README.zh-CN.md) | 用短锁收款，之后启用为普通 R1 输出 | v0.2.0 开发版 | [接入指南](projects/p2pkh-r1-deferred/docs/sdk.zh-CN.md#quickstart) |
 | [P2PKH-SM2](projects/p2pkh-sm2/README.zh-CN.md) | 使用 SM2 签名付款，在链下接收 GB/T 35275‑2026 SignedData，并重建符合条件的 OTDA 输出 | v1.1.0 候选版 | [接入指南](projects/p2pkh-sm2/docs/sdk.zh-CN.md#quickstart) |
 | [Lamport OTS](projects/lamport-ots/README.zh-CN.md) | 评估 SHA‑256 一次性签名，比较完整公钥锁和公钥承诺锁 | v0.1 开发版 | [接入指南](projects/lamport-ots/docs/sdk.zh-CN.md#quickstart) |
@@ -109,14 +109,15 @@ python3 projects/4thgraph/examples/payments.py --public-key 0279be667ef9dcbbac55
 
 ## 比较交易成本
 
-P2PKH-R1 v0.2.0 将两进两出 ForkID ALL 交易由 **119,934 字节降到 93,374 字节**。Deferred 的入金锁为 **1,435 字节**，后续启用时生成 **46,302 字节**的完整 R1 锁。比较这两条路径时，要把每个阶段的字节数和钱包需要完成的步骤一起算进去。[R1 测量](projects/p2pkh-r1/README.zh-CN.md) · [Deferred 测量](projects/p2pkh-r1-deferred/README.zh-CN.md)
+P2PKH-R1 的两进两出 ForkID ALL 付款在 v0.1.0 为 **119,934 B**，在 v0.2.0 为 **93,374 B**，在 Forth v0.3.0 探索版为 **92,322 B**。Deferred 的入金锁为 **1,435 B**，启用时生成 **46,302 B** 的 R1 v0.2.0 锁。[R1 测量](projects/p2pkh-r1/README.zh-CN.md#完整交易与栈测量) · [Deferred 测量](projects/p2pkh-r1-deferred/README.zh-CN.md)
 
-统一基准在提交 `beeb4dd` 测量了七个项目、32 种模板与签名模式组合，共 **260 笔完整交易**。混合输出和配对 `SINGLE` 另测 11 种组合，共 88 笔交易。Deferred v0.2.0 行采用提交 `9c5603d` 的重测结果。
+统一基准在提交 `beeb4dd` 测量了七个项目、32 种模板与签名模式组合，共 **260 笔完整交易**。混合输出和配对 `SINGLE` 另测 11 种组合，共 88 笔交易。Deferred v0.2.0 行采用提交 `9c5603d` 的重测结果。R1 Forth v0.3.0 行来自该实验有资金的 regtest 对照。 [R1 Forth 复放](projects/p2pkh-r1/README.zh-CN.md#forth-探索版)
 
 | 项目和实测版本 | 输入 × 输出 | 上一输出锁 | ForkID ALL 解锁 | ForkID ALL 整笔 | OTDA ALL 整笔 | ForkID ALL 两栈载荷峰值 |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
 | 原生 P2PKH | 2 × 2 | 25 | 107 | 374 | 374 | 145 |
 | P2PKH-R1 v0.2.0 | 2 × 2 | 46,302 | 326 | 93,374 | 101,250 | 3,479 |
+| P2PKH-R1 Forth v0.3.0 探索版 | 2 × 2 | 45,776 | 326 | 92,322 | 100,192 | 3,478 |
 | P2PKH-R1-Deferred 启用 | 3 × 2 | 1,435 | 197 | 93,259 | 93,260 | 359 |
 | P2PKH-SM2 v1.1.0 候选版 | 2 × 2 | 144,925 | 291 | 290,554 | 316,018 | 4,147 |
 | Lamport OTS 公钥承诺模板 | 2 × 2 | 7,746 | 16,549 | 48,708 | 79,616 | 16,707 |
