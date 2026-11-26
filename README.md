@@ -1,14 +1,71 @@
 # BSV Script Lab
 
-**Bring more signature schemes to BSV wallets. Measure the full cost from receiving to spending.**
+**Compile Forth to BSV Script with 4thGraph (4thG). Replay the transactions to measure what you built.**
 
-BSV Script Lab provides locking templates that wallets can recognize, SDKs that work with external signers, and signed transaction vectors you can replay. Start with native P2PKH, integrate P-256 or SM2, or compare Lamport, WOTS+, and pure ML-DSA-44 using the same benchmark methodology.
+BSV Script Lab builds tools for developing and testing BSV contracts. **4thGraph** is its Forth toolchain for compiling individual Script routines and planning multi-transaction workflows. The lab also provides wallet-ready locking templates, external-signer SDKs, and signed transaction vectors.
 
-**[Wallet SDK quickstart](shared/sdk/README.md#quickstart)** · [Choose a project](#project-index) · [Compare transaction costs](#transaction-costs) · [Reproduce the benchmarks](shared/benchmark.md) · [简体中文](README.zh-CN.md)
+**[Try 4thG](#4thg-quickstart)** · [Project comparisons](#4thg-comparisons) · [Wallet SDK quickstart](shared/sdk/README.md#quickstart) · [Wallet projects](#project-index) · [Transaction costs](#transaction-costs) · [简体中文](README.zh-CN.md)
+
+<a name="4thg-quickstart"></a>
+
+## Try 4thG
+
+Install Git and Python 3.12, then clone the `feat/4thgraph` branch. The compiler runs directly from the checkout with the Python standard library. You can compile the example below before setting up a node or installing any Python packages.
+
+```sh
+git clone --branch feat/4thgraph https://github.com/linzhm/bsv-script-lab.git
+cd bsv-script-lab
+
+cat > add-one.fth <<'FORTH'
+bsv-effect: add-one u32 -- u32 ;
+: add-one 1 cell>u32 u32+ ;
+FORTH
+
+PYTHONPATH=. python3 projects/4thgraph/protocol.py add-one.fth \
+  --entry add-one --optimize safe
+```
+
+`bsv-effect:` declares that `add-one` consumes and returns one `u32`. The word adds one with 32-bit wraparound. The compiler prints JSON with `script_hex` equal to `8b05000000000197`, `script_bytes` equal to `8`, the stack signature, and source and build digests. Change the `1` and rerun to see how the output changes.
+
+### Replay a full workflow
+
+From the same checkout on Linux x86-64, install the replay dependencies. `pip` builds the pinned chain-gang package from Git, so have Rust/Cargo and a C toolchain available. The launcher uses `curl` to fetch and verify BSV Node 1.2.3, then funds the example on an isolated regtest network.
+
+```sh
+python3 -m venv .venv
+. .venv/bin/activate
+python -m pip install ecdsa -r shared/requirements-chronicle.txt
+
+project=projects/4thgraph
+PYTHONPATH=. bash shared/verify_node.sh --profile default -- \
+  python "$project/replay.py" --target both --optimize stack --samples 1 \
+  --output "$project/build/quickstart-replay.json"
+
+PYTHONPATH=. python "$project/decision_report.py" "$project/build/quickstart-replay.json" \
+  --output-dir "$project/build/quickstart-decision"
+```
+
+Open `projects/4thgraph/build/quickstart-decision/decision-report.md` to see why a candidate was selected or excluded, transaction bytes for settlement and review, and the BSV Node and chain-gang results. [4thGraph guide](https://github.com/linzhm/bsv-script-lab/tree/feat/4thgraph/projects/4thgraph) · [Forth language reference](https://github.com/linzhm/bsv-script-lab/blob/feat/4thgraph/projects/4thgraph/language.md)
+
+### What you can build
+
+- **Script routines.** Compile a typed Forth word to Script, compare stack schedules, and inspect rewrites at their source locations.
+- **Transaction workflows.** Declare inputs, signer roles, parallel work, and a join. 4thG can fuse the work into one spend or split it across UTXOs for independent submission. The bounded search compares supported transaction boundaries and witness layouts under the declared availability and authorization constraints. The host runner binds transaction templates to actual outpoints and prepares signing requests. [Parallel example](https://github.com/linzhm/bsv-script-lab/blob/feat/4thgraph/projects/4thgraph/example.fth) · [Gated example](https://github.com/linzhm/bsv-script-lab/blob/feat/4thgraph/projects/4thgraph/gated.fth)
+- **Circuits.** A bounded circuit backend emits Circom for supported Forth words. The counter example checks that host evaluation, Script, and circuit constraints agree at wraparound and branch boundaries. [Circuit example](https://github.com/linzhm/bsv-script-lab/blob/feat/4thgraph/projects/4thgraph/proof/workflow.fth)
+
+<a name="4thg-comparisons"></a>
+
+## Projects built and compared with 4thG
+
+| Project | What the comparison shows |
+| --- | --- |
+| P2PKH-R1 Forth v0.3.0 experiment | The Forth baseline reproduces the v0.2.0 lock byte for byte. The optimized lock goes from 46,302 to **45,776 B**, and the two-input, two-output ForkID ALL payment goes from 93,374 to **92,322 B**. The replay also covers OTDA and a build that uses sCrypt-compiled curve kernels. [Experiment and replay](https://github.com/linzhm/bsv-script-lab/tree/feat/4thgraph/projects/p2pkh-r1/experiments/forth) |
+| BLS12-381 Groth16 verifier (in development) | Forth defines the verification stages for off-chain proofs with fixed, mixed, or spend-time public inputs. The comparison with nChain matches the public-input domain and the placement of precomputed pairing data. |
+| CCTP transaction layouts (in development) | Compares the same Groth16 verification workload in a fused spend, an atomic two-input spend, and two serial spends. The comparison measures total transaction bytes and the slowest spend’s validation time. |
 
 <a name="project-index"></a>
 
-## Find the right starting point
+## Wallet projects
 
 | Project | Use it to | Version | Wallet integration |
 | --- | --- | --- | --- |
