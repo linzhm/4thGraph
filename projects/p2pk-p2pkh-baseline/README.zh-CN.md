@@ -4,7 +4,7 @@
 
 ## 开发入口
 
-**[钱包 SDK 快速上手](docs/sdk.zh-CN.md#quickstart)** · [统一钱包 SDK](../../shared/sdk/README.zh-CN.md#quickstart)
+**[钱包 SDK 快速上手](docs/sdk.zh-CN.md#quickstart)** · [统一钱包 SDK](../../sdk/README.zh-CN.md#quickstart)
 
 生成 P2PK 或 P2PKH 收款脚本，再用自己的 secp256k1 签名器完成付款。
 
@@ -12,7 +12,7 @@
 
 原生 P2PKH 是 Script Lab 的第一个钱包接入示例，也是对照其他签名方案的交易成本基准。P2PK 使用同一个 secp256k1 签名器，把公钥放在输出锁中，供对照输入和输出的成本。两种模板都有可复放的公开向量。
 
-[复现基准](../../shared/benchmark.zh-CN.md)
+[复现基准](../../docs/benchmark.zh-CN.md)
 
 ## 使用场景与取舍
 
@@ -58,4 +58,6 @@ uv run --no-project --with-requirements requirements.txt python script_lab.py
 | `p2pkh` · `0x41` | 3×2 | 146 (0 / 105 / 41) | 2×3 | 34 (25 / 0 / 9) | 598 | 972 |
 | `p2pkh` · `0x61` | 3×2 | 146 (0 / 105 / 41) | 2×3 | 33 (25 / -1 / 9) | 599 | 970 |
 
-[统一测量入口与复现口径](../../shared/benchmark.zh-CN.md)
+[统一测量入口与复现口径](../../docs/benchmark.zh-CN.md)
+
+[Compile the Forth locking scripts](forth/README.md).

@@ -9,9 +9,9 @@ import unittest
 from bip340 import verify
 from compare_threshold import TEMPLATES, native_2of2_coin
 from musig2_fixture import FixtureNonce, Policy, SigningRound, fixture_keys
-from shared.benchmark_cases import synthetic_parent
-from shared.benchmark_validation import Node, chain_verdict
-from shared.transaction import Input, Transaction
+from fourthgraph.benchmark.cases import synthetic_parent
+from fourthgraph.benchmark.validation import Node, chain_verdict
+from fourthgraph.bsv.transaction import Input, Transaction
 from test_schnorr import MODES
 
 

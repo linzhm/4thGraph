@@ -80,7 +80,7 @@ def otda_reconstruction(*, shared_kernels=False, scheduled=False):
 
 @cache
 def otda_pattern(*, shared_kernels=False, scheduled=False):
-    from shared.otda_reconstruction import Reconstruction
+    from fourthgraph.bsv.otda_reconstruction import Reconstruction
 
     version, program = otda_reconstruction(shared_kernels=shared_kernels, scheduled=scheduled)
     template = compiled_template(scheduled=scheduled)

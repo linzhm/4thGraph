@@ -4,8 +4,8 @@ from hashlib import shake_128, shake_256
 import unittest
 
 from shake_script import keccak_f1600_script, shake128_script, shake256_script
-from shared.script import asm, push
-from shared.transaction import Input, Output, Transaction
+from fourthgraph.bsv.script import asm, push
+from fourthgraph.bsv.transaction import Input, Output, Transaction
 from tx_engine import Context, Script, Tx
 
 

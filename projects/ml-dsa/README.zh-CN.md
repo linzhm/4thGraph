@@ -4,7 +4,7 @@
 
 ## 开发入口
 
-**[钱包 SDK 快速上手](docs/sdk.zh-CN.md#quickstart)** · [统一钱包 SDK](../../shared/sdk/README.zh-CN.md#quickstart)
+**[钱包 SDK 快速上手](docs/sdk.zh-CN.md#quickstart)** · [统一钱包 SDK](../../sdk/README.zh-CN.md#quickstart)
 
 用原始 ML-DSA-44 公钥生成付款锁，再用纯模式和空上下文签署付款消息。
 
@@ -24,7 +24,7 @@ ML-DSA-44 是 v0.1 开发基线，采用 FIPS 204 纯模式编码。公钥为 1,
 
 验证 FIPS 204 签名器互操作，或测量大脚本资源限制时，可以评估纯模式 ML‑DSA‑44。实验可先跑独立的算法合规向量，再用相同类型的公钥及专用付款签名器验证付款封装。付款封装把 32 字节的付款消息交给纯模式 ML‑DSA‑44，使用空上下文。公钥和签名校验、交易绑定，以及节点接收策略应各自核验。[复现与验证](#复现方法)
 
-实测夹具的固定公钥付款锁约为 926 kB。如果计划对这种输出实际入金，应先在目标节点或矿工环境验证脚本大小、整笔交易上限及验证策略。[出块测量方法](../../shared/benchmark.zh-CN.md)
+实测夹具的固定公钥付款锁约为 926 kB。如果计划对这种输出实际入金，应先在目标节点或矿工环境验证脚本大小、整笔交易上限及验证策略。[出块测量方法](../../docs/benchmark.zh-CN.md)
 
 ## 开发和钱包接入
 
@@ -32,14 +32,14 @@ ML-DSA-44 是 v0.1 开发基线，采用 FIPS 204 纯模式编码。公钥为 1,
 2. 单输入付款用 `sign_payment`，已排好输入输出的交易逐输入调用 `sign_spend`。付款支持 ForkID 与 Chronicle OTDA 的十二种签名模式，无配对 OTDA SINGLE 使用伴随绑定。
 3. 外部签名器把收到的 32 字节作为纯模式的消息，使用空上下文并返回 2,420 字节签名。钱包验签后构造解锁脚本。通用消息验签可另行指定上下文和消息长度。
 
-[付款接口](reference/payment.py) · [付款验收矩阵](reference/payment-acceptance.md) · [验证绑定实现](../../shared/pushtx.py)
+[付款接口](reference/payment.py) · [付款验收矩阵](reference/payment-acceptance.md) · [验证绑定实现](../../src/fourthgraph/bsv/pushtx.py)
 
 ## 复现方法
 
 在仓库根目录使用 Python 3.12 和 OpenSSL 3.5 或以上版本。OpenSSL 夹具使用公开测试种子。
 
 ```sh
-python -m pip install -r shared/requirements-chronicle.txt
+python -m pip install -r tools/requirements-chronicle.txt
 python -m unittest discover -s projects/ml-dsa/reference -p test_mldsa.py -v
 python projects/ml-dsa/reference/check_chain_gang.py -v
 python projects/ml-dsa/reference/test_shake_script.py -v
@@ -48,14 +48,14 @@ python projects/ml-dsa/reference/test_challenge_script.py -v
 python projects/ml-dsa/reference/test_payment.py -v
 ```
 
-测试覆盖 80 条 Wycheproof 标准验签用例、15 条 NIST ACVP 外部纯模式向量及 640 个付款判定组合。详见[统一节点回归](../../shared/chronicle-regression.md)。Linux 节点重放使用统一入口的脚本策略配置。
+测试覆盖 80 条 Wycheproof 标准验签用例、15 条 NIST ACVP 外部纯模式向量及 640 个付款判定组合。详见[统一节点回归](../../docs/chronicle-regression.md)。Linux 节点重放使用统一入口的脚本策略配置。
 
 将三个环境变量设为本地语料文件后，可以通过以下命令单独重放。若系统的 OpenSSL 版本较低，可以用
 `ML_DSA_OPENSSL` 指向支持 ML-DSA 的可执行文件。
 
 ```sh
 python projects/ml-dsa/reference/check_wycheproof.py "$WYCHEPROOF_VECTORS"
-PYTHONPATH=. python projects/ml-dsa/reference/check_acvp.py "$ACVP_PROMPT" "$ACVP_EXPECTED"
+PYTHONPATH=src:. python projects/ml-dsa/reference/check_acvp.py "$ACVP_PROMPT" "$ACVP_EXPECTED"
 ```
 
 [固定 Wycheproof 语料](https://github.com/C2SP/wycheproof/blob/8e7fa6f87e6993d7b613cf48b46512a32df8084a/testvectors_v1/mldsa_44_standard_verify_test.json) · [NIST ACVP 验签语料](https://github.com/usnistgov/ACVP-Server/tree/master/gen-val/json-files/ML-DSA-sigVer-FIPS204)
@@ -88,4 +88,4 @@ PYTHONPATH=. python projects/ml-dsa/reference/check_acvp.py "$ACVP_PROMPT" "$ACV
 | `pure-ml-dsa-44` · `0x41` | 3×2 | 2,627 (-4 / 2,588 / 43) | 2×3 | 926,418 (926,405 / 0 / 13) | 1,858,346 | 3,716,464 |
 | `pure-ml-dsa-44` · `0x61` | 3×2 | 1,855,545 (-2 / 1,855,502 / 45) | 2×3 | 2,779,266 (926,409 / 1,852,844 / 13) | 1,858,363 | 7,422,076 |
 
-[统一测量入口与复现口径](../../shared/benchmark.zh-CN.md)
+[统一测量入口与复现口径](../../docs/benchmark.zh-CN.md)

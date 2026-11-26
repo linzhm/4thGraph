@@ -4,7 +4,7 @@
 
 ## Developer resources
 
-**[Wallet SDK quickstart](docs/sdk.en.md#quickstart)** · [Unified wallet SDK](../../shared/sdk/README.md#quickstart)
+**[Wallet SDK quickstart](docs/sdk.en.md#quickstart)** · [Unified wallet SDK](../../sdk/README.md#quickstart)
 
 Create a short deposit lock, arrange its committed R1 target at the same index, and call `activate`. Spend the resulting R1 output through the ordinary R1 integration.
 
@@ -32,7 +32,7 @@ See the [protocol specification](docs/spec.en.md), [SDK guide](docs/sdk.en.md), 
 
 ```sh
 python -m pip install -r projects/p2pkh-r1-deferred/reference/requirements.txt
-PYTHONPATH=. python projects/p2pkh-r1-deferred/reference/generate_vectors.py
+PYTHONPATH=src:. python projects/p2pkh-r1-deferred/reference/generate_vectors.py
 bash projects/p2pkh-r1-deferred/reference/verify.sh
 ```
 
@@ -45,4 +45,4 @@ These samples spend two short locks and one fee sponsor into two R1 v0.2.0 outpu
 | ForkID ALL | 93,259 | 46,552 | 46,313 | 97,125 | 190,498 |
 | OTDA ALL | 93,260 | 46,551 | 46,312 | 97,139 | 198,389 |
 
-The two activation unlocks are 197 bytes each. The sponsor's native signature encoding accounts for the one-byte variation. For the first activation input, the development evaluator measures peaks of 7 main-stack items, 34 altstack items and 359 bytes of combined payload. [Benchmark method](../../shared/benchmark.md)
+The two activation unlocks are 197 bytes each. The sponsor's native signature encoding accounts for the one-byte variation. For the first activation input, the development evaluator measures peaks of 7 main-stack items, 34 altstack items and 359 bytes of combined payload. [Benchmark method](../../docs/benchmark.md)

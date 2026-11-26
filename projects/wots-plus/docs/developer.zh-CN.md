@@ -36,4 +36,4 @@
 
 按[统一 WOTS+ 钱包指南](sdk.zh-CN.md)选择输出模板并接入外部一次性签名器。回调对请求中的摘要返回 2,144 字节签名。符合条件时可用 `compressOtda` 生成紧凑解锁脚本，密钥消耗由签名服务持久记录。
 
-[付款接口](../reference/payment.py) · [一次性签名接口](../reference/wots.py) · [基准持久签名器](../../../shared/one_time_signer.py)
+[付款接口](../reference/payment.py) · [一次性签名接口](../reference/wots.py) · [基准持久签名器](../../../src/fourthgraph/bsv/one_time_signer.py)

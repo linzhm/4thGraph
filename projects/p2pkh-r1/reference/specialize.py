@@ -1,6 +1,6 @@
 """Size and verify mode-specific P2PKH-R1 locks as an experimental comparison."""
 from assemble import assemble
-from shared.script import asm
+from fourthgraph.bsv.script import asm
 
 
 def specialized_lock(owner, family):

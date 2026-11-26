@@ -7,6 +7,9 @@ on:
 permissions:
   contents: read
 
+env:
+  PYTHONPATH: ${{ github.workspace }}/src:${{ github.workspace }}
+
 jobs:
   verify:
     runs-on: ubuntu-24.04
@@ -19,7 +22,7 @@ jobs:
         with:
           node-version: '24'
       - name: Type-check the shared TypeScript SDK
-        working-directory: shared/sdk/typescript
+        working-directory: sdk/typescript
         run: |
           npm install --ignore-scripts --no-audit --no-fund
           npm run check
@@ -49,4 +52,4 @@ jobs:
           PY
           bash verify.sh
       - name: Replay the shared wallet SDK
-        run: bash shared/verify_node.sh -- bash shared/sdk/verify_wallet.sh p2pkh-r1
+        run: bash tools/verify_node.sh -- bash sdk/verify_wallet.sh p2pkh-r1

@@ -16,8 +16,8 @@ from cryptography.hazmat.primitives.asymmetric import ec, utils
 from tx_engine import Tx
 
 from script_lab import OTHER_PUB, OWNER_PUB, TEMPLATES
-from shared.script import push
-from shared.transaction import (
+from fourthgraph.bsv.script import push
+from fourthgraph.bsv.transaction import (
     ANYONECANPAY, CHRONICLE, SIGHASH_ALL, SIGHASH_NONE, Input, Output, Transaction,
     hash256, preimage_forkid, preimage_otda,
 )

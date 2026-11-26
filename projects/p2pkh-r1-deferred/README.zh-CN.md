@@ -4,7 +4,7 @@
 
 ## 开发入口
 
-**[钱包 SDK 快速上手](docs/sdk.zh-CN.md#quickstart)** · [统一钱包 SDK](../../shared/sdk/README.zh-CN.md#quickstart)
+**[钱包 SDK 快速上手](docs/sdk.zh-CN.md#quickstart)** · [统一钱包 SDK](../../sdk/README.zh-CN.md#quickstart)
 
 生成入金短锁，在同一索引安排它承诺的 R1 目标输出，再调用 `activate`。启用后的输出按普通 R1 流程花费。
 
@@ -32,7 +32,7 @@ Deferred 将生成完整 R1 锁定脚本的成本推迟到启用阶段。[1,435 
 
 ```sh
 python -m pip install -r projects/p2pkh-r1-deferred/reference/requirements.txt
-PYTHONPATH=. python projects/p2pkh-r1-deferred/reference/generate_vectors.py
+PYTHONPATH=src:. python projects/p2pkh-r1-deferred/reference/generate_vectors.py
 bash projects/p2pkh-r1-deferred/reference/verify.sh
 ```
 
@@ -45,4 +45,4 @@ bash projects/p2pkh-r1-deferred/reference/verify.sh
 | ForkID ALL | 93,259 | 46,552 | 46,313 | 97,125 | 190,498 |
 | OTDA ALL | 93,260 | 46,551 | 46,312 | 97,139 | 198,389 |
 
-两个启用输入的解锁各为 197 字节，1 字节的差异来自赞助输入的原生签名编码。开发求值器测得第一个启用输入的主栈峰值为 7 项，备用栈峰值为 34 项，两栈载荷峰值为 359 字节。 [统一测量口径](../../shared/benchmark.zh-CN.md)
+两个启用输入的解锁各为 197 字节，1 字节的差异来自赞助输入的原生签名编码。开发求值器测得第一个启用输入的主栈峰值为 7 项，备用栈峰值为 34 项，两栈载荷峰值为 359 字节。 [统一测量口径](../../docs/benchmark.zh-CN.md)

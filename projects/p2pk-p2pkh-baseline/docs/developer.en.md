@@ -28,7 +28,7 @@ Use a wallet's existing secp256k1 signer with an authenticated funding outpoint,
 
 The declared native coverage includes 2,880 combinations, 80 unpaired SINGLE mutation checks and 192 activation-boundary cases. In the ForkID ALL 2×2 fixture, P2PK measures 326 bytes and P2PKH measures 374 bytes. Moving from P2PK to P2PKH saves 10 bytes per output script and adds about 34 bytes per input witness, subject to DER signature length.
 
-Run the [offline reproduction command](../README.md#run) or use the [unified benchmark](../../../shared/benchmark.md) with `--project p2pk-p2pkh-baseline`. The default fixture runner and acceptance suite use the same repository pin documented in the project README.
+Run the [offline reproduction command](../README.md#run) or use the [unified benchmark](../../../docs/benchmark.md) with `--project p2pk-p2pkh-baseline`. The default fixture runner and acceptance suite use the same repository pin documented in the project README.
 
 <a name="sdk"></a>
 
@@ -38,4 +38,4 @@ Start with the [unified P2PKH quickstart](sdk.en.md). Create a lock, recognize t
 
 Use the [Python fixture generator](../reference/script_lab.py) as a serialization and verification example. An application uses its own wallet and native signing stack for real transactions. The [fixture JSON](../template/baseline.json) gives complete parent and spend bytes, scripts and expected results for comparing application output.
 
-[Project run guide](../README.md#run) · [Pinned dependency guidance](../../../shared/benchmark.md)
+[Project run guide](../README.md#run) · [Pinned dependency guidance](../../../docs/benchmark.md)

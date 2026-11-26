@@ -9,8 +9,8 @@ import unittest
 from fixtures import fixture_seeds, funding_transaction, vector_document
 from payment import sign_payment
 from script import locking_script
-from shared.evaluate import ScriptError, evaluate
-from shared.transaction import Output
+from fourthgraph.bsv.evaluate import ScriptError, evaluate
+from fourthgraph.bsv.transaction import Output
 from wots import (
     CHAINS,
     KEY_BYTES,

@@ -8,11 +8,11 @@ from pathlib import Path
 
 import curve_compiler
 from compile_p256 import ENTRIES, SOURCE, build, identity
-from kernel_bench import failure_vectors, measure_vectors, require_failure, run
-from replay import Replay
-from shared.benchmark_validation import CONTEXT_PIN, Node, chain_metadata
-from shared.evaluate import evaluate
-from shared.script import decode_num, encode_num
+from fourthgraph.benchmark.kernels import failure_vectors, measure_vectors, require_failure, run
+from fourthgraph.replay.workflow import Replay
+from fourthgraph.benchmark.validation import CONTEXT_PIN, Node, chain_metadata
+from fourthgraph.bsv.evaluate import evaluate
+from fourthgraph.bsv.script import decode_num, encode_num
 
 G = (
     0x6B17D1F2E12C4247F8BCE6E563A440F277037D812DEB33A0F4A13945D898C296,
@@ -58,7 +58,7 @@ def compare(source, *, regtest=False):
     if regtest:
         engine = chain_metadata()
         if engine["commit"] != CONTEXT_PIN:
-            raise ValueError("use the chain-gang version pinned in shared/requirements-chronicle.txt")
+            raise ValueError("use the chain-gang version pinned in tools/requirements-chronicle.txt")
         node = Node(os.environ["REGTEST_URL"], os.environ["REGTEST_COOKIE"])
         if node.call("getblockcount", []) or node.call("getconnectioncount", []):
             raise ValueError("use a fresh peerless regtest")

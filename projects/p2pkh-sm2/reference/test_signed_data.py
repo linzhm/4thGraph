@@ -13,7 +13,7 @@ from signed_data import signed_data_signer, verify_signed_data
 from sm2 import N, USER_ID, encode_public, fixture_sign, mul, sm3
 from test_sm2 import der, der_signature, fixture, public_pem
 from test_sighash import chain_check
-from shared.transaction import Input, Output, Transaction
+from fourthgraph.bsv.transaction import Input, Output, Transaction
 
 
 SKI = der(0x80, b'\xa7' * 20)

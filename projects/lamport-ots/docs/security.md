@@ -77,7 +77,7 @@ moving the spend to the confirmed outpoint changes the required signing digest.
 This applies to the legacy, universal, and committed payment profiles. If a
 replacement also changes transaction contents, verify that it still makes the
 intended payment.
-[Transaction serialization](../../../shared/transaction.py)
+[Transaction serialization](../../../src/fourthgraph/bsv/transaction.py)
 
 Transactions spending the same inputs compete for those UTXOs. First-seen
 information and conflict notifications help monitor a pending parent. Confirm

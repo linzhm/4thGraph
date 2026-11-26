@@ -3,8 +3,8 @@ from functools import partial
 
 from p2pkh_sm2 import locking_script_from_public_key, sign_input
 from sm2 import N, encode_public, fixture_sign, mul
-from shared.benchmark_cases import Coin, Template, seed
-from shared.transaction import Output
+from fourthgraph.benchmark.cases import Coin, Template, seed
+from fourthgraph.bsv.transaction import Output
 
 
 def sm2_coin(label, value, *, compress_otda=None):
@@ -31,8 +31,8 @@ def components(samples):
     from pathlib import Path
 
     from assemble import sm3_blocks
-    from shared.benchmark_validation import timed
-    from shared.script import assemble
+    from fourthgraph.benchmark.validation import timed
+    from fourthgraph.bsv.script import assemble
     from signed_data import signed_data_signer
     from sm2 import USER_ID, verify
     from test_signed_data import ISSUER_AND_SERIAL, signed_data, der_signature

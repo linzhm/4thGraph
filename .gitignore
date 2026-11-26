@@ -4,3 +4,12 @@ __pycache__/
 node_modules/
 target/
 scriptPubKey.bin
+
+# Local toolchain and project workspaces
+/workspace/
+/projects/*/workspace/
+
+# Python distribution output
+/build/
+/dist/
+*.egg-info/

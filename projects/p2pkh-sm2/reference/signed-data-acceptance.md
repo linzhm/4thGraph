@@ -55,7 +55,7 @@ generates dedicated test keys and checks signatures independently in OpenSSL.
 From the repository root:
 
 ```sh
-PYTHONPATH=.:projects/p2pkh-sm2/reference python -m unittest -v test_signed_data_acceptance
+PYTHONPATH=src:.:projects/p2pkh-sm2/reference python -m unittest -v test_signed_data_acceptance
 ```
 
 For BSV Node 1.2.3 replay, run `bash projects/p2pkh-sm2/reference/verify.sh`.

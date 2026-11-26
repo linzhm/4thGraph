@@ -9,12 +9,12 @@ from functools import cache
 from pathlib import Path
 import sys
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
+sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "src"))
 
 from fips204 import SIGNATURE_BYTES
 from ntt_script import COEFFICIENT_BYTES
 from polynomial import DEGREE, MODULUS
-from shared.script import asm, number, push
+from fourthgraph.bsv.script import asm, number, push
 
 CHALLENGE_BYTES = 32
 RESPONSE_COUNT = HINT_ROWS = 4

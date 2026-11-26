@@ -5,9 +5,9 @@ from unittest.mock import patch
 
 from generate_otda_constructor import generate
 from p2pkh_sm2 import _otda_pattern, current_input_unlock, locking_script_from_public_key, sign_input
-from shared.benchmark_validation import chain_verdict
-from shared.evaluate import evaluate
-from shared.transaction import Input, Output, Transaction
+from fourthgraph.benchmark.validation import chain_verdict
+from fourthgraph.bsv.evaluate import evaluate
+from fourthgraph.bsv.transaction import Input, Output, Transaction
 from sighash import authorization
 from sm2 import USER_ID, encode_public, fixture_sign, mul
 from test_node import check_node

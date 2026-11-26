@@ -29,7 +29,7 @@ python3 sm2_signed_data_signer.py \
 在仓库根目录安装[参考实现依赖](../../requirements.txt)，运行 Python 签名器的专项测试。
 
 ```sh
-PYTHONPATH=.:projects/p2pkh-sm2/reference \
+PYTHONPATH=src:.:projects/p2pkh-sm2/reference \
   python -m unittest -v test_signed_data.PythonSignedDataSignerTests
 ```
 

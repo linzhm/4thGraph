@@ -4,7 +4,7 @@
 
 ## Developer resources
 
-**[Wallet SDK quickstart](docs/sdk.en.md#quickstart)** · [Unified wallet SDK](../../shared/sdk/README.md#quickstart)
+**[Wallet SDK quickstart](docs/sdk.en.md#quickstart)** · [Unified wallet SDK](../../sdk/README.md#quickstart)
 
 Choose a raw SM2 or SignedData signer. The wallet automatically selects a shorter OTDA unlocking script for eligible payments.
 
@@ -115,7 +115,7 @@ Each marginal cell shows the **change in total bytes (output locks / input unloc
 | `v1.0.0` · `0x41` | 3×2 | 334 (0 / 291 / 43) | 2×3 | 144,938 (144,925 / 0 / 13) | 290,780 | 581,334 |
 | `v1.0.0` · `0x61` | 3×2 | 290,277 (0 / 290,232 / 45) | 2×3 | 434,814 (144,925 / 289,876 / 13) | 290,794 | 1,160,988 |
 
-[Unified benchmark and reproduction](../../shared/benchmark.md)
+[Unified benchmark and reproduction](../../docs/benchmark.md)
 
 <a name="otda-constructor"></a>
 

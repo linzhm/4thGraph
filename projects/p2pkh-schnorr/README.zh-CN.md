@@ -10,9 +10,9 @@
 
 ## 从 Forth 构建
 
-付款示例通过 `REQUIRE stdlib/bip340.fth` 引入 4thGraph 标准库。`schnorr-lock` 将库里的验签词与所有者校验、当前输入绑定组合成付款锁。`schnorr-unlock` 为每次花费构造解锁脚本。[付款示例源码](reference/schnorr.fth) · [4thGraph 验签库](../4thgraph/stdlib/bip340.fth)
+付款示例通过 `REQUIRE stdlib/bip340.fth` 引入 4thGraph 标准库。`schnorr-lock` 将库里的验签词与所有者校验、当前输入绑定组合成付款锁。`schnorr-unlock` 为每次花费构造解锁脚本。[付款示例源码](reference/schnorr.fth) · [4thGraph 验签库](../../src/fourthgraph/stdlib/bip340.fth)
 
-在仓库根目录运行 `PYTHONPATH=. python projects/p2pkh-schnorr/reference/generate_template.py --check` 核对锁和布局。用 `--write` 重新生成。早期版本的模板可在 Git 历史中查阅。
+在仓库根目录运行 `PYTHONPATH=src:. python projects/p2pkh-schnorr/reference/generate_template.py --check` 核对锁和布局。用 `--write` 重新生成。早期版本的模板可在 Git 历史中查阅。
 
 钱包 SDK 用编译产物识别输出和构造收款锁。验证外部签名后，SDK 将审批过的预映像和公开见证交给 `schnorr-unlock`，再把脚本写入对应输入。[钱包 SDK](docs/sdk.zh-CN.md#quickstart)
 
@@ -26,10 +26,10 @@
 python3.12 -m venv .venv/p2pkh-schnorr
 .venv/p2pkh-schnorr/bin/python -m pip install -r projects/p2pkh-schnorr/reference/requirements.txt
 export SCRIPT_LAB_SDK_PYTHON="$PWD/.venv/p2pkh-schnorr/bin/python"
-PYTHONPATH=. "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/reference/generate_template.py --check
+PYTHONPATH=src:. "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/reference/generate_template.py --check
 PYTHONPATH="$PWD:$PWD/projects/p2pkh-schnorr/reference" \
-  bash shared/verify_node.sh -- "$SCRIPT_LAB_SDK_PYTHON" -m unittest -v test_schnorr test_musig2
-bash shared/verify_node.sh -- bash shared/sdk/verify_wallet.sh p2pkh-schnorr
+  bash tools/verify_node.sh -- "$SCRIPT_LAB_SDK_PYTHON" -m unittest -v test_schnorr test_musig2
+bash tools/verify_node.sh -- bash sdk/verify_wallet.sh p2pkh-schnorr
 ```
 
 验收在 libsecp256k1 和两套脚本引擎上核对全部 19 条 BIP340 官方验签向量，包括空消息与变长消息，并用公开测试密钥和辅助随机数复算了 8 条官方签名向量。付款矩阵覆盖交易版本 1 和 2，以及有同索引输出的全部 12 种 ForkID 和 Chronicle OTDA 组合。测试核对锁定时间变化后的拒绝结果，以及 ALL、NONE、SINGLE 对输出变化的各自约束。其他用例覆盖错误坐标、所有者校验、手续费平衡、Chronicle 未激活，以及两张表的全部索引、标量分解和无穷远点结果。
@@ -43,17 +43,17 @@ bash shared/verify_node.sh -- bash shared/sdk/verify_wallet.sh p2pkh-schnorr
 | ForkID ALL | 30,398 | 329 | 61,572 | 372 | 30,409 | 61,798 | 123,369 | 3,325 |
 | Chronicle OTDA ALL | 30,398 | 61,087 | 183,088 | 61,253 | 91,235 | 61,811 | 244,899 | 122,006 |
 
-单位均为字节。栈载荷取开发求值器测得的第一个输入的主栈和备用栈合计峰值。完整输入在 BSV Node 1.2.3 和 chain-gang 上用显式提供的上一输出验证。OTDA ALL 的每份预映像都包含完整输出字节。[模板布局及指纹](template/layout.json) · [基准口径](../../shared/benchmark.zh-CN.md)
+单位均为字节。栈载荷取开发求值器测得的第一个输入的主栈和备用栈合计峰值。完整输入在 BSV Node 1.2.3 和 chain-gang 上用显式提供的上一输出验证。OTDA ALL 的每份预映像都包含完整输出字节。[模板布局及指纹](template/layout.json) · [基准口径](../../docs/benchmark.zh-CN.md)
 
 ```sh
-bash shared/verify_node.sh -- "$SCRIPT_LAB_SDK_PYTHON" -m shared.benchmark \
+bash tools/verify_node.sh -- "$SCRIPT_LAB_SDK_PYTHON" -m fourthgraph.benchmark.run \
   --project p2pkh-schnorr --venvs-dir .venv --output /tmp/p2pkh-schnorr-benchmark
 ```
 
 在 BSV Node 1.2.3 的默认 regtest 策略下，ForkID ALL 和 OTDA ALL 两组带 UTXO 的入金与退出交易均进入内存池并出块。
 
 ```sh
-bash shared/verify_node.sh --profile default -- "$SCRIPT_LAB_SDK_PYTHON" -m shared.benchmark_admission \
+bash tools/verify_node.sh --profile default -- "$SCRIPT_LAB_SDK_PYTHON" -m fourthgraph.benchmark.admission \
   p2pkh-schnorr --output /tmp/p2pkh-schnorr-admission.json
 ```
 

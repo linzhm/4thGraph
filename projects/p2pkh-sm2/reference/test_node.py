@@ -8,8 +8,8 @@ from test_sm2 import fixture
 from test_sighash import chain_check, mode_cases, activation_cases
 from p2pkh_sm2 import *
 from sm2 import *
-from shared.differential import node_script_valid
-from shared.script import push
+from fourthgraph.bsv.differential import node_script_valid
+from fourthgraph.bsv.script import push
 
 
 def check_node(tx, parents, index, valid=True, *, chronicle_active=True, old_output=False):

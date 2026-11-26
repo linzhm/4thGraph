@@ -8,13 +8,13 @@ from tempfile import TemporaryDirectory
 
 from musig2_fixture import Policy, fixture_keys, fixture_sign
 from payment import lock_for_public_key, sign_spend
-from shared.benchmark import dump_json, summarize
-from shared.benchmark_admission import admission_case
-from shared.benchmark_cases import Coin, Template, workloads
-from shared.benchmark_validation import CONTEXT_PIN, Node, chain_metadata, measure_leg
-from shared.evaluate import evaluate
-from shared.script import asm, push
-from shared.transaction import CHRONICLE, Output, hash256, preimage_forkid, preimage_otda
+from fourthgraph.benchmark.run import dump_json, summarize
+from fourthgraph.benchmark.admission import admission_case
+from fourthgraph.benchmark.cases import Coin, Template, workloads
+from fourthgraph.benchmark.validation import CONTEXT_PIN, Node, chain_metadata, measure_leg
+from fourthgraph.bsv.evaluate import evaluate
+from fourthgraph.bsv.script import asm, push
+from fourthgraph.bsv.transaction import CHRONICLE, Output, hash256, preimage_forkid, preimage_otda
 
 
 def musig2_coin(label, value):

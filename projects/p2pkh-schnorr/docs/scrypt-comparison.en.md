@@ -10,7 +10,7 @@ Script Lab uses the BIP340 tagged challenge, a 32-byte x-only public key, and tw
 
 ## Standalone verifier replay
 
-Each verifier receives a signature in its own format over the 32-byte message and public-key x-coordinate from official BIP340 vector 0. All three builds use synthetic one-input spends with explicit prevouts and pass BSV Node 1.2.3 `verifyscript` under the repository's raised script limits and the pinned chain-gang evaluator. The figures count serialized script bytes, including witness push opcodes. `scryptlib` 2.1.36's local interpreter reports `SCRIPT_ERR_SCRIPT_SIZE` on the default legacy build with its default flags. [BIP340 vectors](../template/bip340-vectors.csv) · [Runner](../reference/compare_scrypt.py) · [Isolated regtest](../../../shared/verify_node.sh)
+Each verifier receives a signature in its own format over the 32-byte message and public-key x-coordinate from official BIP340 vector 0. All three builds use synthetic one-input spends with explicit prevouts and pass BSV Node 1.2.3 `verifyscript` under the repository's raised script limits and the pinned chain-gang evaluator. The figures count serialized script bytes, including witness push opcodes. `scryptlib` 2.1.36's local interpreter reports `SCRIPT_ERR_SCRIPT_SIZE` on the default legacy build with its default flags. [BIP340 vectors](../template/bip340-vectors.csv) · [Runner](../reference/compare_scrypt.py) · [Isolated regtest](../../../tools/verify_node.sh)
 
 | Verifier | Lock bytes | Witness bytes | Combined script bytes | chain-gang median | BSV Node RPC median |
 | --- | ---: | ---: | ---: | ---: | ---: |
@@ -57,10 +57,10 @@ gh release download v1.19.1 --repo sCrypt-Inc/compiler_dist \
   --pattern 'scryptc-1.19.1-Linux-x86_64' --dir "$scratch"
 chmod +x "$scratch/scryptc-1.19.1-Linux-x86_64"
 export SCRYPTC="$scratch/scryptc-1.19.1-Linux-x86_64" GHCRTS=-N2
-PYTHONPATH=. bash shared/verify_node.sh -- \
+PYTHONPATH=src:. bash tools/verify_node.sh -- \
   .venv/p2pkh-schnorr/bin/python projects/p2pkh-schnorr/reference/compare_scrypt.py \
   "$scratch/boilerplate" --compiler-study --samples 15
-PYTHONPATH=. bash shared/verify_node.sh -- \
+PYTHONPATH=src:. bash tools/verify_node.sh -- \
   .venv/p2pkh-schnorr/bin/python projects/p2pkh-schnorr/reference/compare_bip340.py \
   --compiler "$SCRYPTC" --samples 15
 ```

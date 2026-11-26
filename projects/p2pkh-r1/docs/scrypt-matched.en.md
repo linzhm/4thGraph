@@ -28,13 +28,13 @@ The 2×2 case creates two R1 outputs of the same build. The input and output mar
 | OTDA ALL | Script Lab | 4,264 | 101,250 | 4,430 | 46,393 | 93,613 | 194,863 |
 | OTDA ALL | sCrypt arithmetic | 4,377 | 141,406 | 4,543 | 66,362 | 133,544 | 274,949 |
 
-All sizes are in bytes. The sCrypt candidate crosses 65,535 bytes, increasing the output's CompactSize script length from three to five bytes. OTDA reconstruction reuses the expanded template, so the unlock grows by 113 bytes per input. Peak stack payload for the first input is 3,474 / 4,216 bytes under ForkID and 185,613 / 265,473 under OTDA, in Script Lab / sCrypt order. These are combined main and alternate stack payloads from the development evaluator. [Benchmark method](../../../shared/benchmark.md)
+All sizes are in bytes. The sCrypt candidate crosses 65,535 bytes, increasing the output's CompactSize script length from three to five bytes. OTDA reconstruction reuses the expanded template, so the unlock grows by 113 bytes per input. Peak stack payload for the first input is 3,474 / 4,216 bytes under ForkID and 185,613 / 265,473 under OTDA, in Script Lab / sCrypt order. These are combined main and alternate stack payloads from the development evaluator. [Benchmark method](../../../docs/benchmark.md)
 
 The 2×2 ForkID case took 10.4 / 11.0 ms in chain-gang and 41.4 / 47.2 ms through BSV Node loopback RPC, in Script Lab / sCrypt order. For OTDA the figures were 10.1 / 11.4 ms and 42.0 / 50.0 ms. All results use an AMD EPYC 9V74 Linux host and the median of 15 runs after a warmup. They include input preparation and verification.
 
 The arithmetic differential covers 450 deterministic and boundary-coordinate samples. Each build replays 96 payment cases across transaction versions 1 and 2, all 12 paired sighash modes, unpaired SINGLE, and locktime and output value mutations. The harness also executes all 64 valid input witnesses per build, checks the resulting preimage byte for byte, and confirms the 50 literal, 10 reconstructed, and four companion paths. BSV Node 1.2.3 checks each input in the `verifyscript` context with Chronicle active and the prevout created after activation. The pinned chain-gang evaluator checks the complete transaction. [Acceptance runner](../reference/compare_scrypt.py)
 
-In a separate run with the default script and transaction size policies on isolated regtest, all eight funded transactions entered the mempool and were mined. The run covers funding and direct exit for both builds under ForkID ALL and OTDA ALL. The sCrypt build's funding transactions were about 133 KB each. Turnover figures in the table come from `verifyscript`. [Funding and mining fixture](../../../shared/benchmark_admission.py) · [Node configuration](../../../shared/verify_node.sh)
+In a separate run with the default script and transaction size policies on isolated regtest, all eight funded transactions entered the mempool and were mined. The run covers funding and direct exit for both builds under ForkID ALL and OTDA ALL. The sCrypt build's funding transactions were about 133 KB each. Turnover figures in the table come from `verifyscript`. [Funding and mining fixture](../../../src/fourthgraph/benchmark/admission.py) · [Node configuration](../../../tools/verify_node.sh)
 
 The public implementation has room to move scalar multiplication to projective coordinates and windows, with the single ECDSA scalar inverse provided and checked as a witness. Further reductions to this sCrypt candidate can target the repeated doubling kernel, reuse of point-addition temporaries, and the stack cleanup generated for general function bodies.
 
@@ -50,10 +50,10 @@ scratch=$(mktemp -d)
 gh release download v1.20.0 --repo sCrypt-Inc/compiler_dist \
   --pattern 'scryptc-1.20.0-Linux-x86_64' --dir "$scratch"
 chmod +x "$scratch/scryptc-1.20.0-Linux-x86_64"
-GHCRTS=-N2 PYTHONPATH=. bash shared/verify_node.sh -- \
+GHCRTS=-N2 PYTHONPATH=src:. bash tools/verify_node.sh -- \
   .venv/p2pkh-r1/bin/python projects/p2pkh-r1/reference/compare_scrypt.py \
   --compiler "$scratch/scryptc-1.20.0-Linux-x86_64" --output /tmp/r1-scrypt-comparison.json
-GHCRTS=-N2 PYTHONPATH=. bash shared/verify_node.sh --profile default -- \
+GHCRTS=-N2 PYTHONPATH=src:. bash tools/verify_node.sh --profile default -- \
   .venv/p2pkh-r1/bin/python projects/p2pkh-r1/reference/compare_scrypt.py \
   --compiler "$scratch/scryptc-1.20.0-Linux-x86_64" --admission \
   --output /tmp/r1-scrypt-admission.json

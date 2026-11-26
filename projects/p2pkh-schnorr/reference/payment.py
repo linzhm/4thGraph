@@ -2,8 +2,8 @@
 
 from bip340 import lift_x, to_bytes, verify
 from schnorr_script import authorization_codes, compile_unlock, lock_for_owner, owner_hash, recognize
-from shared.spend_authorization import DEFAULT_SIGHASH, prepare_authorization
-from shared.transaction import CHRONICLE, SIGHASH_SINGLE, SIGHASH_TYPES, Input, Transaction, amount
+from fourthgraph.bsv.spend_authorization import DEFAULT_SIGHASH, prepare_authorization
+from fourthgraph.bsv.transaction import CHRONICLE, SIGHASH_SINGLE, SIGHASH_TYPES, Input, Transaction, amount
 
 
 def lock_for_public_key(public_key):

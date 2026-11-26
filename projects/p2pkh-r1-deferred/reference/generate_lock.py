@@ -5,7 +5,7 @@ from pathlib import Path
 import sys
 
 from deferred import funding_output, funding_output_from_owner_hash, recognize
-from shared.transaction import Output
+from fourthgraph.bsv.transaction import Output
 
 
 def main() -> None:

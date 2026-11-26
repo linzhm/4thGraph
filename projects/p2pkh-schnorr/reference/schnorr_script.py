@@ -2,11 +2,10 @@
 
 from functools import cache
 from hashlib import new, sha256
-from importlib import import_module
 import json
 from pathlib import Path
 
-ScriptBuilder = import_module("projects.4thgraph.script_builder").ScriptBuilder
+from fourthgraph.compiler.script_builder import ScriptBuilder
 SOURCE = Path(__file__).with_name("schnorr.fth")
 TEMPLATE_DIR = Path(__file__).resolve().parents[1] / "template"
 TEMPLATE_VERSION = "v0.6.0"

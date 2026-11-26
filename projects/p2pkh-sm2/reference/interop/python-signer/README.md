@@ -34,7 +34,7 @@ From the repository root, install the [reference dependencies](../../requirement
 and run the Python signer tests.
 
 ```sh
-PYTHONPATH=.:projects/p2pkh-sm2/reference \
+PYTHONPATH=src:.:projects/p2pkh-sm2/reference \
   python -m unittest -v test_signed_data.PythonSignedDataSignerTests
 ```
 

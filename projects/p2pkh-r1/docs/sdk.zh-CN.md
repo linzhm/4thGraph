@@ -13,11 +13,11 @@ python3.12 -m venv .venv
 .venv/bin/python -m pip install -r projects/p2pkh-r1/reference/requirements.txt
 ```
 
-使用[统一接入指南](../../../shared/sdk/README.zh-CN.md)里的 `config` 和已核验的交易数据。
+使用[统一接入指南](../../../sdk/README.zh-CN.md)里的 `config` 和已核验的交易数据。
 
 ```ts
 import { resolve } from "node:path";
-import { WalletClient } from "./shared/sdk/typescript/index.ts";
+import { WalletClient } from "./sdk/typescript/index.ts";
 
 const wallet = new WalletClient("p2pkh-r1", { ...config, template: "v0.2.0" });
 const receiveScript = wallet.createLock({ publicKey: receiveKeyHex });
@@ -40,7 +40,7 @@ const signedHex = wallet.signPayment({
 
 ```sh
 SCRIPT_LAB_SDK_PYTHON="$PWD/.venv/bin/python" \
-  bash shared/verify_node.sh -- bash shared/sdk/verify_wallet.sh p2pkh-r1
+  bash tools/verify_node.sh -- bash sdk/verify_wallet.sh p2pkh-r1
 ```
 
 ## 接通签名设备

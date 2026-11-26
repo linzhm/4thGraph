@@ -4,9 +4,9 @@ from functools import cache
 
 from script import COMPANION_CODE, ORDINARY_CODE, locking_script
 from fixed_template import fixed_pattern
-from shared.pushtx import N, R
-from shared.script import number, push
-from shared.transaction import (
+from fourthgraph.bsv.pushtx import N, R
+from fourthgraph.bsv.script import number, push
+from fourthgraph.bsv.transaction import (
     CHRONICLE, FORKID, SIGHASH_ALL, SIGHASH_SINGLE, SIGHASH_TYPES,
     Input, Transaction, amount, hash256, preimage_forkid, preimage_otda,
 )

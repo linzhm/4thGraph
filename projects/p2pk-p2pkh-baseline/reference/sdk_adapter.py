@@ -5,9 +5,9 @@ from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import ec, utils
 
-from shared.pushtx import N
-from shared.script import push
-from shared.transaction import CHRONICLE, SIGHASH_SINGLE, hash256, preimage_forkid, preimage_otda
+from fourthgraph.bsv.pushtx import N
+from fourthgraph.bsv.script import push
+from fourthgraph.bsv.transaction import CHRONICLE, SIGHASH_SINGLE, hash256, preimage_forkid, preimage_otda
 
 
 def _key(public_key):
@@ -51,7 +51,7 @@ def recognize(script, public_key, *, include_public_key=False):
 
 
 def sign_spend(tx, index, funding_raw, public_key, signer, sighash, options):
-    from shared.transaction import Transaction
+    from fourthgraph.bsv.transaction import Transaction
 
     previous = Transaction.parse(funding_raw).outputs[tx.inputs[index].vout]
     return sign_previous(tx, index, previous, public_key, signer, sighash, options)

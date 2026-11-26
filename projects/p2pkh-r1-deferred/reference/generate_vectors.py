@@ -11,8 +11,8 @@ from cryptography.hazmat.primitives.asymmetric import ec
 
 from deferred import activate_input, activation_preimages, funding_output, recognize, target_output
 from fixed_templates import LEGACY_TEMPLATE_VERSION, TEMPLATE_VERSION
-from shared.script import push
-from shared.transaction import CHRONICLE, SIGHASH_TYPES, Input, Transaction
+from fourthgraph.bsv.script import push
+from fourthgraph.bsv.transaction import CHRONICLE, SIGHASH_TYPES, Input, Transaction
 
 TEMPLATE = Path(__file__).resolve().parents[1] / 'template'
 RELEASE_TEMPLATE = TEMPLATE / f'v{TEMPLATE_VERSION}'

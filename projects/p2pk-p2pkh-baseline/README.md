@@ -4,7 +4,7 @@
 
 ## Developer resources
 
-**[Wallet SDK quickstart](docs/sdk.en.md#quickstart)** · [Unified wallet SDK](../../shared/sdk/README.md#quickstart)
+**[Wallet SDK quickstart](docs/sdk.en.md#quickstart)** · [Unified wallet SDK](../../sdk/README.md#quickstart)
 
 Receive to P2PK or P2PKH, then sign a payment with your secp256k1 signer.
 
@@ -12,7 +12,7 @@ Receive to P2PK or P2PKH, then sign a payment with your secp256k1 signer.
 
 Native P2PKH is the first wallet integration example and the transaction-cost baseline for Script Lab. P2PK uses the same secp256k1 signer and provides a control for placing the public key in the output lock. Both templates have public fixtures that you can replay as you integrate another project.
 
-[Reproduce the benchmark](../../shared/benchmark.md)
+[Reproduce the benchmark](../../docs/benchmark.md)
 
 ## Use cases and trade-offs
 
@@ -53,7 +53,7 @@ mainnet. Do not broadcast these fixtures.
 The offline generator and acceptance tests share the repository's Chronicle
 pin of the chain-gang Python binding. Projects using that exact pin can share
 the same environment. The Rust-backed binding supplies assembly, signing,
-and validation. [Shared dependency](../../shared/requirements-chronicle.txt)
+and validation. [Shared dependency](../../tools/requirements-chronicle.txt)
 
 To reproduce the original upstream control in its own environment, run
 `uv run --no-project --with 'tx-engine==0.13.1' python script_lab.py`.
@@ -112,4 +112,6 @@ Each marginal cell shows the **change in total bytes (output locks / input unloc
 | `p2pkh` · `0x41` | 3×2 | 146 (0 / 105 / 41) | 2×3 | 34 (25 / 0 / 9) | 598 | 972 |
 | `p2pkh` · `0x61` | 3×2 | 146 (0 / 105 / 41) | 2×3 | 33 (25 / -1 / 9) | 599 | 970 |
 
-[Unified benchmark and reproduction](../../shared/benchmark.md)
+[Unified benchmark and reproduction](../../docs/benchmark.md)
+
+[Compile the Forth locking scripts](forth/README.md).

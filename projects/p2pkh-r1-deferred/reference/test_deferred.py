@@ -15,8 +15,8 @@ from deferred import (
 )
 from fixed_templates import LEGACY_TEMPLATE_VERSION, TEMPLATE_VERSION
 from generate_vectors import RELEASE_TEMPLATE, TEMPLATE, artifacts
-from shared.script import asm, push
-from shared.transaction import CHRONICLE, SIGHASH_TYPES, Input, Output, Transaction, hash256, preimage_forkid
+from fourthgraph.bsv.script import asm, push
+from fourthgraph.bsv.transaction import CHRONICLE, SIGHASH_TYPES, Input, Output, Transaction, hash256, preimage_forkid
 from wallet import sign_payment
 from p2pkh_r1 import public_key_hash160
 

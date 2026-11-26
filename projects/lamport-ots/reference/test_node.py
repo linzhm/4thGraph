@@ -8,9 +8,9 @@ from lamport import OneTimeSigner, public_key, sign_digest
 from payment import sign_payment
 from script import locking_script
 from engines import chain_valid
-from shared.transaction import Output, Transaction, Input
-from shared.script import push
-from shared.differential import node_script_valid
+from fourthgraph.bsv.transaction import Output, Transaction, Input
+from fourthgraph.bsv.script import push
+from fourthgraph.bsv.differential import node_script_valid
 
 
 def node_check(tx, parent, index, *, chronicle=True, funding_height=3):

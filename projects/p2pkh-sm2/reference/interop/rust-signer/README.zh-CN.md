@@ -31,7 +31,7 @@ cargo build --locked --release --manifest-path "$signer_dir/Cargo.toml" --target
 
 ```sh
 SM2_SIGNED_DATA_SIGNER="$signer_dir/target/release/sm2-signed-data-signer" \
-  PYTHONPATH=.:projects/p2pkh-sm2/reference python -m unittest -v test_signed_data.IndependentSignedDataTests
+  PYTHONPATH=src:.:projects/p2pkh-sm2/reference python -m unittest -v test_signed_data.IndependentSignedDataTests
 ```
 
 运行 `bash projects/p2pkh-sm2/reference/verify.sh`，可自动构建 Rust 签名器，

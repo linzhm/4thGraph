@@ -5,8 +5,8 @@ from pathlib import Path
 
 from assemble import sm3_blocks
 from p2pkh_sm2 import _canonical
-from shared.evaluate import evaluate
-from shared.script import asm, assemble, number, push
+from fourthgraph.bsv.evaluate import evaluate
+from fourthgraph.bsv.script import asm, assemble, number, push
 
 ASM_DIRECTORY = Path(__file__).with_name("asm")
 

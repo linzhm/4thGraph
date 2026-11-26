@@ -5,9 +5,9 @@ from hashlib import sha256
 from tx_engine import Script, sig_hash_preimage
 
 from fixed_templates import otda_pattern
-from shared.otda_reconstruction import reconstruct_mixed
-from shared.script import push
-from shared.transaction import Output
+from fourthgraph.bsv.otda_reconstruction import reconstruct_mixed
+from fourthgraph.bsv.script import push
+from fourthgraph.bsv.transaction import Output
 
 GROUP_ORDER_R1 = 0xffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc632551
 UNIVERSAL_FLAGS = frozenset({base | mode for base in (0x41, 0x42, 0x43)

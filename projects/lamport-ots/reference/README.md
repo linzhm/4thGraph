@@ -1,7 +1,7 @@
 # Reference implementation
 
 Python 3.12+; production primitive code uses only the standard library. Script
-serialization and transaction helpers are under the repository's `shared/` folder.
+serialization and transaction helpers are under the repository's `src/fourthgraph/bsv/` package.
 Independent tests use the pinned chain-gang commit and BSV Node 1.2.3.
 Install tx-engine from requirements.txt so the test adapter can verify its
 Git revision. Negative cases require a known script rejection or the expected

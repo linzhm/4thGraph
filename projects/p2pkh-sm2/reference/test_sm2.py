@@ -14,9 +14,9 @@ from assemble import assemble
 from p2pkh_sm2 import *
 from sm2 import *
 from sm3_script import hash_script,compress,IV
-from shared.evaluate import evaluate,ScriptError
-from shared.script import push,number,assemble as assemble_blocks
-from shared.transaction import *
+from fourthgraph.bsv.evaluate import evaluate,ScriptError
+from fourthgraph.bsv.script import push,number,assemble as assemble_blocks
+from fourthgraph.bsv.transaction import *
 
 ROOT=Path(__file__).resolve().parents[1]
 SM3_PROFILES = ({}, {'optimized': True}, {'compact': True})

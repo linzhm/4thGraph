@@ -10,9 +10,9 @@ Two parties can use BIP327 MuSig2 to spend through the same signer interface. Th
 
 ## Build from Forth
 
-The payment example imports the 4thGraph standard-library verifier with `REQUIRE stdlib/bip340.fth`. Its `schnorr-lock` word combines the library verifier with the owner check and the current-input binding. Its `schnorr-unlock` word builds the unlocking script for each spend. [Payment example source](reference/schnorr.fth) · [4thGraph BIP340 library](../4thgraph/stdlib/bip340.fth)
+The payment example imports the 4thGraph standard-library verifier with `REQUIRE stdlib/bip340.fth`. Its `schnorr-lock` word combines the library verifier with the owner check and the current-input binding. Its `schnorr-unlock` word builds the unlocking script for each spend. [Payment example source](reference/schnorr.fth) · [4thGraph BIP340 library](../../src/fourthgraph/stdlib/bip340.fth)
 
-From the repository root, run `PYTHONPATH=. python projects/p2pkh-schnorr/reference/generate_template.py --check` to verify the checked-in lock and layout. Use `--write` to regenerate them. Earlier templates are available in Git history.
+From the repository root, run `PYTHONPATH=src:. python projects/p2pkh-schnorr/reference/generate_template.py --check` to verify the checked-in lock and layout. Use `--write` to regenerate them. Earlier templates are available in Git history.
 
 The wallet SDK uses the compiled template to recognize existing outputs and create receive locks. After verifying the external signature, it supplies the approved preimage and public witness to `schnorr-unlock` and inserts the result into the input. [Wallet SDK](docs/sdk.en.md#quickstart)
 
@@ -26,10 +26,10 @@ From the repository root, create a Python 3.12 project environment. The tests us
 python3.12 -m venv .venv/p2pkh-schnorr
 .venv/p2pkh-schnorr/bin/python -m pip install -r projects/p2pkh-schnorr/reference/requirements.txt
 export SCRIPT_LAB_SDK_PYTHON="$PWD/.venv/p2pkh-schnorr/bin/python"
-PYTHONPATH=. "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/reference/generate_template.py --check
+PYTHONPATH=src:. "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/reference/generate_template.py --check
 PYTHONPATH="$PWD:$PWD/projects/p2pkh-schnorr/reference" \
-  bash shared/verify_node.sh -- "$SCRIPT_LAB_SDK_PYTHON" -m unittest -v test_schnorr test_musig2
-bash shared/verify_node.sh -- bash shared/sdk/verify_wallet.sh p2pkh-schnorr
+  bash tools/verify_node.sh -- "$SCRIPT_LAB_SDK_PYTHON" -m unittest -v test_schnorr test_musig2
+bash tools/verify_node.sh -- bash sdk/verify_wallet.sh p2pkh-schnorr
 ```
 
 The acceptance suite checks all 19 official BIP340 verification vectors, including empty and variable-length messages, through libsecp256k1 and both Script engines. It also regenerates the eight official signing vectors with test keys and auxiliary randomness. The payment matrix covers all 12 paired ForkID and Chronicle OTDA modes for transaction versions 1 and 2. It rejects locktime changes and checks the expected output commitments for ALL, NONE, and SINGLE. Separate cases cover malformed coordinates, key ownership, fee balance, inactive Chronicle, and both lookup tables, scalar decomposition, and results at infinity.
@@ -43,17 +43,17 @@ The fixed lock is **30,398 bytes**. Its owner field starts at byte offset **238*
 | ForkID ALL | 30,398 | 329 | 61,572 | 372 | 30,409 | 61,798 | 123,369 | 3,325 |
 | Chronicle OTDA ALL | 30,398 | 61,087 | 183,088 | 61,253 | 91,235 | 61,811 | 244,899 | 122,006 |
 
-All sizes are in bytes. Stack payload is the approximate combined main and alternate stack payload for the first input from the development evaluator. BSV Node 1.2.3 and chain-gang verify each complete input with supplied prevouts. OTDA ALL includes the literal signed outputs in each preimage. [Layout and fingerprint](template/layout.json) · [Benchmark method](../../shared/benchmark.md)
+All sizes are in bytes. Stack payload is the approximate combined main and alternate stack payload for the first input from the development evaluator. BSV Node 1.2.3 and chain-gang verify each complete input with supplied prevouts. OTDA ALL includes the literal signed outputs in each preimage. [Layout and fingerprint](template/layout.json) · [Benchmark method](../../docs/benchmark.md)
 
 ```sh
-bash shared/verify_node.sh -- "$SCRIPT_LAB_SDK_PYTHON" -m shared.benchmark \
+bash tools/verify_node.sh -- "$SCRIPT_LAB_SDK_PYTHON" -m fourthgraph.benchmark.run \
   --project p2pkh-schnorr --venvs-dir .venv --output /tmp/p2pkh-schnorr-benchmark
 ```
 
 Under BSV Node 1.2.3's default regtest policy, funding and exit transactions entered the mempool and were mined in both ForkID ALL and OTDA ALL runs.
 
 ```sh
-bash shared/verify_node.sh --profile default -- "$SCRIPT_LAB_SDK_PYTHON" -m shared.benchmark_admission \
+bash tools/verify_node.sh --profile default -- "$SCRIPT_LAB_SDK_PYTHON" -m fourthgraph.benchmark.admission \
   p2pkh-schnorr --output /tmp/p2pkh-schnorr-admission.json
 ```
 

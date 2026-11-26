@@ -34,7 +34,7 @@ defined above and run the Rust signer tests.
 
 ```sh
 SM2_SIGNED_DATA_SIGNER="$signer_dir/target/release/sm2-signed-data-signer" \
-  PYTHONPATH=.:projects/p2pkh-sm2/reference python -m unittest -v test_signed_data.IndependentSignedDataTests
+  PYTHONPATH=src:.:projects/p2pkh-sm2/reference python -m unittest -v test_signed_data.IndependentSignedDataTests
 ```
 
 Run `bash projects/p2pkh-sm2/reference/verify.sh` to build the signer

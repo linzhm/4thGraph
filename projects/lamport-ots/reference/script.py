@@ -2,10 +2,10 @@
 from hashlib import sha256
 from pathlib import Path
 import sys
-sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
-from shared.pushtx import N, R, PUBLIC, ORDINARY_CODE, COMPANION_CODE
-from shared.pushtx import authorization_checks, binding_der, check_binding
-from shared.script import asm, push, number
+sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "src"))
+from fourthgraph.bsv.pushtx import N, R, PUBLIC, ORDINARY_CODE, COMPANION_CODE
+from fourthgraph.bsv.pushtx import authorization_checks, binding_der, check_binding
+from fourthgraph.bsv.script import asm, push, number
 from lamport import KEY_BYTES, SIGNATURE_BYTES, require_bytes
 
 

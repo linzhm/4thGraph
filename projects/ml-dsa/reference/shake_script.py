@@ -9,9 +9,9 @@ from functools import cache
 from pathlib import Path
 import sys
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
+sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "src"))
 
-from shared.script import asm, number, push
+from fourthgraph.bsv.script import asm, number, push
 
 
 _LANE_BYTES = 8

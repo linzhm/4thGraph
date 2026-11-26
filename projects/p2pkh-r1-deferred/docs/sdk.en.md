@@ -13,10 +13,10 @@ python3.12 -m venv .venv
 .venv/bin/python -m pip install -r projects/p2pkh-r1-deferred/reference/requirements.txt
 ```
 
-Use `config` from the [wallet quickstart](../../../shared/sdk/README.md) and authenticated wallet data.
+Use `config` from the [wallet quickstart](../../../sdk/README.md) and authenticated wallet data.
 
 ```ts
-import { WalletClient } from "./shared/sdk/typescript/index.ts";
+import { WalletClient } from "./sdk/typescript/index.ts";
 
 const deferred = new WalletClient("p2pkh-r1-deferred", { ...config, template: "v0.2.0" });
 const shortLock = deferred.createLock({ publicKey: receiveKeyHex, valueSats });
@@ -39,7 +39,7 @@ Replay the vector in all four languages from the repository root.
 
 ```sh
 SCRIPT_LAB_SDK_PYTHON="$PWD/.venv/bin/python" \
-  bash shared/verify_node.sh -- bash shared/sdk/verify_wallet.sh p2pkh-r1-deferred
+  bash tools/verify_node.sh -- bash sdk/verify_wallet.sh p2pkh-r1-deferred
 ```
 
 ## Build the activation transaction

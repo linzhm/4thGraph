@@ -2,8 +2,8 @@
 from functools import partial
 from pathlib import Path
 import sys
-sys.path.insert(0,str(Path(__file__).resolve().parents[3]))
-from shared.script import assemble as assemble_blocks, push
+sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "src"))
+from fourthgraph.bsv.script import assemble as assemble_blocks, push
 from sm2 import A,B,G,USER_ID,be32
 from sm3_script import IV,compile_hash,compress,hash_script
 

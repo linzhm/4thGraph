@@ -2,8 +2,8 @@
 
 from fips204 import verify
 from script import COMPANION_CODE, ORDINARY_CODE, locking_script
-from shared.spend_authorization import DEFAULT_SIGHASH, SpendAuthorization, prepare_authorization
-from shared.transaction import Input, Transaction, amount
+from fourthgraph.bsv.spend_authorization import DEFAULT_SIGHASH, SpendAuthorization, prepare_authorization
+from fourthgraph.bsv.transaction import Input, Transaction, amount
 
 def authorization(tx, index, previous_amount, sighash=DEFAULT_SIGHASH) -> SpendAuthorization:
     return prepare_authorization(

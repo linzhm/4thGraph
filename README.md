@@ -1,14 +1,16 @@
 # 4thGraph
 
+[Install](docs/install.md) · [SDL language](docs/language/README.md) · [Projects](projects/README.md) · [Results](showcase/README.md) · [Repository layout](docs/repository-layout.md)
+
 **4thGraph (4thG) compiles Forth to BSV Script and plans transaction workflows.** This repository includes runnable contract examples, wallet templates, and SDKs.
 
-**[Try 4thG](#4thg-quickstart)** · [Project comparisons](#4thg-comparisons) · [Wallet SDK quickstart](shared/sdk/README.md#quickstart) · [Wallet projects](#project-index) · [Transaction costs](#transaction-costs) · [简体中文](README.zh-CN.md)
+**[Try 4thG](#4thg-quickstart)** · [Project comparisons](#4thg-comparisons) · [Wallet SDK quickstart](sdk/README.md#quickstart) · [Wallet projects](#project-index) · [Transaction costs](#transaction-costs) · [简体中文](README.zh-CN.md)
 
 <a name="4thg-quickstart"></a>
 
 ## Try 4thG
 
-**[PELS Counter](#pels-counter)** · [P2PKH](#p2pkh-example) · [P2PK](#p2pk-example) · [Install the CLI](projects/4thgraph/INSTALL.md)
+**[PELS Counter](#pels-counter)** · [P2PKH](#p2pkh-example) · [P2PK](#p2pk-example) · [Install the CLI](docs/install.md)
 
 <a name="pels-counter"></a>
 
@@ -21,11 +23,12 @@ Start at `0`. Every spend increments the counter and puts the same rules in the 
 ```sh
 git clone https://github.com/linzhm/4thGraph.git
 cd 4thGraph
-export PYTHONPATH=.:projects/4thgraph
-counter=projects/4thgraph/examples/pels_counter.py
+export PYTHONPATH=src:.
+bash tools/setup-workspaces.sh
+counter=projects/pels-counter/pels_counter.py
 ```
 
-**2. Compile the lock.** 4thG compiles the Forth transition below. The example adds the checks that bind it to the next transaction output. [Forth source](projects/4thgraph/examples/pels-counter.fth)
+**2. Compile the lock.** 4thG compiles the Forth transition below. The example adds the checks that bind it to the next transaction output. [Forth source](projects/pels-counter/pels-counter.fth)
 
 ```forth
 bsv-effect: advance u32 -- u32 ;
@@ -41,15 +44,15 @@ The command prints the full lock as `script_hex`. Building uses the Python stand
 **3. Spend and verify.** On Linux x86-64 with `curl`, Rust/Cargo, and a C toolchain, install the replay dependencies and run the example.
 
 ```sh
-python3 -m venv .venv
-. .venv/bin/activate
-python -m pip install ecdsa -r shared/requirements-chronicle.txt
+python3 -m venv workspace/venv
+. workspace/venv/bin/activate
+python -m pip install ecdsa -r tools/requirements-chronicle.txt
 
-bash shared/verify_node.sh --profile default -- python "$counter" replay \
-  --output projects/4thgraph/build/pels-counter.json
+bash tools/verify_node.sh --profile default -- python "$counter" replay \
+  --output projects/pels-counter/workspace/build/pels-counter.json
 ```
 
-The replay funds `0` and mines `0 → 1 → 2`, deducting **1,000 sat per spend**. Open the JSON report to see both engines' verdicts and the mined blocks. To construct an individual spend, use `spend --parent` with the raw parent transaction. [Spend and verification guide](projects/4thgraph/examples/README.md#spend-and-verify-on-regtest)
+The replay funds `0` and mines `0 → 1 → 2`, deducting **1,000 sat per spend**. Open the JSON report to see both engines' verdicts and the mined blocks. To construct an individual spend, use `spend --parent` with the raw parent transaction. [Spend and verification guide](projects/pels-counter/README.md#spend-and-verify-on-regtest)
 
 <a name="p2pkh-example"></a>
 
@@ -57,10 +60,10 @@ The replay funds `0` and mines `0 → 1 → 2`, deducting **1,000 sat per spend*
 <summary>P2PKH · 25-byte lock</summary>
 
 ```sh
-python3 projects/4thgraph/examples/payments.py --hash160 751e76e8199196d454941c45d1b3a323f1433bd6
+python3 projects/p2pk-p2pkh-baseline/forth/payments.py --hash160 751e76e8199196d454941c45d1b3a323f1433bd6
 ```
 
-The lock commits to a public-key hash. To spend, push the signature and public key. [Forth source](projects/4thgraph/examples/payments.fth) · [Signed transaction examples](projects/p2pk-p2pkh-baseline/README.md)
+The lock commits to a public-key hash. To spend, push the signature and public key. [Forth source](projects/p2pk-p2pkh-baseline/forth/payments.fth) · [Signed transaction examples](projects/p2pk-p2pkh-baseline/README.md)
 
 </details>
 
@@ -70,14 +73,14 @@ The lock commits to a public-key hash. To spend, push the signature and public k
 <summary>P2PK · 35-byte lock</summary>
 
 ```sh
-python3 projects/4thgraph/examples/payments.py --public-key 0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798
+python3 projects/p2pk-p2pkh-baseline/forth/payments.py --public-key 0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798
 ```
 
-The lock contains the compressed public key. To spend, push the signature. [Forth source](projects/4thgraph/examples/payments.fth) · [Signed transaction examples](projects/p2pk-p2pkh-baseline/README.md)
+The lock contains the compressed public key. To spend, push the signature. [Forth source](projects/p2pk-p2pkh-baseline/forth/payments.fth) · [Signed transaction examples](projects/p2pk-p2pkh-baseline/README.md)
 
 </details>
 
-4thG also supports stack optimization, candidate search across transaction boundaries, decision reports, and Circom generation for supported words. [Toolchain guide](projects/4thgraph) · [Forth language reference](projects/4thgraph/language.md)
+4thG also supports stack optimization, candidate search across transaction boundaries, decision reports, and Circom generation for supported words. [Toolchain guide](docs/toolchain.md) · [Forth language reference](docs/language/specification.md)
 
 <a name="4thg-comparisons"></a>
 
@@ -87,7 +90,6 @@ The lock contains the compressed public key. To spend, push the signature. [Fort
 | --- | --- |
 | P2PKH-R1 Forth v0.3.0 experiment | The Forth baseline reproduces the v0.2.0 lock byte for byte. The optimized lock goes from 46,302 to **45,776 B**, and the two-input, two-output ForkID ALL payment goes from 93,374 to **92,322 B**. The replay also covers OTDA and a build that uses sCrypt-compiled curve kernels. [Experiment and replay](projects/p2pkh-r1/experiments/forth) |
 | BLS12-381 Groth16 verifier (in development) | Forth defines the verification stages for off-chain proofs with fixed, mixed, or spend-time public inputs. The comparison with nChain matches the public-input domain and the placement of precomputed pairing data. |
-| CCTP transaction layouts (in development) | Compares the same Groth16 verification workload in a fused spend, an atomic two-input spend, and two serial spends. The comparison measures total transaction bytes and the slowest spend’s validation time. |
 
 <a name="project-index"></a>
 
@@ -106,7 +108,7 @@ The wallet projects give teams recognizable locking templates, a shared SDK for 
 | [WOTS+](projects/wots-plus/README.md) | A SHA-256 one-time-signature experiment with a smaller signature and several receive templates | Manage one-time keys and compare cached output code and OTDA reconstruction | v0.1 development | [Integration guide](projects/wots-plus/docs/sdk.en.md#quickstart) |
 | [Pure ML-DSA-44](projects/ml-dsa/README.md) | A FIPS 204 interoperability or large-script experiment | Use a Pure ML-DSA-44 signer and validate relay and mining policy for large locks | v0.1 development | [Integration guide](projects/ml-dsa/docs/sdk.en.md#quickstart) |
 
-Start with native P2PKH to run your first payment. The unified SDK uses the same wallet workflow in TypeScript, Rust, Go, and Python. Follow a project guide to connect your signer, choose a template, and replay the appropriate payment or activation. [Wallet SDK quickstart](shared/sdk/README.md)
+Start with native P2PKH to run your first payment. The unified SDK uses the same wallet workflow in TypeScript, Rust, Go, and Python. Follow a project guide to connect your signer, choose a template, and replay the appropriate payment or activation. [Wallet SDK quickstart](sdk/README.md)
 
 <a name="transaction-costs"></a>
 
@@ -135,4 +137,4 @@ The SM2 candidate uses locking template `1` from v1.0.0 and automatically select
 
 ## Reproduce the results
 
-The benchmark guide shows how to replay signed transactions against BSV Node 1.2.3 and the pinned chain-gang version. Each project links its protocol specification, security analysis, acceptance cases, and SDK. [Benchmark guide](shared/benchmark.md)
+The benchmark guide shows how to replay signed transactions against BSV Node 1.2.3 and the pinned chain-gang version. Each project links its protocol specification, security analysis, acceptance cases, and SDK. [Benchmark guide](docs/benchmark.md)
