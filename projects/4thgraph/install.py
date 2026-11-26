@@ -8,7 +8,7 @@ import zipapp
 
 
 PROJECT = Path(__file__).resolve().parent
-COMPILER_MODULES = ("compiler", "wordsets", "lowering", "stack_schedule", "protocol", "decision_report")
+COMPILER_MODULES = ("compiler", "wordsets", "ranges", "lowering", "stack_schedule", "protocol", "decision_report")
 SHARED_MODULES = ("pushtx", "script", "transaction")
 COMMANDS = {"4thgraph": "protocol:main", "4thgraph-report": "decision_report:main"}
 

@@ -34,7 +34,7 @@ Use `--mode fused` to require a single post-deployment spend, or `--mode split` 
 4thgraph-report replay.json --output-dir decision
 ```
 
-To generate new replay evidence, use the checkout's [regtest workflow](README.md#复放与编译). It runs with BSV Node and the pinned chain-gang build.
+Use the same checkout revision for the CLI and skill. To generate new replay evidence, use the checkout's [regtest workflow](README.md#复放与编译) with BSV Node and the pinned chain-gang build. Use the checkout for the [circuit and verifier builders](skills/4thgraph/references/circuits-and-verifiers.md) and their backend-specific dependencies.
 
 ## Codex Agent Skill
 
