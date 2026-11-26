@@ -3,10 +3,12 @@
 from dataclasses import replace
 import json
 from pathlib import Path
+from tempfile import TemporaryDirectory
 import unittest
 from unittest.mock import patch
 
 from proof_contract import FIELD, ProofContract, VerificationKey
+from circuit_backend import compile_circuit
 from circuit_tools import CircuitFixture
 from replay import TestKeys
 from shared.benchmark_validation import chain_verdict
@@ -62,22 +64,21 @@ class ProofContractTests(unittest.TestCase):
     def test_selected_route_controls_the_actual_successor(self):
         source = Path(__file__).with_name("proof").joinpath("step-by-three.fth").read_bytes()
         definition_source = source.split(b"workflow-input:")[0]
-        document = {"prime": str(FIELD), "useCustomGates": False, "nVars": 5, "nOutputs": 1,
-                    "nPubInputs": 3, "nPrvInputs": 0, "nConstraints": 1,
-                    "constraints": [[{}, {}, {"1": "1", "2": str(FIELD - 1), "0": str(FIELD - 3)}]]}
-        key = VerificationKey.load(json.dumps(document).encode())
-        keys = TestKeys().public
-        workflow = ProofContract(source, key, 9, keys)
-        explicit = ProofContract(definition_source, key, 9, keys, entries=("add-three", "choose-destination"))
-        self.assertEqual(workflow.root, explicit.root)
-        self.assertEqual(explicit.describe()["circuit"]["entries"]["route"]["word"], "choose-destination")
-        parent = Transaction((Input(bytes(32), 0),), (explicit.root,))
-        correct = explicit.unsigned(parent, 12)
-        self.assertEqual(correct.outputs[0], explicit.terminals[1])
-        self.assertTrue(chain_verdict(explicit.seal(correct, (1, 12, 9, *explicit.public_binding(correct))), (parent,)))
-        incorrect = replace(correct, outputs=(explicit.terminals[0], correct.outputs[1]))
-        assignment = (1, 12, 9, *explicit.public_binding(incorrect))
-        self.assertFalse(chain_verdict(explicit.seal(incorrect, assignment), (parent,)))
+        with TemporaryDirectory() as directory:
+            fixture = CircuitFixture(compile_circuit(source), directory, has_route=True)
+            keys = TestKeys().public
+            workflow = ProofContract(source, fixture, 9, keys)
+            explicit = ProofContract(definition_source, fixture, 9, keys, entries=("add-three", "choose-destination"))
+            self.assertEqual(workflow.root, explicit.root)
+            self.assertEqual(explicit.describe()["circuit"]["entries"]["route"]["word"], "choose-destination")
+            parent = Transaction((Input(bytes(32), 0),), (explicit.root,))
+            correct = explicit.unsigned(parent, 12)
+            self.assertEqual(correct.outputs[0], explicit.terminals[1])
+            assignment = fixture.prove(current=9, binding=explicit.public_binding(correct))
+            self.assertTrue(chain_verdict(explicit.seal(correct, assignment), (parent,)))
+            incorrect = replace(correct, outputs=(explicit.terminals[0], correct.outputs[1]))
+            assignment = fixture.prove(current=9, binding=explicit.public_binding(incorrect))
+            self.assertFalse(chain_verdict(explicit.seal(incorrect, assignment), (parent,)))
 
 
 if __name__ == "__main__":

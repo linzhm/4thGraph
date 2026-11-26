@@ -26,11 +26,11 @@ class TransactionGraphTests(unittest.TestCase):
         )
         for raw, message in cases:
             with self.subTest(message=message), self.assertRaisesRegex(CompileError, "line .*" + message):
-                SourceCompiler(raw).workflow()
+                SourceCompiler(raw, source_path=SOURCE).workflow()
 
     def test_same_graph_schema_for_linear_parallel_and_gated(self):
         keys = TestKeys().public
-        linear = WorkflowContracts(SourceCompiler(SOURCE.read_text()).workflow(), keys, 19, mode="atomic")
+        linear = WorkflowContracts(SourceCompiler(SOURCE.read_text(), source_path=SOURCE).workflow(), keys, 19, mode="atomic")
         artifacts = [linear.artifact(SOURCE.read_bytes())]
         for path in (EXAMPLE, GATED_EXAMPLE):
             program = parse(path.read_text())

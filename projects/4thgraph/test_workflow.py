@@ -18,7 +18,7 @@ from workflow_replay import SOURCE
 
 class WorkflowTests(unittest.TestCase):
     def test_linked_context_rebuilds_the_exact_forkid_preimage(self):
-        program = SourceCompiler(SOURCE.read_text()).workflow()
+        program = SourceCompiler(SOURCE.read_text(), source_path=SOURCE).workflow()
         contract = WorkflowContracts(program, TestKeys().public, 19, target="both")
         template, = contract.plan.templates
         context = LinkedContext.for_template(template, FLAG, BINDING_CODE, ("terminal", "receipt"))
@@ -42,7 +42,7 @@ class WorkflowTests(unittest.TestCase):
 
     def test_chronicle_context_rebuilds_and_authenticates_the_same_output_assertions(self):
         source = SOURCE.read_bytes()
-        program = SourceCompiler(source.decode()).workflow()
+        program = SourceCompiler(source.decode(), source_path=SOURCE).workflow()
         keys = TestKeys()
         artifact, report = compile_workflow(program, keys.public, 19, source_bytes=source, search=True,
                                             target="both", sighash_family="chronicle")
@@ -67,7 +67,7 @@ class WorkflowTests(unittest.TestCase):
 
     def test_dual_lock_binds_authorizations_to_the_selected_preimage(self):
         source = SOURCE.read_bytes()
-        program = SourceCompiler(source.decode()).workflow()
+        program = SourceCompiler(source.decode(), source_path=SOURCE).workflow()
         keys = TestKeys()
         options = dict(target="both", sighash_family="both")
         contract = WorkflowContracts(program, keys.public, 19, mode="fused", **options)
@@ -81,7 +81,7 @@ class WorkflowTests(unittest.TestCase):
         with self.assertRaisesRegex(CompileError, "requires a Chronicle spend target"):
             WorkflowContracts(program, keys.public, 19, target="forkid-v1", sighash_family="both")
         with self.assertRaisesRegex(CompileError, "recovery branch is unavailable"):
-            with_recovery = SourceCompiler(source.decode() + "\nrecovery: 145 review ;\n").workflow()
+            with_recovery = SourceCompiler(source.decode() + "\nrecovery: 145 review ;\n", source_path=SOURCE).workflow()
             WorkflowContracts(with_recovery, keys.public, 19, **options)
         root = Transaction((Input(bytes(32), 0),), contract.deployment_outputs)
         done = {"deploy": root}
@@ -123,13 +123,13 @@ class WorkflowTests(unittest.TestCase):
         )
         for candidate, message in cases:
             with self.subTest(message=message), self.assertRaisesRegex(CompileError, rf"line \d+, column \d+: .*{message}"):
-                SourceCompiler(candidate).workflow()
+                SourceCompiler(candidate, source_path=SOURCE).workflow()
 
     def test_ordered_plan_and_artifacts(self):
         source = SOURCE.read_bytes()
         *body, first, second = source.decode().splitlines()
         reordered = "\n".join((*body, second, first))
-        program = SourceCompiler(reordered).workflow()
+        program = SourceCompiler(reordered, source_path=SOURCE).workflow()
         self.assertEqual(tuple(stage.name for stage in program.stages), ("advance", "decide"))
         keys = TestKeys().public
         for mode in WORKFLOW_MODES:
@@ -150,7 +150,7 @@ class WorkflowTests(unittest.TestCase):
                 self.assertEqual(templates[-1]["inputs"], expected)
 
     def test_state_and_signing_digest_bind_actual_parent_bytes(self):
-        workflow = SourceCompiler(SOURCE.read_text()).workflow()
+        workflow = SourceCompiler(SOURCE.read_text(), source_path=SOURCE).workflow()
         keys = TestKeys()
         contracts = WorkflowContracts(workflow, keys.public, 19, mode="serial", target="both")
         root = Transaction((Input(bytes(32), 0),), (contracts.root,))
@@ -177,7 +177,7 @@ class WorkflowTests(unittest.TestCase):
         keys = TestKeys().public
 
         def compile_example(raw=source, **options):
-            return compile_workflow(SourceCompiler(raw.decode()).workflow(), keys, 19,
+            return compile_workflow(SourceCompiler(raw.decode(), source_path=SOURCE).workflow(), keys, 19,
                                     source_bytes=raw, search=True, **options)
 
         artifact, default = compile_example()
@@ -220,7 +220,7 @@ class WorkflowTests(unittest.TestCase):
 
     def test_atomic_signing_requests_bind_distinct_inputs_and_deployment(self):
         source = SOURCE.read_bytes()
-        stages = SourceCompiler(source.decode()).workflow()
+        stages = SourceCompiler(source.decode(), source_path=SOURCE).workflow()
         keys = TestKeys()
         contract = WorkflowContracts(stages, keys.public, 19, mode="atomic", target="both")
         root = Transaction((Input(bytes(32), 0),), contract.deployment_outputs)
@@ -249,7 +249,7 @@ class WorkflowTests(unittest.TestCase):
 
     def test_recovery_reports_remaining_atomic_output(self):
         source = SOURCE.read_text() + "\nrecovery: 145 review\n"
-        stages = SourceCompiler(source).workflow()
+        stages = SourceCompiler(source, source_path=SOURCE).workflow()
         keys = TestKeys()
         contract = WorkflowContracts(stages, keys.public, 19, mode="atomic")
         root = Transaction((Input(bytes(32), 0),), contract.deployment_outputs)
