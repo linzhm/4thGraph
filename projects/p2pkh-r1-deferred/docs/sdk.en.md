@@ -6,7 +6,7 @@
 
 ## Unified wallet API
 
-Use `createLock` with the amount to build a short lock. Pass the output amount and raw script to recognition. Existing locks activate to their committed R1 version. Install the reference environment from the repository root.
+Use `createLock` with the amount to build the v0.3.0 short lock. Pass the output amount and raw script to recognition. The result reports the Deferred version as `template` and the committed R1 version as `targetTemplate`. Install the reference environment from the repository root.
 
 ```sh
 python3.12 -m venv projects/p2pkh-r1-deferred/workspace/venv
@@ -18,7 +18,7 @@ Use authenticated transaction data. Set `config.python` to the absolute path of 
 ```ts
 import { WalletClient } from "./sdk/typescript/index.ts";
 
-const deferred = new WalletClient("p2pkh-r1-deferred", { ...config, template: "v0.2.0" });
+const deferred = new WalletClient("p2pkh-r1-deferred", { ...config, template: "v0.3.0" });
 const shortLock = deferred.createLock({ publicKey: receiveKeyHex, valueSats });
 const prevout = deferred.prevoutFromFunding(fundingTxHex, fundingVout);
 const commitment = deferred.recognize({
@@ -55,4 +55,4 @@ Store the short-lock outpoint, value, owner and `targetTemplate` with the invoic
 
 After confirmation, record the final activation txid and output index as the new R1 outpoint. If broadcast is delayed or a reorganization changes the parent, reconcile the short-lock and activated outpoints in the wallet's chain view before creating a child payment. [R1 spending workflow](../../p2pkh-r1/docs/sdk.en.md#quickstart)
 
-[Activation specification](spec.en.md) · [Twelve-mode vectors](../versions/v0.2.0/sighash-modes.json) · [Reference transaction construction](../reference/README.md)
+[Activation specification](spec.en.md) · [Twelve-mode vectors](../versions/v0.3.0/sighash-modes.json) · [Reference transaction construction](../reference/README.md)
