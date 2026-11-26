@@ -1,5 +1,7 @@
 # P-256 script size comparison · P-256 脚本体积对照
 
+[Matched v0.2.0 arithmetic comparison](scrypt-matched.en.md) · [v0.2.0 同算法对照](scrypt-matched.zh-CN.md)
+
 A funding output carries the complete locking script. The table measures serialized Bitcoin Script bytes, beginning at the first opcode, for the same public P-256 key, signature and digest. Unlock sizes include push opcodes. The comparison uses a single [published payment vector](../template/spend-all.json).
 
 每个收款输出都包含完整锁定脚本。下表从第一个 opcode 数起，解锁字节数含推送指令。三者使用同一组公开的 R1 公钥、签名和摘要。
