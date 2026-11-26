@@ -1,14 +1,71 @@
 # BSV Script Lab
 
-**在 BSV 上接入更多签名方案，看清从收款到花费的完整成本。**
+**用 4thGraph（4thG）把 Forth 编译成 BSV Script，再复放交易验证结果、测量成本。**
 
-BSV Script Lab 提供钱包可识别的锁定模板、可接入外部签名器的源码 SDK，以及可复放的签名交易向量。你可以从原生 P2PKH 基准出发，接入 P‑256 或 SM2，也可以用统一的测量口径比较 Lamport、WOTS+ 和纯模式 ML‑DSA‑44。
+BSV Script Lab 提供开发和测试 BSV 合约的工具。**4thGraph** 是仓库的 Forth 工具链，可以编译独立的 Script 例程，也可以编译多笔交易组成的工作流。仓库还提供钱包锁定模板、可接入外部签名器的 SDK，以及已签名的交易测试向量。
 
-**[钱包 SDK 快速上手](shared/sdk/README.zh-CN.md#quickstart)** · [选择项目](#project-index) · [比较交易成本](#transaction-costs) · [复现交易基准](shared/benchmark.zh-CN.md) · [English](README.md)
+**[立即试用 4thG](#4thg-quickstart)** · [项目改造与对照](#4thg-comparisons) · [钱包 SDK 快速上手](shared/sdk/README.zh-CN.md#quickstart) · [钱包项目](#project-index) · [交易成本](#transaction-costs) · [English](README.md)
+
+<a name="4thg-quickstart"></a>
+
+## 立即试用 4thG
+
+安装 Git 和 Python 3.12，然后克隆 `feat/4thgraph` 分支。编译器直接从源码运行，只依赖 Python 标准库。先运行以下示例，再按需安装节点和复放依赖。
+
+```sh
+git clone --branch feat/4thgraph https://github.com/linzhm/bsv-script-lab.git
+cd bsv-script-lab
+
+cat > add-one.fth <<'FORTH'
+bsv-effect: add-one u32 -- u32 ;
+: add-one 1 cell>u32 u32+ ;
+FORTH
+
+PYTHONPATH=. python3 projects/4thgraph/protocol.py add-one.fth \
+  --entry add-one --optimize safe
+```
+
+`bsv-effect:` 声明 `add-one` 消耗一个 `u32` 并返回一个 `u32`。这个词将输入加一，溢出时按 32 位回绕。编译器输出 JSON，`script_hex` 为 `8b05000000000197`，`script_bytes` 为 `8`，同时列出栈签名、源码摘要和构建摘要。把源码中的 `1` 改成其他值再编译，就能看到输出变化。
+
+### 复放完整工作流
+
+在 Linux x86-64 上，从同一份检出安装复放依赖。`pip` 从固定的 Git 提交构建 chain-gang，需要 Rust/Cargo 和 C 编译工具链。启动脚本通过 `curl` 下载并校验 BSV Node 1.2.3，在隔离的 regtest 网络中给示例提供测试资金。
+
+```sh
+python3 -m venv .venv
+. .venv/bin/activate
+python -m pip install ecdsa -r shared/requirements-chronicle.txt
+
+project=projects/4thgraph
+PYTHONPATH=. bash shared/verify_node.sh --profile default -- \
+  python "$project/replay.py" --target both --optimize stack --samples 1 \
+  --output "$project/build/quickstart-replay.json"
+
+PYTHONPATH=. python "$project/decision_report.py" "$project/build/quickstart-replay.json" \
+  --output-dir "$project/build/quickstart-decision"
+```
+
+打开 `projects/4thgraph/build/quickstart-decision/decision-report.md`，查看候选方案入选或排除的原因、结算与复核的交易字节数，以及 BSV Node 和 chain-gang 的验证结果。[4thGraph 使用手册](https://github.com/linzhm/bsv-script-lab/tree/feat/4thgraph/projects/4thgraph) · [Forth 语言规范](https://github.com/linzhm/bsv-script-lab/blob/feat/4thgraph/projects/4thgraph/language.md)
+
+### 可以构建什么
+
+- **Script 例程。** 把有栈类型声明的 Forth 词编译成 Script，对照不同栈调度，并按源码位置查看改写记录。
+- **交易工作流。** 声明输入、签名角色、并行步骤和汇合条件。4thG 可以把步骤融合到一次花费，也可以拆到不同 UTXO 以支持独立提交。候选搜索根据授权和可用性约束比较受支持的交易边界与见证布局。宿主运行器把交易模板绑定到实际 outpoint，并准备签名请求。[并行示例](https://github.com/linzhm/bsv-script-lab/blob/feat/4thgraph/projects/4thgraph/example.fth) · [带门条件的示例](https://github.com/linzhm/bsv-script-lab/blob/feat/4thgraph/projects/4thgraph/gated.fth)
+- **算术电路。** 受限的电路后端可将支持的 Forth 词编译为 Circom。计数器示例对照宿主求值、Script 执行和电路约束，覆盖回绕和分支边界。[电路示例](https://github.com/linzhm/bsv-script-lab/blob/feat/4thgraph/projects/4thgraph/proof/workflow.fth)
+
+<a name="4thg-comparisons"></a>
+
+## 4thG 项目改造与对照
+
+| 项目 | 对照结果 |
+| --- | --- |
+| P2PKH-R1 Forth v0.3.0 探索版 | Forth 基线逐字节复现 v0.2.0 锁。优化后完整锁由 46,302 B 降到 **45,776 B**，两进两出 ForkID ALL 付款由 93,374 B 降到 **92,322 B**。复放还覆盖 OTDA，以及用 sCrypt 编译曲线内核的版本。[改造与复放](https://github.com/linzhm/bsv-script-lab/tree/feat/4thgraph/projects/p2pkh-r1/experiments/forth) |
+| BLS12-381 Groth16 验证器（开发中） | 用 Forth 编排链下证明的链上验证，支持全固定、混合以及花费时提供全部公开输入。与 nChain 的对照采用相同的公开输入域和配对预计算数据放置方式。 |
+| CCTP 交易布局（开发中） | 在单笔融合、同交易双输入和两笔串行布局中复放同一个 Groth16 验证任务，比较整条路径字节与最慢单笔花费的验证时间。 |
 
 <a name="project-index"></a>
 
-## 按使用场景选项目
+## 钱包项目
 
 | 项目 | 使用场景 | 版本 | 钱包接入 |
 | --- | --- | --- | --- |
