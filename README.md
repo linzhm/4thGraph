@@ -90,7 +90,7 @@ If regtest is available, demonstrate 0 → 1 → 2, then try jumping directly fr
 ## Measured on real transactions
 
 - **What does optimizing a lock save on a payment?** From v0.5.0 to v0.6.0, the P2PKH-R1 compiler experiment reduced a two-input, two-output BIP143 ALL payment from 84,212 B to **83,498 B** and an OTDA ALL payment from 95,282 B to **94,864 B**. [P2PKH-R1 results](projects/p2pkh-r1/README.md#measured-results)
-- **What does it cost to verify a proof on-chain?** For the same BLS12-381 Groth16 proof and fixed public inputs, deployment plus one spend totaled **280,731 bytes** with 4thGraph and **393,553 bytes** with the tested nChain configuration. Both spends were mined on BSV regtest. [Experiment, raw results, and transaction IDs](projects/proof-counter/experiments/fixed-statement/README.md)
+- **What does it cost to verify a proof on-chain?** For the same BLS12-381 Groth16 proof and fixed public inputs, deployment plus one spend totaled **280,731 bytes** with 4thGraph and **393,553 bytes** with the tested nChain configuration. Both spends were mined on BSV regtest. [Experiment, raw results, and transaction IDs](projects/proof-counter/reference/fixed-statement/README.md)
 
 [All project results](showcase/README.md) · [Detailed wallet transaction costs](docs/benchmark.md#transaction-costs)
 

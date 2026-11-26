@@ -9,8 +9,9 @@ from pathlib import Path
 TEMPLATE_VERSION = "0.2.0"
 LEGACY_TEMPLATE_VERSION = "0.1.0"
 TEMPLATE_VERSIONS = (TEMPLATE_VERSION, LEGACY_TEMPLATE_VERSION)
-TEMPLATE_DIRECTORY = Path(__file__).resolve().parents[1] / "template/candidates"
-RELEASE_DIRECTORY = TEMPLATE_DIRECTORY.parent / f"v{TEMPLATE_VERSION}"
+VERSIONS_DIRECTORY = Path(__file__).resolve().parents[1] / "versions"
+TEMPLATE_DIRECTORY = VERSIONS_DIRECTORY / f"v{LEGACY_TEMPLATE_VERSION}" / "compiled"
+RELEASE_DIRECTORY = VERSIONS_DIRECTORY / f"v{TEMPLATE_VERSION}"
 
 
 def _directory(scheduled):

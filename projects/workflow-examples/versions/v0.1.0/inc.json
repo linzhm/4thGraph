@@ -1,0 +1,22 @@
+{
+  "artifact_sha256": "6e792fa4e5d3a91c9c220036d2a806509cf1c185a471618600cf26d7c26d42e7",
+  "compiler_version": "0.2.7",
+  "enabled_optional_wordsets": [
+    "core-ext",
+    "file-ext"
+  ],
+  "entry": "inc",
+  "gives": [
+    "u32"
+  ],
+  "optimization": "baseline",
+  "project": "4thGraph",
+  "rewrites": [],
+  "schema_version": 1,
+  "script_bytes": 70,
+  "script_hex": "51930900000000000000800093090000000000000000019776009f6309000000000000000001936809000000000000008000940500000000019776009f630500000000019368",
+  "source_sha256": "137ccf4af6cc2c0ab4da36be14e7bcf2c3f1968f4e0ccbe960f2f293ffecf230",
+  "takes": [
+    "u32"
+  ]
+}

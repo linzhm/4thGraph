@@ -358,7 +358,7 @@ BIP143 复放可用 `REGTEST_CHRONICLE_HEIGHT=1000` 验证激活前花费。双�
 
 ## Groth16 链上验证器
 
-[固定声明的 nChain 对照](../projects/proof-counter/experiments/fixed-statement/README.md) ·
+[固定声明的 nChain 对照](../projects/proof-counter/reference/fixed-statement/README.md) ·
 
 ### BLS12-381
 

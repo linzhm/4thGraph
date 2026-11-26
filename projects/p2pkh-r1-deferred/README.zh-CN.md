@@ -1,6 +1,6 @@
 # P2PKH-R1-Deferred v0.2.0
 
-[English](README.md) · [4thGraph](../../README.zh-CN.md) · [项目目录](../README.zh-CN.md)
+[English](README.md) · [4thGraph](../../README.zh-CN.md) · [项目目录](../README.zh-CN.md) · [版本](versions/index.json)
 
 ## 开发入口
 
@@ -10,7 +10,7 @@
 
 [协议规范](docs/spec.zh-CN.md) · [安全分析](docs/developer.zh-CN.md#security) · [复现与验证](#开发与复现) · [交易成本](#实测交易成本)
 
-Deferred 将生成完整 R1 锁定脚本的成本推迟到启用阶段。[1,435 字节的入金短锁](template/v0.2.0/template.hex)承诺一个等额的 [46,302 字节 P2PKH-R1 v0.2.0 目标输出](../p2pkh-r1/template/v0.2.0/template.hex)。已有短锁继续采用其原先承诺的目标版本。
+Deferred 将生成完整 R1 锁定脚本的成本推迟到启用阶段。[1,435 字节的入金短锁](versions/v0.2.0/template.hex)承诺一个等额的 [46,302 字节 P2PKH-R1 v0.2.0 目标输出](../p2pkh-r1/versions/v0.2.0/template.hex)。已有短锁继续采用其原先承诺的目标版本。
 
 ## 使用场景与取舍
 
@@ -28,7 +28,7 @@ Deferred 将生成完整 R1 锁定脚本的成本推迟到启用阶段。[1,435 
 
 ## 开发与复现
 
-详见[协议规范](docs/spec.zh-CN.md)、[钱包 SDK](docs/sdk.zh-CN.md)、[模板布局](template/v0.2.0/layout.json)、[启用向量](template/v0.2.0/activation-single.json)、[十二种模式向量](template/v0.2.0/sighash-modes.json)和[验收矩阵](reference/acceptance.md)。
+详见[协议规范](docs/spec.zh-CN.md)、[钱包 SDK](docs/sdk.zh-CN.md)、[模板布局](versions/v0.2.0/layout.json)、[启用向量](versions/v0.2.0/activation-single.json)、[十二种模式向量](versions/v0.2.0/sighash-modes.json)和[验收矩阵](reference/acceptance.md)。
 
 ```sh
 python -m pip install -r projects/p2pkh-r1-deferred/reference/requirements.txt

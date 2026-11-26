@@ -1,6 +1,6 @@
 # P2PKH-R1-Deferred v0.2.0
 
-[简体中文](README.zh-CN.md) · [4thGraph](../../README.md) · [Project index](../README.md)
+[简体中文](README.zh-CN.md) · [4thGraph](../../README.md) · [Project index](../README.md) · [Versions](versions/index.json)
 
 ## Developer resources
 
@@ -10,7 +10,7 @@ Create a short deposit lock, arrange its committed R1 target at the same index, 
 
 [Protocol](docs/spec.en.md) · [Security](docs/developer.en.md#security) · [Verify](#reproduce-and-integrate) · [Transaction costs](#measured-transaction-costs)
 
-Deferred moves the creation of a full R1 locking script from funding to activation. A [1,435-byte funding lock](template/v0.2.0/template.hex) commits to a [46,302-byte P2PKH-R1 v0.2.0 target](../p2pkh-r1/template/v0.2.0/template.hex) at the same value. Existing short locks keep the target version they originally committed to.
+Deferred moves the creation of a full R1 locking script from funding to activation. A [1,435-byte funding lock](versions/v0.2.0/template.hex) commits to a [46,302-byte P2PKH-R1 v0.2.0 target](../p2pkh-r1/versions/v0.2.0/template.hex) at the same value. Existing short locks keep the target version they originally committed to.
 
 ## Use cases and trade-offs
 
@@ -28,7 +28,7 @@ The activation witness already carries the target commitment through BIP143 SING
 
 ## Reproduce and integrate
 
-See the [protocol specification](docs/spec.en.md), [SDK guide](docs/sdk.en.md), [layout](template/v0.2.0/layout.json), [activation vector](template/v0.2.0/activation-single.json), [twelve-mode vectors](template/v0.2.0/sighash-modes.json), and [acceptance matrix](reference/acceptance.md).
+See the [protocol specification](docs/spec.en.md), [SDK guide](docs/sdk.en.md), [layout](versions/v0.2.0/layout.json), [activation vector](versions/v0.2.0/activation-single.json), [twelve-mode vectors](versions/v0.2.0/sighash-modes.json), and [acceptance matrix](reference/acceptance.md).
 
 ```sh
 python -m pip install -r projects/p2pkh-r1-deferred/reference/requirements.txt

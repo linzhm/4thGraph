@@ -52,9 +52,9 @@ for production keys.
 The zero-owner script is 144,925 bytes. Its SHA-256 is
 `196dfcb8244e863521447c7069297d31938fbd80a83d5976af618cf7fbcf9462`.
 The generator and Python constructors emit template version `1` by default.
-The [layout manifest](../template/layout.json) pins the canonical bytecode,
-and the [payment vector](../template/spend-all.json) pins a complete BIP143
-payment. [16 deterministic preimages](../template/sighash-modes.json)
+The [layout manifest](../versions/v1.0.0/layout.json) pins the canonical bytecode,
+and the [payment vector](../versions/v1.0.0/spend-all.json) pins a complete BIP143
+payment. [16 deterministic preimages](../versions/v1.0.0/sighash-modes.json)
 cover all paired modes and each unpaired SINGLE variant.
 
 The script executes all SM3 compression rounds. It reuses powers of two
@@ -66,7 +66,7 @@ by the correct SM2 test key, and spends across the Chronicle activation
 boundary. The activation cases use transaction version 1 on both sides to
 isolate the effect of the activation flags.
 
-[Standard vector](../template/sm2-standard.json) · [BSV Node source](https://github.com/bitcoin-sv/bitcoin-sv/tree/6504a3aff65ba97c0f6c80962b033e35ecbfed4b) · [chain-gang source](https://github.com/linzhm/chain-gang/tree/8b60b71a12a69fdcb465d3e627dbf6f43d6ed081)
+[Standard vector](../versions/v1.0.0/sm2-standard.json) · [BSV Node source](https://github.com/bitcoin-sv/bitcoin-sv/tree/6504a3aff65ba97c0f6c80962b033e35ecbfed4b) · [chain-gang source](https://github.com/linzhm/chain-gang/tree/8b60b71a12a69fdcb465d3e627dbf6f43d6ed081)
 
 <a name="otda-constructor"></a>
 
@@ -76,10 +76,10 @@ The wallet loads the frozen program and checks its byte length and SHA-256 again
 
 ```sh
 python projects/p2pkh-sm2/reference/generate_otda_constructor.py /tmp/sm2-otda.hex
-cmp /tmp/sm2-otda.hex projects/p2pkh-sm2/template/otda-constructor.hex
+cmp /tmp/sm2-otda.hex projects/p2pkh-sm2/versions/v1.1.0/otda-constructor.hex
 ```
 
-The constructor tests compare exact preimage, public key, and signature stack values, then verify complete spends against BSV Node and chain-gang. [Layout and fingerprint](../template/layout.json) · [Wallet integration](../docs/sdk.en.md)
+The constructor tests compare exact preimage, public key, and signature stack values, then verify complete spends against BSV Node and chain-gang. [Layout and fingerprint](../versions/v1.1.0/layout.json) · [Wallet integration](../docs/sdk.en.md)
 
 ## SignedData payment interop
 

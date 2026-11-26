@@ -1,6 +1,6 @@
 # P2PKH-SM2 v1.1.0 candidate
 
-[简体中文](README.zh-CN.md) · [4thGraph](../../README.md) · [Project index](../README.md)
+[简体中文](README.zh-CN.md) · [4thGraph](../../README.md) · [Project index](../README.md) · [Versions](versions/index.json)
 
 ## Developer resources
 
@@ -36,10 +36,10 @@ The v1.1.0 candidate adds default OTDA reconstruction to the unlocking script. T
 | Unlocking stack | Signing preimage, uncompressed public key, and 64-byte `r \|\| s` signature |
 | Signature modes | BIP143 and Chronicle OTDA, each with ALL, NONE, or SINGLE and optional ANYONECANPAY |
 
-The current source includes the [layout manifest](template/layout.json),
-[standard SM2 vector](template/sm2-standard.json),
-[complete payment vector](template/spend-all.json), and
-[16 signing preimages](template/sighash-modes.json). [v1.0.0 release](https://github.com/linzhm/bsv-script-lab/releases/tag/p2pkh-sm2-v1.0.0)
+The current source includes the [layout manifest](versions/v1.0.0/layout.json),
+[standard SM2 vector](versions/v1.0.0/sm2-standard.json),
+[complete payment vector](versions/v1.0.0/spend-all.json), and
+[16 signing preimages](versions/v1.0.0/sighash-modes.json). [v1.0.0 release](https://github.com/linzhm/bsv-script-lab/releases/tag/p2pkh-sm2-v1.0.0)
 
 ## Generate a locking script
 

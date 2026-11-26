@@ -10,7 +10,7 @@ Script Lab 使用 BIP340 带标签的挑战哈希和 32 字节的公钥横坐标
 
 ## 独立验签器复放
 
-两边沿用 BIP340 官方向量第 0 条的 32 字节消息与公钥横坐标，各自使用本身的签名格式。夹具构造单输入交易并显式提供上一输出。三份构建产物均通过 BSV Node 1.2.3 在仓库放宽脚本限制配置下的 `verifyscript`，以及固定版本的 chain-gang 验证。表内统计序列化脚本字节，包含压入见证所用的操作码。`scryptlib` 2.1.36 自带解释器以默认标志执行 `legacy` 默认构建产物时，返回 `SCRIPT_ERR_SCRIPT_SIZE`。[BIP340 向量](../template/bip340-vectors.csv) · [复放程序](../reference/compare_scrypt.py) · [隔离 regtest 配置](../../../tools/verify_node.sh)
+两边沿用 BIP340 官方向量第 0 条的 32 字节消息与公钥横坐标，各自使用本身的签名格式。夹具构造单输入交易并显式提供上一输出。三份构建产物均通过 BSV Node 1.2.3 在仓库放宽脚本限制配置下的 `verifyscript`，以及固定版本的 chain-gang 验证。表内统计序列化脚本字节，包含压入见证所用的操作码。`scryptlib` 2.1.36 自带解释器以默认标志执行 `legacy` 默认构建产物时，返回 `SCRIPT_ERR_SCRIPT_SIZE`。[BIP340 向量](../versions/v0.6.0/bip340-vectors.csv) · [复放程序](../reference/compare_scrypt.py) · [隔离 regtest 配置](../../../tools/verify_node.sh)
 
 | 验签器 | 锁定脚本字节 | 见证脚本字节 | 脚本合计字节 | chain-gang 中位耗时 | BSV Node RPC 中位耗时 |
 | --- | ---: | ---: | ---: | ---: | ---: |

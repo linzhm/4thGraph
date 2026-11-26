@@ -12,7 +12,7 @@ A SHA-256 one-time signature bound to a BSV transaction input. The full-key and 
 
 The ordered key has 256 pairs of commitments. A signature supplies the selected 32-byte secret for each digest bit, totaling 8,192 bytes. The full-key payment lock includes all public commitments. The smaller committed-key lock instead commits to the ordered public key and uses the missing hashes from the unlocking proof. Both bind the digest to the actual input in their documented payment formats.
 
-[Wire and Script specification](spec.md) · [Template measurements](../template/measurement.json) · [Mode vectors](../template/universal-vectors.json)
+[Wire and Script specification](spec.md) · [Template measurements](../versions/v0.1.0/measurements.json) · [Mode vectors](../versions/v0.1.0/universal-vectors.json)
 
 <a name="security"></a>
 
@@ -36,4 +36,4 @@ Install the pinned [requirements](../reference/requirements.txt) and run `bash p
 
 Follow the [unified Lamport wallet guide](sdk.en.md) to generate a full-key or committed-key output and connect an external signer. The signer returns the 8,192-byte raw signature over the requested digest. The wallet needs durable consumption records and a fresh key for change.
 
-[Reference developer workflow](../reference/README.md) · [Payment source](../reference/payment.py) · [Original funding and spend vector](../template/vector.json)
+[Reference developer workflow](../reference/README.md) · [Payment source](../reference/payment.py) · [Original funding and spend vector](../versions/v0.1.0/vector.json)

@@ -1,10 +1,10 @@
 # Reference implementation
 
-The wallet creates outputs from [the v0.2.0 template](../template/v0.2.0/template.hex) by default. The [v0.1.0 template](../template/template.hex) remains available for historical outputs. Its assembly is reproduced independently from [lock.asm](./asm/lock.asm). Conformance compares three owner vectors, validates three consecutive ordinary payments, and exercises the twelve paired sighash modes and four unpaired SINGLE modes. Both BSV Node and chain-gang must accept each valid complete input, including the two OTDA companion cases. This is input-level regtest validation with supplied UTXOs and explicit script flags.
+The wallet creates outputs from [the v0.2.0 template](../versions/v0.2.0/template.hex) by default. The [v0.1.0 template](../versions/v0.1.0/template.hex) remains available for historical outputs. Its assembly is reproduced independently from [lock.asm](./asm/lock.asm). Conformance compares three owner vectors, validates three consecutive ordinary payments, and exercises the twelve paired sighash modes and four unpaired SINGLE modes. Both BSV Node and chain-gang must accept each valid complete input, including the two OTDA companion cases. This is input-level regtest validation with supplied UTXOs and explicit script flags.
 
 Use Python 3.12 on Linux x86-64 with Git and a Rust toolchain available to build the pinned Python extension. Install the dependencies from requirements.txt before running the node comparison. It pins tx-engine to [8b60b71a12](https://github.com/linzhm/chain-gang/commit/8b60b71a12a69fdcb465d3e627dbf6f43d6ed081) from the fork's `fix/otda-complete-validation` branch. CI checks the installed Git commit before executing the full-input tests. The unified wallet SDK uses this reference environment for R1.
 
-Set `R1_OWNER_HASH160` to the recipient’s 20-byte HASH160 in hex. The canonical template’s embedded owner, layout vector C, and the [payment fixture](../template/spend-all.json) use the same publicly known test key. Outputs using that key are for offline and regtest use only.
+Set `R1_OWNER_HASH160` to the recipient’s 20-byte HASH160 in hex. The canonical template’s embedded owner, layout vector C, and the [payment fixture](../versions/v0.1.0/spend-all.json) use the same publicly known test key. Outputs using that key are for offline and regtest use only.
 
 ```sh
 cd projects/p2pkh-r1/reference
@@ -68,7 +68,7 @@ both independent engines.
 
 ## Optimized full-mode template
 
-The [candidate layout](../template/candidates/layout.json) pins the script
+The [candidate layout](../versions/v0.1.0/compiled/layout.json) pins the script
 bytes, SHA-256 fingerprint, owner HASH160 offset and signing modes. The
 wallet fills the 20-byte owner field to create the lock and compares all
 fixed bytes when recognizing an output. The assembler and field compiler
@@ -92,7 +92,7 @@ the default for the wallet generator and the existing SDKs.
 Call `sign_spend(..., compress_otda=True)` when Chronicle functional
 unlocking is available. For version 2 transactions with OTDA ALL
 (`0x61` or `0xe1`), the wallet starts with the
-[precomputed reconstruction program](../template/candidates/otda-all-reconstruct.hex)
+[precomputed reconstruction program](../versions/v0.1.0/compiled/otda-all-reconstruct.hex)
 and fills the output fields in transaction order. Only outputs matching
 the optimized template may use its reconstruction data. Other outputs
 are serialized literally. The wallet uses the literal preimage when the
@@ -136,12 +136,12 @@ support keeping the full-mode template for the SDK candidate.
 
 ### P2PKH-R1 v0.2.0
 
-The [versioned layout](../template/v0.2.0/layout.json) fixes the 46,302-byte lock
+The [versioned layout](../versions/v0.2.0/layout.json) fixes the 46,302-byte lock
 and its 3,913-byte reconstruction program. The generator defaults to v0.2.0.
 Use `--version 0.1.0` to reproduce an older output.
 The owner HASH160 occupies the same 20-byte field. The Python, TypeScript,
 Rust and Go SDKs recognize the prebuilt template. The three non-Python
-SDKs replay its [BIP143 ALL payment vector](../template/v0.2.0/spend-all.json)
+SDKs replay its [BIP143 ALL payment vector](../versions/v0.2.0/spend-all.json)
 with their ordinary signer callbacks.
 
 In the Python reference wallet, `sign_spend(..., compress_otda="paired")`

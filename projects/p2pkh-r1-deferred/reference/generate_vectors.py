@@ -14,8 +14,9 @@ from fixed_templates import LEGACY_TEMPLATE_VERSION, TEMPLATE_VERSION
 from fourthgraph.bsv.script import push
 from fourthgraph.bsv.transaction import CHRONICLE, SIGHASH_TYPES, Input, Transaction
 
-TEMPLATE = Path(__file__).resolve().parents[1] / 'template'
-RELEASE_TEMPLATE = TEMPLATE / f'v{TEMPLATE_VERSION}'
+VERSIONS = Path(__file__).resolve().parents[1] / 'versions'
+TEMPLATE = VERSIONS / f'v{LEGACY_TEMPLATE_VERSION}'
+RELEASE_TEMPLATE = VERSIONS / f'v{TEMPLATE_VERSION}'
 FIELDS = {
     'owner_hash160': (1, 20),
     'target_script_sha256': (22, 32),
