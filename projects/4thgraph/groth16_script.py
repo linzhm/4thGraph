@@ -94,13 +94,16 @@ def runar_proof(raw):
 class ScriptVerifier:
     def __init__(self, adapter, verification_key, directory):
         self.adapter = str(Path(adapter).resolve())
-        self.key_path = Path(directory).resolve() / "runar-vk.json"
-        self.key_path.write_text(json.dumps(runar_key(verification_key), sort_keys=True))
+        self.directory = Path(directory).resolve()
+        self.adapter_key = json.dumps(runar_key(verification_key), sort_keys=True)
         self.key_digest = sha256(verification_key).hexdigest()
 
     def emit(self, signals, proof=None):
-        request = {"VK": str(self.key_path), "Public": signals, "Proof": proof}
-        return bytes.fromhex(json.loads(checked([self.adapter], stdin=json.dumps(request))))
+        with TemporaryDirectory(prefix="runar-", dir=self.directory) as temporary:
+            key_path = Path(temporary) / "vk.json"
+            key_path.write_text(self.adapter_key, encoding="utf-8")
+            request = {"VK": str(key_path), "Public": signals, "Proof": proof}
+            return bytes.fromhex(json.loads(checked([self.adapter], stdin=json.dumps(request))))
 
     def compile(self, signals, owner):
         if not is_compressed_public_key(owner):
