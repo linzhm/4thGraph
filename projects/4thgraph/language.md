@@ -37,6 +37,7 @@ work: <step> <input> <word> <signer-role>
 join: <step> <left-work> <right-work> <word>
 gate: <step> <input> <word> <signer-role>
 split-authority: <signer-role>
+recovery: <block-height> <signer-role>
 independent-submit <gate-or-work-step>
 ```
 
@@ -45,6 +46,7 @@ independent-submit <gate-or-work-step>
 - `join:` 按顺序消费两个不同的工作步骤。汇合词具有 `u32 u32 -- route` 效果。声明次序决定结果的逻辑次序，以及拆分的工作输出索引与汇合的输入次序。
 - `gate:` 可选。其词具有 `u32 -- cell` 效果，只有非零结果允许继续。完整融合先验证条件，再运行分支和汇合。拆分时，如果门和拆分的授权角色相同、数据和签名可同时取得且没有独立边界，则同一笔交易执行两步。独立门只创建已承诺的拆分锁，拆分随后绑定 `gate-step:0`。同一规则适用于两个版本的交易。
 - `split-authority:` 指定创建工作输出的签名角色。拆分完成后，每支只需对应的签名角色即可提交。
+- `recovery:` 给部署、独立门、工作和结果的可花费输出增加超时退款分支。指定的十进制区块高度须在 1 到 499,999,999 之间。锁验证实际交易的 `nLockTime` 等于该值、输入序列为 `0xfffffffe`，并要求指定角色签署。每笔退款只花费一个实际中间 outpoint，发送至该角色的 P2PK，价值为原输出扣除固定 1,000 sat 费用。`nLockTime = h` 的退款最早可进入高度 `h+1` 的区块。常规路径和退款路径花费同一 UTXO。
 - 同一程序中，重复的外部输入名表示同一个 `u32` 值。例如 `work: a x double alice` 和 `work: b x inc bob` 都读取 `x`。融合时见证传一次 `x`，锁将其复制到各使用位置。拆分时，`split` 在每个使用 `x` 的工作锁开头写入相同的值，并核对整个输出向量。若独立的门也读取 `x`，门先将其写入拆分锁，再由拆分传给工作锁。运行器从实际花费的前输出读取该值。各分支仍可独立提交。
 - `independent-submit` 将工作步骤声明为可独立提交的交易边界。存在该约束时，自动调度选择拆分，强制融合报告源码行号。编译器也接受原型曾使用的后缀写法 `<work-step> independent-submit`。
 

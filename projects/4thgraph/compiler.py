@@ -13,8 +13,9 @@ from wordsets import (
 
 PROJECT_NAME = "4thGraph"
 PROJECT_DESCRIPTION = "A Forth compiler for BSV Script and multi-transaction workflows."
-PROJECT_VERSION = "0.1.3"
+PROJECT_VERSION = "0.1.4"
 GATE_BOUNDARIES = ("auto", "merged", "separate")
+LOCKTIME_THRESHOLD = 500_000_000
 
 
 class CompileError(ValueError):
@@ -106,6 +107,12 @@ class Work:
 
 
 @dataclass(frozen=True)
+class Recovery:
+    height: int
+    owner: str
+
+
+@dataclass(frozen=True)
 class Program:
     words: dict[str, Word]
     work: tuple[Work, Work]
@@ -115,6 +122,7 @@ class Program:
     independent: tuple[tuple[str, int], ...]
     optional_wordsets: tuple[str, ...]
     gate: Work | None = None
+    recovery: Recovery | None = None
 
     @property
     def input_order(self):
@@ -275,6 +283,7 @@ class SourceCompiler:
         self.gate = None
         self.join = None
         self.operator = None
+        self.recovery = None
         self.independent = []
         for token in self.tokens:
             try:
@@ -361,6 +370,13 @@ class SourceCompiler:
                 if self.operator is not None:
                     raise token.error("expected one split authority")
                 self.operator = identifier(tokens, token, "signer role")
+            case "recovery:":
+                if self.recovery is not None:
+                    raise token.error("expected at most one recovery policy")
+                height = required(tokens, token, "decimal block height")
+                if not re.fullmatch(r"[0-9]{1,9}", height.text) or not 0 < int(height.text) < LOCKTIME_THRESHOLD:
+                    raise height.error("recovery height must be a block height from 1 to 499999999")
+                self.recovery = Recovery(int(height.text), identifier(tokens, token, "recovery signer role"))
             case "independent-submit":
                 self.independent.append((identifier(tokens, token, "gate or work step"), token.line))
             case name if name in self.work or self.gate is not None and name == self.gate.name:
@@ -392,7 +408,7 @@ class SourceCompiler:
             if step not in step_names:
                 raise CompileError(f"line {line}: unknown gate or work step {step!r}")
         return Program(self.words, (self.work[left], self.work[right]), word, name, self.operator,
-                       tuple(self.independent), self.optional_wordsets, self.gate)
+                       tuple(self.independent), self.optional_wordsets, self.gate, self.recovery)
 
 
 def parse(source):
