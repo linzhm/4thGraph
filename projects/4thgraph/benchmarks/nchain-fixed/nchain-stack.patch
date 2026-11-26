@@ -1,0 +1,12 @@
+diff --git a/src/zkscript/util/utility_functions.py b/src/zkscript/util/utility_functions.py
+index cfabba2..172aa90 100644
+--- a/src/zkscript/util/utility_functions.py
++++ b/src/zkscript/util/utility_functions.py
+@@ -21,6 +21,7 @@ def optimise_script(script: Script) -> Script:
+         The optimised script with redundant operations removed.
+     """
+     patterns = {
++        ("OP_DROP", "OP_DROP"): ["OP_2DROP"],
+         (
+             "OP_TOALTSTACK",
+             "OP_FROMALTSTACK",

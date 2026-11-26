@@ -228,6 +228,8 @@ PYTHONPATH=. bash shared/verify_node.sh --profile default -- \
 
 ## Groth16 链上验证器
 
+[同一份 BLS12-381 Groth16 证明的 nChain 对照实测与复现](benchmarks/nchain-fixed/README.md)
+
 ### BLS12-381
 
 `groth16_bls12381.py` 从 snarkjs 验证密钥和部署时已知的公开信号生成 BSV 锁。宿主预计算固定配对项及 `IC` 线性组合。Script 检查证明的坐标范围、曲线方程、素数阶子群和配对关系。Miller 循环用 Jacobian 坐标，将余数幂合入循环。余数检查替代最终指数运算，见证省去斜率和逆元。
