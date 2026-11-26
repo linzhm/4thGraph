@@ -151,3 +151,19 @@ REQUIRE BSV
     ( The first chain inserts BIN2NUM before the increment. )
     compact-buffer-append op-swap compact-address-increment
 ;
+
+: compact-v8-chain-start ( script -- script )
+    ( The buffer is on the main stack between chains. Park its tail while hashing. )
+    32 bsv-num op-split op-fromaltstack op-swap op-toaltstack
+;
+
+: compact-v8-chain-tail ( script -- script )
+    ( The delta sits below twelve step suffixes, selector, endpoint, prefix and address. )
+    op-16 op-pick op-add op-2swap
+    op-fromaltstack op-swap op-cat
+;
+
+: compact-v8-chain-end ( script -- script )
+    ( Move the address to the top. The first chain inserts BIN2NUM here. )
+    op-2swap compact-v8-chain-tail
+;

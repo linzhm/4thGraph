@@ -65,11 +65,11 @@ def _repeat_bytes(fragment, count, *, trim=False):
 
 def _compact_fragment_programs(first, chain, last, *, profile):
     from fourthgraph.bsv.pushtx import REVERSE32_ON_STACK
-    from script import MESSAGE_BYTE_SUFFIX, MESSAGE_NIBBLE_SUFFIX, _compact_builder
+    from script import MESSAGE_BYTE_SUFFIX, NIBBLE_SUFFIXES, _compact_builder
 
     builder = _compact_builder()
-    trim = profile == "compact-v7"
-    digit_suffix = MESSAGE_NIBBLE_SUFFIX if trim else MESSAGE_BYTE_SUFFIX
+    trim = profile in NIBBLE_SUFFIXES
+    digit_suffix = NIBBLE_SUFFIXES.get(profile, MESSAGE_BYTE_SUFFIX)
     hash_suffix = builder.emit("compact-local-hash-pair", b"") + asm("OP_ENDIF")
     reversal = (_repeat_bytes(asm("OP_1 OP_SPLIT"), N - 1, trim=trim)
                 + _repeat_bytes(asm("OP_SWAP OP_CAT"), N - 1, trim=trim) + asm("OP_CAT"))
@@ -87,28 +87,29 @@ def _compact_fragment_programs(first, chain, last, *, profile):
 
 @cache
 def compact_pattern(profile="compact"):
-    from script import _compact_chain, _first_address_offset, _message_chains, _payment_script
+    from script import (
+        BUFFERED_PROFILES, NIBBLE_SUFFIXES, _compact_chain, _first_address_offset, _message_chains, _payment_script,
+    )
 
     marker = bytes(range(KEY_BYTES))
     raw = _payment_script(marker, cached_constants=profile)
     first, tail = raw.split(marker[:N], 1)
     middle, last = tail.split(marker[N:], 1)
     chain = _compact_chain(profile)
-    normalize_first = profile == "compact-v7"
-    lead, tail = middle.split(_message_chains(chain, normalize_first=normalize_first), 1)
+    lead, tail = middle.split(_message_chains(chain, profile), 1)
     gap, end = tail.split(chain * (CHAINS - 2 * N), 1)
 
     # WOTSP-SHA2_256 uses 64 message chains and three checksum chains.
     # Keep one copy for the checksum and double the other six times.
-    if profile in ("compact-v5", "compact-v6", "compact-v7"):
+    if profile in ("compact-v5", *BUFFERED_PROFILES):
         first_program, chain_program, last_program = _compact_fragment_programs(first, chain, last, profile=profile)
     else:
         first_program, chain_program, last_program = map(push, (first, chain, last))
     program = first_program + push(lead) + chain_program + asm("OP_DUP")
     program += asm("OP_DUP OP_CAT") * 6
-    if normalize_first:
+    if profile in NIBBLE_SUFFIXES:
         # OP_1NEGATE pushes 0x81, the byte encoding of BIN2NUM in the lock.
-        program += number(_first_address_offset(chain)) + asm("OP_SPLIT OP_1NEGATE OP_SWAP OP_CAT OP_CAT")
+        program += number(_first_address_offset(chain, profile)) + asm("OP_SPLIT OP_1NEGATE OP_SWAP OP_CAT OP_CAT")
     program += asm("OP_ROT OP_SWAP OP_CAT")
     program += push(gap) + asm("OP_CAT OP_SWAP OP_DUP OP_DUP OP_CAT OP_CAT OP_CAT")
     program += push(end) + asm("OP_CAT") + last_program

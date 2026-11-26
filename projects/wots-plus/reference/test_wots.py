@@ -9,8 +9,8 @@ import unittest
 from fixtures import fixture_seeds, funding_transaction, mode_fixture, vector_document
 from payment import sign_payment
 from script import (
-    CACHE_PROFILES, COMPACT_PROFILES, COMPANION_CODE, MESSAGE_NIBBLE_SUFFIX, ORDINARY_CODE, _message_digits,
-    locking_script,
+    BUFFERED_PROFILES, CACHE_PROFILES, COMPACT_PROFILES, COMPANION_CODE, NIBBLE_SUFFIXES, ORDINARY_CODE,
+    _message_digits, locking_script,
 )
 from fourthgraph.bsv.evaluate import ScriptError, evaluate
 from fourthgraph.bsv.pushtx import N as CURVE_ORDER, R as BINDING_R, authorization_checks, binding_der, check_binding
@@ -77,11 +77,12 @@ class WotsTests(unittest.TestCase):
 
     def test_bitwise_digest_decoder_matches_for_every_byte(self):
         reference = _message_digits(step_counts=True)
-        bitwise = _message_digits(step_counts=True, byte_suffix=MESSAGE_NIBBLE_SUFFIX)
-        for value in range(256):
-            with self.subTest(value=value):
-                stack = [b"fixture signature", bytes([value]) * N]
-                self.assertEqual(evaluate(bitwise, stack), evaluate(reference, stack))
+        for profile, suffix in NIBBLE_SUFFIXES.items():
+            bitwise = _message_digits(step_counts=True, byte_suffix=suffix)
+            for value in range(256):
+                with self.subTest(profile=profile, value=value):
+                    stack = [b"fixture signature", bytes([value]) * N]
+                    self.assertEqual(evaluate(bitwise, stack), evaluate(reference, stack))
 
     def test_compact_authorization_for_every_flag_byte(self):
         _, _, spend = mode_fixture(0x41)
@@ -134,7 +135,7 @@ class WotsTests(unittest.TestCase):
             with self.subTest(seed=seed):
                 key = public_key(secret, seed)
                 locks = [locking_script(key, transaction=False, cached_constants=profile)
-                         for profile in ("compact-v6", "compact-v7")]
+                         for profile in BUFFERED_PROFILES]
                 for digest in (bytes(N), b"\xff" * N, bytes(range(N))):
                     signature = sign_digest(secret, seed, digest)
                     for lock in locks:
