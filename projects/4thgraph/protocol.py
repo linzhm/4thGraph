@@ -928,6 +928,8 @@ def main():
     action.add_argument("--capabilities", action="store_true", help="list the supported Forth and BSV words")
     action.add_argument("--entry", help="compile one annotated Forth word to Script without a transaction plan")
     cli.add_argument("--version", action="version", version=f"%(prog)s {PROJECT_VERSION}")
+    cli.add_argument("--assume-input-ranges", action="store_true",
+                     help="for --entry, rely on the caller to validate declared input ranges and encodings")
     cli.add_argument("--mode", choices=("auto", "fused", "split"), default="auto")
     cli.add_argument("--target", choices=TARGETS, default=DEFAULT_TARGET, help="permitted transaction versions")
     cli.add_argument("--optimize", choices=OPTIMIZATIONS, default=BASELINE)
@@ -945,6 +947,8 @@ def main():
         cli.error("--objective requires --search")
     if args.entry and (args.search or args.gate_boundary != "auto"):
         cli.error("transaction search and boundaries require a transaction build")
+    if args.assume_input_ranges and args.entry is None:
+        cli.error("--assume-input-ranges requires --entry")
     if args.capabilities:
         print(json.dumps({"project": PROJECT_NAME, "compiler_version": PROJECT_VERSION, "description": PROJECT_DESCRIPTION,
                           **capabilities(), "optimizations": OPTIMIZATIONS, "join_witnesses": JOIN_WITNESSES,
@@ -964,11 +968,16 @@ def main():
             word = source.words.get(args.entry.casefold())
             if word is None:
                 raise CompileError(f"undefined entry word {args.entry!r}")
-            compiled = compile_word(word, args.optimize)
+            compiled = compile_word(word, args.optimize, check_input_ranges=not args.assume_input_ranges)
             result = {"project": PROJECT_NAME, "compiler_version": PROJECT_VERSION, "schema_version": 1,
                       "entry": args.entry, "takes": word.takes, "gives": word.gives,
                       "enabled_optional_wordsets": source.optional_wordsets, "optimization": args.optimize,
                       "script_hex": compiled.script.hex(), **compiled.describe()}
+            if word.ranges:
+                result["ranges"] = {item.name: {"base": item.base, "lower": item.lower,
+                                                "upper_exclusive": item.upper} for item in word.ranges}
+                if any(item.name in word.takes for item in word.ranges):
+                    result["input_range_checks"] = "assumed" if args.assume_input_ranges else "emitted"
         else:
             raw_keys = json.loads(args.keys.read_text())
             if not isinstance(raw_keys, dict) or any(not isinstance(key, str) for key in raw_keys.values()):

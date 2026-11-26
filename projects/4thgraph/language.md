@@ -26,12 +26,47 @@
 
 `+` 接受两个 cell。 `u32+` 接受两个 `u32`。需要跨越类型边界的源码应写出转换，例如 `1 cell>u32 u32+`。
 
+## 整数范围
+
+`range: <name> <base> <lower> <upper> ;` 声明下界包含、上界排除的整数区间。基类型可用 `cell`、`u32`、`route` 和 `script-int`。边界可用十进制或 `#`、`$`、`%` 前缀整数。声明读取数学整数。普通 Forth 字面量仍遵循 64 位 cell 语义。
+
+```forth
+range: r1-digit script-int 0 16 ;
+range: r1-q-depth script-int 5 51 ;
+
+bsv-effect: q-pick-depth r1-digit -- r1-q-depth ;
+: q-pick-depth 3 cell>int int* 50 cell>int swap int- ;
+```
+
+`cell>int` 保留数值并转换为 ScriptNum 类型。 `int+`、`int-`、`int*` 按 Script 整数运算，`int-rem` 保留被除数的余数符号并拒绝零除数。编译器跟踪字面量、计算结果和分支汇合的区间。调用及返回值必须满足相应签名。证明不足时报源码位置。
+
+直接导出的词默认检查所有带范围类型的入口参数，验证规范 ScriptNum 编码和区间。已由调用方验证的入口可用 `--entry <word> --assume-input-ranges` 省去自动检查。产物 JSON 给出范围及入口检查状态。显式的 `check-range <name>` 校验栈顶值并保留它，支持在词内缩小区间，两种入口模式都执行这条检查。原始字节须先解码为相应基类型。
+
+`--optimize safe` 和 `stack` 在证明除数为正、操作数符合数值长度约束且被除数的绝对值小于除数后省掉 `int-rem`。编译报告记录位置信息、参与证明的区间和字节差值。 [R1 窗口示例](../p2pkh-r1/experiments/forth/window-ranges.fth)
+
+### 窗口范围对照
+
+[window-ranges.fth](../p2pkh-r1/experiments/forth/window-ranges.fth) 提取了 R1 数字和选点深度的类型化计算。用 `q-depth-probe` 比较入口检查的成本。 `safe` 证明深度在 `[5, 51)`，省去用于对照的模 64 运算。入口的规范编码与范围检查占 9 B。
+
+| q-depth-probe | 默认验证入口 | 由调用方验证入口 |
+| --- | ---: | ---: |
+| `baseline` | 18 B | 9 B |
+| `safe` | 15 B | 6 B |
+
+```sh
+root=projects/4thgraph
+source=projects/p2pkh-r1/experiments/forth/window-ranges.fth
+PYTHONPATH=. python "$root/protocol.py" "$source" --entry q-depth-probe --optimize safe
+PYTHONPATH=. python "$root/protocol.py" "$source" --entry q-depth-probe --optimize safe --assume-input-ranges
+```
+
 ## 交易声明
 
 顶层声明读取符号参数。各声明不接触运行时 Forth 数据栈。
 
 ```text
 bsv-use <optional-wordset>
+range: <name> <base> <lower> <upper> ;
 bsv-effect: <word> <input-types...> -- <output-types...> ;
 work: <step> <input> <word> <signer-role>
 join: <step> <left-work> <right-work> <word>

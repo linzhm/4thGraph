@@ -4,32 +4,13 @@ from dataclasses import asdict, dataclass, replace
 
 from shared.script import asm
 
-from compiler import CompileError, Conditional, Shuffle, Token, expanded, lower, require_script
+from compiler import CompileError, Conditional, Shuffle, Token, entry_range_checks, expanded, lower, require_script
+from ranges import PRIMITIVE_NAMES, Slot, primitive_outputs, raw_interval, remainder_is_identity
 from stack_schedule import Graph
 from wordsets import NUMERIC_RANGES, PRIMITIVES, SHUFFLES, U32, WRAP_CELL, WRAP_U32, Literal
 
 BASELINE = "baseline"
 OPTIMIZATIONS = (BASELINE, "safe", "stack")
-
-
-@dataclass(frozen=True)
-class Slot:
-    kind: str
-    bounds: tuple[int, int] | None
-
-    @classmethod
-    def of(cls, kind):
-        return cls(kind, NUMERIC_RANGES.get(kind))
-
-    @classmethod
-    def literal(cls, value):
-        bounds = (value.value, value.value) if isinstance(value.value, int) else None
-        return cls(value.kind, bounds)
-
-    def merge(self, other):
-        if self.bounds is None or other.bounds is None:
-            return Slot.of(self.kind)
-        return Slot(self.kind, (min(self.bounds[0], other.bounds[0]), max(self.bounds[1], other.bounds[1])))
 
 
 @dataclass(frozen=True)
@@ -72,43 +53,21 @@ class CompiledWord:
         return {"script_bytes": len(self.script), "rewrites": rewrites}
 
 
-def raw_interval(name, args):
-    if name == "1+":
-        a, b = args[0].bounds
-        return a + 1, b + 1
-    if name == "1-":
-        a, b = args[0].bounds
-        return a - 1, b - 1
-    if name == "negate":
-        a, b = args[0].bounds
-        return -b, -a
-    a, b = args[0].bounds
-    c, d = args[1].bounds
-    if name in {"+", "u32+"}:
-        return a + c, b + d
-    if name == "-":
-        return a - d, b - c
-    corners = a * c, a * d, b * c, b * d
-    return min(corners), max(corners)
-
-
 def encoded_primitive(node, args):
-    name = next((name for name, primitive in PRIMITIVES.items() if node is primitive), None)
-    gives = tuple(map(Slot.of, node.gives))
-    if node.comparison:
-        return node.code, (Slot("cell", (-1, 0)),), None
-    if name == "u32>cell":
-        return node.code, (Slot("cell", args[0].bounds),), None
+    name = PRIMITIVE_NAMES.get(id(node))
+    gives = primitive_outputs(node, args)
     if name == "cell>u32" and args[0].bounds[0] >= 0:
         if args[0].bounds[1] < U32:
-            return b"", (Slot("u32", args[0].bounds),), "u32-conversion-in-range"
+            return b"", gives, "u32-conversion-in-range"
         return WRAP_U32, gives, "u32-remainder-nonnegative"
     if name in {"+", "-", "*", "1+", "1-", "negate", "u32+"}:
         lo, hi = raw_interval(name, args)
         result = gives[0]
         if result.bounds[0] <= lo <= hi <= result.bounds[1]:
             wrap = WRAP_CELL if result.kind == "cell" else WRAP_U32
-            return node.code[:-len(wrap)], (Slot(result.kind, (lo, hi)),), "arithmetic-in-range"
+            return node.code[:-len(wrap)], gives, "arithmetic-in-range"
+    if name == "int-rem" and remainder_is_identity(args):
+        return asm("OP_DROP"), gives, "integer-remainder-in-range"
     return node.code, gives, None
 
 
@@ -148,7 +107,8 @@ def build_block(body, stack, rewrites, *, schedule=False):
             start = len(stack) - argc
             args = tuple(stack[start:])
             pushes = code[-argc:] if argc else ()
-            if node.code is not None and argc and len(pushes) == argc and all(op.literal is not None for op in pushes):
+            if (node.code is not None and not node.may_fail and argc and len(pushes) == argc
+                    and all(op.literal is not None for op in pushes)):
                 value, = node.run(*(op.literal.value for op in pushes))
                 literal = Literal(node.gives[0], value)
                 output = Slot.literal(literal)
@@ -166,12 +126,21 @@ def build_block(body, stack, rewrites, *, schedule=False):
                     takes = args[:-1]
                     script = asm("OP_1ADD") + script[1:]
                     rewrites.append(Rewrite("add-one-instruction", *position, args))
-            if rule:
+            if rule == "integer-remainder-in-range":
+                original_bytes = len(node.code)
+                if code and code[-1].literal is not None:
+                    original_bytes += len(code.pop().script)
+                    depth -= 1
+                    takes = args[:-1]
+                    script = b""
+                rewrites.append(Rewrite(rule, *position, args, (original_bytes, len(script)),
+                                        "positive bounded divisor exceeds the dividend magnitude"))
+            elif rule:
                 rewrites.append(Rewrite(rule, *position, args))
             stack[start:] = outputs
             # Arbitrary byte strings may exceed a Script stack resource limit
             # when used by a compound primitive. Keep their evaluation order.
-            total = all(part.kind in NUMERIC_RANGES for part in (*takes, *outputs))
+            total = not node.may_fail and all(part.kind in NUMERIC_RANGES for part in (*takes, *outputs))
             code.append(Operation(source, takes, outputs, script, depth,
                                   comparison=node.comparison, total=total))
     return schedule_blocks(code, rewrites) if schedule else tuple(code)
@@ -224,16 +193,17 @@ def emit(operations):
     return b"".join(op.script for op in operations)
 
 
-def compile_word(word, optimization=BASELINE):
+def compile_word(word, optimization=BASELINE, *, check_input_ranges=True):
     if optimization not in OPTIMIZATIONS:
         raise ValueError(f"unknown optimization {optimization!r}")
     require_script(word)
     if optimization == BASELINE:
-        return CompiledWord(lower(word))
+        return CompiledWord(lower(word, check_input_ranges=check_input_ranges))
     rewrites = []
     try:
-        operations = build_block(word.body, [Slot.of(kind) for kind in word.takes], rewrites,
+        operations = build_block(word.body, list(word.slots(word.takes)), rewrites,
                                  schedule=optimization == "stack")
     except RecursionError as error:
         raise CompileError("expanded conditional nesting exceeds the compiler's recursion limit") from error
-    return CompiledWord(emit(operations), operations, tuple(rewrites))
+    prefix = entry_range_checks(word) if check_input_ranges else b""
+    return CompiledWord(prefix + emit(operations), operations, tuple(rewrites))
