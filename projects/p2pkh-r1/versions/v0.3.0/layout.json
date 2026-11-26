@@ -1,0 +1,42 @@
+{
+  "template_version": "0.3.0",
+  "script_file": "template.hex",
+  "script_bytes": 45776,
+  "script_sha256": "2cbc8db174a63a351ba43165efa34915e11a34144473b0be288aba8b94769948",
+  "owner_hash160": {
+    "offset": 208,
+    "length": 20
+  },
+  "fixed_bytes_sha256": "a488be57674d3f16f5613200a324303ae2916dff2a8ed347971257ab1104bf0f",
+  "supported_sighash_types": [
+    "41",
+    "42",
+    "43",
+    "61",
+    "62",
+    "63",
+    "c1",
+    "c2",
+    "c3",
+    "e1",
+    "e2",
+    "e3"
+  ],
+  "ordinary_script_code_hex": "68ac",
+  "compressed_preimage": {
+    "spend_transaction_version": 2,
+    "sighash_types": [
+      "61",
+      "63",
+      "e1",
+      "e3"
+    ],
+    "program_file": "otda-reconstruct.hex",
+    "program_bytes": 3910,
+    "program_sha256": "1591415f56edb9786470a16c648848a70f6006efd22f7dffc407a6395fea39bd"
+  },
+  "construction": "previous-forth",
+  "build_source": {
+    "source_sha256": "a4d786453d2528f54a323027580ffd253ededa42e55a6374917b1dc7f7540b09"
+  }
+}

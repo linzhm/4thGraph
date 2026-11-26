@@ -12,7 +12,7 @@
 
 付款人将收款人未压缩 P-256 公钥的 20 字节 HASH160 写入锁定脚本的 `[208, 228)`。花费者提供公钥，并对当前输入的授权签名。BIP143 与 Chronicle OTDA 均支持 ALL、NONE、SINGLE，可组合 ANYONECANPAY。支持 Chronicle 功能解锁的版本 2 交易，可以在解锁时重建符合条件的输出，按原字节恢复签名原文。
 
-通过固定字节指纹区分 v0.2.0 和 v0.1.0。钱包按实际上一输出选择验签路径。 [协议与签名覆盖范围](spec.zh-CN.md) · [v0.2.0 布局](../template/v0.2.0/layout.json) · [v0.1.0 布局](../template/layout.json)
+通过固定字节指纹区分 v0.2.0 和 v0.1.0。钱包按实际上一输出选择验签路径。 [协议与签名覆盖范围](spec.zh-CN.md) · [v0.2.0 布局](../versions/v0.2.0/layout.json) · [v0.1.0 布局](../versions/v0.1.0/layout.json)
 
 <a name="security"></a>
 
@@ -28,7 +28,7 @@
 
 验收覆盖 12 种签名类型、两种交易版本、配对与无配对、三种规则上下文和九类授权情况，每份锁共 1,296 项。独立引擎核对声明的 Chronicle 子集。普通 BIP143 ALL 的解锁是 326 字节。两进两出整笔交易从 v0.1.0 的 119,934 字节降到 v0.2.0 的 93,374 字节。
 
-在仓库根目录安装[参考实现依赖](../reference/requirements.txt)，运行 `bash projects/p2pkh-r1/reference/verify.sh`。 [验收矩阵](../reference/acceptance.md) · [v0.2.0 付款向量](../template/v0.2.0/spend-all.json) · [基准结果](../reference/README.md)
+在仓库根目录安装[参考实现依赖](../reference/requirements.txt)，运行 `bash projects/p2pkh-r1/reference/verify.sh`。 [验收矩阵](../reference/acceptance.md) · [v0.2.0 付款向量](../versions/v0.2.0/spend-all.json) · [基准结果](../reference/README.md)
 
 <a name="sdk"></a>
 

@@ -18,7 +18,7 @@ projects/p2pkh-r1-deferred/workspace/venv/bin/python -m pip install -r projects/
 ```ts
 import { WalletClient } from "./sdk/typescript/index.ts";
 
-const deferred = new WalletClient("p2pkh-r1-deferred", { ...config, template: "v0.2.0" });
+const deferred = new WalletClient("p2pkh-r1-deferred", { ...config, template: "v0.3.0" });
 const shortLock = deferred.createLock({ publicKey: receiveKeyHex, valueSats });
 const prevout = deferred.prevoutFromFunding(fundingTxHex, fundingVout);
 const commitment = deferred.recognize({
@@ -55,4 +55,4 @@ SCRIPT_LAB_SDK_PYTHON="$PWD/projects/p2pkh-r1-deferred/workspace/venv/bin/python
 
 确认后，用启用交易的最终 txid 和输出索引登记新的 R1 outpoint。广播延迟或链重组改变依赖的父交易时，先从链视图核对短锁和启用后的输出，再创建子交易。[R1 花费流程](../../p2pkh-r1/docs/sdk.zh-CN.md#quickstart)
 
-[启用协议](spec.zh-CN.md) · [十二种签名类型向量](../template/v0.2.0/sighash-modes.json) · [参考交易构造](../reference/README.md)
+[启用协议](spec.zh-CN.md) · [十二种签名类型向量](../versions/v0.3.0/sighash-modes.json) · [参考交易构造](../reference/README.md)

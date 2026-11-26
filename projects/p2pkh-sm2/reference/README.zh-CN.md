@@ -46,9 +46,9 @@ bash verify.sh
 
 收款哈希全为零时，锁定脚本长 144,925 字节，SHA-256 为
 `196dfcb8244e863521447c7069297d31938fbd80a83d5976af618cf7fbcf9462`。
-生成器和 Python 脚本构造接口默认使用模板编号 `1`。[布局清单](../template/layout.json)
-固定了基准字节码。[付款向量](../template/spend-all.json)记录了一笔完整的 BIP143 付款。
-[16 个确定性预映像](../template/sighash-modes.json)覆盖全部有配对模式和各种无配对
+生成器和 Python 脚本构造接口默认使用模板编号 `1`。[布局清单](../versions/v1.0.0/layout.json)
+固定了基准字节码。[付款向量](../versions/v1.0.0/spend-all.json)记录了一笔完整的 BIP143 付款。
+[16 个确定性预映像](../versions/v1.0.0/sighash-modes.json)覆盖全部有配对模式和各种无配对
 SINGLE 模式。
 
 脚本执行所有 SM3 压缩轮。实现复用循环移位和取模所需的二次幂常量，用较短的指令访问
@@ -57,7 +57,7 @@ OTDA，包括混用签名模式的输入、全 SM2 的两进两出付款、由�
 预映像，以及跨越 Chronicle 激活边界的花费。激活测试两侧都使用交易版本 1，以便只
 检验激活标志带来的差异。
 
-[标准向量](../template/sm2-standard.json) · [BSV Node 源码](https://github.com/bitcoin-sv/bitcoin-sv/tree/6504a3aff65ba97c0f6c80962b033e35ecbfed4b)
+[标准向量](../versions/v1.0.0/sm2-standard.json) · [BSV Node 源码](https://github.com/bitcoin-sv/bitcoin-sv/tree/6504a3aff65ba97c0f6c80962b033e35ecbfed4b)
 · [chain-gang 源码](https://github.com/linzhm/chain-gang/tree/8b60b71a12a69fdcb465d3e627dbf6f43d6ed081)
 
 <a name="otda-constructor"></a>
@@ -68,10 +68,10 @@ OTDA，包括混用签名模式的输入、全 SM2 的两进两出付款、由�
 
 ```sh
 python projects/p2pkh-sm2/reference/generate_otda_constructor.py /tmp/sm2-otda.hex
-cmp /tmp/sm2-otda.hex projects/p2pkh-sm2/template/otda-constructor.hex
+cmp /tmp/sm2-otda.hex projects/p2pkh-sm2/versions/v1.1.0/otda-constructor.hex
 ```
 
-构造器测试逐字节比对预映像、公钥和签名三项栈值，并由 BSV Node 和 chain-gang 验证完整花费。[布局与指纹](../template/layout.json) · [钱包接入](../docs/sdk.zh-CN.md)
+构造器测试逐字节比对预映像、公钥和签名三项栈值，并由 BSV Node 和 chain-gang 验证完整花费。[布局与指纹](../versions/v1.1.0/layout.json) · [钱包接入](../docs/sdk.zh-CN.md)
 
 ## SignedData 付款接入
 

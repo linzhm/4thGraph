@@ -25,4 +25,12 @@
 
 ## Project workspaces
 
-Run `bash tools/setup-workspaces.sh` from the repository root to create Git-ignored build, cache, and log directories in each project’s `workspace/`. Keep reference implementations, fixed transaction vectors, and comparison experiments with the project. Store selected replay records there and link them from the showcase. [Install 4thGraph](../docs/install.md) · [Shared wallet SDK](../sdk/README.md) · [Showcase](../showcase/README.md)
+Run `bash tools/setup-workspaces.sh` from the repository root to create Git-ignored build, cache, and log directories in each project’s `workspace/`. The project homepage leads to its protocol and integration guide. Reference code, build entry points and test runners live with the project. [Install 4thGraph](../docs/install.md) · [Shared wallet SDK](../sdk/README.md) · [Showcase](../showcase/README.md)
+
+## Versioned project data
+
+`versions/index.json` lists each project's versions in order. `current` selects the current version and `next` identifies the next round when its data is available. `sdk_default` records the wallet template version when the SDK uses a versioned selector.
+
+Each `versions/vX.Y.Z/manifest.json` points to the previous version, lists its compiled artifacts, public fixtures and measurements, and gives the integration guide and commands to build and verify from the repository root. Artifact, fixture and evidence paths are relative to the version directory. Integration and optional `shared_data` paths are relative to the project. `shared_data` points to identical data in earlier versions. Optional `requires` names another project's exact version.
+
+For the next round, use the current version as the comparison baseline. Save the selected lock, corresponding reconstruction, fixtures and replay results in the new version directory. Update the index and homepage when that round is selected. Projects use the repository's existing baseline as their first version when they have no prior version number. Run `PYTHONPATH=src:. python -m unittest discover -s tests -p test_layout.py` to check the version catalog and links. [P2PKH-R1 version index](p2pkh-r1/versions/index.json) · [v0.7.0 build and replay](p2pkh-r1/versions/v0.7.0/manifest.json)

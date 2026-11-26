@@ -10,7 +10,9 @@ from fourthgraph.bsv.otda_reconstruction import Reconstruction
 from fourthgraph.bsv.script import push
 from fourthgraph.bsv.transaction import Transaction,Input,Output,preimage_all,amount
 
-MANIFEST=Path(__file__).resolve().parents[1]/'template/layout.json'
+VERSIONS = Path(__file__).resolve().parents[1] / "versions"
+MANIFEST = VERSIONS / "v1.0.0/layout.json"
+CONSTRUCTOR_LAYOUT = VERSIONS / "v1.1.0/layout.json"
 RECONSTRUCT_ALL = frozenset((0x61, 0xe1))
 RECONSTRUCT_SINGLE = frozenset((0x63, 0xe3))
 
@@ -57,8 +59,8 @@ def recognize(raw):
 
 @cache
 def _otda_pattern():
-    layout = json.loads(MANIFEST.read_text())['otda_constructor']
-    program = bytes.fromhex(MANIFEST.with_name(layout['file']).read_text(encoding='ascii'))
+    layout = json.loads(CONSTRUCTOR_LAYOUT.read_text())['otda_constructor']
+    program = bytes.fromhex(CONSTRUCTOR_LAYOUT.with_name(layout['file']).read_text(encoding='ascii'))
     if len(program) != layout['bytes'] or sha256(program).hexdigest() != layout['sha256']:
         raise ValueError('SM2 OTDA constructor differs from its manifest')
     template, start = _canonical()

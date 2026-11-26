@@ -33,6 +33,7 @@ def r1_vectors(project, directory, node):
     deferred = project == "p2pkh-r1-deferred"
     layouts = [("v0.2.0", False), ("v0.1.0", False)]
     if deferred:
+        layouts.insert(0, ("v0.3.0", False))
         layouts.append(("v0.1.0", True))
     for profile, embedded_key in layouts:
         yield from r1_layout_vectors(project, directory, node, adapter, private, public_key,
@@ -49,7 +50,7 @@ def r1_layout_vectors(project, directory, node, adapter, private, public_key, pr
     value = 10_000
     if existing_output:
         from deferred import funding_output
-        lock = funding_output(value, public_key, target_r1_version="0.1.0").script
+        lock = funding_output(value, public_key, target_r1_version="0.1.0", optimization=None).script
         if embedded_key:
             lock = push(public_key) + lock[21:]
     elif deferred:
@@ -60,7 +61,7 @@ def r1_layout_vectors(project, directory, node, adapter, private, public_key, pr
     funding = Transaction((Input(b"\xf1" * 32, 0),), (Output(1, b"\x51"), Output(value, lock)))
     vout = 1
     if deferred:
-        # Keep the v0.2.0 acceptance domain independent of the production flag set.
+        # Keep the release acceptance domain independent of the production flag set.
         flags = (0x41, 0x42, 0x43, 0x61, 0x62, 0x63, 0xc1, 0xc2, 0xc3, 0xe1, 0xe2, 0xe3)
         if existing_output:
             flags = (0x43, 0x63)
@@ -71,7 +72,8 @@ def r1_layout_vectors(project, directory, node, adapter, private, public_key, pr
         compress = sighash == 0x61
         if deferred:
             from deferred import activate_input, target_output
-            outputs = (target_output(value, public_key, target_r1_version=profile[1:]),)
+            target_profile = "v0.2.0" if profile == "v0.3.0" else profile
+            outputs = (target_output(value, public_key, target_r1_version=target_profile[1:]),)
         else:
             outputs = (Output(value - 100, lock if compress else b"\x51"),)
         tx = Transaction((Input(funding.txid_wire(), vout),), outputs)
@@ -84,6 +86,8 @@ def r1_layout_vectors(project, directory, node, adapter, private, public_key, pr
         if deferred:
             signed = activate_input(tx, 0, funding.serialize(), sighash=sighash)
             recognition = adapter.recognize(lock, public_key, value)
+            assert recognition["template"] == profile
+            assert recognition["targetTemplate"] == target_profile
         else:
             from signature import authorization, current_input_unlock
             raw_tx = Tx.parse(tx.serialize())
@@ -137,6 +141,8 @@ def replay(project, rows):
         if (owner := row["recognition"].get("ownerHash160")) and not row.get("existingOutput"):
             assert client.create_lock(owner_hash160=bytes.fromhex(owner), **scoped) == lock
         if project == "p2pkh-r1-deferred":
+            if row["profile"] == "v0.3.0" and request["sighash"] == 0x43:
+                assert WalletClient(project).create_lock(public_key=key, **scoped) == lock
             assert client.activate(tx, request["inputIndex"], prevout, sighash=request["sighash"],
                                    chronicle_active=request["chronicleActive"]).hex() == row["signed"]
             if request["sighash"] == 0x43:

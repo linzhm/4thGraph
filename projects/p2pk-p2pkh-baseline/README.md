@@ -1,6 +1,6 @@
 # Native P2PK and P2PKH baseline
 
-[简体中文](README.zh-CN.md) · [4thGraph](../../README.md) · [Project index](../README.md)
+[简体中文](README.zh-CN.md) · [4thGraph](../../README.md) · [Project index](../README.md) · [Versions](versions/index.json)
 
 ## Developer resources
 
@@ -64,7 +64,7 @@ OP_DUP OP_HASH160 0x751e76e8199196d454941c45d1b3a323f1433bd6 OP_EQUALVERIFY OP_C
 
 ### Optimization and reproduction
 
-In 4thGraph 0.2.7, `baseline`, `safe`, and `stack` emit identical bytecode for each constructor. Evaluating that bytecode with the fixture inputs produces the 35-byte P2PK and 25-byte P2PKH locks above, byte for byte against the existing `lock_hex` values. The wallet build evaluates the Forth constructors off-chain and uses the resulting bytes as the transaction output scripts. [Baseline fixtures](template/baseline.json)
+In 4thGraph 0.2.7, `baseline`, `safe`, and `stack` emit identical bytecode for each constructor. Evaluating that bytecode with the fixture inputs produces the 35-byte P2PK and 25-byte P2PKH locks above, byte for byte against the existing `lock_hex` values. The wallet build evaluates the Forth constructors off-chain and uses the resulting bytes as the transaction output scripts. [Baseline fixtures](versions/v0.1.0/baseline.json)
 
 From the repository root, print the locks and inspect the `stack` optimization reports for both constructors.
 
@@ -98,8 +98,8 @@ The first run may download and build the pinned dependency. The script itself
 has no network operations. After provisioning, add `--offline` after `uv run`.
 It exits nonzero on a script encoding or validation mismatch and otherwise
 emits raw parent/spend transactions, ASM, script hex and per-case outcomes.
-`../template/baseline.json` is the checked-in output. To check reproducibility,
-pipe the same command into `cmp - ../template/baseline.json`.
+`../versions/v0.1.0/baseline.json` is the checked-in output. To check reproducibility,
+pipe the same command into `cmp - ../versions/v0.1.0/baseline.json`.
 
 ## Fixture contract
 

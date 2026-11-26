@@ -13,7 +13,7 @@ from fourthgraph.bsv.script import push
 from fourthgraph.bsv.transaction import Input, Output, Transaction, hash256
 
 require_chain_gang_pin(Path(__file__).with_name('requirements.txt'))
-DIRECTORY = Path(__file__).resolve().parents[1] / 'template'
+DIRECTORY = Path(__file__).resolve().parents[1] / 'versions/v1.0.0'
 
 
 def script(raw):

@@ -28,7 +28,7 @@
 
 付款验收域包含 640 项，并复放 80 条 Wycheproof 和 15 条 NIST ACVP 外部纯模式向量。新版付款锁的确定性样本为 663,284 字节，固定公钥内容会使编译大小略有变化。两进两出的 OTDA ALL 样本为 3,985,011 字节。开发求值器缺少所需的比较指令，暂无栈峰值。[脚本和交易大小](../README.zh-CN.md#脚本大小)
 
-使用 Python 3.12 和 OpenSSL 3.5 或以上版本。 [项目验证命令](../README.zh-CN.md#复现方法) · [确定性向量](../template/deterministic.json) · [付款矩阵（英文）](../reference/payment-acceptance.md)
+使用 Python 3.12 和 OpenSSL 3.5 或以上版本。 [项目验证命令](../README.zh-CN.md#复现方法) · [确定性向量](../versions/v0.1.0/deterministic.json) · [付款矩阵（英文）](../reference/payment-acceptance.md)
 
 <a name="sdk"></a>
 

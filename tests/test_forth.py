@@ -8,19 +8,74 @@ import unittest
 from fourthgraph.benchmark.validation import chain_verdict
 from fourthgraph.bsv.chain_gang import validate_at_heights
 from fourthgraph.bsv.evaluate import evaluate as evaluate_script
-from fourthgraph.bsv.script import decode_num, encode_num
+from fourthgraph.bsv.script import asm, decode_num, encode_num
 from fourthgraph.bsv.transaction import Input, Output, Transaction
 
 from fourthgraph.compiler.source import CompileError, SourceCompiler, evaluate, lower, parse, schedule
 from fourthgraph.compiler.lowering import compile_word
+from fourthgraph.compiler.script_builder import SCRIPT_WORDS, ScriptBuilder, build_word
 from fourthgraph.workflow.protocol import Contracts, OutputLayout, compile_candidates, invalidated, output_hash
 from fourthgraph.replay.workflow import EXAMPLE, GATED_EXAMPLE, TASK_ID, TestKeys
-from fourthgraph.compiler.wordsets import CELL_SIGN, U32, capabilities
+from fourthgraph.compiler.wordsets import CELL_SIGN, U32, Primitive, capabilities
 
 SOURCE = EXAMPLE.read_text()
 
 
 class CompilerTests(unittest.TestCase):
+    def test_build_time_script_words_cannot_be_compiled_as_spending_code(self):
+        builder = ScriptBuilder(": append-drop ( script -- script ) op-drop ;")
+        word = builder.words["append-drop"]
+        self.assertEqual(builder.emit("append-drop", b""), b"\x75")
+        for mode in ("baseline", "safe", "stack"):
+            with self.assertRaisesRegex(CompileError, "build-time Script constructor"):
+                compile_word(word, mode)
+        composed = SourceCompiler(": wrapper ( script -- script ) append-drop ;",
+                                  vocabulary={"append-drop": word})
+        with self.assertRaisesRegex(CompileError, "append-drop"):
+            compile_word(composed.words["wrapper"])
+
+        with self.assertRaisesRegex(CompileError, "host-only word 'op-drop'"):
+            SourceCompiler("lock: invalid ( value:script ) value append-drop drop 1 ;",
+                           vocabulary={"append-drop": word})
+        with self.assertRaisesRegex(CompileError, "lock: requires a spend-time source"):
+            ScriptBuilder("lock: invalid ( ) 1 ;")
+
+    def test_injected_wallet_primitives_cannot_be_lowered(self):
+        primitive = SCRIPT_WORDS["script-size"]
+        self.assertEqual(primitive.location, "build")
+        word = SourceCompiler(": size ( script -- cell ) script-size ;", vocabulary=SCRIPT_WORDS).words["size"]
+        self.assertEqual(evaluate(word, b"abc"), (3,))
+        mislabeled = replace(word, location="script")
+        for mode in ("baseline", "safe", "stack"):
+            with self.subTest(mode=mode):
+                with self.assertRaisesRegex(CompileError, "script-size"):
+                    compile_word(word, mode)
+                with self.assertRaisesRegex(CompileError, "build-time Script constructors"):
+                    compile_word(primitive, mode)
+                with self.assertRaisesRegex(CompileError, "build-time Script constructors"):
+                    compile_word(mislabeled, mode)
+        injected = build_word("bytes", "cell", len)
+        with self.assertRaisesRegex(CompileError, "host-only word 'length'"):
+            SourceCompiler("lock: invalid ( value:bytes ) value length ;", vocabulary={"length": injected})
+
+    def test_stack_scheduling_preserves_zero_and_multi_result_primitives(self):
+        words = SourceCompiler("""
+: discard ( cell -- cell ) consume 1 1+ ;
+: twice ( cell -- cell ) pair + ;
+""", vocabulary={
+            "consume": Primitive(("cell",), (), asm("OP_DROP"), lambda value: (), "discard a cell"),
+            "pair": Primitive(("cell",), ("cell", "cell"), asm("OP_DUP"), lambda value: (value, value), "copy a cell"),
+        }).words
+        cases = (("discard", 7, 2), ("twice", 21, 42), ("twice", CELL_SIGN - 1, -2))
+        for name, value, expected in cases:
+            word = words[name]
+            self.assertEqual(evaluate(word, value), (expected,))
+            for mode in ("baseline", "safe", "stack"):
+                with self.subTest(entry=name, value=value, mode=mode):
+                    compiled = compile_word(word, mode)
+                    stack, alt = evaluate_script(compiled.script, [encode_num(value)])
+                    self.assertEqual((tuple(map(decode_num, stack)), alt), ((expected,), []))
+
     def test_stack_types_and_host_location(self):
         with self.assertRaisesRegex(CompileError, "declared"):
             parse(SOURCE.replace("DUP u32+", "DUP"))

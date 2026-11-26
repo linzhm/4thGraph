@@ -21,7 +21,7 @@ from fourthgraph.bsv.transaction import FORKID, SIGHASH_NONE, Input, Output, Tra
 
 from fourthgraph.verification.bls12381.verifier import FIELD_BYTES, PACKET_BYTES, Q, ScriptVerifier, public_signals
 
-FIXTURE = CHECKOUT / "projects/proof-counter/fixtures/bls12381-counter.json"
+FIXTURE = CHECKOUT / "projects/proof-counter/versions/v0.1.0/bls12381-counter.json"
 
 
 def load_fixture():

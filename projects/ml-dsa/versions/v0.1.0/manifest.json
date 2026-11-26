@@ -1,0 +1,12 @@
+{
+  "version": "0.1.0",
+  "previous": null,
+  "artifacts": [],
+  "fixtures": [
+    "deterministic.json"
+  ],
+  "evidence": [],
+  "integration": "docs/sdk.en.md",
+  "build": "PYTHONPATH=src:. python -m unittest discover -s projects/ml-dsa/reference -p test_signature_script.py",
+  "verify": "PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- python -m unittest discover -s projects/ml-dsa/reference -p test_payment.py"
+}

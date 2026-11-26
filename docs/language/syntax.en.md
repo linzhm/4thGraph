@@ -102,6 +102,8 @@ TypeScript reads type annotations from JSDoc, and Rust uses explicit attributes 
 ### 3.1 Named inputs and locking checks
 
 - `bytes-param: name size ;` declares a fixed-length build parameter. Pass each value with `--bind-bytes NAME=HEX`. Repeat the option to bind multiple parameters. The compiler checks each binding and byte length as it reads the declaration. A missing, duplicate, undeclared, or incorrectly sized binding fails the build. Using the parameter name in the body reads the bound byte constant.
+- `lock:` declares a standalone spending entry for compilation and validation. Define reusable checks as ordinary words and use `verify` in their bodies to abort on failure.
+- `lock:` and CLI `--entry` check canonical ScriptNum encoding and the declared numeric range before the body runs. Use `--assume-input-ranges` for a fragment whose caller has already performed those checks.
 - `lock:` lists witness inputs from left to right in push order, which is the stack's bottom-to-top order. Input names are local to the body. They must be unique and distinct from words already in scope. The body runs in Forth postfix order. Script uses the sole remaining `cell` for the final decision. Nonzero passes and zero fails. A terminal `verify` can take that cell and lower directly to Script's final truth check. An earlier `verify` consumes its operand and aborts when it is zero.
 - The body and the words it calls must compile to Script. `IF … [ELSE …] THEN` consumes one `cell` as its condition, and both branches must leave the same ordered stack types. The compiler schedules the values needed in each branch and preserves the order of checks. [Forth 2012 IF](https://forth-standard.org/standard/core/IF)
 
@@ -132,7 +134,7 @@ lock: values-match ( left:bytes right:bytes )
 
 ### 3.2 Native Script opcodes
 
-Repository sources targeting BSV Script begin with `REQUIRE BSV`. It loads `verify` and the supported subset of native `OP_*` words common to Genesis and Chronicle. These words use the compiler's static type checking. `OP_CAT` has stack effect `bytes bytes -- bytes`, and `OP_ADD` has stack effect `script-int script-int -- script-int`. When `OP_EQUAL` or `OP_CHECKSIG` returns normally, it produces `1` or `0`. The standard Forth comparison `=` produces `-1` or `0`. `OP_EQUALVERIFY` aborts if the byte strings differ, and `OP_CHECKSIG` checks the signature against the spending transaction. The `bsv.native_opcodes` field in `4thgraph --capabilities` lists the supported opcodes.
+Use `REQUIRE BSV` at the top of a Script source to load `verify` and the supported subset of native `OP_*` words common to Genesis and Chronicle. These words use the compiler's static type checking. `OP_CAT` has stack effect `bytes bytes -- bytes`, and `OP_ADD` has stack effect `script-int script-int -- script-int`. When `OP_EQUAL` or `OP_CHECKSIG` returns normally, it produces `1` or `0`. The standard Forth comparison `=` produces `-1` or `0`. `OP_EQUALVERIFY` aborts if the byte strings differ, and `OP_CHECKSIG` checks the signature against the spending transaction. The `bsv.native_opcodes` field in `4thgraph --capabilities` lists the supported opcodes.
 
 ## 4. Public exports
 

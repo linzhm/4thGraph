@@ -9,8 +9,9 @@ from pathlib import Path
 TEMPLATE_VERSION = "0.2.0"
 LEGACY_TEMPLATE_VERSION = "0.1.0"
 TEMPLATE_VERSIONS = (TEMPLATE_VERSION, LEGACY_TEMPLATE_VERSION)
-TEMPLATE_DIRECTORY = Path(__file__).resolve().parents[1] / "template/candidates"
-RELEASE_DIRECTORY = TEMPLATE_DIRECTORY.parent / f"v{TEMPLATE_VERSION}"
+VERSIONS_DIRECTORY = Path(__file__).resolve().parents[1] / "versions"
+TEMPLATE_DIRECTORY = VERSIONS_DIRECTORY / f"v{LEGACY_TEMPLATE_VERSION}" / "compiled"
+RELEASE_DIRECTORY = VERSIONS_DIRECTORY / f"v{TEMPLATE_VERSION}"
 
 
 def _directory(scheduled):
@@ -36,6 +37,12 @@ class CompiledTemplate:
     def lock(self, owner):
         return self.script[:self.owner_start] + owner + self.script[self.owner_end:]
 
+    def reconstruction(self, program):
+        from fourthgraph.bsv.otda_reconstruction import Reconstruction
+
+        parts = self.script[:self.owner_start], self.script[self.owner_end:]
+        return Reconstruction(program, parts, (self.owner_end - self.owner_start,))
+
 
 @cache
 def _layout(*, scheduled=False):
@@ -49,10 +56,8 @@ def _load_bytes(directory, file, size, digest):
     return raw
 
 
-@cache
-def compiled_template(*, scheduled=False):
-    layout = _layout(scheduled=scheduled)
-    raw = _load_bytes(_directory(scheduled), layout["script_file"], layout["script_bytes"], layout["script_sha256"])
+def read_compiled_template(directory, layout):
+    raw = _load_bytes(directory, layout["script_file"], layout["script_bytes"], layout["script_sha256"])
     start = layout["owner_hash160"]["offset"]
     end = start + 20
     if (layout["owner_hash160"]["length"] != 20 or not 0 <= start < end <= len(raw)
@@ -62,6 +67,11 @@ def compiled_template(*, scheduled=False):
     return CompiledTemplate(raw, start)
 
 
+@cache
+def compiled_template(*, scheduled=False):
+    return read_compiled_template(_directory(scheduled), _layout(scheduled=scheduled))
+
+
 def compiled_owner(raw):
     for scheduled in (False, True):
         if len(raw) == _layout(scheduled=scheduled)["script_bytes"]:
@@ -69,20 +79,19 @@ def compiled_owner(raw):
     return None
 
 
-@cache
-def otda_reconstruction(*, shared_kernels=False, scheduled=False):
-    layout = _layout(scheduled=scheduled)["compressed_preimage"]
-    artifact = layout["shared_kernels"] if shared_kernels and not scheduled else layout
-    program = _load_bytes(_directory(scheduled), artifact["program_file"], artifact["program_bytes"],
-                          artifact["program_sha256"])
+def read_otda_reconstruction(directory, layout, *, shared_kernels=False):
+    artifact = layout["shared_kernels"] if shared_kernels else layout
+    program = _load_bytes(directory, artifact["program_file"], artifact["program_bytes"], artifact["program_sha256"])
     return layout["spend_transaction_version"], program
 
 
 @cache
-def otda_pattern(*, shared_kernels=False, scheduled=False):
-    from fourthgraph.bsv.otda_reconstruction import Reconstruction
+def otda_reconstruction(*, shared_kernels=False, scheduled=False):
+    return read_otda_reconstruction(_directory(scheduled), _layout(scheduled=scheduled)["compressed_preimage"],
+                                    shared_kernels=shared_kernels and not scheduled)
 
+
+@cache
+def otda_pattern(*, shared_kernels=False, scheduled=False):
     version, program = otda_reconstruction(shared_kernels=shared_kernels, scheduled=scheduled)
-    template = compiled_template(scheduled=scheduled)
-    parts = template.script[:template.owner_start], template.script[template.owner_end:]
-    return version, Reconstruction(program, parts, (20,))
+    return version, compiled_template(scheduled=scheduled).reconstruction(program)

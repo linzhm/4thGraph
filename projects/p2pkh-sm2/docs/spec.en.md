@@ -70,13 +70,13 @@ OTDA serializes the selected inputs and outputs in the original format and appen
 | Ordinary OTDA scriptSig | `len(push(P)) + 131` bytes, transaction-dependent |
 | Unpaired OTDA SINGLE scriptSig | 294 bytes (161-byte companion P) |
 
-Recognition compares every fixed byte of the locking program. The layout manifest records the length, owner offset, SHA-256 of the zero-owner script, and the fingerprint of the fixed bytes. The generator can write raw bytes or hex. [Layout manifest](../template/layout.json) · [Script generator](../reference/generate_lock.py)
+Recognition compares every fixed byte of the locking program. The layout manifest records the length, owner offset, SHA-256 of the zero-owner script, and the fingerprint of the fixed bytes. The generator can write raw bytes or hex. [Layout manifest](../versions/v1.0.0/layout.json) · [Script generator](../reference/generate_lock.py)
 
 ## Integration
 
 [The Python API](../reference/p2pkh_sm2.py) exports output generation from a hash or validated public key, full-template recognition (`identify` returns template version `1` and owner), `current_input_unlock`, `sign_input`, and `sign_payment`. The payment helper validates the funding output, key, outputs and explicit fee, calls `signer(H, IDA)`, verifies its returned raw signature and serializes the spend.
 
-`sign_payment` uses `0x41`. For a prepared transaction, call `sign_input(tx, index, funding_raw, key, signer, sighash_type, chronicle_active=active)`. The wallet matches the funding outpoint and signs only that input. `chronicle_active` defaults to `True`; callers handling pre-activation spends must supply `False`. The wallet rejects OTDA before invoking the signer in that context. [Mode vectors](../template/sighash-modes.json) cover all twelve paired modes and four unpaired SINGLE cases.
+`sign_payment` uses `0x41`. For a prepared transaction, call `sign_input(tx, index, funding_raw, key, signer, sighash_type, chronicle_active=active)`. The wallet matches the funding outpoint and signs only that input. `chronicle_active` defaults to `True`; callers handling pre-activation spends must supply `False`. The wallet rejects OTDA before invoking the signer in that context. [Mode vectors](../versions/v1.0.0/sighash-modes.json) cover all twelve paired modes and four unpaired SINGLE cases.
 
 The caller authenticates the funding transaction and confirmation state and obtains approval of recipients, change and fees. Secret-key signing belongs in an external signer. The pure-Python arithmetic and explicit-nonce fixture signer are not constant-time production signing implementations. Treat the SM2 user ID as an algorithm input. Establish signer identity and certificate trust separately.
 

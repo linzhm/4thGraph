@@ -1,6 +1,6 @@
 # P2PKH-SM2 v1.1.0 候选版
 
-[English](README.md) · [4thGraph](../../README.zh-CN.md) · [项目目录](../README.zh-CN.md)
+[English](README.md) · [4thGraph](../../README.zh-CN.md) · [项目目录](../README.zh-CN.md) · [版本](versions/index.json)
 
 ## 开发入口
 
@@ -34,8 +34,8 @@ v1.1.0 候选版在解锁脚本中默认启用 OTDA 重建。生成器和钱包�
 | 解锁栈 | 签名预映像、未压缩公钥，以及 64 字节的 `r \|\| s` 签名 |
 | 交易签名模式 | BIP143 和 Chronicle OTDA 均支持 ALL、NONE、SINGLE，每种模式均可选用 ANYONECANPAY |
 
-当前源码包含[模板布局](template/layout.json)、[SM2 标准向量](template/sm2-standard.json)、
-[完整付款向量](template/spend-all.json)和 [16 个签名预映像](template/sighash-modes.json)。[v1.0.0 发布页](https://github.com/linzhm/bsv-script-lab/releases/tag/p2pkh-sm2-v1.0.0)
+当前源码包含[模板布局](versions/v1.0.0/layout.json)、[SM2 标准向量](versions/v1.0.0/sm2-standard.json)、
+[完整付款向量](versions/v1.0.0/spend-all.json)和 [16 个签名预映像](versions/v1.0.0/sighash-modes.json)。[v1.0.0 发布页](https://github.com/linzhm/bsv-script-lab/releases/tag/p2pkh-sm2-v1.0.0)
 
 ## 生成锁定脚本
 

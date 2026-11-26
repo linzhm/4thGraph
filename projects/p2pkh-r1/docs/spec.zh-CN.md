@@ -12,7 +12,7 @@
 
 1. 接受 65 字节 X9.63 编码 `04 || X_BE32 || Y_BE32`，验证该点属于 secp256r1，再对这 65 字节计算 HASH160。已知收款哈希的钱包可直接使用 20 字节值。
 2. 复制 v0.2.0 锁定模板，将收款哈希填入从零起算的区间 `[208, 228)`。脚本总长 **46,302 字节**。
-3. 返回收款哈希前，按实际版本核对长度和固定字节指纹。自第一个 opcode 起算，取 `SHA256(raw[:208] || raw[228:])`。v0.2.0 的指纹为 `52a1d9eb9e236403c66e845e18cf31d9c3a5f4c2e0ed7ca0270a60ba4e867ca6`。识别 v0.1.0 上一输出时按旧版布局核对。 [v0.2.0](../template/v0.2.0/layout.json) · [v0.1.0](../template/layout.json)
+3. 返回收款哈希前，按实际版本核对长度和固定字节指纹。自第一个 opcode 起算，取 `SHA256(raw[:208] || raw[228:])`。v0.2.0 的指纹为 `52a1d9eb9e236403c66e845e18cf31d9c3a5f4c2e0ed7ca0270a60ba4e867ca6`。识别 v0.1.0 上一输出时按旧版布局核对。 [v0.2.0](../versions/v0.2.0/layout.json) · [v0.1.0](../versions/v0.1.0/layout.json)
 
 将 `R1_OWNER_HASH160` 设为收款人 20 字节 HASH160 的十六进制值。
 
@@ -75,7 +75,7 @@ version || hashPrevouts || hashSequence || outpoint || 02 68 ac ||
 amount || sequence || hashOutputs || locktime || typeLE32
 ```
 
-普通原像为 159 字节。伴随路径将 `02 68 ac` 换为 `06 63 ad 67 ab 68 ac`。BIP143 在 NONE、SINGLE 或带 ANYONECANPAY 时将 hashSequence 置零。SINGLE 缺少同索引输出时，实际交易无需补输出。有配对的 OTDA SINGLE 在签名序列化中给更早的索引写空输出占位，这些占位只用于算摘要。按所在网络激活规则与当前花费上下文运行节点算法。普通付款 SDK 使用交易版本 2、最终 sequence 和零 locktime。[普通花费向量](../template/spend-all.json) · [参考原像构造器](../reference/signature.py)
+普通原像为 159 字节。伴随路径将 `02 68 ac` 换为 `06 63 ad 67 ab 68 ac`。BIP143 在 NONE、SINGLE 或带 ANYONECANPAY 时将 hashSequence 置零。SINGLE 缺少同索引输出时，实际交易无需补输出。有配对的 OTDA SINGLE 在签名序列化中给更早的索引写空输出占位，这些占位只用于算摘要。按所在网络激活规则与当前花费上下文运行节点算法。普通付款 SDK 使用交易版本 2、最终 sequence 和零 locktime。[普通花费向量](../versions/v0.1.0/spend-all.json) · [参考原像构造器](../reference/signature.py)
 
 ## 安全与互操作
 

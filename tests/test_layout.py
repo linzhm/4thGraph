@@ -49,8 +49,8 @@ def write_markdown(root, relative, target):
 class LayoutTests(unittest.TestCase):
     def test_r1_canonical_bytes_unchanged(self):
         project=ROOT/'projects/p2pkh-r1'
-        layout=json.loads((project/'template/layout.json').read_text())
-        raw=bytes.fromhex((project/'template/template.hex').read_text())
+        layout=json.loads((project/'versions/v0.1.0/layout.json').read_text())
+        raw=bytes.fromhex((project/'versions/v0.1.0/template.hex').read_text())
         self.assertEqual(hashlib.sha256(raw).hexdigest(),'b3acd6b92a23120bd24432ada2b1cac013fe06381d7ea96ac6c5a73c493f4287')
         for vector in layout['vectors']:
             owner=bytes.fromhex(vector['owner_hash160']); rebuilt=assemble(project/'reference/asm',owner)
@@ -59,9 +59,46 @@ class LayoutTests(unittest.TestCase):
 
     def test_project_resources_and_local_links(self):
         for name in ('p2pkh-r1','p2pkh-r1-deferred','p2pkh-sm2'):
-            for child in ('README.md','docs','reference','template'):
+            for child in ('README.md','docs','reference','versions'):
                 self.assertTrue((ROOT/'projects'/name/child).exists())
         self.check_local_links(ROOT)
+
+    def test_project_version_catalogs(self):
+        for project in sorted(path for path in (ROOT / "projects").iterdir() if path.is_dir()):
+            with self.subTest(project=project.name):
+                versions = project / "versions"
+                index = json.loads((versions / "index.json").read_text())
+                self.assertEqual(index["schema_version"], 1)
+                ordered = index["versions"]
+                self.assertTrue(all(re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", version) for version in ordered))
+                self.assertEqual(ordered, sorted(set(ordered), key=lambda version: tuple(map(int, version.split(".")))))
+                current = index["current"]
+                if "next" in index:
+                    self.assertEqual([current, index["next"]], ordered[-2:])
+                else:
+                    self.assertEqual(current, ordered[-1])
+                if "sdk_default" in index:
+                    self.assertIn(index["sdk_default"], ordered[:ordered.index(current) + 1])
+                self.assertEqual({path.name for path in versions.iterdir() if path.is_dir()},
+                                 {f"v{version}" for version in ordered})
+                previous = None
+                earlier_files = set()
+                for version in ordered:
+                    directory = versions / f"v{version}"
+                    manifest = json.loads((directory / "manifest.json").read_text())
+                    self.assertEqual((manifest["version"], manifest["previous"]), (version, previous))
+                    listed = manifest["artifacts"] + manifest["fixtures"] + manifest["evidence"]
+                    actual = {file.relative_to(directory).as_posix() for file in directory.rglob("*") if file.is_file()}
+                    self.assertEqual(sorted(listed), sorted(actual - {"manifest.json"}))
+                    self.assertTrue(set(manifest.get("shared_data", [])) <= earlier_files)
+                    for dependency, required in manifest.get("requires", {}).items():
+                        pinned = ROOT / "projects" / dependency / "versions" / f"v{required}" / "manifest.json"
+                        self.assertTrue(pinned.is_file(), f"{project.name} v{version} needs {dependency} v{required}")
+                    self.assertTrue((project / manifest["integration"].split("#", 1)[0]).is_file())
+                    self.assertTrue(manifest["build"])
+                    self.assertTrue(manifest["verify"])
+                    earlier_files.update(f"versions/v{version}/{name}" for name in listed)
+                    previous = version
 
     def test_sdk_quickstarts_are_reachable(self):
         for filename, language in (("README.md", "en"), ("README.zh-CN.md", "zh-CN")):

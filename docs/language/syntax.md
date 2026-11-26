@@ -98,6 +98,8 @@ TypeScript 的 JSDoc 类型是工具读取注解的例子。Rust 属性提供显
 ### 3.1 命名输入与锁定验证
 
 - `bytes-param: name size ;` 声明固定长度的构建参数。编译器读取声明时检查绑定和字节数。每个参数通过 `--bind-bytes NAME=HEX` 传入，可重复使用该选项为多个参数绑定。缺少绑定、重复绑定、未声明的绑定和字节数错误都会使编译失败。主体引用参数名时读取绑定的字节常量。
+- `lock:` 声明供编译和验证的独立花费入口。把可组合的验证写成普通词，在词内使用 `verify` 立即中止失败路径。
+- `lock:` 和 CLI `--entry` 默认先校验数值见证的规范 ScriptNum 编码和声明类型的取值区间。调用方已完成这些检查时，可用 `--assume-input-ranges` 导出片段。
 - `lock:` 的输入从左到右对应见证的压入顺序，也就是从栈底到栈顶。输入名在锁主体内有效，必须唯一，且不能与已有词重名。主体遵循 Forth 后缀顺序。Script 以留下的唯一 `cell` 作最终判定，非零通过，零不通过。末尾的 `verify` 可以接收这个值，编译器将它直接接到 Script 的最终判定。中间的 `verify` 会消费栈顶并在零值时中止。
 - 锁主体及其调用的词须能编译到 Script。`IF … [ELSE …] THEN` 消耗一个 `cell` 作为条件，两支必须留下相同顺序和类型的栈项。编译器为各支安排所需的值，并保留检查的执行顺序。 [Forth 2012 IF](https://forth-standard.org/standard/core/IF)
 
@@ -128,7 +130,7 @@ lock: values-match ( left:bytes right:bytes )
 
 ### 3.2 原生 Script 指令
 
-仓库中以 BSV Script 为目标的源码在开头用 `REQUIRE BSV` 声明后端词汇。它加载受支持的 Genesis 和 Chronicle 共有原生 `OP_*` 词，以及 `verify`。这些词使用同一套静态类型检查。`OP_CAT` 的栈效果为 `bytes bytes -- bytes`，`OP_ADD` 的栈效果为 `script-int script-int -- script-int`。`OP_EQUAL` 和 `OP_CHECKSIG` 正常返回时产生 `1` 或 `0`。标准 Forth 比较词 `=` 产生 `-1` 或 `0`。`OP_EQUALVERIFY` 在字节不等时中止，`OP_CHECKSIG` 根据花费交易验证签名。支持的指令见 `4thgraph --capabilities` 输出的 `bsv.native_opcodes`。
+在 BSV Script 源码开头使用 `REQUIRE BSV` 加载受支持的 Genesis 和 Chronicle 共有原生 `OP_*` 词，以及 `verify`。这些词使用同一套静态类型检查。`OP_CAT` 的栈效果为 `bytes bytes -- bytes`，`OP_ADD` 的栈效果为 `script-int script-int -- script-int`。`OP_EQUAL` 和 `OP_CHECKSIG` 正常返回时产生 `1` 或 `0`。标准 Forth 比较词 `=` 产生 `-1` 或 `0`。`OP_EQUALVERIFY` 在字节不等时中止，`OP_CHECKSIG` 根据花费交易验证签名。支持的指令见 `4thgraph --capabilities` 输出的 `bsv.native_opcodes`。
 
 ## 4. 公开导出
 

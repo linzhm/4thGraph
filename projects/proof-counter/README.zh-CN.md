@@ -1,8 +1,8 @@
 # 证明计数器
 
-[English](README.md) · [项目目录](../README.zh-CN.md)
+[English](README.md) · [项目目录](../README.zh-CN.md) · [版本](versions/index.json)
 
-**[生成电路](#generate-a-circuit)** · [可用的验证路径](../../docs/language/stdlib.md#验证路径) · [Groth16 固定声明对照](experiments/fixed-statement/README.md)
+**[生成电路](#generate-a-circuit)** · [可用的验证路径](../../docs/language/stdlib.md#验证路径) · [Groth16 固定声明对照](reference/fixed-statement/README.md)
 
 [公开关系](verify-state.fth)导入同一份[计数规则](counter.fth)，供直接 Script 验证和 Circom 后端使用。[工作流示例](workflow.fth)把计数器用作一个交易阶段。
 

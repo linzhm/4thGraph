@@ -1,6 +1,6 @@
 # Lamport OTS（SHA-256）
 
-[English](README.md) · [4thGraph](../../README.zh-CN.md) · [项目目录](../README.zh-CN.md)
+[English](README.md) · [4thGraph](../../README.zh-CN.md) · [项目目录](../README.zh-CN.md) · [版本](versions/index.json)
 
 ## 开发入口
 
@@ -10,7 +10,7 @@
 
 [协议规范](docs/developer.zh-CN.md#protocol) · [安全分析](docs/developer.zh-CN.md#security) · [复现与验证](#复现方法) · [交易成本](#完整交易与栈测量)
 
-Lamport OTS 是 v0.1 开发基线，使用 SHA-256 在 Bitcoin Script 中验证一次性签名。私钥和公钥各为 16,384 字节，原始签名为 8,192 字节。每组密钥只用于一个 UTXO 并只签一次。完整的付款构造还将签名绑定到当前交易输入。
+Lamport OTS 是 v0.1.0 开发基线，使用 SHA-256 在 Bitcoin Script 中验证一次性签名。私钥和公钥各为 16,384 字节，原始签名为 8,192 字节。每组密钥只用于一个 UTXO 并只签一次。完整的付款构造还将签名绑定到当前交易输入。
 
 ## 使用场景与取舍
 
@@ -36,7 +36,7 @@ python -m unittest discover -s projects/lamport-ots/reference -p test_lamport.py
 bash projects/lamport-ots/reference/verify.sh
 ```
 
-macOS 可使用 `bash projects/lamport-ots/reference/verify_apple.sh`。单项尺寸见[测量清单](template/measurement.json)，验收范围见[用例矩阵](docs/acceptance.md)和[验证记录](docs/validation.md)，可用[十二种模式向量](template/universal-vectors.json)核对编码。
+macOS 可使用 `bash projects/lamport-ots/reference/verify_apple.sh`。单项尺寸见[测量清单](versions/v0.1.0/measurements.json)，验收范围见[用例矩阵](docs/acceptance.md)和[验证记录](docs/validation.md)，可用[十二种模式向量](versions/v0.1.0/universal-vectors.json)核对编码。
 
 可用同一项目的测量脚本复现组件尺寸和公钥承诺候选的交易成本。
 

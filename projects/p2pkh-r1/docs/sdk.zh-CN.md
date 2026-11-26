@@ -60,17 +60,17 @@ SCRIPT_LAB_SDK_PYTHON="$PWD/projects/p2pkh-r1/workspace/venv/bin/python" \
 ^760052a569766b7c8201[0-9a-f]{396}([0-9a-f]{40})$
 ```
 
-3. 在原始二进制上计算 `SHA256(script[0:208] || script[228:])`，必须等于 `52a1d9eb9e236403c66e845e18cf31d9c3a5f4c2e0ed7ca0270a60ba4e867ca6`。只有这一步成功才返回捕获值。后缀即使只有一字节不同也会导致失败。对收款人做替换时，在已验证模板的副本上覆盖 `[208,228)`。[布局](../template/v0.2.0/layout.json)
+3. 在原始二进制上计算 `SHA256(script[0:208] || script[228:])`，必须等于 `52a1d9eb9e236403c66e845e18cf31d9c3a5f4c2e0ed7ca0270a60ba4e867ca6`。只有这一步成功才返回捕获值。后缀即使只有一字节不同也会导致失败。对收款人做替换时，在已验证模板的副本上覆盖 `[208,228)`。[布局](../versions/v0.2.0/layout.json)
 
 ## 设备签名和逐输入付款
 
 摘要签名器接收 `SHA256d(P)`。设备内部还会执行一次 SHA-256 时，设 `signMessage: true`，传入的消息是 `SHA256(P)`。两种回调均返回 64 字节原始签名，`r` 和 `s` 各为左侧补零的 32 字节大端数。TypeScript 的 `signPaymentAsync` 和 `signInputAsync` 可对接异步设备。
 
-混合输入或逐输入指定签名方式时使用 `signInput`。钱包在收集签名前固定交易并核对上一输出和手续费。父交易确认后如果 txid 有变化，核对实际 outpoint 并重建子交易。[R1 签名和摘要向量](../template/v0.2.0/spend-all.json) · [恢复子交易](chronicle.md#恢复子交易)
+混合输入或逐输入指定签名方式时使用 `signInput`。钱包在收集签名前固定交易并核对上一输出和手续费。父交易确认后如果 txid 有变化，核对实际 outpoint 并重建子交易。[R1 签名和摘要向量](../versions/v0.2.0/spend-all.json) · [恢复子交易](chronicle.md#恢复子交易)
 
 ## 当前开发版本
 
-新建输出使用 v0.2.0。Python 默认选择这一版本。已有 UTXO 按 v0.1.0 原有布局核对。统一客户端可识别两个版本，并支持普通 BIP143 ALL 付款。 [v0.1.0 布局](../template/layout.json)
+新建输出使用 v0.2.0。Python 默认选择这一版本。已有 UTXO 按 v0.1.0 原有布局核对。统一客户端可识别两个版本，并支持普通 BIP143 ALL 付款。 [v0.1.0 布局](../versions/v0.1.0/layout.json)
 
 Python 的 `sign_spend(..., compress_otda="paired")` 在支持 Chronicle
 功能解锁的版本 2 交易中重建 OTDA ALL 输出和有配对输出的 OTDA SINGLE。

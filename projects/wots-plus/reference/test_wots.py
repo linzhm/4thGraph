@@ -151,7 +151,7 @@ class WotsTests(unittest.TestCase):
         self.assertEqual(len(calls), 1)
 
     def test_payment_vectors_are_reproducible(self):
-        path = Path(__file__).resolve().parents[1] / "template" / "vectors.json"
+        path = Path(__file__).resolve().parents[1] / "versions/v0.1.0" / "vectors.json"
         self.assertEqual(json.loads(path.read_text()), vector_document())
 
 

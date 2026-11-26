@@ -1,0 +1,338 @@
+{
+  "compiler_version": "0.2.7",
+  "forth_source_sha256": "fc8dac5df25716a809f7e5bba1ef607430455af1b216394cd98809ae00029c10",
+  "target_r1_version": "0.2.0",
+  "fixture": {
+    "funding_inputs_outputs": [
+      1,
+      3
+    ],
+    "activation_inputs_outputs": [
+      3,
+      3
+    ],
+    "values_sats": [
+      100000,
+      120000
+    ],
+    "target_lock_bytes": [
+      46302,
+      46302
+    ],
+    "sponsor_value_sats": 10000,
+    "sponsor_change_sats": 8000,
+    "transaction_version": 2
+  },
+  "variants": {
+    "published": {
+      "lock_bytes": 1435,
+      "lock_sha256": "41f94039a91c1f8f296376392111ed357ebaf7a9a56a5dc7fe60e4fe75106636",
+      "funding_txid": "f0d841c5c513d4a70086521742a20ecf633be484658e9f81fcd5bda550db6d43",
+      "funding_transaction_bytes": 2953,
+      "activations": {
+        "BIP143 SINGLE": {
+          "txid": "05628f5e62711f2d951c77a674dbbc5393329b155ab15e287a8070ed5ef3e65a",
+          "sighash": "43",
+          "unlock_bytes": 160,
+          "transaction_bytes": 93089,
+          "funding_and_activation_bytes": 96042,
+          "first_input_stack": {
+            "source": "development evaluator; native CHECKSIG modeled as true",
+            "main_items": 5,
+            "alt_items": 34,
+            "combined_payload_bytes": 319
+          }
+        },
+        "BIP143 ALL": {
+          "txid": "d3aa12f0dbf8a5d21180d78770727476716c039c86bf94e4871f4001627669bd",
+          "sighash": "41",
+          "unlock_bytes": 197,
+          "transaction_bytes": 93163,
+          "funding_and_activation_bytes": 96116,
+          "first_input_stack": {
+            "source": "development evaluator; native CHECKSIG modeled as true",
+            "main_items": 7,
+            "alt_items": 34,
+            "combined_payload_bytes": 359
+          }
+        },
+        "OTDA ALL": {
+          "txid": "21876be5b07b7743cd0c20a3d32304faab53ff1e139c6af44fa42171532d4909",
+          "sighash": "61",
+          "unlock_bytes": 197,
+          "transaction_bytes": 93163,
+          "funding_and_activation_bytes": 96116,
+          "first_input_stack": {
+            "source": "development evaluator; native CHECKSIG modeled as true",
+            "main_items": 7,
+            "alt_items": 34,
+            "combined_payload_bytes": 359
+          }
+        }
+      }
+    },
+    "baseline": {
+      "lock_bytes": 1185,
+      "lock_sha256": "84f6f426535beccddf2c0cff1b5fc3dea052767e5a8923001fa250366e7dcc1b",
+      "funding_txid": "13b37a759ca18977197aacb90497233ec9387131e5ac76466a613ca024fa9461",
+      "funding_transaction_bytes": 2453,
+      "activations": {
+        "BIP143 SINGLE": {
+          "txid": "2d545d0d0dc36cb2e749eedabc0ce19291dc8823b525ce445762dd4552b34271",
+          "sighash": "43",
+          "unlock_bytes": 160,
+          "transaction_bytes": 93089,
+          "funding_and_activation_bytes": 95542,
+          "first_input_stack": {
+            "source": "development evaluator; native CHECKSIG modeled as true",
+            "main_items": 9,
+            "alt_items": 1,
+            "combined_payload_bytes": 320
+          }
+        },
+        "BIP143 ALL": {
+          "txid": "94396975ffc9b8be5baa06212bea9fcc51e0a599b0e398c08e597d6981629bc0",
+          "sighash": "41",
+          "unlock_bytes": 197,
+          "transaction_bytes": 93163,
+          "funding_and_activation_bytes": 95616,
+          "first_input_stack": {
+            "source": "development evaluator; native CHECKSIG modeled as true",
+            "main_items": 10,
+            "alt_items": 1,
+            "combined_payload_bytes": 360
+          }
+        },
+        "OTDA ALL": {
+          "txid": "a27f6139fffce3275e282ffee9466946ab49eab0e1a7e4e272d033f7683430f2",
+          "sighash": "61",
+          "unlock_bytes": 197,
+          "transaction_bytes": 93163,
+          "funding_and_activation_bytes": 95616,
+          "first_input_stack": {
+            "source": "development evaluator; native CHECKSIG modeled as true",
+            "main_items": 10,
+            "alt_items": 1,
+            "combined_payload_bytes": 360
+          }
+        }
+      },
+      "compiler": {
+        "script_bytes": 1130,
+        "rewrites": []
+      }
+    },
+    "safe": {
+      "lock_bytes": 1087,
+      "lock_sha256": "27063410bf03166c70f4d5f6660f0b144c3c8b7a01319bf07630ff62ddb893c8",
+      "funding_txid": "f444e7007dae66c9931ef7b004da4244f6f5bc30d4568fc56ea5271307ef46da",
+      "funding_transaction_bytes": 2257,
+      "activations": {
+        "BIP143 SINGLE": {
+          "txid": "da742f6fa25ccbc40ecae0686d5f7e38e59637569d064d43c808eff0df5b570e",
+          "sighash": "43",
+          "unlock_bytes": 160,
+          "transaction_bytes": 93089,
+          "funding_and_activation_bytes": 95346,
+          "first_input_stack": {
+            "source": "development evaluator; native CHECKSIG modeled as true",
+            "main_items": 9,
+            "alt_items": 1,
+            "combined_payload_bytes": 320
+          }
+        },
+        "BIP143 ALL": {
+          "txid": "f4c38090e2edb9820dc886d64a636fa0d872ca58a925067f17ba9a4af2ef75e4",
+          "sighash": "41",
+          "unlock_bytes": 197,
+          "transaction_bytes": 93163,
+          "funding_and_activation_bytes": 95420,
+          "first_input_stack": {
+            "source": "development evaluator; native CHECKSIG modeled as true",
+            "main_items": 10,
+            "alt_items": 1,
+            "combined_payload_bytes": 360
+          }
+        },
+        "OTDA ALL": {
+          "txid": "4ef343f63c391d5c084a19e28e3031c4938b149e3cbebb90935962f261716d8a",
+          "sighash": "61",
+          "unlock_bytes": 197,
+          "transaction_bytes": 93163,
+          "funding_and_activation_bytes": 95420,
+          "first_input_stack": {
+            "source": "development evaluator; native CHECKSIG modeled as true",
+            "main_items": 10,
+            "alt_items": 1,
+            "combined_payload_bytes": 360
+          }
+        }
+      },
+      "compiler": {
+        "script_bytes": 1032,
+        "rewrites": [
+          {
+            "rule": "arithmetic-in-range",
+            "line": 37,
+            "column": 18,
+            "inputs": [
+              {
+                "kind": "cell",
+                "bounds": [
+                  32,
+                  32
+                ]
+              },
+              {
+                "kind": "cell",
+                "bounds": [
+                  0,
+                  9223372036854775807
+                ]
+              }
+            ],
+            "script_bytes": null
+          },
+          {
+            "rule": "arithmetic-in-range",
+            "line": 37,
+            "column": 18,
+            "inputs": [
+              {
+                "kind": "cell",
+                "bounds": [
+                  32,
+                  32
+                ]
+              },
+              {
+                "kind": "cell",
+                "bounds": [
+                  0,
+                  9223372036854775807
+                ]
+              }
+            ],
+            "script_bytes": null
+          }
+        ]
+      }
+    },
+    "stack": {
+      "lock_bytes": 1085,
+      "lock_sha256": "03a53f4e5c603bcfb3b0e91e30363f6068e38a000c75ed77ce4a2a5088feffcc",
+      "funding_txid": "ca7a0f82a12a03c2e14f4b3a3f4f2de3758d5064eefacd9132abc3d1233da8d7",
+      "funding_transaction_bytes": 2253,
+      "activations": {
+        "BIP143 SINGLE": {
+          "txid": "e066abd2e0f111687d68ecb67f5e06926083b3ad7248726930ea3b94c1141afe",
+          "sighash": "43",
+          "unlock_bytes": 160,
+          "transaction_bytes": 93089,
+          "funding_and_activation_bytes": 95342,
+          "first_input_stack": {
+            "source": "development evaluator; native CHECKSIG modeled as true",
+            "main_items": 9,
+            "alt_items": 1,
+            "combined_payload_bytes": 320
+          }
+        },
+        "BIP143 ALL": {
+          "txid": "dcc7cfea323d6345808af4a474a1e8f1bf371e41777f66c79cbf996568d3e660",
+          "sighash": "41",
+          "unlock_bytes": 197,
+          "transaction_bytes": 93163,
+          "funding_and_activation_bytes": 95416,
+          "first_input_stack": {
+            "source": "development evaluator; native CHECKSIG modeled as true",
+            "main_items": 10,
+            "alt_items": 1,
+            "combined_payload_bytes": 360
+          }
+        },
+        "OTDA ALL": {
+          "txid": "32e8da03b9ac8b8b06eeb13cd4c09c85c8c41d89f97deff4e60a62538f9a7369",
+          "sighash": "61",
+          "unlock_bytes": 197,
+          "transaction_bytes": 93163,
+          "funding_and_activation_bytes": 95416,
+          "first_input_stack": {
+            "source": "development evaluator; native CHECKSIG modeled as true",
+            "main_items": 10,
+            "alt_items": 1,
+            "combined_payload_bytes": 360
+          }
+        }
+      },
+      "compiler": {
+        "script_bytes": 1030,
+        "rewrites": [
+          {
+            "rule": "arithmetic-in-range",
+            "line": 37,
+            "column": 18,
+            "inputs": [
+              {
+                "kind": "cell",
+                "bounds": [
+                  32,
+                  32
+                ]
+              },
+              {
+                "kind": "cell",
+                "bounds": [
+                  0,
+                  9223372036854775807
+                ]
+              }
+            ],
+            "script_bytes": null
+          },
+          {
+            "rule": "arithmetic-in-range",
+            "line": 37,
+            "column": 18,
+            "inputs": [
+              {
+                "kind": "cell",
+                "bounds": [
+                  32,
+                  32
+                ]
+              },
+              {
+                "kind": "cell",
+                "bounds": [
+                  0,
+                  9223372036854775807
+                ]
+              }
+            ],
+            "script_bytes": null
+          },
+          {
+            "rule": "stack-last-use-and-sharing",
+            "line": 37,
+            "column": 5,
+            "inputs": [],
+            "script_bytes": [
+              5,
+              4
+            ]
+          },
+          {
+            "rule": "stack-last-use-and-sharing",
+            "line": 37,
+            "column": 5,
+            "inputs": [],
+            "script_bytes": [
+              5,
+              4
+            ]
+          }
+        ]
+      }
+    }
+  }
+}

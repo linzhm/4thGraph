@@ -1,6 +1,6 @@
 # Pure ML-DSA-44
 
-[简体中文](README.zh-CN.md) · [4thGraph](../../README.md) · [Project index](../README.md)
+[简体中文](README.zh-CN.md) · [4thGraph](../../README.md) · [Project index](../README.md) · [Versions](versions/index.json)
 
 ## Developer resources
 
@@ -10,7 +10,7 @@ Make a lock from the raw ML-DSA-44 public key and sign the payment message in Pu
 
 [Protocol](docs/developer.en.md#protocol) · [Security](docs/developer.en.md#security) · [Verify](#reproduce-the-checks) · [Transaction costs](#complete-transactions-and-stack-measurements)
 
-**Status** · v0.1 development baseline.
+**Status** · v0.1.0 development baseline.
 
 The verifier uses the FIPS 204 Pure ML-DSA-44 public-key and signature
 encodings. A public key is 1,312 bytes and a signature is 2,420 bytes.
@@ -114,6 +114,8 @@ Decoding the 80 hint slots in one pass and simplifying FIPS 204 `UseHint`
 brings it to 663,284 bytes, 28.4% below the baseline. The arithmetic kernel
 measurements also retain the signed-residue experiment, whose verification
 equation uses 452,154 bytes. [Benchmark adapter](reference/benchmark_adapter.py)
+
+The arithmetic and SHAKE scripts are also independently replayable. [Deterministic fixture](versions/v0.1.0/deterministic.json)
 
 ## Developer and wallet integration
 
