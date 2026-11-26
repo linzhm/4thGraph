@@ -1,0 +1,52 @@
+{
+  "nchain": {
+    "lock_bytes": 372236,
+    "witness_prefix_bytes": 21012,
+    "unlock_bytes": 21084,
+    "deployment_bytes": 372372,
+    "spend_bytes": 21181,
+    "node_rpc_median_ms": 202.6702999992267,
+    "chain_gang_median_ms": 71.89934000052745,
+    "valid_admission": {
+      "txid": "7f0c49f85ad6c76a213378f29f6d2bd3091813161d5e7b9ad69be8f7f9fa019d",
+      "bytes": 21181,
+      "mempool": true,
+      "mined": true,
+      "block": "6ab0a4f777685c2a5e782e406458b93d43fdaee52431900fbbdafdefb14e482c",
+      "height": 104
+    },
+    "wrong_statement_admission": {
+      "txid": "781ff1755685589fb5431726f01b9290a3d221e5f37587bff9eac79454b4c421",
+      "bytes": 21180,
+      "mempool": false,
+      "mined": false,
+      "rpc_code": -26,
+      "rpc_message": "16: mandatory-script-verify-flag-failed (Script failed an OP_EQUALVERIFY operation)"
+    }
+  },
+  "4thgraph": {
+    "lock_bytes": 279463,
+    "witness_prefix_bytes": 963,
+    "unlock_bytes": 1035,
+    "deployment_bytes": 279599,
+    "spend_bytes": 1132,
+    "node_rpc_median_ms": 113.75792100079707,
+    "chain_gang_median_ms": 27.67234900056792,
+    "valid_admission": {
+      "txid": "d1f050048d61a15c0093f257250480ec795c450f6b08ed2e51de7bd9dab24e8c",
+      "bytes": 1132,
+      "mempool": true,
+      "mined": true,
+      "block": "3048ab793f597d12ed61dfbff69639a92ce2b82bcaf131c0234263578247e0fb",
+      "height": 208
+    },
+    "wrong_statement_admission": {
+      "txid": "17fe68b1da849a79737816d1dc5ab21dcb8e609e928aa4db4b883ab3cc9889a1",
+      "bytes": 1132,
+      "mempool": false,
+      "mined": false,
+      "rpc_code": -26,
+      "rpc_message": "16: mandatory-script-verify-flag-failed (Script evaluated without error but finished with a false/empty top stack element)"
+    }
+  }
+}

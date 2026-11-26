@@ -228,6 +228,67 @@ PYTHONPATH=. bash shared/verify_node.sh --profile default -- \
   --output "$project/build/v0.2.0-circuit-both-2.json"
 ```
 
+## Groth16 链上验证器
+
+[固定声明的 nChain 对照](benchmarks/nchain-fixed/README.md) · [动态、混合和固定输入的同基线对照](benchmarks/groth16-inputs/README.md)
+
+### BLS12-381
+
+`groth16_bls12381.py` 从 snarkjs 验证密钥和公开输入配置生成 BSV 锁。对每个公开输入，JSON 配置用十进制标量固定部署时的值，用 `null` 表示完整 Fr 范围的花费时输入，也可用 `{"bits":128}` 限定为无符号 128 位。混合配置把固定项折叠进 `IC` 累加器，Script 使用两位固定基点窗口计算其余项并校验所声明的仿射 MSM 点。全固定配置预计算完整的公开输入配对项。
+
+Script 检查坐标范围、曲线方程、素数阶子群和配对关系。Miller 循环用 Jacobian 坐标，并将余数幂合入循环。余数检查替代最终指数运算，见证省去斜率和逆元。全固定配置使用 960 B 证明数据包加 3 B push 编码。数据包包含 `A.x, A.y, B.x0, B.x1, B.y0, B.y1, C.x, C.y` 及 Fp12 余数。每个 Fp 元素用 48 B 无符号小端编码。余数先编码 w 的偶次幂系数，再编码奇次幂系数，每个 Fp2 系数按实部、虚部顺序。
+
+动态和混合路径在证明包末尾追加 96 B 的 MSM 声明，接着单独 push 一个公开输入包。公开输入包按验证密钥槽顺序编码花费时提供的标量，每项是按所声明位宽向上取整到整字节的无符号小端数。范围是 `[0, min(2^bits, R))`。无穷远 MSM 点用两个零坐标表示。
+
+原始验证锁可直接组合应用检查。示例 `bind_public_output` 用 ForkID ALL 原像验证真实后继输出的金额和状态字节，再把同一个公开输入包交给证明谓词。选择 `--owner` 时，在见证后追加对完整锁签出的 DER 签名和 `0x41`，由该签名授权交易。
+
+同一份字节码支持 Genesis 和 Chronicle 下的 v1、v2 交易。用 BLS12-381 格式的 snarkjs 文件构建锁和见证。
+
+```sh
+project=projects/4thgraph
+PYTHONPATH=. python "$project/groth16_bls12381.py" \
+  --verification-key verification_key.json --public public.json \
+  --owner "$owner_public_key_hex" --output lock.json \
+  --proof proof.json --witness-output witness.hex
+```
+
+`--public` 单独使用时编译固定声明。动态或混合构建使用 `--input-sources input-sources.json`，生成见证时再传 `--public` 和 `--proof`。省略两种公开输入选项会生成完整 Fr 范围的动态锁。动态和混合路径可用 `--stack-schedule baseline` 对照默认的紧凑栈调度。
+
+测试夹具来自 `proof/workflow.fth`，使用 `circom2@0.2.22 --prime bls12381` 和 `snarkjs@0.7.5` 的本地测试专用设置。签名密钥也是测试专用。已导出的夹具让完整复放无需重新出证，同一个程序可分别复放 v1 和 v2。
+
+```sh
+project=projects/4thgraph
+PYTHONPATH=. bash shared/verify_node.sh --profile raised -- \
+  python "$project/groth16_bls12381_replay.py" --tx-version 2 \
+  --output "$project/build/groth16-bls12381-v2.json"
+```
+
+设置 `REGTEST_CHRONICLE_HEIGHT=1000` 可复放 Chronicle 激活前的完整交易。报告包含脚本与交易字节、双引擎判定及验证时长、开发求值器的两栈载荷峰值，以及实际挖块结果。
+
+此夹具的锁为 **279,463 B**，v2 花费为 **1,132 B**。在 `raised` 配置下，四种时代与版本组合各复放一次有效花费及九个拒绝用例。默认配置下有效 v2 花费也能入块，完整反例复放的 `verifyscript` RPC 遇到 3 ms 超时。
+
+CCTP 的动态公开输入原型使用同一 Forth 源码生成融合、双输入和串行布局，并复放同一密钥和证明的 zkscript 外部基线。[VK_x 交易边界与重跑命令](cctp/README.md)
+
+### BN254 参考
+
+`groth16_script.py` 把 BN254 的 snarkjs 验证密钥和五个预期公开信号编译成一个 BSV 锁。锁中固定验证密钥和公开信号。Rúnar 的配对验证使用随证明提供的辅助算术见证，Script 核验这些见证及 Groth16 配对关系。锁还要求所有者提供 ForkID ALL 签名，由该签名覆盖真实交易的输入和输出。Forth 示例的信号顺序为 `next`、`route`、`current`、`bindLo`、`bindHi`。
+
+此验证器使用 Chronicle 操作码。部署锁约 1.52 MB，算术见证约 31 KB。下面的本地复放使用 `raised` 节点配置和独立的钱包资金。要观察激活前的拒绝，可设置 `REGTEST_CHRONICLE_HEIGHT=1000`。
+
+以下命令用现有 Forth 电路生成测试专用 Groth16 密钥和证明，然后复放有资金的部署与花费。需要 Node.js、npm 和 Go 1.26.6。Rúnar 检出固定提交，证明工具沿用本项目固定的 Circom 和 snarkjs。
+
+```sh
+project=projects/4thgraph
+runar="$project/build/runar"
+git clone https://github.com/icellan/runar.git "$runar"
+git -C "$runar" checkout --detach dbcc4269f8e0895c4738cf86948b05b7d62a2010
+PYTHONPATH=. bash shared/verify_node.sh --profile raised -- \
+  python "$project/groth16_replay.py" --runar "$runar" \
+  --output "$project/build/groth16-verifier-v2.json"
+```
+
+已持有验证密钥时，用 `groth16_script.py --runar DIR --verification-key verification_key.json --public expected.json --owner HEX --output lock.json` 生成锁。`expected.json` 是由部署方确定的五个公开标量。加 `--proof proof.json --witness-output witness.hex` 会导出 push-only 解锁前缀。花费时在前缀后追加对完整锁脚本生成的 DER 签名及 `0x41`。复放报告同时记录测试专用设置、Script 字节、两独立引擎判定和 regtest 挖块结果。
+
 ## 链上编译器里程碑
 
 用 PELS counter 验证下一步。让有界的 Script 编译器计算确定性的后继脚本或符号交易计划，让部署输出承诺该编译结果。计划先编码 `(父步骤, vout)`，部署交易最终字节和 txid 确定后再绑定真实 outpoint 和授权。这样部署承诺的对象在部署 txid 出现前就能确定。当前原型完成宿主侧编译、绑定和复放。
