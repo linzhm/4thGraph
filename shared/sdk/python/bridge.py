@@ -127,6 +127,8 @@ def wallet_transaction(options):
     outpoint = Input(txid[::-1], uint32(prevout["vout"], "vout"))
     previous = Output(sats(prevout["valueSats"]), hex_bytes(prevout["script"]))
     if "transaction" in options:
+        if "outputs" in options or "feeSats" in options:
+            raise ValueError("prepared transaction and payment fields cannot be combined")
         tx = Transaction.parse(hex_bytes(options["transaction"]))
         index = uint32(options["inputIndex"], "inputIndex")
         if index >= len(tx.inputs):
@@ -138,6 +140,8 @@ def wallet_transaction(options):
             raise ValueError("payment requires outputs")
         return tx, index, previous
 
+    if "inputIndex" in options:
+        raise ValueError("a prepared input requires a transaction")
     outputs = tuple(Output(sats(out["valueSats"]), hex_bytes(out["script"])) for out in options["outputs"])
     if not outputs:
         raise ValueError("payment requires outputs")

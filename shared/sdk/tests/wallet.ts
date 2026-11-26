@@ -59,6 +59,11 @@ for (const row of vectors) {
     assert.equal(client.signPayment(payment, signer), row.signed);
     assert.throws(() => client.signPayment({ ...payment, feeSats: "99" }, signer));
     assert.throws(() => client.signInput({ ...row.request, inputIndex: 1 }, signer));
+    const ambiguous = { ...payment, transaction, inputIndex };
+    assert.throws(() => client.signPayment(ambiguous, signer), /fields cannot be combined/);
+    assert.throws(() => client.signInput(ambiguous, signer), /fields cannot be combined/);
+    const missingTransaction = { ...ambiguous, transaction: undefined } as unknown as WalletInput;
+    assert.throws(() => client.signInput(missingTransaction, signer), /requires a transaction/);
     assert.equal(calls, 2);
     if (project === "p2pkh-r1") {
       const pending = { ...payment };

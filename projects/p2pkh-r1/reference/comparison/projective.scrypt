@@ -1,0 +1,38 @@
+// Same signed-residue, complete projective formulas as curve_compiler.py.
+struct Point {
+    int x;
+    int y;
+    int z;
+}
+
+library P256 {
+    static function add(Point p, Point q, int field, int b3) : Point {
+        int yy = p.y * q.y;
+        int zz = p.z * q.z;
+        int azz = -3 * zz;
+        int xx = p.x * q.x;
+        int t = 3 * xx + azz;
+        int yz = (p.y + p.z) * (q.y + q.z) - yy - zz;
+        int xy = (p.x + p.y) * (q.x + q.y) - xx - yy;
+        int xz = (p.x + p.z) * (q.x + q.z) - xx - zz;
+        int h = -3 * xz + b3 * zz;
+        int plus = yy + h;
+        int minus = yy - h;
+        int k = b3 * xz - 3 * (xx - azz);
+        return {(xy * minus - yz * k) % field,
+                (minus * plus + t * k) % field,
+                (yz * plus + xy * t) % field};
+    }
+
+    static function double(Point p, int field) : Point {
+        int s = 2 * (p.y * p.z);
+        int z = s * s * s % field;
+        int r = p.y * s;
+        int b = 2 * (p.x * r);
+        int w = 3 * ((p.x - p.z) * (p.x + p.z));
+        int h = w * w - 2 * b;
+        int y = ((b - h) * w - 2 * (r * r)) % field;
+        int x = h * s % field;
+        return {x, y, z};
+    }
+}
