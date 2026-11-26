@@ -193,6 +193,27 @@ lock: match ( unused:bytes data:bytes )
         with self.assertRaisesRegex(CompileError, "OP_HASH160.*expected stack suffix"):
             SourceCompiler(f"REQUIRE bsv\n{source.replace('bytes --', 'cell --')}")
 
+    def test_require_keeps_local_paths_distinct_from_catalog_names(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            local = root / "std/bsv"
+            local.parent.mkdir()
+            local.write_text(": project-value ( -- cell ) 7 ;\n")
+            entry = ": hash ( bytes -- bytes ) OP_HASH160 ;"
+            with self.assertRaisesRegex(CompileError, "OP_HASH160.*requires REQUIRE BSV"):
+                SourceCompiler(f"REQUIRE std/bsv\n{entry}", source_path=root / "main.fth")
+            for requirements in (("BSV", "std/bsv"), ("std/bsv", "BSV")):
+                with self.subTest(requirements=requirements):
+                    source = "".join(f"REQUIRE {name}\n" for name in requirements) + entry
+                    frontend = SourceCompiler(source, source_path=root / "main.fth")
+                    imports = {item.name: item for item in frontend.library_imports}
+                    self.assertEqual(set(imports), {"std/bsv", "./std/bsv"})
+                    self.assertEqual(imports["std/bsv"].sha256, sha256(LIBRARIES["std/bsv"].source.read_bytes()).hexdigest())
+                    self.assertEqual(imports["./std/bsv"].sha256, sha256(local.read_bytes()).hexdigest())
+                    self.assertIsNone(imports["./std/bsv"].interface_sha256)
+                    self.assertEqual(compile_word(frontend.words["hash"]).script, b"\xa9")
+                    self.assertEqual(evaluate(frontend.words["project-value"]), (7,))
+
     def test_named_lock_uses_forth_branches_with_shared_stack_values(self):
         source = """
 REQUIRE bsv

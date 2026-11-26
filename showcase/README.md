@@ -6,7 +6,7 @@
 | **P-256 lock optimization** | P2PKH-R1 v0.6.0 measures 41,364 B per lock and 83,498 B per two-input, two-output BIP143 ALL payment. [P2PKH-R1 results](../projects/p2pkh-r1/README.md#measured-results) |
 | **Deferred R1 activation** | [Deferred v0.3.0](../projects/p2pkh-r1-deferred/README.md#4thgraph-forth-comparison) uses a 1,085 B funding lock built with `stack` optimization |
 | **PELS Counter** | [Build and replay](../projects/pels-counter/README.md) covers the funded `0 → 1 → 2` sequence and rejected mutations |
-| **BIP340** | [Schnorr locks and signing](../projects/p2pkh-schnorr/README.md) and [fixed BIP340 vectors](../projects/p2pkh-schnorr/versions/v0.6.0/bip340-vectors.csv) |
+| **BIP340** | P2PKH-Schnorr v0.7.0 measures 29,660 B per lock and 178,660 B per two-input, two-output Chronicle OTDA ALL payment. [Schnorr results](../projects/p2pkh-schnorr/README.md#measured-sizes) · [Measurements](../projects/p2pkh-schnorr/versions/v0.7.0/measurements.json) · [BIP340 vectors](../projects/p2pkh-schnorr/versions/v0.6.0/bip340-vectors.csv) |
 | **Pure ML-DSA-44** | The v0.3.0 fixture measures 467,733 B per payment lock. [Compiler and transaction measurements](../projects/ml-dsa/versions/v0.3.0/measurements.json) |
 | **BLS12-381 Groth16** | [Fixed-statement comparison](../projects/proof-counter/reference/fixed-statement/README.md) and [recorded benchmark](../projects/proof-counter/versions/v0.1.0/measurements.json) |
 

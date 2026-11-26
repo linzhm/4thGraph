@@ -14,7 +14,7 @@ from fourthgraph.bsv.script import asm, number
 
 from fourthgraph.compiler.ranges import NUMERIC_TYPES, RangeType, Slot, primitive_outputs, range_bound, script_num_checks
 from fourthgraph.stdlib import (
-    WALLET_BACKEND, LibraryImport, interface_digest, p256_vocabulary, read_library, required_source,
+    LIBRARIES, WALLET_BACKEND, LibraryImport, interface_digest, p256_vocabulary, read_library, required_source,
 )
 from fourthgraph.workflow.transaction_graph import CompileError, ParentOutput, Port, StageGraph, StageNode, Template, TransactionGraph
 from fourthgraph.compiler.wordsets import (
@@ -485,6 +485,8 @@ class SourceCompiler:
         if name is None:
             base = self.root_source.parent if self.root_source is not None else Path.cwd()
             name = Path(relpath(path, base)).as_posix()
+            if name in LIBRARIES:
+                name = f"./{name}"
         backend_words = ({word: primitive for word, primitive in p256_vocabulary().items() if word not in self.words}
                          if name == "std/p256" else {})
         self.words.update(backend_words)
