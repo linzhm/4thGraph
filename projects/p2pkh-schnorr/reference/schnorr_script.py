@@ -7,8 +7,8 @@ from pathlib import Path
 
 from fourthgraph.compiler.script_builder import ScriptBuilder
 SOURCE = Path(__file__).with_name("schnorr.fth")
-TEMPLATE_DIR = Path(__file__).resolve().parents[1] / "template"
 TEMPLATE_VERSION = "v0.6.0"
+TEMPLATE_DIR = Path(__file__).resolve().parents[1] / "versions" / TEMPLATE_VERSION
 
 
 @cache

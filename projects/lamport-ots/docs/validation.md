@@ -34,7 +34,7 @@ and unlock remain 22,491 and 8,355 bytes.
 Thirty warm samples on macOS arm64 / Python 3.12.16 gave median chain-gang
 complete-transaction verification of 0.319 ms for universal BIP143 ALL and
 0.363 ms for unpaired OTDA SINGLE with ANYONECANPAY. Local timing, the legacy
-stack observation, and opcode counts are in [measurement.json](../template/measurement.json).
+stack observation, and opcode counts are in [measurements.json](../versions/v0.1.0/measurements.json).
 
 ## Reproduction
 

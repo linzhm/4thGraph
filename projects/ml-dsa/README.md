@@ -1,6 +1,6 @@
 # Pure ML-DSA-44
 
-[简体中文](README.zh-CN.md) · [4thGraph](../../README.md) · [Project index](../README.md)
+[简体中文](README.zh-CN.md) · [4thGraph](../../README.md) · [Project index](../README.md) · [Versions](versions/index.json)
 
 ## Developer resources
 
@@ -10,7 +10,7 @@ Make a lock from the raw ML-DSA-44 public key and sign the payment message in Pu
 
 [Protocol](docs/developer.en.md#protocol) · [Security](docs/developer.en.md#security) · [Verify](#reproduce-the-checks) · [Transaction costs](#complete-transactions-and-stack-measurements)
 
-**Status** · v0.1 development baseline.
+**Status** · v0.1.0 development baseline.
 
 The verifier uses the FIPS 204 Pure ML-DSA-44 public-key and signature
 encodings. A public key is 1,312 bytes and a signature is 2,420 bytes.
@@ -112,7 +112,7 @@ The SHAKE measurements fix the input and output lengths at compile time.
 
 The fixed-key equation accepts packed challenge and response coefficients and
 produces four canonical residual polynomials. The arithmetic and SHAKE scripts
-are also independently replayable. [Deterministic fixture](template/deterministic.json)
+are also independently replayable. [Deterministic fixture](versions/v0.1.0/deterministic.json)
 
 ### Signed-residue NTT experiment
 

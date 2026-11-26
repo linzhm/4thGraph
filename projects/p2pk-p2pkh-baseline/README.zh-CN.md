@@ -1,6 +1,6 @@
 # 原生 P2PK 与 P2PKH 基准
 
-[English](README.md) · [4thGraph](../../README.zh-CN.md) · [项目目录](../README.zh-CN.md)
+[English](README.md) · [4thGraph](../../README.zh-CN.md) · [项目目录](../README.zh-CN.md) · [版本](versions/index.json)
 
 ## 开发入口
 
@@ -64,7 +64,7 @@ OP_DUP OP_HASH160 0x751e76e8199196d454941c45d1b3a323f1433bd6 OP_EQUALVERIFY OP_C
 
 ### 优化与复现
 
-在 4thGraph 0.2.7 中，每个构造词在 `baseline`、`safe` 和 `stack` 模式下都生成相同的字节码。传入夹具数据求值后，得到上面的 35 字节 P2PK 和 25 字节 P2PKH 锁定脚本，与现有的 `lock_hex` 逐字节一致。钱包在链下执行 Forth 构造词，把得到的字节用作交易输出的锁定脚本。[基准夹具](template/baseline.json)
+在 4thGraph 0.2.7 中，每个构造词在 `baseline`、`safe` 和 `stack` 模式下都生成相同的字节码。传入夹具数据求值后，得到上面的 35 字节 P2PK 和 25 字节 P2PKH 锁定脚本，与现有的 `lock_hex` 逐字节一致。钱包在链下执行 Forth 构造词，把得到的字节用作交易输出的锁定脚本。[基准夹具](versions/v0.1.0/baseline.json)
 
 从仓库根目录运行以下命令，打印两种锁定脚本并查看构造词的 `stack` 优化报告。
 
@@ -93,7 +93,7 @@ done
 uv run --no-project --with-requirements requirements.txt python script_lab.py
 ```
 
-脚本输出上笔交易、花费交易、Script 汇编、十六进制和用例结果。依赖已安装时，可以添加 `--offline`。通过 `cmp - ../template/baseline.json` 与[固定输出](template/baseline.json)比较。样本用公开私钥和合成上一输出，只用于本地重放。
+脚本输出上笔交易、花费交易、Script 汇编、十六进制和用例结果。依赖已安装时，可以添加 `--offline`。通过 `cmp - ../versions/v0.1.0/baseline.json` 与[固定输出](versions/v0.1.0/baseline.json)比较。样本用公开私钥和合成上一输出，只用于本地重放。
 
 离线示例使用版本 1 的交易和 BIP143 ALL。独立[验收矩阵](reference/acceptance.md)列出 2,880 种完整输入组合、80 个无配对 SINGLE 变更用例和 192 个 Chronicle 激活边界用例。统一测量使用独立的版本 2 交易样本。
 

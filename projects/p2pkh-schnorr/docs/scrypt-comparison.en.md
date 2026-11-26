@@ -10,7 +10,7 @@ Script Lab uses the BIP340 tagged challenge, a 32-byte x-only public key, and tw
 
 ## Standalone verifier replay
 
-Each verifier receives a signature in its own format over the 32-byte message and public-key x-coordinate from official BIP340 vector 0. All three builds use synthetic one-input spends with explicit prevouts and pass BSV Node 1.2.3 `verifyscript` under the repository's raised script limits and the pinned chain-gang evaluator. The figures count serialized script bytes, including witness push opcodes. `scryptlib` 2.1.36's local interpreter reports `SCRIPT_ERR_SCRIPT_SIZE` on the default legacy build with its default flags. [BIP340 vectors](../template/bip340-vectors.csv) · [Runner](../reference/compare_scrypt.py) · [Isolated regtest](../../../tools/verify_node.sh)
+Each verifier receives a signature in its own format over the 32-byte message and public-key x-coordinate from official BIP340 vector 0. All three builds use synthetic one-input spends with explicit prevouts and pass BSV Node 1.2.3 `verifyscript` under the repository's raised script limits and the pinned chain-gang evaluator. The figures count serialized script bytes, including witness push opcodes. `scryptlib` 2.1.36's local interpreter reports `SCRIPT_ERR_SCRIPT_SIZE` on the default legacy build with its default flags. [BIP340 vectors](../versions/v0.6.0/bip340-vectors.csv) · [Runner](../reference/compare_scrypt.py) · [Isolated regtest](../../../tools/verify_node.sh)
 
 | Verifier | Lock bytes | Witness bytes | Combined script bytes | chain-gang median | BSV Node RPC median |
 | --- | ---: | ---: | ---: | ---: | ---: |

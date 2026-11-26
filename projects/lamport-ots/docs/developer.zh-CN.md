@@ -12,7 +12,7 @@
 
 有序公钥包含 256 对承诺。签名为摘要每一位公开所选的 32 字节秘密值，总计 8,192 字节。全公钥付款锁携带全部公开承诺。公钥承诺候选锁只保存有序公钥的承诺，解锁时另提供每对中另一侧的哈希，用以还原并校验有序公钥。两种付款格式都把摘要绑定到交易输入。
 
-[线格式与脚本规范（英文）](spec.md) · [测量清单](../template/measurement.json) · [签名模式向量](../template/universal-vectors.json)
+[线格式与脚本规范（英文）](spec.md) · [测量清单](../versions/v0.1.0/measurements.json) · [签名模式向量](../versions/v0.1.0/universal-vectors.json)
 
 <a name="security"></a>
 
@@ -36,4 +36,4 @@
 
 按[统一 Lamport 钱包指南](sdk.zh-CN.md)生成完整公钥或承诺公钥输出，并接入外部签名器。签名器对请求中的摘要返回 8,192 字节原始签名。钱包需要持久记录密钥消耗，找零使用新密钥。
 
-[参考使用说明（英文）](../reference/README.md) · [付款接口](../reference/payment.py) · [原始入金和花费向量](../template/vector.json)
+[参考使用说明（英文）](../reference/README.md) · [付款接口](../reference/payment.py) · [原始入金和花费向量](../versions/v0.1.0/vector.json)

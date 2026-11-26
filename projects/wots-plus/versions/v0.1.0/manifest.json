@@ -1,0 +1,16 @@
+{
+  "version": "0.1.0",
+  "previous": null,
+  "artifacts": [
+    "cached-steps-layout.json",
+    "cached-steps.hex",
+    "otda-all-reconstruct.hex"
+  ],
+  "fixtures": [
+    "vectors.json"
+  ],
+  "evidence": [],
+  "integration": "docs/sdk.en.md",
+  "build": "PYTHONPATH=src:. python projects/wots-plus/reference/generate_reconstruction.py --check",
+  "verify": "bash projects/wots-plus/reference/verify.sh"
+}

@@ -1,6 +1,6 @@
 # 交易工作流示例
 
-[English](README.md) · [项目目录](../README.zh-CN.md)
+[English](README.md) · [项目目录](../README.zh-CN.md) · [版本](versions/index.json)
 
 **[编译一个词](#compile-a-word)** · [构建交易计划](../../docs/toolchain.md#交易与验证) · [Gforth 前端](gforth/README.md)
 
