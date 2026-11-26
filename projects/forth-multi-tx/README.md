@@ -14,7 +14,7 @@ python -m venv .venv
 python -m pip install ecdsa -r shared/requirements-chronicle.txt
 PYTHONPATH=. python -m unittest discover -v -s projects/forth-multi-tx
 PYTHONPATH=. bash shared/verify_node.sh --profile default -- \
-  python projects/forth-multi-tx/replay.py --output /tmp/forth-replay.json --samples 21
+  python projects/forth-multi-tx/replay.py --output projects/forth-multi-tx/build/replay.json --samples 21
 ```
 
 编译和复放都用 `--target` 选目标。三个目标均使用原始 ForkID ALL（`0x41`）。
@@ -31,10 +31,10 @@ PYTHONPATH=. bash shared/verify_node.sh --profile default -- \
 
 ```sh
 REGTEST_CHRONICLE_HEIGHT=1000 PYTHONPATH=. bash shared/verify_node.sh --profile default -- \
-  python projects/forth-multi-tx/replay.py --target forkid-v1 --output /tmp/forth-replay-v1.json --samples 21
+  python projects/forth-multi-tx/replay.py --target forkid-v1 --output projects/forth-multi-tx/build/replay-v1.json --samples 21
 
 PYTHONPATH=. bash shared/verify_node.sh --profile default -- \
-  python projects/forth-multi-tx/replay.py --target both --output /tmp/forth-replay-both.json --samples 21
+  python projects/forth-multi-tx/replay.py --target both --output projects/forth-multi-tx/build/replay-both.json --samples 21
 ```
 
 复放 JSON 保存源码、两套脚本和符号模板、每笔交易的原始字节与真实 outpoint、每个输入的 BSV Node 脚本判定、Node 入池及挖块结果，以及 chain-gang 的整笔交易判定。启动时使用钱包矿工奖励建立共享资金夹具。报告从各路径自己的部署交易开始计量。
@@ -42,9 +42,9 @@ PYTHONPATH=. bash shared/verify_node.sh --profile default -- \
 可用复放报告里的测试公钥离线编译。换用自己的公钥时，`keys.json` 的格式为角色名到压缩 secp256k1 公钥十六进制字符串的映射。
 
 ```sh
-jq '.fixture_public_keys' /tmp/forth-replay.json > /tmp/forth-keys.json
+jq '.fixture_public_keys' projects/forth-multi-tx/build/replay.json > projects/forth-multi-tx/build/fixture-keys.json
 PYTHONPATH=. python projects/forth-multi-tx/protocol.py projects/forth-multi-tx/example.fth \
-  --mode split --target both --keys /tmp/forth-keys.json --task-id "$(jq -r .task_id /tmp/forth-replay.json)"
+  --mode split --target both --keys projects/forth-multi-tx/build/fixture-keys.json --task-id "$(jq -r .task_id projects/forth-multi-tx/build/replay.json)"
 PYTHONPATH=. python projects/forth-multi-tx/protocol.py --capabilities
 ```
 

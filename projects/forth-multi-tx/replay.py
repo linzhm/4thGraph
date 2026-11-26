@@ -16,7 +16,7 @@ from shared.transaction import Input, Transaction
 
 from compiler import PROJECT_NAME, CompileError, Word, evaluate, parse, schedule
 from lowering import BASELINE, OPTIMIZATIONS
-from protocol import DEFAULT_TARGET, TARGETS, Contracts, FLAG, Host, ROOT_VALUE, UTXO, invalidated
+from protocol import DEFAULT_TARGET, JOIN_WITNESSES, TARGETS, Contracts, FLAG, Host, ROOT_VALUE, UTXO, invalidated
 from wordsets import HOST_WORDS
 
 EXAMPLE = Path(__file__).with_name("example.fth")
@@ -68,11 +68,12 @@ def stack_peaks(tx, previous):
 
 
 class Replay:
-    def __init__(self, node, samples, target, activation_height, optimization=BASELINE):
+    def __init__(self, node, samples, target, activation_height, optimization=BASELINE, join_witness="full"):
         self.node = node
         self.samples = samples
         self.target = target
         self.optimization = optimization
+        self.join_witness = join_witness
         self.versions, _ = TARGETS[target]
         self.version = self.versions[-1]
         self.activation_height = activation_height
@@ -80,6 +81,10 @@ class Replay:
         self.known = {}
         self.host = Host(self.lookup, self.keys.sign, self.submit)
         self.traces = {}
+
+    def contracts(self, plan):
+        return Contracts(plan, self.keys.public, TASK_ID, target=self.target,
+                         optimization=self.optimization, join_witness=self.join_witness)
 
     def lookup(self, outpoint):
         utxo = UTXO(self.known[outpoint.txid], outpoint.vout)
@@ -194,7 +199,7 @@ class Replay:
                 "wrong_successor": wrong_successor, "wrong_version": wrong_version}
 
     def path(self, plan, bootstrap, slot, data, route, *, foreign=None):
-        c = Contracts(plan, self.keys.public, TASK_ID, target=self.target, optimization=self.optimization)
+        c = self.contracts(plan)
         first_version, second_version = self.versions[0], self.versions[-1]
         if route == "review":
             first_version, second_version = second_version, first_version
@@ -263,6 +268,7 @@ def main():
     cli.add_argument("--samples", type=int, default=7)
     cli.add_argument("--target", choices=TARGETS, default=DEFAULT_TARGET)
     cli.add_argument("--optimize", choices=OPTIMIZATIONS, default=BASELINE)
+    cli.add_argument("--join-witness", choices=JOIN_WITNESSES, default="full")
     args = cli.parse_args()
     if args.samples < 1:
         cli.error("--samples must be positive")
@@ -275,7 +281,7 @@ def main():
     if node.call("getconnectioncount", []) or node.call("getblockcount", []):
         raise ValueError("replay requires an empty peerless regtest")
     activation = int(os.environ.get("SCRIPT_LAB_CHRONICLE_HEIGHT", ACTIVATION_HEIGHT))
-    replay = Replay(node, args.samples, args.target, activation, args.optimize)
+    replay = Replay(node, args.samples, args.target, activation, args.optimize, args.join_witness)
     source = EXAMPLE.read_text()
     pp = parse(source)
     fused, split = schedule(pp, "fused"), schedule(pp, "split")
@@ -289,7 +295,7 @@ def main():
     else:
         raise ValueError("hard independent submission boundary did not block fusion")
     bootstrap = replay.fund(5)
-    c = Contracts(split, replay.keys.public, TASK_ID, target=args.target, optimization=args.optimize)
+    c = replay.contracts(split)
     other, deployment = replay.deploy(c, bootstrap, 4)
     foreign = {"deploy": other}
     split_row = replay.branch(c, "split", foreign, None)
@@ -305,13 +311,12 @@ def main():
         "project": PROJECT_NAME, "schema_version": 1, "sample_count": args.samples,
         "bsv_node_version": node.version, "chain_gang": engine,
         "regtest_profile": os.environ.get("SCRIPT_LAB_REGTEST_PROFILE"),
-        "target": args.target, "optimization": args.optimize, "chronicle_activation_height": activation,
+        "target": args.target, "optimization": args.optimize, "join_witness": args.join_witness,
+        "chronicle_activation_height": activation,
         "task_id": TASK_ID.hex(), "bootstrap_raw": bootstrap.serialize().hex(),
         "fixture_public_keys": {name: key.hex() for name, key in replay.keys.public.items()},
         "source": source, "constrained_source": constrained_source,
-        "plans": {plan.mode: Contracts(plan, replay.keys.public, TASK_ID, target=args.target,
-                                      optimization=args.optimize).describe()
-                  for plan in (fused, split)},
+        "plans": {plan.mode: replay.contracts(plan).describe() for plan in (fused, split)},
         "constrained_auto_schedule": constrained.mode, "constrained_fused_error": rejected,
         "foreign_same_task_id": {"deploy": deployment, "split": split_row, "b": b_row},
         "cases": cases,

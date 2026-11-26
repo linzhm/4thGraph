@@ -13,7 +13,7 @@ from shared.transaction import Input, Transaction
 
 from compiler import CompileError, SourceCompiler, evaluate, lower, parse, schedule
 from lowering import compile_word
-from protocol import Contracts, invalidated
+from protocol import Contracts, compile_candidates, invalidated
 from replay import EXAMPLE, TASK_ID, TestKeys
 from wordsets import CELL_SIGN, U32, capabilities
 
@@ -189,6 +189,33 @@ class ProtocolTests(unittest.TestCase):
         witness = (self.done["a"].serialize(), forged)
         fake_proof = replace(join, payload=(witness, witness))
         self.assertFalse(chain_verdict(fake_proof.seal(self.keys.sign), join.parents))
+
+    def test_shared_join_authenticates_the_reconstructed_transactions(self):
+        contracts = Contracts(self.plan, self.keys.public, TASK_ID, target="both", join_witness="shared")
+        deploy = Transaction((Input(bytes(32), 0),), (contracts.root,))
+        done = {"deploy": deploy}
+        done["split"] = contracts.prepare("split", done).seal(self.keys.sign)
+        for version, name, data in ((1, "a", {"x": 10}), (2, "b", {"y": 5})):
+            done[name] = contracts.prepare(name, done, data, version=version).seal(self.keys.sign)
+        join = contracts.prepare("route", done, version=1)
+        head_a, tail_a, head_b, tail_b, common = join.payload[0]
+        self.assertEqual(head_a + common + tail_a, done["a"].serialize())
+        self.assertEqual(head_b + common + tail_b, done["b"].serialize())
+        self.assertTrue(chain_verdict(join.seal(self.keys.sign), join.parents))
+        forged = (head_a, tail_a, head_b, tail_b, bytes([common[0] ^ 1]) + common[1:])
+        fake = replace(join, payload=(forged, forged))
+        self.assertFalse(chain_verdict(fake.seal(self.keys.sign), join.parents))
+
+    def test_cost_explanation_applies_constraints_before_candidate_comparison(self):
+        options = {"mode": "auto", "available_data": None, "available_authorizers": None, "target": "both"}
+        _, report = compile_candidates(self.plan.program, self.keys.public, TASK_ID, **options)
+        self.assertEqual(report["selected"], "fused")
+        self.assertLess(report["candidates"]["fused"]["cost"]["whole_path_bytes"],
+                        report["candidates"]["split"]["cost"]["whole_path_bytes"])
+        constrained = parse(SOURCE + "\nindependent-submit a\n")
+        _, report = compile_candidates(constrained, self.keys.public, TASK_ID, **options)
+        self.assertEqual(report["selected"], "split")
+        self.assertIn("independent-submit a", report["candidates"]["fused"]["reason"])
 
     def test_exact_version(self):
         cases = (("forkid-v1", 1, 5, 2), ("chronicle-v2", 2, 2, 1))

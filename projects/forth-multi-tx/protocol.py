@@ -26,6 +26,7 @@ RESULT_WIDTH = 5  # Four unsigned payload bytes plus a zero sign byte.
 PREVOUTS_HASH = 4
 CURRENT_OUTPOINT = 68
 OUTPUTS_HASH = 118
+JOIN_WITNESSES = ("full", "shared")
 
 
 def field(offset, width):
@@ -104,14 +105,24 @@ def proof(index, data_prefix, versions):
     return bound_prefix + tail
 
 
-def join_lock(code, terminals, data_prefix, versions):
+def reconstruct_parents():
+    # Entry: aHead aTail bHead bTail common preimage splitTxid.
+    # The supplied common bytes acquire authority only through hashPrevouts.
+    return asm("OP_TOALTSTACK OP_TOALTSTACK OP_DUP OP_TOALTSTACK OP_SWAP OP_CAT OP_CAT "
+               "OP_FROMALTSTACK OP_2SWAP OP_ROT OP_SWAP OP_CAT OP_CAT OP_SWAP "
+               "OP_FROMALTSTACK OP_FROMALTSTACK")
+
+
+def join_lock(code, terminals, data_prefix, versions, witness):
     # Lock prefix pushes splitTxid above witness rawA rawB P.
     read_results = (asm("OP_2 OP_PICK OP_OVER") + proof(0, data_prefix, versions)
                     + asm("OP_TOALTSTACK OP_OVER OP_OVER") + proof(1, data_prefix, versions)
                     + asm("OP_FROMALTSTACK OP_SWAP"))
     bind_prevouts = (asm("OP_DROP OP_HASH256") + push(ZERO_INDEX) + asm("OP_CAT OP_SWAP OP_HASH256")
                      + push(ZERO_INDEX) + asm("OP_CAT OP_SWAP OP_CAT OP_HASH256") + check_field(PREVOUTS_HASH))
-    return asm("OP_SWAP") + begin(versions) + read_results + code + route_check(terminals) + bind_prevouts + finish()
+    reconstruct = reconstruct_parents() if witness == "shared" else b""
+    return (reconstruct + asm("OP_SWAP") + begin(versions) + read_results + code
+            + route_check(terminals) + bind_prevouts + finish())
 
 
 def work_lock(index, code, owner, join_code, data_prefix, versions):
@@ -223,11 +234,15 @@ class Host:
 
 
 class Contracts:
-    def __init__(self, plan: Plan, keys, task_id, *, target=DEFAULT_TARGET, optimization=BASELINE):
+    def __init__(self, plan: Plan, keys, task_id, *, target=DEFAULT_TARGET, optimization=BASELINE,
+                 join_witness="full"):
         if target not in TARGETS:
             raise ValueError(f"unknown compilation target {target!r}")
         self.target = target
         self.optimization = optimization
+        if join_witness not in JOIN_WITNESSES:
+            raise ValueError(f"unknown join witness format {join_witness!r}")
+        self.join_witness = join_witness
         self.versions, self.era = TARGETS[target]
         self.version = self.versions[-1]
         if len(task_id) != 32:
@@ -254,7 +269,7 @@ class Contracts:
                     + validate_u32() + asm("OP_SWAP") + validate_u32() + self.words[a.name].script
                     + asm("OP_SWAP") + self.words[b.name].script + select_route + route_check(self.terminals) + finish())
         else:
-            self.join_code = join_lock(select_route, self.terminals, self.data_prefix, self.versions)
+            self.join_code = join_lock(select_route, self.terminals, self.data_prefix, self.versions, join_witness)
             self.work_outputs = tuple(
                 Output(WORK_VALUE, work_lock(i, self.words[step.name].script, keys[step.owner], self.join_code,
                                              self.data_prefix, self.versions))
@@ -272,6 +287,7 @@ class Contracts:
             "project": PROJECT_NAME,
             "target": self.target,
             "optimization": self.optimization,
+            "join_witness": self.join_witness,
             "word_builds": {name: word.describe() for name, word in self.words.items()},
             "era": self.era,
             "transaction_version": self.version,
@@ -280,6 +296,7 @@ class Contracts:
             "enabled_optional_wordsets": self.plan.program.optional_wordsets,
             "schedule": self.plan.mode,
             "fusion_blockers": self.plan.fusion_blockers,
+            "estimated_cost": estimate_cost(self),
             "templates": [asdict(template) for template in self.plan.templates],
             "deploy_output": describe_output(self.root),
             "terminal_outputs": {route: describe_output(output)
@@ -308,6 +325,18 @@ class Contracts:
             raise ValueError("incorrect result data output")
         return decode_num(encoded[-RESULT_WIDTH:])
 
+    def join_payload(self, parents):
+        if self.join_witness == "full":
+            return tuple(parent.serialize() for parent in parents)
+        fields = []
+        for parent in parents:
+            if len(parent.outputs) != 2 or not parent.outputs[0].script.endswith(self.join_code):
+                raise ValueError("result parent has no common join script")
+            raw = parent.serialize()
+            end = len(raw) - len(parent.outputs[1].serialize()) - 4  # Ends before output 1 and locktime.
+            fields.extend((raw[:end - len(self.join_code)], raw[end:]))
+        return (*fields, self.join_code)
+
     def prepare(self, name, completed, data=None, *, version=None):
         version = self.version if version is None else version
         if type(version) is not int or version not in self.versions:
@@ -327,7 +356,7 @@ class Contracts:
         elif name == self.plan.program.join_name:
             parents = tuple(utxo.parent for utxo in previous)
             route, = evaluate(self.plan.program.join, *(self.result_value(parent) for parent in parents))
-            outputs, payload = (self.terminals[route],), (tuple(parent.serialize() for parent in parents),) * 2
+            outputs, payload = (self.terminals[route],), (self.join_payload(parents),) * 2
         else:
             step = a if name == a.name else b
             value = input_value(data, step.input)
@@ -346,6 +375,66 @@ def input_value(data, name):
     return value
 
 
+def estimate_cost(contracts):
+    # Fixed fixture for plan comparison. ECDSA signature size and input
+    # encoding may vary in a signed transaction, so this is not a fee quote.
+    fake_der = bytes(71)
+    deploy = Transaction((Input(bytes(32), 0, push(fake_der + bytes([FLAG]))),),
+                         (contracts.root,), version=contracts.version)
+    done = {"deploy": deploy}
+    depths = {"deploy": 1}
+    rows = {"deploy": {"bytes": len(deploy.serialize()), "signature_checks": 1,
+                       "depends_on": [], "decision": "fund the first lock"}}
+    data = {step.input: 0 for step in contracts.plan.program.work}
+    for step in contracts.plan.templates:
+        draft = contracts.prepare(step.name, done, data)
+        tx = draft.seal(lambda _: fake_der)
+        done[step.name] = tx
+        depths[step.name] = 1 + max(depths[ref.step] for ref in step.inputs)
+        decision = {
+            ("terminal",): "choose the terminal under the verified route",
+            ("work", "work"): "create separately spendable work outputs",
+            ("result", "data"): "materialize a result for the join",
+        }[step.outputs]
+        rows[step.name] = {
+            "bytes": len(tx.serialize()),
+            "signature_checks": len(step.inputs) + len(step.authorizers),
+            "depends_on": [asdict(ref) for ref in step.inputs],
+            "decision": decision,
+        }
+    return {
+        "assumptions": {"external_u32_values": data, "ecdsa_der_bytes": len(fake_der), "deployment_inputs": 1},
+        "whole_path_bytes": sum(step["bytes"] for step in rows.values()),
+        "max_transaction_bytes": max(step["bytes"] for step in rows.values()),
+        "max_signature_checks": max(step["signature_checks"] for step in rows.values()),
+        "dependency_depth_including_deploy": max(depths.values()),
+        "steps": rows,
+    }
+
+
+def compile_candidates(program, keys, task_id, *, mode, available_data, available_authorizers, **options):
+    if mode != "auto":
+        schedule(program, mode, available_data=available_data, available_authorizers=available_authorizers)
+    viable, evidence = {}, {}
+    for candidate in ("fused", "split"):
+        try:
+            plan = schedule(program, candidate, available_data=available_data,
+                            available_authorizers=available_authorizers)
+            contract = Contracts(plan, keys, task_id, **options)
+        except ValueError as error:
+            evidence[candidate] = {"eligible": False, "reason": str(error)}
+            continue
+        evidence[candidate] = {"eligible": True, "cost": estimate_cost(contract)}
+        viable[candidate] = contract
+    if mode == "auto" and viable:
+        order = ("whole_path_bytes", "max_signature_checks", "dependency_depth_including_deploy")
+        mode = min(viable, key=lambda name: tuple(evidence[name]["cost"][metric] for metric in order))
+    if mode not in viable:
+        reasons = ", ".join(f"{name}: {row.get('reason')}" for name, row in evidence.items() if not row["eligible"])
+        raise CompileError(f"no requested transaction plan is eligible ({reasons})")
+    return viable[mode], {"selected": mode, "candidates": evidence}
+
+
 def main():
     cli = argparse.ArgumentParser(prog=PROJECT_NAME, description=PROJECT_DESCRIPTION)
     cli.add_argument("source", type=Path, nargs="?")
@@ -355,6 +444,8 @@ def main():
     cli.add_argument("--mode", choices=("auto", "fused", "split"), default="auto")
     cli.add_argument("--target", choices=TARGETS, default=DEFAULT_TARGET, help="permitted transaction versions")
     cli.add_argument("--optimize", choices=OPTIMIZATIONS, default=BASELINE)
+    cli.add_argument("--join-witness", choices=JOIN_WITNESSES, default="full")
+    cli.add_argument("--explain", action="store_true", help="show both candidates and how the plan was chosen")
     cli.add_argument("--keys", type=Path, help="JSON map of role to compressed public key hex")
     cli.add_argument("--task-id", help="32-byte hex data identifier")
     cli.add_argument("--available-data", nargs="*")
@@ -380,11 +471,15 @@ def main():
                       "enabled_optional_wordsets": source.optional_wordsets, "optimization": args.optimize,
                       "script_hex": compiled.script.hex(), **compiled.describe()}
         else:
-            plan = schedule(source.program(), args.mode, available_data=args.available_data,
-                            available_authorizers=args.available_authorizers)
             keys = {name: bytes.fromhex(key) for name, key in json.loads(args.keys.read_text()).items()}
-            result = Contracts(plan, keys, bytes.fromhex(args.task_id), target=args.target,
-                               optimization=args.optimize).describe()
+            contract, explanation = compile_candidates(
+                source.program(), keys, bytes.fromhex(args.task_id), mode=args.mode, available_data=args.available_data,
+                available_authorizers=args.available_authorizers, target=args.target, optimization=args.optimize,
+                join_witness=args.join_witness,
+            )
+            result = contract.describe()
+            if args.explain:
+                result["schedule_explanation"] = explanation
     except CompileError as error:
         cli.error(f"{args.source}: {error}")
     except (OSError, ValueError) as error:
