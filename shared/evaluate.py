@@ -58,6 +58,9 @@ def evaluate(raw, stack=None, checksig=None, *, observe_stack=None):
                 require_stack(3)
                 stack.extend(stack[-3:])
             elif name=='OVER': stack.append(stack[-2])
+            elif name=='2OVER':
+                require_stack(4)
+                stack.extend(stack[-4:-2])
             elif name=='2SWAP':
                 require_stack(4)
                 stack[-4:] = stack[-2:] + stack[-4:-2]
