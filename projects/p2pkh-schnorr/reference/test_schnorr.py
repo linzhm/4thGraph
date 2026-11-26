@@ -253,7 +253,7 @@ class SchnorrTests(unittest.TestCase):
         self.assertEqual(raw, reference[:offset] + owner + reference[offset + 20:])
         self.assertEqual(compiled_template(owner), (raw, offset))
         self.assertEqual(recognize_template(raw), (TEMPLATE_VERSION, owner))
-        self.assertLess(len(raw), len(lock_for_owner(bytes(20), version="v0.9.0")))
+        self.assertLess(len(raw), len(lock_for_owner(bytes(20), version="v0.10.0")))
 
     def test_mixed_template_spend(self):
         public = self.public_keys[0]
@@ -264,6 +264,7 @@ class SchnorrTests(unittest.TestCase):
             "v0.7.0": "b1aff80ac6a66e83cf915f6636b54fd7853b2803543d2410a19840efb50ad966",
             "v0.8.0": "eafc3937ba802a3fcfeae3bf7a814a747be3c797906c86e330cd68001f3509e5",
             "v0.9.0": "8c58eb80a5adb4aaf1256db2f12e0f4bbc551885e919200350621481a45de0a3",
+            "v0.10.0": "48411a610a80dbeba846332ef28f78c7ee3dedeaa131e82faa89f6cd24b88f83",
         }
         for version, checksum in versions.items():
             raw = lock_for_public_key(public, version=version)
@@ -414,6 +415,7 @@ class SchnorrTests(unittest.TestCase):
         split = contract.emit("secp256k1-lambda-split", b"")
         table = contract.emit("bip340-joint-window-table", b"")
         step = contract.emit("bip340-joint-window-step", b"")
+        depths = contract.emit("bip340-window-depths", b"")
 
         def check_point(coordinates, scalar):
             x, y, z = (decode_num(item) % FIELD for item in coordinates)
@@ -423,6 +425,21 @@ class SchnorrTests(unittest.TestCase):
             else:
                 inverse = pow(z, -1, FIELD)
                 self.assertEqual((x * inverse % FIELD, y * inverse % FIELD), affine_generator_multiple(scalar))
+
+        def fixed_depth(index):
+            return 3 + 2 * index if index else 0
+
+        def variable_depth(index):
+            return 82 - 3 * index if index else 0
+
+        def depth_streams(windows):
+            return [bytes(fixed_depth(digit & 15) for digit in windows),
+                    bytes(variable_depth(digit >> 4) for digit in windows)]
+
+        depth_vectors = [bytes(64), b"\xff" * 64]
+        depth_vectors.extend(bytes(range(start, start + 64)) for start in range(0, 256, 64))
+        for windows in depth_vectors:
+            self.assertEqual(evaluate(depths, [windows]), (depth_streams(windows), []))
 
         for public_multiple, s, k in ((1, ORDER - 1, 13), (-1, HALF_RADIX, ORDER),
                                       (2, 0, ORDER // 2), (11, HALF_RADIX + 17, ORDER // 3)):
@@ -434,7 +451,8 @@ class SchnorrTests(unittest.TestCase):
             q = LAMBDA * (-public_multiple if k2 < 0 else public_multiple)
             built, alt = evaluate(table, list(map(encode_num, original)))
             scalar_lanes = (s % HALF_RADIX, s // HALF_RADIX, abs(k1), abs(k2))
-            self.assertEqual(alt, [self.window_stream(scalar_lanes)])
+            windows = self.window_stream(scalar_lanes)
+            self.assertEqual(alt, depth_streams(windows))
             self.assertEqual(len(built), 81)
             self.assertEqual(list(map(decode_num, built[:2])), original[1:3])
             self.assertEqual(list(map(decode_num, built[-4:])), [FIELD, 0, 1, 0])
@@ -451,10 +469,12 @@ class SchnorrTests(unittest.TestCase):
                 with self.subTest(public_multiple=public_multiple, fixed=fixed, variable=variable):
                     high, low = divmod(fixed, 4)
                     vhigh, vlow = divmod(variable, 4)
-                    remaining = b"\xff"
-                    stream = bytes([variable * 16 + fixed]) + remaining
-                    selected, alt = evaluate(push(stream) + asm("OP_TOALTSTACK") + step, built)
-                    self.assertEqual(alt, [remaining])
+                    remaining = [b"\x21", b"\x25"]
+                    streams = (bytes([fixed_depth(fixed)]) + remaining[0],
+                               bytes([variable_depth(variable)]) + remaining[1])
+                    setup = b"".join(push(stream) + asm("OP_TOALTSTACK") for stream in streams)
+                    selected, alt = evaluate(setup + step, built)
+                    self.assertEqual(alt, remaining)
                     self.assertEqual(selected[:-3], built[:-3])
                     check_point(selected[-3:], high * HALF_RADIX + low + vhigh * q + vlow * p)
 

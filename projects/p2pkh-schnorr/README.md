@@ -1,4 +1,4 @@
-# P2PKH-Schnorr v0.10.0
+# P2PKH-Schnorr v0.11.0
 
 [简体中文](README.zh-CN.md) · [4thGraph](../../README.md) · [Project index](../README.md) · [Versions](versions/index.json)
 
@@ -12,11 +12,11 @@ Two parties can use BIP327 MuSig2 to spend through the same signer interface. Th
 
 The payment example imports the 4thGraph standard-library verifier with `REQUIRE stdlib/bip340.fth`. Its `schnorr-lock` word combines the library verifier with the owner check and the current-input binding. Its `schnorr-unlock` word builds the unlocking script for each spend. [Payment example source](reference/schnorr.fth) · [4thGraph BIP340 library](../../src/fourthgraph/stdlib/bip340.fth)
 
-From the repository root, run `PYTHONPATH=src:. python projects/p2pkh-schnorr/reference/generate_template.py --check` to verify the current lock and layout. Use `--write` to regenerate them. The wallet creates v0.10.0 outputs by default and also recognizes and spends v0.6.0 through v0.9.0 outputs. [Version catalog](versions/index.json)
+From the repository root, run `PYTHONPATH=src:. python projects/p2pkh-schnorr/reference/generate_template.py --check` to verify the current lock and layout. Use `--write` to regenerate them. The wallet creates v0.11.0 outputs by default and also recognizes and spends v0.6.0 through v0.10.0 outputs. [Version catalog](versions/index.json)
 
 The wallet uses libsecp256k1 to verify the external signature, then supplies the approved preimage and public witness to `schnorr-unlock` to construct the unlocking script. [Wallet SDK](docs/sdk.en.md#quickstart)
 
-The verifier uses 64 packed two-bit windows over four 128-bit components. v0.10.0 schedules complete projective and mixed affine addition with fewer stack operations. The detached verifier shrinks from 25,998 to 24,942 bytes. The payment lock uses a bit mask for the sighash check. [Scalar decomposition and window construction](docs/spec.en.md#joint-scalar-multiplication)
+The verifier uses 64 packed two-bit windows over four 128-bit components. v0.11.0 prepares both streams of table depths before iteration and builds recurring masks from short patterns. The detached verifier shrinks from 24,942 to 24,107 bytes. [Scalar decomposition and window construction](docs/spec.en.md#joint-scalar-multiplication)
 
 ## Validate the baseline
 
@@ -37,16 +37,16 @@ The acceptance suite checks all 19 official BIP340 verification vectors, includi
 
 ## Measured sizes
 
-Each v0.10.0 output lock is **25,752 bytes**, saving 1,105 bytes over v0.9.0. Its owner field starts at byte offset **189**. The table measures two inputs creating two Schnorr outputs. The unlocking scripts push the complete signing preimage, BIP340 signature, and coordinate witnesses.
+Each v0.11.0 output lock is **24,917 bytes**, saving 835 bytes over v0.10.0. Its owner field starts at byte offset **189**. The table measures two inputs creating two Schnorr outputs. The unlocking scripts push the complete signing preimage, BIP340 signature, and coordinate witnesses.
 
 | Mode | Each output lock | Each input unlock | Complete transaction | Extra input | Extra output | Fund and exit | One turnover | Peak stack payload |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| BIP143 ALL | 25,752 | 329 | 52,280 | 372 | 25,763 | 52,505 | 104,786 | 3,338 |
-| Chronicle OTDA ALL | 25,752 | 51,795 | 155,212 | 51,961 | 77,297 | 52,519 | 207,731 | 103,422 |
+| BIP143 ALL | 24,917 | 329 | 50,610 | 372 | 24,928 | 50,836 | 101,445 | 3,410 |
+| Chronicle OTDA ALL | 24,917 | 50,125 | 150,202 | 50,291 | 74,792 | 50,849 | 201,052 | 100,082 |
 
-All sizes are in bytes. Stack payload is the approximate combined main and alternate stack payload for the first input from the development evaluator. BSV Node 1.2.3 and chain-gang verify each complete input with supplied prevouts. OTDA ALL includes the literal signed outputs in each preimage. [Layout and fingerprint](versions/v0.10.0/layout.json) · [Replayed measurements](versions/v0.10.0/measurements.json) · [Benchmark method](../../docs/benchmark.md)
+All sizes are in bytes. Stack payload is the approximate combined main and alternate stack payload for the first input from the development evaluator. BSV Node 1.2.3 and chain-gang verify each complete input with supplied prevouts. OTDA ALL includes the literal signed outputs in each preimage. [Layout and fingerprint](versions/v0.11.0/layout.json) · [Replayed measurements](versions/v0.11.0/measurements.json) · [Benchmark method](../../docs/benchmark.md)
 
-In the one-input fixture that pays one ordinary P2PKH output, both Schnorr versions measure 416 bytes for BIP143 ALL and 348 bytes for OTDA ALL. The smaller Schnorr lock reduces the size of the transaction that creates the UTXO. The standalone BIP340 vectors exercise the same point arithmetic with no payment preimage. [Verifier and exit measurements](versions/v0.10.0/measurements.json)
+In the one-input fixture that pays one ordinary P2PKH output, v0.10.0 and v0.11.0 both measure 416 bytes for BIP143 ALL and 348 bytes for OTDA ALL. The smaller Schnorr lock reduces the size of the transaction that creates the UTXO. The standalone BIP340 vectors exercise the same point arithmetic with no payment preimage. [Verifier and exit measurements](versions/v0.11.0/measurements.json)
 
 ```sh
 PYTHONPATH=src:. bash tools/verify_node.sh -- "$SCRIPT_LAB_SDK_PYTHON" -m fourthgraph.benchmark.run \
@@ -57,7 +57,7 @@ Under BSV Node 1.2.3's default regtest policy, funding, turnover, and exit enter
 
 ```sh
 PYTHONPATH=src:. bash tools/verify_node.sh --profile default -- "$SCRIPT_LAB_SDK_PYTHON" -m fourthgraph.benchmark.admission \
-  p2pkh-schnorr --template v0.10.0 --turnover --output projects/p2pkh-schnorr/workspace/build/admission.json
+  p2pkh-schnorr --template v0.11.0 --turnover --output projects/p2pkh-schnorr/workspace/build/admission.json
 ```
 
 The [sCrypt comparison](docs/scrypt-comparison.en.md) includes the 2021 article's linked verifier and a sCrypt BIP340 implementation with a common witness layout. The [native 2-of-2 comparison](docs/threshold-comparison.en.md) measures the full transaction lifecycle and the amount of signing data produced off-chain.

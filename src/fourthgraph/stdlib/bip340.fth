@@ -6,7 +6,7 @@ REQUIRE stdlib/secp256k1.fth
 
 : bip340-challenge-tag ( script -- script )
     ( SHA256 of BIP0340/challenge, repeated twice. )
-    bytes-hex 7bb52d7a9fef58323eb1bf7a407db382d2f3f2d81bb1224f49fe518f6d48d37c dup bytes-cat bsv-push
+    bytes-hex 7bb52d7a9fef58323eb1bf7a407db382d2f3f2d81bb1224f49fe518f6d48d37c bsv-push op-dup op-cat
 ;
 
 : bip340-half-radix ( script -- script )
@@ -146,10 +146,15 @@ REQUIRE stdlib/secp256k1.fth
     17 bsv-num op-num2bin op-16 op-split op-drop
 ;
 
-: bip340-swap-window-digits ( script cell bytes -- script )
+: bip340-repeat-mask ( bytes cell -- script )
+    ( Each emitted DUP CAT doubles the number of copies of the seed. )
+    bsv-empty rot bsv-push bsv-empty op-dup op-cat rot script-append-repeated
+;
+
+: bip340-swap-window-digits ( script cell script -- script )
     ( A mask selects the lower position of each digit pair. XOR the differences into both positions. )
     swap rot op-dup over bsv-num op-rshift op-over op-xor
-    rot bsv-push op-and op-tuck op-xor op-swap swap bsv-num op-lshift op-xor
+    rot bsv-cat-code op-and op-tuck op-xor op-swap swap bsv-num op-lshift op-xor
 ;
 
 : bip340-pack-windows ( script -- script )
@@ -158,49 +163,70 @@ REQUIRE stdlib/secp256k1.fth
     ( Digit positions are numbered from the low end of the 512-bit string. )
     ( Transpose lane and digit bits. The first four swaps also reverse little-endian byte order. )
     ( Swap position bits 4 and 6, complementing both. )
-    160 bytes-hex 0000000000000000000000000000000000000000ffffffff00000000ffffffff0000000000000000000000000000000000000000ffffffff00000000ffffffff bip340-swap-window-digits
+    160 bytes-hex 0000000000000000000000000000000000000000ffffffff00000000ffffffff 1 bip340-repeat-mask bip340-swap-window-digits
     ( Swap position bits 5 and 7, complementing both. )
-    320 bytes-hex 00000000000000000000000000000000000000000000000000000000000000000000000000000000ffffffffffffffff0000000000000000ffffffffffffffff bip340-swap-window-digits
+    320 bsv-empty op-0 40 bsv-num op-num2bin
+    bytes-hex ffffffffffffffff0000000000000000ffffffffffffffff bsv-push op-cat bip340-swap-window-digits
     ( Swap position bits 2 and 4, complementing both. )
-    40 bytes-hex 0000000000ff00ff0000000000ff00ff0000000000ff00ff0000000000ff00ff0000000000ff00ff0000000000ff00ff0000000000ff00ff0000000000ff00ff bip340-swap-window-digits
+    40 bytes-hex 0000000000ff00ff 3 bip340-repeat-mask bip340-swap-window-digits
     ( Swap position bits 3 and 5, complementing both. )
-    80 bytes-hex 00000000000000000000ffff0000ffff00000000000000000000ffff0000ffff00000000000000000000ffff0000ffff00000000000000000000ffff0000ffff bip340-swap-window-digits
+    80 bytes-hex 00000000000000000000ffff0000ffff 2 bip340-repeat-mask bip340-swap-window-digits
     ( Swap position bits 0 and 2. )
-    6 bytes-hex 00cc00cc00cc00cc00cc00cc00cc00cc00cc00cc00cc00cc00cc00cc00cc00cc00cc00cc00cc00cc00cc00cc00cc00cc00cc00cc00cc00cc00cc00cc00cc00cc bip340-swap-window-digits
+    6 bytes-hex 00cc 5 bip340-repeat-mask bip340-swap-window-digits
     ( Swap position bits 1 and 3. )
-    12 bytes-hex 0000f0f00000f0f00000f0f00000f0f00000f0f00000f0f00000f0f00000f0f00000f0f00000f0f00000f0f00000f0f00000f0f00000f0f00000f0f00000f0f0 bip340-swap-window-digits
+    12 bytes-hex 0000f0f0 4 bip340-repeat-mask bip340-swap-window-digits
+;
+
+: bip340-nonzero-window-digits ( script -- script )
+    ( Leave the input and a ScriptNum whose bytes are 1 where the input digit was nonzero. )
+    ( The two shifts and ORs move any of the four bits into bit zero of its byte. )
+    op-dup op-dup op-2 op-rshift op-or op-dup op-1 op-rshift op-or
+    bytes-hex 01 6 bip340-repeat-mask bsv-cat-code op-and op-bin2num
+;
+
+: bip340-window-depths ( script -- script )
+    ( Split into two 64-byte lanes of little-endian digits. )
+    op-dup bytes-hex 0f 6 bip340-repeat-mask bsv-cat-code
+    op-tuck op-and
+    op-rot op-4 op-rshift op-rot op-and
+    ( For a nonzero fixed digit i, use 3+2*i. All results fit in a byte. )
+    op-swap bip340-nonzero-window-digits op-3 op-mul
+    op-swap op-bin2num op-2 op-mul op-add 64 bsv-num op-num2bin
+    ( For a nonzero variable digit i, use 82-3*i. The subtraction never borrows across bytes. )
+    op-swap bip340-nonzero-window-digits 82 bsv-num op-mul
+    op-swap op-bin2num op-3 op-mul op-sub 64 bsv-num op-num2bin
 ;
 
 : bip340-joint-window-table ( script -- script )
-    ( field r ry px py s k -> r ry TV1..TV15 TF15..TF1 field X Y Z. Save window bytes on the altstack. )
+    ( field r ry px py s k -> r ry TV1..TV15 TF15..TF1 field X Y Z. Save both streams on the altstack. )
     bip340-variable-bases bip340-variable-window-table bip340-fixed-window-table
     op-fromaltstack bip340-half-radix op-2dup op-div op-toaltstack op-mod
-    3 script-restore-items bip340-pack-windows op-toaltstack
+    3 script-restore-items bip340-pack-windows bip340-window-depths op-swap op-toaltstack op-toaltstack
     ( Keep the field prime immediately below the accumulator for all window arithmetic. )
     op-depth op-1sub op-roll op-0 op-1 op-0
 ;
 
 : bip340-variable-window-add ( script -- script )
-    ( Variable points occupy three stack items. For TV15, X is at depth 36. )
-    op-ifdup op-if op-3 op-mul 82 bsv-num op-swap op-sub
+    ( The input is zero or the lookup depth with the index and accumulator in place. )
+    op-ifdup op-if
       ( Keep the depth on the main stack while copying X and Y. )
       op-dup op-pick op-over op-pick op-rot op-1sub op-pick 1 secp256k1-add-with-field
     op-endif
 ;
 
 : bip340-fixed-window-add ( script -- script )
-    ( Fixed points are affine and occupy two items. For TF1, x is at depth 5. )
-    op-ifdup op-if op-2 op-mul op-3 op-add
+    ( The input is zero or the depth of the affine x coordinate. )
+    op-ifdup op-if
       op-dup op-toaltstack op-pick op-fromaltstack op-pick 1 secp256k1-add-affine-with-field
     op-endif
 ;
 
 : bip340-window-addends ( script -- script )
-    ( Read one byte from the stream. The low nibble indexes the fixed table. )
-    op-fromaltstack op-1 op-split op-toaltstack
-    op-dup op-15 op-and op-bin2num op-toaltstack
-    op-4 op-rshift op-bin2num bip340-variable-window-add
-    op-fromaltstack bip340-fixed-window-add
+    ( Read one depth from each stream. Save both tails below the fixed depth. )
+    op-fromaltstack op-1 op-split op-fromaltstack op-1 op-split
+    op-toaltstack op-swap op-toaltstack op-toaltstack
+    op-bin2num bip340-variable-window-add
+    op-fromaltstack op-bin2num bip340-fixed-window-add
 ;
 
 : bip340-joint-window-step ( script -- script )
@@ -210,9 +236,9 @@ REQUIRE stdlib/secp256k1.fth
 
 : bip340-joint-multiply ( script -- script )
     bip340-joint-window-table
-    ( The initial accumulator is infinity. Drop the empty stream after the last window. )
+    ( The initial accumulator is infinity. Drop both empty streams after the last window. )
     bip340-window-addends bsv-empty bip340-joint-window-step 63 script-append-repeated
-    op-fromaltstack op-drop
+    op-fromaltstack op-fromaltstack op-2drop
     ( Reject infinity. Compare X and Y to r*Z and ry*Z modulo the field prime. )
     op-dup op-verify
     80 script-pick-depth 1 script-pick-depth op-mul 3 script-pick-depth op-swap op-sub

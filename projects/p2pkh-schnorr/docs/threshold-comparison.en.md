@@ -10,14 +10,14 @@ Both schemes require both signatures. The fixtures use the same transaction shap
 
 | Scheme | ALL mode | Lock | 2×2 unlocks by input | 2×2 transaction | Extra input | Extra output | Fund and exit | With one turnover | First-input peak stack payload |
 | --- | --- | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| MuSig2 v0.10.0 | BIP143 | 25,752 | 329 / 329 | 52,280 | 372 | 25,763 | 52,506 | 104,785 | 3,340 |
+| MuSig2 v0.11.0 | BIP143 | 24,917 | 329 / 329 | 50,610 | 372 | 24,928 | 50,836 | 101,446 | 3,405 |
 | Native 2-of-2 | BIP143 | 71 | 146 / 147 | 545 | 186 | 80 | 771 | 1,313 | 211 |
-| MuSig2 v0.10.0 | Chronicle OTDA | 25,752 | 51,795 / 51,795 | 155,212 | 51,961 | 77,297 | 52,519 | 207,731 | 103,422 |
+| MuSig2 v0.11.0 | Chronicle OTDA | 24,917 | 50,125 / 50,125 | 150,202 | 50,291 | 74,792 | 50,850 | 201,051 | 100,082 |
 | Native 2-of-2 | Chronicle OTDA | 71 | 145 / 146 | 543 | 187 | 81 | 769 | 1,314 | 210 |
 
 All sizes are in bytes. At a common rate of one satoshi per byte, the transaction and lifecycle byte counts also give their fee in satoshis. Native ECDSA DER lengths vary with the signature, so the observed marginals include small witness changes. Stack payload counts main and alternate stack data. The native peak occurs immediately before `CHECKMULTISIG`. The MuSig2 stack figures come from the development evaluator. Internal engine allocations are outside this measurement. [Runner](../reference/compare_threshold.py) · [Benchmark method](../../../docs/benchmark.md)
 
-For the 2×2 fixtures, median chain-gang verification was **6.19 ms** for MuSig2 and **0.65 ms** for native BIP143, and **7.20 ms** and **0.85 ms** for OTDA. BSV Node loopback RPC medians were **28.36 ms** and **1.13 ms** for BIP143, and **35.00 ms** and **1.70 ms** for OTDA. These host-specific medians use 15 measurements after one warmup and include input preparation and verification. Node timings include local RPC overhead.
+For the 2×2 fixtures, median chain-gang verification was **6.00 ms** for MuSig2 and **0.43 ms** for native BIP143, and **6.35 ms** and **0.39 ms** for OTDA. BSV Node loopback RPC medians were **26.95 ms** and **0.73 ms** for BIP143, and **31.61 ms** and **0.81 ms** for OTDA. These host-specific medians use 15 measurements after one warmup and include input preparation and verification. Node timings include local RPC overhead.
 
 For OTDA ALL, the current template puts the complete committed outputs in each preimage. When exiting into ordinary P2PKH outputs, each MuSig2 OTDA unlock falls to 336 bytes. Native `CHECKMULTISIG` constructs the signature digest in the node and requires only the dummy item and two signatures in the unlocking script.
 
