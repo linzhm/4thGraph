@@ -22,6 +22,13 @@ _NORMALIZE = asm("OP_DUP OP_0 OP_LESSTHAN OP_IF") + _Q + asm("OP_ADD OP_ENDIF")
 _ROLL_TOP = (b"", asm("OP_SWAP"), asm("OP_ROT"))
 _SPLIT_COEFFICIENT = _COEFF + asm("OP_SPLIT OP_SWAP")
 _INVERSE_SCALE = pow(DEGREE, -1, MODULUS)
+_LANE_BYTES = 26
+_LANE_RADIX = 1 << (8 * _LANE_BYTES)
+# Each centered butterfly grows a lane by at most q. Starting below q,
+# all eight stages stay below q**9, which fits on either side of this offset.
+# The offset is a multiple of q, so decoding biased lanes preserves residues.
+_LANE_OFFSET = (_LANE_RADIX // 2 // MODULUS) * MODULUS
+_READ_LANE = number(_LANE_BYTES) + asm("OP_SPLIT OP_SWAP") + push(b"\x00") + asm("OP_CAT OP_BIN2NUM")
 
 
 def _take(order, index, *, above=0, compact=False):
@@ -185,7 +192,7 @@ def verification_equation_script(public_key, *, signed_residues=False, compact=F
     return bytes(code)
 
 
-def checked_equation_script(public_key):
+def checked_equation_script(public_key, *, packed=True):
     """Reconstruct rows from the sampler and the range-checked signed response."""
     # The inverse transform is linear. Fold its 1/256 factor into the public
     # coefficients so each unpacked output lane needs only reduction mod q.
@@ -193,7 +200,7 @@ def checked_equation_script(public_key):
         [tuple(value * _INVERSE_SCALE % MODULUS for value in column) for column in row]
         for row in verification_key_rows(public_key)
     ]
-    return _compact_equation(rows, integrated=True)
+    return _packed_equation(rows) if packed else _compact_equation(rows, integrated=True)
 
 
 def _compact_equation(rows, *, integrated=False):
@@ -214,14 +221,7 @@ def _compact_equation(rows, *, integrated=False):
         code += read
         for row_index, row in enumerate(reversed(rows)):
             last_row = row_index == row_count - 1
-            for column, values in enumerate(reversed(row)):
-                if last_row:
-                    code += asm("OP_SWAP") if column else b""
-                else:
-                    code += number(column + 1) + asm("OP_PICK") if column else asm("OP_DUP")
-                code += number(values[coefficient]) + asm("OP_MUL")
-                if column:
-                    code += asm("OP_ADD")
+            code += _dot_product(reversed(row), coefficient, consume=last_row)
             code += pack_coefficient
             depth = (input_count if last_row else 2 * input_count) + 1
             code += number(depth) + asm("OP_ROLL OP_SWAP OP_CAT OP_TOALTSTACK")
@@ -235,36 +235,92 @@ def _compact_equation(rows, *, integrated=False):
     return bytes(code) + asm("OP_FROMALTSTACK") + asm("OP_FROMALTSTACK OP_CAT") * (row_count - 1)
 
 
+def _dot_product(columns, coefficient, *, consume):
+    """Apply fixed coefficients to NTT values ordered from the top down."""
+    code = bytearray()
+    for column, values in enumerate(columns):
+        if consume:
+            code += asm("OP_SWAP") if column else b""
+        else:
+            code += number(column + 1) + asm("OP_PICK") if column else asm("OP_DUP")
+        code += number(values[coefficient]) + asm("OP_MUL")
+        if column:
+            code += asm("OP_ADD")
+    return code
+
+
+def _packed_bias(lanes, offset):
+    return number(offset * sum(_LANE_RADIX ** index for index in range(lanes)))
+
+
+def _packed_equation(rows):
+    input_count, row_count = len(rows[0]), len(rows)
+    code = bytearray(asm("OP_SIZE") + number(input_count * POLYNOMIAL_BYTES) + asm("OP_NUMEQUALVERIFY"))
+    code += asm("OP_TOALTSTACK") + number(_LANE_RADIX) + _packed_bias(input_count, _LANE_OFFSET)
+    code += asm("OP_FROMALTSTACK")
+    code += (number(POLYNOMIAL_BYTES) + asm("OP_SPLIT")) * (input_count - 1)
+
+    # The packed challenge and signed responses were checked upstream. Read
+    # each coefficient across the five polynomial tails in Horner order.
+    read = _SPLIT_COEFFICIENT + asm("OP_BIN2NUM")
+    first = number(input_count - 1) + asm("OP_ROLL") + read
+    next_lane = number(input_count + 2) + asm("OP_PICK OP_MUL")
+    next_lane += number(input_count) + asm("OP_ROLL") + read + asm("OP_ROT OP_ADD")
+    code += (first + next_lane * (input_count - 1) + asm("OP_TOALTSTACK")) * DEGREE
+    code += asm("OP_2DROP") * (input_count // 2) + asm("OP_DROP") * (input_count % 2)
+    restore = asm("OP_FROMALTSTACK") * DEGREE
+    code += restore
+
+    order = list(reversed(range(DEGREE)))
+    code += _butterflies(order, inverse=False, compact=True)
+    for coefficient in range(DEGREE):
+        code += _take(order, coefficient, compact=True)
+        code += number(len(order) + 1) + asm("OP_PICK OP_ADD")
+        code += number(_LANE_BYTES * input_count + 1) + asm("OP_NUM2BIN")
+        # The biased values are congruent to the forward NTT values mod q.
+        # Reduce each row of the dot product before packing its inverse input.
+        code += (_READ_LANE + asm("OP_SWAP")) * input_count + asm("OP_DROP")
+        for row_index, row in enumerate(rows):
+            code += _dot_product(row, coefficient, consume=row_index == row_count - 1)
+            code += _REDUCE + asm("OP_TOALTSTACK")
+        multiply = number(len(order) + 2) + asm("OP_PICK OP_MUL")
+        code += asm("OP_FROMALTSTACK")
+        code += (multiply + asm("OP_FROMALTSTACK OP_ADD")) * (row_count - 1)
+        code += asm("OP_TOALTSTACK")
+
+    # All forward coefficients have been consumed. The altstack holds one
+    # packed coefficient per inverse butterfly input, with row zero low.
+    code += asm("OP_2DROP") + _packed_bias(row_count, _LANE_OFFSET) + restore
+    order = list(reversed(range(DEGREE)))
+    code += _butterflies(order, inverse=True, compact=True)
+    return bytes(code) + _serialize_inverse_rows(order, row_count)
+
+
 @cache
 def _packed_inverse():
     """Apply the inverse butterflies to all four already scaled rows together."""
     lanes = 4
-    width = 26
-    base = 1 << (8 * width)
-    half = base // 2
-    # The centered twiddle has magnitude <= q/2. Each stage grows a lane by
-    # at most q, so starting below q the eight stages stay below q^9 < 2^207.
-    # Adding one half-base per lane converts signed lanes to unsigned chunks
-    # without a carry or borrow between chunks.
-    bias = half * sum(base ** index for index in range(lanes))
-    code = bytearray(asm("OP_TOALTSTACK") + number(bias) + number(half) + asm("OP_FROMALTSTACK"))
+    half = _LANE_RADIX // 2
+    code = bytearray(asm("OP_TOALTSTACK") + _packed_bias(lanes, half) + number(half) + asm("OP_FROMALTSTACK"))
     code += (number(POLYNOMIAL_BYTES) + asm("OP_SPLIT")) * (lanes - 1)
     read = asm("OP_3 OP_ROLL") + _SPLIT_COEFFICIENT
-    read += asm("OP_BIN2NUM") + number(width) + asm("OP_NUM2BIN OP_TOALTSTACK")
+    read += asm("OP_BIN2NUM") + number(_LANE_BYTES) + asm("OP_NUM2BIN OP_TOALTSTACK")
     pack = asm("OP_FROMALTSTACK") + asm("OP_FROMALTSTACK OP_SWAP OP_CAT") * (lanes - 1)
     code += (read * lanes + pack + asm("OP_BIN2NUM OP_TOALTSTACK")) * DEGREE
     code += asm("OP_2DROP OP_2DROP") + asm("OP_FROMALTSTACK") * DEGREE
 
     order = list(reversed(range(DEGREE)))
     code += _butterflies(order, inverse=True, compact=True)
-    code += asm("OP_0") * lanes
+    return bytes(code) + _serialize_inverse_rows(order, lanes, unbias=True)
+
+
+def _serialize_inverse_rows(order, lanes, *, unbias=False):
+    code = bytearray(asm("OP_0") * lanes)
     for index in range(DEGREE):
         code += _take(order, index, above=lanes, compact=True)
-        # Below the remaining coefficients and row buffers are bias and half.
-        depth = number(len(order) + lanes + 2) + asm("OP_PICK")
-        code += depth + asm("OP_ADD") + number(width * lanes + 1) + asm("OP_NUM2BIN")
-        read = number(width) + asm("OP_SPLIT OP_SWAP") + push(b"\x00") + asm("OP_CAT OP_BIN2NUM")
-        residue = depth + asm("OP_SUB") + _REDUCE + _NORMALIZE + _COEFF + asm("OP_NUM2BIN")
-        append = asm("OP_5 OP_ROLL OP_SWAP OP_CAT OP_SWAP")
-        code += (read + residue + append) * lanes + asm("OP_DROP")
-    return bytes(code) + asm("OP_CAT OP_CAT OP_CAT OP_NIP OP_NIP")
+        depth = number(len(order) + lanes + 1 + int(unbias)) + asm("OP_PICK")
+        code += depth + asm("OP_ADD") + number(_LANE_BYTES * lanes + 1) + asm("OP_NUM2BIN")
+        residue = depth + asm("OP_SUB") + _REDUCE + _NORMALIZE if unbias else _REDUCE
+        append = _COEFF + asm("OP_NUM2BIN") + number(lanes + 1) + asm("OP_ROLL OP_SWAP OP_CAT OP_SWAP")
+        code += (_READ_LANE + residue + append) * lanes + asm("OP_DROP")
+    return bytes(code) + asm("OP_CAT") * (lanes - 1) + asm("OP_NIP") * (1 + int(unbias))

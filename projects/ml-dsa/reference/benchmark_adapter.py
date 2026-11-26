@@ -32,7 +32,7 @@ def components(_samples):
     from challenge_script import sample_in_ball_script
     from hint_script import apply_hints_script
     from ntt_script import checked_equation_script, transform_script, verification_equation_script
-    from script import _compile_payment_lock, _historical_lock, _reconstruct_challenge
+    from script import _compile_payment_lock, _historical_lock, _reconstruct_challenge, _v02_lock
     from shake_script import shake256_script
     from signature_script import signature_decode_script
     from test_mldsa import equation_fixture
@@ -44,6 +44,7 @@ def components(_samples):
     profiles = (
         ("legacy", False, False, _historical_lock(payment_key, compact=False)),
         ("compact", True, False, _historical_lock(payment_key, compact=True)),
+        ("v0.2.0", True, True, _v02_lock(payment_key)),
         ("optimized", True, True, locking_script(payment_key)),
     )
     return {
@@ -57,6 +58,7 @@ def components(_samples):
                                    ("compact", {"compact": True}))
         },
         "checked_equation_script_bytes": len(checked_equation_script(key)),
+        "v02_checked_equation_script_bytes": len(checked_equation_script(key, packed=False)),
         "forth_lock_with_previous_verifier_bytes": len(_compile_payment_lock(previous_challenges)),
         "shake256_832_to_32_script_bytes": len(shake256_script(832, 32)),
         "payment_script_bytes": {

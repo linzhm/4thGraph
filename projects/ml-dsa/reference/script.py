@@ -31,7 +31,7 @@ def verify_message_script(public_key, message_bytes, *, context=b"", legacy=Fals
     return challenges + asm("OP_EQUAL")
 
 
-def _reconstruct_challenge(public_key, message_bytes, *, context=b"", compact, optimize):
+def _reconstruct_challenge(public_key, message_bytes, *, context=b"", compact, optimize, packed=True):
     if not isinstance(public_key, bytes) or len(public_key) != PUBLIC_KEY_BYTES:
         raise ValueError("ML-DSA-44 public key must be 1,312 bytes")
     if not isinstance(context, bytes) or len(context) > 255:
@@ -43,7 +43,7 @@ def _reconstruct_challenge(public_key, message_bytes, *, context=b"", compact, o
     code += signature_decode_script(compact=compact, signed_response=optimize)
     # [message, c_tilde, z, hints] -> [message, c_tilde, c || z].
     code += asm("OP_TOALTSTACK OP_OVER") + sample_in_ball_script(compact=compact, optimize=optimize)
-    equation = (checked_equation_script(public_key) if optimize
+    equation = (checked_equation_script(public_key, packed=packed) if optimize
                 else verification_equation_script(public_key, compact=compact))
     code += asm("OP_SWAP OP_CAT") + equation
     code += asm("OP_FROMALTSTACK") + apply_hints_script(compact=compact)
@@ -92,8 +92,17 @@ def _historical_lock(public_key, *, compact):
     return code + check_binding(COMPANION_CODE)
 
 
+def _v02_lock(public_key):
+    challenges = _reconstruct_challenge(public_key, DIGEST_BYTES, compact=True, optimize=True, packed=False)
+    # Reproduce the v0.2.0 Forth output even if a future compiler reschedules it.
+    code = authorization_checks(ORDINARY_CODE, COMPANION_CODE)
+    code += asm("OP_SWAP OP_HASH256 OP_DUP OP_ROT")
+    return code + challenges + asm("OP_EQUALVERIFY") + check_binding(COMPANION_CODE)
+
+
 def matches_lock(script, public_key):
     """Match any supported generation of the fixed-key payment template."""
     return (script == locking_script(public_key)
+            or script == _v02_lock(public_key)
             or script == _historical_lock(public_key, compact=True)
             or script == _historical_lock(public_key, compact=False))

@@ -18,7 +18,7 @@ P2PKH-R1's two-input, two-output BIP143 ALL payments measure **119,934 B** in v0
 
 The unified benchmark measured **260 complete transactions** across seven projects and 32 template and sighash combinations at commit `beeb4dd`. Additional mixed-output and paired `SINGLE` replays measured 88 transactions across 11 combinations. The Deferred v0.2.0 row uses the rerun at `9c5603d`. The Deferred v0.3.0 row uses the rerun with the fixed Forth template. The R1 Forth v0.3.0 row comes from its funded regtest comparison. [R1 Forth replay](../projects/p2pkh-r1/README.md#forth-experiment)
 
-The ML-DSA-44 v0.2.0 row uses a project rerun with the same fixtures and the Forth payment entry. [ML-DSA-44 measurements](../projects/ml-dsa/README.md#complete-transactions-and-stack-measurements)
+The ML-DSA-44 v0.3.0 row uses a project rerun with the same fixtures and the Forth payment entry. [ML-DSA-44 measurements](../projects/ml-dsa/README.md#complete-transactions-and-stack-measurements)
 
 | Project and measured version | Inputs × outputs | Prevout lock | BIP143 ALL unlock | BIP143 ALL tx | OTDA ALL tx | BIP143 ALL peak stack payload |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
@@ -30,7 +30,7 @@ The ML-DSA-44 v0.2.0 row uses a project rerun with the same fixtures and the For
 | P2PKH-SM2 v1.1.0 candidate | 2 × 2 | 144,925 | 291 | 290,554 | 316,018 | 4,147 |
 | Lamport OTS, committed key | 2 × 2 | 7,746 | 16,549 | 48,708 | 79,616 | 16,707 |
 | WOTS+, cached steps with reconstruction | 2 × 2 | 33,956 | 2,310 | 72,650 | 79,090 | 2,701 |
-| Pure ML-DSA-44 v0.2.0 | 2 × 2 | 586,979 | 2,588 | 1,179,254 | 3,527,082 | — |
+| Pure ML-DSA-44 v0.3.0 | 2 × 2 | 467,731 | 2,588 | 940,758 | 2,811,594 | — |
 
 All sizes are in bytes. Lock, unlock, and stack measurements use the first BIP143 ALL input. Peak stack payload is the local evaluator's peak combined data size on the main and alternate stacks. Deferred activation includes a fee-sponsor input. ML-DSA-44 stack data is unavailable. Each project README has the per-input and per-output measurements, the cost of adding an input or output, and the lifecycle totals.
 
