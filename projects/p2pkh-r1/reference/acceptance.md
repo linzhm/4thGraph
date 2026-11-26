@@ -11,7 +11,7 @@ the field commitments of each mode.
 | --- | --- |
 | Transaction version | 1, 2 |
 | Output layout | Output at input index, no output at input index |
-| Sighash | ALL, NONE or SINGLE × ForkID or OTDA × with or without ANYONECANPAY |
+| Sighash | ALL, NONE or SINGLE × BIP143 or OTDA × with or without ANYONECANPAY |
 | Rule context | Genesis UTXO and Genesis spend, Genesis UTXO and Chronicle spend, Chronicle UTXO and Chronicle spend |
 | Change after preparing the authorization | Unchanged, another input's outpoint, another input's sequence, current sequence, output zero, same-index output, valid signature from a different key, changed signing amount, locktime |
 
@@ -27,8 +27,8 @@ The wrong-amount witness uses a fresh signature for the changed amount.
 | Output zero | ALL commits to this output. NONE and SINGLE at input 1 leave it free. |
 | Same-index output | Only NONE permits changing or adding this output. |
 | Wrong P-256 signing key | Rejected with the claimed owner's key. |
-| Changed amount passed to the signer | Only a direct OTDA digest omits the amount. ForkID and the unpaired OTDA SINGLE companion both commit to it. |
-| Witness structure | Each ordinary ForkID/OTDA and both unpaired companion paths reject an extra item, a bad inverse, a flipped or non-boolean selector, higher type bytes, and a correctly signed witness from a different owner. |
+| Changed amount passed to the signer | Only a direct OTDA digest omits the amount. BIP143 and the unpaired OTDA SINGLE companion both commit to it. |
+| Witness structure | Each ordinary BIP143/OTDA and both unpaired companion paths reject an extra item, a bad inverse, a flipped or non-boolean selector, higher type bytes, and a correctly signed witness from a different owner. |
 
 The fixture checks the axes for duplicates and requires every observed tuple to
 belong to the product and occur once. It then requires the number observed to

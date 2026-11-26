@@ -14,13 +14,13 @@ P2PKH-R1 lets a BSV wallet use an existing P-256 signer. The output commits to t
 
 The reference wallet uses **v0.2.0** for new outputs and can spend existing v0.1.0 outputs. The Forth experiments reached **41,538 B** for the lock and **91,692 B** for an OTDA ALL payment, with different constructions winning each objective. Payment sizes use two R1 inputs and two R1 outputs.
 
-| Template | Lock | ForkID ALL payment | OTDA ALL payment |
+| Template | Lock | BIP143 ALL payment | OTDA ALL payment |
 | --- | ---: | ---: | ---: |
 | Wallet default v0.2.0 | 46,302 B | 93,374 B | 101,250 B |
 | Forth experiment, 4-bit split tables with affine `G` | **41,538 B** | **83,846 B** | 92,032 B |
 | Forth experiment, 2-bit joint table | 42,378 B | 85,526 B | **91,692 B** |
 
-Both experimental winners completed ForkID ALL, OTDA ALL, and paired OTDA SINGLE payments on BSV Node regtest and passed independent chain-gang verification. [Build and replay](experiments/forth/README.md) · [Historical measurements](experiments/forth/history.md)
+Both experimental winners completed BIP143 ALL, OTDA ALL, and paired OTDA SINGLE payments on BSV Node regtest and passed independent chain-gang verification. [Build and replay](experiments/forth/README.md) · [Historical measurements](experiments/forth/history.md)
 
 ## Wallet integration
 

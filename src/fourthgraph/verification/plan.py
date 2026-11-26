@@ -16,6 +16,7 @@ from fourthgraph.compiler.source import MAX_EXPANSION, PROJECT_NAME, PROJECT_VER
 from fourthgraph.compiler.lowering import compile_word
 from fourthgraph.verification.proof_contract import ProofContract, StateContract
 from fourthgraph.workflow.protocol import (
+    normalize_target,
     DEFAULT_TARGET, ROOT_VALUE, TARGETS, UTXO, begin, build_artifact, copy_preimage, field, finish, single_input,
 )
 from fourthgraph.bsv.script import asm, number, push
@@ -156,6 +157,7 @@ def compile_solutions(source, keys, current, scratch, *, target=DEFAULT_TARGET, 
         "groth16-bn254": "the fixed-statement adapter requires owner authorization and lacks this spend binding",
     }
     base_witness = len(push(bytes(158)))
+    target = normalize_target(target)
     parameters = {"target": target, "terminal_value": ROOT_VALUE - spend_fee}
     try:
         direct = DirectContract(program, current, keys, max_expansion=max_expansion, **parameters)
@@ -234,7 +236,7 @@ def compile_solutions(source, keys, current, scratch, *, target=DEFAULT_TARGET, 
         },
         "candidates": {**{name: {"eligible": False, "reason": reason} for name, reason in rejected.items()},
                        **oversized, **{name: case.describe() for name, case in candidates.items()}},
-        "binding": "ForkID ALL; committed current state; exact terminal and state receipt outputs",
+        "binding": "BIP143 ALL with committed current state and exact terminal and state receipt outputs",
         "deploy_output": {"satoshis": chosen.root.value, "script_hex": chosen.root.script.hex()},
     }
     return candidates[selected], build_artifact(report, source)
@@ -290,7 +292,7 @@ def main():
     cli.add_argument("source", type=Path)
     cli.add_argument("--current", type=int, required=True)
     cli.add_argument("--keys", type=Path, required=True)
-    cli.add_argument("--target", choices=TARGETS, default=DEFAULT_TARGET)
+    cli.add_argument("--target", type=normalize_target, choices=TARGETS, default=DEFAULT_TARGET)
     cli.add_argument("--policy", choices=POLICIES, default=POLICIES[0])
     cli.add_argument("--objective", choices=OBJECTIVES, default=OBJECTIVES[0])
     cli.add_argument("--spend-fee", type=int, default=SPEND_FEE, help="same spend fee in satoshis for every candidate")

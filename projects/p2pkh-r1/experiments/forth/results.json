@@ -5,7 +5,7 @@
   },
   "selected": {
     "lock_bytes": "split-4-affine-g",
-    "forkid-all": "split-4-affine-g",
+    "bip143-all": "split-4-affine-g",
     "otda-all": "joint-2",
     "otda-single": "joint-2"
   },
@@ -29,17 +29,17 @@
       "lock_bytes": 41986,
       "otda_program_bytes": 3940,
       "payment_bytes": {
-        "forkid-all": 84742,
+        "bip143-all": 84742,
         "otda-all": 92672,
         "otda-single": 92601
       },
       "payment_peak_stack_payload_bytes": {
-        "forkid-all": 3644,
+        "bip143-all": 3644,
         "otda-all": 168350,
         "otda-single": 84374
       },
       "unlock_bytes": {
-        "forkid-all": [
+        "bip143-all": [
           326,
           326
         ],
@@ -53,7 +53,7 @@
         ]
       },
       "payment_evidence": {
-        "forkid-all": {
+        "bip143-all": {
           "spend_txid": "1801e51b21bb771646a221e68d77df9d73fe6b033bfb04e17e583dc884104c55",
           "locktime_mutation_rejected": true
         },
@@ -80,17 +80,17 @@
       "lock_bytes": 41538,
       "otda_program_bytes": 4068,
       "payment_bytes": {
-        "forkid-all": 83846,
+        "bip143-all": 83846,
         "otda-all": 92032,
         "otda-single": 91961
       },
       "payment_peak_stack_payload_bytes": {
-        "forkid-all": 3642,
+        "bip143-all": 3642,
         "otda-all": 166557,
         "otda-single": 83478
       },
       "unlock_bytes": {
-        "forkid-all": [
+        "bip143-all": [
           326,
           326
         ],
@@ -104,7 +104,7 @@
         ]
       },
       "payment_evidence": {
-        "forkid-all": {
+        "bip143-all": {
           "spend_txid": "a55f58cd30ab9e815c739b2f6fe725f996c8cb8ce7d82910ce4f7d6c2d605836",
           "locktime_mutation_rejected": true
         },
@@ -131,17 +131,17 @@
       "lock_bytes": 42378,
       "otda_program_bytes": 3058,
       "payment_bytes": {
-        "forkid-all": 85526,
+        "bip143-all": 85526,
         "otda-all": 91692,
         "otda-single": 91621
       },
       "payment_peak_stack_payload_bytes": {
-        "forkid-all": 2550,
+        "bip143-all": 2550,
         "otda-all": 169918,
         "otda-single": 85158
       },
       "unlock_bytes": {
-        "forkid-all": [
+        "bip143-all": [
           326,
           326
         ],
@@ -155,7 +155,7 @@
         ]
       },
       "payment_evidence": {
-        "forkid-all": {
+        "bip143-all": {
           "spend_txid": "5c607e2c1a93e62c0b5a81fe71dff8567144965233d38476d63cc16a1fcf905e",
           "locktime_mutation_rejected": true
         },
@@ -182,17 +182,17 @@
       "lock_bytes": 41721,
       "otda_program_bytes": 5510,
       "payment_bytes": {
-        "forkid-all": 84212,
+        "bip143-all": 84212,
         "otda-all": 95282,
         "otda-single": 95211
       },
       "payment_peak_stack_payload_bytes": {
-        "forkid-all": 4683,
+        "bip143-all": 4683,
         "otda-all": 167289,
         "otda-single": 83844
       },
       "unlock_bytes": {
-        "forkid-all": [
+        "bip143-all": [
           326,
           326
         ],
@@ -206,7 +206,7 @@
         ]
       },
       "payment_evidence": {
-        "forkid-all": {
+        "bip143-all": {
           "spend_txid": "b04ffae255a029cb4f752084dc3d386614f47e5ffa681308a5f659f835a43493",
           "locktime_mutation_rejected": true
         },

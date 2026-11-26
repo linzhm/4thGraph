@@ -2,7 +2,7 @@
 
 [简体中文](sdk.zh-CN.md) · [Developer guide](developer.en.md#sdk) · [Wallet quickstart](../../../sdk/README.md)
 
-Choose `full-key` (default) or `committed-key` for receiving and pass the complete ordered public key to recognition. The SDK can also recognize legacy outputs, whose spending mode is ForkID ALL. The signer receives a 32-byte digest and returns an 8,192-byte signature. Have the signer durably consume the key before releasing a signature. Use a fresh key for change and keep the signed transaction for retries.
+Choose `full-key` (default) or `committed-key` for receiving and pass the complete ordered public key to recognition. The SDK can also recognize legacy outputs, whose spending mode is BIP143 ALL. The signer receives a 32-byte digest and returns an 8,192-byte signature. Have the signer durably consume the key before releasing a signature. Use a fresh key for change and keep the signed transaction for retries.
 
 <a name="quickstart"></a>
 

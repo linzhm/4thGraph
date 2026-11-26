@@ -2,7 +2,7 @@
 
 [English](sdk.en.md) · [开发指南](developer.zh-CN.md#sdk) · [统一钱包接入](../../../sdk/README.zh-CN.md)
 
-收款时选择 `full-key`（默认）或 `committed-key`，识别时传入完整且顺序一致的公钥。SDK 也能识别旧版输出，其花费模式为 ForkID ALL。签名器接收 32 字节摘要，返回 8,192 字节签名。释放签名前持久记录密钥已使用。找零用新密钥，重试时保留已签交易。
+收款时选择 `full-key`（默认）或 `committed-key`，识别时传入完整且顺序一致的公钥。SDK 也能识别旧版输出，其花费模式为 BIP143 ALL。签名器接收 32 字节摘要，返回 8,192 字节签名。释放签名前持久记录密钥已使用。找零用新密钥，重试时保留已签交易。
 
 <a name="quickstart"></a>
 

@@ -21,10 +21,10 @@ Budget for an extra transaction and a fee sponsor. Several deposits can activate
 ## Activation and later payment
 
 1. Create the funding output with `funding_output` or `funding_output_from_owner_hash`. On receipt, verify the short lock, value and both target commitments. The Python `recognize` result includes `target_r1_version`. The unified client reports this version as `targetTemplate`.
-2. Arrange the activation input and its same-index R1 output. Call `activate_input` and have the sponsor sign its own input if needed. The direct ForkID SINGLE unlock is 160 bytes. The two-check path carries a second digest commitment and takes 197 bytes. All twelve activation sighash combinations require the same-index output.
+2. Arrange the activation input and its same-index R1 output. Call `activate_input` and have the sponsor sign its own input if needed. The direct BIP143 SINGLE unlock is 160 bytes. The two-check path carries a second digest commitment and takes 197 bytes. All twelve activation sighash combinations require the same-index output.
 3. Once activated, spend the full R1 output with the regular R1 wallet and signer. Chronicle OTDA reconstruction is available for supported later payments.
 
-The activation witness already carries the target commitment through ForkID SINGLE. In two-check modes, the selected mode contributes an extra digest. The full R1 target occupies the new transaction output.
+The activation witness already carries the target commitment through BIP143 SINGLE. In two-check modes, the selected mode contributes an extra digest. The full R1 target occupies the new transaction output.
 
 ## Reproduce and integrate
 
@@ -42,7 +42,7 @@ These samples spend two short locks and one fee sponsor into two R1 v0.2.0 outpu
 
 | Activation mode | 3 inputs, 2 outputs | Added activation pair | Added output | Funding, activation and exit | With one turnover |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| ForkID ALL | 93,259 | 46,552 | 46,313 | 97,125 | 190,498 |
+| BIP143 ALL | 93,259 | 46,552 | 46,313 | 97,125 | 190,498 |
 | OTDA ALL | 93,260 | 46,551 | 46,312 | 97,139 | 198,389 |
 
 The two activation unlocks are 197 bytes each. The sponsor's native signature encoding accounts for the one-byte variation. For the first activation input, the development evaluator measures peaks of 7 main-stack items, 34 altstack items and 359 bytes of combined payload. [Benchmark method](../../docs/benchmark.md)

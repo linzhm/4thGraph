@@ -134,7 +134,7 @@ def sign_input(tx, index, funding_raw, key, signer, sighash_type=0x41, *, chroni
 
 
 def sign_payment(funding_raw,vout,outputs,fee,key,signer):
-    """One-input ForkID ALL payment. signer(SHA256d(P), user_id) returns r||s."""
+    """One-input BIP143 ALL payment. signer(SHA256d(P), user_id) returns r||s."""
     funding=Transaction.parse(funding_raw)
     if not 0<=vout<len(funding.outputs): raise ValueError('invalid funding output')
     previous=funding.outputs[vout]

@@ -26,7 +26,7 @@ The default wallet rejects an unpaired SINGLE because it commits to no outputs. 
 
 ## Validation and measurements
 
-The acceptance matrix covers 408 authorization decisions for the declared payment domain. The full-key and committed-key ForkID ALL 2×2 fixtures are 62,392 and 48,708 bytes. The smaller funding lock shifts cost into spending. In the same fixture, a new input increases from 8,400 to 16,592 bytes while a new output drops from 22,791 to 7,757 bytes.
+The acceptance matrix covers 408 authorization decisions for the declared payment domain. The full-key and committed-key BIP143 ALL 2×2 fixtures are 62,392 and 48,708 bytes. The smaller funding lock shifts cost into spending. In the same fixture, a new input increases from 8,400 to 16,592 bytes while a new output drops from 22,791 to 7,757 bytes.
 
 Install the pinned [requirements](../reference/requirements.txt) and run `bash projects/lamport-ots/reference/verify.sh`. [Acceptance domain](acceptance.md) · [Test and measurement record](validation.md) · [Project cost analysis](../README.md)
 

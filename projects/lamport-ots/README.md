@@ -21,7 +21,7 @@ protect copied keys, process restarts, backups, rollback, or duplicate funding.
 
 ## Use cases and trade-offs
 
-Use Lamport when comparing how a SHA-256 one-time signature affects the cost of funding and spending. The full-key template puts the ordered public key in the lock. The committed template saves 15,034 bytes per output and adds 8,192 bytes to an ordinary ForkID unlock. An output-heavy allocation and an input-heavy consolidation can therefore favor different templates. [Measured trade-offs](#committed-key-candidate)
+Use Lamport when comparing how a SHA-256 one-time signature affects the cost of funding and spending. The full-key template puts the ordered public key in the lock. The committed template saves 15,034 bytes per output and adds 8,192 bytes to an ordinary BIP143 unlock. An output-heavy allocation and an input-heavy consolidation can therefore favor different templates. [Measured trade-offs](#committed-key-candidate)
 
 Fund each new output, including change, with a fresh Lamport key. Keep the ordered public key and a durable record of key consumption. For a delayed or rejected broadcast, retain the signed bytes for rebroadcast. Treat uncertain signing state after a restore as a consumed key. [Wallet integration](docs/sdk.en.md)
 
@@ -30,9 +30,9 @@ Fund each new output, including change, with a fresh Lamport key. Keep the order
 - `locking_script(key, transaction=False)` checks a supplied 32-byte digest only.
   **Never fund this script**: an observer can replay the proof into another spend.
 - `locking_script(key)` additionally binds the authorized digest to the current
-  input using fixed-r PUSHTX. It supports ForkID BIP143 and Chronicle OTDA
+  input using fixed-r PUSHTX. It supports BIP143 and Chronicle OTDA
   ALL, NONE and SINGLE, each with optional ANYONECANPAY. The wallet default
-  is ForkID ALL (`0x41`). Production signing uses an external callback.
+  is BIP143 ALL (`0x41`). Production signing uses an external callback.
 
 The hash-based signature is a post-quantum research building block. The complete
 payment construction needs its own security analysis: [binding and one-time
@@ -53,7 +53,7 @@ system or a standardized “256-bit quantum security” level.
 | Lock + ordinary BIP143 unlock | 31,137 |
 
 The universal BIP143 ALL path totals 30.41 KiB. The original two-push
-ForkID ALL lock and vector remain available. OTDA ordinary witness size
+BIP143 ALL lock and vector remain available. OTDA ordinary witness size
 varies with the serialized transaction. Full measurements are in
 [measurement.json](template/measurement.json).
 
@@ -93,18 +93,18 @@ available to the wallet. Use fresh keys across formats and persist key
 consumption before disclosing a signature.
 
 The candidate saves 15,034 bytes per lock and adds 8,192 bytes to an ordinary
-ForkID witness. These complete, signed transactions use fresh, synthetic
+BIP143 witness. These complete, signed transactions use fresh, synthetic
 Lamport keys for every input and output. Marginal costs are measured from the
 2-input, 2-output payment.
 
 | Mode and format | 2 inputs, 2 outputs | Extra input | Extra output |
 | --- | ---: | ---: | ---: |
-| ForkID ALL, full key | 62,392 B | 8,400 B | 22,791 B |
-| ForkID ALL, commitment | 48,708 B | 16,592 B | 7,757 B |
+| BIP143 ALL, full key | 62,392 B | 8,400 B | 22,791 B |
+| BIP143 ALL, commitment | 48,708 B | 16,592 B | 7,757 B |
 | Chronicle OTDA ALL, full key | 153,436 B | 54,045 B | 68,381 B |
 | Chronicle OTDA ALL, commitment | 79,616 B | 32,169 B | 23,271 B |
 
-The ForkID format favors the committed lock when the number of Lamport
+The BIP143 format favors the committed lock when the number of Lamport
 outputs divided by the number of Lamport inputs exceeds `8192/15034`. This
 uses the same transaction framing and CompactSize widths. OTDA ALL repeats
 the serialized outputs in each signing preimage, so the shorter output
@@ -117,8 +117,8 @@ outputs before exit.
 
 | Path | Full-key lifecycle | Committed-key lifecycle |
 | --- | ---: | ---: |
-| ForkID ALL, fund and exit | 62,618 B | 48,933 B |
-| ForkID ALL, one turnover | 125,009 B | 97,641 B |
+| BIP143 ALL, fund and exit | 62,618 B | 48,933 B |
+| BIP143 ALL, one turnover | 125,009 B | 97,641 B |
 | Chronicle OTDA ALL, fund and exit | 62,631 B | 48,947 B |
 | Chronicle OTDA ALL, one turnover | 216,068 B | 128,563 B |
 

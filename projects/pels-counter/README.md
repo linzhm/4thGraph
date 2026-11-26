@@ -18,7 +18,7 @@ python3 "$counter" build
 
 The JSON gives the counter-zero lock in `script_hex` and the starting output amount in `satoshis`. The Forth increment compiles to 8 bytes. The full lock includes the checks that bind the successor output to the actual transaction.
 
-The build combines PUSHTX and witness candidates and selects the least serialized bytes for the deployment lock field and first spend. The `optimization` record lists the typed transition, the lowering rules, and the cost of each candidate. A single input determines `hashPrevouts` and `hashSequence`. An exact successor determines `hashOutputs`. The transaction template fixes the ForkID ALL flag, so the reconstructed witness omits these four fields. When the compiler can link a stable script size, it also supplies the script's CompactSize. The smallest PUSHTX candidate derives the compressed public key from the fixed `r` in the DER signature.
+The build combines PUSHTX and witness candidates and selects the least serialized bytes for the deployment lock field and first spend. The `optimization` record lists the typed transition, the lowering rules, and the cost of each candidate. A single input determines `hashPrevouts` and `hashSequence`. An exact successor determines `hashOutputs`. The transaction template fixes the BIP143 ALL sighash type (`0x41`), so the reconstructed witness omits these four fields. When the compiler can link a stable script size, it also supplies the script's CompactSize. The smallest PUSHTX candidate derives the compressed public key from the fixed `r` in the DER signature.
 
 The successor assertions fix the next counter and the code that the next output preserves. The source supplies the amount rule separately. The compiler can also omit a duplicate code fragment from the witness. It links the two positions and checks that their emitted byte ranges match. The lock restores the omitted copy before hashing the successor and the transaction preimage. The replay includes a forged successor with matching tampered witness data to check that the actual input's code still governs the spend.
 
@@ -48,7 +48,7 @@ python3 "$counter" spend --parent "$(jq -r '.deployment.raw' "$report")"
 
 The result includes `transaction_hex`, the input and output counter values, the fee, and the transaction ID. With the replay's deployment it reconstructs the first spend byte for byte. The parent lock determines the witness layout, including for deployments built with the original 705-byte lock.
 
-In the lock, `OP_CODESEPARATOR` places the counter data outside `scriptCode`. The original witness carries the full ForkID ALL preimage. Reconstructed witnesses supply the version, outpoint, `scriptCode`, previous amount, sequence, and locktime. Script builds the required successor and inserts its hash into the preimage. Every layout authenticates the full preimage against the actual spend with native `OP_CHECKSIG`. [PELS construction](https://patents.google.com/patent/EP4374535A1/en)
+In the lock, `OP_CODESEPARATOR` places the counter data outside `scriptCode`. The original witness carries the full BIP143 ALL preimage. Reconstructed witnesses supply the version, outpoint, `scriptCode`, previous amount, sequence, and locktime. Script builds the required successor and inserts its hash into the preimage. Every layout authenticates the full preimage against the actual spend with native `OP_CHECKSIG`. [PELS construction](https://patents.google.com/patent/EP4374535A1/en)
 
 ## Declare a fee constraint
 

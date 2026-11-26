@@ -21,7 +21,7 @@ TypeScript、Rust、Go 用偶数长度、无前缀的十六进制传递交易、
 
 钱包可以直接传入已核验的 prevout。`prevoutFromFunding` 解析入金交易并计算 txid，钱包仍需通过可信链视图核对输出存在、确认、金额和可花费状态。`signPayment` 检查输出金额加手续费是否等于输入金额。多输入交易由钱包核对所有上一输出和总手续费，再用 `signInput` 逐个填写尚未签名的输入。`prevout.vout` 始终对应父交易，`inputIndex` 始终对应本次花费交易。
 
-普通付款默认使用 ForkID ALL（`0x41`）。`SINGLE` 需要同索引输出，选择 OTDA 时从可信链视图填写 `chronicleActive`。签名请求包含 `algorithm`、`payloadKind`（`digest` 或 `message`）、`signatureFormat`、`sighash`、`payload`，SM2 还提供 `userId`。各项目的签名方式和编码见下表。
+普通付款默认使用 BIP143 ALL（`0x41`）。`SINGLE` 需要同索引输出，选择 OTDA 时从可信链视图填写 `chronicleActive`。签名请求包含 `algorithm`、`payloadKind`（`digest` 或 `message`）、`signatureFormat`、`sighash`、`payload`，SM2 还提供 `userId`。各项目的签名方式和编码见下表。
 
 省略重建选项即可使用所选方案的默认行为。SM2 在能缩短 OTDA 解锁脚本时自动重建。Go 的 `CompressOTDA` 为 `*bool`，用 `nil` 选择默认行为。Rust 的 `compress_otda` 为 `Option<bool>`，用 `None` 选择默认行为。要复现 SM2 的原样编码，Go 传入指向 `false` 的指针，Rust 传入 `Some(false)`，TypeScript 和 Python 传入 `false`。
 

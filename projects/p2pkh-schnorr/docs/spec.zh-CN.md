@@ -4,7 +4,7 @@
 
 所有者字段是 32 字节 BIP340 x-only 公钥的 HASH160。其余脚本字节固定。创建收款输出时按布局清单填入所有者字段。识别输出时先比对脚本长度和全部固定字节，再读取所有者哈希。[固定模板](../template/template.hex) · [布局清单](../template/layout.json)
 
-钱包按所选 sighash 为当前输入构造 BSV 签名预映像。外部签名器收到其 SHA256d 作为 32 字节 BIP340 消息，返回标准签名字节。锁验证 Schnorr 签名，并通过 PUSHTX 将同一消息绑定到当前输入。钱包默认用 ForkID ALL。使用 OTDA 时应从可信链视图取得 Chronicle 激活状态，使用 SINGLE 时要提供同索引输出。[Forth 合约](../reference/schnorr.fth)
+钱包按所选 sighash 为当前输入构造 BSV 签名预映像。外部签名器收到其 SHA256d 作为 32 字节 BIP340 消息，返回标准签名字节。锁验证 Schnorr 签名，并通过 PUSHTX 将同一消息绑定到当前输入。钱包默认用 BIP143 ALL。使用 OTDA 时应从可信链视图取得 Chronicle 激活状态，使用 SINGLE 时要提供同索引输出。[Forth 合约](../reference/schnorr.fth)
 
 | 解锁栈项 | 编码 |
 | --- | --- |

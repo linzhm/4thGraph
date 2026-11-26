@@ -1,4 +1,4 @@
-"""ForkID transaction templates and covenants for the two-branch program."""
+"""BIP143 transaction templates and covenants for the two-branch program."""
 
 import argparse
 from collections.abc import Callable, Mapping
@@ -27,10 +27,10 @@ from fourthgraph.workflow.cpn import from_build as transaction_plan, mermaid as 
 from fourthgraph.compiler.wordsets import U32, capabilities, push_value
 
 DEFAULT_TARGET = "chronicle-v2"
-TARGETS = {"forkid-v1": ((1,), "genesis"), DEFAULT_TARGET: ((2,), "chronicle"),
+TARGETS = {"bip143-v1": ((1,), "genesis"), DEFAULT_TARGET: ((2,), "chronicle"),
            "both": ((1, 2), "genesis")}
 FLAG = FORKID | SIGHASH_ALL
-SIGHASH_FAMILIES = {"forkid": FLAG, "chronicle": FLAG | CHRONICLE}
+SIGHASH_FAMILIES = {"bip143": FLAG, "otda": FLAG | CHRONICLE}
 SIGHASH_FAMILY_OPTIONS = (*SIGHASH_FAMILIES, "both")
 FLAG_BYTES = FLAG.to_bytes(4, "little")
 BINDING_CODE = asm("OP_CHECKSIG")
@@ -53,6 +53,14 @@ OBJECTIVES = {
     "peak-validation": ("max_signature_checks", "max_input_script_bytes", "whole_path_bytes",
                         "dependency_depth_including_deploy"),
 }
+
+
+def normalize_target(value):
+    return "bip143-v1" if value == "forkid-v1" else value
+
+
+def normalize_sighash_family(value):
+    return {"forkid": "bip143", "chronicle": "otda"}.get(value, value)
 
 
 def field(offset, width):
@@ -181,7 +189,7 @@ def refund_output(value, public):
 def recoverable_lock(normal, value, public, height, versions, *, prefixed=0):
     suffix = finish()
     if not normal.endswith(suffix):
-        raise ValueError("recoverable covenant requires the shared ForkID verification suffix")
+        raise ValueError("recoverable covenant requires the shared BIP143 verification suffix")
     # Both branches converge before CODESEPARATOR to preserve the scriptCode.
     select = asm(("OP_IF", "OP_SWAP OP_IF OP_DROP", "OP_ROT OP_IF OP_2DROP")[prefixed])
     refund = (begin(versions) + single_input() + authorize(public)
@@ -404,6 +412,7 @@ def template_external_inputs(program, template):
 class Contracts:
     def __init__(self, plan: Plan, keys, task_id, *, target=DEFAULT_TARGET, optimization=BASELINE,
                  join_witness="full"):
+        target = normalize_target(target)
         if target not in TARGETS:
             raise ValueError(f"unknown compilation target {target!r}")
         self.target = target
@@ -1005,9 +1014,10 @@ def main():
     cli.add_argument("--assume-input-ranges", action="store_true",
                      help="for --entry, rely on the caller to validate declared input ranges and encodings")
     cli.add_argument("--mode", choices=("auto", "split", *WORKFLOW_MODES), default="auto")
-    cli.add_argument("--target", choices=TARGETS, default=DEFAULT_TARGET, help="permitted transaction versions")
-    cli.add_argument("--sighash-family", choices=SIGHASH_FAMILY_OPTIONS, default="forkid",
-                     help="staged workflow signature preimage formats accepted by the lock")
+    cli.add_argument("--target", type=normalize_target, choices=TARGETS, default=DEFAULT_TARGET,
+                     help="permitted transaction versions")
+    cli.add_argument("--sighash-family", type=normalize_sighash_family, choices=SIGHASH_FAMILY_OPTIONS,
+                     default="bip143", help="staged workflow preimage formats accepted by the lock")
     cli.add_argument("--optimize", choices=OPTIMIZATIONS, default=BASELINE)
     cli.add_argument("--join-witness", choices=JOIN_WITNESSES)
     cli.add_argument("--gate-boundary", choices=GATE_BOUNDARIES, default="auto")
@@ -1025,7 +1035,7 @@ def main():
         cli.error("--objective requires --search")
     if args.max_tx_bytes is not None and not args.search:
         cli.error("--max-tx-bytes requires --search")
-    if args.entry and (args.search or args.sighash_family != "forkid" or args.gate_boundary != "auto" or args.current is not None
+    if args.entry and (args.search or args.sighash_family != "bip143" or args.gate_boundary != "auto" or args.current is not None
                        or args.mode in ("serial", "atomic")):
         cli.error("transaction search and boundaries require a transaction build")
     if args.assume_input_ranges and args.entry is None:
@@ -1079,7 +1089,7 @@ def main():
                 if args.current is None:
                     cli.error("relation: requires --current")
                 if (args.mode != "auto" or args.cpn or args.cpn_plan or args.search or args.task_id is not None
-                        or args.join_witness or args.gate_boundary != "auto" or args.sighash_family != "forkid"
+                        or args.join_witness or args.gate_boundary != "auto" or args.sighash_family != "bip143"
                         or args.available_data is not None or args.available_authorizers is not None
                         or args.optimize != BASELINE):
                     cli.error("workflow layout options do not apply to relation: builds. "
@@ -1108,7 +1118,7 @@ def main():
                 return
             if args.task_id is None or args.current is not None:
                 cli.error("parallel builds require --task-id and take their u32 values at spend time")
-            if args.sighash_family != "forkid":
+            if args.sighash_family != "bip143":
                 cli.error("Chronicle sighashes require a staged workflow")
             if args.max_tx_bytes is not None:
                 cli.error("--max-tx-bytes applies to staged workflow search")

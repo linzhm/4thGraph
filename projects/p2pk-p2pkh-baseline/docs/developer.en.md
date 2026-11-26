@@ -26,7 +26,7 @@ Use a wallet's existing secp256k1 signer with an authenticated funding outpoint,
 
 ## Validation and measurements
 
-The declared native coverage includes 2,880 combinations, 80 unpaired SINGLE mutation checks and 192 activation-boundary cases. In the ForkID ALL 2×2 fixture, P2PK measures 326 bytes and P2PKH measures 374 bytes. Moving from P2PK to P2PKH saves 10 bytes per output script and adds about 34 bytes per input witness, subject to DER signature length.
+The declared native coverage includes 2,880 combinations, 80 unpaired SINGLE mutation checks and 192 activation-boundary cases. In the BIP143 ALL 2×2 fixture, P2PK measures 326 bytes and P2PKH measures 374 bytes. Moving from P2PK to P2PKH saves 10 bytes per output script and adds about 34 bytes per input witness, subject to DER signature length.
 
 Run the [offline reproduction command](../README.md#run) or use the [unified benchmark](../../../docs/benchmark.md) with `--project p2pk-p2pkh-baseline`. The default fixture runner and acceptance suite use the same repository pin documented in the project README.
 

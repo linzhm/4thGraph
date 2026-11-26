@@ -30,7 +30,7 @@ run in every height context. [Executable fixture](test_payment.py)
 | `SINGLE` without matching output | Accept | Accept | Reject | Reject |
 
 The table applies where the sighash family is active. Before Chronicle,
-all OTDA rows reject, including unpaired `SINGLE` with the companion ForkID
+all OTDA rows reject, including unpaired `SINGLE` with the companion BIP143
 binding. After applying the activation rule, 144 original transactions and 72
 output changes must pass. The other 424 rows must fail. The acceptance table
 uses declared commitment rules. Chain-gang and optional Lean and native Node

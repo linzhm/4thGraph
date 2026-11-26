@@ -24,7 +24,7 @@ from signature import authorization, current_input_unlock
 from test_payment import fixture_signature, signer
 import test_payment_acceptance as acceptance
 
-MODES = {"forkid-all": 0x41, "otda-all": 0x61, "otda-single": 0x63}
+MODES = {"bip143-all": 0x41, "otda-all": 0x61, "otda-single": 0x63}
 
 
 def template(source, *, mode, source_path=SOURCE):

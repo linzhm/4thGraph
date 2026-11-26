@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 
 from fourthgraph.compiler.source import PROJECT_NAME, PROJECT_VERSION, parse, schedule
-from fourthgraph.workflow.protocol import DEFAULT_TARGET, JOIN_WITNESSES, TARGETS, UTXO, build_artifact
+from fourthgraph.workflow.protocol import DEFAULT_TARGET, JOIN_WITNESSES, TARGETS, UTXO, build_artifact, normalize_target
 from fourthgraph.replay.workflow import EXAMPLE, TASK_ID, Replay
 from fourthgraph.benchmark.admission import submit_and_mine
 from fourthgraph.benchmark.validation import ACTIVATION_HEIGHT, CONTEXT_PIN, Node, RPCError, chain_metadata
@@ -135,7 +135,7 @@ def race(replay, contracts, done, records, states, *, winner):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--target", choices=TARGETS, default=DEFAULT_TARGET)
+    parser.add_argument("--target", type=normalize_target, choices=TARGETS, default=DEFAULT_TARGET)
     parser.add_argument("--join-witness", choices=JOIN_WITNESSES, default="shared")
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()

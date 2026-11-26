@@ -27,7 +27,7 @@ REQUIRE stdlib/bip340.fth
 ;
 
 : check-companion ( script -- script )
-    ( Unpaired SINGLE uses ForkID 0x43 or 0xc3 and a zero hashOutputs. )
+    ( Unpaired SINGLE uses BIP143 0x43 or 0xc3 and a zero hashOutputs. )
     op-fromaltstack op-dup op-toaltstack op-dup bytes-hex 43 bsv-push op-equal op-swap
     bytes-hex c3 bsv-push op-equal op-boolor op-verify
     bsv-empty schnorr-companion-code check-forkid-shape

@@ -3,10 +3,19 @@ from tempfile import TemporaryDirectory
 import unittest
 
 from msm_compiler import CALIBRATION, SOURCE, R1MSMCompiler
-from msm_experiment import local_build
+from msm_experiment import local_build, reference_rows
 
 
 class R1MSMTests(unittest.TestCase):
+    def test_reference_reports_accept_old_and_new_payment_labels(self):
+        old = {"layouts": {"split-4": {"payment_bytes": {"forkid-all": 84742, "otda-all": 92672}}}}
+        new = {"candidates": {"split-4": {"measured": {"payment_bytes": {
+            "bip143-all": 84742, "otda-all": 92672,
+        }}}}}
+        expected = {"split-4": {"payment_bytes": {"bip143-all": 84742, "otda-all": 92672}}}
+        self.assertEqual(reference_rows(old), expected)
+        self.assertEqual(reference_rows(new), expected)
+
     def test_scan_proves_affine_opportunity_without_lowering_a_window(self):
         compiler = R1MSMCompiler()
         report = compiler.scan(compiler.plan("split-4"))

@@ -47,12 +47,12 @@ bash verify.sh
 收款哈希全为零时，锁定脚本长 144,925 字节，SHA-256 为
 `196dfcb8244e863521447c7069297d31938fbd80a83d5976af618cf7fbcf9462`。
 生成器和 Python 脚本构造接口默认使用模板编号 `1`。[布局清单](../template/layout.json)
-固定了基准字节码。[付款向量](../template/spend-all.json)记录了一笔完整的 ForkID 付款。
+固定了基准字节码。[付款向量](../template/spend-all.json)记录了一笔完整的 BIP143 付款。
 [16 个确定性预映像](../template/sighash-modes.json)覆盖全部有配对模式和各种无配对
 SINGLE 模式。
 
 脚本执行所有 SM3 压缩轮。实现复用循环移位和取模所需的二次幂常量，用较短的指令访问
-栈顶附近的操作数，并简化后 48 轮的布尔运算。完整输入测试覆盖 ForkID 和 Chronicle
+栈顶附近的操作数，并简化后 48 轮的布尔运算。完整输入测试覆盖 BIP143 和 Chronicle
 OTDA，包括混用签名模式的输入、全 SM2 的两进两出付款、由正确测试私钥签署的畸形
 预映像，以及跨越 Chronicle 激活边界的花费。激活测试两侧都使用交易版本 1，以便只
 检验激活标志带来的差异。
@@ -107,7 +107,7 @@ signed_tx = sign_input(tx, input_index, funding_raw, public_key, signer, sighash
 Rust 测试签名器用 RustCrypto 的 `sm2` 签名，并用 `der` 编码。Python 测试签名器
 用 OpenSSL 签名，并用 `asn1crypto` 编码。两者提供相同的命令行参数和 JSON 字段。
 `verify.sh` 用 Cargo 构建 Rust 版，并通过 BSV Node 和 chain-gang 重放两版签名器
-生成的附带内容 ForkID 付款和分离内容 Chronicle OTDA 付款。测试还用 OpenSSL 验证
+生成的附带内容 BIP143 付款和分离内容 Chronicle OTDA 付款。测试还用 OpenSSL 验证
 签名、检查畸形封装是否被拒绝，并逐字节对照适配器与原始签名路径生成的解锁脚本。
 [Python 测试签名器](interop/python-signer/README.zh-CN.md) · [Rust 测试签名器](interop/rust-signer/README.zh-CN.md)
 

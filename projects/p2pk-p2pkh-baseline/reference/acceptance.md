@@ -43,7 +43,7 @@ unpaired OTDA inputs with `input out of tx_out range`.
 | Lock and witness public key | P2PK signature only, P2PKH with matching key, P2PKH with different key |
 | Original spending transaction version | 1, 2 |
 | Controlled input index | 0, 1 |
-| Sighash byte | ForkID and Chronicle OTDA crossed with ALL, NONE, SINGLE and with or without ANYONECANPAY |
+| Sighash byte | BIP143 and Chronicle OTDA crossed with ALL, NONE, SINGLE and with or without ANYONECANPAY |
 | Signing key | Lock owner's key, a different key |
 | Transaction or signing data | Unchanged, changed version, locktime, current or other sequence, current or other outpoint, signed amount, current or other output |
 
@@ -89,10 +89,10 @@ two input positions yield 368 accepted rows and 2,512 rejected rows.
 | Domain | Rows | Expected result |
 | --- | ---: | --- |
 | Unpaired SINGLE with the owned input at index 1 | 80 | Two locks, two transaction versions, four SINGLE flags and five mutations. Both families accept the original and an earlier output change. Only OTDA accepts a change to the current sequence. Adding the indexed output and signing a different digest both fail. 40 accept and 40 reject. |
-| Chronicle activation | 192 | Two locks and two versions, with 12 paired modes and four unpaired SINGLE modes, in three contexts. The cases cover pre-activation spend, post-activation spend of an older UTXO and post-activation spend of a new UTXO. Before activation ForkID passes and OTDA fails. Both pass after activation. 160 accept and 32 reject. |
+| Chronicle activation | 192 | Two locks and two versions, with 12 paired modes and four unpaired SINGLE modes, in three contexts. The cases cover pre-activation spend, post-activation spend of an older UTXO and post-activation spend of a new UTXO. Before activation BIP143 passes and OTDA fails. Both pass after activation. 160 accept and 32 reject. |
 
 Each slice uses the owner's key and the correct witness. Unpaired native
-OTDA SINGLE uses the constant-one digest. ForkID uses a transaction
+OTDA SINGLE uses the constant-one digest. BIP143 uses a transaction
 preimage with zero hashOutputs. The fixture exercises both cases with the
 native locks. [BSV Node 1.2.3 sighash implementation](https://github.com/bitcoin-sv/bitcoin-sv/blob/6504a3aff65ba97c0f6c80962b033e35ecbfed4b/src/script/interpreter.cpp#L2034)
 

@@ -26,9 +26,9 @@ The OpenSSL fixture uses a public test seed and deterministic signing.
 The Script compiler precomputes the matrix and transformed public-key
 polynomials. At execution the script checks the signature encoding, response
 norm and canonical hints, derives the challenge polynomial, and reconstructs
-and hashes the commitment. The payment wrapper supports all twelve ForkID and
+and hashes the commitment. The payment wrapper supports all twelve BIP143 and
 Chronicle OTDA sighash combinations. Unpaired OTDA `SINGLE` uses the companion
-ForkID binding. The wallet checks the funding output before requesting an
+BIP143 binding. The wallet checks the funding output before requesting an
 external signature. The caller authenticates the funding transaction and
 approves the transaction intent.
 [Transaction-binding construction](../../src/fourthgraph/bsv/pushtx.py)
@@ -80,7 +80,7 @@ for `prompt.json` and `dba8bcfe5f090503c9390701c11677389752cecd` for
 `expectedResults.json`.
 
 The payment fixture enumerates 640 unique cases across transaction versions 1
-and 2, Genesis ForkID and Chronicle OTDA, paired and unpaired `SINGLE`, ordered
+and 2, Genesis BIP143 and Chronicle OTDA, paired and unpaired `SINGLE`, ordered
 prevout eras, and three single changes. Its coverage record gives the exact
 domain and expected decisions. [Payment acceptance](reference/payment-acceptance.md)
 
@@ -108,7 +108,7 @@ The SHAKE measurements fix the input and output lengths at compile time.
 | Apply hints and encode high bits | 89,687 |
 | SHAKE256, 832-byte input to 32-byte output | 176,542 |
 | Complete payment lock | 926,403 |
-| One-input ForkID `ALL` unlock | 2,588 |
+| One-input BIP143 `ALL` unlock | 2,588 |
 
 The fixed-key equation accepts packed challenge and response coefficients and
 produces four canonical residual polynomials. The arithmetic and SHAKE scripts

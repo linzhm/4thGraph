@@ -25,14 +25,14 @@
 
 ## 花费短锁
 
-启用输入 `i` 必须在输出 `i` 创建等额的承诺目标。两条路径均使用锁内生成的 PUSHTX 签名和节点的原生验签来绑定 BIP143 ForkID SINGLE 原像。短锁核对实际输入金额及 `hashOutputs`，并拒绝缺少配对输出时的全零值。
+启用输入 `i` 必须在输出 `i` 创建等额的承诺目标。两条路径均使用锁内生成的 PUSHTX 签名和节点的原生验签来绑定 BIP143 SINGLE 原像。短锁核对实际输入金额及 `hashOutputs`，并拒绝缺少配对输出时的全零值。
 
 | 选择的模式 | 解锁脚本 | 辅助检查 |
 |---|---|---|
-| ForkID SINGLE `0x43`、`0xc3` | 推送 158 字节原像，合计 **160 字节** | `scriptCode` 为 `ac`，包含长度前缀时为 `01 ac` |
-| 其他 10 种模式 | 先推送 `typeByte || HASH256(selectedPreimage)`，再推送 161 字节 ForkID SINGLE 原像，合计 **197 字节** | 先用 `04 ad 68 ab ac` 验证等额输出约束，再用 `01 ac` 验证所选摘要。两个标志使用相同的 `ANYONECANPAY` 位 |
+| BIP143 SINGLE `0x43`、`0xc3` | 推送 158 字节原像，合计 **160 字节** | `scriptCode` 为 `ac`，包含长度前缀时为 `01 ac` |
+| 其他 10 种模式 | 先推送 `typeByte || HASH256(selectedPreimage)`，再推送 161 字节 BIP143 SINGLE 原像，合计 **197 字节** | 先用 `04 ad 68 ab ac` 验证等额输出约束，再用 `01 ac` 验证所选摘要。两个标志使用相同的 `ANYONECANPAY` 位 |
 
-Genesis 支持六种 ForkID 模式。Chronicle 激活后可使用另外六种 OTDA 模式。两者共用锁定脚本和识别规则。两条路径都要求配对输出存在，包括 OTDA SINGLE `0x63` 和 `0xe3`。 [原像与解锁向量](../template/v0.2.0/sighash-modes.json) · [锁定脚本汇编](../reference/asm/lock.asm)
+Genesis 支持六种 BIP143 模式。Chronicle 激活后可使用另外六种 OTDA 模式。两者共用锁定脚本和识别规则。两条路径都要求配对输出存在，包括 OTDA SINGLE `0x63` 和 `0xe3`。 [原像与解锁向量](../template/v0.2.0/sighash-modes.json) · [锁定脚本汇编](../reference/asm/lock.asm)
 
 同一交易可启用多个短锁。钱包先确定每个输入与输出的同索引配对，再附加手续费输入和找零，最后为每个启用输入生成原像。第三方可以支付手续费并启用。钱包应跟踪实际生效的启用交易及其输出索引。后续花费按原有 P2PKH-R1 流程，由收款人的外部 R1 签名器授权。 [P2PKH-R1 规范](../../p2pkh-r1/docs/spec.zh-CN.md)
 

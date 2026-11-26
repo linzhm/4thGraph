@@ -33,7 +33,7 @@ const targetScript = r1.createLock({ publicKey: spendKeyHex });
 const activatedHex = deferred.activate({ transaction: preparedHex, inputIndex, prevout });
 ```
 
-`activate` 默认使用 ForkID SINGLE（`0x43`），只填指定输入，不调用私钥签名器。预先组装交易，将承诺的完整 R1 输出放到同索引，金额与短锁一致。若有额外的付费输入，钱包另行签署。启用后用普通 R1 SDK 花费。
+`activate` 默认使用 BIP143 SINGLE（`0x43`），只填指定输入，不调用私钥签名器。预先组装交易，将承诺的完整 R1 输出放到同索引，金额与短锁一致。若有额外的付费输入，钱包另行签署。启用后用普通 R1 SDK 花费。
 
 从仓库根目录复放四语言向量。
 
@@ -46,7 +46,7 @@ SCRIPT_LAB_SDK_PYTHON="$PWD/projects/p2pkh-r1-deferred/workspace/venv/bin/python
 
 1. 从可信链视图认证入金 UTXO，用实际金额识别短锁。核对发票公钥哈希，并使用返回的 `targetTemplate`。
 2. 为同一公钥哈希生成等额的完整 R1 输出，将其放在与启用输入相同的索引。用独立的赞助输入支付手续费，并确定找零。
-3. 将已准备的交易、输入索引和可信 prevout 传给 `activate`。默认使用 ForkID SINGLE（`0x43`）。其他模式同样需要同索引目标输出，参数见协议规范。赞助输入单独签署。
+3. 将已准备的交易、输入索引和可信 prevout 传给 `activate`。默认使用 BIP143 SINGLE（`0x43`）。其他模式同样需要同索引目标输出，参数见协议规范。赞助输入单独签署。
 4. 记录启用后的 R1 outpoint，后续付款按 [R1 钱包接入](../../p2pkh-r1/docs/sdk.zh-CN.md)处理。
 
 ## 跟踪短锁和启用后的输出

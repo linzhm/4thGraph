@@ -57,7 +57,7 @@ def sign_previous(tx, index, previous, public_key, signer, *, sighash=DEFAULT_SI
 
 
 def sign_payment(funding_raw, vout, outputs, fee, public_key, signer):
-    """Build a version-2 single-input ForkID ALL payment with an approved fee."""
+    """Build a version-2 single-input BIP143 ALL payment with an approved fee."""
     funding = Transaction.parse(funding_raw)
     if type(vout) is not int or not 0 <= vout < len(funding.outputs):
         raise ValueError("funding output index out of range")

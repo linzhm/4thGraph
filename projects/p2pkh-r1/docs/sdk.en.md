@@ -45,7 +45,7 @@ SCRIPT_LAB_SDK_PYTHON="$PWD/projects/p2pkh-r1/workspace/venv/bin/python" \
 
 ## Bring up a device signer
 
-1. Replay ordinary ForkID ALL with the test fixture. Confirm that recognition returns the expected owner hash and template before trying a physical device.
+1. Replay ordinary BIP143 ALL with the test fixture. Confirm that recognition returns the expected owner hash and template before trying a physical device.
 2. Use the default with a prehashed signer. Set `signMessage: true` when the device applies SHA-256 exactly once. Return fixed-width, 64-byte `r ∥ s`. Convert DER to that format if your device returns DER.
 3. Configure an absolute persistent `historyPath` on storage shared by signing processes. Exercise a restart using the same history. If the wallet blocks a key after detecting nonce reuse, investigate the signer and affected key before resuming payment.
 
@@ -70,7 +70,7 @@ Use `signInput` for mixed inputs and explicit sighash modes. The wallet assemble
 
 ## Current development version
 
-Use v0.2.0 for new outputs. Python uses it by default. For older UTXOs, use the original v0.1.0 layout. The shared client recognizes both versions and supports ordinary ForkID ALL payments. [v0.1.0 layout](../template/layout.json)
+Use v0.2.0 for new outputs. Python uses it by default. For older UTXOs, use the original v0.1.0 layout. The shared client recognizes both versions and supports ordinary BIP143 ALL payments. [v0.1.0 layout](../template/layout.json)
 
 In the Python reference, `sign_spend(..., compress_otda="paired")` enables
 output reconstruction in version 2 Chronicle OTDA transactions using ALL

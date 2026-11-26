@@ -1,4 +1,4 @@
-"""Legacy BSV transaction wire format and ForkID and OTDA sighash preimages."""
+"""Legacy BSV transaction wire format with BIP143 and OTDA sighash preimages."""
 from dataclasses import dataclass, replace
 from hashlib import sha256
 
@@ -81,7 +81,7 @@ SIGHASH_TYPES = FORKID_TYPES | OTDA_TYPES
 
 def preimage_forkid(tx, index, previous_amount, script_code, sighash):
     if sighash not in FORKID_TYPES or not 0 <= index < len(tx.inputs):
-        raise ValueError('invalid ForkID sighash or input index')
+        raise ValueError('invalid BIP143 sighash or input index')
     base = sighash & 31
     anyone = sighash & ANYONECANPAY
     current = tx.inputs[index]

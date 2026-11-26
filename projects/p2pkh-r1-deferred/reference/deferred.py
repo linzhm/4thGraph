@@ -115,7 +115,7 @@ def recognize(output: Output, *, expected_key: bytes | None = None,
 
 
 def activation_preimages(tx: Transaction, index: int, value: int, sighash: int) -> tuple[bytes, bytes]:
-    """Return the ForkID output check preimage and optional selected-digest witness."""
+    """Return the BIP143 output check preimage and optional selected-digest witness."""
     if sighash not in SIGHASH_TYPES:
         raise ValueError('unsupported activation sighash type')
     if not 0 <= index < len(tx.inputs) or index >= len(tx.outputs):

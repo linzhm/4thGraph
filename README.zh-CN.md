@@ -89,10 +89,12 @@ flowchart LR
 
 ## 从实测看构建结果
 
-- **脚本优化省下多少交易字节？** P2PKH-R1 的 Forth 实验将两进两出 ForkID ALL 付款从 93,374 B 降到 **83,846 B**，最小 OTDA ALL 付款为 **91,692 B**。[P2PKH-R1 实测结果](projects/p2pkh-r1/README.zh-CN.md#实测结果)
+- **脚本优化省下多少交易字节？** P2PKH-R1 的 Forth 实验将两进两出 BIP143 ALL 付款从 93,374 B 降到 **83,846 B**，最小 OTDA ALL 付款为 **91,692 B**。[P2PKH-R1 实测结果](projects/p2pkh-r1/README.zh-CN.md#实测结果)
 - **链上验证一份证明要付出多少成本？** 在同一份 BLS12-381 Groth16 证明、同一组固定公开输入下，4thGraph 的部署加一次花费共 **280,731 字节**，受测 nChain 配置为 **393,553 字节**。两种花费都在 BSV regtest 入块。[实验条件、原始数据与交易 ID](projects/proof-counter/experiments/fixed-statement/README.md)
 
 [全部项目成果](showcase/README.md) · [钱包交易成本明细](docs/benchmark.zh-CN.md#transaction-costs)
+
+**BIP143 / OTDA** 表示这里比较的两种 BSV 签名摘要格式。两种格式均设置 `SIGHASH_FORKID`（`0x40`）。BSV 的 BIP143 格式使用交易各部分的哈希，Chronicle OTDA 加设 `0x20` 位，使用原始交易摘要算法。 [BIP143](https://github.com/bitcoin/bips/blob/master/bip-0143.mediawiki) · [Chronicle](https://docs.bsvblockchain.org/network-topology/nodes/sv-node/chronicle-release)
 
 <a name="architecture"></a><a name="toolchain"></a>
 

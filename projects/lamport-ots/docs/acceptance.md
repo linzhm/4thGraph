@@ -42,7 +42,7 @@ The declared domain is `2 × 256 × 3 = 1,536` rows. The complete row-set
 comparison covers 512 acceptances and 1,024 rejections, in addition to the
 two unchanged baseline signatures.
 
-For the legacy ForkID ALL lock, the fixture checks the exact inventory of 32
+For the legacy BIP143 ALL lock, the fixture checks the exact inventory of 32
 existing scenarios, including the two expected valid rows, against chain-gang
 and BSV Node. Its scope is the named inventory in the test.
 
