@@ -2,19 +2,16 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
 
+from comparison_report import read_report
 from msm_compiler import CALIBRATION, SOURCE, R1MSMCompiler
-from msm_experiment import frozen_build, local_build, reference_rows
+from msm_experiment import frozen_build, local_build
 
 
 class R1MSMTests(unittest.TestCase):
-    def test_reference_reports_accept_old_and_new_payment_labels(self):
-        old = {"layouts": {"split-4": {"payment_bytes": {"forkid-all": 84742, "otda-all": 92672}}}}
-        new = {"candidates": {"split-4": {"measured": {"payment_bytes": {
-            "bip143-all": 84742, "otda-all": 92672,
-        }}}}}
-        expected = {"split-4": {"payment_bytes": {"bip143-all": 84742, "otda-all": 92672}}}
-        self.assertEqual(reference_rows(old), expected)
-        self.assertEqual(reference_rows(new), expected)
+    def test_published_reference_uses_versioned_bip143_measurements(self):
+        report, _ = read_report(SOURCE.with_name("results.json"))
+        costs = report["candidates"]["split-4"]["measured"]["payment_bytes"]
+        self.assertEqual(costs, {"bip143-all": 84742, "otda-all": 92672, "otda-single": 92601})
 
     def test_scan_proves_affine_opportunity_without_lowering_a_window(self):
         compiler = R1MSMCompiler()

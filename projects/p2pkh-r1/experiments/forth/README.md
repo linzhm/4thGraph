@@ -23,3 +23,15 @@ bash tools/verify_node.sh --profile raised -- \
 ```
 
 报告记录前置扫描依据、各候选的估算与实测、以及每种付款模式的优胜候选。交易证据包含两进两出的付款、两套引擎的判定和改动锁定时间后的拒绝结果。 [已验证的实测数据](results.json)
+
+## 复用比较报告
+
+比较报告的 `schema_version` 为 `2`。候选按名称存入 `candidates`，每项含 `status`，实测指标放在 `measured`，可用的估算放在 `estimated`。运行 `--matrix` 时，候选的验收结果存入 `acceptance`。完整锁复放也使用这一结构，候选的原始交易保存在 `payments`。
+
+`compare --reference PATH` 可读取上一轮 `compare --output` 生成的新版报告，也可使用本目录的 `results.json`。参考报告中已构建的候选计为已知方案。校准比较已有的实测值，输出记录参考文件的 SHA-256。
+
+```sh
+bash tools/verify_node.sh --profile raised -- \
+  python "$experiment/msm_experiment.py" compare --reference /tmp/r1-comparison.json \
+  --output /tmp/r1-next-comparison.json
+```

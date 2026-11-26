@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 from time import perf_counter
 
+from comparison_report import PAYMENT_SHAPE, SCHEMA_VERSION, measured_costs, read_report
 from fixed_templates import read_compiled_template, read_otda_reconstruction
 from fourthgraph.bsv.evaluate import evaluate
 from msm_compiler import CALIBRATION, SOURCE, R1MSMCompiler, payment_estimates
@@ -26,17 +27,6 @@ def elapsed(start):
 def objective(row, field, metric):
     values = row[field]
     return values["lock_bytes"] if metric == "lock_bytes" else values["payment_bytes"][metric]
-
-
-def measure(payments, lock, pattern):
-    return {
-        "lock_bytes": len(lock.script), "otda_program_bytes": len(pattern.program),
-        "payment_bytes": {mode: row["spend"]["bytes"] for mode, row in payments.items()},
-        "payment_peak_stack_payload_bytes": {
-            mode: row["spend"]["stack"]["combined_payload_bytes"] for mode, row in payments.items()
-        },
-        "unlock_bytes": {mode: row["unlock_bytes"] for mode, row in payments.items()},
-    }
 
 
 def estimated_cost(compiler, plan, program, lock, pattern):
@@ -115,20 +105,13 @@ def shortlist(rows, limit):
     return selected
 
 
-def reference_rows(document):
-    rows = document["layouts"] if "layouts" in document else document["candidates"]
-    result = {}
-    for name, candidate in rows.items():
-        row = dict(candidate.get("measured", candidate))
-        if "payment_bytes" in row:
-            row["payment_bytes"] = {"bip143-all" if mode == "forkid-all" else mode: size
-                                    for mode, size in row["payment_bytes"].items()}
-        result[name] = row
-    return result
-
-
 def compare(args):
     start = perf_counter()
+    reference = {}
+    reference_sha256 = None
+    if args.reference:
+        report, reference_sha256 = read_report(args.reference)
+        reference = report["candidates"]
     compiler = R1MSMCompiler(args.source)
     scans = {}
     if args.workflow == "guided":
@@ -141,21 +124,19 @@ def compare(args):
     names = tuple(dict.fromkeys(args.candidate or default_candidates))
     if FROZEN_BASELINE in names:
         names = (FROZEN_BASELINE, *(name for name in names if name != FROZEN_BASELINE))
-    reference = {}
-    if args.reference:
-        raw = args.reference.read_bytes()
-        reference = reference_rows(json.loads(raw))
-    known = {*CALIBRATION, REFERENCE_TRIAL, FROZEN_BASELINE, *reference}
+    prior_builds = {name for name, row in reference.items() if row.get("measured") or row.get("estimated")}
+    known = {*CALIBRATION, REFERENCE_TRIAL, FROZEN_BASELINE, *prior_builds}
     rows, builds = {}, {}
     summary = {
+        "schema_version": SCHEMA_VERSION, "payment_shape": PAYMENT_SHAPE,
         **compiler.source_identity, "workflow": args.workflow, "proposal": proposal, "scans": scans,
         "budget": {"local_candidates": args.budget, "full_candidates": args.full_budget,
                    "point_vectors_per_candidate": args.vectors, "timing_samples": args.samples,
                    "full_acceptance_matrix": args.matrix},
         "candidates": rows,
     }
-    if args.reference:
-        summary["reference_sha256"] = sha256(raw).hexdigest()
+    if reference_sha256 is not None:
+        summary["reference_sha256"] = reference_sha256
     times = {"frontend_and_scan_seconds": elapsed(start), "first_locally_verified_seconds": None,
              "first_novel_locally_verified_seconds": None, "first_dual_engine_seconds": None,
              "first_novel_dual_engine_seconds": None, "measured_decision_seconds": None}
@@ -191,14 +172,17 @@ def compare(args):
             raise ValueError("use a fresh peerless regtest")
         runner = Replay(node, args.samples, "chronicle-v2", int(os.environ["SCRIPT_LAB_CHRONICLE_HEIGHT"]))
         bootstrap = runner.fund(len(candidates) * len(MODES))
-        evidence.update(bsv_node_version=node.version, chain_gang=engine, funding_parent_hex=bootstrap.serialize().hex(),
-                        regtest_profile=os.environ["SCRIPT_LAB_REGTEST_PROFILE"])
+        engines = {"bsv_node_version": node.version, "chain_gang": engine,
+                   "regtest_profile": os.environ["SCRIPT_LAB_REGTEST_PROFILE"]}
+        summary["engines"] = engines
+        evidence.update(engines, funding_parent_hex=bootstrap.serialize().hex())
         for index, name in enumerate(candidates):
             stage = perf_counter()
             lock, pattern = builds[name]
             try:
                 payments = replay_layout(runner, bootstrap, index, lock, pattern)
-                rows[name].update(status="verified", measured=measure(payments, lock, pattern))
+                measured = measured_costs(len(lock.script), len(pattern.program), payments)
+                rows[name].update(status="verified", measured=measured)
                 evidence["payments"][name] = payments
                 if times["first_dual_engine_seconds"] is None:
                     times["first_dual_engine_seconds"] = elapsed(start)
@@ -212,7 +196,9 @@ def compare(args):
             for name in evidence["payments"]:
                 stage = perf_counter()
                 try:
-                    evidence["acceptance"][name] = matrix_check(builds[name][0])
+                    acceptance = matrix_check(builds[name][0])
+                    evidence["acceptance"][name] = acceptance
+                    rows[name]["acceptance"] = acceptance
                 except (AssertionError, ValueError) as error:
                     rows[name].update(status="matrix-rejected", reason=str(error))
                 rows[name]["phase_seconds"]["acceptance_matrix"] = elapsed(stage)
@@ -222,10 +208,10 @@ def compare(args):
     summary["selected"] = select(rows, verified)
     summary["calibration_selected"] = select(rows, controls)
     summary["calibration"] = {
-        name: {field: rows[name]["measured"][field] == reference[name][field]
-               for field in ("lock_bytes", "otda_program_bytes", "payment_bytes")
-               if field in reference.get(name, {})}
+        name: {field: rows[name]["measured"][field] == prior[field]
+               for field in ("lock_bytes", "otda_program_bytes", "payment_bytes") if field in prior}
         for name in controls
+        if (prior := reference.get(name, {}).get("measured"))
     }
     comparisons = [("split-5x4", "split-4"), ("joint-2", "split-5x4"),
                    ("split-4-affine-g", "split-4"), ("split-5x4-affine-g", "split-5x4")]
@@ -351,14 +337,17 @@ def main():
             command.add_argument("--matrix", action="store_true")
             command.add_argument("--evidence", type=Path)
             command.add_argument("--markdown", type=Path)
-            command.add_argument("--reference", type=Path, help="previous comparison JSON for calibration and novelty")
+            command.add_argument("--reference", type=Path, help="previous R1 comparison report (schema version 2)")
     args = parser.parse_args()
     if args.command != "scan" and args.vectors < 12:
         parser.error("--vectors must cover the 12 fixed boundary cases")
     if args.command == "compare":
         if min(args.budget, args.full_budget, args.samples) < 1 or args.full_budget > args.budget:
             parser.error("positive replay and timing budgets are required, with full-budget <= budget")
-        report, evidence = compare(args)
+        try:
+            report, evidence = compare(args)
+        except ValueError as error:
+            parser.error(str(error))
         dump(report, args.output)
         if args.evidence:
             dump(evidence, args.evidence)

@@ -11,6 +11,7 @@ from unittest.mock import patch
 
 from tx_engine import Script, Tx
 
+from comparison_report import PAYMENT_SHAPE, SCHEMA_VERSION, measured_costs
 from compile_r1 import BASELINE_VERSION, SOURCE, VERSION, compile_source, previous_build
 from fixed_templates import compiled_template, otda_pattern
 from reconstruct import shared_kernel_program
@@ -139,7 +140,8 @@ def compare(source, *, matrix=False, scryptc=None, source_path=SOURCE):
         raise ValueError("use a fresh peerless regtest")
     layouts = {name: template(source, mode=name, source_path=source_path)
                for name in ("baseline", "previous-forth", "source", "optimized")}
-    report = {"baseline_version": BASELINE_VERSION, "experiment_version": VERSION,
+    report = {"schema_version": SCHEMA_VERSION, "payment_shape": PAYMENT_SHAPE,
+              "baseline_version": BASELINE_VERSION, "experiment_version": VERSION,
               "source_sha256": sha256(source).hexdigest(), "bsv_node_version": node.version, "chain_gang": engine,
               "regtest_profile": os.environ.get("SCRIPT_LAB_REGTEST_PROFILE")}
     if scryptc is not None:
@@ -151,11 +153,13 @@ def compare(source, *, matrix=False, scryptc=None, source_path=SOURCE):
     rows = {}
     for layout_index, (name, (lock, pattern, formulas)) in enumerate(layouts.items()):
         payments = replay_layout(replay, bootstrap, layout_index, lock, pattern)
-        rows[name] = {"lock_bytes": len(lock.script), "lock_sha256": sha256(lock.script).hexdigest(),
-                      "otda_program_bytes": len(pattern.program), "formulas": formulas, "payments": payments}
+        rows[name] = {"status": "verified", "lock_sha256": sha256(lock.script).hexdigest(),
+                      "otda_program_sha256": sha256(pattern.program).hexdigest(), "formulas": formulas,
+                      "measured": measured_costs(len(lock.script), len(pattern.program), payments),
+                      "payments": payments}
     if matrix:
-        report["optimized_acceptance"] = matrix_check(layouts["optimized"][0])
-    return {**report, "layouts": rows}
+        rows["optimized"]["acceptance"] = matrix_check(layouts["optimized"][0])
+    return {**report, "candidates": rows}
 
 
 def main():
