@@ -96,7 +96,7 @@ The lock contains the compressed public key. To spend, push the signature. [Fort
 | Project | Use it to | Version | Wallet integration |
 | --- | --- | --- | --- |
 | [Native P2PK and P2PKH](projects/p2pk-p2pkh-baseline/README.md) | Establish a size and signing baseline with native secp256k1 scripts | v0.1 development | [Integration guide](projects/p2pk-p2pkh-baseline/docs/sdk.en.md#quickstart) |
-| [P2PKH-R1](projects/p2pkh-r1/README.md) | Pay to a P-256 public-key hash using a fixed locking template | v0.2.0 development | [Integration guide](projects/p2pkh-r1/docs/sdk.en.md#quickstart) |
+| [P2PKH-R1](projects/p2pkh-r1/README.md) | Pay to a P-256 public-key hash and compare Forth-compiled locks | [v0.3.0 Forth experiment](projects/p2pkh-r1/README.md#version-history) | [v0.2.0 SDK guide](projects/p2pkh-r1/docs/sdk.en.md#quickstart) |
 | [P2PKH-R1-Deferred](projects/p2pkh-r1-deferred/README.md) | Receive funds with a short lock and activate a standard R1 output later | v0.2.0 development | [Integration guide](projects/p2pkh-r1-deferred/docs/sdk.en.md#quickstart) |
 | [P2PKH-SM2](projects/p2pkh-sm2/README.md) | Pay with SM2 signatures, accept GB/T 35275-2026 SignedData off-chain, and reconstruct eligible OTDA outputs | v1.1.0 candidate | [Integration guide](projects/p2pkh-sm2/docs/sdk.en.md#quickstart) |
 | [Lamport OTS](projects/lamport-ots/README.md) | Evaluate SHA-256 one-time signatures with full-key and committed-key locks | v0.1 development | [Integration guide](projects/lamport-ots/docs/sdk.en.md#quickstart) |
@@ -109,14 +109,15 @@ Start with native P2PKH to run your first payment. The projects share the same w
 
 ## Compare transaction costs
 
-P2PKH-R1 v0.2.0 reduced the two-input, two-output ForkID ALL benchmark from **119,934 to 93,374 bytes**. Deferred uses a **1,435-byte deposit lock** and creates the full **46,302-byte R1 lock** at activation. The right comparison includes both the bytes paid at each step and the number of steps in the wallet's flow. [R1 results](projects/p2pkh-r1/README.md) · [Deferred results](projects/p2pkh-r1-deferred/README.md)
+P2PKH-R1's two-input, two-output ForkID ALL payments measure **119,934 B** in v0.1.0, **93,374 B** in v0.2.0, and **92,322 B** in the Forth v0.3.0 experiment. Deferred uses a **1,435 B** deposit lock and creates the **46,302 B** R1 v0.2.0 lock at activation. [R1 measurements](projects/p2pkh-r1/README.md#complete-transactions-and-stack-measurements) · [Deferred measurements](projects/p2pkh-r1-deferred/README.md)
 
-The unified benchmark measured **260 complete transactions** across seven projects and 32 template and sighash combinations at commit `beeb4dd`. Additional mixed-output and paired `SINGLE` replays measured 88 transactions across 11 combinations. The Deferred v0.2.0 row uses the rerun at `9c5603d`.
+The unified benchmark measured **260 complete transactions** across seven projects and 32 template and sighash combinations at commit `beeb4dd`. Additional mixed-output and paired `SINGLE` replays measured 88 transactions across 11 combinations. The Deferred v0.2.0 row uses the rerun at `9c5603d`. The R1 Forth v0.3.0 row comes from its funded regtest comparison. [R1 Forth replay](projects/p2pkh-r1/README.md#forth-experiment)
 
 | Project and measured version | Inputs × outputs | Prevout lock | ForkID ALL unlock | ForkID ALL tx | OTDA ALL tx | ForkID ALL peak stack payload |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
 | Native P2PKH | 2 × 2 | 25 | 107 | 374 | 374 | 145 |
 | P2PKH-R1 v0.2.0 | 2 × 2 | 46,302 | 326 | 93,374 | 101,250 | 3,479 |
+| P2PKH-R1 Forth v0.3.0 experiment | 2 × 2 | 45,776 | 326 | 92,322 | 100,192 | 3,478 |
 | P2PKH-R1-Deferred activation | 3 × 2 | 1,435 | 197 | 93,259 | 93,260 | 359 |
 | P2PKH-SM2 v1.1.0 candidate | 2 × 2 | 144,925 | 291 | 290,554 | 316,018 | 4,147 |
 | Lamport OTS, committed key | 2 × 2 | 7,746 | 16,549 | 48,708 | 79,616 | 16,707 |

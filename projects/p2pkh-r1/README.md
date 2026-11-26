@@ -1,4 +1,4 @@
-# P2PKH-R1 v0.2.0
+# P2PKH-R1
 
 [简体中文](README.zh-CN.md) · [BSV Script Lab](../../README.md)
 
@@ -8,15 +8,27 @@
 
 Create a P-256 receive script and sign an approved payment. The unified client supports prepared inputs and Chronicle OTDA.
 
-[Protocol](docs/spec.en.md) · [Security](docs/developer.en.md#security) · [Verify](reference/acceptance.md) · [Transaction costs](#complete-transactions-and-stack-measurements)
+[Version history](#version-history) · [Protocol](docs/spec.en.md) · [Security](docs/developer.en.md#security) · [Verify](reference/acceptance.md) · [Transaction costs](#complete-transactions-and-stack-measurements)
 
 P2PKH-R1 locks a BSV output to the HASH160 of the recipient's uncompressed secp256r1 (P-256) public key. The payer fills a 20-byte owner field. On spend, the wallet supplies the public key and one verified 64-byte `r || s` signature for the selected input.
 
+## Version history
+
+| Version | Main change | Lock | 2×2 ForkID ALL | 2×2 OTDA ALL |
+| --- | --- | ---: | ---: | ---: |
+| Forth v0.3.0 experiment | Compiles the full lock from Forth and shortens internal point doubling | **45,776 B** | **92,322 B** | **100,192 B** |
+| v0.2.0 | Schedules P-256 arithmetic and adds shared-kernel OTDA reconstruction for eligible outputs | 46,302 B | 93,374 B | 101,250 B |
+| v0.1.0 | Introduces the fixed R1 payment template with literal OTDA preimages | 59,582 B | 119,934 B | 358,194 B |
+
 ## Current template
 
-v0.2.0 is the current development version. Its [46,302-byte fixed lock](template/v0.2.0/template.hex) and [binary layout](template/v0.2.0/layout.json) define the format for new outputs. The 59,582-byte [v0.1.0 lock](template/template.hex) remains recognized and spendable. Both use the same owner field at offsets 208 through 227 and support all twelve ForkID and Chronicle OTDA sighash combinations. The wallet verifies the fixed bytes of the actual prevout to identify its template.
+The reference wallet uses the 46,302-byte v0.2.0 template for new outputs and can spend existing v0.1.0 outputs. Both use the owner field at offsets 208 through 227 and support all twelve ForkID and Chronicle OTDA sighash combinations. The wallet identifies the template from the fixed bytes of the actual prevout. [v0.2.0 template](template/v0.2.0/template.hex) · [Binary layout](template/v0.2.0/layout.json) · [v0.1.0 template](template/template.hex)
 
 Ordinary payments use ForkID ALL (`0x41`) and a 326-byte unlock. The v0.2.0 two-input, two-output fixture is 93,374 bytes, compared with 119,934 bytes for v0.1.0. OTDA is available after Chronicle activation. On version 2 transactions, the reference wallet can reconstruct recognized outputs for OTDA ALL and same-index outputs for paired SINGLE. An unpaired SINGLE uses the companion path.
+
+## Forth experiment
+
+The Forth source `r1.fth` reproduces the full v0.2.0 lock byte for byte. The v0.3.0 build saves two bytes at each of 263 internal point doublings, or 526 bytes in the full lock. The lock checks untrusted witness fields before curve arithmetic. On the same regtest node, the v0.2.0 baseline, v0.3.0 build, and 66,265 B matched sCrypt kernel build each completed payments using ForkID ALL, OTDA ALL, and paired OTDA SINGLE. [Forth source and replay](https://github.com/linzhm/4thGraph/blob/f6f2c66e8476b29975b43be76850229ee38b47ea/projects/p2pkh-r1/experiments/forth/README.md)
 
 ## Wallet integration
 
@@ -33,7 +45,7 @@ See the [protocol specification](docs/spec.en.md), [acceptance matrix](reference
 
 ## Complete transactions and stack measurements
 
-These deterministic fixtures use commit `beeb4dd`. BSV Node 1.2.3 and the project's pinned chain-gang validate the complete inputs. The node replays scripts with supplied prevouts. Funded mempool and mining tests have separate records. Scripts and transactions are measured in bytes. Script sizes follow input and output order. `× n` indicates n equal sizes. Stack peaks refer to input zero, with independent peaks for main-stack items, altstack items, and combined payload. The development evaluator measures stack payload bytes on the successful path.
+The v0.1.0 and v0.2.0 figures use deterministic fixtures at `beeb4dd`. The Forth v0.3.0 rows come from funded regtest transactions that BSV Node 1.2.3 mined and chain-gang `74676b9` independently verified. Sizes are in bytes. Script sizes follow input and output order, and `× n` indicates n equal sizes. The development evaluator measures peak main-stack items, altstack items, and combined payload for input zero.
 
 | Template and mode | Inputs×outputs | Previous locks | Unlocks | New locks | Total | Main / alt items | Stack payload |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -53,6 +65,9 @@ These deterministic fixtures use commit `beeb4dd`. BSV Node 1.2.3 and the projec
 | `compiled + v0.2.0` · `0xe1` · after | 2×2 | 46,302 / 47,510 | 8,144 × 2 | 46,302 / 47,510 | 110,218 | 113 / 131 | 187,947 |
 | `v0.2.0` · `0x63` · after | 2×2 | 46,302 × 2 | 4,224 / 4,233 | 46,302 × 2 | 101,179 | 113 / 131 | 92,987 |
 | `v0.2.0` · `0xe3` · after | 2×2 | 46,302 × 2 | 4,182 / 4,191 | 46,302 × 2 | 101,095 | 113 / 131 | 92,905 |
+| Forth v0.3.0 · `0x41` | 2×2 | 45,776 × 2 | 326 × 2 | 45,776 × 2 | 92,322 | 113 / 131 | 3,478 |
+| Forth v0.3.0 · `0x61` | 2×2 | 45,776 × 2 | 4,261 × 2 | 45,776 × 2 | 100,192 | 113 / 131 | 183,510 |
+| Forth v0.3.0 · `0x63` | 2×2 | 45,776 × 2 | 4,221 / 4,230 | 45,776 × 2 | 100,121 | 113 / 131 | 91,935 |
 
 ## Marginal and lifecycle costs
 
