@@ -4,7 +4,8 @@ from pathlib import Path
 
 from fourthgraph.bsv.script import OPS, number, push
 
-from .source import CompileError, SourceCompiler, Word, evaluate
+from .source import CompileError, Located, SourceCompiler, Word, evaluate
+from .script_formula import read_formula
 from fourthgraph.stdlib import WALLET_BACKEND
 from .wordsets import script_word
 
@@ -37,13 +38,31 @@ SCRIPT_WORDS = {
 
 
 class ScriptBuilder(SourceCompiler):
-    def __init__(self, source, *, source_path=None):
-        super().__init__(source, vocabulary=SCRIPT_WORDS, backend=WALLET_BACKEND, source_path=source_path)
+    def __init__(self, source, *, source_path=None, vocabulary=None, optimize=False):
+        self.optimize = optimize
+        self.formulas = {}
+        self.formula_ir = {}
+        super().__init__(source, vocabulary=SCRIPT_WORDS | (vocabulary or {}), backend=WALLET_BACKEND,
+                         source_path=source_path)
 
     @classmethod
     def from_file(cls, path):
         path = Path(path)
         return cls(path.read_text(encoding="utf-8"), source_path=path)
+
+    def declaration(self, token):
+        if token.name != "formula:":
+            super().declaration(token)
+            return
+        name, formula = read_formula(self.tokens, token, self.ranges)
+        if name.name.startswith("bsv-") or name.name in self.words:
+            raise name.error(f"invalid or duplicate formula name {name.text!r}")
+        code, report = formula.lower(optimize=self.optimize)
+        append = script_word("script", "script", b"", lambda prefix: prefix + code)
+        self.words[name.name] = Word(("script",), ("script",), (Located(append, name),), "script", name=name.name)
+        self.definitions[name.name] = name
+        self.formulas[name.name] = report
+        self.formula_ir[name.name] = formula
 
     def emit(self, entry, *args):
         word = self.words.get(entry.casefold())

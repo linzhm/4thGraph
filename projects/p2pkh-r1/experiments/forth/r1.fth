@@ -1,4 +1,4 @@
-( P2PKH-R1 v0.2.0. Script construction runs at compile time. )
+( P2PKH-R1 payment lock. Script construction runs at compile time. )
 ( op-* words emit one Script opcode. The R1 words combine them into a full lock. )
 ( The runtime data-stack conventions are those of the original v0.2.0 template. )
 
@@ -275,38 +275,56 @@ bsv-effect: r1-gy15 script -- script ;
     bytes-hex b5b93ee3592e2d1f4e6594e51f9643e62a3b21ce75b5fa3f47e59cde0d034f36 bsv-num-be
 ;
 
-bsv-effect: r1-double-point script -- script ;
-: r1-double-point
-    ( Infinity preserves the input point. The branch consumes only this copy. )
-    op-dup bsv-optimize? if op-if else op-0notequal op-if then
-    ( Use y and z twice to compute s = 2*y*z and leave the input point in place. )
-    bsv-optimize? if op-2dup else op-over op-over then op-mul op-dup op-add
-    op-dup op-over op-mul op-over op-mul op-depth op-1sub op-pick op-mod
-    op-over op-4 op-roll op-mul op-4 op-pick op-over op-mul op-dup op-add op-3 op-6 op-pick op-6
-    op-pick op-sub op-7 op-roll op-7 op-roll op-add op-mul op-mul op-dup op-over op-mul op-2
-    op-pick op-dup op-add op-sub op-rot op-over op-sub op-rot op-mul op-2 op-pick op-3 op-roll
-    op-mul op-dup op-add op-sub op-depth op-1sub op-pick op-mod
-    op-swap op-3 op-roll op-mul op-depth op-1sub op-pick op-mod
-    op-swap op-rot
-    op-endif
+( Every coordinate is a canonical ScriptNum in the signed residue interval. )
+range: p256-coordinate script-int
+    $-ffffffff00000001000000000000000000000000fffffffffffffffffffffffe
+    $ffffffff00000001000000000000000000000000ffffffffffffffffffffffff ;
+range: p256-prime script-int
+    $ffffffff00000001000000000000000000000000ffffffffffffffffffffffff
+    $ffffffff00000001000000000000000000000001000000000000000000000000 ;
+range: p256-3b script-int
+    $1052a18afeafbbb61bc3380063c994352f57141164fb12e2b36ab4ba777720e2
+    $1052a18afeafbbb61bc3380063c994352f57141164fb12e2b36ab4ba777720e3 ;
+
+formula: r1-double-finite ( p256-coordinate p256-coordinate p256-coordinate -- p256-coordinate p256-coordinate p256-coordinate )
+    {: x y z :}
+    3 x z int- x z int+ int* int* let w
+    2 y z int* int* let s
+    y s int* let r
+    2 x r int* int* let b
+    w w int* 2 b int* int- let h
+
+    h s int* int-from-bottom 0 p256-prime int-rem
+    b h int- w int* 2 r r int* int* int- int-from-bottom 0 p256-prime int-rem
+    s s int* s int* int-from-bottom 0 p256-prime int-rem
 ;
 
-bsv-effect: r1-add-points script -- script ;
-: r1-add-points
-    ( Cached p and 3b are at the bottom of the stack. The top six items are the input points. )
-    op-over op-5 op-pick op-mul op-over op-5 op-pick op-mul -3 bsv-num op-over op-mul op-8
-    op-pick op-6 op-pick op-mul op-over op-over op-3 op-mul op-add op-9 op-pick op-9 op-pick
-    op-add op-7 op-pick op-7 op-pick op-add op-mul op-5 op-pick op-sub op-4 op-pick op-sub op-11
-    op-pick op-11 op-roll op-add op-9 op-pick op-9 op-roll op-add op-mul op-3 op-pick op-sub
-    op-6 op-pick op-sub op-10 op-roll op-10 op-roll op-add op-9 op-roll op-9 op-roll op-add
-    op-mul op-4 op-pick op-sub op-6 op-pick op-sub -3 bsv-num op-over op-mul op-depth op-2
-    op-sub op-pick op-8 op-roll op-mul op-add op-7 op-pick op-over op-add op-8 op-roll op-rot
-    op-sub op-rot op-depth op-2 op-sub op-pick op-mul op-3 op-7 op-roll op-8 op-roll op-sub
-    op-mul op-sub op-over op-4 op-pick op-mul op-over op-6 op-pick op-mul op-sub op-depth
-    op-1sub op-pick op-mod
-    op-rot op-3 op-pick op-mul op-rot op-6 op-pick op-mul op-add op-depth op-1sub op-pick op-mod
-    op-rot op-4 op-roll op-mul op-3 op-roll op-4 op-roll op-mul op-add op-depth op-1sub op-pick
-    op-mod
+formula: r1-add-points ( p256-coordinate p256-coordinate p256-coordinate p256-coordinate p256-coordinate p256-coordinate -- p256-coordinate p256-coordinate p256-coordinate )
+    {: x1 y1 z1 x2 y2 z2 :}
+    x1 x2 int* let xx
+    y1 y2 int* let yy
+    z1 z2 int* let zz
+    x1 y1 int+ x2 y2 int+ int* xx int- yy int- let xy
+    x1 z1 int+ x2 z2 int+ int* xx int- zz int- let xz
+    y1 z1 int+ y2 z2 int+ int* yy int- zz int- let yz
+
+    -3 xz int* int-from-bottom 1 p256-3b zz int* int+ let h
+    yy h int- let minus
+    yy h int+ let plus
+    -3 zz int* let azz
+    3 xx int* azz int+ let t
+    int-from-bottom 1 p256-3b xz int* 3 xx azz int- int* int- let k
+
+    xy minus int* yz k int* int- int-from-bottom 0 p256-prime int-rem
+    minus plus int* t k int* int+ int-from-bottom 0 p256-prime int-rem
+    yz plus int* xy t int* int+ int-from-bottom 0 p256-prime int-rem
+;
+
+: r1-double-point ( script -- script )
+    ( Doubling a point at infinity preserves the input point. )
+    op-dup op-0notequal op-if
+        r1-double-finite
+    op-endif
 ;
 
 bsv-effect: r1-digits-split4 script -- script ;
@@ -404,22 +422,35 @@ bsv-effect: r1-clear-points script -- script ;
     bsv-empty r1-drop-two 51 bsv-repeat-code bsv-cat-code
 ;
 
-bsv-effect: r1-verify-r1-point script -- script ;
-: r1-verify-r1-point
+: r1-prepare-scalars ( script -- script )
     ( p r s x y z invS. Store u=z/s then v=r/s above saved P. )
     op-dup 2 bsv-num op-pick op-mul r1-n op-mod op-toaltstack
     5 bsv-num op-pick op-mul r1-n op-mod op-toaltstack
     op-drop op-rot op-drop op-toaltstack op-toaltstack
     r1-b3 op-swap
-    r1-window
+;
+
+: r1-check-point-start ( script -- script )
     ( Reject infinity; X/Z is r, or r+n if below p. )
     op-dup op-verify
     r1-normalize-endpoint
-    op-dup r1-copy-r-low r1-m 3 bsv-num op-pick op-numequal op-toaltstack
-    r1-copy-r-high r1-n op-add op-dup r1-field op-lessthan op-toaltstack
+    op-dup
+;
+
+: r1-check-point-low ( script -- script )
+    r1-m 3 bsv-num op-pick op-numequal op-toaltstack
+;
+
+: r1-check-point-high ( script -- script )
+    r1-n op-add op-dup r1-field op-lessthan op-toaltstack
     1 bsv-num op-pick r1-m 3 bsv-num op-pick op-numequal op-fromaltstack op-booland
     op-fromaltstack op-boolor op-verify
-    r1-clear-points
+;
+
+: r1-verify-r1-point ( script -- script )
+    r1-prepare-scalars r1-window
+    r1-check-point-start r1-copy-r-low r1-check-point-low
+    r1-copy-r-high r1-check-point-high r1-clear-points
 ;
 
 bsv-effect: r1-k1-gx script -- script ;
@@ -469,30 +500,47 @@ bsv-effect: r1-native-binding script -- script ;
     op-codeseparator op-if op-checksigverify op-else op-codeseparator op-endif op-checksig
 ;
 
-bsv-effect: r1-finish-r1-binding script -- script ;
-: r1-finish-r1-binding
+: r1-check-inverse ( script -- script )
     op-fromaltstack op-fromaltstack op-fromaltstack
     op-swap op-toaltstack op-swap op-toaltstack
     op-dup op-1 r1-n op-within op-verify
     op-dup 5 bsv-num op-pick op-mul r1-n op-mod op-1 op-numequalverify
-    r1-verify-r1-point op-fromaltstack r1-k1-bind-digest
-    r1-native-binding
 ;
 
-bsv-effect: r1-lock script -- script ;
-: r1-lock
-    ( Runtime stack: preimage public-key signature inverse companion-selector. )
+: r1-bind-transaction ( script -- script )
+    op-fromaltstack r1-k1-bind-digest r1-native-binding
+;
+
+: r1-save-selector-and-inverse ( script -- script )
     op-dup op-0 op-2 op-within op-verify op-dup op-toaltstack op-swap
     op-size 32 bsv-num op-numequalverify r1-le-unsigned op-toaltstack
-    ( main: P Q sig mode. alt: mode inverse. )
-    r1-select-authorization
-    r1-check-type
+;
+
+: r1-check-witness-widths ( script -- script )
     op-depth 3 bsv-num op-numequalverify
     op-over op-size 65 bsv-num op-numequalverify op-drop
     op-size 64 bsv-num op-numequalverify
+;
+
+: r1-check-owner ( script -- script )
     op-over op-hash160 bsv-owner bsv-push op-equalverify
+;
+
+: r1-save-authorization-digest ( script -- script )
     r1-p-type op-1 op-split op-drop op-toaltstack
     2 bsv-num op-pick op-hash256 r1-uint256be op-dup op-toaltstack op-toaltstack
+;
+
+: r1-prepare-lock ( script -- script )
+    ( Runtime stack: preimage public-key signature inverse companion-selector. )
+    r1-save-selector-and-inverse
+    r1-select-authorization r1-check-type
+    r1-check-witness-widths r1-check-owner
+    r1-save-authorization-digest
     r1-unpack-r1-inputs op-drop r1-check-r1-fields
-    r1-finish-r1-binding
+    r1-check-inverse
+;
+
+: r1-lock ( script -- script )
+    r1-prepare-lock r1-verify-r1-point r1-bind-transaction
 ;

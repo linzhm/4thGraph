@@ -11,7 +11,7 @@ from unittest.mock import patch
 
 from tx_engine import Script, Tx
 
-from compile_r1 import BASELINE_VERSION, SOURCE, VERSION, compile_source
+from compile_r1 import BASELINE_VERSION, SOURCE, VERSION, compile_source, previous_build
 from fixed_templates import compiled_template, otda_pattern
 from reconstruct import shared_kernel_program
 from fourthgraph.replay.workflow import Replay, SOURCE as FUNDING_COIN
@@ -27,21 +27,20 @@ import test_payment_acceptance as acceptance
 MODES = {"forkid-all": 0x41, "otda-all": 0x61, "otda-single": 0x63}
 
 
-def template(source, *, optimize):
+def template(source, *, mode, source_path=SOURCE):
     marker = bytes(range(20))
-    compiler = compile_source(source, marker, optimize=optimize)
-    prefix, suffix = compiler.emit("r1-lock").split(marker)
     reference = compiled_template(scheduled=True)
+    if mode == "baseline":
+        return reference, otda_pattern(scheduled=True)[1], {}
+    compiler = (previous_build(marker, optimize=True) if mode == "previous-forth"
+                else compile_source(source, marker, optimize=mode == "optimized", source_path=source_path))
+    prefix, suffix = compiler.emit("r1-lock", b"").split(marker)
     raw = prefix + bytes(20) + suffix
-    if not optimize and raw != reference.script:
-        raise ValueError("the Forth baseline differs from the checked-in v0.2.0 lock")
     blocks = ("ADD_POINTS", "DOUBLE_POINT", "DIGITS_SPLIT4", "STEP_SPLIT4")
-    injected = {name: compiler.emit("r1-" + name.lower().replace("_", "-")) for name in blocks}
+    injected = {name: compiler.emit("r1-" + name.lower().replace("_", "-"), b"") for name in blocks}
     program = shared_kernel_program(prefix, suffix, injected=injected)
     pattern = Reconstruction(program, (prefix, suffix), (20,))
-    if not optimize and pattern != otda_pattern(scheduled=True)[1]:
-        raise ValueError("the Forth baseline differs from the checked-in OTDA reconstruction")
-    return replace(reference, script=raw, owner_start=len(prefix)), pattern
+    return replace(reference, script=raw, owner_start=len(prefix)), pattern, compiler.formulas
 
 
 def scrypt_template(binary):
@@ -76,7 +75,7 @@ def scrypt_template(binary):
 
 
 def spend(deposit, locks, pattern, owners, mode):
-    outputs = tuple(Output(400_000, raw) for raw in locks)
+    outputs = tuple(Output(365_000, raw) for raw in locks)
     unsigned = Transaction(tuple(Input(deposit.txid_wire(), index) for index in range(2)), outputs, version=2)
     engine_tx = Tx.parse(unsigned.serialize())
     tx = unsigned
@@ -109,45 +108,51 @@ def matrix_check(candidate):
             "valid_witness_controls": 4, "invalid_witness_controls": 24}
 
 
-def compare(source, *, matrix=False, scryptc=None):
+def replay_layout(replay, bootstrap, layout_index, lock, pattern):
+    owners = (signer(7), signer(19))
+    recipients = (signer(23), signer(29))
+    payments = {}
+    for mode_index, (label, mode) in enumerate(MODES.items()):
+        slot = layout_index * len(MODES) + mode_index
+        root = UTXO(bootstrap, slot)
+        # Keep both large 2-output transactions above the regtest mining fee floor.
+        deposit = Transaction((Input(root.outpoint.txid, root.outpoint.vout),),
+                              tuple(Output(450_000, lock.lock(owner)) for _, _, owner in owners), version=2)
+        deposit = FUNDING_COIN.unlock(deposit, 0, bootstrap, FLAG, None)
+        funding = replay.record(deposit, (root,))
+        payment = spend(deposit, [lock.lock(owner) for _, _, owner in recipients], pattern, owners, mode)
+        inputs = tuple(UTXO(deposit, i) for i in range(2))
+        rejected = replay.record(replace(payment, locktime=1), inputs, expected=False)
+        spent = replay.record(payment, inputs)
+        payments[label] = {"deployment": funding, "spend": spent, "changed_locktime": rejected,
+                           "unlock_bytes": [len(txin.script) for txin in payment.inputs],
+                           "total_bytes": funding["bytes"] + spent["bytes"]}
+    return payments
+
+
+def compare(source, *, matrix=False, scryptc=None, source_path=SOURCE):
     engine = chain_metadata()
     if engine["commit"] != CONTEXT_PIN:
         raise ValueError("use the pinned Chronicle-aware chain-gang")
     node = Node(os.environ["REGTEST_URL"], os.environ["REGTEST_COOKIE"])
     if node.call("getblockcount", []) or node.call("getconnectioncount", []):
         raise ValueError("use a fresh peerless regtest")
-    layouts = {name: template(source, optimize=optimized)
-               for name, optimized in (("baseline", False), ("optimized", True))}
+    layouts = {name: template(source, mode=name, source_path=source_path)
+               for name in ("baseline", "previous-forth", "source", "optimized")}
     report = {"baseline_version": BASELINE_VERSION, "experiment_version": VERSION,
               "source_sha256": sha256(source).hexdigest(), "bsv_node_version": node.version, "chain_gang": engine,
               "regtest_profile": os.environ.get("SCRIPT_LAB_REGTEST_PROFILE")}
     if scryptc is not None:
-        layouts["scrypt"], report["scrypt"] = scrypt_template(scryptc)
+        (lock, pattern), report["scrypt"] = scrypt_template(scryptc)
+        layouts["scrypt"] = lock, pattern, {}
     replay = Replay(node, 7, "chronicle-v2", int(os.environ["SCRIPT_LAB_CHRONICLE_HEIGHT"]))
     bootstrap = replay.fund(len(layouts) * len(MODES))
     report["funding_parent_hex"] = bootstrap.serialize().hex()
-    owners = (signer(7), signer(19))
-    recipients = (signer(23), signer(29))
     rows = {}
-    for layout_index, (name, (lock, pattern)) in enumerate(layouts.items()):
-        payments = {}
-        for mode_index, (label, mode) in enumerate(MODES.items()):
-            slot = layout_index * len(MODES) + mode_index
-            root = UTXO(bootstrap, slot)
-            # Keep both large 2-output transactions above the regtest mining fee floor.
-            deposit = Transaction((Input(root.outpoint.txid, root.outpoint.vout),),
-                                  tuple(Output(450_000, lock.lock(owner)) for _, _, owner in owners), version=2)
-            deposit = FUNDING_COIN.unlock(deposit, 0, bootstrap, FLAG, None)
-            funding = replay.record(deposit, (root,))
-            payment = spend(deposit, [lock.lock(owner) for _, _, owner in recipients], pattern, owners, mode)
-            inputs = tuple(UTXO(deposit, i) for i in range(2))
-            rejected = replay.record(replace(payment, locktime=1), inputs, expected=False)
-            spent = replay.record(payment, inputs)
-            payments[label] = {"deployment": funding, "spend": spent, "changed_locktime": rejected,
-                               "unlock_bytes": [len(txin.script) for txin in payment.inputs],
-                               "total_bytes": funding["bytes"] + spent["bytes"]}
+    for layout_index, (name, (lock, pattern, formulas)) in enumerate(layouts.items()):
+        payments = replay_layout(replay, bootstrap, layout_index, lock, pattern)
         rows[name] = {"lock_bytes": len(lock.script), "lock_sha256": sha256(lock.script).hexdigest(),
-                      "otda_program_bytes": len(pattern.program), "payments": payments}
+                      "otda_program_bytes": len(pattern.program), "formulas": formulas, "payments": payments}
     if matrix:
         report["optimized_acceptance"] = matrix_check(layouts["optimized"][0])
     return {**report, "layouts": rows}
@@ -160,7 +165,7 @@ def main():
     parser.add_argument("--scryptc", type=Path, help="include the pinned sCrypt arithmetic comparison from PR #45")
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
-    report = compare(args.source.read_bytes(), matrix=args.matrix, scryptc=args.scryptc)
+    report = compare(args.source.read_bytes(), matrix=args.matrix, scryptc=args.scryptc, source_path=args.source)
     args.output.write_text(json.dumps(report, indent=2) + "\n")
 
 

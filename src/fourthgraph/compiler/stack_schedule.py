@@ -2,6 +2,7 @@
 
 from collections import Counter
 from dataclasses import dataclass
+from heapq import nsmallest
 
 from fourthgraph.bsv.script import asm, number
 
@@ -41,31 +42,51 @@ class Graph:
         self.common[key] = value
         return value
 
-    def emit(self, returns, *, last_use=True, compact=False):
+    def live_definitions(self, returns):
         needed = set(returns)
         for value, node in reversed(self.definitions.items()):
             if value in needed:
                 needed.update(node.args)
-        live = [(value, node) for value, node in self.definitions.items() if value in needed]
+        return [(value, node) for value, node in self.definitions.items() if value in needed]
+
+    def emit(self, returns, *, last_use=True, compact=False):
+        live = self.live_definitions(returns)
         uses = Counter(returns)
         uses.update(arg for _, node in live for arg in node.args)
         stack = Layout(self.inputs, uses)
         for slot, node in live:
-            if compact and last_use and 0 < len(node.args) <= 2:
-                stack.arrange(node.args, commutative=node.script in COMMUTATIVE)
-            else:
-                for staged, operand in enumerate(node.args):
-                    stack.access(operand, staged, last_use=last_use)
-            if node.args:
-                del stack.slots[-len(node.args):]
-            stack.code.extend(node.script)
-            stack.slots.append(slot)
-        if tuple(stack.slots) != tuple(returns):
-            for staged, result in enumerate(returns):
-                stack.access(result, staged, last_use=last_use)
-            for _ in range(len(stack.slots) - len(returns)):
-                stack.discard(len(returns))
-        return bytes(stack.code)
+            stack.execute(slot, node, last_use=last_use, compact=compact)
+        return stack.finish(returns, last_use=last_use)
+
+    def search_order(self, returns, *, width=96):
+        """Try alternative dependency orders for a bounded pure arithmetic graph."""
+        source_order = self.emit(returns, compact=True)
+        definitions = self.live_definitions(returns)
+        if len(definitions) > 128:
+            return source_order
+        masks = {value: 1 << index for index, (value, _) in enumerate(definitions)}
+        operations = [(masks[value], sum(masks.get(arg, 0) for arg in set(node.args)), value, node)
+                      for value, node in definitions]
+        uses = Counter(returns)
+        uses.update(arg for _, node in definitions for arg in node.args)
+        beam = [(0, Layout(self.inputs, uses))]
+        for _ in operations:
+            candidates = {}
+            for done, stack in beam:
+                for flag, dependencies, value, node in operations:
+                    if done & flag or dependencies & ~done:
+                        continue
+                    candidate = Layout(stack.slots, stack.uses.copy())
+                    candidate.execute(value, node, last_use=True, compact=True)
+                    candidate.code = stack.code + candidate.code
+                    state = done | flag, tuple(candidate.slots)
+                    previous = candidates.get(state)
+                    if previous is None or len(candidate.code) < len(previous.code):
+                        candidates[state] = candidate
+            best = nsmallest(width, candidates.items(),
+                             key=lambda entry: (len(entry[1].code), len(entry[1].slots)))
+            beam = [(done, stack) for (done, _), stack in best]
+        return min((source_order, *(stack.finish(returns, last_use=True) for _, stack in beam)), key=len)
 
 
 class Layout:
@@ -73,6 +94,25 @@ class Layout:
         self.slots = list(inputs)
         self.uses = uses
         self.code = bytearray()
+
+    def execute(self, slot, node, *, last_use, compact):
+        if compact and last_use and 0 < len(node.args) <= 2:
+            self.arrange(node.args, commutative=node.script in COMMUTATIVE)
+        else:
+            for staged, operand in enumerate(node.args):
+                self.access(operand, staged, last_use=last_use)
+        if node.args:
+            del self.slots[-len(node.args):]
+        self.code.extend(node.script)
+        self.slots.append(slot)
+
+    def finish(self, returns, *, last_use):
+        if tuple(self.slots) != tuple(returns):
+            for staged, result in enumerate(returns):
+                self.access(result, staged, last_use=last_use)
+            for _ in range(len(self.slots) - len(returns)):
+                self.discard(len(returns))
+        return bytes(self.code)
 
     def access(self, value, staged, *, last_use):
         # Operands already brought to the top are consumed by the instruction.
