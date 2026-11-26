@@ -47,4 +47,6 @@ bash shared/verify_node.sh --profile default -- "$SCRIPT_LAB_SDK_PYTHON" -m shar
   p2pkh-schnorr --output /tmp/p2pkh-schnorr-admission.json
 ```
 
+The [sCrypt comparison](docs/scrypt-comparison.en.md) replays the verifier linked from the 2021 article alongside our standalone BIP340 verifier. The two fixtures use the same message and public-key x-coordinate.
+
 The next milestone is a two-party MuSig2 spend and a measured native 2-of-2 baseline, including the cost of a signing session interrupted before all parties respond.

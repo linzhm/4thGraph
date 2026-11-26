@@ -47,4 +47,6 @@ bash shared/verify_node.sh --profile default -- "$SCRIPT_LAB_SDK_PYTHON" -m shar
   p2pkh-schnorr --output /tmp/p2pkh-schnorr-admission.json
 ```
 
+[sCrypt 对照](docs/scrypt-comparison.zh-CN.md)复放了 2021 年文章当前链接的实现。它与本项目的独立 BIP340 验签器使用相同消息和相同的公钥横坐标。
+
 下一里程碑是跑通双方 MuSig2 花费，再与原生 2-of-2 实测对照，同时检验签名会话在参与方未全部响应时的处理方式。
