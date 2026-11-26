@@ -4,11 +4,12 @@ from dataclasses import asdict, dataclass, replace
 
 from shared.script import asm
 
-from compiler import Conditional, Located, Shuffle, Word, lower, require_script
+from compiler import Conditional, Located, Shuffle, Token, Word, lower, require_script
+from stack_schedule import Graph
 from wordsets import CELL_SIGN, PRIMITIVES, SHUFFLES, U32, WRAP_CELL, WRAP_U32, Literal
 
 BASELINE = "baseline"
-OPTIMIZATIONS = (BASELINE, "safe")
+OPTIMIZATIONS = (BASELINE, "safe", "stack")
 NUMERIC_RANGES = {"cell": (-CELL_SIGN, CELL_SIGN - 1), "u32": (0, U32 - 1), "route": (0, 1)}
 
 
@@ -34,12 +35,15 @@ class Slot:
 
 @dataclass(frozen=True)
 class Operation:
-    source: object
+    source: Token | None
     takes: tuple[Slot, ...]
     gives: tuple[Slot, ...]
     script: bytes
+    depth: int
     literal: Literal | None = None
     comparison: bool = False
+    total: bool = False
+    permutation: tuple[int, ...] | None = None
     arms: tuple[tuple, tuple] | None = None
 
 
@@ -49,6 +53,7 @@ class Rewrite:
     line: int | None
     column: int | None
     inputs: tuple[Slot, ...]
+    script_bytes: tuple[int, int] | None = None
 
 
 @dataclass(frozen=True)
@@ -110,25 +115,27 @@ def encoded_primitive(node, args):
     return node.code, gives, None
 
 
-def build_block(body, stack, rewrites):
+def build_block(body, stack, rewrites, *, schedule=False):
     code = []
     for node, source in expanded(body):
+        depth = len(stack)
         position = (source.line, source.column) if source is not None else (None, None)
         if isinstance(node, Literal):
             slot = Slot.literal(node)
             stack.append(slot)
-            code.append(Operation(source, (), (slot,), node.lower(), literal=node))
+            total = isinstance(node.value, int) or len(node.value) <= 32
+            code.append(Operation(source, (), (slot,), node.lower(), depth, literal=node, total=total))
         elif isinstance(node, Shuffle):
             count, order, opcode = SHUFFLES[node.name]
             args = tuple(stack[-count:])
             outputs = tuple(args[i] for i in order)
             stack[-count:] = outputs
-            code.append(Operation(source, args, outputs, asm(opcode)))
+            code.append(Operation(source, args, outputs, asm(opcode), depth, total=True, permutation=order))
         elif isinstance(node, Conditional):
             flag = stack.pop()
             yes, no = list(stack), list(stack)
-            yes_code = build_block(node.yes, yes, rewrites)
-            no_code = build_block(node.no, no, rewrites)
+            yes_code = build_block(node.yes, yes, rewrites, schedule=schedule)
+            no_code = build_block(node.no, no, rewrites, schedule=schedule)
             stack[:] = [a.merge(b) for a, b in zip(yes, no, strict=True)]
             prefix = asm("OP_0NOTEQUAL")
             if code and code[-1].comparison:
@@ -138,7 +145,7 @@ def build_block(body, stack, rewrites):
                 rewrites.append(Rewrite("comparison-feeds-if", *position, (flag,)))
             script = (prefix + asm("OP_IF") + emit(yes_code)
                       + asm("OP_ELSE") + emit(no_code) + asm("OP_ENDIF"))
-            code.append(Operation(source, (flag,), (), script, arms=(yes_code, no_code)))
+            code.append(Operation(source, (flag,), (), script, depth, arms=(yes_code, no_code)))
         else:
             argc = len(node.takes)
             start = len(stack) - argc
@@ -148,20 +155,66 @@ def build_block(body, stack, rewrites):
                 value, = node.run(*(op.literal.value for op in pushes))
                 literal = Literal(node.gives[0], value)
                 output = Slot.literal(literal)
-                code[-argc:] = [Operation(source, (), (output,), literal.lower(), literal=literal)]
+                total = isinstance(value, int) or len(value) <= 32
+                code[-argc:] = [Operation(source, (), (output,), literal.lower(), pushes[0].depth,
+                                          literal=literal, total=total)]
                 stack[start:] = [output]
                 continue
             script, outputs, rule = encoded_primitive(node, args)
+            takes = args
             if node is PRIMITIVES["+"] or node is PRIMITIVES["u32+"]:
                 if code and code[-1].literal == Literal(node.takes[-1], 1):
                     code.pop()
+                    depth -= 1
+                    takes = args[:-1]
                     script = asm("OP_1ADD") + script[1:]
                     rewrites.append(Rewrite("add-one-instruction", *position, args))
             if rule:
                 rewrites.append(Rewrite(rule, *position, args))
             stack[start:] = outputs
-            code.append(Operation(source, args, outputs, script, comparison=node.comparison))
-    return tuple(code)
+            # Arbitrary byte strings may exceed a Script stack resource limit
+            # when used by a compound primitive. Keep their evaluation order.
+            total = all(part.kind in NUMERIC_RANGES for part in (*takes, *outputs))
+            code.append(Operation(source, takes, outputs, script, depth,
+                                  comparison=node.comparison, total=total))
+    return schedule_blocks(code, rewrites) if schedule else tuple(code)
+
+
+def schedule_blocks(code, rewrites):
+    result, block = [], []
+    for op in code:
+        if op.total:
+            block.append(op)
+        else:
+            result.extend(schedule_block(block, rewrites))
+            block.clear()
+            result.append(op)
+    result.extend(schedule_block(block, rewrites))
+    return tuple(result)
+
+
+def schedule_block(block, rewrites):
+    if len(block) < 2:
+        return block
+    start = block[0]
+    graph = Graph(start.depth)
+    slots = list(graph.inputs)
+    for op in block:
+        assert len(slots) == op.depth
+        cut = len(slots) - len(op.takes)
+        operands = slots[cut:]
+        if op.permutation is not None:
+            slots[cut:] = [operands[i] for i in op.permutation]
+        else:
+            slots[cut:] = [graph.define(op.script, operands, kind=op.gives[0].kind)]
+    before = sum(len(op.script) for op in block)
+    script = graph.emit(slots)
+    if len(script) >= before:
+        return block
+    source = start.source
+    rewrites.append(Rewrite("stack-last-use-and-sharing", source.line if source else None,
+                            source.column if source else None, (), (before, len(script))))
+    return (Operation(source, (), (), script, start.depth),)
 
 
 def emit(operations):
@@ -175,5 +228,6 @@ def compile_word(word, optimization=BASELINE):
     if optimization == BASELINE:
         return CompiledWord(lower(word))
     rewrites = []
-    operations = build_block(word.body, [Slot.of(kind) for kind in word.takes], rewrites)
+    operations = build_block(word.body, [Slot.of(kind) for kind in word.takes], rewrites,
+                             schedule=optimization == "stack")
     return CompiledWord(emit(operations), operations, tuple(rewrites))

@@ -69,6 +69,23 @@ class CompilerTests(unittest.TestCase):
                 stack, alt = evaluate_script(compile_word(word, mode).script, list(map(encode_num, args)))
                 self.assertEqual((list(map(decode_num, stack)), alt), (expected, []), (args, mode))
 
+    def test_stack_scheduling_shares_repeated_operands_and_preserves_branch_slots(self):
+        source = """
+bsv-effect: shared u32 u32 -- u32 ;
+: shared 2DUP u32+ ROT ROT u32+ u32+ ;
+bsv-effect: branch u32 u32 cell -- u32 ;
+: branch IF shared ELSE SWAP DROP THEN ;
+"""
+        words = SourceCompiler(source).words
+        shared = compile_word(words["shared"], "stack")
+        self.assertTrue(any(item.rule == "stack-last-use-and-sharing" for item in shared.rewrites))
+        self.assertLess(len(shared.script), len(compile_word(words["shared"], "safe").script))
+        cases = [(words["shared"], (a, b)) for a, b in product((0, 7, U32 - 1), repeat=2)]
+        cases += [(words["branch"], args) for args in product((0, U32 - 1), (3, 8), (0, -1))]
+        for word, args in cases:
+            stack, alt = evaluate_script(compile_word(word, "stack").script, list(map(encode_num, args)))
+            self.assertEqual((tuple(map(decode_num, stack)), alt), (evaluate(word, *args), []))
+
     def test_core_cell_semantics(self):
         source = """
 bsv-effect: sum cell cell -- cell ;
