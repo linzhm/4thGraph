@@ -8,7 +8,7 @@ import unittest
 from fourthgraph.benchmark.validation import chain_verdict
 from fourthgraph.bsv.chain_gang import validate_at_heights
 from fourthgraph.bsv.evaluate import evaluate as evaluate_script
-from fourthgraph.bsv.script import decode_num, encode_num
+from fourthgraph.bsv.script import asm, decode_num, encode_num
 from fourthgraph.bsv.transaction import Input, Output, Transaction
 
 from fourthgraph.compiler.source import CompileError, SourceCompiler, evaluate, lower, parse, schedule
@@ -16,7 +16,7 @@ from fourthgraph.compiler.lowering import compile_word
 from fourthgraph.compiler.script_builder import ScriptBuilder
 from fourthgraph.workflow.protocol import Contracts, OutputLayout, compile_candidates, invalidated, output_hash
 from fourthgraph.replay.workflow import EXAMPLE, GATED_EXAMPLE, TASK_ID, TestKeys
-from fourthgraph.compiler.wordsets import CELL_SIGN, U32, capabilities
+from fourthgraph.compiler.wordsets import CELL_SIGN, U32, Primitive, capabilities
 
 SOURCE = EXAMPLE.read_text()
 
@@ -33,6 +33,30 @@ class CompilerTests(unittest.TestCase):
                                   vocabulary={"append-drop": word})
         with self.assertRaisesRegex(CompileError, "append-drop"):
             compile_word(composed.words["wrapper"])
+
+        with self.assertRaisesRegex(CompileError, "host-only word 'append-drop'"):
+            SourceCompiler("lock: invalid ( value:script ) value append-drop drop 1 ;",
+                           vocabulary={"append-drop": word})
+        with self.assertRaisesRegex(CompileError, "lock: requires a spend-time source"):
+            ScriptBuilder("lock: invalid ( ) 1 ;")
+
+    def test_stack_scheduling_preserves_zero_and_multi_result_primitives(self):
+        words = SourceCompiler("""
+: discard ( cell -- cell ) consume 1 1+ ;
+: twice ( cell -- cell ) pair + ;
+""", vocabulary={
+            "consume": Primitive(("cell",), (), asm("OP_DROP"), lambda value: (), "discard a cell"),
+            "pair": Primitive(("cell",), ("cell", "cell"), asm("OP_DUP"), lambda value: (value, value), "copy a cell"),
+        }).words
+        cases = (("discard", 7, 2), ("twice", 21, 42), ("twice", CELL_SIGN - 1, -2))
+        for name, value, expected in cases:
+            word = words[name]
+            self.assertEqual(evaluate(word, value), (expected,))
+            for mode in ("baseline", "safe", "stack"):
+                with self.subTest(entry=name, value=value, mode=mode):
+                    compiled = compile_word(word, mode)
+                    stack, alt = evaluate_script(compiled.script, [encode_num(value)])
+                    self.assertEqual((tuple(map(decode_num, stack)), alt), ((expected,), []))
 
     def test_stack_types_and_host_location(self):
         with self.assertRaisesRegex(CompileError, "declared"):

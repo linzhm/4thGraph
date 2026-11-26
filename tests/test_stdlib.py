@@ -34,6 +34,30 @@ OWNER = bytes.fromhex("751e76e8199196d454941c45d1b3a323f1433bd6")
 COMPRESSED = bytes.fromhex("0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798")
 NATIVE_LOCK = bytes.fromhex("76a914") + OWNER + bytes.fromhex("88ac")
 
+ASSERTION_SOURCE = """
+REQUIRE BSV
+: require-positive ( cell -- ) 0 > verify ;
+: assert-and-return ( cell -- cell ) require-positive 1 ;
+lock: terminal ( value:cell ) value 0 > verify ;
+lock: guarded ( value:cell selector:cell )
+    selector 0 > dup IF
+        -1 = verify value require-positive
+    ELSE
+        0= verify value 0 < verify
+    THEN
+    1 ;
+"""
+ASSERTION_CASES = (
+    ("assert-and-return", (1,), "pass"),
+    ("assert-and-return", (0,), "abort"),
+    ("terminal", (1,), "pass"),
+    ("terminal", (0,), "false"),
+    ("guarded", (1, 1), "pass"),
+    ("guarded", (0, 1), "abort"),
+    ("guarded", (-1, 0), "pass"),
+    ("guarded", (0, 0), "abort"),
+)
+
 
 class LibraryTests(unittest.TestCase):
     def test_named_p2pkh_preserves_native_lock_and_verification_order(self):
@@ -66,11 +90,30 @@ class LibraryTests(unittest.TestCase):
         self.assertEqual(evaluate(word, 0), (0,))
         self.assertEqual(evaluate_script(compile_word(word).script, [b""]), ([b""], []))
         for suffix in (": bypass ( u32 -- cell ) positive drop 1 ;",
+                       ": nested ( u32 cell -- cell ) IF positive drop 1 ELSE drop 0 THEN ;",
                        "gate: approval state positive alice ;",
                        "lock: composed ( value:u32 ) value positive ;"):
             with self.subTest(suffix=suffix):
                 with self.assertRaisesRegex(CompileError, "positive.*lock entry.*cannot be called"):
                     SourceCompiler(source + suffix)
+
+    def test_verify_aborts_inside_reusable_words_and_both_branch_paths(self):
+        words = SourceCompiler(ASSERTION_SOURCE).words
+        for name, inputs, verdict in ASSERTION_CASES:
+            word = words[name]
+            for mode in ("baseline", "safe", "stack"):
+                with self.subTest(entry=name, inputs=inputs, mode=mode):
+                    script = compile_word(word, mode).script
+                    encoded = list(map(encode_num, inputs))
+                    if verdict == "abort":
+                        with self.assertRaisesRegex(ValueError, "verification failed"):
+                            evaluate(word, *inputs)
+                        with self.assertRaisesRegex(ScriptError, "VERIFY"):
+                            evaluate_script(script, encoded)
+                    else:
+                        expected = -1 if name == "terminal" and verdict == "pass" else int(verdict == "pass")
+                        self.assertEqual(evaluate(word, *inputs), (expected,))
+                        self.assertEqual(evaluate_script(script, encoded), ([encode_num(expected)], []))
 
     def test_named_lock_rewrites_only_a_single_use_branch_flag(self):
         frontend = SourceCompiler("""
@@ -340,6 +383,42 @@ lock: match ( value:bytes switch:cell inner:cell )
             self.assertEqual(first, second)
             self.assertEqual(first["selected"], "r1cs")
             self.assertEqual(len(set(builds)), 2)
+
+
+@unittest.skipUnless(os.environ.get("REGTEST_URL"), "requires tools/verify_node.sh")
+class AssertionRegtestTests(unittest.TestCase):
+    def test_verify_and_branch_outcomes_match_both_engines(self):
+        from fourthgraph.bsv.chain_gang import validate_at_heights
+
+        node = Node(os.environ["REGTEST_URL"], os.environ["REGTEST_COOKIE"])
+        words = SourceCompiler(ASSERTION_SOURCE).words
+        # Each synthetic spend references the exact compiled lock. Heights select
+        # Genesis, Chronicle spending a Genesis output, and Chronicle throughout.
+        activation = int(os.environ["SCRIPT_LAB_CHRONICLE_HEIGHT"])
+        old_height = activation - 1
+        contexts = (
+            ("Genesis", 1, old_height, old_height),
+            ("Chronicle with Genesis output", 2, old_height, activation + 1),
+            ("Chronicle", 2, activation, activation + 1),
+        )
+        for era, version, funding_height, spend_height in contexts:
+            context = dict(spend_height=spend_height, activation_height=activation, utxo_heights=(funding_height,))
+            for name, inputs, verdict in ASSERTION_CASES:
+                witness = b"".join(number(value) for value in inputs)
+                expected = verdict == "pass"
+                for mode in ("baseline", "safe", "stack"):
+                    with self.subTest(era=era, entry=name, inputs=inputs, mode=mode):
+                        lock = compile_word(words[name], mode).script
+                        parent = Transaction((Input(bytes([42]) * 32, 0),), (Output(1000, lock),))
+                        spend = Transaction((Input(parent.txid_wire(), 0, script=witness),),
+                                            (Output(900, asm("OP_1")),), version=version)
+                        parents = (parent,)
+                        self.assertEqual(node.verdicts(spend, parents, **context), [expected])
+                        if expected:
+                            validate_at_heights(spend, parents, **context)
+                        else:
+                            with self.assertRaises((ValueError, RuntimeError)):
+                                validate_at_heights(spend, parents, **context)
 
 
 @unittest.skipUnless(os.environ.get("REGTEST_URL"), "requires tools/verify_node.sh")

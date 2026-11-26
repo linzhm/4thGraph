@@ -23,6 +23,20 @@ class ComparisonReportTests(unittest.TestCase):
         _, proposal, _ = guided_candidates(compiler, 1)
         self.assertIsNone(proposal)
 
+    def test_compare_builds_the_frozen_control_and_guided_rewrite_within_budget(self):
+        options = dict(source=SOURCE, workflow="guided", candidate=None, full_budget=1,
+                       vectors=12, samples=1, matrix=False, reference=None)
+        for budget in (1, 2):
+            with self.subTest(budget=budget), patch(
+                "msm_experiment.local_build", return_value=(None, {"status": "local-verified"})
+            ) as build, patch("msm_experiment.shortlist", return_value=()):
+                report, _ = compare(SimpleNamespace(**options, budget=budget))
+                checked = [name for name, row in report["candidates"].items() if row["status"] == "local-verified"]
+                self.assertEqual(checked, ["v0.6.0", "split-5x4-affine-g-ifdup"][:budget])
+                self.assertEqual(build.call_count, budget - 1)
+                if budget == 2:
+                    self.assertEqual(build.call_args.args[1].strategy.name, "split-5x4-affine-g-ifdup")
+
     def test_compare_can_reuse_its_output_as_a_reference(self):
         options = dict(
             source=SOURCE, workflow="explicit", candidate=["joint-2-affine-g"], budget=1, full_budget=1,

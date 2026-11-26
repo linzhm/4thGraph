@@ -13,6 +13,23 @@ SOURCE = EXAMPLE.read_text()
 
 
 class RangeTests(unittest.TestCase):
+    def test_named_lock_checks_ranges_for_inputs_it_drops(self):
+        source = """
+range: admitted cell 1 3 ;
+lock: entry ( value:admitted ) value drop 1 ;
+"""
+        word = SourceCompiler(source).words["entry"]
+        for mode in ("baseline", "safe", "stack"):
+            with self.subTest(mode=mode):
+                script = compile_word(word, mode).script
+                for value in (1, 2):
+                    self.assertEqual(evaluate_script(script, [encode_num(value)]), ([b"\x01"], []))
+                for value in (0, 3):
+                    with self.assertRaisesRegex(ScriptError, "VERIFY"):
+                        evaluate_script(script, [encode_num(value)])
+                with self.assertRaisesRegex(CompileError, "expansion budget"):
+                    compile_word(word, mode, max_expansion=2)
+
     def test_window_ranges_are_proved_and_remainder_is_removed(self):
         word = SourceCompiler(SOURCE).words["q-depth-probe"]
         for check in (False, True):

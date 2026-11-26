@@ -158,7 +158,8 @@ def build_block(body, stack, rewrites, *, schedule=False):
 def schedule_blocks(code, rewrites):
     result, block = [], []
     for op in code:
-        if op.total:
+        # The arithmetic graph schedules single-result nodes and stack permutations.
+        if op.total and (op.permutation is not None or len(op.gives) == 1):
             block.append(op)
         else:
             result.extend(schedule_block(block, rewrites))
