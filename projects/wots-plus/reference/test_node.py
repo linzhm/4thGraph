@@ -106,18 +106,22 @@ class NodeTests(unittest.TestCase):
         self.assertIsNone(pattern.match(sample[:-1] + bytes([sample[-1] ^ 1])))
 
     def test_compact_reconstruction_matches_compiled_lock(self):
-        pattern = compact_pattern()
-        self.assertEqual(len(pattern.program), 2395)
-        self.assertEqual(evaluate(pattern.program), (list(pattern.fixed_parts), []))
-        zero_key_lock = locking_script(bytes(64), cached_constants="compact")
-        self.assertEqual(sha256(zero_key_lock).hexdigest(),
-                         "b5de618ce7e3429a4f4b2f1d6c386a8841afb40c11dcf1eb57ee135765cea4ca")
-        for key in (bytes(64), bytes(range(64)), b"\xff" * 64):
-            lock = locking_script(key, cached_constants="compact")
-            self.assertEqual(len(lock), 29217)
-            self.assertEqual(lock, _payment_script(key, cached_constants="compact"))
-            self.assertEqual(pattern.match(lock), (key[:32], key[32:]))
-            self.assertIsNone(pattern.match(lock[:-1] + bytes([lock[-1] ^ 1])))
+        for profile, lock_bytes, program_bytes, fingerprint in (
+            ("compact", 29217, 2395, "b5de618ce7e3429a4f4b2f1d6c386a8841afb40c11dcf1eb57ee135765cea4ca"),
+            ("compact-v2", 27070, 2358, "6325b2e472c95893b9d76cf95d3240c9c3ff5ec4f334f9f69784f905004dbd91"),
+        ):
+            with self.subTest(profile=profile):
+                pattern = compact_pattern(profile)
+                self.assertEqual(len(pattern.program), program_bytes)
+                self.assertEqual(evaluate(pattern.program), (list(pattern.fixed_parts), []))
+                zero_key_lock = locking_script(bytes(64), cached_constants=profile)
+                self.assertEqual(sha256(zero_key_lock).hexdigest(), fingerprint)
+                for key in (bytes(64), bytes(range(64)), b"\xff" * 64):
+                    lock = locking_script(key, cached_constants=profile)
+                    self.assertEqual(len(lock), lock_bytes)
+                    self.assertEqual(lock, _payment_script(key, cached_constants=profile))
+                    self.assertEqual(pattern.match(lock), (key[:32], key[32:]))
+                    self.assertIsNone(pattern.match(lock[:-1] + bytes([lock[-1] ^ 1])))
 
     def test_reconstructed_wots_transactions_and_marginals(self):
         self.check_transactions_and_marginals("cached-steps-reconstructed", fixed_pattern(), {
@@ -134,6 +138,15 @@ class NodeTests(unittest.TestCase):
             0xe1: (68124, 72953, 97530),
             0x63: (68039, 70479, 97267),
             0xe3: (67955, 70313, 97183),
+        })
+
+    def test_compact_v2_transactions_and_marginals(self):
+        self.check_transactions_and_marginals("compact-v2-reconstructed", compact_pattern("compact-v2"), {
+            0x41: (58878, 61231, 85959),
+            0x61: (63840, 68797, 91099),
+            0xe1: (63756, 68548, 91015),
+            0x63: (63671, 66111, 90752),
+            0xe3: (63587, 65945, 90668),
         })
 
     def check_transactions_and_marginals(self, template, pattern, sizes):
@@ -175,11 +188,14 @@ class NodeTests(unittest.TestCase):
         recipients = [OneTimeSigner(*fixture_seeds(f"coverage/recipient/{i}".encode())) for i in range(3)]
         fixed = [locking_script(recipient.public_key, cached_constants="steps") for recipient in recipients]
         compact = [locking_script(recipient.public_key, cached_constants="compact") for recipient in recipients]
+        v2 = [locking_script(recipient.public_key, cached_constants="compact-v2") for recipient in recipients]
         layouts = (
             ((False, True, "steps"), (fixed[0], b"\x51", fixed[1], fixed[2])),
             ((False, True, "steps"), (fixed[0], fixed[1])),
             ((False, "steps", "compact"), (compact[0], b"\x51", fixed[1], compact[2])),
             ((False, "steps", "compact"), (compact[0], compact[1])),
+            (("steps", "compact", "compact-v2"), (v2[0], b"\x51", fixed[1], compact[2])),
+            (("steps", "compact", "compact-v2"), (v2[0], v2[1])),
         )
         for version in (1, 2):
             for profiles, locks in layouts:
@@ -224,9 +240,9 @@ class NodeTests(unittest.TestCase):
                 mode in (0x63, 0xe3) and i < len(locks) and locks[i] != b"\x51"
             )
             if version == 2 and compresses:
-                # Both WOTS+ dictionaries must be used for mixed ALL. A single
-                # literal WOTS+ lock would exceed this bound by over 19 kB.
-                self.assertLess(len(witness), min(10_000, len(literal)), i)
+                # The witness fits all three dictionaries. A literal WOTS+
+                # lock alone exceeds this bound.
+                self.assertLess(len(witness), min(12_000, len(literal)), i)
             else:
                 self.assertEqual(witness, literal, i)
         self.assertTrue(chain_valid(tx, parents))

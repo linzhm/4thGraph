@@ -13,7 +13,8 @@ from wots import CHAINS, KEY_BYTES, N, SIGNATURE_BYTES, W
 ORDINARY_CODE = asm('OP_NOP OP_ENDIF OP_CHECKSIG')
 COMPANION_CODE = asm('OP_NOP OP_IF OP_CHECKSIGVERIFY OP_ELSE OP_CODESEPARATOR') + ORDINARY_CODE
 
-CACHE_PROFILES = (False, True, 'steps', 'compact')
+COMPACT_PROFILES = ('compact', 'compact-v2')
+CACHE_PROFILES = (False, True, 'steps', *COMPACT_PROFILES)
 
 
 def _message_digits():
@@ -59,21 +60,27 @@ def _chain(index, *, cached_constants):
 
 
 @cache
-def _compact_chain():
+def _compact_chain(profile='compact'):
     from fourthgraph.compiler.script_builder import ScriptBuilder
 
     builder = ScriptBuilder.from_file(Path(__file__).with_name('compact.fth'))
-    code = builder.emit('compact-chain-start', b'')
-    # Open the gates from step 14 to 0. On the way back out the hashes run
-    # from the signed digit to 14, and a digit of 15 executes no hashes.
-    for limit in reversed(range(2, W)):
-        code = builder.emit('compact-if-digit-below', code, limit)
-    code += asm('OP_OVER OP_NOTIF')
+    # Open gates from step 14 to 0. The hashes run in order as the gates close.
+    code = builder.emit(f'{profile}-chain-start', b'')
+    if profile == 'compact-v2':
+        # The counter starts at 15 minus the signed digit. The first false
+        # gate consumes zero, and the innermost gate consumes the final flag.
+        code += builder.emit('compact-v2-countdown-gate', b'') * (W - 2) + asm('OP_IF')
+        table_depth = 9
+    else:
+        for limit in reversed(range(2, W)):
+            code = builder.emit('compact-if-digit-below', code, limit)
+        code += asm('OP_OVER OP_NOTIF')
+        table_depth = 11
     for step in range(W - 1):
-        # Eleven items above the table, with the highest step nearest the top.
-        code = builder.emit('compact-hash-step', code, 11 + W - 2 - step)
+        # The highest step is the nearest table entry.
+        code = builder.emit(f'{profile}-hash-step', code, table_depth + W - 2 - step)
         code += asm('OP_ENDIF')
-    return builder.emit('compact-chain-end', code)
+    return builder.emit(f'{profile}-chain-end', code)
 
 
 def _checksum_digits(depth):
@@ -82,20 +89,27 @@ def _checksum_digits(depth):
             + asm('OP_DUP OP_16 OP_MOD OP_TOALTSTACK OP_16 OP_DIV OP_TOALTSTACK'))
 
 
-def _compact_verifier(public_seed, commitment):
+def _compact_verifier(public_seed, commitment, *, profile):
     # Cache the step/selector suffixes and a full-width mask for selector one.
     suffixes = b''.join(push(step.to_bytes(4, 'big') + bytes(4)) for step in range(W - 1))
     selector_bit = push(bytes(3 * N - 1) + b'\x01')
     # The chain appends its one-byte index to the first 23 address bytes.
     prf_base = push((3).to_bytes(N, 'big') + public_seed + bytes(23))
-    restore_input = (number(W + 3) + asm('OP_ROLL')) * 2
-    chain = _compact_chain()
-    cleanup = asm('OP_2DROP') * ((W - 1) // 2) + asm('OP_DROP')
-    return (suffixes + selector_bit + push(bytes(N)) + prf_base + restore_input
-            + _message_digits() + asm('OP_SWAP OP_0 OP_SWAP OP_0') + chain * (2 * N)
-            + _checksum_digits(3) + chain * (CHAINS - 2 * N)
+    constants = suffixes + selector_bit + push(bytes(N)) + prf_base
+    roll = number(W + 3) + asm('OP_ROLL')
+    if profile == 'compact-v2':
+        # Keep the checksum below the cache so step table entries are closer.
+        prefix = _message_digits() + constants + roll + asm('OP_0 OP_SWAP OP_0')
+        checksum_depth = W + 5
+    else:
+        prefix = constants + roll * 2 + _message_digits() + asm('OP_SWAP OP_0 OP_SWAP OP_0')
+        checksum_depth = 3
+    chain = _compact_chain(profile)
+    cleanup = asm('OP_2DROP') * ((W + 3) // 2) + asm('OP_DROP')
+    return (prefix + chain * (2 * N)
+            + _checksum_digits(checksum_depth) + chain * (CHAINS - 2 * N)
             + asm('OP_DROP OP_0 OP_EQUALVERIFY OP_SHA256') + push(commitment)
-            + asm('OP_EQUALVERIFY OP_2DROP OP_2DROP') + cleanup)
+            + asm('OP_EQUALVERIFY') + cleanup)
 
 
 def verifier(key, *, cached_constants=False):
@@ -103,8 +117,8 @@ def verifier(key, *, cached_constants=False):
     if not isinstance(key, bytes) or len(key) != KEY_BYTES:
         raise ValueError('WOTS+ public key must be 64 bytes')
     public_seed, commitment = key[:N], key[N:]
-    if cached_constants == 'compact':
-        return _compact_verifier(public_seed, commitment)
+    if cached_constants in COMPACT_PROFILES:
+        return _compact_verifier(public_seed, commitment, profile=cached_constants)
     prf_prefix = (3).to_bytes(N, 'big') + public_seed + bytes(20)
     if type(cached_constants) is not bool and cached_constants != 'steps':
         raise ValueError('unknown WOTS+ constant cache profile')
@@ -139,7 +153,7 @@ def locking_script(key, *, transaction=True, cached_constants=False):
         shape += number(N) + asm('OP_NUMEQUALVERIFY OP_DROP OP_SIZE')
         shape += number(SIGNATURE_BYTES) + asm('OP_NUMEQUALVERIFY OP_SWAP')
         return shape + verifier(key, cached_constants=cached_constants) + asm('OP_1')
-    if cached_constants in ('steps', 'compact'):
+    if cached_constants in ('steps', *COMPACT_PROFILES):
         from fixed_template import lock_for_key
 
         return lock_for_key(key, profile=cached_constants)

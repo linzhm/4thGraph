@@ -33,14 +33,14 @@ def fixed_pattern():
 
 
 @cache
-def compact_pattern():
+def compact_pattern(profile="compact"):
     from script import _compact_chain, _payment_script
 
     marker = bytes(range(KEY_BYTES))
-    raw = _payment_script(marker, cached_constants="compact")
+    raw = _payment_script(marker, cached_constants=profile)
     first, tail = raw.split(marker[:N], 1)
     middle, last = tail.split(marker[N:], 1)
-    chain = _compact_chain()
+    chain = _compact_chain(profile)
     lead, tail = middle.split(chain * (2 * N), 1)
     gap, end = tail.split(chain * (CHAINS - 2 * N), 1)
 
@@ -56,6 +56,6 @@ def compact_pattern():
 def lock_for_key(key, *, profile="steps"):
     if not isinstance(key, bytes) or len(key) != KEY_BYTES:
         raise ValueError("WOTS+ public key must be 64 bytes")
-    pattern = compact_pattern() if profile == "compact" else fixed_pattern()
+    pattern = fixed_pattern() if profile == "steps" else compact_pattern(profile)
     first, middle, last = pattern.fixed_parts
     return first + key[:N] + middle + key[N:] + last

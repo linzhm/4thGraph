@@ -2,7 +2,7 @@
 from dataclasses import dataclass
 from functools import cache
 
-from script import CACHE_PROFILES, COMPANION_CODE, ORDINARY_CODE, locking_script
+from script import CACHE_PROFILES, COMPACT_PROFILES, COMPANION_CODE, ORDINARY_CODE, locking_script
 from fixed_template import compact_pattern, fixed_pattern
 from fourthgraph.bsv.otda_reconstruction import reconstruct_mixed
 from fourthgraph.bsv.pushtx import N, R
@@ -107,10 +107,13 @@ def sign_previous(tx, index, previous, public_key, signer, *, sighash=DEFAULT_SI
     program = None
     if compress_otda and tx.version == 2 and not auth.companion and sighash in COMPRESSIBLE_OTDA_TYPES:
         outputs = (tx.outputs[index],) if sighash & 31 == SIGHASH_SINGLE else tx.outputs
-        steps, compact = fixed_pattern(), compact_pattern()
-        program = reconstruct_mixed(auth.preimage, outputs, (steps, compact))
+        patterns = (fixed_pattern(), *(compact_pattern(profile) for profile in COMPACT_PROFILES))
+        program = reconstruct_mixed(auth.preimage, outputs, patterns)
         if program is None:
-            program = steps.build(auth.preimage, outputs) or compact.build(auth.preimage, outputs)
+            for pattern in patterns:
+                program = pattern.build(auth.preimage, outputs)
+                if program is not None:
+                    break
     signature = signer(_checked_digest(auth))
     witness = current_input_unlock(auth, public_key, signature)
     if program is not None:

@@ -79,6 +79,9 @@ class AcceptanceTests(unittest.TestCase):
     def test_compact_complete_payment_domain(self):
         self.check_payment_domain(cached_constants="compact")
 
+    def test_compact_v2_complete_payment_domain(self):
+        self.check_payment_domain(cached_constants="compact-v2")
+
     def check_payment_domain(self, *, cached_constants):
         expected = base_verdicts()
         self.assertEqual(len(expected), 123)

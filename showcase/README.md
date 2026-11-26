@@ -7,7 +7,7 @@
 | **Deferred R1 activation** | [Deferred v0.3.0](../projects/p2pkh-r1-deferred/README.md#4thgraph-forth-comparison) uses a 1,085 B funding lock built with `stack` optimization |
 | **PELS Counter** | [Build and replay](../projects/pels-counter/README.md) covers the funded `0 → 1 → 2` sequence and rejected mutations |
 | **BIP340** | [Schnorr locks and signing](../projects/p2pkh-schnorr/README.md) and [fixed BIP340 vectors](../projects/p2pkh-schnorr/versions/v0.6.0/bip340-vectors.csv) |
-| **WOTS+ lock optimization** | [Compact profile measurements](../projects/wots-plus/README.md#compact-profile) report a 29,217 B lock and a 68,208 B reconstructed OTDA ALL payment |
+| **WOTS+ lock optimization** | Compact v2 uses a 27,070 B lock and a 63,840 B reconstructed OTDA ALL payment. [Compact profile measurements](../projects/wots-plus/README.md#compact-profile) |
 | **BLS12-381 Groth16** | [Fixed-statement comparison](../projects/proof-counter/reference/fixed-statement/README.md) and [recorded benchmark](../projects/proof-counter/versions/v0.1.0/measurements.json) |
 
 The [wallet benchmark](../docs/benchmark.md) specifies transaction shapes, measurement and engine pins for cross-project comparisons.

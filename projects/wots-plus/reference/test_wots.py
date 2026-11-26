@@ -59,6 +59,16 @@ class WotsTests(unittest.TestCase):
         self.assertEqual(digits(b"\xff" * 32), (15,) * 64 + (0, 0, 0))
         self.assertEqual(digits(b"\xab" + bytes(31)), (10, 11) + (0,) * 62 + (3, 10, 11))
 
+    def test_compact_v2_countdown_for_each_digit(self):
+        for digit in range(16):
+            with self.subTest(digit=digit):
+                seeds = fixture_seeds(b"countdown/" + bytes([digit]))
+                key = public_key(*seeds)
+                digest = bytes([17 * digit]) * N
+                signature = sign_digest(*seeds, digest)
+                lock = locking_script(key, transaction=False, cached_constants="compact-v2")
+                self.assertEqual(evaluate(lock, [digest, signature]), ([b"\x01"], []))
+
     def test_keys_and_malformed_values(self):
         secret, key = generate_keypair()
         self.assertEqual((len(secret), len(key)), (N, KEY_BYTES))
@@ -128,17 +138,13 @@ class WotsTests(unittest.TestCase):
             calls.append(digest)
             return bytes(SIGNATURE_BYTES)
 
+        same_key_outputs = [(0, [Output(9_900, locking_script(key, transaction=transaction,
+                                                              cached_constants=profile))])
+                            for profile in CACHE_PROFILES for transaction in (True, False)]
         for vout, outputs in (
             (1, [Output(9_900, b"\x51")]),
             (0, [Output(9_899, b"\x51")]),
-            (0, [Output(9_900, locking_script(key))]),
-            (0, [Output(9_900, locking_script(key, transaction=False))]),
-            (0, [Output(9_900, locking_script(key, cached_constants=True))]),
-            (0, [Output(9_900, locking_script(key, transaction=False, cached_constants=True))]),
-            (0, [Output(9_900, locking_script(key, cached_constants="steps"))]),
-            (0, [Output(9_900, locking_script(key, transaction=False, cached_constants="steps"))]),
-            (0, [Output(9_900, locking_script(key, cached_constants="compact"))]),
-            (0, [Output(9_900, locking_script(key, transaction=False, cached_constants="compact"))]),
+            *same_key_outputs,
         ):
             with self.subTest(vout=vout, output_bytes=len(outputs[0].script)):
                 with self.assertRaises(ValueError):

@@ -25,6 +25,20 @@ mixed compact, cached-steps and native outputs. Lean `spec@1c051ea`
 matched all 125 compact fixtures. The wallet replay passed in Python,
 TypeScript, Go and Rust. [Measurements and replay commands](../README.md#compact-profile)
 
+## Compact v2 profile
+
+With the compiler at `454456f`, `compact-v2` builds a 27,070-byte lock
+and a 2,358-byte reconstruction program. Its detached tests exercise all
+16 starting digits. BSV Node 1.2.3 and chain-gang at `74676b9` matched the
+1,230 payment outcomes and rejected all 67 signature-chain mutations.
+The matrix also passed for the four older profiles.
+
+The two engines checked the 2×2, 3×2 and 2×3 compact-v2 sizes. They
+validated mixed OTDA ALL transactions containing all three supported
+reconstruction formats alongside a native output. Lean `spec@1c051ea`
+matched all 125 compact-v2 fixtures. The Python, TypeScript, Go and Rust
+wallet replays passed. [Measurements and replay commands](../README.md#compact-profile)
+
 ## Bounded coverage of complete payments
 
 The [acceptance fixture](../reference/test_acceptance.py) builds the expected key

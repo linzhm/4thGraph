@@ -1,6 +1,6 @@
 """Compare WOTS+ payment templates and OTDA reconstruction."""
 from payment import sign_spend
-from script import locking_script
+from script import COMPACT_PROFILES, locking_script
 from wots import OneTimeSigner
 from fourthgraph.benchmark.cases import Coin, Template, seed
 from fourthgraph.bsv.transaction import Output
@@ -23,8 +23,9 @@ TEMPLATES = {"canonical": Template(coin),
              "cached-steps": Template(lambda label, value: coin(label, value, cached="steps")),
              "cached-steps-reconstructed": Template(
                  lambda label, value: coin(label, value, cached="steps", compress=True),
-             ),
-             "compact": Template(lambda label, value: coin(label, value, cached="compact")),
-             "compact-reconstructed": Template(
-                 lambda label, value: coin(label, value, cached="compact", compress=True),
              )}
+for profile in COMPACT_PROFILES:
+    TEMPLATES[profile] = Template(lambda label, value, cached=profile: coin(label, value, cached=cached))
+    TEMPLATES[f"{profile}-reconstructed"] = Template(
+        lambda label, value, cached=profile: coin(label, value, cached=cached, compress=True),
+    )
