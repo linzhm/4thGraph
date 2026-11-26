@@ -89,7 +89,7 @@ If regtest is available, demonstrate 0 → 1 → 2, then try jumping directly fr
 
 ## Measured on real transactions
 
-- **What does optimizing a lock save on a payment?** The P2PKH-R1 Forth baseline reproduced the 46,302-byte reference lock byte for byte. Optimization brought the lock to **45,776 bytes** and the same two-input, two-output ForkID ALL payment from 93,374 to **92,322 bytes**. [Source, comparison, and replay](projects/p2pkh-r1/experiments/forth/README.md)
+- **What does optimizing a lock save on a payment?** The P2PKH-R1 Forth experiment reduced the two-input, two-output ForkID ALL payment from 93,374 B to **83,846 B**. Its smallest OTDA ALL payment measured **91,692 B**. [P2PKH-R1 results](projects/p2pkh-r1/README.md#measured-results)
 - **What does it cost to verify a proof on-chain?** For the same BLS12-381 Groth16 proof and fixed public inputs, deployment plus one spend totaled **280,731 bytes** with 4thGraph and **393,553 bytes** with the tested nChain configuration. Both spends were mined on BSV regtest. [Experiment, raw results, and transaction IDs](projects/proof-counter/experiments/fixed-statement/README.md)
 
 [All project results](showcase/README.md) · [Detailed wallet transaction costs](docs/benchmark.md#transaction-costs)
