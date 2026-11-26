@@ -142,7 +142,7 @@ lock: values-match ( left:bytes right:bytes )
 | `…-lock` | 用于返回序列化锁定 Script 的构造词。参数和返回值由栈签名定义。`lock:` 声明可直接定义花费验证入口 |
 | `…-verify` | 失败终止当前执行。成功后的返回值由栈签名定义。算法及影响互操作的参数写入词名 |
 
-`protocol.py --capabilities` 的 `bsv.source_syntax` 给出规范声明及兼容形式。`libraries.<module>.interfaces.<word>` 的记录采用以下字段。
+`4thgraph --capabilities` 的 `bsv.source_syntax` 给出规范声明及兼容形式。`libraries.<module>.interfaces.<word>` 的记录采用以下字段。
 
 | 字段 | 内容 |
 | --- | --- |

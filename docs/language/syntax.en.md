@@ -146,7 +146,7 @@ Repository sources targeting BSV Script begin with `REQUIRE BSV`. It loads `veri
 | `…-lock` | A constructor that returns serialized locking Script. Its stack signature defines its parameters and results. A `lock:` declaration can define a spending check directly |
 | `…-verify` | Aborts execution on failure. The signature specifies the results on success. The word name identifies the algorithm and any parameters that affect interoperability |
 
-The `bsv.source_syntax` field in `protocol.py --capabilities` describes the canonical declarations and compatibility forms. Each record at `libraries.<module>.interfaces.<word>` has these fields.
+The `bsv.source_syntax` field in `4thgraph --capabilities` describes the canonical declarations and compatibility forms. Each record at `libraries.<module>.interfaces.<word>` has these fields.
 
 | Field | Meaning |
 | --- | --- |
