@@ -33,7 +33,8 @@ def runtime_only(takes, gives, opcodes):
 
 def within(kind):
     return Primitive((kind, "cell", "cell"), ("cell",), asm("OP_WITHIN OP_NEGATE"),
-                     lambda x, lo, hi: (-int(lo <= x < hi),), "Script numeric comparison", comparison=True)
+                     lambda x, lo, hi: (-int(lo <= x < hi),), "Script numeric comparison",
+                     comparison=True, branch_code=asm("OP_WITHIN"))
 
 
 SCRIPT_WORDS = {

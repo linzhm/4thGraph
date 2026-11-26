@@ -47,6 +47,14 @@ class Slot:
         return f"{self.kind} [{self.bounds[0]}, {self.bounds[1] + 1})"
 
 
+def script_num_checks(bounds):
+    canonical = asm("OP_DUP OP_DUP OP_BIN2NUM OP_EQUALVERIFY")
+    if bounds is None:
+        return canonical
+    lower, upper = bounds
+    return canonical + asm("OP_DUP") + number(lower) + number(upper + 1) + asm("OP_WITHIN OP_VERIFY")
+
+
 @dataclass(frozen=True)
 class RangeType:
     name: str
@@ -64,8 +72,7 @@ class RangeType:
                 raise ValueError(f"value is out of range for {self.name}")
             return (value,)
 
-        canonical = asm("OP_DUP OP_DUP OP_BIN2NUM OP_EQUALVERIFY")
-        code = (canonical + asm("OP_DUP") + number(self.lower) + number(self.upper) + asm("OP_WITHIN OP_VERIFY"))
+        code = script_num_checks(self.slot.bounds)
         return Primitive((self.base,), (self.base,), code, validate, "explicit integer range check",
                          may_fail=True, checked_bounds=self.slot.bounds)
 

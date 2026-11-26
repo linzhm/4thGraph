@@ -1,5 +1,7 @@
 """Forth 2012 Core subset, typed BSV declarations and transaction scheduling."""
 
+from __future__ import annotations
+
 from bisect import bisect_right
 from dataclasses import InitVar, dataclass, field
 from hashlib import sha256
@@ -10,9 +12,10 @@ import re
 from fourthgraph import PROJECT_VERSION
 from fourthgraph.bsv.script import asm, number
 
-from fourthgraph.compiler.ranges import NUMERIC_TYPES, RangeType, Slot, primitive_outputs, range_bound
-from fourthgraph.compiler.stack_schedule import emit_steps
-from fourthgraph.stdlib import LibraryImport, interface_digest, p256_vocabulary, read_library, required_source
+from fourthgraph.compiler.ranges import NUMERIC_TYPES, RangeType, Slot, primitive_outputs, range_bound, script_num_checks
+from fourthgraph.stdlib import (
+    WALLET_BACKEND, LibraryImport, interface_digest, p256_vocabulary, read_library, required_source,
+)
 from fourthgraph.workflow.transaction_graph import CompileError, ParentOutput, Port, StageGraph, StageNode, Template, TransactionGraph
 from fourthgraph.compiler.wordsets import (
     BSV_SOURCE, CORE_EXT_WORDS, CORE_WORDS, FILE_EXT_SOURCE, FILE_EXT_WORDS, HOST_WORDS,
@@ -144,6 +147,7 @@ class Word:
     host_uses: tuple[Token, ...] = ()
     name: str | None = None
     ranges: tuple[RangeType, ...] = ()
+    lock: LockBlock | None = None
 
     def slots(self, kinds):
         refinements = {item.name: item.slot for item in self.ranges}
@@ -324,15 +328,18 @@ def body(tokens, stack, words, opener, ranges, *, native_opcodes=False):
         if isinstance(instruction, Literal):
             stack.append(Slot.literal(instruction))
         elif isinstance(instruction, Word):
+            require_callable(instruction, token)
             transform(stack, instruction.slots(instruction.takes), instruction.slots(instruction.gives), token)
             host_uses.update(dict.fromkeys(instruction.host_uses))
+            if instruction.location == "build":
+                host_uses[token] = None
         else:
             start = len(stack) - len(instruction.takes)
             args = stack[start:] if start >= 0 else ()
             takes = tuple(map(Slot.of, instruction.takes))
             transform(stack, takes, (), token)
             stack.extend(primitive_outputs(instruction, args))
-            if instruction.location == "host":
+            if instruction.location in ("host", "build"):
                 host_uses[token] = None
         instructions.append(Located(instruction, token))
     raise opener.error(f"unterminated {opener.text!r}")
@@ -365,16 +372,26 @@ def resolve(tokens, token, words, ranges):
 
 
 def require_script(word):
+    if word.location == "build":
+        if isinstance(word, Word) and word.name is not None:
+            raise CompileError(f"{word.name!r} is a build-time Script constructor")
+        raise CompileError("build-time Script constructors cannot compile to BSV Script")
     if word.location != "script":
         uses = ", ".join(f"{token.text} ({token.location})" for token in dict.fromkeys(word.host_uses))
         suffix = f": {uses}" if uses else ""
         raise CompileError(f"host-only words cannot compile to BSV Script{suffix}")
 
 
+def require_callable(word, at):
+    if isinstance(word, Word) and word.lock is not None:
+        raise at.error(f"{at.text!r} is a lock entry and cannot be called as a word")
+
+
 def check_word(words, at, takes, gives):
     word = words.get(at.name)
     if word is None:
         raise at.error(f"undefined worker or join word {at.text!r}")
+    require_callable(word, at)
     try:
         require_script(word)
     except CompileError as error:
@@ -561,6 +578,8 @@ class SourceCompiler:
         self.definitions[name.name] = name
 
     def define_lock(self, at):
+        if self.backend == WALLET_BACKEND:
+            raise at.error("lock: requires a spend-time source")
         name = named_token(self.tokens, at, "lock name")
         if name.name.startswith("bsv-") or name.name in CONTROL | BSV_SOURCE | FILE_EXT_SOURCE:
             raise name.error(f"invalid or reserved lock name {name.text!r}")
@@ -590,9 +609,8 @@ class SourceCompiler:
             raise name.error("a lock must leave one cell or end with verify")
         takes = tuple(takes)
         ranges = tuple(self.ranges[kind] for kind in dict.fromkeys(takes) if kind in self.ranges)
-        operation = lower_lock(instructions, takes, name)
-        self.words[name.name] = Word(takes, ("cell",), (Located(operation, name),), "script", name=name.name,
-                                     ranges=ranges)
+        lock = plan_lock(instructions, takes, name)
+        self.words[name.name] = Word(takes, ("cell",), instructions, "script", name=name.name, ranges=ranges, lock=lock)
         self.definitions[name.name] = name
         self.imported_words.pop(name.name, None)
 
@@ -624,8 +642,10 @@ class SourceCompiler:
             actual = tuple(slot.describe() for slot in stack)
             expected = tuple(slot.describe() for slot in outputs)
             raise name.error(f"body leaves {actual}, declared {gives} with ranges {expected}")
-        self.words[name.name] = Word(takes, gives, instructions, "host" if host_uses else "script",
-                                     host_uses, name.name, ranges)
+        location = "host" if host_uses else "script"
+        if self.backend == WALLET_BACKEND:
+            location = "build"
+        self.words[name.name] = Word(takes, gives, instructions, location, host_uses, name.name, ranges)
         self.definitions[name.name] = name
         self.imported_words.pop(name.name, None)
 
@@ -769,6 +789,7 @@ class SourceCompiler:
             word = self.words.get(entry.name)
             if word is None:
                 raise entry.error(f"undefined Script word {entry.text!r}")
+            require_callable(word, entry)
             try:
                 require_script(word)
             except CompileError as error:
@@ -993,6 +1014,8 @@ def evaluate(word, *values, context=None, checksig=None):
             raise ValueError(f"argument is out of range for {kind}")
         if kind == "bytes" and not isinstance(value, bytes):
             raise ValueError("expected a bytes argument")
+    if word.lock is not None:
+        return word.lock.run(range(len(values)), values, checksig)
     stack = list(values)
     frames = [expanded(word.body)]
     while frames:
@@ -1058,34 +1081,37 @@ def bounded_expansion(*roots, limit):
 
 
 @dataclass(frozen=True)
+class LockStep:
+    node: Literal | Primitive | LockBranch
+    args: tuple[int, ...]
+    results: tuple[int, ...]
+    source: Token | None
+
+
+@dataclass(frozen=True)
 class LockBlock:
-    steps: tuple
-    returns: tuple
+    steps: tuple[LockStep, ...]
+    returns: tuple[int, ...]
 
     def uses_before(self, slot):
-        values = {*self.returns, *(arg for _, args, _ in self.steps for arg in args)}
+        values = {*self.returns, *(arg for step in self.steps for arg in step.args)}
         return {value for value in values if value < slot}
-
-    def lower(self, inputs):
-        steps = [(node.lower() if isinstance(node, Literal) else node.code, args, results)
-                 for node, args, results in self.steps]
-        return emit_steps(inputs, steps, self.returns, compact=True)
 
     def run(self, inputs, values, checksig):
         slots = dict(zip(inputs, values, strict=True))
-        for node, args, results in self.steps:
+        for step in self.steps:
+            node = step.node
             outputs = ((node.value,) if isinstance(node, Literal)
-                       else run_primitive(node, (slots[index] for index in args), checksig=checksig))
-            slots.update(zip(results, outputs, strict=True))
+                       else run_primitive(node, (slots[index] for index in step.args), checksig=checksig))
+            slots.update(zip(step.results, outputs, strict=True))
         return tuple(slots[index] for index in self.returns)
 
 
 @dataclass(frozen=True)
 class LockBranch:
-    inputs: tuple
+    inputs: tuple[int, ...]
     yes: LockBlock
     no: LockBlock
-    code: bytes
 
     location = "script"
     requires_checksig = True
@@ -1097,17 +1123,15 @@ class LockBranch:
 
 def plan_lock_block(instructions, stack, next_slot):
     steps = []
-    for node, _ in expanded(instructions):
+    for node, source in expanded(instructions):
         if isinstance(node, Conditional):
             flag = stack.pop()
             before_branch = next_slot
             yes, next_slot = plan_lock_block(node.yes, list(stack), next_slot)
             no, next_slot = plan_lock_block(node.no, list(stack), next_slot)
             inputs = tuple(sorted(yes.uses_before(before_branch) | no.uses_before(before_branch)))
-            code = (asm("OP_0NOTEQUAL OP_IF") + yes.lower(inputs)
-                    + asm("OP_ELSE") + no.lower(inputs) + asm("OP_ENDIF"))
             results = tuple(range(next_slot, next_slot + len(yes.returns)))
-            steps.append((LockBranch(inputs, yes, no, code), (*inputs, flag), results))
+            steps.append(LockStep(LockBranch(inputs, yes, no), (*inputs, flag), results, source))
             stack[:] = results
             next_slot += len(results)
             continue
@@ -1122,30 +1146,22 @@ def plan_lock_block(instructions, stack, next_slot):
         arity, outputs = (0, 1) if isinstance(node, Literal) else (len(node.takes), len(node.gives))
         start = len(stack) - arity
         results = tuple(range(next_slot, next_slot + outputs))
-        steps.append((node, tuple(stack[start:]), results))
+        steps.append(LockStep(node, tuple(stack[start:]), results, source))
         stack[start:] = results
         next_slot += outputs
     return LockBlock(tuple(steps), tuple(stack)), next_slot
 
 
-def lower_lock(instructions, takes, at):
-    cost = bounded_expansion(instructions, limit=MAX_EXPANSION)
-    if cost > MAX_EXPANSION:
+def plan_lock(instructions, takes, at):
+    if bounded_expansion(instructions, limit=MAX_EXPANSION) > MAX_EXPANSION:
         raise at.error(f"lock {at.text!r} exceeds the {MAX_EXPANSION}-operation expansion budget")
-    inputs = tuple(range(len(takes)))
-    block, _ = plan_lock_block(instructions, [], len(inputs))
-    if not block.returns:
-        if not block.steps or block.steps[-1][0] is not PRIMITIVES["op_verify"]:
-            raise at.error("a lock must leave one cell or end with verify")
-        # Script uses the terminal assertion's operand as the final result.
-        _, returns, _ = block.steps[-1]
-        block = LockBlock(block.steps[:-1], returns)
-
-    def run(checksig, *values):
-        return block.run(inputs, values, checksig)
-
-    return Primitive(takes, ("cell",), block.lower(inputs), run, "named Script verification", may_fail=True,
-                     requires_checksig=True, expansion_cost=cost)
+    block, _ = plan_lock_block(instructions, [], len(takes))
+    if block.returns:
+        return block
+    if not block.steps or block.steps[-1].node is not PRIMITIVES["op_verify"]:
+        raise at.error("a lock must leave one cell or end with verify")
+    # Only a standalone Script entry can use the assertion operand as its final result.
+    return LockBlock(block.steps[:-1], block.steps[-1].args)
 
 
 def check_word_expansion(word, max_expansion):
@@ -1153,25 +1169,31 @@ def check_word_expansion(word, max_expansion):
         raise CompileError(f"word {word.name!r} exceeds the {max_expansion}-operation expansion budget before lowering")
 
 
-def lower(word, *, check_input_ranges=True, max_expansion=MAX_EXPANSION):
+def lower(word, *, check_input_ranges=True, spend_entry=False, max_expansion=MAX_EXPANSION):
     require_script(word)
+    if word.lock is not None:
+        from fourthgraph.compiler.lowering import compile_word
+
+        return compile_word(word, check_input_ranges=check_input_ranges, max_expansion=max_expansion).script
     check_word_expansion(word, max_expansion)
     try:
-        prefix = entry_range_checks(word) if check_input_ranges else b""
+        prefix = entry_range_checks(word, spend_entry=spend_entry) if check_input_ranges else b""
         return prefix + lower_body(word.body)
     except RecursionError as error:
         raise CompileError("expanded conditional nesting exceeds the compiler's recursion limit") from error
 
 
-def entry_range_checks(word):
-    refinements = {item.name: item for item in word.ranges}
+def entry_range_checks(word, *, spend_entry=False):
+    spend_entry = spend_entry or word.lock is not None
+    refinements = {item.name for item in word.ranges}
     code = bytearray()
-    for depth, kind in enumerate(reversed(word.takes)):
-        if kind not in refinements:
+    inputs = tuple(zip(word.takes, word.slots(word.takes), strict=True))
+    for depth, (kind, slot) in enumerate(reversed(inputs)):
+        if kind not in refinements and not (spend_entry and slot.kind in NUMERIC_TYPES):
             continue
         if depth:
             code.extend(asm("OP_OVER") if depth == 1 else number(depth) + asm("OP_PICK"))
-        code.extend(refinements[kind].check().code)
+        code.extend(script_num_checks(slot.bounds))
         if depth:
             code.extend(asm("OP_DROP"))
     return bytes(code)
@@ -1180,6 +1202,8 @@ def entry_range_checks(word):
 def lower_body(instructions):
     folded = []
     for instruction, _ in expanded(instructions):
+        if isinstance(instruction, Primitive) and instruction.location == "build":
+            require_script(instruction)
         if isinstance(instruction, Primitive) and not instruction.may_fail:
             count = len(instruction.takes)
             args = folded[-count:]

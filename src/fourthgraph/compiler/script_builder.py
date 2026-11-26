@@ -16,24 +16,28 @@ def repeat(code, count):
     return code * count
 
 
+def build_word(takes, gives, run):
+    return script_word(takes, gives, None, run, build_only=True)
+
+
 def emit_opcode(opcode):
-    return script_word("script", "script", b"", lambda code: code + bytes([opcode]))
+    return build_word("script", "script", lambda code: code + bytes([opcode]))
 
 
 SCRIPT_WORDS = {
     name.lower().replace("_", "-"): emit_opcode(opcode)
     for name, opcode in OPS.items()
 } | {
-    "bsv-empty": script_word("", "script", b"", bytes),
-    "bsv-push": script_word("script bytes", "script", b"", lambda code, data: code + push(data)),
-    "bsv-num": script_word("script cell", "script", b"", lambda code, value: code + number(value)),
-    "bsv-num-be": script_word("script bytes", "script", b"",
-                              lambda code, data: code + number(int.from_bytes(data, "big"))),
-    "bsv-cat-code": script_word("script script", "script", b"", bytes.__add__),
-    "bsv-repeat-code": script_word("script cell", "script", b"", repeat),
-    "script>bytes": script_word("script", "bytes", b"", bytes),
-    "script-size": script_word("script", "cell", b"", len),
-    "cell>byte": script_word("cell", "bytes", b"", lambda value: value.to_bytes(1, "big")),
+    "bsv-empty": build_word("", "script", bytes),
+    "bsv-push": build_word("script bytes", "script", lambda code, data: code + push(data)),
+    "bsv-num": build_word("script cell", "script", lambda code, value: code + number(value)),
+    "bsv-num-be": build_word("script bytes", "script",
+                             lambda code, data: code + number(int.from_bytes(data, "big"))),
+    "bsv-cat-code": build_word("script script", "script", bytes.__add__),
+    "bsv-repeat-code": build_word("script cell", "script", repeat),
+    "script>bytes": build_word("script", "bytes", bytes),
+    "script-size": build_word("script", "cell", len),
+    "cell>byte": build_word("cell", "bytes", lambda value: value.to_bytes(1, "big")),
 }
 
 
@@ -58,8 +62,8 @@ class ScriptBuilder(SourceCompiler):
         if name.name.startswith("bsv-") or name.name in self.words:
             raise name.error(f"invalid or duplicate formula name {name.text!r}")
         code, report = formula.lower(optimize=self.optimize)
-        append = script_word("script", "script", b"", lambda prefix: prefix + code)
-        self.words[name.name] = Word(("script",), ("script",), (Located(append, name),), "script", name=name.name)
+        append = build_word("script", "script", lambda prefix: prefix + code)
+        self.words[name.name] = Word(("script",), ("script",), (Located(append, name),), "build", name=name.name)
         self.definitions[name.name] = name
         self.formulas[name.name] = report
         self.formula_ir[name.name] = formula
