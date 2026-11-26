@@ -6,7 +6,7 @@
 
 ## 在同一个付款模板里更换算术内核
 
-这次以 Script Lab v0.2.0 为基线，将同样的 P-256 射影点加、`a = −3` 专用倍点和有符号余数规则写成高级 sCrypt，用 `scryptc 1.20.0 --asm -O` 编译。提取夹具删去实验用的 ABI 参数复制、边界标记和返回清理，将编译产物接入同一个 4 位窗口、交易绑定与钱包见证布局。两版分别用各自的内核生成 OTDA 重建程序。sCrypt 点运算源码使用高级表达式，夹具的标记 ASM 不进入付款锁。[高级 sCrypt 内核](../reference/comparison/projective.scrypt) · [编译提取和交易复放](../reference/compare_scrypt.py)
+Script Lab v0.2.0 基线直接使用现有钱包签名入口和固定模板。对照组将同样的 P-256 射影点加、`a = −3` 专用倍点和有符号余数规则写成高级 sCrypt，用 `scryptc 1.20.0 --asm -O` 编译。夹具提取算术字节码，加入读取栈上域常量的适配指令，再接入相同的四位窗口、交易绑定和见证布局。sCrypt 内核尺寸包含适配指令。两版分别使用从各自内核生成的 OTDA 重建程序。[高级 sCrypt 内核](../reference/comparison/projective.scrypt) · [编译提取和交易复放](../reference/compare_scrypt.py)
 
 | 项目 | Script Lab v0.2.0 | sCrypt `-O` 算术内核 |
 | --- | ---: | ---: |
@@ -15,7 +15,7 @@
 | 完整付款锁 | **46,302 B** | **66,265 B** |
 | OTDA 重建程序 | 3,913 B | 4,022 B |
 
-锁的 **19,963 字节**差额全部来自两类算术内核的静态展开，即 `135 × 68 + 263 × 41`。当前 Script Lab 生成器按最后一次使用消耗栈上的值，重排独立表达式，并共享域常量。本次 sCrypt 产物也使用了相同的射影算法和交易布局，差异来自这两个点运算的具体代码生成方式。[Script Lab 算术生成器](../reference/curve_compiler.py)
+夹具在组装时标记点加和倍点的展开位置，然后逐字节验证两份完整锁都从相同的外层脚本展开。两版内核外的 6,469 字节相同。锁的 **19,963 字节**差额来自两类内核，即 `135 × 68 + 263 × 41`。当前 Script Lab 生成器按最后一次使用消耗栈上的值，重排独立表达式，并共享域常量。这组数字对应两个具体的算术实现及其栈上接入方式。[Script Lab 算术生成器](../reference/curve_compiler.py)
 
 ## 实测交易和验收
 
@@ -30,9 +30,11 @@
 
 单位均为字节。sCrypt 内核使锁超过 65,535 字节，输出的 CompactSize 长度字段从 3 字节变成 5 字节。OTDA 复用重建程序，所以每输入只多 113 字节。栈载荷峰值在 ForkID 为 3,474 / 4,216 字节，在 OTDA 为 185,613 / 265,473 字节，顺序均为 Script Lab / sCrypt 内核。数值为开发求值器测得的首输入主栈与备用栈数据量。[统一计量口径](../../../shared/benchmark.zh-CN.md)
 
-两进两出的验证耗时也按 Script Lab / sCrypt 内核排序。ForkID 在 chain-gang 为 9.7 / 10.6 ms，在 BSV Node 本机 RPC 为 37.2 / 47.0 ms。OTDA 对应为 10.4 / 11.2 ms 和 37.1 / 47.6 ms。数据来自同一台 AMD EPYC 9V74 Linux 主机，每组预热一次，再取 15 次中位数，包含输入准备与验证。
+两进两出的验证耗时也按 Script Lab / sCrypt 内核排序。ForkID 在 chain-gang 为 10.4 / 11.0 ms，在 BSV Node 本机 RPC 为 41.4 / 47.2 ms。OTDA 对应为 10.1 / 11.4 ms 和 42.0 / 50.0 ms。数据来自同一台 AMD EPYC 9V74 Linux 主机，每组预热一次，再取 15 次中位数，包含输入准备与验证。
 
-算术差分覆盖 450 组坐标边界和确定性样本。两版分别复放 96 笔付款用例，覆盖交易版本 1 和 2、全部 12 种配对 sighash、未配对 SINGLE，以及锁定时间与输出金额变更。两套构建均在 BSV Node 1.2.3 的隔离 `verifyscript` 与固定版本 chain-gang 上得到预期结果。[验收入口](../reference/compare_scrypt.py)
+算术差分覆盖 450 组坐标边界和确定性样本。两版分别复放 96 笔付款用例，覆盖交易版本 1 和 2、全部 12 种配对 sighash、未配对 SINGLE，以及锁定时间与输出金额变更。夹具也执行每版有效用例的 64 份见证，逐字节核对签名原像，并确认实际采用 50 份字面原像、10 份重建原像与 4 份伴随路径见证。BSV Node 1.2.3 在 Chronicle 已激活且上一输出创建于激活之后的 `verifyscript` 上下文逐输入核验，固定版本 chain-gang 核对整笔交易结果。[验收入口](../reference/compare_scrypt.py)
+
+另用未放宽脚本和交易大小策略的隔离 regtest 复放真实 UTXO。两版在 ForkID ALL 和 OTDA ALL 下的入金与直接退出共 8 笔交易，均进入内存池并出块。sCrypt 内核版的两笔入金各约 133 KB。上表的周转字节数来自 `verifyscript` 测量。 [入金与出块夹具](../../../shared/benchmark_admission.py) · [节点启动参数](../../../shared/verify_node.sh)
 
 公开版最直接的体积改进是把点乘循环换为射影运算和窗口点乘，并把唯一的 ECDSA 标量逆元作为见证交给脚本核验。若要进一步压缩这份 sCrypt 候选，应缩短重复次数最多的倍点内核，并复用点加的中间量、减少通用函数生成的栈清理。独立验签、付款绑定和 OTDA 重建各自使用上面的数据口径。
 
@@ -51,4 +53,8 @@ chmod +x "$scratch/scryptc-1.20.0-Linux-x86_64"
 GHCRTS=-N2 PYTHONPATH=. bash shared/verify_node.sh -- \
   .venv/p2pkh-r1/bin/python projects/p2pkh-r1/reference/compare_scrypt.py \
   --compiler "$scratch/scryptc-1.20.0-Linux-x86_64" --output /tmp/r1-scrypt-comparison.json
+GHCRTS=-N2 PYTHONPATH=. bash shared/verify_node.sh --profile default -- \
+  .venv/p2pkh-r1/bin/python projects/p2pkh-r1/reference/compare_scrypt.py \
+  --compiler "$scratch/scryptc-1.20.0-Linux-x86_64" --admission \
+  --output /tmp/r1-scrypt-admission.json
 ```

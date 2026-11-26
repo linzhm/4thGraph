@@ -6,7 +6,7 @@ The historical single-entry verifier from the public `scrypt-ts-lib` R1 library 
 
 ## The same payment template with two point arithmetic backends
 
-The baseline is Script Lab v0.2.0. The high-level sCrypt port uses the same P-256 projective addition, specialized `a = −3` doubling, and signed residues. We compile it with `scryptc 1.20.0 --asm -O`. The harness strips its ABI argument copies, boundary marker and return cleanup, then inserts the arithmetic into the same four-bit window, transaction binding, and witness layout. Both builds generate OTDA reconstruction from their respective kernels. The point arithmetic uses high-level source. The harness marker ASM is excluded from the payment lock. [sCrypt arithmetic source](../reference/comparison/projective.scrypt) · [Compiler extraction and replay](../reference/compare_scrypt.py)
+The Script Lab v0.2.0 baseline uses the existing wallet signing entry point and fixed template. The high-level sCrypt port uses the same P-256 projective addition, specialized `a = −3` doubling, and signed residues. We compile it with `scryptc 1.20.0 --asm -O`. The harness extracts the arithmetic and adds instructions that load the field constants from the stack, then inserts the kernels into the same four-bit window, transaction binding, and witness layout. The sCrypt kernel sizes include those adapter instructions. Each build uses an OTDA reconstruction program generated from its kernels. [sCrypt arithmetic source](../reference/comparison/projective.scrypt) · [Compiler extraction and replay](../reference/compare_scrypt.py)
 
 | Component | Script Lab v0.2.0 | sCrypt `-O` arithmetic |
 | --- | ---: | ---: |
@@ -15,7 +15,7 @@ The baseline is Script Lab v0.2.0. The high-level sCrypt port uses the same P-25
 | Complete payment lock | **46,302 B** | **66,265 B** |
 | OTDA reconstruction program | 3,913 B | 4,022 B |
 
-The two arithmetic kernels account for the entire **19,963-byte** lock gap by `135 × 68 + 263 × 41`. The Script Lab generator consumes stack values on their last use, schedules independent expressions, and shares field constants. The sCrypt candidate uses the same projective algorithm and transaction layout, so this comparison isolates how the two point arithmetic kernels are generated. [Script Lab arithmetic lowering](../reference/curve_compiler.py)
+The harness marks each point addition and doubling site during assembly. It expands both full locks from the same marked script and checks them byte for byte. The 6,469 bytes outside the kernels match. The two kernels account for the **19,963-byte** gap by `135 × 68 + 263 × 41`. The Script Lab generator consumes stack values on their last use, schedules independent expressions, and shares field constants. The figures apply to these two kernel implementations and their stack adapters. [Script Lab arithmetic lowering](../reference/curve_compiler.py)
 
 ## Transaction costs and acceptance
 
@@ -30,9 +30,11 @@ The 2×2 case creates two R1 outputs of the same build. The input and output mar
 
 All sizes are in bytes. The sCrypt candidate crosses 65,535 bytes, increasing the output's CompactSize script length from three to five bytes. OTDA reconstruction reuses the expanded template, so the unlock grows by 113 bytes per input. Peak stack payload for the first input is 3,474 / 4,216 bytes under ForkID and 185,613 / 265,473 under OTDA, in Script Lab / sCrypt order. These are combined main and alternate stack payloads from the development evaluator. [Benchmark method](../../../shared/benchmark.md)
 
-The 2×2 ForkID case took 9.7 / 10.6 ms in chain-gang and 37.2 / 47.0 ms through BSV Node loopback RPC, in Script Lab / sCrypt order. For OTDA the figures were 10.4 / 11.2 ms and 37.1 / 47.6 ms. All results use an AMD EPYC 9V74 Linux host and the median of 15 runs after a warmup. They include input preparation and verification.
+The 2×2 ForkID case took 10.4 / 11.0 ms in chain-gang and 41.4 / 47.2 ms through BSV Node loopback RPC, in Script Lab / sCrypt order. For OTDA the figures were 10.1 / 11.4 ms and 42.0 / 50.0 ms. All results use an AMD EPYC 9V74 Linux host and the median of 15 runs after a warmup. They include input preparation and verification.
 
-The arithmetic differential covers 450 deterministic and boundary-coordinate samples. Each build replays 96 payment cases across transaction versions 1 and 2, all 12 paired sighash modes, unpaired SINGLE, and locktime and output value mutations. Both match expected verdicts in BSV Node 1.2.3 `verifyscript` on isolated regtest and pinned chain-gang. [Acceptance runner](../reference/compare_scrypt.py)
+The arithmetic differential covers 450 deterministic and boundary-coordinate samples. Each build replays 96 payment cases across transaction versions 1 and 2, all 12 paired sighash modes, unpaired SINGLE, and locktime and output value mutations. The harness also executes all 64 valid input witnesses per build, checks the resulting preimage byte for byte, and confirms the 50 literal, 10 reconstructed, and four companion paths. BSV Node 1.2.3 checks each input in the `verifyscript` context with Chronicle active and the prevout created after activation. The pinned chain-gang evaluator checks the complete transaction. [Acceptance runner](../reference/compare_scrypt.py)
+
+In a separate run with the default script and transaction size policies on isolated regtest, all eight funded transactions entered the mempool and were mined. The run covers funding and direct exit for both builds under ForkID ALL and OTDA ALL. The sCrypt build's funding transactions were about 133 KB each. Turnover figures in the table come from `verifyscript`. [Funding and mining fixture](../../../shared/benchmark_admission.py) · [Node configuration](../../../shared/verify_node.sh)
 
 The public implementation has room to move scalar multiplication to projective coordinates and windows, with the single ECDSA scalar inverse provided and checked as a witness. Further reductions to this sCrypt candidate can target the repeated doubling kernel, reuse of point-addition temporaries, and the stack cleanup generated for general function bodies.
 
@@ -51,4 +53,8 @@ chmod +x "$scratch/scryptc-1.20.0-Linux-x86_64"
 GHCRTS=-N2 PYTHONPATH=. bash shared/verify_node.sh -- \
   .venv/p2pkh-r1/bin/python projects/p2pkh-r1/reference/compare_scrypt.py \
   --compiler "$scratch/scryptc-1.20.0-Linux-x86_64" --output /tmp/r1-scrypt-comparison.json
+GHCRTS=-N2 PYTHONPATH=. bash shared/verify_node.sh --profile default -- \
+  .venv/p2pkh-r1/bin/python projects/p2pkh-r1/reference/compare_scrypt.py \
+  --compiler "$scratch/scryptc-1.20.0-Linux-x86_64" --admission \
+  --output /tmp/r1-scrypt-admission.json
 ```
