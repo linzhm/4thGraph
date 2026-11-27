@@ -41,3 +41,5 @@
 - Agent 有界选候选、固定评估和公式报告重放。首页流程图与 skill 说明同一个循环。[调优 PR #88](https://github.com/linzhm/4thGraph/pull/88)
 - BIP143 ALL 项目 WASM 包，R1 和 PELS Counter 作为验收实例。[钱包示例 PR #89](https://github.com/linzhm/4thGraph/pull/89)
 - 将现有 BIP143 动态后继按原字节纳入标准库。非计数状态标签夹具复跑两步，R1 作为调用该库的组合示例。[动态后继 PR #90](https://github.com/linzhm/4thGraph/pull/90)
+
+组合安装验收从各评审分支构建了同一个干净 wheel。包内有公式夹具、WASI 运行文件和两个 PELS 标准库入口。在仓库外，已安装的公式执行器用同一组 625 个向量重放了 Bézier 基线和栈调度候选。同一个安装用固定版 chain-gang 0.13.2 重放了 R1 项目包的公开回执。

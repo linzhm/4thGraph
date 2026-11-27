@@ -41,3 +41,5 @@ Move an item to complete when its code, build command, and observed acceptance r
 - Bounded Agent selection and fixed evaluation with replayable formula reports. The homepage diagram and skill document the same loop. [Tuning PR #88](https://github.com/linzhm/4thGraph/pull/88)
 - BIP143 ALL project WASM packages, with R1 and PELS Counter as fixture examples. [Wallet examples PR #89](https://github.com/linzhm/4thGraph/pull/89)
 - Exact-byte promotion of the existing dynamic BIP143 successor into the standard library. The state-label fixture uses two linked spends. R1 consumes the same library as an integration example. [Dynamic successor PR #90](https://github.com/linzhm/4thGraph/pull/90)
+
+The combined install check built one clean wheel from the review branches. It contained the formula fixtures, the WASI runtime, and both PELS library entry points. Outside the checkout, the installed formula runner replayed the Bézier baseline and stack plan on the same 625 vectors. The same installation replayed the packaged R1 receipt with pinned chain-gang 0.13.2.
