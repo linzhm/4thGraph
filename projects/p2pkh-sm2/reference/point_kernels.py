@@ -3,11 +3,13 @@ import argparse
 import json
 from pathlib import Path
 
+from fourthgraph.bsv.script import asm
 from fourthgraph.compiler.script_builder import ScriptBuilder
 
 
 SOURCE = Path(__file__).with_name("point-formulas.fth")
 CARRIED_SOURCE = Path(__file__).with_name("point-window.fth")
+CARRIED_KERNEL_FILE = Path(__file__).resolve().parents[1] / "versions/v1.11.0/window-kernels.json"
 KERNEL_NAMES = ("sm2-add-kernel", "sm2-double-kernel")
 WINDOW_KERNEL_NAME = "sm2-double-window-kernel"
 AFFINE_KERNEL_NAME = "sm2-add-affine-kernel"
@@ -28,6 +30,16 @@ def compile_carried_kernels():
 def load_kernels(path, names=KERNEL_NAMES):
     encoded = json.loads(path.read_text(encoding="utf-8"))
     return {name: bytes.fromhex(encoded[name]) for name in names}
+
+
+def split_window_doublings(wrapped):
+    """Recover the repeated finite-point kernel from template 10's guarded window."""
+    guard, end = asm("OP_DUP OP_0NOTEQUAL OP_IF"), asm("OP_ENDIF")
+    inline = wrapped[len(guard):-len(end)]
+    double = inline[:len(inline) // 5]
+    if not double or wrapped != guard + double * 5 + end:
+        raise ValueError("unexpected frozen SM2 window doubling layout")
+    return double
 
 
 if __name__ == "__main__":

@@ -1,0 +1,479 @@
+{
+  "schema_version": 2,
+  "engines": {
+    "bsv_node_version": 101020300,
+    "chain_gang": {
+      "version": "0.13.2",
+      "commit": "74676b9c002c452e7f21a9ed9265f4972bef03f6"
+    },
+    "regtest_profile": "raised"
+  },
+  "payment_fixture_sha256": "94703c73ffb3fdfd68c87c90124d692ec46b84e848c252b218735591cfa7409b",
+  "payment_shape": {
+    "inputs": 2,
+    "outputs": 2
+  },
+  "candidates": {
+    "v0.7.0": {
+      "status": "verified",
+      "template_version": "0.7.0",
+      "construction": "split-5x4-affine-g-ifdup",
+      "build_source": {
+        "source_sha256": "654e8130d49704c4a99961b2763216eebcd1c76e880ad65e284033491128a94f",
+        "dependencies": {
+          "r1.fth": "8acaf9f81bc367c98f9a42d561e302c6f27cc376ad3f3f8c8d49f5176cbaa7d9"
+        }
+      },
+      "reconstruction_byte_match": true,
+      "estimated": {
+        "window_sections_bytes": {
+          "table_setup": 3603,
+          "digit_extraction": 902,
+          "window_loop": 34349
+        },
+        "window_bytes": 38854,
+        "static_window_mul_opcodes": 5407,
+        "affine_g": {
+          "calls": 51,
+          "generic_kernel_bytes": 123,
+          "affine_kernel_bytes": 114,
+          "kernel_bytes_saved": 459,
+          "lookup_bytes_saved": 153,
+          "guard_bytes_added": 153,
+          "multiplications_removed_on_nonzero_path": 153,
+          "formula": {
+            "selected": "rewrite-and-schedule",
+            "candidates": {
+              "baseline": 393,
+              "schedule": 149,
+              "rewrite-and-schedule": 114
+            },
+            "rewrites": {
+              "multiply-by-one": 3,
+              "expand-cross-products": 3,
+              "fuse-cached-divisor-load": 3
+            },
+            "max_magnitude_bits": 1280
+          }
+        },
+        "lock_bytes": 41262,
+        "otda_program_bytes": 5644,
+        "payment_bytes": {
+          "bip143-all": 83294,
+          "otda-all": 94632,
+          "otda-single": 94561
+        },
+        "payment_peak_stack_payload_bytes": {
+          "bip143-all": 5384,
+          "otda-all": 165448,
+          "otda-single": 82924
+        }
+      },
+      "lock_sha256": "f6eef6f8f51e50329f6174fba18728d021085fe5bba803da91de4cb0d0de521b",
+      "otda_program_sha256": "8d038efbbdac3d0310885dda63738d9da20d32e90fa1a1af23dd443debe4dacd",
+      "measured": {
+        "lock_bytes": 41262,
+        "otda_program_bytes": 5644,
+        "payment_bytes": {
+          "bip143-all": 83294,
+          "otda-all": 94632,
+          "otda-single": 94561
+        },
+        "payment_peak_stack_payload_bytes": {
+          "bip143-all": 4687,
+          "otda-all": 165453,
+          "otda-single": 82926
+        },
+        "unlock_bytes": {
+          "bip143-all": [
+            326,
+            326
+          ],
+          "otda-all": [
+            5995,
+            5995
+          ],
+          "otda-single": [
+            5955,
+            5964
+          ]
+        }
+      },
+      "payment_evidence": {
+        "bip143-all": {
+          "deployment_txid": "7fb9189789ebdbd5c2a46ca20bcdf475497f43c8136e57b0322549bf94ed88fe",
+          "payment_txid": "64d95f7a7d7cafb6972dcd87ffee3a50e1b9ea140eaf091ed57ca89ea6532da3",
+          "node_mined": true,
+          "chain_gang_passed": true,
+          "changed_locktime_rejected": true
+        },
+        "otda-all": {
+          "deployment_txid": "2458bcc78d76eeef2a9f323a8c81b3c5987682fd975efa7df8016055bb483e62",
+          "payment_txid": "c478a7f9e77876ada2c0c5f7881df547870fc9115baaf11610997d5742ad9b75",
+          "node_mined": true,
+          "chain_gang_passed": true,
+          "changed_locktime_rejected": true
+        },
+        "otda-single": {
+          "deployment_txid": "602dc0c47a3440100b68659f349a9d3531ed4861b198471fdb8e7793c73745f7",
+          "payment_txid": "4f30acb07db7a52e64993461c00fa3e026c1ca03ad3f60950534aae1df72bffd",
+          "node_mined": true,
+          "chain_gang_passed": true,
+          "changed_locktime_rejected": true
+        }
+      }
+    },
+    "unshared-plan": {
+      "plan": [
+        "affine-g",
+        "compact-g",
+        "ifdup",
+        "pack-stack-repeat",
+        "pack-adjacent-kernels"
+      ],
+      "lock_template_sha256": "71ad4d2bb0a2b0e059094ec18b3aa9f866d47df08fa76b7ceb720b322171642a",
+      "otda_program_sha256": "55710e06d9f0c7a6cd000c72423b00b3778ca68e41870c123f93818d29d75dc0",
+      "status": "verified",
+      "lock_sha256": "71ad4d2bb0a2b0e059094ec18b3aa9f866d47df08fa76b7ceb720b322171642a",
+      "measured": {
+        "lock_bytes": 41114,
+        "otda_program_bytes": 5563,
+        "payment_bytes": {
+          "bip143-all": 82998,
+          "otda-all": 94174,
+          "otda-single": 94103
+        },
+        "payment_peak_stack_payload_bytes": {
+          "bip143-all": 4719,
+          "otda-all": 164861,
+          "otda-single": 82630
+        },
+        "unlock_bytes": {
+          "bip143-all": [
+            326,
+            326
+          ],
+          "otda-all": [
+            5914,
+            5914
+          ],
+          "otda-single": [
+            5874,
+            5883
+          ]
+        }
+      },
+      "payment_evidence": {
+        "bip143-all": {
+          "deployment_txid": "80c836d86821b8d514c6f34b21b5c86d646cef9aa8d66a954e446318d3b76d6d",
+          "payment_txid": "555911d77352d4333ed38e96b56c307edb2061df8443ee6cd425737fcd13b8b3",
+          "node_mined": true,
+          "chain_gang_passed": true,
+          "changed_locktime_rejected": true
+        },
+        "otda-all": {
+          "deployment_txid": "3a03fcb37c99ed70a1f11ce3b061d2578b7bf7c63ffe9559a322ec23d02ce1d4",
+          "payment_txid": "d173efd81007548e57ce3ec4b65130d30afc017f532e1487cb51a2436fe0edf9",
+          "node_mined": true,
+          "chain_gang_passed": true,
+          "changed_locktime_rejected": true
+        },
+        "otda-single": {
+          "deployment_txid": "03d83c4bb2a7f0adef50cff89b46505f28bd99eab6a7ee7fe9adf8f020e90199",
+          "payment_txid": "e7e52907e98a405fd6d1374e03854db3517d049a451c56f57503bcb9a18e7a12",
+          "node_mined": true,
+          "chain_gang_passed": true,
+          "changed_locktime_rejected": true
+        }
+      },
+      "estimated": {
+        "window_sections_bytes": {
+          "table_setup": 3571,
+          "digit_extraction": 902,
+          "window_loop": 34247
+        },
+        "window_bytes": 38720,
+        "static_window_mul_opcodes": 5407,
+        "affine_g": {
+          "calls": 51,
+          "generic_kernel_bytes": 123,
+          "affine_kernel_bytes": 113,
+          "kernel_bytes_saved": 510,
+          "lookup_bytes_saved": 153,
+          "guard_bytes_added": 153,
+          "multiplications_removed_on_nonzero_path": 153,
+          "formula": {
+            "selected": "rewrite-and-schedule",
+            "candidates": {
+              "baseline": 393,
+              "schedule": 148,
+              "rewrite-and-schedule": 113
+            },
+            "rewrites": {
+              "multiply-by-one": 3,
+              "expand-cross-products": 3,
+              "fuse-cached-divisor-load": 3
+            },
+            "max_magnitude_bits": 1280
+          }
+        },
+        "lock_bytes": 41114,
+        "otda_program_bytes": 5563,
+        "payment_bytes": {
+          "bip143-all": 82998,
+          "otda-all": 94174,
+          "otda-single": 94103
+        },
+        "payment_peak_stack_payload_bytes": {
+          "bip143-all": 4328,
+          "otda-all": 164856,
+          "otda-single": 82628
+        }
+      },
+      "reconstruction_byte_match": true,
+      "decision": {
+        "reason": "Same lock and BIP143 ALL size. Both OTDA spends cost 562 more bytes."
+      }
+    },
+    "v0.8.0": {
+      "plan": [
+        "affine-g",
+        "compact-g",
+        "ifdup",
+        "pack-stack-repeat",
+        "pack-adjacent-kernels",
+        "share-otda-fragments"
+      ],
+      "lock_template_sha256": "71ad4d2bb0a2b0e059094ec18b3aa9f866d47df08fa76b7ceb720b322171642a",
+      "otda_program_sha256": "d14d7eca5109df33ad8e5102b2a4537278fc493333978c7c1efe10d3b6b87a0b",
+      "status": "verified",
+      "lock_sha256": "71ad4d2bb0a2b0e059094ec18b3aa9f866d47df08fa76b7ceb720b322171642a",
+      "measured": {
+        "lock_bytes": 41114,
+        "otda_program_bytes": 5282,
+        "payment_bytes": {
+          "bip143-all": 82998,
+          "otda-all": 93612,
+          "otda-single": 93541
+        },
+        "payment_peak_stack_payload_bytes": {
+          "bip143-all": 4720,
+          "otda-all": 164862,
+          "otda-single": 82629
+        },
+        "unlock_bytes": {
+          "bip143-all": [
+            326,
+            326
+          ],
+          "otda-all": [
+            5633,
+            5633
+          ],
+          "otda-single": [
+            5593,
+            5602
+          ]
+        }
+      },
+      "payment_evidence": {
+        "bip143-all": {
+          "deployment_txid": "9e0432a95f4acbc1fda7b8029be386b92c4b43f4f9ebbe373eacad4b01d42ec3",
+          "payment_txid": "b8a3f0215bbe3c2fa91b2bd3ba0e12587a2e80de61c3a6bfd77b6bdb83a5b868",
+          "node_mined": true,
+          "chain_gang_passed": true,
+          "changed_locktime_rejected": true
+        },
+        "otda-all": {
+          "deployment_txid": "eef24ce7f635e168b9c6eb4aef535d451920713fbd706eb069f68ff0218161eb",
+          "payment_txid": "a8aef5ece99c1e495a1758ec8559c84583ecc0e99ce701e2b05bdef94f41a2bb",
+          "node_mined": true,
+          "chain_gang_passed": true,
+          "changed_locktime_rejected": true
+        },
+        "otda-single": {
+          "deployment_txid": "201f47dfdfb28a18dac95eb078143e52c69ddc16786a871a6457ce28664b2db9",
+          "payment_txid": "32d0c77d950ae4e4bd8d24fcbe5be2095567fab9c06cb725400d6ffaaf9680a2",
+          "node_mined": true,
+          "chain_gang_passed": true,
+          "changed_locktime_rejected": true
+        }
+      },
+      "acceptance": {
+        "node_payment_cases": 1296,
+        "chain_gang_payment_cases": 432,
+        "valid_witness_controls": 4,
+        "invalid_witness_controls": 24
+      },
+      "estimated": {
+        "window_sections_bytes": {
+          "table_setup": 3571,
+          "digit_extraction": 902,
+          "window_loop": 34247
+        },
+        "window_bytes": 38720,
+        "static_window_mul_opcodes": 5407,
+        "affine_g": {
+          "calls": 51,
+          "generic_kernel_bytes": 123,
+          "affine_kernel_bytes": 113,
+          "kernel_bytes_saved": 510,
+          "lookup_bytes_saved": 153,
+          "guard_bytes_added": 153,
+          "multiplications_removed_on_nonzero_path": 153,
+          "formula": {
+            "selected": "rewrite-and-schedule",
+            "candidates": {
+              "baseline": 393,
+              "schedule": 148,
+              "rewrite-and-schedule": 113
+            },
+            "rewrites": {
+              "multiply-by-one": 3,
+              "expand-cross-products": 3,
+              "fuse-cached-divisor-load": 3
+            },
+            "max_magnitude_bits": 1280
+          }
+        },
+        "lock_bytes": 41114,
+        "otda_program_bytes": 5282,
+        "payment_bytes": {
+          "bip143-all": 82998,
+          "otda-all": 93612,
+          "otda-single": 93541
+        },
+        "payment_peak_stack_payload_bytes": {
+          "bip143-all": 4328,
+          "otda-all": 164856,
+          "otda-single": 82628
+        }
+      },
+      "point_vectors": 64,
+      "construction": "split-5x4-affine-g-ifdup-compact",
+      "build_source": {
+        "source_sha256": "877f30ef15d05758d30aefc0d2666dc338d118d802492e795cb0400b44f3a3c6",
+        "dependencies": {
+          "r1.fth": "c79cf9ba9a20d9a9c01274ae6676e2ae51b0de2de365266ebe3467c706ba13e3",
+          "std/bsv": "92f4510c9d3e8e0371d9b41d08f9f7e639324c9795e6d0a1c3f9779e9179b404"
+        },
+        "window_backend": {
+          "source_sha256": "08df84282d5624ff8a010a9a24631a974322d75c72b3634ff6c6306c2d6451d5",
+          "dependencies": {
+            "r1.fth": "c79cf9ba9a20d9a9c01274ae6676e2ae51b0de2de365266ebe3467c706ba13e3",
+            "std/bsv": "92f4510c9d3e8e0371d9b41d08f9f7e639324c9795e6d0a1c3f9779e9179b404"
+          }
+        }
+      },
+      "reconstruction_byte_match": true
+    }
+  },
+  "packing_search": {
+    "fixed_window_strategy": "split-5x4-affine-g-ifdup-compact",
+    "elapsed_local_seconds": 3.601,
+    "attempts": [
+      {
+        "order": [
+          "affine-g",
+          "compact-g",
+          "ifdup",
+          "share-otda-fragments"
+        ],
+        "unshared_program_bytes": 5590,
+        "shared_program_bytes": 5292,
+        "selected": false,
+        "reason": "larger constructor for the same lock"
+      },
+      {
+        "order": [
+          "affine-g",
+          "compact-g",
+          "ifdup",
+          "pack-stack-repeat",
+          "share-otda-fragments"
+        ],
+        "unshared_program_bytes": 5582,
+        "shared_program_bytes": 5284,
+        "selected": false,
+        "reason": "larger constructor for the same lock"
+      },
+      {
+        "order": [
+          "affine-g",
+          "compact-g",
+          "ifdup",
+          "pack-adjacent-kernels",
+          "share-otda-fragments"
+        ],
+        "unshared_program_bytes": 5571,
+        "shared_program_bytes": 5290,
+        "selected": false,
+        "reason": "larger constructor for the same lock"
+      },
+      {
+        "order": [
+          "affine-g",
+          "compact-g",
+          "ifdup",
+          "pack-stack-repeat",
+          "pack-adjacent-kernels",
+          "share-otda-fragments"
+        ],
+        "unshared_program_bytes": 5563,
+        "shared_program_bytes": 5282,
+        "selected": true
+      }
+    ]
+  },
+  "scope": "Two-input, two-output spend bytes. Each lock and constructor is measured separately.",
+  "selected": {
+    "lock_bytes": "v0.8.0",
+    "bip143-all": "v0.8.0",
+    "otda-all": "v0.8.0",
+    "otda-single": "v0.8.0"
+  },
+  "cost_differences": [
+    {
+      "candidate": "v0.8.0",
+      "baseline": "v0.7.0",
+      "lock_bytes": -148,
+      "otda_program_bytes": -362,
+      "window_sections_bytes": {
+        "table_setup": -32,
+        "digit_extraction": 0,
+        "window_loop": -102
+      },
+      "payment_bytes": {
+        "bip143-all": -296,
+        "otda-all": -1020,
+        "otda-single": -1020
+      },
+      "payment_peak_stack_payload_bytes": {
+        "bip143-all": 33,
+        "otda-all": -591,
+        "otda-single": -297
+      }
+    },
+    {
+      "candidate": "v0.8.0",
+      "baseline": "unshared-plan",
+      "lock_bytes": 0,
+      "otda_program_bytes": -281,
+      "window_sections_bytes": {
+        "table_setup": 0,
+        "digit_extraction": 0,
+        "window_loop": 0
+      },
+      "payment_bytes": {
+        "bip143-all": 0,
+        "otda-all": -562,
+        "otda-single": -562
+      },
+      "payment_peak_stack_payload_bytes": {
+        "bip143-all": 1,
+        "otda-all": 1,
+        "otda-single": -1
+      }
+    }
+  ]
+}

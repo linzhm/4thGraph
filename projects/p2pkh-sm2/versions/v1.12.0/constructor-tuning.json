@@ -1,0 +1,27 @@
+{
+  "template_version": 11,
+  "lock_sha256": "05c97fcdba8f49111d36a4cb1eac909e74e6af227d68ed1406154a22fb7df529",
+  "selected": "point-cache-follow-up",
+  "candidates": {
+    "literal-cache": {
+      "bytes": 7796,
+      "sha256": "d40db1c93855aef1803bb71958db7e9eec57a3131ecc332c1dd64663b929ad32"
+    },
+    "shared-cache": {
+      "bytes": 7634,
+      "sha256": "3b3a635eb20baf8174a8bcba6d09cad893293379a53289a7e8c7254c6183a98e"
+    },
+    "shared-cache-follow-up": {
+      "bytes": 7461,
+      "sha256": "2f841589d1ef9c69e63a89bdec502006828cf1cabc0381b794e941f53cb237d1"
+    },
+    "point-cache": {
+      "bytes": 7580,
+      "sha256": "b53ca20b8b7652d632199e3e3ae19431d4aa3372c0c9a8578a73090e3d81ab64"
+    },
+    "point-cache-follow-up": {
+      "bytes": 7412,
+      "sha256": "671a92c0abf9ea60f1dace1aa9c6c565cd08386fbcb0e18c102a98136e3add56"
+    }
+  }
+}

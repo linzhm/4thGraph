@@ -4,14 +4,14 @@ title:
   en: WOTS+ (SHA-256)
   zh-CN: WOTS+（SHA-256）
 summary:
-  en: Choose a receive template and connect a durable one-time signer. The cached-step profile supports
-    eligible OTDA reconstruction.
-  zh-CN: 选择收款模板并接入有持久化记录的一次性签名器。缓存步骤模板支持符合条件的 OTDA 重建。
+  en: WOTS+ v0.12.0 uses the `compact-v11` template. The lock is 21,272 bytes and its OTDA reconstruction program
+    is 732 bytes. Connect a durable one-time signer to use the payment lock. [Version artifacts](versions/v0.12.0/manifest.json)
+  zh-CN: WOTS+ v0.12.0 采用 `compact-v11` 模板，付款锁为 21,272 字节，OTDA 重建程序为 732 字节。使用付款锁时，请接入能持久记录密钥消耗的一次性签名器。[版本产物](versions/v0.12.0/manifest.json)
 entry_points:
   - name: locking_script
     description:
-      en: Select a canonical or cached payment lock, or build a detached verifier for tests.
-      zh-CN: 构造标准或缓存付款锁，也可生成用于测试的独立验签器。
+      en: Build a canonical, cached or Compact payment lock, or a detached verifier for tests.
+      zh-CN: 构造标准、缓存或 Compact 付款锁，也可生成用于测试的独立验签器。
   - name: sign_spend
     description:
       en: Request the one-time signature for a selected transaction input.
@@ -32,23 +32,19 @@ setup:
 sections:
   use_cases:
     en:
-      - Use WOTS+ to compare SHA-256 one-time signatures when witness size matters. The raw signature
-        is 2,144 bytes, while a Lamport signature here is 8,192 bytes. A fair transaction comparison includes
-        both the payment locks and the unlocking scripts. WOTS+ offers a canonical lock and two cache
-        presets. Use the published measurements to examine how the smaller cached-step lock and eligible
-        OTDA reconstruction affect funding, turnover and exit. [Measured costs](#complete-transactions-and-stack-measurements)
-      - The payment workflow requires a fresh key per UTXO, including change. Reserve that key durably
-        before returning a signature. A wallet investigating repeated turnover should test key reservation
-        and rebroadcast alongside script verification. [Wallet integration](docs/sdk.en.md)
+      - Use WOTS+ to compare SHA-256 one-time signatures when witness size matters. The raw signature is 2,144 bytes,
+        while a Lamport signature here is 8,192 bytes. A fair transaction comparison includes both the payment locks
+        and the unlocking scripts. [Measured costs](#compact-profile)
+      - The payment workflow requires a fresh key per UTXO, including change. Reserve that key durably before returning
+        a signature. A wallet investigating repeated turnover should test key reservation and rebroadcast alongside
+        script verification. [Wallet integration](docs/sdk.en.md)
     zh-CN:
-      - 当研究重点是 SHA‑256 一次性签名的见证体积时，可以评估 WOTS+。WOTS+ 的原始签名为 2,144 字节，本仓库的 Lamport 签名为 8,192 字节。比较整笔交易时，要把付款锁和解锁脚本都算上。WOTS+
-        提供标准锁和两种缓存模板。可对照实测结果，查看缓存步骤模板及适用的 OTDA 重建如何影响入金、周转和退出。[交易实测](#完整交易与栈测量)
+      - 当研究重点是 SHA‑256 一次性签名的见证体积时，可以评估 WOTS+。WOTS+ 的原始签名为 2,144 字节，本仓库的 Lamport 签名为 8,192 字节。比较整笔交易时，要把付款锁和解锁脚本都算上。[交易实测](#compact-模板实测)
       - 每个 UTXO 使用新密钥，找零也一样。签名返回前要持久记录密钥已消耗。评估连续周转时，除了脚本验证，还应演练密钥保留和已签交易重播。[钱包接入](docs/sdk.zh-CN.md)
   algorithm:
     en:
       - '[Protocol](docs/developer.en.md#protocol) · [Security](docs/developer.en.md#security) · [Verify](#run-the-checks)
         · [Transaction costs](#complete-transactions-and-stack-measurements)'
-      - '**Status** · v0.1.0 development baseline.'
       - |-
         This experiment verifies a WOTS+ one-time signature in Bitcoin Script and binds
         it to the current BSV transaction input. It uses the RFC 8391
@@ -66,10 +62,10 @@ sections:
         and is only for testing the primitive. The payment lock supports the twelve
         BIP143 and Chronicle OTDA modes, with BIP143 `ALL` (`0x41`) as the wallet default.
     zh-CN:
-      - '[协议规范](docs/developer.zh-CN.md#protocol) · [安全分析](docs/developer.zh-CN.md#security) · [复现与验证](#开发和钱包接入)
-        · [交易成本](#完整交易与栈测量)'
-      - WOTS+ 是 v0.1.0 开发基线，按 RFC 8391 的 `WOTSP-SHA2_256` 哈希链验证一次性签名。项目定义 64 字节的 BSV 公钥编码，原始签名为 2,144
-        字节。付款锁将证明绑定到实际花费的交易输入。 [编码规范](docs/spec.md) · [RFC 8391](https://www.rfc-editor.org/rfc/rfc8391)
+      - '[协议规范](docs/developer.zh-CN.md#protocol) · [安全分析](docs/developer.zh-CN.md#security) · [复现与验证](#开发和钱包接入) ·
+        [交易成本](#完整交易与栈测量)'
+      - WOTS+ 按 RFC 8391 的 `WOTSP-SHA2_256` 哈希链验证一次性签名。项目定义 64 字节的 BSV 公钥编码，原始签名为 2,144 字节。付款锁将证明绑定到实际花费的交易输入。[编码规范](docs/spec.md)
+        · [RFC 8391](https://www.rfc-editor.org/rfc/rfc8391)
       - '### 模板与签名模式'
       - |-
         | 付款模板 | 锁定脚本 | 说明 |
@@ -77,8 +73,19 @@ sections:
         | 默认 `locking_script(key)` | 42,266 字节 | 交易绑定模板 |
         | `cached_constants=True` | 36,283 字节 | 在栈上保存复用的常量 |
         | `cached_constants="steps"` | 33,956 字节 | 再缓存 15 个四字节步骤索引 |
-      - 三种锁的普通 BIP143 解锁都为 2,310 字节。启用 Chronicle 并采用版本 2 交易时，可为缓存步骤输出显式启用 `compress_otda=True`。OTDA ALL
-        重建签名原文里的相关输出，配对 SINGLE 只重建同索引输出。未知输出原样处理，无配对 SINGLE 采用伴随验签。仅验证给定摘要的 `transaction=False` 模板用于算法测试。
+        | `cached_constants="compact"` | 29,217 字节 | 复用 Forth 生成的哈希链指令，缓存完整地址后缀和选择位 |
+        | `cached_constants="compact-v2"` | 27,070 字节 | 用栈上的剩余步数选择需要执行的哈希步骤 |
+        | `cached_constants="compact-v3"` | 25,965 字节 | 成对复制哈希输入的固定字段，压缩缓存常量和交易绑定 |
+        | `cached_constants="compact-v4"` | 23,296 字节 | 在链值旁缓存地址选择位掩码，复用交易绑定的公钥 |
+        | `cached_constants="compact-v5"` | 22,494 字节 | 跨链保留常量，在解析摘要时计算剩余步数 |
+        | `cached_constants="compact-v6"` | 21,982 字节 | 用同一个缓冲区保存签名和端点，直接递增地址里的链索引 |
+        | `cached_constants="compact-v7"` | 21,774 字节 | 用位运算解析摘要，只在第一次进位时规范化地址 |
+        | `cached_constants="compact-v8"` | 21,540 字节 | 在链之间把签名缓冲区留在主栈，成对保存摘要半字节 |
+        | `cached_constants="compact-v9"` | 21,332 字节 | 并行计算摘要校验和，复用连续的摘要拆分指令 |
+        | `cached_constants="compact-v10"` | 21,320 字节 | 每两条消息链按需解码一个摘要字节 |
+        | `cached_constants="compact-v11"` | 21,272 字节 | 批量生成并拆分哈希步骤的地址后缀 |
+      - 十四种锁的普通 BIP143 解锁都为 2,310 字节。启用 Chronicle 并采用版本 2 交易时，可用 `compress_otda=True` 重建 Compact 系列和 `cached-steps`
+        输出。OTDA ALL 可在同一笔交易中重建这十二种输出，配对 SINGLE 只重建同索引输出。未知输出原样处理，无配对 SINGLE 采用伴随验签。仅验证给定摘要的 `transaction=False` 模板用于算法测试。
   reproduction:
     en:
       - '### Run the checks'
@@ -145,8 +152,9 @@ sections:
       - |-
         Use `compress_otda=True` with `sign_spend` or `sign_payment` only when
         Chronicle functional unlocking is available. Version 2 OTDA ALL and paired
-        OTDA SINGLE use the [prebuilt reconstruction program](versions/v0.1.0/cached-steps-layout.json)
-        to recreate cached-steps outputs. SINGLE covers only its same-index output.
+        OTDA SINGLE use the [prebuilt cached-steps program](versions/v0.1.0/cached-steps-layout.json)
+        or a compact program generated from the chain body. An ALL transaction may
+        use all twelve dictionaries. SINGLE covers only its same-index output.
         Earlier null outputs stay in the signed prefix, and unpaired SINGLE
         uses the existing companion authorization. Mixed transactions copy
         unrecognized outputs literally. The wallet chooses the shorter encoding,
@@ -174,13 +182,15 @@ sections:
         and run the same synthetic spend fixtures through its complete-input API.
       - |-
         ```sh
-        python projects/wots-plus/reference/test_lean.py /path/to/bsv-script-lean/eval/bsvs
+        python projects/wots-plus/reference/test_lean.py --compact-v11 /path/to/bsv-script-lean/eval/bsvs
         ```
       - |-
         The runner checks the transaction gate and the selected input's Script verdict
         for the sighash matrix and malformed witnesses. It also checks a BIP143 `ALL`
         spend at Genesis-era heights before Chronicle. This is a separate executable
         specification check alongside BSV Node and chain-gang.
+      - Run `python projects/wots-plus/reference/generate_reconstruction.py --version v0.12.0 --check` to compare
+        the current compiler output with the archived lock and reconstruction program.
     zh-CN:
       - 在仓库根目录的独立 Python 环境运行以下命令。Linux x86-64 节点复放用 `verify.sh`，macOS 可用 `verify_apple.sh`。
       - |-
@@ -191,17 +201,135 @@ sections:
       - 可选用 [Lean Script 求值器](https://github.com/Calhooon/bsv-script-lean#try-it)重放同一批合成输入。
       - |-
         ```sh
-        python projects/wots-plus/reference/test_lean.py /path/to/bsv-script-lean/eval/bsvs
+        python projects/wots-plus/reference/test_lean.py --compact-v11 /path/to/bsv-script-lean/eval/bsvs
         ```
       - 该入口单独检查交易激活规则和指定输入的 Script 判定。
+      - 运行 `python projects/wots-plus/reference/generate_reconstruction.py --version v0.12.0 --check`，可逐字节核对当前编译结果与归档的付款锁和重建程序。
   script_sizes:
     en:
-      - The complete transaction table lists lock and unlock sizes for the canonical, cached-constant,
-        and cached-step profiles. [Validation record](docs/validation.md)
+      - '### Compact profile'
+      - |-
+        `locking_script(key, cached_constants="compact")` builds a 29,217-byte
+        lock, 4,739 bytes smaller than `cached-steps`. The verifier compiles a
+        single [Forth chain body](reference/compact.fth) for all 67 chains. It
+        uses a running chain index and a cached bit to form both key-and-mask
+        addresses. The BIP143 unlocking script is 2,310 bytes.
+      - |-
+        `locking_script(key, cached_constants="compact-v2")` builds a 27,070-byte
+        lock. For signed digit `d`, the chain starts a stack counter at `15 - d`.
+        The nested conditions consume the counter before hashing steps
+        `d` through 14. Keeping the checksum below the constants also shortens
+        some stack lookups. Together these changes reduce each chain from 406 to
+        374 bytes.
+      - |-
+        `locking_script(key, cached_constants="compact-v3")` builds a 25,965-byte
+        lock. It copies the zero function prefix and chain address together, carries
+        the chain index as a byte, and generates the cached padding in Script.
+        The chain body is 363 bytes. The transaction binding uses a masked sighash
+        range check and the compact DER builder.
+      - |-
+        `locking_script(key, cached_constants="compact-v4")` builds a 23,296-byte
+        lock. It keeps the selector mask next to the chain value and arranges the
+        two PRF inputs with `OP_TUCK` and `OP_2SWAP`, bringing the chain body down
+        to 324 bytes. The transaction binding extracts the fixed public key from
+        the ordinary signature and reuses it for the unpaired OTDA SINGLE check.
+      - |-
+        `locking_script(key, cached_constants="compact-v5")` builds a 22,494-byte
+        lock. It keeps the function prefix and selector mask across chains and
+        derives remaining step counts during digest and checksum decoding. This
+        reduces the chain body to 312 bytes. The OTDA program also assembles
+        repeated digit, hash and reversal instructions from cached byte strings.
+      - |-
+        `locking_script(key, cached_constants="compact-v6")` builds a 21,982-byte
+        lock. An alternate-stack buffer holds the unprocessed signature followed by
+        the computed endpoints. Each chain consumes one element from the front
+        and appends its endpoint. The verifier increments the chain index in
+        the PRF base directly, shortening the chain body to 305 bytes. The
+        companion binding assembles its fixed DER signature from the public key.
+      - |-
+        `locking_script(key, cached_constants="compact-v7")` builds a 21,774-byte
+        lock. It extracts digest nibbles with a mask and a byte shift. It
+        normalizes the zero-index PRF address on the first increment. Later
+        increments already return canonical byte strings, so the repeated chain
+        body is 304 bytes. It also builds the fixed PRF padding and the companion
+        zero hash in Script. The reconstruction program generates the countdown
+        and reversal runs by doubling their instructions and trimming the excess.
+      - |-
+        `locking_script(key, cached_constants="compact-v8")` builds a 21,540-byte
+        lock. It keeps the signature and endpoint buffer on the main stack between
+        chains and parks its tail on the alternate stack while hashing. Moving the
+        address increment into the step suffix table shortens one lookup per chain.
+        The repeated chain body is 301 bytes. The digest decoder uses `OP_2DUP` to
+        save each nibble pair for the chain countdowns.
+      - |-
+        `locking_script(key, cached_constants="compact-v9")` builds a 21,332-byte
+        lock. It computes the checksum in parallel by folding complemented digest
+        nibbles into 16-bit lanes and reducing the packed sum modulo 65,535.
+        The countdown accepts raw nibble flags. For the last 15 digest bytes, the decoder
+        splits at the remaining digest length minus one. These identical splits
+        let the OTDA program reconstruct the whole run by doubling and trimming.
+      - |-
+        `locking_script(key, cached_constants="compact-v10")` builds a 21,320-byte
+        lock. It keeps the complemented digest in a buffer and decodes one byte
+        for each pair of message chains. OTDA reconstructs the pair by inserting
+        the byte decoder into one copy of the 301-byte chain body. It then
+        duplicates the pair to fill the 64 message positions.
+      - |-
+        `locking_script(key, cached_constants="compact-v11")` builds a 21,272-byte
+        lock. It generates all 15 PRF step suffixes with one division and splits
+        the result into eight-byte entries. The entries go on the stack in
+        descending order. The chain loads them by their new positions. OTDA
+        reconstruction also shares the opcode before each variable lookup depth.
+      - |-
+        In the two-input, two-output BIP143 ALL fixture, the development evaluator
+        measured a peak of 32 main stack items for `compact-v6` through `compact-v8`.
+        The alternate stack peak fell from 68 to 67 items in `compact-v8`.
+        `compact-v9` peaked at 32 main and 67 alternate stack items, with combined
+        stack payload rising from 2,916 to 2,922 bytes. `compact-v10` and `compact-v11`
+        peaked at 32 main and 6 alternate stack items, with a combined stack
+        payload of 2,891 bytes.
+      - |-
+        | Measured bytes | `cached-steps` | `compact` | `compact-v2` | `compact-v3` | `compact-v4` | `compact-v5` | `compact-v6` | `compact-v7` | `compact-v8` | `compact-v9` | `compact-v10` | `compact-v11` |
+        | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+        | Version | [v0.1.0](versions/v0.1.0/manifest.json) | [v0.2.0](versions/v0.2.0/manifest.json) | [v0.3.0](versions/v0.3.0/manifest.json) | [v0.4.0](versions/v0.4.0/manifest.json) | [v0.5.0](versions/v0.5.0/manifest.json) | [v0.6.0](versions/v0.6.0/manifest.json) | [v0.7.0](versions/v0.7.0/manifest.json) | [v0.8.0](versions/v0.8.0/manifest.json) | [v0.9.0](versions/v0.9.0/manifest.json) | [v0.10.0](versions/v0.10.0/manifest.json) | [v0.11.0](versions/v0.11.0/manifest.json) | [v0.12.0](versions/v0.12.0/manifest.json) |
+        | Payment lock | 33,956 | 29,217 | 27,070 | 25,965 | 23,296 | 22,494 | 21,982 | 21,774 | 21,540 | 21,332 | 21,320 | 21,272 |
+        | OTDA reconstruction program | 3,097 | 2,395 | 2,358 | 1,979 | 1,884 | 1,126 | 1,076 | 957 | 952 | 910 | 795 | 732 |
+        | 2×2 BIP143 ALL payment | 72,650 | 63,172 | 58,878 | 56,668 | 51,330 | 49,726 | 48,702 | 48,286 | 47,818 | 47,402 | 47,378 | 47,282 |
+        | 2×2 OTDA ALL, reconstructed | 79,090 | 68,208 | 63,840 | 60,872 | 55,344 | 52,224 | 51,100 | 50,446 | 49,968 | 49,468 | 49,214 | 48,992 |
+        | 2×2 paired OTDA SINGLE, reconstructed | 78,921 | 68,039 | 63,671 | 60,703 | 55,175 | 52,055 | 50,931 | 50,277 | 49,799 | 49,299 | 49,045 | 48,823 |
+      - 'Select the v0.12.0 lock in the wallet SDK with `template: "compact-v11"`. Each version manifest records its
+        SDK template, Git tag and source commit. [SDK quickstart](docs/sdk.en.md#quickstart) · [Version index](versions/index.json)'
     zh-CN:
-      - '### 输入输出取舍'
-      - 缓存步骤把每个锁从 42,266 降到 33,956 字节，降低入金及新建输出的成本。OTDA ALL 的重建再把同类两进两出从 208,406 降到 79,090 字节。配对 SINGLE
-        从 140,473 降到 78,921 字节，而重建前后的两栈载荷峰值都是 70,280 字节。新增第三个输入与前两个输出无配对，边际仍是 2,440 字节。
+      - '### Compact 模板实测'
+      - '`compact` 的 67 条哈希链共用同一段编译后的指令，OTDA 重建时只需携带一份。`compact-v2` 用栈上的 `15 − d` 选择从签名值 `d` 到第 14 步要执行的哈希，将每条链从 406
+        字节减到 374 字节。'
+      - '`compact-v3` 一次复制零前缀和链地址，把链索引保留为一个字节，并用指令生成缓存的填充字节。每条链降到 363 字节。更短的签名模式检查和 DER 构造也减少了交易绑定代码。'
+      - '`compact-v4` 将地址选择位掩码留在链值旁边，用 `OP_TUCK` 和 `OP_2SWAP` 减少每步的重复取值，每条链降到 324 字节。交易绑定从普通签名中构造固定公钥，并在无配对 OTDA SINGLE
+        的伴随验签中复用。'
+      - '`compact-v5` 跨链保留零前缀和选择位掩码，在解析摘要和校验和时直接算出剩余步数。每条链降到 312 字节。OTDA 重建程序用缓存的字节串拼接重复指令。'
+      - '`compact-v6` 每条链从备用栈缓冲区的开头取一个签名元素，将算出的端点追加到末尾，并直接递增 PRF 地址的链索引。每条链降到 305 字节，固定的伴随签名也改由公钥重建。'
+      - '`compact-v7` 用掩码和移位解析摘要，只在第一次递增链索引时规范化地址。其余链复用 304 字节的指令。脚本生成固定的 PRF 填充字节和伴随验签的零哈希。重建程序通过倍增指令序列并裁去多余字节来生成倒计时和字节反转指令。'
+      - '`compact-v8` 在两条链之间把缓冲区留在主栈，哈希时才把缓冲区剩余部分放入备用栈。它还把地址增量移入步骤后缀表，缩短每条链的一次取值。重复链体降到 301 字节，摘要解析改用 `OP_2DUP` 成对保存半字节。在两进两出
+        BIP143 ALL 夹具中，开发求值器测得主栈峰值为 32 项，备用栈峰值从 68 项降到 67 项。[Forth 实现](reference/compact.fth)'
+      - '`compact-v9` 把取反后的摘要半字节合并为 16 位字组，再对 65,535 取模得到校验和。倒计时直接读取按字节保存的半字节值。拆分最后 15 个摘要字节时，脚本用剩余长度计算索引，OTDA 重建程序可通过倍增复原这段连续指令。两进两出
+        BIP143 ALL 夹具中的主栈和备用栈峰值仍为 32 项和 67 项，合计栈载荷峰值由 2,916 B 增至 2,922 B。'
+      - '`compact-v10` 将取反后的摘要保存在一个缓冲区里，每两条消息链按需解码一个字节。OTDA 在 301 字节链体的一份副本里插入解码指令，再倍增链对生成全部 64 条消息链。两进两出 BIP143 ALL
+        夹具中，开发求值器测得主栈峰值为 32 项，备用栈峰值由 67 项降至 6 项，合计栈载荷峰值为 2,891 B。'
+      - '`compact-v11` 用一次除法生成 15 个 PRF 步骤的地址后缀，再按每项 8 字节拆到栈上。哈希链按新栈位置取值，OTDA 重建程序复用每次取值前的相同指令。在同一 BIP143 ALL 夹具中，开发求值器测得主栈和备用栈峰值分别为
+        32 项和 6 项，合计栈载荷峰值为 2,891 B。'
+      - |-
+        | 实测项目 | `cached-steps` | `compact` | `compact-v2` | `compact-v3` | `compact-v4` | `compact-v5` | `compact-v6` | `compact-v7` | `compact-v8` | `compact-v9` | `compact-v10` | `compact-v11` |
+        | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+        | 版本 | [v0.1.0](versions/v0.1.0/manifest.json) | [v0.2.0](versions/v0.2.0/manifest.json) | [v0.3.0](versions/v0.3.0/manifest.json) | [v0.4.0](versions/v0.4.0/manifest.json) | [v0.5.0](versions/v0.5.0/manifest.json) | [v0.6.0](versions/v0.6.0/manifest.json) | [v0.7.0](versions/v0.7.0/manifest.json) | [v0.8.0](versions/v0.8.0/manifest.json) | [v0.9.0](versions/v0.9.0/manifest.json) | [v0.10.0](versions/v0.10.0/manifest.json) | [v0.11.0](versions/v0.11.0/manifest.json) | [v0.12.0](versions/v0.12.0/manifest.json) |
+        | 锁定脚本 | 33,956 B | 29,217 B | 27,070 B | 25,965 B | 23,296 B | 22,494 B | 21,982 B | 21,774 B | 21,540 B | 21,332 B | 21,320 B | 21,272 B |
+        | OTDA 重建程序 | 3,097 B | 2,395 B | 2,358 B | 1,979 B | 1,884 B | 1,126 B | 1,076 B | 957 B | 952 B | 910 B | 795 B | 732 B |
+        | 两进两出 BIP143 ALL | 72,650 B | 63,172 B | 58,878 B | 56,668 B | 51,330 B | 49,726 B | 48,702 B | 48,286 B | 47,818 B | 47,402 B | 47,378 B | 47,282 B |
+        | 两进两出 OTDA ALL，启用重建 | 79,090 B | 68,208 B | 63,840 B | 60,872 B | 55,344 B | 52,224 B | 51,100 B | 50,446 B | 49,968 B | 49,468 B | 49,214 B | 48,992 B |
+        | 两进两出配对 OTDA SINGLE，启用重建 | 78,921 B | 68,039 B | 63,671 B | 60,703 B | 55,175 B | 52,055 B | 50,931 B | 50,277 B | 49,799 B | 49,299 B | 49,045 B | 48,823 B |
+      - '钱包 SDK 用 `template: "compact-v11"` 选择 v0.12.0 的付款锁。各版清单记录了 SDK 模板、Git 标签和源码提交。[接入示例](docs/sdk.zh-CN.md#quickstart)'
+      - '### 缓存步骤模板实测'
+      - 缓存步骤把每个锁从 42,266 降到 33,956 字节，降低入金及新建输出的成本。OTDA ALL 的重建再把同类两进两出从 208,406 降到 79,090 字节。配对 SINGLE 从 140,473
+        降到 78,921 字节，而重建前后的两栈载荷峰值都是 70,280 字节。新增第三个输入与前两个输出无配对，边际仍是 2,440 字节。
   integration:
     en:
       - |-

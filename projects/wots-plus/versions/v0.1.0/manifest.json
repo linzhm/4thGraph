@@ -12,5 +12,8 @@
   "evidence": [],
   "integration": "docs/sdk.en.md",
   "build": "PYTHONPATH=src:. python projects/wots-plus/reference/generate_reconstruction.py --check",
-  "verify": "bash projects/wots-plus/reference/verify.sh"
+  "verify": "bash projects/wots-plus/reference/verify.sh",
+  "template": "cached-steps",
+  "git_tag": "wots-plus-v0.1.0",
+  "source_commit": "758f2a6aa53d5ed4ff45a72d44ffa06db5913bf2"
 }

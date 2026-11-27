@@ -2,8 +2,9 @@
 from dataclasses import dataclass
 from functools import cache
 
-from script import COMPANION_CODE, ORDINARY_CODE, locking_script
-from fixed_template import fixed_pattern
+from script import CACHE_PROFILES, COMPACT_PROFILES, COMPANION_CODE, ORDINARY_CODE, locking_script
+from fixed_template import compact_pattern, fixed_pattern
+from fourthgraph.bsv.otda_reconstruction import reconstruct_mixed
 from fourthgraph.bsv.pushtx import N, R
 from fourthgraph.bsv.script import number, push
 from fourthgraph.bsv.transaction import (
@@ -57,7 +58,7 @@ def current_input_unlock(auth, public_key, signature):
 def _layout_sizes():
     return {(transaction, profile): len(locking_script(bytes(KEY_BYTES), transaction=transaction,
                                                       cached_constants=profile))
-            for transaction in (True, False) for profile in (False, True, 'steps')}
+            for transaction in (True, False) for profile in CACHE_PROFILES}
 
 
 def _layouts_for_sizes(sizes):
@@ -106,7 +107,13 @@ def sign_previous(tx, index, previous, public_key, signer, *, sighash=DEFAULT_SI
     program = None
     if compress_otda and tx.version == 2 and not auth.companion and sighash in COMPRESSIBLE_OTDA_TYPES:
         outputs = (tx.outputs[index],) if sighash & 31 == SIGHASH_SINGLE else tx.outputs
-        program = fixed_pattern().build(auth.preimage, outputs)
+        patterns = (fixed_pattern(), *(compact_pattern(profile) for profile in COMPACT_PROFILES))
+        program = reconstruct_mixed(auth.preimage, outputs, patterns)
+        if program is None:
+            for pattern in patterns:
+                program = pattern.build(auth.preimage, outputs)
+                if program is not None:
+                    break
     signature = signer(_checked_digest(auth))
     witness = current_input_unlock(auth, public_key, signature)
     if program is not None:

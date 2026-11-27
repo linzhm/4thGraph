@@ -1,0 +1,264 @@
+{
+  "fixture_label_profile": "v1.11.0",
+  "baseline": "v1.11.0",
+  "compiler_version": "0.2.7",
+  "compiler_commit": "1c44d2882e37d3f46e4b861e83063d630db66555",
+  "bsv_node_version": "1.2.3",
+  "chain_gang_commit": "8b60b71a12a69fdcb465d3e627dbf6f43d6ed081",
+  "validation": "Peerless regtest script replay with supplied prevouts",
+  "component_bytes": {
+    "v1.11.0": {
+      "lock_bytes": 94355,
+      "otda_program_bytes": 7417,
+      "window_bytes": 35478,
+      "window_step_bytes": 613,
+      "window_table_bytes": 2797
+    },
+    "v1.12.0": {
+      "lock_bytes": 94117,
+      "otda_program_bytes": 7412,
+      "window_bytes": 35240,
+      "window_step_bytes": 613,
+      "window_table_bytes": 2559
+    }
+  },
+  "payments_2x2": {
+    "bip143-all": {
+      "v1.11.0": {
+        "transaction_bytes": 189414,
+        "unlock_bytes": [
+          291,
+          291
+        ],
+        "txid": "67f3a5b673480cf2c2ed1e90f05c4e95210a94ada6abe96fbea1675b15c490a4",
+        "peak_stack_payload_bytes": 3837
+      },
+      "v1.12.0": {
+        "transaction_bytes": 188938,
+        "unlock_bytes": [
+          291,
+          291
+        ],
+        "txid": "0b494791ed893b23a496b5881532d479e9fb2a6c204f7a1f1298623597f88356",
+        "peak_stack_payload_bytes": 3839
+      }
+    },
+    "otda-all": {
+      "v1.11.0": {
+        "transaction_bytes": 204306,
+        "unlock_bytes": [
+          7737,
+          7737
+        ],
+        "txid": "738df6c5bd79a6572f2237851e3c0b8b32193865a75707880e1dd64cf60a3b64",
+        "peak_stack_payload_bytes": 377800
+      },
+      "v1.12.0": {
+        "transaction_bytes": 203820,
+        "unlock_bytes": [
+          7732,
+          7732
+        ],
+        "txid": "f3142bb1843a937ce9e9294efcd0c6b606f4153d4416e309c62df7bd50e3a2de",
+        "peak_stack_payload_bytes": 376848
+      }
+    }
+  },
+  "otda_all_fan_in": {
+    "12x1": {
+      "v1.11.0": {
+        "transaction_bytes": 191615,
+        "unlock_bytes": [
+          8061,
+          8060,
+          8060,
+          8060,
+          8060,
+          8060,
+          8060,
+          8060,
+          8060,
+          8060,
+          8060,
+          8060
+        ],
+        "txid": "7f3d7989e20dbe62002097842ca8ed6e78f792bb1a9705a95f5ea7067350840a"
+      },
+      "v1.12.0": {
+        "transaction_bytes": 191317,
+        "unlock_bytes": [
+          8056,
+          8055,
+          8055,
+          8055,
+          8055,
+          8055,
+          8055,
+          8055,
+          8055,
+          8055,
+          8055,
+          8055
+        ],
+        "txid": "35398e36e7c47142a118acf002142383ce6904e843d34ac23402e3d1b64efa8f"
+      }
+    },
+    "24x1": {
+      "v1.11.0": {
+        "transaction_bytes": 299219,
+        "unlock_bytes": [
+          8493,
+          8492,
+          8492,
+          8492,
+          8492,
+          8492,
+          8492,
+          8492,
+          8492,
+          8492,
+          8492,
+          8492,
+          8492,
+          8492,
+          8492,
+          8492,
+          8492,
+          8492,
+          8492,
+          8492,
+          8492,
+          8492,
+          8492,
+          8492
+        ],
+        "txid": "e8485fce157b4a544bd48e47a238402f188c7e2dcbb5ca4ae672f18f64ddaeb2"
+      },
+      "v1.12.0": {
+        "transaction_bytes": 298861,
+        "unlock_bytes": [
+          8488,
+          8487,
+          8487,
+          8487,
+          8487,
+          8487,
+          8487,
+          8487,
+          8487,
+          8487,
+          8487,
+          8487,
+          8487,
+          8487,
+          8487,
+          8487,
+          8487,
+          8487,
+          8487,
+          8487,
+          8487,
+          8487,
+          8487,
+          8487
+        ],
+        "txid": "587ada1de5132e2ad362631520bdb9913bf97d7d35f2f750883256009df0811f"
+      }
+    },
+    "40x1": {
+      "v1.11.0": {
+        "transaction_bytes": 458819,
+        "unlock_bytes": [
+          9069,
+          9068,
+          9068,
+          9068,
+          9068,
+          9068,
+          9068,
+          9068,
+          9068,
+          9068,
+          9068,
+          9068,
+          9068,
+          9068,
+          9068,
+          9068,
+          9068,
+          9068,
+          9068,
+          9068,
+          9068,
+          9068,
+          9068,
+          9068,
+          9068,
+          9068,
+          9068,
+          9068,
+          9068,
+          9068,
+          9068,
+          9068,
+          9068,
+          9068,
+          9068,
+          9068,
+          9068,
+          9068,
+          9068,
+          9068
+        ],
+        "txid": "0f6ee5b17cd6c825474455dd80165577c9c6edb7dc8fb33899779ef5587e7ee3"
+      },
+      "v1.12.0": {
+        "transaction_bytes": 458381,
+        "unlock_bytes": [
+          9064,
+          9063,
+          9063,
+          9063,
+          9063,
+          9063,
+          9063,
+          9063,
+          9063,
+          9063,
+          9063,
+          9063,
+          9063,
+          9063,
+          9063,
+          9063,
+          9063,
+          9063,
+          9063,
+          9063,
+          9063,
+          9063,
+          9063,
+          9063,
+          9063,
+          9063,
+          9063,
+          9063,
+          9063,
+          9063,
+          9063,
+          9063,
+          9063,
+          9063,
+          9063,
+          9063,
+          9063,
+          9063,
+          9063,
+          9063
+        ],
+        "txid": "cfd22d50ac6d6102d79f378989670a2bd4415d8d95506185027a1b9b92acdd47"
+      }
+    }
+  },
+  "source": "README.md#v1120"
+}

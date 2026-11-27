@@ -124,7 +124,7 @@ def _preimage_script(tx, index, auth, *, compress_otda, chronicle_active):
     candidates = [literal]
     for version, pattern in patterns.items():
         encode_prefix = push
-        if version == CARRIED_FIELD_TEMPLATE_VERSION and not auth.requested_type & ANYONECANPAY and len(tx.inputs) >= 4:
+        if version >= CARRIED_FIELD_TEMPLATE_VERSION and not auth.requested_type & ANYONECANPAY and len(tx.inputs) >= 4:
             parts = otda_input_parts(tx, index, ORDINARY_CODE, auth.requested_type)
             encode_prefix = partial(pack_otda_input_prefix, input_parts=parts)
         if (program := pattern.build(auth.preimage, outputs, encode_prefix=encode_prefix)) is not None:

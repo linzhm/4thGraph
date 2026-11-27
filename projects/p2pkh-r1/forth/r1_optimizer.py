@@ -14,7 +14,7 @@ from fourthgraph.bsv.otda_reconstruction import Reconstruction
 from fourthgraph.bsv.transaction import compact
 from fourthgraph.compiler.method_search import IneligibleMethod, Method, explore_orders, replay_order
 from msm_compiler import OWNER, R1MSMCompiler
-from msm_lowering import Program, Strategy, clear_window_table, reconstruction, window_program
+from msm_lowering import Program, Strategy, clear_window_table, reconstruction, share_reconstruction_fragments, window_program
 
 
 METHODS = {
@@ -37,6 +37,7 @@ PACKING_OPTIONS = {
     "pack-stack-repeat": "stack_repeat",
     "pack-adjacent-kernels": "adjacent_kernels",
 }
+FRAGMENT_SHARING = "share-otda-fragments"
 TERMINAL = ("rewrite", "share", "stack", "search")
 
 
@@ -90,7 +91,7 @@ def apply(method, state, *, backend, scheduled, constructor_for):
         except ValueError as error:
             raise IneligibleMethod(str(error)) from error
         return replace(state, strategy=narrower)
-    if method in PACKING_OPTIONS:
+    if method in PACKING_OPTIONS or method == FRAGMENT_SHARING:
         if method in state.packing:
             return state
         candidate = replace(state, packing=state.packing | {method})
@@ -159,8 +160,12 @@ class R1Optimizer:
         self._constructors = {}
         self._linked = {}
 
-    def methods(self, *, pairs=False):
+    def methods(self, *, pairs=False, fragment_sharing=False):
         registry = METHODS if pairs else SEARCH_METHODS
+        if fragment_sharing:
+            registry = {**registry, FRAGMENT_SHARING: (
+                "OTDA copies of repeated byte strings", "a smaller byte-exact constructor",
+            )}
         return {
             name: Method(region, requires, partial(apply, name, backend=self.backend, scheduled=self.schedule,
                                                   constructor_for=self.constructor_for))
@@ -178,8 +183,9 @@ class R1Optimizer:
         if state not in self._constructors:
             program = self.program_for(state)
             after = clear_window_table(program.table_slots) + self.epilogue
-            options = {PACKING_OPTIONS[method]: True for method in state.packing}
-            self._constructors[state] = reconstruction(
+            options = {PACKING_OPTIONS[method]: True for method in state.packing if method in PACKING_OPTIONS}
+            pack = share_reconstruction_fragments if FRAGMENT_SHARING in state.packing else reconstruction
+            self._constructors[state] = pack(
                 self.prefix, self.before, program.pieces, after, program.kernels, **options,
             )
         return self._constructors[state]
@@ -249,7 +255,7 @@ def replay_plan(source, owner, plan, *, source_path):
     optimizer = R1Optimizer(source, source_path)
     if plan["snapshot"] != plan_snapshot(optimizer):
         raise ValueError("R1 optimization plan snapshot differs from the compiler, source, or dependencies")
-    linked = optimizer.link(replay_order(optimizer.start, optimizer.methods(), plan["order"]))
+    linked = optimizer.link(replay_order(optimizer.start, optimizer.methods(fragment_sharing=True), plan["order"]))
     if plan["expected"] != plan_artifacts(linked):
         raise ValueError("R1 optimization plan emitted different lock or reconstruction bytes")
     return optimizer.compiler, linked.lock.lock(owner), constructor_report(linked)

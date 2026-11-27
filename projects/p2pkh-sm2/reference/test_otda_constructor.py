@@ -228,9 +228,10 @@ class ConstructorTests(unittest.TestCase):
         )
         tx = Transaction(inputs, outputs)
         signed = self.sign_modes(tx, 0x61, (True, True), funding=funding)
-        # Copying any complete output verbatim would exceed this bound.
-        self.assertLess(max(len(item.script) for item in signed.inputs), min(len(out.script) for out in outputs))
-        for index in range(len(inputs)):
+        for index, item in enumerate(signed.inputs):
+            for output_index, output in enumerate(outputs):
+                self.assertFalse(output.script in item.script,
+                                 f"input {index} embeds the full lock of output {output_index}")
             check_node(signed, funding, index, old_output=True)
 
     def test_reconstruction_requires_chronicle_before_signing(self):
