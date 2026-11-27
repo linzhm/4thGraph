@@ -1,6 +1,6 @@
 # 4thGraph 文档
 
-[English](README.md) · [4thGraph](../README.zh-CN.md)
+[English](README.md) · [4thGraph](../README.zh-CN.md) · [架构](architecture.zh-CN.md) · [Forth 基线](language/README.md)
 
 4thGraph 把 **Forth 规则、UTXO 交易计划和验证策略**放在一条构建流程里。开发者声明状态怎样推进、谁必须授权、哪些阶段可以独立提交。工具链据此生成锁与交易计划，再用可复放的交易数据衡量构建结果。
 

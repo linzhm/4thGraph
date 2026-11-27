@@ -1,6 +1,6 @@
 # 4thGraph documentation
 
-[简体中文](README.zh-CN.md) · [4thGraph](../README.md)
+[简体中文](README.zh-CN.md) · [4thGraph](../README.md) · [Architecture](architecture.md) · [Forth baseline](language/README.md)
 
 4thGraph puts **Forth rules, UTXO transaction plans, and verification policies** in one build workflow. You describe how state moves, who must authorize each step, and which steps can be submitted independently. The toolchain produces locks and transaction plans, then measures the results with replayable transactions.
 
