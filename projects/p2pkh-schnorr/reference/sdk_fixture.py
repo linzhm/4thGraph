@@ -13,6 +13,8 @@ def cases():
     for version, scalar, sighash in (
         (TEMPLATE_VERSION, 3, 0x41),
         (TEMPLATE_VERSION, 11, 0x63),
+        ("v0.16.0", 3, 0x41),
+        ("v0.16.0", 3, 0x63),
         ("v0.15.0", 3, 0x41),
         ("v0.15.0", 3, 0x63),
         ("v0.14.0", 3, 0x41),
