@@ -6,7 +6,7 @@ from hashlib import sha256
 from fourthgraph.bsv.evaluate import evaluate
 from fourthgraph.bsv.script import asm, decode_num, encode_num, number, push
 from .curve_windows import CURVES, GLV_PACKED, GLV_REFERENCE, GLV_SCALED, JOINT_STRATEGIES, SECP256K1, fixed_table, scalar_plans
-from .lowering import DATAFLOW, compile_word
+from .lowering import BASELINE, DATAFLOW, compile_word
 from .modular_scale import lower_modular_scale
 from .script_builder import ScriptBuilder
 from .source import SourceCompiler
@@ -202,8 +202,8 @@ def joint_vocabulary(library):
 
 
 @cache
-def _joint_library():
-    return ScriptBuilder("REQUIRE stdlib/secp256k1.fth\nREQUIRE stdlib/secp256k1-window.fth")
+def _joint_library(*, optimize=False):
+    return ScriptBuilder("REQUIRE stdlib/secp256k1.fth\nREQUIRE stdlib/secp256k1-window.fth", optimize=optimize)
 
 
 def _pack_windows(*lanes):
@@ -212,7 +212,7 @@ def _pack_windows(*lanes):
 
 
 def _optimized_joint_words(vocabulary, optimization, *, scaled):
-    library = _joint_library()
+    library = _joint_library(optimize=optimization != BASELINE)
     prefix = "secp256k1-scaled-" if scaled else "secp256k1-"
     words = vocabulary | {
         "pack-windows": script_word("script-int script-int script-int script-int", "bytes",
@@ -220,6 +220,7 @@ def _optimized_joint_words(vocabulary, optimization, *, scaled):
         "double-pair": numeric_fragment(library.emit(prefix + "double-pair-with-field", b"", 1), 4, 4),
         "double-point": numeric_fragment(library.emit(prefix + "double-with-field", b"", 1), 4, 4),
         "add-fixed-affine": numeric_fragment(library.emit(prefix + "add-affine-with-field", b"", 1), 6, 4),
+        "map-row-coordinates": numeric_fragment(library.emit("secp-window-map-row-coordinates", b""), 9, 6),
     }
     points = fixed_table(SECP256K1, split_bits=128)
     scale_public = restore = b""
@@ -242,7 +243,7 @@ def _optimized_joint_words(vocabulary, optimization, *, scaled):
 def _variable_stack_table(frontend, words, optimization):
     """Schedule the three nonzero rows around the shared P, 2P and 3P."""
     p, px, py, qx, qy = inputs = (0, 1, 2, 3, 4)
-    map_row = compile_word(frontend.words["map-row-start"], optimization).script
+    map_pair = compile_word(frontend.words["map-row-pair"], optimization).script
     row = compile_word(frontend.words["stack-table-row"], optimization).script
 
     def schedule(preserve_field):
@@ -262,7 +263,8 @@ def _variable_stack_table(frontend, words, optimization):
         drop = b"" if preserve_field else asm("3 OP_ROLL OP_DROP")
         P2 = emit(words["double-point"].code + drop, (p, *P), 3, retained)
         P3 = emit(words["add-fixed-affine"].code + drop, (p, *P2, px, py), 3, retained)
-        Q2, Q3 = (emit(map_row, (p, py, qy, *point), 3) for point in (P2, P3))
+        mapped = emit(map_pair, (p, *P2, *P3, py, qy), 6)
+        Q2, Q3 = mapped[:3], mapped[3:]
         rows = [emit(row, (p, px, py, *point), 12) for point in (Q, Q2, Q3)]
         returns = (p, *P, *P2, *P3, *(slot for values in rows for slot in values))
         return emit_steps(inputs, steps, returns, compact=True, trim_suffix=optimization == DATAFLOW,

@@ -230,7 +230,7 @@ REGTEST_CHRONICLE_HEIGHT=5 PYTHONPATH=src:. bash tools/verify_node.sh --profile 
 
 ## 64 窗口验签器的 Forth 调优
 
-调优后的 Forth 将同一个域模数用于四个坐标的上界检查、公钥曲线方程和两个仿射点的映射。在映射前检查原始编码及两个纵坐标的偶性，点乘后验证两个模余数为零并排除 `Z = 0`。编译器使用与上一版相同的 `dataflow` 选项和 secp256k1 联合点乘词。[调优后的 Forth](../experiments/high-level/window-verifier-tuned.fth)
+调优后的 Forth 将同一个域模数用于四个坐标的上界检查、公钥曲线方程和两个仿射点的映射。在映射前检查原始编码及两个纵坐标的偶性，点乘后验证两个模余数为零并排除 `Z = 0`。在 `f4b29f9` 上，编译器使用与上一版相同的 `dataflow` 选项和 secp256k1 联合点乘词。[调优后的 Forth](../experiments/high-level/window-verifier-tuned.fth)
 
 | 构建 | 窗口前 | 窗口后 | 付款锁 | 两进两出 OTDA ALL，使用构造器 |
 | --- | ---: | ---: | ---: | ---: |
@@ -247,4 +247,27 @@ PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
 REGTEST_CHRONICLE_HEIGHT=5 PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
   "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/experiments/high-level/window_compare.py \
   --joint-lowerings --forth-tuning --matrix-only --output workspace/schnorr-high-level/forth-tuning-matrix.json
+```
+
+<a name="sharing-the-endomorphism-at-two-row-starts"></a>
+
+## 两个建表行首共用自同态
+
+变基表将 `2P`、`3P` 映射为 `2Q`、`3Q` 后再展开对应的行。Forth 词只比较一次 `P` 和 `Q` 的带符号纵坐标，再用一条公式执行两次 `(X, Y, Z) → (βX mod p, ±Y, Z)`，共用域模数、相对符号和 β。链接器将两点传给编译出的词。原曲线和缩放模型的栈表都使用这段实现。[Forth 组合](../../../src/fourthgraph/compiler/secp256k1-joint-stack.fth) · [行首映射公式](../../../src/fourthgraph/stdlib/secp256k1-window.fth)
+
+| 构建 | 联合点乘准备 | 付款锁 | 两进两出 OTDA ALL，使用构造器 |
+| --- | ---: | ---: | ---: |
+| `f4b29f9` 的独立行首映射 | 3,107 B | 22,992 B | 56,854 B |
+| 共用行首映射 | 3,055 B | 22,940 B | 56,646 B |
+| 手工 v0.17.0 | 2,763 B | 22,435 B | 54,626 B |
+
+省下的 52 B 都在联合点乘准备阶段。三个版本的 18,379 B 窗口主体逐字节相同。每锁剩余 505 B，联合点乘调用前占 207 B，联合点乘准备占 292 B，窗口后占 6 B。双引擎复放涵盖独立验签、付款和八种构造器场景。[实测](../experiments/high-level/table-tuning-measurements.json) · [交易矩阵](../experiments/high-level/table-tuning-matrix.json)
+
+```sh
+PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
+  "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/experiments/high-level/window_compare.py \
+  --joint-lowerings --forth-tuning --output workspace/schnorr-high-level/table-tuning-measurements.json
+REGTEST_CHRONICLE_HEIGHT=5 PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
+  "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/experiments/high-level/window_compare.py \
+  --joint-lowerings --forth-tuning --matrix-only --output workspace/schnorr-high-level/table-tuning-matrix.json
 ```
