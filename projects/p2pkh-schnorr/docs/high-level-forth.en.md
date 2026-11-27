@@ -81,3 +81,32 @@ REGTEST_CHRONICLE_HEIGHT=5 PYTHONPATH=src:. bash tools/verify_node.sh --profile 
   "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/experiments/high-level/constructor_matrix.py \
   --output workspace/schnorr-high-level/constructor-matrix.json
 ```
+
+<a name="64-window-lowering"></a>
+
+## Curve-aware 64-window lowering
+
+The second high-level version splits the generator scalar as `s = s0 + 2^128 s1` and uses the secp256k1 GLV relation `k = k1 + λk2 mod n`. Two indexed point tables cover the two-bit digits of the four 128-bit lanes. Each of the 64 windows doubles the accumulator twice and adds one point from each table. Index zero represents infinity. The Forth uses the same generated complete point-add formula as the high-level binary verifier. The compiler generates the fixed table from the curve generator and links the standard GLV split. [Joint lowering](../../../src/fourthgraph/compiler/secp256k1-joint.fth) · [BIP340 wrapper](../experiments/high-level/window-verifier.fth)
+
+| Build | Payment lock | 2×2 OTDA ALL using the template constructor |
+| --- | ---: | ---: |
+| High-level binary, automatic | 218,701 B | 446,920 B |
+| High-level 64 windows, optional passes disabled | 114,753 B | 264,448 B |
+| High-level 64 windows, inline automatic | 56,414 B | 137,720 B |
+| High-level 64 windows, separately compiled and linked | 43,999 B | 107,404 B |
+| Handwritten v0.17.0 | 22,435 B | 54,626 B |
+
+Switching the algorithm under automatic compilation saves 162,287 B per lock. Compiling the same joint word separately and linking it saves another 12,415 B. The linked build uses typed layouts for table access and generic point addition. The hand-tuned control uses compact stack lookups, specialized doubling and mixed addition. These choices account for further implementation differences within the 64-window algorithm.
+
+The table and measurement file record the compiler at commit `7882fb7`. Run the commands below from that checkout to reproduce the recorded Script bytes. With the shared stack scheduler changes in #109, the same replay emits 113,983 B for the build with optional passes disabled and 55,644 B for the automatic inline build. The linked build still emits 43,999 B. [Measurement checkout](https://github.com/linzhm/4thGraph/tree/7882fb793b1d354614df9210b59b8c30037f2343) · [PR #109](https://github.com/linzhm/4thGraph/pull/109)
+
+The replay checks the pinned BIP340 vectors, malformed witnesses, all 12 paired payment modes, native exits and changed locktime in both engines. The linked build additionally runs the eight automatic transaction cases from the constructor matrix, with output and sequence mutation controls. [Measurements](../experiments/high-level/window-measurements.json) · [Transaction matrix](../experiments/high-level/window-matrix.json)
+
+```sh
+PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
+  "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/experiments/high-level/window_compare.py \
+  --output workspace/schnorr-high-level/window-measurements.json
+REGTEST_CHRONICLE_HEIGHT=5 PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
+  "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/experiments/high-level/window_compare.py \
+  --matrix-only --output workspace/schnorr-high-level/window-matrix.json
+```

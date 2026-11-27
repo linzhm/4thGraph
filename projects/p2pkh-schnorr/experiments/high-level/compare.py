@@ -72,7 +72,8 @@ def fragment(code, inputs, outputs):
                      "bounded Forth formula")
 
 
-def compile_candidate(plan, *, trace=False):
+def compile_candidate(plan, *, trace=False, source=None, entry="reference-bip340", source_compiler=SourceCompiler,
+                      extra_vocabulary=None, source_prefix="", link_vocabulary=None):
     started = perf_counter_ns()
     arithmetic = ScriptBuilder.from_file(
         HERE / "arithmetic.fth", optimize=plan.passes is None,
@@ -99,9 +100,13 @@ def compile_candidate(plan, *, trace=False):
         literal = library.emit(word, b"")
         (value,), _ = evaluate(literal)
         vocabulary[name] = script_word("", "script-int", literal, lambda value=value: decode_num(value))
-    source = HERE / "verifier.fth"
-    frontend = SourceCompiler(source.read_text(), vocabulary=vocabulary, source_path=source)
-    compiled = compile_word(frontend.words["reference-bip340"], plan.runtime)
+    if extra_vocabulary is not None:
+        vocabulary.update(extra_vocabulary(library))
+    if link_vocabulary is not None:
+        vocabulary.update(link_vocabulary(vocabulary, plan.runtime))
+    source = source or HERE / "verifier.fth"
+    frontend = source_compiler(source_prefix + source.read_text(), vocabulary=vocabulary, source_path=source)
+    compiled = compile_word(frontend.words[entry], plan.runtime)
     detached = library.emit("bip340-check-witness-depth", b"") + compiled.script
     owner_prefix = _contract().emit("schnorr-check-owner", b"", bytes(20))
     binding = _contract().emit("bind-current-input", asm("OP_FROMALTSTACK"))

@@ -717,6 +717,24 @@ class SourceCompiler:
         self.definitions[name.name] = name
         self.imported_words.pop(name.name, None)
 
+    def declare_curve_multiply(self, at):
+        from fourthgraph.compiler.curve_lowering import multiplication_word
+
+        name = named_token(self.tokens, at, "curve multiplication word")
+        curve = named_token(self.tokens, at, "curve name")
+        operation = named_token(self.tokens, at, "curve multiplication operation")
+        strategy = named_token(self.tokens, at, "curve multiplication strategy")
+        end_declaration(self.tokens, at)
+        if name.name.startswith("bsv-") or name.name in self.words or name.name in BUILTIN_WORDS:
+            raise name.error(f"invalid or duplicate curve multiplication word {name.text!r}")
+        try:
+            primitive = multiplication_word(curve.name, operation.name, strategy.name)
+        except ValueError as error:
+            raise at.error(str(error)) from error
+        self.words[name.name] = Word(primitive.takes, primitive.gives, (Located(primitive, at),),
+                                     primitive.location, name=name.name)
+        self.definitions[name.name] = name
+
     def declaration(self, token):
         tokens = self.tokens
         match token.name:
@@ -728,6 +746,8 @@ class SourceCompiler:
                 self.declare_range(token)
             case "bytes-param:":
                 self.declare_bytes_param(token)
+            case "curve-multiply:":
+                self.declare_curve_multiply(token)
             case "lock:":
                 self.define_lock(token)
             case ":":

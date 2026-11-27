@@ -74,3 +74,27 @@ REGTEST_CHRONICLE_HEIGHT=10 bash tools/verify_node.sh -- python -m unittest \
 ```
 
 The payment regression matrix exercises the full R1, Schnorr, SM2, Lamport, WOTS+, and ML-DSA templates against changed witnesses and transaction fields. It complements the compiler fixtures by checking authorization and transaction commitments in their project contexts. [Project matrix](../tests/test_optimization_matrix.py)
+
+## Elliptic-curve lowering
+
+For a checked scalar in `[0,n)` and the registered generator, the compiler can select binary, two-bit or four-bit fixed-base windows on secp256k1, P-256 and SM2. It derives constant points from the curve parameters and compares the emitted Script bytes. The generated Script returns homogeneous `X Y Z`. Infinity has `Z = 0`.
+
+A separate secp256k1 operation accepts a checked affine public point and two scalars, and returns `p X Y Z` for the generator plus public-point combination. It uses the GLV endomorphism and a two-bit window over four 128-bit components. The operation checks input ranges and curve membership. P-256 and SM2 use the registered fixed-base plans.
+
+In a Forth source file, a `curve-multiply:` declaration binds the selected Script to a typed word. `auto` uses the same size comparison as the CLI. The declared word runs its input checks when called.
+
+```forth
+curve-multiply: mul-p256-generator p256 generator auto ;
+curve-multiply: mul-secp256k1-joint secp256k1 joint glv-joint-window-2 ;
+```
+
+The replay uses OpenSSL as the independent point reference and the project verification environment for BSV Node and chain-gang.
+
+```sh
+PYTHONPATH=src:. python -m fourthgraph.workflow.protocol curve-multiply --curve p256 --strategy auto
+PYTHONPATH=src:. python -m fourthgraph.workflow.protocol curve-multiply --curve secp256k1 --operation joint
+PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
+  "$SCRIPT_LAB_SDK_PYTHON" -m unittest tests.test_curve_windows
+```
+
+[Source and measured BIP340 comparison](../projects/p2pkh-schnorr/docs/high-level-forth.en.md#64-window-lowering)

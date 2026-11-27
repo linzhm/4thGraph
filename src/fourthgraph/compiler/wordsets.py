@@ -260,6 +260,7 @@ CORE_SCRIPT = CORE_PRIMITIVES.keys() | CORE_SHUFFLES.keys() | {"if", "else", "th
 CORE_EXT_SCRIPT = CORE_EXT_PRIMITIVES.keys() | CORE_EXT_SHUFFLES.keys() | CORE_EXT_LITERALS.keys() | {"?do"}
 DECLARATIONS = {
     "bytes-param:": "<name> <size> ;",
+    "curve-multiply:": "<name> <curve> <generator|joint> <strategy> ;",
     "lock:": "<name> ( <input-name>:<type> ... ) <verification> ;",
     "range:": "<name> <base> <lower> <upper> ;",
     "work:": "<step> <input> <word> <signer-role> ;",

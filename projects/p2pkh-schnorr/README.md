@@ -71,7 +71,7 @@ bash tools/verify_node.sh -- bash sdk/verify_wallet.sh p2pkh-schnorr
 
 The acceptance suite checks all 19 official BIP340 verification vectors through libsecp256k1 and both Script engines, and regenerates eight signing vectors with public test data. Payment cases cover all 12 paired BIP143 and Chronicle OTDA sighash modes in transaction versions 1 and 2. They cover stale locktime, ALL/NONE/SINGLE output commitments, malformed coordinates, ownership, fee balance, and Chronicle activation. The verifier tests exercise both lookup tables and infinity. The curve tests compare scaled point operations and GLV rounding with independent references and replay correct and incorrect results in both engines. [Payment tests](reference/test_schnorr.py) · [Curve tests](../../tests/test_secp256k1_library.py)
 
-The high-level Forth experiment compares a plain binary verifier with automatic compiler passes and the v0.17.0 hand-tuned build. [Build and replay](docs/high-level-forth.en.md)
+The high-level Forth experiment compares the plain binary verifier, the automatic 64-window GLV verifier, and the v0.17.0 hand-tuned build. [Build and replay](docs/high-level-forth.en.md) · [64-window results](docs/high-level-forth.en.md#64-window-lowering)
 
 ## Script sizes
 

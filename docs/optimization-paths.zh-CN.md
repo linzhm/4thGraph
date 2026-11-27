@@ -74,3 +74,27 @@ REGTEST_CHRONICLE_HEIGHT=10 bash tools/verify_node.sh -- python -m unittest \
 ```
 
 支付回归矩阵对 R1、Schnorr、SM2、Lamport、WOTS+ 和 ML-DSA 的完整模板改动见证与交易字段，在各项目的上下文中核对授权和交易承诺。[项目矩阵](../tests/test_optimization_matrix.py)
+
+## 椭圆曲线 lowering
+
+对范围为 `[0,n)` 的标量及已登记的生成点，编译器支持 secp256k1、P-256 和 SM2 的二进制、两位窗口和四位窗口固定基算法。固定表由曲线参数计算，自动选择比较生成的 Script 字节数。脚本返回齐次射影坐标 `X Y Z`，无穷远点的 `Z = 0`。
+
+secp256k1 的联合点乘入口检查两个标量的范围和传入的仿射点，再对生成点与公钥点做联合乘法，返回 `p X Y Z`。GLV 路径使用本曲线的自同态，并在四个 128 位分量上使用两位窗口。P-256 和 SM2 使用已登记的固定基计划。
+
+在 Forth 源文件中，`curve-multiply:` 可将选出的脚本绑定为带类型的词。`auto` 与 CLI 使用同样的字节比较，调用声明的词时执行输入检查。
+
+```forth
+curve-multiply: mul-p256-generator p256 generator auto ;
+curve-multiply: mul-secp256k1-joint secp256k1 joint glv-joint-window-2 ;
+```
+
+复跑使用 OpenSSL 提供独立的点乘结果，并在项目验证环境中运行 BSV Node 和 chain-gang。
+
+```sh
+PYTHONPATH=src:. python -m fourthgraph.workflow.protocol curve-multiply --curve p256 --strategy auto
+PYTHONPATH=src:. python -m fourthgraph.workflow.protocol curve-multiply --curve secp256k1 --operation joint
+PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
+  "$SCRIPT_LAB_SDK_PYTHON" -m unittest tests.test_curve_windows
+```
+
+[BIP340 源码和实测对照](../projects/p2pkh-schnorr/docs/high-level-forth.zh-CN.md#64-window-lowering)
