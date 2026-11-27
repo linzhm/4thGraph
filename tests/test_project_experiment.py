@@ -8,23 +8,201 @@ from itertools import product
 import unittest
 from unittest.mock import patch
 
-from fourthgraph.benchmark.experiment import capabilities, digest, next_request, run
-from fourthgraph.benchmark.fixtures import FIXTURES, HashChainFixture
+from fourthgraph.benchmark.experiment import binding_plans, capabilities, digest, next_request, run
+from fourthgraph.benchmark.fixtures import ByteLayoutFixture, FIXTURES, HashChainFixture
 from fourthgraph.benchmark.spend_fixture import CONTEXT, linked_spends
 from fourthgraph.benchmark.validation import CONTEXT_PIN, NODE_GENESIS_FLAGS, Node, chain_metadata
 from fourthgraph.bsv.evaluate import evaluate
 from fourthgraph.bsv.script import asm, encode_num, number
-from fourthgraph.compiler.formula_experiment import enumerate_orders
+from fourthgraph.compiler.formula_experiment import RULES, enumerate_orders, transform
+from fourthgraph.compiler.byte_layout import PACKED as PACKED_BYTES, REPEAT as REPEAT_BYTES
 from fourthgraph.compiler.hash_chain import PAIRS, SINGLE, HashChainBuilder
 from fourthgraph.compiler.point_add import AFFINE, GENERAL, GUARDED, PointAddBuilder
+from fourthgraph.compiler.ranges import Slot
 from fourthgraph.benchmark.point_add_fixture import PointAddFixture
 from fourthgraph.compiler.script_builder import ScriptBuilder
+from fourthgraph.compiler.script_formula import GENESIS_NUM_BYTES, Formula, Step
 
 
 EQUALVERIFY_REJECTION = "Script failed an OP_EQUALVERIFY operation"
+FALSE_TOP_REJECTION = "Script evaluated without error but finished with a false/empty top stack element"
 
 
 class FormulaExperiments(unittest.TestCase):
+    def test_byte_layout_composes_distinct_bindings_and_respects_the_payload_budget(self):
+        self._require_pinned_chain()
+        request = {"fixture": "byte-layout", "evaluation": "spend", "enumerate": "binding-combinations"}
+        report = run(request)
+        base, packed, repeat, combined = report["candidates"]
+        self.assertEqual(len({row["source_sha256"] for row in report["candidates"]}), 1)
+        self.assertEqual([row["metrics"]["path_bytes"] for row in report["candidates"]], [1720, 1090, 1542, 912])
+        self.assertEqual([row["metrics"]["peak_payload_bytes"] for row in report["candidates"]], [425, 617, 425, 617])
+        self.assertEqual(report["ranking"][0], combined["id"])
+        self.assertIn("peak_payload_bytes", report["frontier_costs"])
+        for row in (base, packed, repeat, combined):
+            receipt = row["test"]["spend"]
+            self.assertEqual((receipt["status"], receipt["accepted"], receipt["rejected"]), ("passed", 24, 24))
+            script = bytes.fromhex(row["artifact"]["hex"])
+            for site in row["compile"]["lowering"]["call_sites"]:
+                start = site["offset"]
+                self.assertEqual(site["linked_sha256"], sha256(script[start:start + site["bytes"]]).hexdigest())
+        reverse_site, mask_site, single_site, irregular_site = combined["compile"]["lowering"]["call_sites"]
+        self.assertEqual((reverse_site["kernel"], mask_site["kernel"]), (PACKED_BYTES, REPEAT_BYTES))
+        self.assertEqual(reverse_site["evidence"]["checked_input_bytes"], 192)
+        self.assertEqual((mask_site["evidence"]["seed_bytes"], mask_site["evidence"]["doublings"]), (3, 6))
+        self.assertFalse(single_site["candidates"][1]["eligible"])
+        self.assertFalse(irregular_site["candidates"][1]["eligible"])
+
+        bounded = run({**request, "max_payload_bytes": 500})
+        self.assertEqual(bounded["baseline_path_bytes"], 1720)
+        self.assertEqual(bounded["ranking"], [repeat["id"], base["id"]])
+        self.assertEqual(bounded["winner_including_parents"], repeat["id"])
+        self.assertEqual(bounded["candidates"][-1]["selection"], {"eligible": False, "reason": "payload_budget_exceeded"})
+        self.assertEqual(run(bounded["request"], replaying=True)["run_id"], bounded["run_id"])
+        self.assertEqual(run({**request, "max_payload_bytes": 424})["ranking"], [])
+        self.assertEqual(len(run({**request, "max_payload_bytes": 617})["ranking"]), 4)
+
+    def test_byte_layout_excludes_bindings_without_matching_width_and_contents(self):
+        report = run({"fixture": "byte-layout", "plans": [
+            {"bindings": [{"site": 2, "kernel": PACKED_BYTES}]},
+            {"bindings": [{"site": 3, "kernel": REPEAT_BYTES}]},
+            {"bindings": [{"site": 0, "kernel": REPEAT_BYTES}]},
+        ]})
+        self.assertEqual(report["ranking"], [])
+        for row, message in zip(report["candidates"], ("exactly six", "identical halves", "wrong operation"), strict=True):
+            self.assertEqual(row["compile"]["status"], "failed")
+            self.assertIn(message, row["compile"]["diagnostic"])
+
+    def test_binding_combinations_keep_one_kernel_per_site_and_obey_the_candidate_limit(self):
+        choices = [{"kernel": name, "eligible": True} for name in ("base", "a", "b")]
+        sites = [{"site": site, "kernel": "base", "candidates": choices} for site in (0, 0, 1)]
+        plans = list(binding_plans(sites, combine=True))
+        self.assertEqual([len(row.get("bindings", ())) for row in plans], [0, 1, 1, 1, 1, 2, 2, 2, 2])
+        self.assertTrue(all(len({row["site"] for row in p["bindings"]}) == 2 for p in plans[-4:]))
+        report = run({"fixture": "byte-layout", "enumerate": "binding-combinations", "max_candidates": 3})
+        self.assertEqual(report["stop"], "candidate_budget")
+        self.assertEqual(len(report["candidates"]), 3)
+
+    def test_payload_budget_survives_follow_up_and_is_verified_during_replay(self):
+        report = run({"fixture": "square", "plans": [{}, {"passes": ["stack"]}], "max_payload_bytes": 50})
+        request = next_request(report)
+        self.assertEqual(request["max_payload_bytes"], 50)
+        with self.assertRaisesRegex(ValueError, "keep the parent's max_payload_bytes"):
+            run({**request, "max_payload_bytes": 51}, report)
+        self.assertEqual(run(request, report)["winner_including_parents"], report["ranking"][0])
+        report["request"]["max_payload_bytes"] = 51
+        result = subprocess.run([sys.executable, "-m", "fourthgraph.workflow.protocol", "experiment", "replay", "-"],
+                                input=json.dumps(report), text=True, capture_output=True)
+        self.assertEqual(result.returncode, 2)
+
+    @unittest.skipUnless(os.environ.get("REGTEST_COOKIE"), "requires tools/verify_node.sh")
+    def test_byte_layout_spends_and_malformed_fields_match_both_engines(self):
+        from fourthgraph.bsv.chain_gang import validate_at_heights
+
+        self._require_pinned_chain()
+        fixture = ByteLayoutFixture()
+        node = Node(os.environ["REGTEST_URL"], os.environ["REGTEST_COOKIE"])
+        report = run({"fixture": fixture.name, "evaluation": "spend", "enumerate": "binding-combinations"})
+        for row in report["candidates"]:
+            self.assertEqual(row["test"]["status"], "passed")
+            script = bytes.fromhex(row["artifact"]["hex"])
+            for case, parent, spend, rejected in linked_spends(fixture, script):
+                self.assertEqual(node.verdicts(spend, (parent,), **CONTEXT), [True], case)
+                changed_short = case["operands"][0] != case["rejected_operands"][0]
+                expected_rejection = FALSE_TOP_REJECTION if changed_short else EQUALVERIFY_REJECTION
+                self.assertEqual(node.verdicts(rejected, (parent,), **CONTEXT,
+                                               expected_rejection=expected_rejection), [False], case)
+            for short, wide in ((31, 192), (33, 192), (32, 191), (32, 193)):
+                witness = fixture.encode(bytes(short).hex()) + fixture.encode(bytes(wide).hex())
+                malformed = spend.with_script(0, witness)
+                self.assertEqual(node.verdicts(malformed, (parent,), **CONTEXT,
+                                               expected_rejection="Script failed an OP_NUMEQUALVERIFY operation"),
+                                 [False], (short, wide))
+                with self.assertRaisesRegex(ValueError, r"^Error evaluating the script `Numbers are not equal`$"):
+                    validate_at_heights(malformed, (parent,), **CONTEXT)
+
+    def test_modular_rules_reduce_a_full_spend_with_the_same_source(self):
+        self._require_pinned_chain()
+        report = run({"fixture": "modular-dot", "enumerate": "orders", "trace": True, "evaluation": "spend"})
+        rows = report["candidates"]
+        index = {row["id"]: row for row in rows}
+        winner = index[report["ranking"][0]]
+        self.assertEqual(len({row["source_sha256"] for row in rows}), 1)
+        self.assertEqual(len(rows), 9)
+        self.assertEqual(report["baseline_path_bytes"], 245)
+        self.assertEqual(rows[1]["metrics"]["path_bytes"], 202)
+        self.assertEqual(winner["metrics"]["path_bytes"], 187)
+        self.assertEqual(winner["applied"]["rules"], list(RULES[-3:]))
+        self.assertEqual(winner["compile"]["lowering"]["ordered_rules"], [
+            {"rule": "fold-literals", "applications": 2},
+            {"rule": "factor-products", "applications": 2},
+            {"rule": "elide-redundant-remainder", "applications": 1},
+        ])
+        self.assertEqual(winner["metrics"]["peak_payload_bytes"], 44)
+        for row, multiply, remainder in ((rows[1], 5, 2), (winner, 2, 1)):
+            instructions = [entry["op"] for entry in row["artifact"]["instructions"]]
+            self.assertEqual((instructions.count("OP_MUL"), instructions.count("OP_MOD")), (multiply, remainder))
+        for row in rows:
+            spend = row["test"]["spend"]
+            self.assertEqual((spend["status"], spend["accepted"], spend["rejected"]), ("passed", 96, 96))
+        follow = run(next_request(report), report)
+        self.assertEqual(follow["winner_including_parents"], winner["id"])
+        self.assertEqual(run(follow["request"], report)["run_id"], follow["run_id"])
+        self.assertEqual(run(report["request"])["run_id"], report["run_id"])
+
+    def test_constant_and_remainder_rules_preserve_signed_boundaries(self):
+        source = """REQUIRE BSV
+        range: inexact script-int -10 11 ;
+        range: narrow script-int -9 10 ;
+        formula: exact ( inexact -- narrow narrow ) {: x :}
+            -13 5 int-rem
+            x 10 int-rem 10 int-rem
+        ;
+        formula: identity ( narrow -- narrow ) {: x :}
+            x 10 int-rem
+        ;
+        """
+        builder = ScriptBuilder(source, formula_passes=["stack"],
+                                experimental_rules=["fold-literals", "elide-redundant-remainder"])
+        code = builder.emit("exact", b"")
+        self.assertEqual(builder.emit("identity", b""), b"")
+        for x, result in ((-10, 0), (-9, -9), (0, 0), (9, 9), (10, 0)):
+            self.assertEqual(evaluate(code, [encode_num(x)]), ([encode_num(-3), encode_num(result)], []))
+        unsafe = source.replace("-13 5 int-rem", "-13 0 int-rem")
+        with self.assertRaisesRegex(ValueError, "positive divisor"):
+            ScriptBuilder(unsafe, formula_passes=["stack"], experimental_rules=["fold-literals"])
+
+    def test_factorization_keeps_original_when_new_intermediate_is_too_wide(self):
+        bound = 1 << (GENESIS_NUM_BYTES * 8 - 2)
+        wide = Slot("script-int", (bound, bound))
+        zero = Slot("script-int", (0, 0))
+        steps = (Step("input", wide), Step("input", wide), Step("literal", zero, immediate=0),
+                 Step("int*", zero, (2, 0)), Step("int*", zero, (2, 1)), Step("int+", zero, (3, 4)))
+        formula = Formula(2, steps, (5,), ((),) * len(steps))
+        self.assertEqual(transform(formula, "factor-products"), formula)
+
+    def test_order_enumeration_reports_the_candidate_limit(self):
+        orders = [*product(RULES, repeat=3)]
+        with patch("fourthgraph.benchmark.experiment.enumerate_orders", return_value=iter(orders)):
+            report = run({"fixture": "square", "enumerate": "orders"})
+        self.assertEqual(len(report["candidates"]), 32)
+        self.assertEqual(report["stop"], "candidate_budget")
+        self.assertEqual(report["baseline"]["applied"]["passes"], [])
+        self.assertEqual(run(report["request"], replaying=True)["run_id"], report["run_id"])
+
+    @unittest.skipUnless(os.environ.get("REGTEST_COOKIE"), "requires tools/verify_node.sh")
+    def test_modular_spends_match_regtest(self):
+        self._require_pinned_chain()
+        report = run({"fixture": "modular-dot", "enumerate": "orders", "evaluation": "spend"})
+        node = Node(os.environ["REGTEST_URL"], os.environ["REGTEST_COOKIE"])
+        for row in report["candidates"]:
+            self.assertEqual(row["test"]["status"], "passed")
+            script = bytes.fromhex(row["artifact"]["hex"])
+            for case, parent, spend, rejected in linked_spends(FIXTURES["modular-dot"], script):
+                self.assertEqual(node.verdicts(spend, (parent,), **CONTEXT), [True], case)
+                self.assertEqual(node.verdicts(rejected, (parent,), **CONTEXT,
+                                               expected_rejection=FALSE_TOP_REJECTION), [False], case)
+
     def test_large_matrix_keeps_the_smallest_linked_plan(self):
         self._require_pinned_chain()
         report = run({"fixture": "matrix-mul", "axis": "B", "evaluation": "spend", "trace": True, "plans": [

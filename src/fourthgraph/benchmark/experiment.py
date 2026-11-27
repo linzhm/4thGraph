@@ -4,7 +4,7 @@ import argparse
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict
 from hashlib import sha256
-from itertools import chain, combinations
+from itertools import chain, combinations, islice, product
 import json
 from pathlib import Path
 import platform
@@ -37,12 +37,27 @@ def pass_sets():
             if "search" not in plan or "stack" in plan]
 
 
+def binding_plans(sites, *, combine):
+    alternatives = {row["site"]: tuple({"site": row["site"], "kernel": choice["kernel"]}
+                                      for choice in row["candidates"]
+                                      if choice["eligible"] and choice["kernel"] != row["kernel"])
+                    for row in sites}
+    groups = [options for _, options in sorted(alternatives.items()) if options]
+    yield {}
+    for count in range(1, (len(groups) if combine else 1) + 1):
+        for selected_sites in combinations(groups, count):
+            for bindings in product(*selected_sites):
+                yield {"bindings": list(bindings)}
+
+
 def capabilities():
     return {"schema": SCHEMA, "compiler": PROJECT_VERSION, "target": TARGET,
             "fixtures": {name: list(fix.implementations) for name, fix in FIXTURES.items()},
-            "call_site_fixtures": {name: {"axis": "call-site", "enumerate": "bindings"}
+            "call_site_fixtures": {name: {"axis": "call-site", "enumerate": "bindings",
+                                          "combination_mode": "binding-combinations"}
                                    for name in CALL_SITE_FIXTURES},
             "evaluations": {"formula": {"default": True}, "spend": {"fixtures": tuple(SPEND_FIXTURES)}},
+            "selection_limits": {"max_payload_bytes": "observed fixture main plus alternate stack payload"},
             "plan_sets": pass_sets(), "requires": {"search": ["stack"]},
             "ordered_rules": RULES, "max_rule_depth": MAX_DEPTH, "max_candidates": LIMIT, "max_workers": WORKERS,
             "stages": ["formula", "graph", "terminal schedule and emission"], "commands": ["run", "next", "replay"]}
@@ -115,7 +130,7 @@ def compile_row(raw, fixture, sources, frozen, trace):
 
 
 def stable(row):
-    fields = ("requested", "id", "source_sha256", "applied", "artifact", "test", "next", "trace")
+    fields = ("requested", "id", "source_sha256", "applied", "artifact", "test", "next", "trace", "selection")
     return {**{key: row.get(key) for key in fields},
             "metrics": {key: value for key, value in row.get("metrics", {}).items() if key != "compile_ns"},
             "delta": {key: value for key, value in row.get("delta", {}).items() if not key.endswith("_ns_observed")},
@@ -124,7 +139,7 @@ def stable(row):
 
 def report_id(report):
     request = report["request"]
-    return digest([report["snapshot"], request["axis"], request.get("parent_run"),
+    return digest([report["snapshot"], request["axis"], request.get("parent_run"), request.get("max_payload_bytes"),
                    report["baseline"], report["baseline_bytes"], report.get("baseline_path_bytes"),
                    report["ranking"], report["winner_including_parents"], [stable(row) for row in report["candidates"]]])
 
@@ -155,11 +170,18 @@ def counted(value, low, high, name):
     return value
 
 
+def selectable(row):
+    return row["test"]["status"] == "passed" and row.get("selection", {}).get("eligible", True)
+
+
 def run(request, previous=None, *, replaying=False):
     if not isinstance(request, dict) or set(request) - {"fixture","plans","workers","trace","snapshot","parent_run",
                                                         "axis","max_candidates","time_ms","enumerate","depth","terminal",
-                                                        "evaluation"}:
+                                                        "evaluation", "max_payload_bytes"}:
         raise ValueError("unknown experiment request fields")
+    payload_limit = request.get("max_payload_bytes")
+    if "max_payload_bytes" in request and (type(payload_limit) is not int or payload_limit < 0):
+        raise ValueError("max_payload_bytes must be a nonnegative integer")
     name = request["fixture"]
     call_site = name in CALL_SITE_FIXTURES
     fixture = CALL_SITE_FIXTURES[name]() if call_site else FIXTURES[name]
@@ -179,25 +201,36 @@ def run(request, previous=None, *, replaying=False):
     if previous and (previous["snapshot"] != identity or previous["run_id"] != request["parent_run"]
                      or previous["run_id"] != report_id(previous)):
         raise ValueError("parent run or snapshot mismatch")
+    if previous and previous["request"].get("max_payload_bytes") != payload_limit:
+        raise ValueError("follow-up must keep the parent's max_payload_bytes")
     axis = request.get("axis", "call-site" if call_site else "A")
     if axis not in (("call-site",) if call_site else ("A", "B")):
         raise ValueError("binding fixtures require the call-site axis and formula fixtures require axis A or B")
     plans = request.get("plans")
     mode = request.get("enumerate")
+    truncated = False
     if mode is not None:
         if plans is not None:
             raise ValueError("enumeration requires a request without explicit plans")
-        if axis == "call-site" and mode == "bindings":
+        if axis == "call-site" and mode in ("bindings", "binding-combinations"):
             _, sites = fixture.builder(sources[fixture.name]).emit_plan(fixture.entry, [])
-            plans = [{}] + [{"bindings": [{"site": row["site"], "kernel": choice["kernel"]}]}
-                            for row in sites for choice in row["candidates"]
-                            if choice["eligible"] and choice["kernel"] != row["kernel"]]
+            plans = list(islice(binding_plans(sites, combine=mode == "binding-combinations"), LIMIT + 1))
+            truncated = len(plans) > LIMIT
+            plans = plans[:LIMIT]
         elif axis == "A" and mode == "sets":
             plans = [{"passes": p} for p in pass_sets()]
         elif axis == "A" and mode == "orders":
             ir = ScriptBuilder(sources[fixture.name].decode(), formula_passes=()).formula_ir[fixture.entry]
-            plans = [{"rules": list(r), "passes": request.get("terminal", ["stack"])}
-                     for r in enumerate_orders(ir, request.get("depth", MAX_DEPTH))]
+            terminal = request.get("terminal", ["stack"])
+            orders = enumerate_orders(ir, request.get("depth", MAX_DEPTH))
+            candidates = ({"rules": list(order), "passes": terminal} for order in orders)
+            # The unoptimized anchor gives next() a verified path delta even
+            # when every ordered candidate uses a nonempty terminal plan.
+            if terminal:
+                candidates = chain(({},), candidates)
+            plans = list(islice(candidates, LIMIT + 1))
+            truncated = len(plans) > LIMIT
+            plans = plans[:LIMIT]
         else:
             raise ValueError("unknown enumeration mode")
     minimum = 0 if replaying else 1
@@ -241,7 +274,7 @@ def run(request, previous=None, *, replaying=False):
     plans = unique
     rows, cache = [], {}
     deadline = None if replaying else monotonic() + timeout / 1000
-    stop = "exhausted" if limit >= len(plans) else "candidate_budget"
+    stop = "exhausted" if limit >= len(plans) and not truncated else "candidate_budget"
     with ThreadPoolExecutor(max_workers=workers) as pool:
         for start in range(0, min(limit,len(plans)), workers):
             if deadline is not None and monotonic() >= deadline:
@@ -265,15 +298,15 @@ def run(request, previous=None, *, replaying=False):
                 rows.append(row)
     if deadline is not None and monotonic() >= deadline:
         stop = "time_budget"
-    eligible = [r for r in rows if r["test"]["status"] == "passed"]
-    baseline = matching_baseline(axis, fixture, eligible, parents, previous)
+    verified = [r for r in rows if r["test"]["status"] == "passed"]
+    baseline = matching_baseline(axis, fixture, verified, parents, previous)
     base_size = baseline["bytes"] if baseline else None
 
     def path_bytes(row):
         return row["test"]["spend"]["max_bytes"]["path_bytes"]
 
     base_path = baseline.get("path_bytes") if spend and baseline else None
-    for row in eligible:
+    for row in verified:
         size = row["artifact"]["bytes"]
         parent = parents.get(row["requested"].get("parent_id"))
         row["delta"] = {"baseline_bytes": size-base_size if base_size is not None else None,
@@ -284,6 +317,11 @@ def run(request, previous=None, *, replaying=False):
                           "transaction_bytes": {"status":"not_measured"}, "caller_bytes":{"status":"not_measured"}}
         if "peak_payload_bytes" in row["test"]:
             row["metrics"]["peak_payload_bytes"] = row["test"]["peak_payload_bytes"]
+        if payload_limit is not None:
+            observed = row["metrics"].get("peak_payload_bytes")
+            reason = ("payload_unmeasured" if observed is None else
+                      "payload_budget_exceeded" if observed > payload_limit else None)
+            row["selection"] = {"eligible": reason is None, "reason": reason}
         if spend:
             row["metrics"].update(row["test"]["spend"]["max_bytes"])
             row["metrics"]["caller_bytes"] = row["metrics"]["lock_script_bytes"]
@@ -304,8 +342,12 @@ def run(request, previous=None, *, replaying=False):
         size = path_bytes(row) if spend else row["artifact"]["bytes"]
         return size, len(spec["passes"]) + len(spec["rules"]) + len(spec.get("bindings", ())), row["id"]
 
+    eligible = [row for row in verified if selectable(row)]
     order = sorted(eligible, key=rank)
-    frontier_costs = [primary_cost, "main_peak_items", "alt_peak_items", "compile_ns"]
+    frontier_costs = [primary_cost, "main_peak_items", "alt_peak_items"]
+    if eligible and all("peak_payload_bytes" in row["metrics"] for row in eligible):
+        frontier_costs.append("peak_payload_bytes")
+    frontier_costs.append("compile_ns")
 
     def costs(row):
         return tuple(row["metrics"][name] for name in frontier_costs)
@@ -315,7 +357,7 @@ def run(request, previous=None, *, replaying=False):
         if not any(costs(other) != current and all(a <= b for a,b in zip(costs(other), current))
                    for other in eligible):
             frontier.append(row["id"])
-    incumbents = list(parents.values()) + eligible
+    incumbents = [row for row in parents.values() if selectable(row)] + eligible
     winner = min(incumbents, key=rank)["id"] if incumbents else None
     # Replays fix the exact admitted sequence, independent of the original wall-clock cutoff.
     replay = {"fixture": fixture.name, "plans": [r["requested"] for r in rows], "axis": axis, "trace": trace,
@@ -324,8 +366,12 @@ def run(request, previous=None, *, replaying=False):
         replay["parent_run"] = previous["run_id"]
     if spend:
         replay["evaluation"] = evaluation
-    tie_break = "fewer explicit bindings" if call_site else "fewer passes"
+    if payload_limit is not None:
+        replay["max_payload_bytes"] = payload_limit
+    tie_break = "fewer explicit bindings" if call_site else "fewer passes and ordered rules"
     scope = "maximum fixture funding plus spend bytes" if spend else "fixture script bytes"
+    if payload_limit is not None:
+        scope += " within the observed payload budget"
     report = {"schema": SCHEMA, "snapshot": identity, "frozen": frozen, "request": replay, "candidates": rows,
               "baseline": baseline, "baseline_bytes": base_size, "ranking": [r["id"] for r in order],
               **({"baseline_path_bytes": base_path} if spend else {}),
@@ -338,12 +384,14 @@ def run(request, previous=None, *, replaying=False):
 def next_request(report):
     spend = "spend" in report["frozen"]
     baseline = "baseline_path_bytes" if spend else "baseline_bytes"
-    plans = [p for row in report["candidates"] if row["test"]["status"] == "passed"
+    plans = [p for row in report["candidates"] if selectable(row)
              and row["delta"][baseline] is not None and row["delta"][baseline] < 0 for p in row["next"]]
     if not plans:
         return {"stop": "no_improving_expansion"}
     return {"fixture": report["frozen"]["fixture"], "plans": plans[:LIMIT],
             "snapshot": report["snapshot"], "parent_run": report["run_id"],
+            **({"max_payload_bytes": report["request"]["max_payload_bytes"]}
+               if "max_payload_bytes" in report["request"] else {}),
             **({"trace": True} if report["request"].get("trace") else {}),
             **({"evaluation": "spend"} if spend else {})}
 

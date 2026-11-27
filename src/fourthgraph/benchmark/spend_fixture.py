@@ -7,7 +7,7 @@ from fourthgraph.bsv.differential import is_chain_gang_script_rejection
 from fourthgraph.bsv.script import asm, number
 from fourthgraph.bsv.transaction import Input, Output, Transaction
 from .fixtures import SPEND_FIXTURES
-from .formula_fixture import MATRIX_MAX
+from .formula_fixture import DOT_MAX, MATRIX_MAX
 from .validation import CONTEXT_PIN, chain_metadata
 
 
@@ -39,7 +39,14 @@ def _wrong_matrix(operands):
     return operands[:index] + (value + (-1 if value == MATRIX_MAX else 1),) + operands[index + 1:]
 
 
-FORMULA_WRONG_INPUTS = {"square": _wrong_square, "bezier": _wrong_bezier, "matrix-mul": _wrong_matrix}
+def _wrong_dot(operands):
+    *terms, offset, modulus = operands
+    changed = offset + (-1 if offset == DOT_MAX else 1)
+    return (*terms, changed, modulus)
+
+
+FORMULA_WRONG_INPUTS = {"square": _wrong_square, "bezier": _wrong_bezier, "matrix-mul": _wrong_matrix,
+                        "modular-dot": _wrong_dot}
 
 
 def _check_outputs(expected, encode):

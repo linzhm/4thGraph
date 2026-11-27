@@ -46,15 +46,17 @@ class _LinkedScript(bytes):
         return _LinkedScript(bytes(self) * count, sites)
 
 
-def emit_bound_calls(builder, entry, operation, bindings, lower):
+def emit_bound_calls(builder, entry, bindings, operations):
     requested = {row["site"]: row["kernel"] for row in normalize_bindings(bindings)}
+    handlers = {id(operation): lower for operation, lower in operations}
     sites = []
 
     def bind(instruction, token, args):
         if instruction is SCRIPT_WORDS["bsv-cat-code"]:
             left, right = args
             return (left + right,)
-        if instruction is not operation:
+        lower = handlers.get(id(instruction))
+        if lower is None:
             return instruction.run(*args)
         prefix, *operands = args
         site = len(sites)

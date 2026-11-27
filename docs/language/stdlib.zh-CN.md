@@ -10,6 +10,7 @@
 | --- | --- |
 | 语言基础与 Script 片段 | `BSV`、`stdlib/u32.fth`、`stdlib/script-fragments.fth` |
 | 重复哈希 | `stdlib/hash-chain.fth` |
+| 定宽字段与字节常量 | `stdlib/byte-layout.fth` |
 | 原生支付 | `stdlib/p2pk.fth`、`stdlib/p2pkh.fth`、`stdlib/native-p2pk.fth`、`stdlib/native-p2pkh.fth` |
 | 曲线算术与验签 | `stdlib/p256.fth`、`stdlib/secp256k1.fth`、`stdlib/bip340.fth` |
 | 钱包锁构造 | `stdlib/wallet/` 下的 `r1.fth`、`p2pkh-r1-deferred.fth`、`p2pkh-sm2.fth`、`lamport-ots.fth`、`wots-plus.fth`、`ml-dsa.fth` |
@@ -42,6 +43,7 @@ PELS 在架构上归属标准库模板族，应用提供输出和字段约束，
 | `std/p256` | `p256-add`、`p256-double`，项目式坐标，保留栈底的 `p b3` | [P-256 内核](../../src/fourthgraph/stdlib/p256.fth) |
 | `std/script-fragments` | 构造栈搬运、32 字节反序和无符号大端整数解码片段 | [库源码](../../src/fourthgraph/stdlib/script-fragments.fth) |
 | `std/hash-chain` | `sha256-chain-single` 和 `sha256-chain-pairs` 按构建期给定的次数生成 SHA-256 单轮或配对片段，各片段从运行时栈消费一个字节串 | [哈希内核](../../src/fourthgraph/stdlib/hash-chain.fth) |
+| `std/byte-layout` | 在调用方检查宽度后反转打包的 32 字节字段，或用字面量、重复种子生成固定字节串。 | [字节内核](../../src/fourthgraph/stdlib/byte-layout.fth) · [绑定实验](../optimization-paths.zh-CN.md) |
 | `std/secp256k1` | 齐次射影点加、仿射混合点加、倍点及对应的缩放坐标内核。`secp256k1-lambda-split` 分解标量。群阶已在栈上时，`secp256k1-lambda-split-with-order` 接收 `k n`。 | [曲线内核](../../src/fourthgraph/stdlib/secp256k1.fth) |
 | `std/bip340` | `bip340-verify ( script -- script )`，构造 BIP340 验签片段 | [付款示例](../../projects/p2pkh-schnorr/README.zh-CN.md) |
 | `std/groth16-bls12-381` | `groth16-bls12-381-verify ( -- groth16-verified )`，由 BLS12-381 verifier 后端编译 | [Groth16 Forth 源码](../../src/fourthgraph/stdlib/groth16-bls12-381.fth) · [项目调用](../../projects/groth16-verifier/verifier.fth) |

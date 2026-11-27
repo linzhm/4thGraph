@@ -162,6 +162,19 @@ LIBRARIES = {
         for name, count in (("sha256-chain-single", "Number of SHA-256 rounds"),
                             ("sha256-chain-pairs", "Number of consecutive SHA-256 pairs"))
     )),
+    "std/byte-layout": Library(ROOT / "stdlib/byte-layout.fth", (
+        script_fragment("byte-reverse-fields-split", (Parameter("fields", "bytes", "Packed 32-byte fields"),),
+                        takes=("script", "cell"),
+                        build_parameters=(Parameter("count", "cell", "Number of fields, from 1 to 6"),),
+                        failure="The caller checks that the input is exactly 32 times count bytes."),
+        script_fragment("byte-reverse-six-fields", (Parameter("fields", "bytes", "Six packed 32-byte fields"),),
+                        failure="The caller checks that the input is exactly 192 bytes."),
+        script_fragment("byte-constant-literal", takes=("script", "bytes"),
+                        build_parameters=(Parameter("data", "bytes", "Constant byte string"),)),
+        script_fragment("byte-constant-repeat", takes=("script", "bytes", "cell"),
+                        build_parameters=(Parameter("seed", "bytes", "Repeating block"),
+                                          Parameter("doublings", "cell", "Number of self-concatenations"))),
+    ), WALLET_BACKEND),
     "std/script-fragments": Library(ROOT / "stdlib/script-fragments.fth", (
         script_fragment("script-pick-depth", takes=("script", "cell"),
                         failure="The spend stack must contain the selected depth."),
