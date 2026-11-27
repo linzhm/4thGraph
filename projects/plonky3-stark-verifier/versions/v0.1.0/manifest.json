@@ -15,6 +15,6 @@
     "replay.json"
   ],
   "integration": "docs/spec.en.md",
-  "build": "PYTHONPATH=src:. python projects/plonky3-stark-verifier/reference/verify.py build --plan baseline",
-  "verify": "bash tools/verify_node.sh --profile long-script -- python projects/plonky3-stark-verifier/reference/verify.py replay --plan baseline"
+  "build": "PYTHONPATH=src:. python projects/plonky3-stark-verifier/reference/verify.py build --plan baseline --output projects/plonky3-stark-verifier/workspace/baseline",
+  "verify": "bash tools/verify_node.sh --profile long-script -- python projects/plonky3-stark-verifier/reference/verify.py replay --plan baseline --output projects/plonky3-stark-verifier/workspace/baseline"
 }

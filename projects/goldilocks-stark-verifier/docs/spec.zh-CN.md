@@ -29,7 +29,7 @@ PYTHONPATH=src:. python -m fourthgraph.workflow.protocol script-build \
   "$out/verifier.fth" --entry stark-lock --output "$out/lock.bin"
 ```
 
-可用 `generate --public SEED_A SEED_B RESULT` 生成其他公开声明的锁。运行 `compare` 复测四个编译方案，用 `build --plan baseline` 复现 v0.1.0 锁字节。 [生成的验证器](../versions/v0.2.0/verifier.fth) · [迭代实测](../../../docs/optimization-paths.zh-CN.md#stark-验证器迭代)
+可用 `generate --public SEED_A SEED_B RESULT` 生成其他公开声明的锁。运行 `compare` 复测四个编译方案，用 `build --plan baseline --output "$project/workspace/baseline"` 复现 v0.1.0 锁字节。更换声明、方案或证明时使用单独的输出目录。复用目录前，命令会核对已有产物与报告。[生成的验证器](../versions/v0.2.0/verifier.fth) · [迭代实测](../../../docs/optimization-paths.zh-CN.md#stark-验证器迭代)
 
 ## 重新生成上游证明
 

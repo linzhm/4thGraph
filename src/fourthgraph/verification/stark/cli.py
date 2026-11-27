@@ -6,6 +6,7 @@ from hashlib import sha256
 import json
 import os
 from pathlib import Path
+from tempfile import TemporaryDirectory
 
 from fourthgraph.bsv.evaluate import ScriptError, evaluate
 from fourthgraph.bsv.script import number, push
@@ -15,6 +16,9 @@ from fourthgraph.compiler.source import PROJECT_VERSION
 from .proof import DIGEST, LOG_BLOWUP, LOG_LDE, LOG_TRACE, QUERIES, witness_packet
 from .script import DEFAULT_PLAN, PLANS, Script
 
+ARTIFACT_HASH_FIELDS = {"verifier.fth": "forth_sha256", "lock.bin": "lock_sha256", "unlock.bin": "unlock_sha256"}
+ARTIFACT_REPORTS = ("build.json", "verify.json", "check.json", "replay.json")
+
 
 def digest(raw):
     return sha256(raw).hexdigest()
@@ -22,6 +26,56 @@ def digest(raw):
 
 def write_json(path, document):
     path.write_text(json.dumps(document, indent=2) + "\n", encoding="utf-8")
+
+
+def output_conflict(path, name):
+    return ValueError(f"{path} conflicts with the requested {name}. Choose another --output directory.")
+
+
+def check_artifact(path, raw):
+    if path.read_bytes() != raw:
+        raise output_conflict(path, path.name)
+
+
+def check_output(directory, artifacts):
+    hashes = {name: digest(raw) for name, raw in artifacts.items()}
+    for name, raw in artifacts.items():
+        path = directory / name
+        if path.exists() or path.is_symlink():
+            check_artifact(path, raw)
+    for name in ARTIFACT_REPORTS:
+        path = directory / name
+        if not path.exists() and not path.is_symlink():
+            continue
+        report = json.loads(path.read_bytes())
+        if not isinstance(report, dict):
+            raise ValueError(f"{path} must contain a JSON object")
+        for artifact, expected in hashes.items():
+            if report.get(ARTIFACT_HASH_FIELDS[artifact]) != expected:
+                raise output_conflict(path, artifact)
+
+
+def publish_output(directory, artifacts, *, command=None, report=None):
+    directory.mkdir(parents=True, exist_ok=True)
+    check_output(directory, artifacts)
+    with TemporaryDirectory(dir=directory) as temporary:
+        staged = Path(temporary)
+        report_path = staged / f"{command}.json" if command is not None else None
+        if report_path is not None:
+            write_json(report_path, report)
+        for name, raw in artifacts.items():
+            (staged / name).write_bytes(raw)
+        for name in ARTIFACT_HASH_FIELDS:
+            if name not in artifacts:
+                continue
+            target = directory / name
+            # Claim a complete file without replacing a concurrent build's artifact.
+            try:
+                os.link(staged / name, target)
+            except FileExistsError:
+                check_artifact(target, artifacts[name])
+        if report_path is not None:
+            report_path.replace(directory / report_path.name)
 
 
 @dataclass(frozen=True)
@@ -234,10 +288,8 @@ def main(profile, project):
         if args.command == "generate":
             public = args.public if args.public is not None else fixture(project)["valid"][0]
             forth = Script(profile, source, plan=args.plan).generate(public)
-            args.output.mkdir(parents=True, exist_ok=True)
-            output = args.output / "verifier.fth"
-            output.write_text(forth, encoding="utf-8")
-            print(output)
+            publish_output(args.output, {"verifier.fth": forth.encode("utf-8")})
+            print(args.output / "verifier.fth")
             return
         proof_path = getattr(args, "proof", None)
         if args.command == "build" and (args.public is None) != (proof_path is None):
@@ -249,6 +301,8 @@ def main(profile, project):
             public, proof = cases["valid"]
         result = build_artifacts(profile, source, public, proof, plan=args.plan)
         lock, unlock, report = result.lock, result.unlock, result.report
+        outputs = {"verifier.fth": result.forth.encode("utf-8"), "lock.bin": lock, "unlock.bin": unlock}
+        check_output(args.output, outputs)
         if args.command == "verify":
             if not script_verdict(lock, unlock):
                 raise ValueError("proof rejected for the supplied public statement")
@@ -258,11 +312,7 @@ def main(profile, project):
             report["script_checks"] = check(profile, source, cases, lock, unlock, rejected, plan=args.plan)
         if args.command == "replay":
             report["regtest"] = replay(lock, unlock, rejected)
+        publish_output(args.output, outputs, command=args.command, report=report)
     except (KeyError, OSError, ValueError) as error:
         cli.error(str(error))
-    args.output.mkdir(parents=True, exist_ok=True)
-    (args.output / "verifier.fth").write_text(result.forth, encoding="utf-8")
-    (args.output / "lock.bin").write_bytes(lock)
-    (args.output / "unlock.bin").write_bytes(unlock)
-    write_json(args.output / f"{args.command}.json", report)
     print(f"{profile.name}: {len(lock):,} lock bytes, {len(unlock):,} unlock bytes. {args.output}")
