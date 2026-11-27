@@ -10,6 +10,7 @@ from pathlib import Path
 import subprocess
 from tempfile import TemporaryDirectory
 
+from fourthgraph.compiler.stack_peephole import compact_stack_moves
 from fourthgraph.compiler.source import MAX_EXPANSION, PROJECT_NAME, CompileError, SourceCompiler, check_word_expansion, expanded
 from fourthgraph.compiler.stack_schedule import compact_pair_moves
 from fourthgraph.compiler.wordsets import Primitive, TYPES
@@ -202,6 +203,10 @@ BN254_WORDS = {
                             ), "fixed pairing terms and projective G2 subgroup check", build_only=True),
 }
 BN254_WORDS.update(bn254_forth.WORDS)
+STACK_OPTIMIZATIONS = {
+    bn254_forth.PLAN_ENTRY: ("paired-moves", compact_pair_moves),
+    bn254_forth.COMPACT_STACK_ENTRY: ("compact-moves", compact_stack_moves),
+}
 BN254_TYPES = TYPES | {kind for word in BN254_WORDS.values() for kind in (*word.takes, *word.gives)}
 
 
@@ -222,7 +227,11 @@ class ForthVerifier(ScriptVerifier):
             if all(instruction is not stage for stage in BN254_WORDS.values()):
                 raise token.error(f"{token.text!r} cannot build a BN254 verifier lock")
         self.libraries = frontend.library_imports
-        planned = any(instruction is BN254_WORDS[bn254_forth.PLAN_ENTRY] for instruction, _ in self.instructions)
+        self.stack_optimization = next(
+            (optimization for name, optimization in STACK_OPTIMIZATIONS.items()
+             if any(instruction is BN254_WORDS[name] for instruction, _ in self.instructions)), None,
+        )
+        planned = self.stack_optimization is not None
         self.forth_plan = bn254_forth.source_plan(frontend, self.instructions) if planned else None
         self.compact_statement = planned or any(instruction is BN254_WORDS[COMPACT_WORD]
                                                 for instruction, _ in self.instructions)
@@ -232,7 +241,11 @@ class ForthVerifier(ScriptVerifier):
         for instruction, _ in self.instructions:
             start = len(stack) - len(instruction.takes)
             stack[start:] = instruction.run(self, signals, owner, *stack[start:])
-        return compact_pair_moves(stack[0]) if self.forth_plan is not None else stack[0]
+        script, = stack
+        if self.stack_optimization is not None:
+            _, optimize = self.stack_optimization
+            script = optimize(script)
+        return script
 
     def artifact(self, signals, owner, script):
         document = super().artifact(signals, owner, script)
@@ -244,7 +257,7 @@ class ForthVerifier(ScriptVerifier):
             })
             document.update(subgroup_schedule=COMPACT_SUBGROUP, modulo_threshold=COMPACT_MODULO_THRESHOLD)
         if self.forth_plan is not None:
-            document.update(forth_plan=self.forth_plan, stack_optimization="paired-moves")
+            document.update(forth_plan=self.forth_plan, stack_optimization=self.stack_optimization[0])
             document["runar_extension_sha256"].update({
                 name: sha256((RUNAR_EXTENSION / name).read_bytes()).hexdigest()
                 for name in ("forth_groth16.go", "forth_groth16.patch")

@@ -5,6 +5,7 @@ from fourthgraph.compiler.wordsets import Primitive
 
 
 PLAN_ENTRY = "bn254-emit-verified"
+COMPACT_STACK_ENTRY = "bn254-emit-compact-stack"
 
 
 def begin(_verifier, _signals, _owner, guard, statement):
@@ -58,6 +59,8 @@ WORDS.update({
                                     None, begin, "read compact BN254 witness", build_only=True),
     PLAN_ENTRY: Primitive(("bn254-checked",), ("bn254-verified",), None,
                           finish, "emit the checked BN254 verifier", build_only=True),
+    COMPACT_STACK_ENTRY: Primitive(("bn254-checked",), ("bn254-verified",), None,
+                                   finish, "emit with compact Script stack moves", build_only=True),
 })
 EVENTS = {id(WORDS[name]): event for name, _, _, event in STAGES if event is not None}
 FP2 = "bn254-fp2"
