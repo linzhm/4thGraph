@@ -188,6 +188,12 @@ def emit(input_count, steps, returns, *, rewrite=False, share=False, stack=False
                 code = cached_integer(right.immediate) + code
                 args = (args[0],)
                 rules["fuse-cached-divisor-load"] += 1
+            elif rewrite and step.operation == "int-rem":
+                value = graph.remainder(*args, reuse=True)
+                if value == args[0]:
+                    rules["reuse-same-divisor-remainder"] += 1
+                values.append(value)
+                continue
         values.append(graph.define(code, args))
     outputs = tuple(values[result] for result in returns)
     code = (graph.search_order(outputs, trace=trace) if search

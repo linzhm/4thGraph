@@ -21,7 +21,9 @@
 | `bls12-381-miller-loop` | 检查 B 点，计算 Miller 乘积并复用循环验证 B 的子群 |
 | `bls12-381-check-residue` | 检查配对余数条件 |
 
-`groth16-bls12-381-verify` 的静态输出 `groth16-verified` 代表完整验证路径。验证失败会终止 Script，成功留下一个真值。默认的 `--stack-schedule compact` 对稀疏配对线乘法做特化，并在检查结果可用时发出 `OP_VERIFY`。`--stack-schedule baseline` 使用通用域乘法和汇总验证谓词。两种模式共用见证编码。`groth16-verify` 为兼容别名。当前入口支持 BSV 验证词、Forth 词定义及栈排列词。应用可在锁外层组合签名和交易绑定。 [公开输入及绑定接口](toolchain.md#bls12-381)
+`groth16-bls12-381-verify` 的静态输出 `groth16-verified` 代表完整验证路径。验证失败会终止 Script，成功留下一个真值。默认的 `--stack-schedule compact` 对稀疏配对线乘法做特化，并在检查结果可用时发出 `OP_VERIFY`。Fp12 乘法和平方在系数重组后统一取模，每次运算完成时将十二个系数约减到绝对值小于 Fp 模数的有符号余数。`--stack-schedule baseline` 使用通用域乘法和汇总验证谓词。两种模式共用见证编码。`groth16-verify` 为兼容别名。当前入口支持 BSV 验证词、Forth 词定义及栈排列词。应用可在锁外层组合签名和交易绑定。 [公开输入及绑定接口](toolchain.md#bls12-381)
+
+编译器的余数块只接受多项式运算和同一正模数的取模。余数块的输出按模数相等，具体的有符号代表元可以不同。Verifier 在写回配对累积器或检查余数前完成约减。 [编译器实现](../src/fourthgraph/compiler/stack_schedule.py)
 
 调用方可先写 `REQUIRE stdlib/groth16-bls12-381.fth`，再在定义体中调用验证词。构建和复放工具支持 `--entry <word>` 来选择栈效果为 `-- groth16-verified` 的入口。构建清单记录入口、导出接口及验证密钥摘要。 [语法书](language/syntax.md#4-公开导出)
 

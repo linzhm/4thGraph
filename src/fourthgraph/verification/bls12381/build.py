@@ -204,7 +204,7 @@ def main():
     cli.add_argument("--verification-key", type=Path, required=True)
     cli.add_argument("--input-sources", type=Path, help="ordered JSON of fixed scalars, nulls, widths, or inclusive bounds")
     cli.add_argument("--stack-schedule", choices=("compact", "baseline"), default="compact",
-                     help="compact lowers sparse products and early checks (default: compact)")
+                     help="compact uses optimized field arithmetic and early checks (default: compact)")
     cli.add_argument("--script-era", choices=SCRIPT_ERAS, default="genesis",
                      help="allow Chronicle opcodes for outputs created after its activation")
     layout = cli.add_mutually_exclusive_group()

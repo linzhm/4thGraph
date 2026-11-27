@@ -2,10 +2,12 @@
 
 import json
 from hashlib import sha256
+from itertools import chain
 from math import gcd
 import unittest
 
 from fourthgraph.replay.groth16_bls12381 import load_fixture, witness_controls
+from fourthgraph.verification.bls12381.field import ScriptField, Tower
 from fourthgraph.verification.bls12381.verifier import (
     AFFINE_BYTES, Curve, Dynamic, HOST, PACKET_BYTES, Q, QUOTIENT_ORDER, R, U, ScriptVerifier,
     bind_public_output, input_sources, public_output, public_packet, public_signals,
@@ -13,7 +15,8 @@ from fourthgraph.verification.bls12381.verifier import (
 from fourthgraph.replay.groth16_bn254 import sign_spend
 from fourthgraph.replay.workflow import TestKeys
 from fourthgraph.bsv.chain_gang import validate_at_heights
-from fourthgraph.bsv.script import asm, push
+from fourthgraph.bsv.evaluate import evaluate
+from fourthgraph.bsv.script import asm, decode_num, encode_num, push
 from fourthgraph.bsv.transaction import Input, Output, Transaction, preimage_all
 
 
@@ -40,6 +43,39 @@ class BLS12381Tests(unittest.TestCase):
         self.assertEqual(gcd(Q + U, QUOTIENT_ORDER), R)
         value = (((11, 20), (33, 49), (55, 61)), ((72, 80), (95, 105), (112, 125)))
         self.assertEqual(HOST.power12(value, Q), HOST.frobenius12(value))
+
+    def test_fp12_kernels_reduce_signed_limbs_after_recombination(self):
+        def pairs(limbs):
+            return tuple(zip(limbs[::2], limbs[1::2], strict=True))
+
+        def fp12(limbs):
+            return pairs(limbs[:6]), pairs(limbs[6:12])
+
+        def flatten(value):
+            return tuple(chain.from_iterable(chain.from_iterable(value)))
+
+        field = ScriptField(18, assert_checks=True)
+        tower = Tower(field, sparse=True, defer_reductions=True)
+        inputs = field.graph.inputs
+        element = fp12(inputs)
+        squared = tower.square12(element)
+        lined = tower.mul_line(squared, pairs(inputs[12:]))
+        product = tower.mul12(lined, element)
+        self.assertEqual(field.reduce(product[0][0][0]), product[0][0][0])
+        outputs = (*flatten(squared), *flatten(lined), *flatten(product))
+        script = field.graph.emit(outputs, compact=True)
+
+        limbs = (Q - 1, -Q + 1, 0, -7, 1, -1, -Q + 1, 2, Q - 2, 0, 3, -4)
+        line_limbs = (Q - 1, -Q + 1, -(Q - 1)**2, (Q - 1)**2, Q - 1, 0)
+        value = fp12(limbs)
+        squared = HOST.square12(value)
+        lined = HOST.mul_line(squared, pairs(line_limbs))
+        product = HOST.mul12(lined, value)
+        stack, alt = evaluate(script, list(map(encode_num, limbs + line_limbs)))
+        signed = tuple(map(decode_num, stack))
+        self.assertEqual(alt, [])
+        self.assertTrue(all(abs(limb) < Q for limb in signed))
+        self.assertEqual(tuple(limb % Q for limb in signed), (*flatten(squared), *flatten(lined), *flatten(product)))
 
     def test_nchain_and_residue_exponent_kernels(self):
         # Symbolically track the signed-seed nChain hard exponent straight-line program.

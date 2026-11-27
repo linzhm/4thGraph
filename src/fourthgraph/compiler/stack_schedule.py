@@ -8,6 +8,10 @@ from fourthgraph.bsv.script import asm, number
 
 COMMUTATIVE = frozenset(map(asm, ("OP_ADD", "OP_MUL", "OP_MIN", "OP_MAX", "OP_NUMEQUAL", "OP_EQUAL")))
 VERIFY = asm("OP_VERIFY")
+REMAINDER = asm("OP_MOD")
+POLYNOMIAL_ARITIES = {asm(name): arity for name, arity in (
+    ("OP_ADD", 2), ("OP_SUB", 2), ("OP_MUL", 2), ("OP_NEGATE", 1), ("OP_2MUL", 1),
+)}
 # These pairs have the same pass/fail behavior in Genesis and Chronicle.
 VERIFY_FORMS = {
     asm("OP_EQUAL"): asm("OP_EQUALVERIFY"),
@@ -47,6 +51,20 @@ class Graph:
         self.definitions[value] = node
         self.common[key] = value
         return value
+
+    def integer(self, value):
+        return self.define(number(value))
+
+    def remainder(self, dividend, divisor, *, reuse=False):
+        if reuse:
+            previous = self.definitions.get(dividend)
+            if previous is not None and previous.script == REMAINDER and previous.args[1:] == (divisor,):
+                return dividend
+        return self.define(REMAINDER, (dividend, divisor))
+
+    def residue_block(self, modulus):
+        """Lower a bounded polynomial that exposes outputs only modulo a positive integer."""
+        return ResidueBlock(self, modulus)
 
     def live_definitions(self, returns):
         needed = set(returns)
@@ -138,6 +156,33 @@ class Graph:
                 raise AssertionError("traced stack order does not reproduce the selected Script")
             trace.update(order="source" if chosen is None else "beam", search="completed")
         return code
+
+
+class ResidueBlock:
+    """Defer same-modulus remainders in a polynomial over Script integers.
+
+    The caller bounds the unreduced intermediates and reduces the results on
+    the parent graph before exposing them. Signed representatives may change.
+    """
+
+    def __init__(self, graph, modulus):
+        if type(modulus) is not int or modulus <= 0:
+            raise ValueError("a residue block requires a positive integer modulus")
+        self.graph = graph
+        self.divisor = graph.integer(modulus)
+
+    def integer(self, value):
+        return self.graph.integer(value)
+
+    def define(self, script, args):
+        if POLYNOMIAL_ARITIES.get(script) != len(args):
+            raise ValueError("a residue block only supports polynomial arithmetic")
+        return self.graph.define(script, args)
+
+    def remainder(self, dividend, divisor, *, reuse=False):
+        if divisor != self.divisor:
+            raise ValueError("a residue block only supports its declared modulus")
+        return dividend
 
 
 def fuse_verifications(steps, uses):

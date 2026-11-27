@@ -76,3 +76,25 @@ class FormulaPassTests(unittest.TestCase):
                 ScriptBuilder(SOURCE, formula_passes=names)
         with self.assertRaisesRegex(ValueError, "automatic formula optimization"):
             ScriptBuilder(SOURCE, optimize=True, formula_passes=())
+
+    def test_reuse_remainder_only_for_the_same_divisor(self):
+        source = """REQUIRE BSV
+range: coordinate script-int -100 101 ;
+range: modulus script-int 1 8 ;
+range: residue script-int -6 7 ;
+formula: repeated ( coordinate modulus -- residue )
+    {: n d :} n d int-rem d int-rem ;
+formula: different ( coordinate modulus modulus -- residue )
+    {: n first second :} n first int-rem second int-rem ;
+"""
+        baseline = ScriptBuilder(source, formula_passes=())
+        optimized = ScriptBuilder(source, formula_passes=("rewrite", "share", "stack"))
+        rule = "reuse-same-divisor-remainder"
+        self.assertEqual(optimized.formulas["repeated"]["rewrites"][rule], 1)
+        self.assertNotIn(rule, optimized.formulas["different"]["rewrites"])
+        self.assertLess(len(optimized.emit("repeated", b"")), len(baseline.emit("repeated", b"")))
+        for entry, operands in (("repeated", (-19, 7)), ("repeated", (19, 7)), ("different", (-19, 7, 3))):
+            with self.subTest(entry=entry, operands=operands):
+                stack = list(map(encode_num, operands))
+                self.assertEqual(evaluate(optimized.emit(entry, b""), stack),
+                                 evaluate(baseline.emit(entry, b""), stack))

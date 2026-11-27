@@ -479,7 +479,7 @@ class VerifierStages:
             extra_inputs = 2 if self.slots else 0  # Projective VK_x claim.
         self.field = ScriptField(self.proof_elements + len(self.slots) + extra_inputs,
                                  chronicle=chronicle, assert_checks=optimize)
-        self.tower = Tower(self.field, sparse=optimize)
+        self.tower = Tower(self.field, sparse=optimize, defer_reductions=optimize)
         self.setup = b""
 
     def read_witness(self):

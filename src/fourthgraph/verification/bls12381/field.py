@@ -1,8 +1,9 @@
 """BLS12-381 arithmetic shared by the host and the Script code generator."""
 
+from contextlib import contextmanager
 from functools import cache
 
-from fourthgraph.bsv.script import asm, number
+from fourthgraph.bsv.script import asm
 from fourthgraph.compiler.stack_schedule import Graph
 
 U = 0xd201000000010000  # Absolute value of the negative BLS12-381 seed.
@@ -45,7 +46,7 @@ class ScriptField:
         self.chronicle = chronicle
 
     def value(self, a):
-        return self.graph.define(number(a)) if type(a) is int else a
+        return self.graph.integer(a) if type(a) is int else a
 
     def op(self, name, *args):
         return self.graph.define(opcode(name), tuple(map(self.value, args)))
@@ -90,7 +91,18 @@ class ScriptField:
         return self.op("OP_2DIV", digit) if self.chronicle else self.op("OP_DIV", digit, 2)
 
     def reduce(self, a):
-        return a % Q if type(a) is int else self.op("OP_MOD", a, Q)
+        if type(a) is int:
+            return a % Q
+        return self.graph.remainder(a, self.value(Q), reuse=self.checks is not None)
+
+    @contextmanager
+    def residue_block(self):
+        graph = self.graph
+        self.graph = graph.residue_block(Q)
+        try:
+            yield
+        finally:
+            self.graph = graph
 
     def select(self, condition, yes, no):
         if type(condition) is int:
@@ -121,9 +133,10 @@ class ScriptField:
 class Tower:
     """Fp2 = Fp[i], i² = -1, Fp6 = Fp2[v], v³ = 1+i, Fp12 = Fp6[w], w² = v."""
 
-    def __init__(self, field, *, sparse=False):
+    def __init__(self, field, *, sparse=False, defer_reductions=False):
         self.fp = field
         self.sparse = sparse
+        self.defer_reductions = defer_reductions
 
     def add2(self, a, b):
         return self.fp.add(a[0], b[0]), self.fp.add(a[1], b[1])
@@ -190,18 +203,36 @@ class Tower:
             self.add2(t1, self.sub2(self.sub2(s2, t0), t2)),
         )
 
+    def _fp12(self, kernel, *operands):
+        if not self.defer_reductions:
+            return kernel(*operands)
+        # Accumulator limbs enter below Q in magnitude. Evaluated line limbs
+        # are bounded by Q², and products only combine linearly within a block.
+        with self.fp.residue_block():
+            even, odd = kernel(*operands)
+        return tuple(self.reduce2(pair) for pair in even), tuple(self.reduce2(pair) for pair in odd)
+
     def mul12(self, a, b):
+        return self._fp12(self._mul12, a, b)
+
+    def _mul12(self, a, b):
         t0, t1 = self.mul6(a[0], b[0]), self.mul6(a[1], b[1])
         cross = self.mul6(self.add6(*a), self.add6(*b))
         return self.add6(t0, self.mul_v(t1)), self.sub6(self.sub6(cross, t0), t1)
 
     def square12(self, a):
+        return self._fp12(self._square12, a)
+
+    def _square12(self, a):
         even, odd = a
         cross = self.mul6(even, odd)
         product = self.mul6(self.add6(even, odd), self.add6(even, self.mul_v(odd)))
         return self.sub6(self.sub6(product, cross), self.mul_v(cross)), self.add6(cross, cross)
 
     def mul_line(self, a, line):
+        return self._fp12(self._mul_line, a, line)
+
+    def _mul_line(self, a, line):
         c0, c2, c3 = line
         even, odd = a
         t0 = self.mul6(even, (c0, c2, ZERO2))

@@ -157,7 +157,7 @@ class ForthVerifierTests(unittest.TestCase):
                     with self.assertRaises((RuntimeError, ValueError)):
                         check_spend(parent, spend)
 
-    def test_affine_compact_checks_slope_and_committed_lines(self):
+    def test_affine_compact_checks_trace_lines_and_residue(self):
         verifier = ForthVerifier(self.key, self.source, witness_layout="affine-witness")
         signals, proof = self.cases[0]
         lock = verifier.compile(SOURCES)
@@ -171,12 +171,19 @@ class ForthVerifierTests(unittest.TestCase):
         line_push = len(push(bytes(line_size)))
         line_start = line_push - line_size
         slope_start = line_push + len(push(bytes(slope_size))) - slope_size
+        residue_bytes = 12 * FIELD_BYTES
+        public_push = len(push(public_packet(SOURCES, signals)))
+        residue_start = len(witness) - public_push - residue_bytes
         # The first public scalar is zero, so its first window requires slope zero.
         self.assertEqual(witness[slope_start:slope_start + FIELD_BYTES], bytes(FIELD_BYTES))
-        for offset, replacement in ((line_start, bytes([witness[line_start] ^ 1])),
-                                    (slope_start, (1).to_bytes(FIELD_BYTES, "little")),
-                                    (slope_start, Q.to_bytes(FIELD_BYTES, "little"))):
-            with self.subTest(offset=offset, replacement=replacement), self.assertRaises((RuntimeError, ValueError)):
+        controls = (
+            ("lines", line_start, bytes([witness[line_start] ^ 1])),
+            ("slope", slope_start, (1).to_bytes(FIELD_BYTES, "little")),
+            ("out-of-range slope", slope_start, Q.to_bytes(FIELD_BYTES, "little")),
+            ("zero residue", residue_start, bytes(residue_bytes)),
+        )
+        for name, offset, replacement in controls:
+            with self.subTest(name=name), self.assertRaises((RuntimeError, ValueError)):
                 bad = witness[:offset] + replacement + witness[offset + len(replacement):]
                 check_spend(parent, spend.with_script(0, bad))
 
