@@ -24,4 +24,4 @@ REQUIRE stdlib/groth16-bls12-381.fth
 
 ## 测量与证据
 
-v0.2.0 在同一组公开输入配置下比较原 Fp2 公式和改写后的公式。布局比较计量锁和见证脚本的序列化字段。回放计量完整部署和花费，包含资金输入签名和交易结构。复现 Chronicle 回放时，设置 `REGTEST_CHRONICLE_HEIGHT=2`，传入 `--script-era chronicle` 并使用单独的输出文件。[v0.2.0 实测记录](../versions/v0.2.0/measurements.json) · [v0.1.0 实测记录](../versions/v0.1.0/measurements.json)
+v0.3.0 沿用 v0.2.0 的验证器、公开输入配置和证明夹具，比较两种栈调度顺序。布局比较计量锁和见证脚本的序列化字段。回放计量完整部署和花费，包含资金输入签名和交易结构。复现 Chronicle 回放时，设置 `REGTEST_CHRONICLE_HEIGHT=2`，传入 `--script-era chronicle` 并使用单独的输出文件。[v0.3.0 实测记录](../versions/v0.3.0/measurements.json) · [v0.2.0 Fp2 实测记录](../versions/v0.2.0/measurements.json) · [v0.1.0 实测记录](../versions/v0.1.0/measurements.json)

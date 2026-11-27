@@ -28,6 +28,33 @@ class StackScheduleTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "undefined"):
             graph.emit_assertions((Value(1),))
 
+    def test_assertion_schedule_selects_the_shorter_order(self):
+        for order, dependencies_win in (((0, 2, 1, 3), True), ((0, 1, 2, 3), False)):
+            with self.subTest(order=order):
+                graph = Graph(4)
+                a, b, c, d = (graph.inputs[index] for index in order)
+                difference = graph.define(asm("OP_SUB"), (a, b))
+                first = graph.define(asm("OP_0NOTEQUAL"), (c,))
+                balance = graph.define(asm("OP_SUB"), (difference, d))
+                second = graph.define(asm("OP_NOT"), (balance,))
+                source = graph.emit_assertions((first, second), compact=True)
+                chosen = graph.emit_assertions((second, first), compact=True, reorder=True)
+                if dependencies_win:
+                    self.assertLess(len(chosen), len(source))
+                    self.assertLess(chosen.index(asm("OP_VERIFY")), chosen.index(asm("OP_SUB")))
+                else:
+                    self.assertEqual(chosen, source)
+
+                prefix = b"unrelated stack item"
+                for values, accepted in (((8, 3, 1, 5), True), ((8, 3, 0, 5), False), ((8, 3, 1, 4), False)):
+                    stack = [prefix, *map(encode_num, (values[order.index(index)] for index in range(4)))]
+                    for script in (source, chosen):
+                        if accepted:
+                            self.assertEqual(evaluate(script, stack), ([prefix], []))
+                        else:
+                            with self.assertRaises(ScriptError):
+                                evaluate(script, stack)
+
     def test_residue_block_defers_polynomial_remainders(self):
         graph = Graph(2)
         left, right = graph.inputs

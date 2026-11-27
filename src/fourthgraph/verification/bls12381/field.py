@@ -144,7 +144,9 @@ class ScriptField:
     def compile(self, *, compact=False):
         if self.checks is None:
             return self.graph.emit((self.value(self.valid),), compact=compact)
-        return self.graph.emit_assertions(self.checks, compact=compact)
+        # Packet setup checks lengths before the graph runs. Its fixed-slice
+        # reads and arithmetic have no dependency on the surrounding stack.
+        return self.graph.emit_assertions(self.checks, compact=compact, reorder=compact)
 
 
 class Tower:

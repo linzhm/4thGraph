@@ -77,8 +77,12 @@ class Graph:
         return self._emit_order(self.live_definitions(returns), returns, last_use=last_use, compact=compact,
                                 trace=trace)
 
-    def emit_assertions(self, checks, *, compact=False):
-        """Consume required flags at their producers in a graph of total operations."""
+    def emit_assertions(self, checks, *, compact=False, reorder=False):
+        """Consume required flags in source order.
+
+        Reordering requires that each operation be total and observe only
+        its explicit operands. Keep the shorter of the two schedules.
+        """
         checks = set(checks)
         if checks.difference(self.inputs, self.definitions):
             raise ValueError("assertion refers to an undefined graph value")
@@ -87,7 +91,29 @@ class Graph:
             steps.append((node.script, node.args, (value,)))
             if value in checks:
                 steps.append((VERIFY, (value,), ()))
-        return emit_steps(self.inputs, steps, (), compact=compact)
+        source = emit_steps(self.inputs, steps, (), compact=compact)
+        if not reorder:
+            return source
+        steps = list(self._assertion_dependencies(checks))
+        dependencies = emit_steps(self.inputs, steps, (), compact=compact)
+        return min(source, dependencies, key=len)
+
+    def _assertion_dependencies(self, checks):
+        emitted = set(self.inputs)
+        for check in sorted(checks, key=lambda value: value.slot):
+            pending = [(check, False)]
+            while pending:
+                value, ready = pending.pop()
+                if value in emitted:
+                    continue
+                node = self.definitions[value]
+                if ready:
+                    emitted.add(value)
+                    yield node.script, node.args, (value,)
+                else:
+                    pending.append((value, True))
+                    pending.extend((operand, False) for operand in reversed(node.args) if operand not in emitted)
+            yield VERIFY, (check,), ()
 
     def _emit_order(self, ordered, returns, *, last_use, compact, trace=None):
         uses = Counter(returns)
@@ -239,7 +265,11 @@ class Layout:
         # Operands already brought to the top are consumed by the instruction.
         # They cannot be reused as the original slot of another operand.
         ready = len(self.slots) - staged
-        index = max(i for i in range(ready) if self.slots[i] == value)
+        for index in range(ready - 1, -1, -1):
+            if self.slots[index] == value:
+                break
+        else:
+            raise ValueError("operand has no unstaged stack slot")
         depth = len(self.slots) - index - 1
         self.uses[value] -= 1
         if self.uses[value] == 0 and last_use:

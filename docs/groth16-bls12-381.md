@@ -27,6 +27,8 @@
 
 `compact` 模式用 `ScriptBuilder` 读取带范围的 Fp2 乘法公式，再用 `expand-cross-products` 展开虚部的交叉项。改写后的公式内联到整个验证器的算术图，由共享栈调度器安排操作数。构建清单的 `fp2_kernel` 记录公式入口、源码摘要和有序规则。 [Fp2 公式](../src/fourthgraph/stdlib/bls12-381-fp2.fth)
 
+对只依赖显式操作数的算术图，`compact` 还比较源码顺序和按断言依赖发码的两种布局，选用序列化字节数较小的一种。两种布局按相同顺序执行断言。按依赖发码时，编译器只在断言需要某个值时发出该值的计算。 [共享栈调度器](../src/fourthgraph/compiler/stack_schedule.py)
+
 调用方可先写 `REQUIRE stdlib/groth16-bls12-381.fth`，再在定义体中调用验证词。构建和复放工具支持 `--entry <word>` 来选择栈效果为 `-- groth16-verified` 的入口。构建清单记录入口、导出接口及验证密钥摘要。[项目调用演示](../projects/groth16-verifier/README.zh-CN.md) · [语法书](language/syntax.md#4-公开导出)
 
 ## 调用方选择
