@@ -4,6 +4,7 @@ from functools import lru_cache
 from hashlib import sha256
 from itertools import chain
 
+from .field import FP2_RULES
 from .verifier import (
     FIELD_BYTES, HOST, PSI_X, PSI_Y, Q, SEED_BITS, Curve,
     VerifierStages, affine_lines, dynamic_slots, evaluated_line, fold_msm, prepare_key, proof_packet,
@@ -135,9 +136,10 @@ def checked_b_line(curve, point, other, slope, *, doubling):
 
 
 class AffineStages(VerifierStages):
-    def __init__(self, key, sources, *, lines_in_witness, chronicle=False, optimize=False):
+    def __init__(self, key, sources, *, lines_in_witness, chronicle=False, optimize=False, fp2_rules=FP2_RULES):
         self.witness_items = 2 if lines_in_witness else 1
-        super().__init__(key, sources, chronicle=chronicle, optimize=optimize, extra_inputs=self.witness_items)
+        super().__init__(key, sources, chronicle=chronicle, optimize=optimize, extra_inputs=self.witness_items,
+                         fp2_rules=fp2_rules)
         if not self.slots:
             raise ValueError("an affine witness layout requires at least one spend-time public input")
         self.lines_in_witness = lines_in_witness
@@ -177,7 +179,7 @@ class AffineStages(VerifierStages):
             acc = add_msm_window(f, acc, point, digit, self.trace.read(offset))
         return Curve(self.tower).negate(acc), f.nonzero(acc[1])
 
-    def miller_loop(self, pairing_key, proof):
+    def miller_loop(self, pairing_key, proof, *, bits=SEED_BITS):
         a, b, c, z = proof
         vk_point, vk_finite = pairing_key
         tower, f = self.tower, self.field
@@ -187,7 +189,7 @@ class AffineStages(VerifierStages):
         prepared = iter(vk_lines(self.key))
         step = 0
         acc, current = z, b
-        for bit in SEED_BITS:
+        for bit in bits:
             acc = tower.square12(acc)
             for doubling in ((True, False) if bit == "1" else (True,)):
                 offset = len(self.windows) + step * 2

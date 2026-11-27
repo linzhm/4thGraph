@@ -3,13 +3,14 @@
 from dataclasses import replace
 from hashlib import sha256
 import json
+from pathlib import Path
 import unittest
 
 from fourthgraph.verification.bls12381.verifier import (
     FIELD_BYTES, HOST, Q, R, Curve, Dynamic, ScriptVerifier, bind_public_output, input_sources, public_output,
     public_packet,
 )
-from fourthgraph.verification.bls12381.build import ForthVerifier, SOURCE, layout_candidates, select_layout
+from fourthgraph.verification.bls12381.build import ArithmeticPlan, ForthVerifier, SOURCE, layout_candidates, select_layout
 from fourthgraph.compiler.source import CompileError
 from fourthgraph.workflow.protocol import artifact_digest
 from fourthgraph.replay.bls12381_verifier import SOURCES, fixture
@@ -18,6 +19,10 @@ from fourthgraph.bsv.script import asm, push
 from fourthgraph.bsv.transaction import blob, preimage_all
 from fourthgraph.stdlib import GROTH16_ENTRY, LEGACY_GROTH16_ENTRY, capabilities
 from .test_backend import check_spend, g1_json, g2_json, spend_fixture
+
+
+HIGH_LEVEL = (Path(__file__).resolve().parents[2]
+              / "projects/groth16-verifier/experiments/high-level/verifier.fth")
 
 
 class ForthVerifierTests(unittest.TestCase):
@@ -81,6 +86,23 @@ class ForthVerifierTests(unittest.TestCase):
         invalid = self.source.replace(b"swap bls12-381-check-g1-points", b"swap")
         with self.assertRaisesRegex(CompileError, r"line 5, column 3: body leaves .*groth16-checked-g1"):
             ForthVerifier(self.key, invalid)
+
+    def test_high_level_requires_the_complete_miller_plan(self):
+        source = HIGH_LEVEL.read_bytes()
+        for before, after in ((b"16 0 DO", b"15 0 DO"), (b"16 0 DO", b"17 0 DO")):
+            with self.subTest(loop=after):
+                invalid = ForthVerifier(self.key, source.replace(before, after), entry="verify-proof")
+                with self.assertRaisesRegex(ValueError, "round plan must match the BLS12-381 seed"):
+                    invalid.compile(self.cases[0][0])
+
+    def test_high_level_requires_both_residue_checks(self):
+        source = HIGH_LEVEL.read_bytes()
+        for word in (b"bls12-381-require-fp6", b"bls12-381-require-nonzero"):
+            with self.subTest(word=word):
+                with self.assertRaises(CompileError):
+                    ForthVerifier(self.key, source.replace(word, b""), entry="verify-proof")
+        with self.assertRaisesRegex(CompileError, "requires an explicit BLS12-381 residue product"):
+            ForthVerifier(self.key, self.source, plan=ArithmeticPlan(residue_association="right"))
 
     def test_reports_unsupported_words(self):
         invalid = self.source.replace(b"swap bls12", b"1 drop swap bls12")

@@ -19,9 +19,9 @@ FP2_RULES = ("expand-cross-products",)
 
 
 @cache
-def fp2_kernel():
+def fp2_kernel(rules=FP2_RULES):
     source = files("fourthgraph.stdlib").joinpath("bls12-381-fp2.fth").read_bytes()
-    builder = ScriptBuilder(source.decode("utf-8"), formula_passes=("stack",), experimental_rules=FP2_RULES)
+    builder = ScriptBuilder(source.decode("utf-8"), formula_passes=("stack",), experimental_rules=rules)
     return builder.formula_ir[FP2_ENTRY], sha256(source).hexdigest()
 
 
@@ -51,11 +51,12 @@ def opcode(name):
 class ScriptField:
     """Signed residues are sufficient at arithmetic boundaries inside Script."""
 
-    def __init__(self, inputs, *, chronicle=False, assert_checks=False):
+    def __init__(self, inputs, *, chronicle=False, assert_checks=False, fp2_rules=FP2_RULES):
         self.graph = Graph(inputs)
         self.valid = 1
         self.checks = set() if assert_checks else None
         self.chronicle = chronicle
+        self.fp2_rules = fp2_rules
 
     def value(self, a):
         return self.graph.integer(a) if type(a) is int else a
@@ -99,7 +100,7 @@ class ScriptField:
         return self.op("OP_MUL", a, b)
 
     def multiply2(self, *limbs):
-        formula, _ = fp2_kernel()
+        formula, _ = fp2_kernel(self.fp2_rules)
         operations = {"int+": self.add, "int-": self.sub, "int*": self.mul}
         return formula.inline(limbs, lambda name, *args: operations[name](*args))
 

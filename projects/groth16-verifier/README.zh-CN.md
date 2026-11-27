@@ -1,6 +1,6 @@
 <!-- Generated from manifest.yaml with Copier. -->
 
-# BLS12-381 Groth16 验证器 v0.5.0
+# BLS12-381 Groth16 验证器 v0.6.0
 
 [English](README.md) · [4thGraph](../../README.zh-CN.md) · [项目目录](../README.zh-CN.md) · [版本](versions/index.json)
 
@@ -8,7 +8,7 @@
 
 在 Forth 中调用 4thGraph 的 Groth16 标准库，构建验证锁与见证，并在 BSV regtest 复放花费。
 
-[算法与执行](#算法与执行) · [复现方法](#复现方法) · [实测数据](versions/v0.5.0/measurements.json)
+[算法与执行](#算法与执行) · [复现方法](#复现方法) · [实测数据](versions/v0.6.0/measurements.json)
 
 | 入口 | 用途 |
 | --- | --- |
@@ -25,6 +25,8 @@
 
 共享调度器识别何时用 `OP_TUCK` 保留右操作数，并在使用处推入单字节数字常量。[操作数调度实测](versions/v0.5.0/measurements.json)
 
+高层 Forth 实验写出 Miller 轮次和剩余式，再从同一份验证器源码搜索算术计划。[实验与回放](docs/verification.zh-CN.md#高层-forth-实验)
+
 ## 复现方法
 
 使用 Python 3.11 或更新版本，从仓库根目录运行。构建只用 Python 标准库。入金回放使用固定的 chain-gang 绑定和隔离的 Linux BSV Node 1.2.3。
@@ -34,12 +36,13 @@ python3 -m pip install ecdsa -r tools/requirements-chronicle.txt
 ```
 
 ```sh
-PYTHONPATH=src:. python3 projects/groth16-verifier/reference/build.py
+PYTHONPATH=src:. python3 projects/groth16-verifier/experiments/high-level/optimize.py
 REGTEST_CHRONICLE_HEIGHT=1000 bash tools/verify_node.sh --profile raised -- \
   python3 -m fourthgraph.replay.bls12381_verifier \
-  --source projects/groth16-verifier/verifier.fth --entry verify-proof \
-  --script-era genesis --objective path-bytes --tx-version 2 \
-  --output projects/groth16-verifier/workspace/build/replay.json
+  --source projects/groth16-verifier/experiments/high-level/verifier.fth \
+  --entry verify-proof --witness-layout affine-inline --script-era genesis \
+  --arithmetic-plan projects/groth16-verifier/workspace/build/high-level/genesis-plan.json \
+  --output projects/groth16-verifier/workspace/build/high-level/genesis-replay.json
 ```
 
-在 `projects/groth16-verifier/workspace/build/` 查看 `lock.json`、`witness.hex` 和 `replay.json`。回放将两笔有效花费打包入块，并验证互换公开声明和 G1 点不在子群内的拒绝结果。[验证与复现指南](docs/verification.zh-CN.md)
+高层实验将 `search.json`、胜出的锁和计划以及入金回放写入 `projects/groth16-verifier/workspace/build/high-level/`。回放将两笔有效花费打包入块，并验证互换公开声明和 G1 点不在子群内的拒绝结果。[验证与复现指南](docs/verification.zh-CN.md)

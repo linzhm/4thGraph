@@ -35,13 +35,15 @@ sections:
       - The compact verifier constructs its Fp2 kernel with `ScriptBuilder` and inlines the cross-product rewrite. The lock manifest records the formula hash and ordered rule. [Fp2 formula](../../src/fourthgraph/stdlib/bls12-381-fp2.fth)
       - The compact verifier compares two assertion schedules and automatically consumes fixed-width packet fields from the unread suffix when the reads are ordered and disjoint. [Packet lowering measurements](versions/v0.4.0/measurements.json)
       - The shared stack scheduler recognizes when to keep a live right operand with `OP_TUCK` and pushes one-byte numeric constants at their uses. [Operand scheduling measurements](versions/v0.5.0/measurements.json)
+      - The high-level Forth experiment writes out the Miller rounds and residue equation, then searches arithmetic plans for one verifier source. [Experiment and replay](docs/verification.en.md#high-level-forth-experiment)
     zh-CN:
       - 项目词通过 `REQUIRE` 导入并调用验证器。共享后端根据验证密钥和公开输入配置，将该调用编译为 BSV Script。[项目 Forth](verifier.fth) · [标准库源码](../../src/fourthgraph/stdlib/groth16-bls12-381.fth) · [见证布局与接口](../../docs/groth16-bls12-381.md)
       - 紧凑模式用 `ScriptBuilder` 构造 Fp2 内核，并内联交叉项改写。锁定脚本清单记录公式摘要和有序规则。[Fp2 公式](../../src/fourthgraph/stdlib/bls12-381-fp2.fth)
       - 紧凑模式对同一组断言比较两种调度顺序。定长字段按偏移递增且互不重叠时，编译器自动从未读后缀依次取出字段。[字节包发码实测](versions/v0.4.0/measurements.json)
       - 共享调度器识别何时用 `OP_TUCK` 保留右操作数，并在使用处推入单字节数字常量。[操作数调度实测](versions/v0.5.0/measurements.json)
+      - 高层 Forth 实验写出 Miller 轮次和剩余式，再从同一份验证器源码搜索算术计划。[实验与回放](docs/verification.zh-CN.md#高层-forth-实验)
   reproduction:
     en:
-      - Look in `projects/groth16-verifier/workspace/build/` for `lock.json`, `witness.hex`, and `replay.json`. The replay mines two valid spends and checks rejection of swapped statements and G1 points outside the subgroup. [Verification guide](docs/verification.en.md)
+      - The high-level experiment writes `search.json`, the winning locks and plans, and the funded replay under `projects/groth16-verifier/workspace/build/high-level/`. The replay mines two valid spends and checks rejection of swapped statements and G1 points outside the subgroup. [Verification guide](docs/verification.en.md)
     zh-CN:
-      - 在 `projects/groth16-verifier/workspace/build/` 查看 `lock.json`、`witness.hex` 和 `replay.json`。回放将两笔有效花费打包入块，并验证互换公开声明和 G1 点不在子群内的拒绝结果。[验证与复现指南](docs/verification.zh-CN.md)
+      - 高层实验将 `search.json`、胜出的锁和计划以及入金回放写入 `projects/groth16-verifier/workspace/build/high-level/`。回放将两笔有效花费打包入块，并验证互换公开声明和 G1 点不在子群内的拒绝结果。[验证与复现指南](docs/verification.zh-CN.md)

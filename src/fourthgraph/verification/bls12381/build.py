@@ -11,6 +11,7 @@ from fourthgraph.verification.bls12381.field import FP2_ENTRY, FP2_RULES, fp2_ke
 from fourthgraph.verification.bls12381.verifier import (
     PACKET_BYTES, ScriptVerifier, VerifierStages, _FIXED_WITNESS, dynamic_slots, input_sources, public_signals,
 )
+from fourthgraph.compiler.formula_experiment import validate_rules
 from fourthgraph.compiler.source import MAX_EXPANSION, PROJECT_VERSION, CompileError, Shuffle, SourceCompiler, check_word_expansion, expanded
 from fourthgraph.workflow.protocol import build_artifact
 from fourthgraph.bsv.script import asm, push
@@ -28,6 +29,25 @@ OBJECTIVES = {
     "witness-bytes": ("witness_bytes", "path_bytes", "lock_bytes"),
 }
 WITNESS_PACKETS = ("pairing_line_packet_bytes", "slope_packet_bytes", "proof_packet_bytes", "public_packet_bytes")
+RESIDUE_ASSOCIATIONS = ("left", "right", "accumulator-frobenius-first")
+
+
+@dataclass(frozen=True)
+class ArithmeticPlan:
+    fp2_rules: tuple[str, ...] = FP2_RULES
+    residue_association: str = "left"
+
+    def __post_init__(self):
+        object.__setattr__(self, "fp2_rules", validate_rules(self.fp2_rules))
+        if self.residue_association not in RESIDUE_ASSOCIATIONS:
+            raise ValueError(f"residue association must be one of {', '.join(RESIDUE_ASSOCIATIONS)}")
+
+    @classmethod
+    def read(cls, path):
+        plan = json.loads(path.read_bytes())
+        if not isinstance(plan, dict) or set(plan) != {"fp2_rules", "residue_association"}:
+            raise ValueError("arithmetic plan requires fp2_rules and residue_association")
+        return cls(**plan)
 
 
 @dataclass(frozen=True)
@@ -35,6 +55,7 @@ class Stage:
     takes: tuple[str, ...]
     gives: tuple[str, ...]
     method: str
+    argument: str | None = None
 
     location = "script"
     checked_bounds = None
@@ -57,6 +78,35 @@ VOCABULARY = {
     "bls12-381-check-residue": Stage(
         ("groth16-miller-state",), ("groth16-verified",), "check_residue",
     ),
+    "bls12-381-miller-begin": Stage(
+        ("groth16-pairing-key", "groth16-checked-g1"), ("groth16-miller-plan",), "begin_miller_plan",
+    ),
+    "bls12-381-miller-zero-bit": Stage(
+        ("groth16-miller-plan",), ("groth16-miller-plan",), "append_miller_bit", "0",
+    ),
+    "bls12-381-miller-one-bit": Stage(
+        ("groth16-miller-plan",), ("groth16-miller-plan",), "append_miller_bit", "1",
+    ),
+    "bls12-381-miller-execute": Stage(
+        ("groth16-miller-plan",), ("groth16-miller-state",), "execute_miller_plan",
+    ),
+    "bls12-381-miller-factors": Stage(
+        ("groth16-miller-state",), ("groth16-accumulator", "groth16-key-factor", "groth16-residue-witness"),
+        "miller_factors",
+    ),
+    "bls12-381-frobenius-residue": Stage(
+        ("groth16-residue-witness",), ("groth16-frobenius-factor",), "frobenius_residue",
+    ),
+    "bls12-381-residue-product": Stage(
+        ("groth16-accumulator", "groth16-key-factor", "groth16-frobenius-factor"),
+        ("groth16-residue-product",), "residue_product",
+    ),
+    "bls12-381-require-fp6": Stage(
+        ("groth16-residue-product",), ("groth16-fp6-residue",), "require_fp6",
+    ),
+    "bls12-381-require-nonzero": Stage(
+        ("groth16-fp6-residue",), ("groth16-verified",), "require_nonzero_fp6",
+    ),
 }
 STACK_TYPES = TYPES | {kind for stage in VOCABULARY.values() for kind in (*stage.takes, *stage.gives)}
 
@@ -70,7 +120,7 @@ class VerifierSource(SourceCompiler):
 
 class ForthVerifier(ScriptVerifier):
     def __init__(self, verification_key, source, *, witness_layout="projective", script_era="genesis", entry=None,
-                 source_path=None):
+                 source_path=None, plan=None):
         super().__init__(verification_key)
         if witness_layout not in LAYOUTS:
             raise ValueError(f"unknown witness layout {witness_layout!r}")
@@ -79,6 +129,7 @@ class ForthVerifier(ScriptVerifier):
         self.witness_layout = witness_layout
         self.script_era = script_era
         self.source = source
+        self.plan = plan
         frontend = VerifierSource(source.decode(), vocabulary=VOCABULARY, stack_types=STACK_TYPES,
                                   backend="groth16-bls12-381", source_path=source_path)
         self.libraries = frontend.library_imports
@@ -101,13 +152,20 @@ class ForthVerifier(ScriptVerifier):
         for instruction, token in self.instructions:
             if not isinstance(instruction, (Stage, Shuffle)):
                 raise token.error(f"{token.text!r} cannot compile in a Groth16 verifier build")
+        if plan is not None and plan.residue_association != "left" and not any(
+                isinstance(instruction, Stage) and instruction.method == "residue_product"
+                for instruction, _ in self.instructions):
+            raise CompileError("changing the association requires an explicit BLS12-381 residue product")
 
     def lower(self, sources, *, compact):
+        if self.plan is not None and not compact:
+            raise ValueError("an arithmetic plan requires the compact stack schedule")
         chronicle = self.script_era == "chronicle"
+        fp2_rules = self.plan.fp2_rules if self.plan is not None else FP2_RULES
         if self.witness_layout == "projective":
-            stages = VerifierStages(self.key, sources, chronicle=chronicle, optimize=compact)
+            stages = VerifierStages(self.key, sources, chronicle=chronicle, optimize=compact, fp2_rules=fp2_rules)
         else:
-            stages = AffineStages(self.key, sources, chronicle=chronicle, optimize=compact,
+            stages = AffineStages(self.key, sources, chronicle=chronicle, optimize=compact, fp2_rules=fp2_rules,
                                   lines_in_witness=self.witness_layout == "affine-witness")
         stack = []
         for instruction, _ in self.instructions:
@@ -117,7 +175,13 @@ class ForthVerifier(ScriptVerifier):
                 stack[-count:] = [operands[index] for index in order]
             else:
                 start = len(stack) - len(instruction.takes)
-                value = getattr(stages, instruction.method)(*stack[start:])
+                operands = stack[start:]
+                if instruction.argument is not None:
+                    operands.append(instruction.argument)
+                method = getattr(stages, instruction.method)
+                association = {"association": self.plan.residue_association} if (
+                    self.plan is not None and instruction.method == "residue_product") else {}
+                value = method(*operands, **association)
                 stack[start:] = (value,) if len(instruction.gives) == 1 else value
         return stages.compile(compact=compact) + asm("OP_1" if compact else "OP_VERIFY OP_1")
 
@@ -133,9 +197,12 @@ class ForthVerifier(ScriptVerifier):
         result["compiler_version"] = PROJECT_VERSION
         result["stack_schedule"] = "compact" if compact else "baseline"
         if compact:
-            _, kernel_digest = fp2_kernel()
+            rules = self.plan.fp2_rules if self.plan is not None else FP2_RULES
+            _, kernel_digest = fp2_kernel(rules)
             result["fp2_kernel"] = {"entry": FP2_ENTRY, "source_sha256": kernel_digest,
-                                    "ordered_rules": FP2_RULES}
+                                    "ordered_rules": rules}
+        if self.plan is not None:
+            result["arithmetic_plan"] = asdict(self.plan)
         result["forth_entry"] = self.entry
         result["entry_interface"] = describe_export(MODULE, GROTH16_VERIFY)
         result["entry_interface_sha256"] = interface_digest(MODULE, LIBRARIES[MODULE])
@@ -162,15 +229,17 @@ class LayoutCandidate:
 
 
 def layout_candidates(verification_key, source, sources=None, owner=None, *, compact=True, script_era="genesis",
-                      entry=None, source_path=None):
+                      entry=None, source_path=None, plan=None):
     """Build the applicable layouts under the same proof and deployment policy."""
-    projective = ForthVerifier(verification_key, source, script_era=script_era, entry=entry, source_path=source_path)
+    projective = ForthVerifier(verification_key, source, script_era=script_era, entry=entry, source_path=source_path,
+                               plan=plan)
     sources = projective.sources(sources)
     layouts = LAYOUTS if dynamic_slots(sources) else (projective.witness_layout,)
     candidates = []
     for layout in layouts:
         verifier = projective if layout == projective.witness_layout else ForthVerifier(
             verification_key, source, witness_layout=layout, script_era=script_era, entry=entry, source_path=source_path,
+            plan=plan,
         )
         lock = verifier.compile(sources, owner, compact=compact)
         artifact = verifier.artifact(sources, owner, lock, compact=compact)
@@ -212,6 +281,7 @@ def main():
                      help="compact uses optimized field arithmetic and early checks (default: compact)")
     cli.add_argument("--script-era", choices=SCRIPT_ERAS, default="genesis",
                      help="allow Chronicle opcodes for outputs created after its activation")
+    cli.add_argument("--arithmetic-plan", type=Path, help="replay an explicit Fp2 and residue lowering plan")
     layout = cli.add_mutually_exclusive_group()
     layout.add_argument("--objective", choices=OBJECTIVES, help="choose the verifier layout by a byte budget")
     layout.add_argument("--witness-layout", choices=LAYOUTS, help="pin the wire format (default: projective)")
@@ -231,13 +301,14 @@ def main():
         sources = input_sources(args.input_sources.read_bytes()) if args.input_sources else None
         owner = bytes.fromhex(args.owner) if args.owner is not None else None
         compact = args.stack_schedule == "compact"
+        plan = ArithmeticPlan.read(args.arithmetic_plan) if args.arithmetic_plan else None
         if args.objective:
             candidates = layout_candidates(key, source, sources, owner, compact=compact, script_era=args.script_era,
-                                           entry=args.entry, source_path=args.source)
+                                           entry=args.entry, source_path=args.source, plan=plan)
             verifier, artifact = select_layout(candidates, args.objective)
         else:
             verifier = ForthVerifier(key, source, witness_layout=args.witness_layout or "projective",
-                                     script_era=args.script_era, entry=args.entry, source_path=args.source)
+                                     script_era=args.script_era, entry=args.entry, source_path=args.source, plan=plan)
             lock = verifier.compile(sources, owner, compact=compact)
             artifact = verifier.artifact(sources, owner, lock, compact=compact)
         witness = None

@@ -33,6 +33,8 @@
 
 紧凑发码从栈位置和剩余引用数判断何时用 `OP_TUCK` 保留二元运算的右操作数，并从单字节数字推入识别可在使用处重新推入的常量。项目和标准库入口使用同一套规则。[v0.5.0 实测记录](../projects/groth16-verifier/versions/v0.5.0/measurements.json)
 
+高层 Forth 实验用类型化的词声明 Miller 种子轮次和终端 Fp12 剩余式。编译器核对轮次和终端断言，并允许在显式三因子乘积中选择先乘哪一对。构建与回放接受 `--arithmetic-plan` 重现搜索选出的 Fp2 改写和 Fp12 乘法顺序。[高层 Forth 实验](../projects/groth16-verifier/docs/verification.zh-CN.md#高层-forth-实验)
+
 调用方可先写 `REQUIRE stdlib/groth16-bls12-381.fth`，再在定义体中调用验证词。构建和复放工具支持 `--entry <word>` 来选择栈效果为 `-- groth16-verified` 的入口。构建清单记录入口、导出接口及验证密钥摘要。[项目调用演示](../projects/groth16-verifier/README.zh-CN.md) · [语法书](language/syntax.md#4-公开导出)
 
 ## 调用方选择
