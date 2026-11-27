@@ -253,7 +253,7 @@ class SchnorrTests(unittest.TestCase):
         self.assertEqual(raw, reference[:offset] + owner + reference[offset + 20:])
         self.assertEqual(compiled_template(owner), (raw, offset))
         self.assertEqual(recognize_template(raw), (TEMPLATE_VERSION, owner))
-        self.assertLess(len(raw), len(lock_for_owner(bytes(20), version="v0.12.0")))
+        self.assertLess(len(raw), len(lock_for_owner(bytes(20), version="v0.13.0")))
 
     def test_mixed_template_spend(self):
         public = self.public_keys[0]
@@ -267,6 +267,7 @@ class SchnorrTests(unittest.TestCase):
             "v0.10.0": "48411a610a80dbeba846332ef28f78c7ee3dedeaa131e82faa89f6cd24b88f83",
             "v0.11.0": "88b7b3a46548ca376a29fe04bb0deb11f2a503d9cf5de92e89604aa490660fdc",
             "v0.12.0": "0c867581a116fd86be8aaa6f3c700742d265df4473e77ba9f2344c13122841e2",
+            "v0.13.0": "0c09881b86ddfa644701e4f2bd6bdeee5930095fcdfdaf07e2ce38be2f960f27",
         }
         for version, checksum in versions.items():
             raw = lock_for_public_key(public, version=version)
@@ -441,14 +442,14 @@ class SchnorrTests(unittest.TestCase):
         def variable_depth(index):
             return 82 - 3 * index if index else 0
 
-        def depth_streams(windows):
-            return [bytes(fixed_depth(digit & 15) for digit in windows),
-                    bytes(variable_depth(digit >> 4) for digit in windows)]
+        def depth_pairs(windows):
+            return bytes(depth for digit in windows
+                         for depth in (variable_depth(digit >> 4), fixed_depth(digit & 15)))
 
         depth_vectors = [bytes(64), b"\xff" * 64]
         depth_vectors.extend(bytes(range(start, start + 64)) for start in range(0, 256, 64))
         for windows in depth_vectors:
-            self.assertEqual(evaluate(depths, [windows]), (depth_streams(windows), []))
+            self.assertEqual(evaluate(depths, [windows]), ([depth_pairs(windows)], []))
 
         cases = (
             (1, ORDER - 1, 13), (-1, HALF_RADIX, ORDER),
@@ -468,7 +469,7 @@ class SchnorrTests(unittest.TestCase):
             built, alt = evaluate(table, list(map(encode_num, original)))
             scalar_lanes = (s % HALF_RADIX, s // HALF_RADIX, abs(k1), abs(k2))
             windows = self.window_stream(scalar_lanes)
-            self.assertEqual(alt, depth_streams(windows))
+            self.assertEqual(alt, [depth_pairs(windows)])
             self.assertEqual(len(built), 81)
             self.assertEqual(list(map(decode_num, built[:2])), original[1:3])
             self.assertEqual(list(map(decode_num, built[-4:])), [FIELD, 0, 1, 0])
@@ -485,12 +486,11 @@ class SchnorrTests(unittest.TestCase):
                 with self.subTest(public_multiple=public_multiple, fixed=fixed, variable=variable):
                     high, low = divmod(fixed, 4)
                     vhigh, vlow = divmod(variable, 4)
-                    remaining = [b"\x21", b"\x25"]
-                    streams = (bytes([fixed_depth(fixed)]) + remaining[0],
-                               bytes([variable_depth(variable)]) + remaining[1])
-                    setup = b"".join(push(stream) + asm("OP_TOALTSTACK") for stream in streams)
+                    remaining = b"\x25\x21"
+                    stream = bytes([variable_depth(variable), fixed_depth(fixed)]) + remaining
+                    setup = push(stream) + asm("OP_TOALTSTACK")
                     selected, alt = evaluate(setup + step, built)
-                    self.assertEqual(alt, remaining)
+                    self.assertEqual(alt, [remaining])
                     self.assertEqual(selected[:-3], built[:-3])
                     check_point(selected[-3:], high * HALF_RADIX + low + vhigh * q + vlow * p)
         self.assertEqual(signs, set(product((False, True), repeat=2)))

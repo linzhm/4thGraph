@@ -2,9 +2,9 @@
 
 [简体中文](spec.zh-CN.md) · [Project overview](../README.md)
 
-The owner field is HASH160 of the 32-byte BIP340 x-only public key. The rest of the file is fixed. Fill the owner slot identified in the manifest when creating a receive output. When recognizing an output, compare its length and all fixed bytes before taking the owner hash. [Frozen template](../versions/v0.13.0/template.hex) · [Layout](../versions/v0.13.0/layout.json)
+The owner field is HASH160 of the 32-byte BIP340 x-only public key. The rest of the file is fixed. Fill the owner slot identified in the manifest when creating a receive output. When recognizing an output, compare its length and all fixed bytes before taking the owner hash. [Frozen template](../versions/v0.14.0/template.hex) · [Layout](../versions/v0.14.0/layout.json)
 
-Versions 0.6.0 through 0.13.0 use the same `scriptCode` fragments for the current-input binding and the same witness encoding. A wallet can spend outputs from different versions in one transaction. [Version catalog](../versions/index.json)
+Versions 0.6.0 through 0.14.0 use the same `scriptCode` fragments for the current-input binding and the same witness encoding. A wallet can spend outputs from different versions in one transaction. [Version catalog](../versions/index.json)
 
 The wallet builds the BSV sighash preimage for the current input. The external signer receives SHA256d of that preimage as the 32-byte BIP340 message and returns the standard signature bytes. The lock verifies the signature and binds the same message to the current input with PUSHTX. BIP143 ALL is the wallet default. A wallet must supply trusted Chronicle activation context for OTDA and a same-index output for SINGLE. [Forth contract](../reference/schnorr.fth)
 
@@ -43,7 +43,7 @@ The verifier computes `s0*G + s1*H + k1*P + k2*φ(P)` in 64 two-bit windows. It 
 
 The verifier packs the four 128-bit components into a 64-byte value. For lane `ℓ` in `(s0, s1, |k1|, |k2|)` and two-bit digit `d = 4q + r` counted from the least significant end, the concatenated little-endian encoding places that digit at bit-pair position `j = 64ℓ + 4(15 − q) + r`. Six masked swaps implement `rotl8(j, 2) XOR 0xf0 = 4d + ℓ`. Each resulting byte carries the fixed digit in its low nibble and the variable digit in its high nibble. [Index packing](../../../src/fourthgraph/stdlib/bip340.fth)
 
-v0.11.0 separates the nibbles into two 64-byte streams and computes the stack depths before iteration. A mask reduces each digit `i` to a presence bit `m`. The fixed lookup depth is `3m + 2i` and the variable lookup depth is `82m − 3i`. Both are zero at index zero. For all other indices the results fit in positive signed bytes. The whole-stream arithmetic has no carry or borrow between bytes. Each window reads one depth from each stream in most-significant-window order. [Depth computation](../../../src/fourthgraph/stdlib/bip340.fth)
+The verifier computes stack depths before iteration. v0.14.0 widens each packed byte to a variable digit followed by a fixed digit and stores all 64 pairs in one stream. For each digit `i`, a mask computes a presence bit `m`. The common depth is `3m + 2i`. Adding `79m − 5i` to the variable bytes yields their depth `82m − 3i`. Both depths are zero at index zero, and the arithmetic neither carries nor borrows across byte boundaries. Each window splits off its two bytes before unpacking the depths. [Depth computation](../../../src/fourthgraph/stdlib/bip340.fth)
 
 v0.12.0 reads the depth bytes directly. A zero byte is false in the point-addition branch, and a nonzero byte is already a minimally encoded positive ScriptNum. When constructing the variable point table, let `ε` be the relative sign of the two variable bases, so `Q = εφ(P)`. The verifier obtains `2Q` and `3Q` from `2P` and `3P` by multiplying X by β modulo the field prime and Y by ε. The projective Z coordinate stays unchanged. [Point-table construction](../../../src/fourthgraph/stdlib/bip340.fth)
 
