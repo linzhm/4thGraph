@@ -10,7 +10,7 @@ Make a lock from the raw ML-DSA-44 public key and sign the payment message in Pu
 
 [Protocol](docs/developer.en.md#protocol) · [Security](docs/developer.en.md#security) · [Verify](#reproduce-the-checks) · [Transaction costs](#complete-transactions-and-stack-measurements)
 
-**Status** · v0.9.0.
+**Status** · v0.10.0.
 
 The verifier uses the FIPS 204 Pure ML-DSA-44 public-key and signature
 encodings. A public key is 1,312 bytes and a signature is 2,420 bytes.
@@ -37,7 +37,7 @@ approves the transaction intent.
 
 Evaluate Pure ML-DSA-44 when measuring FIPS 204 signer interoperability or large-script resource limits. A lab can start with the detached conformance vectors and then run the payment wrapper with the same kind of public key and a dedicated payment signer. The wrapper passes a 32-byte payment message to Pure ML-DSA-44 with an empty context. Key and signature validation, transaction binding, and node admission each have their own evidence. [Reproduction steps](#reproduce-the-checks)
 
-The fixed-key payment lock is about 273 kB in the measured fixtures. Evaluate script size, transaction size and validation policy on the target node or miner before choosing this format for a funded workflow. [Funded regtest method](../../docs/benchmark.md#funded-regtest-measurements)
+The fixed-key payment lock is about 258 kB in the measured fixtures. Evaluate script size, transaction size and validation policy on the target node or miner before choosing this format for a funded workflow. [Funded regtest method](../../docs/benchmark.md#funded-regtest-measurements)
 
 ## Sampling boundary
 
@@ -95,17 +95,17 @@ matrix through `REGTEST_COOKIE` and `REGTEST_URL`.
 
 These are Script bytes for identical fixtures, before transaction serialization.
 
-| Component | PR #68 baseline | Compact `879b52c` | v0.2.0 | v0.3.0 | v0.4.0 | v0.5.0 | v0.6.0 | v0.7.0 | v0.8.0 | v0.9.0 |
-|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| Fixed-key verification equation | 500,794 | 310,198 | 257,122 | 137,874 | 137,874 | 137,874 | 124,849 | 124,849 | 127,876 | 122,627 |
-| Signature decoding | 62,723 | 46,392 | 36,152 | 36,152 | 28,224 | 28,224 | 28,224 | 28,224 | 6,007 | 6,007 |
-| SampleInBall with the 221-byte budget | 70,229 | 63,701 | 61,101 | 61,101 | 61,101 | 45,211 | 43,512 | 40,827 | 40,827 | 40,827 |
-| Apply hints and encode high bits | 89,687 | 66,135 | 66,135 | 66,135 | 31,087 | 31,087 | 31,087 | 23,389 | 23,389 | 11,829 |
-| Standalone Keccak-f[1600] with little-endian lanes | 25,097 | 21,833 | 20,533 | 20,533 | 20,533 | 12,588 | 12,588 | 12,588 | 12,588 | 12,588 |
-| SHAKE256, 832-byte input to 32-byte output | 176,542 | 153,694 | 144,594 | 144,594 | 144,594 | 88,979 | 81,821 | 79,133 | 79,133 | 79,133 |
-| Current-input binding | 718 | 718 | 718 | 718 | 718 | 506 | 506 | 506 | 506 | 506 |
-| Complete payment lock | 926,403 | 663,284 | 586,981 | 467,733 | 424,757 | 345,095 | 322,447 | 308,992 | 289,802 | **272,993** |
-| One-input BIP143 `ALL` unlock | 2,588 | 2,588 | 2,588 | 2,588 | 2,588 | 2,588 | 2,588 | 2,588 | 2,588 | 2,588 |
+| Component | PR #68 baseline | Compact `879b52c` | v0.2.0 | v0.3.0 | v0.4.0 | v0.5.0 | v0.6.0 | v0.7.0 | v0.8.0 | v0.9.0 | v0.10.0 |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| Fixed-key verification equation | 500,794 | 310,198 | 257,122 | 137,874 | 137,874 | 137,874 | 124,849 | 124,849 | 127,876 | 122,627 | 122,627 |
+| Signature decoding | 62,723 | 46,392 | 36,152 | 36,152 | 28,224 | 28,224 | 28,224 | 28,224 | 6,007 | 6,007 | 6,007 |
+| SampleInBall with the 221-byte budget | 70,229 | 63,701 | 61,101 | 61,101 | 61,101 | 45,211 | 43,512 | 40,827 | 40,827 | 40,827 | 30,638 |
+| Apply hints and encode high bits | 89,687 | 66,135 | 66,135 | 66,135 | 31,087 | 31,087 | 31,087 | 23,389 | 23,389 | 11,829 | 11,829 |
+| Standalone Keccak-f[1600] with little-endian lanes | 25,097 | 21,833 | 20,533 | 20,533 | 20,533 | 12,588 | 12,588 | 12,588 | 12,588 | 12,588 | 12,588 |
+| SHAKE256, 832-byte input to 32-byte output | 176,542 | 153,694 | 144,594 | 144,594 | 144,594 | 88,979 | 81,821 | 79,133 | 79,133 | 79,133 | 74,766 |
+| Current-input binding | 718 | 718 | 718 | 718 | 718 | 506 | 506 | 506 | 506 | 506 | 506 |
+| Complete payment lock | 926,403 | 663,284 | 586,981 | 467,733 | 424,757 | 345,095 | 322,447 | 308,992 | 289,802 | 272,993 | **257,662** |
+| One-input BIP143 `ALL` unlock | 2,588 | 2,588 | 2,588 | 2,588 | 2,588 | 2,588 | 2,588 | 2,588 | 2,588 | 2,588 | 2,588 |
 
 The Forth payment entry uses `stack` optimization on upstream revision `889ff6e`. v0.5.0 emits Keccak's theta and chi over five-lane rows. Theta masks the one-bit shifts at lane boundaries, and rho and pi operate on individual lanes. Ten permutations in the payment lock save 79,450 bytes. The shared compact input binding saves another 212 bytes. [Forth entry](reference/payment-lock.fth) · [v0.4.0 measurements](versions/v0.4.0/measurements.json) · [v0.5.0 measurements](versions/v0.5.0/measurements.json)
 
@@ -117,13 +117,15 @@ v0.8.0 checks the strict response norm in 64-coefficient blocks in the original 
 
 v0.9.0 complements the wire response and subtracts one bias from all four packed response lanes at once. The NTT reuses the forward bias and modulus at fixed stack depths. Together with the fixed-depth inverse bias, this saves 5,249 bytes in the equation. A reciprocal multiplication rounds 64 hint-adjusted residues in parallel. A second multiplication gathers four six-bit digits at a time into the FIPS 204 encoding, saving 11,560 bytes in hint application and encoding. [v0.9.0 measurements](versions/v0.9.0/measurements.json)
 
+v0.10.0 makes a mask of acceptable draws with a parallel byte comparison, then bisects it to find the first acceptable byte for each SampleInBall selection. The original 221-byte budget still applies, including the sign bytes. This saves 8,683 bytes in the sampler. SHAKE swaps byte groups in parallel when converting the rate block and uses the shorter shift for some Keccak rotations, saving 6,648 bytes in the lock. [v0.10.0 measurements](versions/v0.10.0/measurements.json)
+
 The arithmetic and SHAKE scripts are also independently replayable. [Deterministic fixture](versions/v0.1.0/deterministic.json)
 
 ## Developer and wallet integration
 
 Use `locking_script(public_key)` to create a compact payment output and retain
 the authenticated 1,312-byte public key. The wallet recognizes and spends
-the nine earlier generations for that key. Use `locking_script(public_key, legacy=True)`
+the ten earlier generations for that key. Use `locking_script(public_key, legacy=True)`
 to reproduce the original v0.1.0 lock bytes. Before authorizing a payment, verify the
 funding amount, outpoint and confirmations. Call `sign_payment`
 for a single-input payment or `sign_spend` for an already prepared input.
@@ -138,12 +140,12 @@ amplifies the savings from smaller output locks.
 
 ## Complete transactions and stack measurements
 
-BSV Node 1.2.3 and the pinned chain-gang validate these transactions with supplied prevouts. Sizes are in bytes and follow input and output order. `× n` indicates n equal sizes. The development evaluator lacks the comparison opcodes needed for stack measurements. The two-input, two-output transactions measured 584,896 bytes for BIP143 ALL and 1,744,008 bytes for OTDA ALL in v0.8.0.
+BSV Node 1.2.3 and the pinned chain-gang validate these transactions with supplied prevouts. Sizes are in bytes and follow input and output order. `× n` indicates n equal sizes. The development evaluator lacks the comparison opcodes needed for stack measurements. The two-input, two-output transactions measured 551,278 bytes for BIP143 ALL and 1,643,154 bytes for OTDA ALL in v0.9.0.
 
 | Template and mode | Inputs×outputs | Previous locks | Unlocks | New locks | Total | Main / alt items | Stack payload |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| `pure-ml-dsa-44` · `0x41` | 2×2 | 272,991 / 272,993 | 2,588 × 2 | 272,990 × 2 | 551,278 | — / — | — |
-| `pure-ml-dsa-44` · `0x61` | 2×2 | 272,997 / 272,989 | 548,528 × 2 | 272,983 / 272,989 | 1,643,154 | — / — | — |
+| `pure-ml-dsa-44` · `0x41` | 2×2 | 257,660 / 257,662 | 2,588 × 2 | 257,659 × 2 | 520,616 | — / — | — |
+| `pure-ml-dsa-44` · `0x61` | 2×2 | 257,666 / 257,658 | 517,866 × 2 | 257,652 / 257,658 | 1,551,168 | — / — | — |
 
 ## Marginal and lifecycle costs
 
@@ -151,7 +153,7 @@ Each marginal cell shows the **change in total bytes (output locks / input unloc
 
 | Template and mode | Added-input shape | Added-input bytes | Added-output shape | Added-output bytes | Fund and exit | One turnover |
 | --- | --- | --- | --- | --- | --- | --- |
-| `pure-ml-dsa-44` · `0x41` | 3×2 | 2,635 (4 / 2,588 / 43) | 2×3 | 272,997 (272,984 / 0 / 13) | 551,511 | 1,102,782 |
-| `pure-ml-dsa-44` · `0x61` | 3×2 | 548,680 (-4 / 548,639 / 45) | 2×3 | 818,997 (272,986 / 545,998 / 13) | 551,524 | 2,194,668 |
+| `pure-ml-dsa-44` · `0x41` | 3×2 | 2,635 (4 / 2,588 / 43) | 2×3 | 257,666 (257,653 / 0 / 13) | 520,850 | 1,041,458 |
+| `pure-ml-dsa-44` · `0x61` | 3×2 | 518,018 (-4 / 517,977 / 45) | 2×3 | 773,004 (257,655 / 515,336 / 13) | 520,861 | 2,072,020 |
 
 [Unified benchmark and reproduction](../../docs/benchmark.md)

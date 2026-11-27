@@ -30,7 +30,7 @@ TEMPLATES = {"pure-ml-dsa-44": Template(coin)}
 
 
 def components(_samples):
-    from challenge_script import sample_in_ball_script
+    from challenge_script import sample_from_stream_script, sample_in_ball_script
     from ntt_script import (
         checked_equation_script, packed_response_equation_script, transform_script, verification_equation_script,
     )
@@ -56,7 +56,8 @@ def components(_samples):
         ("v0.6.0", _VerifierVersion.V06, _historical_forth_lock(payment_key, version=_VerifierVersion.V06)),
         ("v0.7.0", _VerifierVersion.V07, _historical_forth_lock(payment_key, version=_VerifierVersion.V07)),
         ("v0.8.0", _VerifierVersion.V08, _historical_forth_lock(payment_key, version=_VerifierVersion.V08)),
-        ("optimized", _VerifierVersion.V09, locking_script(payment_key)),
+        ("v0.9.0", _VerifierVersion.V09, _historical_forth_lock(payment_key, version=_VerifierVersion.V09)),
+        ("optimized", _VerifierVersion.V10, locking_script(payment_key)),
     )
     payment_sizes = {}
     for label, version, lock in profiles:
@@ -69,7 +70,8 @@ def components(_samples):
             "keccak_f1600": len(keccak_f1600_script(compact=compact, optimize=shake["optimize"],
                                                    packed_rows=shake["packed_rows"])),
             "signature_decode": len(signature),
-            "sample_in_ball": len(sample_in_ball_script(**shake, signed=version >= _VerifierVersion.V07)),
+            "sample_in_ball": len(sample_in_ball_script(**shake, signed=version >= _VerifierVersion.V07,
+                                                       search=version >= _VerifierVersion.V10)),
             "apply_hints": len(_hints_script(version)),
             "shake256_832_to_32": len(shake256_script(832, 32, **shake)),
             "input_binding": len(check_binding(COMPANION_CODE, compact=version >= _VerifierVersion.V05)),
@@ -95,7 +97,12 @@ def components(_samples):
         "shake256_832_to_32_script_bytes": len(shake256_script(832, 32)),
         "packed_keccak_script_bytes": {
             "v0.6.0": len(_state_permutation()),
-            "optimized": len(_state_permutation(stream_rows=True)),
+            "v0.9.0": len(_state_permutation(stream_rows=True)),
+            "optimized": len(_state_permutation(stream_rows=True, short_rotations=True)),
+        },
+        "sampler_without_shake_bytes": {
+            "v0.9.0": len(sample_from_stream_script(signed=True)),
+            "optimized": len(sample_from_stream_script(signed=True, search=True)),
         },
         "payment_script_bytes": payment_sizes,
     }

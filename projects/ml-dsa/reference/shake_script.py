@@ -84,6 +84,13 @@ def _rotate_packed_lane(bits):
     return _rotate_doubled_lane(bits)
 
 
+def _rotate_short_lane(bits):
+    if bits > 48 and bits % 8:
+        # The final half of a right-shifted double lane is the same rotation.
+        return asm('OP_DUP OP_CAT') + number(64 - bits) + asm('OP_RSHIFT OP_8 OP_SPLIT OP_NIP')
+    return _rotate_packed_lane(bits)
+
+
 class _Round:
     """Resolve named lanes to stack offsets while emitting one round."""
 
@@ -224,13 +231,13 @@ def _packed_theta():
 
 
 @cache
-def _keccak_rows(*, stream_rows=False):
+def _keccak_rows(*, stream_rows=False, short_rotations=False):
     code = bytearray()
     theta = _packed_theta()
     # Chi uses the whole row and its rotations by one and two lanes.
     chi = _PACK_ROW + asm('OP_DUP') + _rotate_bytes(_LANE_BYTES) + asm('OP_INVERT OP_OVER')
     chi += _rotate_bytes(2 * _LANE_BYTES) + asm('OP_AND OP_XOR')
-    rho_pi = _Round(compact=True, rotate=_rotate_packed_lane)
+    rho_pi = _Round(compact=True, rotate=_rotate_short_lane if short_rotations else _rotate_packed_lane)
     if stream_rows:
         # After rho and pi produce each row, apply chi immediately and
         # move the row off the main stack before selecting more lanes.
@@ -268,10 +275,11 @@ def _packed_keccak():
 
 
 @cache
-def _state_permutation(*, stream_rows=False):
+def _state_permutation(*, stream_rows=False, short_rotations=False):
     """Permute an internal state whose lanes are already big-endian."""
     return (push(_LANE_LSB_MASK) + asm('OP_SWAP') + (number(_ROW_BYTES) + asm('OP_SPLIT')) * 4
-            + _keccak_rows(stream_rows=stream_rows) + _PACK_ROW + asm('OP_NIP'))
+            + _keccak_rows(stream_rows=stream_rows, short_rotations=short_rotations)
+            + _PACK_ROW + asm('OP_NIP'))
 
 
 @cache
@@ -283,8 +291,32 @@ def _reverse_lane_stream(lanes):
     return asm('OP_0 OP_SWAP') + step * (lanes - 1) + reverse + asm('OP_CAT')
 
 
+def _byte_swap_masks(rate):
+    """Build the three lane-wise swap masks below the sponge state."""
+    code = asm('OP_TOALTSTACK')
+    lanes = rate // _LANE_BYTES
+    grow = asm('OP_DUP OP_CAT') * (lanes - 1).bit_length()
+    for group in (1, 2, 4):
+        mask = (bytes(group) + b'\xff' * group) * (_LANE_BYTES // (2 * group))
+        code += push(mask) + grow + number(rate) + asm('OP_SPLIT OP_DROP')
+    return code + asm('OP_FROMALTSTACK')
+
+
+def _reverse_rate_bytes(*, above):
+    """Reverse all eight-byte lanes in the rate block using the shared masks."""
+    code = b''
+    for index, bits in enumerate((8, 16, 32)):
+        shift = number(bits)
+        # t = (x XOR (x >> bits)) AND mask. XOR t into the low groups
+        # and t << bits into the high groups to exchange them in place.
+        code += asm('OP_DUP OP_DUP') + shift + asm('OP_RSHIFT OP_XOR')
+        code += number(above + 4 - index) + asm('OP_PICK OP_AND OP_DUP')
+        code += shift + asm('OP_LSHIFT OP_XOR OP_XOR')
+    return code
+
+
 def _shake_script(message_bytes, output_bytes, rate, *, compact=True, optimize=True,
-                  packed_rows=True, packed_state=True, stream_rows=True):
+                  packed_rows=True, packed_state=True, stream_rows=True, vector_bytes=True):
     if type(message_bytes) is not int or message_bytes < 0:
         raise ValueError('message length must be a nonnegative integer')
     if type(output_bytes) is not int or output_bytes < 1:
@@ -297,18 +329,22 @@ def _shake_script(message_bytes, output_bytes, rate, *, compact=True, optimize=T
     padding[-1] |= 0x80
 
     code = bytearray(asm('OP_SIZE') + number(message_bytes) + asm('OP_NUMEQUALVERIFY'))
-    code += push(padding) + asm('OP_CAT') + push(bytes(_STATE_BYTES))
     packed_state = packed_state and compact and optimize and packed_rows
+    vector_bytes = vector_bytes and packed_state
+    if vector_bytes:
+        code += _byte_swap_masks(rate)
+    code += push(padding) + asm('OP_CAT') + push(bytes(_STATE_BYTES))
     # Keep all state lanes big-endian across permutations. Convert only the
     # bytes that cross the sponge boundary, in FIPS 202 little-endian order.
     if packed_state:
-        permutation = _state_permutation(stream_rows=stream_rows)
-        rate_conversion = _reverse_lane_stream(rate // _LANE_BYTES)
+        permutation = _state_permutation(stream_rows=stream_rows, short_rotations=vector_bytes)
+        absorb_bytes = _reverse_rate_bytes(above=1) if vector_bytes else _reverse_lane_stream(rate // _LANE_BYTES)
+        squeeze_bytes = _reverse_rate_bytes(above=2) if vector_bytes else absorb_bytes
     else:
         permutation = keccak_f1600_script(compact=compact, optimize=optimize, packed_rows=packed_rows)
-        rate_conversion = b''
+        absorb_bytes = squeeze_bytes = b''
     absorb = (
-        asm('OP_SWAP') + number(rate) + asm('OP_SPLIT OP_TOALTSTACK') + rate_conversion
+        asm('OP_SWAP') + number(rate) + asm('OP_SPLIT OP_TOALTSTACK') + absorb_bytes
         + push(bytes(_STATE_BYTES - rate)) + asm('OP_CAT OP_XOR')
         + permutation + asm('OP_FROMALTSTACK OP_SWAP')
     )
@@ -319,13 +355,17 @@ def _shake_script(message_bytes, output_bytes, rate, *, compact=True, optimize=T
     # still acts only on the state at the top of the stack.
     code += asm('OP_0 OP_SWAP')
     squeeze = (
-        asm('OP_DUP') + number(rate) + asm('OP_SPLIT OP_DROP') + rate_conversion
+        asm('OP_DUP') + number(rate) + asm('OP_SPLIT OP_DROP') + squeeze_bytes
         + asm('OP_ROT OP_SWAP OP_CAT OP_SWAP')
         + permutation
     )
     code += squeeze * extra_blocks
     final_size = final_index + 1
-    if packed_state:
+    if vector_bytes:
+        code += number(rate) + asm('OP_SPLIT OP_DROP') + absorb_bytes
+        if final_size != rate:
+            code += number(final_size) + asm('OP_SPLIT OP_DROP')
+    elif packed_state:
         lanes = (final_size + _LANE_BYTES - 1) // _LANE_BYTES
         lane_bytes = lanes * _LANE_BYTES
         code += number(lane_bytes) + asm('OP_SPLIT OP_DROP') + _reverse_lane_stream(lanes)
@@ -334,6 +374,8 @@ def _shake_script(message_bytes, output_bytes, rate, *, compact=True, optimize=T
     else:
         code += number(final_size) + asm('OP_SPLIT OP_DROP')
     code += asm('OP_CAT')
+    if vector_bytes:
+        code += asm('OP_NIP') * 3
     return bytes(code)
 
 
@@ -343,7 +385,8 @@ def shake128_script(message_bytes, output_bytes):
 
 
 def shake256_script(message_bytes, output_bytes, *, compact=True, optimize=True, packed_rows=True,
-                    packed_state=True, stream_rows=True):
+                    packed_state=True, stream_rows=True, vector_bytes=True):
     """Replace a byte vector of the specified length with a SHAKE256 XOF."""
     return _shake_script(message_bytes, output_bytes, rate=136, compact=compact, optimize=optimize,
-                         packed_rows=packed_rows, packed_state=packed_state, stream_rows=stream_rows)
+                         packed_rows=packed_rows, packed_state=packed_state, stream_rows=stream_rows,
+                         vector_bytes=vector_bytes)

@@ -39,6 +39,7 @@ class _VerifierVersion(IntEnum):
     V07 = 7
     V08 = 8
     V09 = 9
+    V10 = 10
 
 
 def _shake_options(version):
@@ -48,6 +49,7 @@ def _shake_options(version):
         "packed_rows": version >= _VerifierVersion.V05,
         "packed_state": version >= _VerifierVersion.V06,
         "stream_rows": version >= _VerifierVersion.V07,
+        "vector_bytes": version >= _VerifierVersion.V10,
     }
 
 
@@ -63,7 +65,7 @@ def _hints_script(version):
 
 def verify_message_script(public_key, message_bytes, *, context=b"", legacy=False):
     """Compile a verifier that consumes the message and signature from the stack."""
-    version = _VerifierVersion.ORIGINAL if legacy else _VerifierVersion.V09
+    version = _VerifierVersion.ORIGINAL if legacy else _VerifierVersion.V10
     challenges = _reconstruct_challenge(public_key, message_bytes, context=context, version=version)
     return challenges + asm("OP_EQUAL")
 
@@ -86,7 +88,9 @@ def _reconstruct_challenge(public_key, message_bytes, *, context=b"", version):
     code += signature_decode_script(compact=compact, signed_response=signed, sparse_hints=sparse_hints,
                                     packed_response=packed_response)
     # [message, c_tilde, z, hints] -> [message, c_tilde, c || z].
-    code += asm("OP_TOALTSTACK OP_OVER") + sample_in_ball_script(**shake, signed=signed_challenge)
+    code += asm("OP_TOALTSTACK OP_OVER") + sample_in_ball_script(
+        **shake, signed=signed_challenge, search=version >= _VerifierVersion.V10,
+    )
     if packed_response:
         equation = packed_response_equation_script(public_key, compact_packing=version >= _VerifierVersion.V09)
     elif signed:
@@ -112,7 +116,7 @@ def locking_script(public_key, *, legacy=False):
     """Bind the Pure ML-DSA-44 verifier to the current transaction input."""
     if legacy:
         return _historical_lock(public_key, compact=False)
-    challenges = _reconstruct_challenge(public_key, DIGEST_BYTES, version=_VerifierVersion.V09)
+    challenges = _reconstruct_challenge(public_key, DIGEST_BYTES, version=_VerifierVersion.V10)
     return _compile_payment_lock(challenges, compact_binding=True)
 
 
@@ -157,7 +161,7 @@ def matches_lock(script, public_key):
     """Match any supported generation of the fixed-key payment template."""
     return (script == locking_script(public_key)
             or any(script == _historical_forth_lock(public_key, version=version)
-                   for version in (_VerifierVersion.V08, _VerifierVersion.V07, _VerifierVersion.V06,
+                   for version in (_VerifierVersion.V09, _VerifierVersion.V08, _VerifierVersion.V07, _VerifierVersion.V06,
                                    _VerifierVersion.V05, _VerifierVersion.V04, _VerifierVersion.V03,
                                    _VerifierVersion.V02))
             or script == _historical_lock(public_key, compact=True)
