@@ -2,10 +2,12 @@
 from functools import cache
 import json
 import os
+from operator import mul, sub
 from pathlib import Path
 from shutil import which
 import subprocess
 import sys
+from types import SimpleNamespace
 import unittest
 
 from fourthgraph.benchmark.validation import Node, chain_verdict
@@ -14,7 +16,8 @@ from fourthgraph.bsv.script import asm, decode_num, encode_num, push
 from fourthgraph.bsv.transaction import Input, Output, Transaction
 from fourthgraph.compiler.curve_lowering import compile_fixed_generator, compile_joint_generator_point
 from fourthgraph.compiler.curve_windows import (
-    CURVES, GLV_REFERENCE, JOINT_STRATEGIES, P256, SECP256K1, SM2, fixed_table, scalar_plans, signed_radix4,
+    CURVES, GLV_REFERENCE, JOINT_STRATEGIES, P256, SECP256K1, SM2, double_from_affine_slope, fixed_table,
+    scalar_plans, signed_radix4,
 )
 from fourthgraph.compiler.lowering import DATAFLOW, compile_word
 from fourthgraph.compiler.modular_scale import lower_affine_pair_scale, lower_modular_scale, lower_scaled_residuals
@@ -58,6 +61,17 @@ def generator_multiple(curve, scalar):
 
 
 class ScalarRecodingTests(unittest.TestCase):
+    def test_affine_doubling_reuses_a_precomputed_tangent(self):
+        for curve in CURVES.values():
+            with self.subTest(curve=curve.name):
+                prime = curve.field
+                field = SimpleNamespace(mul=mul, sub=sub, reduce=lambda value: value % prime)
+                points = fixed_table(curve)
+                x, y = points[1]
+                slope = (3 * x*x + curve.a) * pow(2*y, -1, prime) % prime
+                self.assertEqual(double_from_affine_slope(field, (x, y), slope), points[2])
+                self.assertEqual(double_from_affine_slope(field, (x - prime, y - prime), slope - prime), points[2])
+
     def test_signed_radix4_preserves_scalar_and_terminal_carry(self):
         for maximum in (*range(65), 2**32 - 1, 2**255 - 1):
             plan = tuple(signed_radix4(maximum))

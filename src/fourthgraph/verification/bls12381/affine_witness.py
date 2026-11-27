@@ -12,10 +12,11 @@ from .verifier import (
     proof_stack, public_packet, read_proof, require_affine, unpack_packet, unpack_public,
 )
 from fourthgraph.bsv.script import asm, number, push
-from fourthgraph.compiler.curve_windows import SignedRadix4Window, signed_radix4
+from fourthgraph.compiler.curve_windows import SignedRadix4Window, double_from_affine_slope, signed_radix4
 
 LAYOUTS = ("projective", "affine-inline", "affine-witness")
 MSM_STRATEGIES = ("unsigned-radix4", "signed-radix4")
+MSM_TABLES = ("points", "doubling-slopes")
 IDENTITY = (0, 0)
 PAIRING_STEPS = len(SEED_BITS) + SEED_BITS.count("1")
 
@@ -167,9 +168,17 @@ def checked_b_line(curve, point, other, slope, *, doubling):
     return (nx, ny), (curve.sub(curve.mul(slope, x), y), slope)
 
 
+def double_msm_point(field, point, trusted_point):
+    host = Curve(HOST)
+    _, (_, slope) = host.affine_line(trusted_point, trusted_point, doubling=True)
+    # Give the compiler the slope as a shared Script value. A constant-folded
+    # square here would materialize a second full-width field literal.
+    return double_from_affine_slope(field, point, field.value(slope))
+
+
 class AffineStages(VerifierStages):
     def __init__(self, key, sources, *, lines_in_witness, chronicle=False, optimize=False, fp2_rules=FP2_RULES,
-                 fp2_selection="uniform", msm=MSM_STRATEGIES[0]):
+                 fp2_selection="uniform", msm=MSM_STRATEGIES[0], msm_table=MSM_TABLES[0]):
         self.witness_items = 2 if lines_in_witness else 1
         super().__init__(key, sources, chronicle=chronicle, optimize=optimize, extra_inputs=self.witness_items,
                          fp2_rules=fp2_rules, fp2_selection=fp2_selection)
@@ -177,6 +186,7 @@ class AffineStages(VerifierStages):
             raise ValueError("an affine witness layout requires at least one spend-time public input")
         self.lines_in_witness = lines_in_witness
         self.msm = msm
+        self.msm_table = msm_table
         self.windows = tuple(msm_windows(key, sources, strategy=msm))
         inputs = self.field.graph.inputs
         self.trace = PackedFields(self.field, inputs[self.witness_items - 1])
@@ -220,6 +230,8 @@ class AffineStages(VerifierStages):
         f = self.field
         scalars = {index: value for (index, _), value in zip(self.slots, public, strict=True)}
         acc = fold_msm(self.key, self.sources) or IDENTITY
+        derive = self.msm_table == "doubling-slopes"
+        bases = {}
 
         def divmod_script(value, radix):
             return f.op("OP_DIV", value, radix), f.op("OP_MOD", value, radix)
@@ -228,9 +240,17 @@ class AffineStages(VerifierStages):
             index, points, step = window.index, window.points, window.signed
             digit, scalars[index] = step.split(scalars[index], add=f.add, sub=f.sub, divide=divmod_script)
             point = points[0]
+            if derive:
+                point = bases.get(index)
+                if point is None:
+                    point = tuple(map(f.value, points[0]))
             if len(points) == 2:
                 twice = f.op("OP_NUMEQUAL", digit, 2)
-                px, py = (f.select(twice, high, low) for low, high in zip(*points, strict=True))
+                doubled = double_msm_point(f, point, points[0]) if derive else points[1]
+                px, py = (f.select(twice, high, low) for low, high in zip(point, doubled, strict=True))
+                if derive and step.carry:
+                    # The next radix-4 window's base is four times this base.
+                    bases[index] = double_msm_point(f, doubled, points[1])
                 if step.carry:
                     negative = f.op("OP_LESSTHAN", digit, 0)
                     py = f.select(negative, f.sub(0, py), py)

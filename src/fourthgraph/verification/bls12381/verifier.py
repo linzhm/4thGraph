@@ -503,7 +503,9 @@ class VerifierStages:
         finite = msm_claim(self.tower, self.key, self.sources, values, (gx, gy))
         return fixed, delta, ((gx, self.field.sub(0, gy)), gamma_lines, finite)
 
-    def check_g1_points(self, proof):
+    def check_g1_points(self, proof, first="a"):
+        if first == "c":
+            return self.check_g1_a(self.check_g1_c(proof))
         return self.check_g1_c(self.check_g1_a(proof))
 
     def check_g1_a(self, proof):

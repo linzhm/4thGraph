@@ -102,6 +102,14 @@ def signed_radix4(maximum):
         maximum = high
 
 
+def double_from_affine_slope(field, point, slope):
+    """Expand a finite affine doubling with a trusted, precomputed tangent slope."""
+    x, y = point
+    doubled_x = field.reduce(field.sub(field.mul(slope, slope), field.mul(2, x)))
+    doubled_y = field.reduce(field.sub(field.mul(slope, field.sub(x, doubled_x)), y))
+    return doubled_x, doubled_y
+
+
 def scalar_plans(curve, *, joint=False):
     """Describe lowered operations and each technique's eligibility."""
     binary = ScalarPlan("binary", 2 if joint else 1, 1, 256, not joint,

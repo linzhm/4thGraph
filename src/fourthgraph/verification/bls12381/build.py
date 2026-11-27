@@ -7,7 +7,7 @@ import json
 from pathlib import Path
 
 from fourthgraph.verification.bls12381.affine_witness import (
-    AffineStages, LAYOUTS, MSM_STRATEGIES, affine_witness, line_packet, msm_windows, slope_packet_bytes,
+    AffineStages, LAYOUTS, MSM_STRATEGIES, MSM_TABLES, affine_witness, line_packet, msm_windows, slope_packet_bytes,
 )
 from fourthgraph.verification.bls12381.field import FP2_ENTRY, FP2_RULES, fp2_alternatives, fp2_kernel
 from fourthgraph.verification.bls12381.verifier import (
@@ -40,6 +40,7 @@ class ArithmeticPlan:
     residue_association: str = "left"
     fp2_selection: str = "uniform"
     msm: str = MSM_STRATEGIES[0]
+    msm_table: str = MSM_TABLES[0]
 
     def __post_init__(self):
         object.__setattr__(self, "fp2_rules", validate_rules(self.fp2_rules))
@@ -49,6 +50,10 @@ class ArithmeticPlan:
             raise ValueError("Fp2 selection must be uniform or callsite")
         if self.msm not in MSM_STRATEGIES:
             raise ValueError(f"MSM must be one of {', '.join(MSM_STRATEGIES)}")
+        if self.msm_table not in MSM_TABLES:
+            raise ValueError(f"MSM table must be one of {', '.join(MSM_TABLES)}")
+        if self.msm_table == "doubling-slopes" and self.msm != "signed-radix4":
+            raise ValueError("doubling-slope tables require signed radix-4 MSM")
 
     def document(self):
         document = asdict(self)
@@ -56,13 +61,16 @@ class ArithmeticPlan:
             del document["fp2_selection"]
         if self.msm == MSM_STRATEGIES[0]:
             del document["msm"]
+        if self.msm_table == MSM_TABLES[0]:
+            del document["msm_table"]
         return document
 
     @classmethod
     def read(cls, path):
         plan = json.loads(path.read_bytes())
         required = {"fp2_rules", "residue_association"}
-        if not isinstance(plan, dict) or not required <= plan.keys() <= required | {"fp2_selection", "msm"}:
+        optional = {"fp2_selection", "msm", "msm_table"}
+        if not isinstance(plan, dict) or not required <= plan.keys() <= required | optional:
             raise ValueError("arithmetic plan requires fp2_rules and residue_association")
         return cls(**plan)
 
@@ -88,6 +96,9 @@ VOCABULARY = {
     ),
     "bls12-381-check-g1-points": Stage(
         ("groth16-proof",), ("groth16-checked-g1",), "check_g1_points",
+    ),
+    "bls12-381-check-g1-c-then-a": Stage(
+        ("groth16-proof",), ("groth16-checked-g1",), "check_g1_points", "c",
     ),
     "bls12-381-check-g1-a": Stage(
         ("groth16-proof",), ("groth16-checked-a",), "check_g1_a",
@@ -194,7 +205,7 @@ class ForthVerifier(ScriptVerifier):
             stages = VerifierStages(self.key, sources, **options)
         else:
             stages = AffineStages(self.key, sources, lines_in_witness=self.witness_layout == "affine-witness",
-                                  msm=self.msm, **options)
+                                  msm=self.msm, msm_table=plan.msm_table, **options)
         stack = []
         for instruction, _ in self.instructions:
             if isinstance(instruction, Shuffle):
