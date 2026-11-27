@@ -44,7 +44,7 @@ The shared PELS entry supports a single-input `lock:` with a complete output vec
 | `std/byte-layout` | Reverse packed 32-byte fields at a caller-checked width, or build a fixed byte string from a literal or a repeating seed. | [Byte kernels](../../src/fourthgraph/stdlib/byte-layout.fth) · [Binding experiments](../optimization-paths.md) |
 | `std/secp256k1` | Homogeneous projective addition, mixed affine addition, doubling, and their scaled-coordinate kernels. `secp256k1-lambda-split` splits a scalar. `secp256k1-lambda-split-with-order` takes `k n` when the group order is already on the stack. | [Curve kernels](../../src/fourthgraph/stdlib/secp256k1.fth) |
 | `std/bip340` | `bip340-verify ( script -- script )` builds a BIP340 verification fragment | [Payment example](../../projects/p2pkh-schnorr/README.md) |
-| `std/groth16-bls12-381` | `groth16-bls12-381-verify ( -- groth16-verified )` compiles through the BLS12-381 verifier backend | [Forth source](../../src/fourthgraph/stdlib/groth16-bls12-381.fth) |
+| `std/groth16-bls12-381` | `groth16-bls12-381-verify ( -- groth16-verified )` compiles through the BLS12-381 verifier backend | [Forth source](../../src/fourthgraph/stdlib/groth16-bls12-381.fth) · [Project call](../../projects/groth16-verifier/verifier.fth) |
 | `std/verify` | `relation: TRANSITION ROUTE ;` declares a relation available to multiple verification backends | [State verification](../../projects/proof-counter/verify-state.fth) |
 
 Payment construction words check input widths. P2PK takes 33 bytes and P2PKH takes 20 bytes. The wallet interface also checks that a compressed public key represents a secp256k1 point. The spending Script verifies the signature with native `CHECKSIG`.

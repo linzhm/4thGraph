@@ -1,0 +1,12 @@
+{
+  "version": "0.2.0",
+  "previous": "0.1.0",
+  "artifacts": [],
+  "fixtures": [],
+  "evidence": ["measurements.json"],
+  "shared_data": ["versions/v0.1.0/input-sources.json"],
+  "requires": {"proof-counter": "0.1.0"},
+  "integration": "docs/verification.en.md",
+  "build": "PYTHONPATH=src:. python3 projects/groth16-verifier/reference/build.py",
+  "verify": "REGTEST_CHRONICLE_HEIGHT=1000 bash tools/verify_node.sh --profile raised -- \\\n  python3 -m fourthgraph.replay.bls12381_verifier \\\n  --source projects/groth16-verifier/verifier.fth --entry verify-proof \\\n  --script-era genesis --objective path-bytes --tx-version 2 \\\n  --output projects/groth16-verifier/workspace/build/replay.json"
+}

@@ -28,7 +28,7 @@ Use these rules on closed formulas whose caller establishes canonical ScriptNum 
 
 With the rules combined, the Script has two multiplications and one remainder, down from five multiplications and two remainders with `stack` alone. Its measured stack payload peak moves from 48 B to 44 B. The rule search admits 32 candidates at most and also includes the unoptimized reference when the terminal pass list is nonempty. The empty rule list under the same terminal passes gives a control for measuring rule effects. `compile.lowering.ordered_rules` records application counts, while traces give resulting ranges and source positions. Explicit rules also work with `ScriptBuilder(..., formula_passes=["stack"], experimental_rules=[...])`. [Fixture](../src/fourthgraph/benchmark/formulas/modular-dot.fth)
 
-`expand-cross-products` recognizes `(a+b)(c+d)-ac-bd` and rewrites it as `ad+bc` after checking the new intermediate ranges.
+`expand-cross-products` recognizes `(a+b)(c+d)-ac-bd` and rewrites it as `ad+bc` after checking the new intermediate ranges. For Groth16, `ScriptBuilder` applies this rule to the Fp2 formula and the verifier inlines the result into its full arithmetic graph. This gives the stack scheduler access to values shared with adjacent operations. [Fp2 formula](../src/fourthgraph/stdlib/bls12-381-fp2.fth) · [Verifier project](../projects/groth16-verifier/README.md)
 
 ## Fixed-width fields and repeating constants
 
