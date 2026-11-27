@@ -94,9 +94,10 @@ def compile_row(raw, fixture, sources, frozen, trace):
 
 
 def stable(row):
-    return {**{k: row.get(k) for k in ("requested", "id", "source_sha256", "applied", "artifact", "test", "next")},
-            "delta": {k:v for k,v in row.get("delta", {}).items() if not k.endswith("_ns_observed")},
-            "compile": {k:v for k,v in row["compile"].items() if k != "elapsed_ns"}}
+    fields = ("requested", "id", "source_sha256", "applied", "artifact", "test", "next", "trace")
+    return {**{key: row.get(key) for key in fields},
+            "delta": {key: value for key, value in row.get("delta", {}).items() if not key.endswith("_ns_observed")},
+            "compile": {key: value for key, value in row["compile"].items() if key != "elapsed_ns"}}
 
 
 def report_id(report):
@@ -294,7 +295,7 @@ def main(argv=None):
             result = run(data["request"] if replaying else data, read(args.parent) if args.parent else None,
                          replaying=replaying)
             if replaying and (data["run_id"] != result["run_id"] or data["run_id"] != report_id(data)):
-                raise ValueError("replay differs from the recorded baseline, artifacts, or verdicts")
+                raise ValueError("replay differs from the recorded baseline, artifacts, verdicts, or formula traces")
         print(json.dumps(result, sort_keys=True))
     except (KeyError, ValueError, TypeError, OSError) as exc:
         print(json.dumps({"schema": SCHEMA, "status":"failed", "diagnostic":str(exc)}))

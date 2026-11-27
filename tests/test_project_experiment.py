@@ -118,6 +118,33 @@ class FormulaExperiments(unittest.TestCase):
         self.assertEqual(call("next",second)["stop"],"no_improving_expansion")
         self.assertEqual(call("replay",first)["run_id"],first["run_id"])
 
+    def test_replay_and_follow_up_verify_formula_trace(self):
+        report = run({"fixture": "square", "trace": True, "plans": [{}, {"passes": ["stack"]}]})
+        saved = json.dumps(report)
+        follow_up = next_request(report)
+        command = [sys.executable, "-m", "fourthgraph.workflow.protocol", "experiment", "replay", "-"]
+
+        replay = subprocess.run(command, input=saved, text=True, capture_output=True, check=True)
+        original = json.loads(saved)
+        replayed = json.loads(replay.stdout)
+        self.assertEqual(replayed["run_id"], report["run_id"])
+        self.assertEqual(replayed["candidates"][1]["trace"], original["candidates"][1]["trace"])
+        self.assertEqual(run(follow_up, original)["candidates"][0]["test"]["status"], "passed")
+
+        for change in ("changed bounds", "missing trace"):
+            with self.subTest(change=change):
+                edited = json.loads(saved)
+                candidate = edited["candidates"][1]
+                if change == "changed bounds":
+                    candidate["trace"]["formula_snapshots"][0]["steps"][0]["bounds"] = [0, 1000]
+                else:
+                    del candidate["trace"]
+                replay = subprocess.run(command, input=json.dumps(edited), text=True, capture_output=True)
+                self.assertEqual(replay.returncode, 2, replay.stderr)
+                self.assertIn("formula traces", json.loads(replay.stdout)["diagnostic"])
+                with self.assertRaisesRegex(ValueError, "parent run"):
+                    run(follow_up, edited)
+
     def test_invalid_candidates_and_limits(self):
         report=run({"fixture":"square","plans":[{"passes":["search"]},{},{"passes":[]}]})
         self.assertEqual(report["candidates"][0]["test"]["status"],"not_run")
