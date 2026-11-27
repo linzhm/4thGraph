@@ -114,7 +114,44 @@ python3 -m fourthgraph.workflow.protocol experiment replay workspace/tuning/seco
   --parent workspace/tuning/first.json
 ```
 
-Formula reports cover the registered function fixture. Use the existing workflow replay for complete-spend evidence. [Workflow replay](toolchain.md#复放与编译) · [Agent skill](../skills/4thgraph/SKILL.md)
+For the registered `square` or `bezier` spend fixture, set `"evaluation":"spend"` and use the same commands in an environment with [pinned chain-gang](../tools/requirements-chronicle.txt). The runner first checks the formula vectors, then links the candidate into synthetic funding outputs and checks complete spends against those parents offline. Each vector expects one acceptance and one rejection. Formula evaluation remains the default.
+
+```sh
+printf '%s\n' '{"fixture":"square","evaluation":"spend","workers":2,"plans":[{},{"passes":["stack"]}]}' |
+  python3 -m fourthgraph.workflow.protocol experiment run - > workspace/tuning/spend.json
+python3 -m fourthgraph.workflow.protocol experiment next workspace/tuning/spend.json > workspace/tuning/spend-next.json
+python3 -m fourthgraph.workflow.protocol experiment run workspace/tuning/spend-next.json \
+  --parent workspace/tuning/spend.json > workspace/tuning/spend-second.json
+python3 -m fourthgraph.workflow.protocol experiment replay workspace/tuning/spend-second.json \
+  --parent workspace/tuning/spend.json
+```
+
+Spend evaluation ranks passing candidates by the maximum serialized funding-plus-spend bytes across the vectors. The path total adds both transactions from the same vector. The individual maxima for lock, witness, funding, and spend can come from different vectors. The report records the engine pin, Script hashes, and transaction IDs. The reported stack peaks describe the formula evaluation. Complete-spend stack peaks are unmeasured for these fixtures. [Workflow replay](toolchain.md#复放与编译) · [Agent skill](../skills/4thgraph/SKILL.md)
+
+To run the two Bézier batches above through the same spend check, add `"evaluation":"spend"` to the first request. All 625 vectors run with the same Forth and transaction context across candidates. The linked lock checks both position and tangent. The rejection set includes cases where only the position changes and cases where only the tangent changes. The report carries those spend receipts into `next` and `replay`.
+
+Add `"trace":true` when comparing terminal schedules. The report links the final formula snapshot to graph slots through `formula_slots`. Under `trace.target_stack_plan`, `steps` lists the selected execution order, actual operand order, abstract stack slots before and after each step, and exact spans in the emitted Script. `operation_offset` marks where the operation starts after stack rearrangement. `finish` records return placement and cleanup. The schedule records whether source order or a beam-search order won. Follow-up requests preserve tracing, and replay checks the trace, Script, test verdicts, deterministic costs, and ranking. Trace collection adds work to observed compile times.
+
+To compare the shortlisted plans, run axis B once per plan with tracing off and a single worker. Each run holds the plan fixed while comparing `bezier` and `bezier-linear`. From the repository root, with `PYTHONPATH` set as above and the pinned engine installed:
+
+```sh
+for plan in stack search; do
+  passes='["stack"]'
+  if [ "$plan" = search ]; then passes='["rewrite","share","stack","search"]'; fi
+  printf '{"fixture":"bezier","axis":"B","evaluation":"spend","trace":false,"plans":[{"implementation":"bezier","passes":%s},{"implementation":"bezier-linear","passes":%s}]}\n' "$passes" "$passes" |
+    python3 -m fourthgraph.workflow.protocol experiment run - > "workspace/tuning/bezier-$plan.json"
+  python3 -m fourthgraph.workflow.protocol experiment replay "workspace/tuning/bezier-$plan.json" > "workspace/tuning/bezier-$plan-replay.json"
+done
+```
+
+| Implementation | Plan | Full path | Formula Script | Formula main / alt peak items |
+| --- | --- | ---: | ---: | ---: |
+| `bezier-linear` | `rewrite`, `share`, `stack`, `search` | 176 B | 34 B | 8 / 1 |
+| `bezier-linear` | `stack` | 179 B | 37 B | 8 / 1 |
+| `bezier` | `rewrite`, `share`, `stack`, `search` | 188 B | 46 B | 10 / 1 |
+| `bezier` | `stack` | 189 B | 47 B | 9 / 1 |
+
+Each combination has 625 accepted and 625 rejected spends. The shortest path uses `bezier-linear` with all four passes. When path bytes tie, ranking prefers the plan with fewer passes and ordered rules. Read `metrics.compile_ns` from the trace-off runs or replays for observed compile time.
 
 <a name="documentation-index"></a>
 

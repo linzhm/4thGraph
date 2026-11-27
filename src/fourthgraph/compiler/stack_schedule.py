@@ -55,30 +55,53 @@ class Graph:
                 needed.update(node.args)
         return [(value, node) for value, node in self.definitions.items() if value in needed]
 
-    def emit(self, returns, *, last_use=True, compact=False):
-        live = self.live_definitions(returns)
-        uses = Counter(returns)
-        uses.update(arg for _, node in live for arg in node.args)
-        stack = Layout(self.inputs, uses)
-        for slot, node in live:
-            stack.execute(node.script, node.args, (slot,), last_use=last_use, compact=compact)
-        return stack.finish(returns, last_use=last_use)
+    def emit(self, returns, *, last_use=True, compact=False, trace=None):
+        return self._emit_order(self.live_definitions(returns), returns, last_use=last_use, compact=compact,
+                                trace=trace)
 
-    def search_order(self, returns, *, width=96):
+    def _emit_order(self, ordered, returns, *, last_use, compact, trace=None):
+        uses = Counter(returns)
+        uses.update(arg for _, node in ordered for arg in node.args)
+        stack = Layout(self.inputs, uses)
+        if trace is not None:
+            trace.update(order="source", last_use=last_use, compact=compact,
+                         inputs=[value.slot for value in self.inputs], returns=[value.slot for value in returns],
+                         steps=[])
+        for slot, node in ordered:
+            record = None
+            if trace is not None:
+                record = {"slot": slot.slot, "args": [value.slot for value in node.args],
+                          "offset": len(stack.code), "before": [value.slot for value in stack.slots]}
+            stack.execute(node.script, node.args, (slot,), last_use=last_use, compact=compact, trace=record)
+            if record is not None:
+                record.update(bytes=len(stack.code) - record["offset"], after=[value.slot for value in stack.slots])
+                trace["steps"].append(record)
+        offset = len(stack.code)
+        before = [value.slot for value in stack.slots] if trace is not None else None
+        code = stack.finish(returns, last_use=last_use)
+        if trace is not None:
+            trace["finish"] = {"offset": offset, "bytes": len(code) - offset, "before": before,
+                               "after": [value.slot for value in stack.slots]}
+        return code
+
+    def search_order(self, returns, *, width=96, trace=None):
         """Try alternative dependency orders for a bounded pure arithmetic graph."""
-        source_order = self.emit(returns, compact=True)
         definitions = self.live_definitions(returns)
         if len(definitions) > 128:
-            return source_order
+            code = self._emit_order(definitions, returns, last_use=True, compact=True, trace=trace)
+            if trace is not None:
+                trace["search"] = "graph_limit"
+            return code
+        source_order = self._emit_order(definitions, returns, last_use=True, compact=True)
         masks = {value: 1 << index for index, (value, _) in enumerate(definitions)}
         operations = [(masks[value], sum(masks.get(arg, 0) for arg in set(node.args)), value, node)
                       for value, node in definitions]
         uses = Counter(returns)
         uses.update(arg for _, node in definitions for arg in node.args)
-        beam = [(0, Layout(self.inputs, uses))]
+        beam = [(0, Layout(self.inputs, uses), ())]
         for _ in operations:
             candidates = {}
-            for done, stack in beam:
+            for done, stack, path in beam:
                 for flag, dependencies, value, node in operations:
                     if done & flag or dependencies & ~done:
                         continue
@@ -87,12 +110,22 @@ class Graph:
                     candidate.code = stack.code + candidate.code
                     state = done | flag, tuple(candidate.slots)
                     previous = candidates.get(state)
-                    if previous is None or len(candidate.code) < len(previous.code):
-                        candidates[state] = candidate
+                    if previous is None or len(candidate.code) < len(previous[0].code):
+                        candidates[state] = (candidate, (*path, value) if trace is not None else ())
             best = nsmallest(width, candidates.items(),
-                             key=lambda entry: (len(entry[1].code), len(entry[1].slots)))
-            beam = [(done, stack) for (done, _), stack in best]
-        return min((source_order, *(stack.finish(returns, last_use=True) for _, stack in beam)), key=len)
+                             key=lambda entry: (len(entry[1][0].code), len(entry[1][0].slots)))
+            beam = [(done, stack, path) for (done, _), (stack, path) in best]
+        schedules = ((stack.finish(returns, last_use=True), path) for _, stack, path in beam)
+        code, chosen = min(((source_order, None), *schedules), key=lambda entry: len(entry[0]))
+        if trace is not None:
+            # Trace only the selected order. Re-emit it with the same layout rules to
+            # avoid storing stack snapshots for each losing beam candidate.
+            ordered = definitions if chosen is None else [(value, self.definitions[value]) for value in chosen]
+            traced = self._emit_order(ordered, returns, last_use=True, compact=True, trace=trace)
+            if traced != code:
+                raise AssertionError("traced stack order does not reproduce the selected Script")
+            trace.update(order="source" if chosen is None else "beam", search="completed")
+        return code
 
 
 def fuse_verifications(steps, uses):
@@ -123,12 +156,15 @@ class Layout:
         self.uses = uses
         self.code = bytearray()
 
-    def execute(self, script, args, results, *, last_use, compact):
+    def execute(self, script, args, results, *, last_use, compact, trace=None):
         if compact and last_use and 0 < len(args) <= 2:
             self.arrange(args, commutative=script in COMMUTATIVE)
         else:
             for staged, operand in enumerate(args):
                 self.access(operand, staged, last_use=last_use)
+        if trace is not None:
+            trace["operation_offset"] = len(self.code)
+            trace["operands"] = [value.slot for value in self.slots[-len(args):]] if args else []
         if args:
             del self.slots[-len(args):]
         self.code.extend(script)

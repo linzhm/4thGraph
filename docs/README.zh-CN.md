@@ -114,7 +114,44 @@ python3 -m fourthgraph.workflow.protocol experiment replay workspace/tuning/seco
   --parent workspace/tuning/first.json
 ```
 
-公式报告覆盖已登记的函数夹具。完整交易验收使用现有工作流复放。[工作流复放](toolchain.md#复放与编译) · [Agent skill](../skills/4thgraph/SKILL.md)
+对已登记的 `square` 或 `bezier` 花费夹具，在安装了[固定版 chain-gang](../tools/requirements-chronicle.txt) 的环境中用相同命令加上 `"evaluation":"spend"`。执行器先检查公式向量，再把候选链接进合成资金输出，离线对照这些实际父交易验证完整花费。每个向量预期一次通过、一次拒绝。默认仍运行公式评估。
+
+```sh
+printf '%s\n' '{"fixture":"square","evaluation":"spend","workers":2,"plans":[{},{"passes":["stack"]}]}' |
+  python3 -m fourthgraph.workflow.protocol experiment run - > workspace/tuning/spend.json
+python3 -m fourthgraph.workflow.protocol experiment next workspace/tuning/spend.json > workspace/tuning/spend-next.json
+python3 -m fourthgraph.workflow.protocol experiment run workspace/tuning/spend-next.json \
+  --parent workspace/tuning/spend.json > workspace/tuning/spend-second.json
+python3 -m fourthgraph.workflow.protocol experiment replay workspace/tuning/spend-second.json \
+  --parent workspace/tuning/spend.json
+```
+
+花费评估按各向量中「资金交易加花费交易」的最大序列化字节数，对通过验收的候选排名。路径总字节使用同一向量的两笔交易。锁、见证、资金交易和花费交易各自的峰值可能来自不同向量。报告也记录引擎提交、Script 摘要和交易 ID。所报栈峰值来自公式评估，完整花费的栈峰值尚未测量。[工作流复放](toolchain.md#复放与编译) · [Agent skill](../skills/4thgraph/SKILL.md)
+
+要把上面的两轮 Bézier 实验接到完整花费上，在第一轮请求中加 `"evaluation":"spend"`。各候选固定同一份 Forth 和交易上下文，跑同一组 625 个向量。链接后的锁同时检查位置和切向量。拒绝用例分别覆盖只改变位置和只改变切向量的情况。花费回执随报告进入 `next` 和 `replay`。
+
+比较终端栈调度时加 `"trace":true`。报告用 `formula_slots` 把最后一份公式快照的节点关联到图槽位。在 `trace.target_stack_plan` 中，`steps` 记录实际选中的执行顺序、操作数排布、每步前后的抽象栈槽和 Script 字节范围。经过栈调整后，`operation_offset` 指向实际操作的起始字节。最后的 `finish` 记录返回值排布和清理。报告标明选中源码顺序还是束搜索顺序。后续请求沿用追踪开关，重放会核对追踪、Script、测试判定、确定性成本和排名。开启追踪会增加所测的编译耗时。
+
+四格对照按两套入围计划分别运行 B 轴，关闭追踪并使用单个编译 worker。每轮固定计划，比较 `bezier` 和 `bezier-linear`。在仓库根目录执行，沿用上面的 `PYTHONPATH` 和固定版本的评估引擎。
+
+```sh
+for plan in stack search; do
+  passes='["stack"]'
+  if [ "$plan" = search ]; then passes='["rewrite","share","stack","search"]'; fi
+  printf '{"fixture":"bezier","axis":"B","evaluation":"spend","trace":false,"plans":[{"implementation":"bezier","passes":%s},{"implementation":"bezier-linear","passes":%s}]}\n' "$passes" "$passes" |
+    python3 -m fourthgraph.workflow.protocol experiment run - > "workspace/tuning/bezier-$plan.json"
+  python3 -m fourthgraph.workflow.protocol experiment replay "workspace/tuning/bezier-$plan.json" > "workspace/tuning/bezier-$plan-replay.json"
+done
+```
+
+| 实现 | 计划 | 完整路径 | 公式 Script | 公式主栈／备用栈峰值项数 |
+| --- | --- | ---: | ---: | ---: |
+| `bezier-linear` | `rewrite`、`share`、`stack`、`search` | 176 B | 34 B | 8／1 |
+| `bezier-linear` | `stack` | 179 B | 37 B | 8／1 |
+| `bezier` | `rewrite`、`share`、`stack`、`search` | 188 B | 46 B | 10／1 |
+| `bezier` | `stack` | 189 B | 47 B | 9／1 |
+
+每种组合均有 625 个花费通过和 625 个花费拒绝。最短路径用 `bezier-linear` 的四 pass 计划。路径字节相同时，优先选择 pass 和有序规则合计较少的计划。实际编译耗时可从关闭追踪的运行或重放报告中读取 `metrics.compile_ns`。
 
 <a name="documentation-index"></a>
 

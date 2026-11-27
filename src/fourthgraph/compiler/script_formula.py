@@ -77,27 +77,30 @@ class Formula:
                        *origins[self.input_count:])
         return Formula(inputs, tuple(steps), tuple(slots[index] for index in self.returns), origins)
 
-    def lower(self, *, optimize=False, specialized=False, passes=None):
+    def lower(self, *, optimize=False, specialized=False, passes=None, trace=None):
         args = self.input_count, self.steps, self.returns
         if passes is not None:
             if optimize or specialized:
                 raise ValueError("explicit formula passes cannot be combined with automatic selection or specialization")
             passes = validate_formula_passes(passes)
             code, rules = emit(*args, rewrite="rewrite" in passes, share="share" in passes,
-                               stack="stack" in passes, search="search" in passes)
+                               stack="stack" in passes, search="search" in passes, trace=trace)
             return code, {
                 "passes": passes, "script_bytes": len(code), "rewrites": rules,
                 "max_magnitude_bits": magnitude_bits(self.steps),
             }
-        baseline, _ = emit(*args)
-        candidates = {"baseline": (baseline, {})}
+        plans = {"baseline": {}}
         if optimize:
-            candidates["schedule"] = emit(*args, share=True, stack=True, search=True)
-            candidates["rewrite-and-schedule"] = emit(
-                *args, share=True, stack=True, search=True, rewrite=True, specialized=specialized,
-            )
+            plans["schedule"] = {"share": True, "stack": True, "search": True}
+            plans["rewrite-and-schedule"] = {**plans["schedule"], "rewrite": True, "specialized": specialized}
+        candidates = {name: emit(*args, **options, trace=None if optimize else trace)
+                      for name, options in plans.items()}
         selected = min(candidates, key=lambda name: len(candidates[name][0]))
         code, rules = candidates[selected]
+        if optimize and trace is not None:
+            traced, _ = emit(*args, **plans[selected], trace=trace)
+            if traced != code:
+                raise AssertionError("traced formula does not reproduce the selected Script")
         return code, {
             "selected": selected, "candidates": {name: len(result[0]) for name, result in candidates.items()},
             "rewrites": rules, "max_magnitude_bits": magnitude_bits(self.steps),
@@ -143,10 +146,11 @@ def cross_products(step, steps):
 
 
 def emit(input_count, steps, returns, *, rewrite=False, share=False, stack=False, search=False,
-         specialized=False):
+         specialized=False, trace=None):
     graph = Graph(input_count, share=share)
     values = list(graph.inputs)
     rules = Counter()
+    expansions = []
 
     def product(a, b):
         for constant, other in ((a, b), (b, a)):
@@ -156,7 +160,7 @@ def emit(input_count, steps, returns, *, rewrite=False, share=False, stack=False
                 return values[other]
         return graph.define(PRIMITIVES["int*"].code, (values[a], values[b]))
 
-    for step in steps[input_count:]:
+    for index, step in enumerate(steps[input_count:], start=input_count):
         args = tuple(values[arg] for arg in step.args)
         if step.operation == "literal":
             code = number(step.immediate)
@@ -170,6 +174,8 @@ def emit(input_count, steps, returns, *, rewrite=False, share=False, stack=False
                 code = PRIMITIVES["int+"].code
                 args = tuple(product(a, b) for a, b in pairs)
                 rules["expand-cross-products"] += 1
+                if trace is not None:
+                    expansions.append({"formula_step": index, "intermediates": [value.slot for value in args]})
             elif rewrite and step.operation == "int*" and any(
                     part.operation == "literal" and part.immediate == 2 for part in (left, right)):
                 code = asm("OP_DUP OP_ADD")
@@ -184,8 +190,10 @@ def emit(input_count, steps, returns, *, rewrite=False, share=False, stack=False
                 rules["fuse-cached-divisor-load"] += 1
         values.append(graph.define(code, args))
     outputs = tuple(values[result] for result in returns)
-    code = (graph.search_order(outputs) if search
-            else graph.emit(outputs, last_use=stack, compact=stack))
+    code = (graph.search_order(outputs, trace=trace) if search
+            else graph.emit(outputs, last_use=stack, compact=stack, trace=trace))
+    if trace is not None:
+        trace.update(formula_slots=[value.slot for value in values], cross_product_expansions=expansions)
     return code, dict(rules)
 
 
