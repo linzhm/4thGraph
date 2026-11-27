@@ -1,0 +1,264 @@
+{
+  "compiler_revision": "889ff6e5d37e0e0215fba306353a8a22795c327a",
+  "forth_optimization": "stack",
+  "baseline_revision": "56b364b",
+  "fixture_public_key_sha256": "9f107644c1084526af3bc8098680b05499a2325a644e388fb4f970e058d19d46",
+  "payment_lock_sha256": "c4f5c209d431c835f18955d500a8c5e102f856ab9db655742be3117be8ebaeb4",
+  "script_bytes": {
+    "arithmetic_script_bytes": {
+      "canonical": {
+        "ntt": 46134,
+        "inverse_ntt": 43500,
+        "fixed_key_equation": 500794
+      },
+      "signed_residues": {
+        "ntt": 38454,
+        "inverse_ntt": 40940,
+        "fixed_key_equation": 452154
+      },
+      "compact": {
+        "ntt": 28721,
+        "inverse_ntt": 29929,
+        "fixed_key_equation": 310198
+      }
+    },
+    "checked_equation_script_bytes": 122627,
+    "v08_checked_equation_script_bytes": 127876,
+    "v07_checked_equation_script_bytes": 124849,
+    "v06_checked_equation_script_bytes": 124849,
+    "v05_checked_equation_script_bytes": 137874,
+    "v02_checked_equation_script_bytes": 257122,
+    "forth_lock_with_previous_verifier_bytes": 663281,
+    "shake256_832_to_32_script_bytes": 74023,
+    "packed_keccak_script_bytes": {
+      "v0.6.0": 10955,
+      "v0.9.0": 10571,
+      "optimized": 10499
+    },
+    "sampler_without_shake_bytes": {
+      "v0.9.0": 17712,
+      "v0.10.0": 9029,
+      "optimized": 4469
+    },
+    "payment_script_bytes": {
+      "legacy": {
+        "keccak_f1600": 25097,
+        "signature_decode": 62723,
+        "sample_in_ball": 70229,
+        "apply_hints": 89687,
+        "shake256_832_to_32": 176542,
+        "input_binding": 718,
+        "payment_lock": 926403
+      },
+      "compact": {
+        "keccak_f1600": 21833,
+        "signature_decode": 46392,
+        "sample_in_ball": 63701,
+        "apply_hints": 66135,
+        "shake256_832_to_32": 153694,
+        "input_binding": 718,
+        "payment_lock": 663284
+      },
+      "v0.2.0": {
+        "keccak_f1600": 20533,
+        "signature_decode": 36152,
+        "sample_in_ball": 61101,
+        "apply_hints": 66135,
+        "shake256_832_to_32": 144594,
+        "input_binding": 718,
+        "payment_lock": 586981
+      },
+      "v0.3.0": {
+        "keccak_f1600": 20533,
+        "signature_decode": 36152,
+        "sample_in_ball": 61101,
+        "apply_hints": 66135,
+        "shake256_832_to_32": 144594,
+        "input_binding": 718,
+        "payment_lock": 467733
+      },
+      "v0.4.0": {
+        "keccak_f1600": 20533,
+        "signature_decode": 28224,
+        "sample_in_ball": 61101,
+        "apply_hints": 31087,
+        "shake256_832_to_32": 144594,
+        "input_binding": 718,
+        "payment_lock": 424757
+      },
+      "v0.5.0": {
+        "keccak_f1600": 12588,
+        "signature_decode": 28224,
+        "sample_in_ball": 45211,
+        "apply_hints": 31087,
+        "shake256_832_to_32": 88979,
+        "input_binding": 506,
+        "payment_lock": 345095
+      },
+      "v0.6.0": {
+        "keccak_f1600": 12588,
+        "signature_decode": 28224,
+        "sample_in_ball": 43512,
+        "apply_hints": 31087,
+        "shake256_832_to_32": 81821,
+        "input_binding": 506,
+        "payment_lock": 322447
+      },
+      "v0.7.0": {
+        "keccak_f1600": 12588,
+        "signature_decode": 28224,
+        "sample_in_ball": 40827,
+        "apply_hints": 23389,
+        "shake256_832_to_32": 79133,
+        "input_binding": 506,
+        "payment_lock": 308992
+      },
+      "v0.8.0": {
+        "keccak_f1600": 12588,
+        "signature_decode": 6007,
+        "sample_in_ball": 40827,
+        "apply_hints": 23389,
+        "shake256_832_to_32": 79133,
+        "input_binding": 506,
+        "payment_lock": 289802
+      },
+      "v0.9.0": {
+        "keccak_f1600": 12588,
+        "signature_decode": 6007,
+        "sample_in_ball": 40827,
+        "apply_hints": 11829,
+        "shake256_832_to_32": 79133,
+        "input_binding": 506,
+        "payment_lock": 272993
+      },
+      "v0.10.0": {
+        "keccak_f1600": 12588,
+        "signature_decode": 6007,
+        "sample_in_ball": 30638,
+        "apply_hints": 11829,
+        "shake256_832_to_32": 74766,
+        "input_binding": 506,
+        "payment_lock": 257662
+      },
+      "optimized": {
+        "keccak_f1600": 12588,
+        "signature_decode": 6007,
+        "sample_in_ball": 25717,
+        "apply_hints": 11829,
+        "shake256_832_to_32": 74023,
+        "input_binding": 506,
+        "payment_lock": 251704
+      }
+    }
+  },
+  "acceptance": {
+    "payment_cases": 640,
+    "expected_acceptances": 216,
+    "expected_rejections": 424,
+    "historical_lock_spends": 33,
+    "node_max_standard_validation_ms": 5000,
+    "node_max_nonstandard_validation_ms": 7000,
+    "acvp_cases": 15,
+    "wycheproof_python_cases": 80,
+    "wycheproof_script_cases": 77,
+    "wycheproof_compile_rejections": 3,
+    "sampler_selection_index_and_candidate_byte_cases_in_chain_gang": 9984,
+    "component_boundary_checks": {
+      "activation_contexts": [
+        {
+          "transaction_version": 1,
+          "prevout_height": 1,
+          "spend_height": 2
+        },
+        {
+          "transaction_version": 2,
+          "prevout_height": 1,
+          "spend_height": 4
+        },
+        {
+          "transaction_version": 2,
+          "prevout_height": 3,
+          "spend_height": 4
+        }
+      ],
+      "vectors": 92,
+      "expected_acceptances": 45,
+      "expected_rejections": 231
+    },
+    "payment_boundary_checks": {
+      "expected_acceptances": 2,
+      "expected_rejections": 16
+    }
+  },
+  "benchmark": {
+    "scope": "synthetic transactions with supplied prevouts",
+    "bsv_node_version": 101020300,
+    "chain_gang": {
+      "version": "0.13.2",
+      "commit": "74676b9c002c452e7f21a9ed9265f4972bef03f6"
+    },
+    "verified_transactions": 16,
+    "two_by_two": {
+      "0x41": {
+        "previous_transaction_bytes": 520616,
+        "transaction_bytes": 508700,
+        "previous_lock_bytes": [
+          251702,
+          251704
+        ],
+        "output_lock_bytes": [
+          251701,
+          251701
+        ],
+        "unlock_bytes": [
+          2588,
+          2588
+        ]
+      },
+      "0x61": {
+        "previous_transaction_bytes": 1551168,
+        "transaction_bytes": 1515420,
+        "previous_lock_bytes": [
+          251708,
+          251700
+        ],
+        "output_lock_bytes": [
+          251694,
+          251700
+        ],
+        "unlock_bytes": [
+          505950,
+          505950
+        ]
+      }
+    },
+    "timing": {
+      "unit": "ms",
+      "protocol": "alternate versions on one isolated node after two warm-ups per version",
+      "samples_per_version_and_engine": 11,
+      "bsv_node_scope": "local RPC round trip with explicit prevouts",
+      "two_by_two_medians": {
+        "0x41": {
+          "bsv_node": {
+            "baseline": 168.21,
+            "optimized": 157.16
+          },
+          "chain_gang": {
+            "baseline": 28.44,
+            "optimized": 28.3
+          }
+        },
+        "0x61": {
+          "bsv_node": {
+            "baseline": 211.88,
+            "optimized": 214.68
+          },
+          "chain_gang": {
+            "baseline": 32.65,
+            "optimized": 32.5
+          }
+        }
+      }
+    }
+  }
+}

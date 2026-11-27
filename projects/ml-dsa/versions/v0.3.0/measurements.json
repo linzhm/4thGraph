@@ -1,0 +1,141 @@
+{
+  "compiler_revision": "454456ffb125e1771fbc72241bf717a7814f2b88",
+  "forth_optimization": "stack",
+  "baseline_revision": "0a58852",
+  "fixture_public_key_sha256": "9f107644c1084526af3bc8098680b05499a2325a644e388fb4f970e058d19d46",
+  "payment_lock_sha256": "1be9cf198ad5fdb4ac6355ad6826b1eaca4390180f2d5b4d76510db34b2a4a8c",
+  "script_bytes": {
+    "arithmetic_script_bytes": {
+      "canonical": {
+        "ntt": 46134,
+        "inverse_ntt": 43500,
+        "fixed_key_equation": 500794
+      },
+      "signed_residues": {
+        "ntt": 38454,
+        "inverse_ntt": 40940,
+        "fixed_key_equation": 452154
+      },
+      "compact": {
+        "ntt": 28721,
+        "inverse_ntt": 29929,
+        "fixed_key_equation": 310198
+      }
+    },
+    "checked_equation_script_bytes": 137874,
+    "v02_checked_equation_script_bytes": 257122,
+    "forth_lock_with_previous_verifier_bytes": 663281,
+    "shake256_832_to_32_script_bytes": 144594,
+    "payment_script_bytes": {
+      "legacy": {
+        "signature_decode": 62723,
+        "sample_in_ball": 70229,
+        "apply_hints": 89687,
+        "shake256_832_to_32": 176542,
+        "payment_lock": 926403
+      },
+      "compact": {
+        "signature_decode": 46392,
+        "sample_in_ball": 63701,
+        "apply_hints": 66135,
+        "shake256_832_to_32": 153694,
+        "payment_lock": 663284
+      },
+      "v0.2.0": {
+        "signature_decode": 36152,
+        "sample_in_ball": 61101,
+        "apply_hints": 66135,
+        "shake256_832_to_32": 144594,
+        "payment_lock": 586981
+      },
+      "optimized": {
+        "signature_decode": 36152,
+        "sample_in_ball": 61101,
+        "apply_hints": 66135,
+        "shake256_832_to_32": 144594,
+        "payment_lock": 467733
+      }
+    }
+  },
+  "acceptance": {
+    "payment_cases": 640,
+    "expected_acceptances": 216,
+    "expected_rejections": 424,
+    "historical_lock_spends": 9,
+    "node_max_standard_validation_ms": 5000,
+    "node_max_nonstandard_validation_ms": 7000,
+    "acvp_cases": 15,
+    "wycheproof_python_cases": 80
+  },
+  "benchmark": {
+    "scope": "synthetic transactions with supplied prevouts",
+    "bsv_node_version": 101020300,
+    "chain_gang": {
+      "version": "0.13.2",
+      "commit": "74676b9c002c452e7f21a9ed9265f4972bef03f6"
+    },
+    "verified_transactions": 16,
+    "two_by_two": {
+      "0x41": {
+        "previous_transaction_bytes": 1179254,
+        "transaction_bytes": 940758,
+        "previous_lock_bytes": [
+          467731,
+          467733
+        ],
+        "output_lock_bytes": [
+          467730,
+          467730
+        ],
+        "unlock_bytes": [
+          2588,
+          2588
+        ]
+      },
+      "0x61": {
+        "previous_transaction_bytes": 3527082,
+        "transaction_bytes": 2811594,
+        "previous_lock_bytes": [
+          467737,
+          467729
+        ],
+        "output_lock_bytes": [
+          467723,
+          467729
+        ],
+        "unlock_bytes": [
+          938008,
+          938008
+        ]
+      }
+    },
+    "timing": {
+      "unit": "ms",
+      "protocol": "alternate versions on one isolated node after one warm-up per version",
+      "samples_per_version_and_engine": 7,
+      "bsv_node_scope": "local RPC round trip with explicit prevouts",
+      "two_by_two_medians": {
+        "0x41": {
+          "bsv_node": {
+            "baseline": 336.62,
+            "optimized": 272.31
+          },
+          "chain_gang": {
+            "baseline": 56.09,
+            "optimized": 42.08
+          }
+        },
+        "0x61": {
+          "bsv_node": {
+            "baseline": 652.51,
+            "optimized": 572.06
+          },
+          "chain_gang": {
+            "baseline": 90.12,
+            "optimized": 70.99
+          }
+        }
+      }
+    }
+  }
+}

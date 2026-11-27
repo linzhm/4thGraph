@@ -97,13 +97,16 @@ class ScriptVerifier:
     def __init__(self, adapter, verification_key, directory):
         self.adapter = str(Path(adapter).resolve())
         self.directory = Path(directory).resolve()
-        self.adapter_key = json.dumps(runar_key(verification_key), sort_keys=True)
+        self.adapter_key = runar_key(verification_key)
         self.key_digest = sha256(verification_key).hexdigest()
 
-    def emit(self, signals, proof=None):
+    def emit(self, signals, proof=None, *, fixed_msm=False):
+        key = self.adapter_key
+        if fixed_msm:
+            key = {**key, "pinnedPublicInputs": dict(enumerate(signals))}
         with TemporaryDirectory(prefix="runar-", dir=self.directory) as temporary:
             key_path = Path(temporary) / "vk.json"
-            key_path.write_text(self.adapter_key, encoding="utf-8")
+            key_path.write_text(json.dumps(key, sort_keys=True), encoding="utf-8")
             request = {"VK": str(key_path), "Public": signals, "Proof": proof}
             return bytes.fromhex(json.loads(checked([self.adapter], stdin=json.dumps(request))))
 
@@ -113,8 +116,8 @@ class ScriptVerifier:
             raise ValueError("owner must be a valid compressed secp256k1 public key")
         return authorize(owner)
 
-    def compile_predicate(self, signals):
-        template = self.emit(signals)
+    def compile_predicate(self, signals, *, fixed_msm=False):
+        template = self.emit(signals, fixed_msm=fixed_msm)
         prefix = asm("OP_0 OP_CHECKSIGVERIFY")
         if not template.startswith(prefix):
             raise ValueError("unexpected owner constructor slot in Rúnar artifact")
@@ -151,6 +154,11 @@ BN254_WORDS = {
                                            guard + verifier.compile_predicate(statement),
                                        ),
                                        "Rúnar Groth16 lock with bound public inputs", build_only=True),
+    "bn254-fixed-msm-and-pairing": Primitive(("bn254-authority", "bn254-statement"), ("bn254-verified",), None,
+                                             lambda verifier, _signals, _owner, guard, statement: (
+                                                 guard + verifier.compile_predicate(statement, fixed_msm=True),
+                                             ),
+                                             "Rúnar Groth16 lock with a precomputed public-input MSM", build_only=True),
 }
 BN254_TYPES = TYPES | {kind for word in BN254_WORDS.values() for kind in (*word.takes, *word.gives)}
 
