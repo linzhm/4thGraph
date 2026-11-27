@@ -343,3 +343,19 @@ REGTEST_CHRONICLE_HEIGHT=5 PYTHONPATH=src:. bash tools/verify_node.sh --profile 
   "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/experiments/high-level/window_compare.py \
   --joint-lowerings --forth-tuning --matrix-only --output workspace/schnorr-high-level/layout-dataflow-matrix.json
 ```
+
+<a name="variable-table-row-starts"></a>
+
+## Reusing unchanged variable-table coordinates
+
+The row mapping returns only the three transformed X coordinates and the two signed projective Y coordinates. The dataflow scheduler reuses the existing signed affine Y, the affine Z = 1, and the projective Z coordinates of 2P and 3P. Both the variable-table row bodies and the 18,379 B window loop retain their previous bytes. [Forth formula](../../../src/fourthgraph/stdlib/secp256k1-window.fth)
+
+| Build | Variable table | Payment lock | 2-input, 2-output OTDA ALL with constructor |
+| --- | ---: | ---: | ---: |
+| Layout-aware dataflow | 1,107 B | 22,465 B | 54,746 B |
+| Shared row coordinates | 1,078 B | 22,436 B | 54,630 B |
+| Manual v0.17.0 | 1,054 B | 22,435 B | 54,626 B |
+
+BSV Node 1.2.3 and pinned chain-gang replayed the tuned verifier and the eight constructor shapes. The default wallet still recognizes the published lock. The compiled lock uses the experimental constructor. [Replay summary](../experiments/high-level/row-start-layout.json)
+
+The layout-aware control comes from commit `5f72078`. Run the same benchmark commands above on the current checkout, writing the new results to separate files.

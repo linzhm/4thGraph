@@ -363,3 +363,19 @@ REGTEST_CHRONICLE_HEIGHT=5 PYTHONPATH=src:. bash tools/verify_node.sh --profile 
   "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/experiments/high-level/window_compare.py \
   --joint-lowerings --forth-tuning --matrix-only --output workspace/schnorr-high-level/layout-dataflow-matrix.json
 ```
+
+<a name="variable-table-row-starts"></a>
+
+## 复用变基表行起点的坐标
+
+行起点公式只返回三个变换后的 X 坐标和两个带符号的射影 Y 坐标。数据流调度复用带符号的仿射 Y、仿射 Z = 1，以及 2P、3P 的射影 Z。变基表三行的计算主体和 18,379 B 的窗口循环保持逐字节一致。[Forth 公式](../../../src/fourthgraph/stdlib/secp256k1-window.fth)
+
+| 构建 | 变基表 | 付款锁 | 两进两出 OTDA ALL，使用构造器 |
+| --- | ---: | ---: | ---: |
+| 布局参与数据流调度 | 1,107 B | 22,465 B | 54,746 B |
+| 复用行起点坐标 | 1,078 B | 22,436 B | 54,630 B |
+| 手工 v0.17.0 | 1,054 B | 22,435 B | 54,626 B |
+
+BSV Node 1.2.3 和固定版本的 chain-gang 复放了调优验证器与八种构造器场景。默认钱包仍识别已发布的付款锁，编译版通过实验构造器复放。[复放摘要](../experiments/high-level/row-start-layout.json)
+
+布局调度基线对应提交 `5f72078`。在当前版本运行上节相同的基准命令，将结果写入新的文件即可复现。

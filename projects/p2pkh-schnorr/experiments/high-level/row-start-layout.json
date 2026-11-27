@@ -1,0 +1,120 @@
+{
+  "compiler": "0.2.7",
+  "control_revision": "5f720782c24de994137f9293f7c6482204793eb8",
+  "candidate_source_revision": "4646eeee9565d1e021854da274cdc1a14f3ef05a",
+  "profile": "glv-joint-scaled-2/dataflow/batch/tuned",
+  "bsv_node": 101020300,
+  "chain_gang": {
+    "version": "0.13.2",
+    "commit": "74676b9c002c452e7f21a9ed9265f4972bef03f6"
+  },
+  "builds": {
+    "layout_aware_control": {
+      "variable_table_bytes": 1107,
+      "verifier_sha256": "ae0b7b62e25c0a38a4864ccbbd68e198a4fdf359ef176f708c8c0dda557fda9e",
+      "lock_bytes": 22465,
+      "lock_sha256": "817f9121e620ea8ee64f897a2dcb17a04e7e1cd8bfb56aecd5d5956eed6c1267",
+      "two_by_two_otda_all": {
+        "transaction_bytes": 54746,
+        "txid": "484c200001e222eac0f782d96c4c76fcf54cb147b8aae4147802822d2b066981",
+        "unlock_bytes": [
+          4849,
+          4849
+        ]
+      },
+      "variable_table_sha256": "b3a90bbcfa023476491bfcc2907ec6ed3740b1f1bb797e9819d6e5d922a3645b"
+    },
+    "shared_row_coordinates": {
+      "variable_table_bytes": 1078,
+      "verifier_sha256": "56a7dab95e38a59b2a339a2173de562a797d33e4f3896201628e2d0ca27b24d5",
+      "lock_bytes": 22436,
+      "lock_sha256": "ca23831d475602948dc65dfc902bf3eb696b18e8a7f2dd84f6a350cf92647482",
+      "two_by_two_otda_all": {
+        "transaction_bytes": 54630,
+        "txid": "82fa4908d6eca569b74d6d4422e1c9257987afdea0fa76a8e2996adfb94da343",
+        "unlock_bytes": [
+          4820,
+          4820
+        ]
+      },
+      "variable_table_sha256": "0da4fb1b495d027ba120d1491b10cde845912b8a02263c4608fbd20fc607239b"
+    },
+    "manual_v0_17_0": {
+      "variable_table_bytes": 1054,
+      "verifier_sha256": "961935071094a9844e2747fb55e17be638c780829a47d3611177b5feee03dcb6",
+      "lock_bytes": 22435,
+      "lock_sha256": "8ccf6e1e0070112603e45e0521a9194efcf61c601d55aadef9c0e20466e734c2",
+      "two_by_two_otda_all": {
+        "transaction_bytes": 54626,
+        "txid": "55b49929976830c485a98936e86cde4f07033d09d4601a7f1b4e6c16e34b007b",
+        "unlock_bytes": [
+          4819,
+          4819
+        ]
+      }
+    }
+  },
+  "identical_windows": true,
+  "window_bytes": 18379,
+  "unchanged_row_body": {
+    "bytes": 264,
+    "sha256": "d56c60533af672d37369efffb249cbafcdaad0b019c260418ffea0c66e8f606e"
+  },
+  "unchanged_legacy_lock_hashes": [
+    "manual-v0.17.0",
+    "glv-joint-window-2",
+    "glv-joint-packed-2",
+    "glv-joint-stack-2",
+    "glv-joint-scaled-2"
+  ],
+  "dual_engine_replay": {
+    "detached_cases": 27,
+    "positive_payments": 14,
+    "changed_locktime_rejections": 14,
+    "constructor_scenarios": [
+      "automatic-rollover/41",
+      "automatic-rollover/61",
+      "automatic-payment-and-change/41",
+      "automatic-payment-and-change/61",
+      "automatic-turnover/41",
+      "automatic-turnover/61",
+      "automatic-mixed-output/41",
+      "automatic-mixed-output/61"
+    ],
+    "extended_scenarios": 46,
+    "companion_cases": [
+      {
+        "case": "unpaired-companion/63",
+        "valid": [
+          true,
+          true
+        ],
+        "wrong_mode": [
+          true,
+          false
+        ],
+        "selection": [
+          "literal",
+          "literal"
+        ]
+      },
+      {
+        "case": "unpaired-companion/e3",
+        "valid": [
+          true,
+          true
+        ],
+        "wrong_mode": [
+          true,
+          false
+        ],
+        "selection": [
+          "literal",
+          "literal"
+        ]
+      }
+    ],
+    "matrix_mutation_verdicts_match_control": true,
+    "default_wallet_recognizes_candidate": false
+  }
+}
