@@ -72,7 +72,7 @@ def fragment(code, inputs, outputs):
                      "bounded Forth formula")
 
 
-def compile_candidate(plan, *, trace=False, source=None, entry="reference-bip340", source_compiler=SourceCompiler,
+def compile_candidate(plan, *, trace=False, source=None, entry="reference-bip340",
                       extra_vocabulary=None, source_prefix="", link_vocabulary=None):
     started = perf_counter_ns()
     arithmetic = ScriptBuilder.from_file(
@@ -90,7 +90,8 @@ def compile_candidate(plan, *, trace=False, source=None, entry="reference-bip340
     # four public secp256k1 constants. Group arithmetic comes from arithmetic.fth.
     vocabulary.update({
         "uint256be": script_word("bytes", "script-int", library.emit("script-uint256be", b""),
-                                 lambda data: int.from_bytes(data, "big")),
+                                 lambda data: int.from_bytes(data, "big"), repeatable=True,
+                                 fixed_width_code=(32, library.emit("script-uint256be-compact", b""))),
         "int<": cell_comparison("script-int script-int", asm("OP_LESSTHAN"), lambda a, b: a < b),
         "int=": cell_comparison("script-int script-int", asm("OP_NUMEQUAL"), lambda a, b: a == b),
         "scalar-threshold": script_word("", "script-int", number(1 << 255), lambda: 1 << 255),
@@ -99,13 +100,13 @@ def compile_candidate(plan, *, trace=False, source=None, entry="reference-bip340
                        ("generator-x", "secp256k1-gx"), ("generator-y", "secp256k1-gy")):
         literal = library.emit(word, b"")
         (value,), _ = evaluate(literal)
-        vocabulary[name] = script_word("", "script-int", literal, lambda value=value: decode_num(value))
+        vocabulary[name] = script_word("", "script-int", literal, lambda value=value: decode_num(value), repeatable=True)
     if extra_vocabulary is not None:
         vocabulary.update(extra_vocabulary(library))
     if link_vocabulary is not None:
         vocabulary.update(link_vocabulary(vocabulary, plan.runtime))
     source = source or HERE / "verifier.fth"
-    frontend = source_compiler(source_prefix + source.read_text(), vocabulary=vocabulary, source_path=source)
+    frontend = SourceCompiler(source_prefix + source.read_text(), vocabulary=vocabulary, source_path=source)
     compiled = compile_word(frontend.words[entry], plan.runtime)
     detached = library.emit("bip340-check-witness-depth", b"") + compiled.script
     owner_prefix = _contract().emit("schnorr-check-owner", b"", bytes(20))

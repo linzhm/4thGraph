@@ -140,14 +140,14 @@ def fuse_verifications(steps, uses):
     return fused
 
 
-def emit_steps(inputs, steps, returns, *, last_use=True, compact=False):
+def emit_steps(inputs, steps, returns, *, last_use=True, compact=False, trim_suffix=False):
     """Schedule already ordered operations with any number of results."""
     uses = Counter(returns)
     uses.update(arg for _, args, _ in steps for arg in args)
     stack = Layout(inputs, uses)
     for script, args, results in fuse_verifications(steps, uses):
         stack.execute(script, args, results, last_use=last_use, compact=compact)
-    return stack.finish(returns, last_use=last_use)
+    return stack.finish(returns, last_use=last_use, trim_suffix=trim_suffix)
 
 
 class Layout:
@@ -170,12 +170,23 @@ class Layout:
         self.code.extend(script)
         self.slots.extend(results)
 
-    def finish(self, returns, *, last_use):
+    def finish(self, returns, *, last_use, trim_suffix=False):
         if tuple(self.slots) != tuple(returns):
+            discarded = len(self.slots) - len(returns)
+            # A live suffix can be parked above the existing altstack, then restored
+            # in reverse pop order. Neither the caller's stacks nor the result order change.
+            if trim_suffix and discarded > 0 and tuple(self.slots[discarded:]) == tuple(returns):
+                direct = asm("OP_2DROP") * (discarded // 2) + asm("OP_DROP") * (discarded % 2)
+                parked = asm("OP_TOALTSTACK") * len(returns) + direct + asm("OP_FROMALTSTACK") * len(returns)
+                start = len(self.code)
+            else:
+                parked = None
             for staged, result in enumerate(returns):
                 self.access(result, staged, last_use=last_use)
             for _ in range(len(self.slots) - len(returns)):
                 self.discard(len(returns))
+            if parked is not None and len(parked) < len(self.code) - start:
+                self.code[start:] = parked
         return bytes(self.code)
 
     def access(self, value, staged, *, last_use):

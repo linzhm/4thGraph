@@ -93,10 +93,15 @@ layout: phi-x-input ( p:script-int px:script-int py:script-int k2:script-int sig
 layout: phi-y-input ( p:script-int px:script-int signed-y:script-int py:script-int
                        k2:script-int qx:script-int -- p px signed-y qx py k2 )
 
-: signed-variable-table ( script-int script-int script-int script-int script-int -- bytes )
+: signed-bases ( script-int script-int script-int script-int script-int --
+                 script-int script-int script-int script-int script-int )
     signed-p sign-ordinate
     phi-x-input swap glv-beta int* swap int-rem
-    phi-y-input sign-ordinate variable-table
+    phi-y-input sign-ordinate
+;
+
+: signed-variable-table ( script-int script-int script-int script-int script-int -- bytes )
+    signed-bases variable-table
 ;
 
 layout: keep-split ( p:script-int px:script-int py:script-int k1:script-int k2:script-int --

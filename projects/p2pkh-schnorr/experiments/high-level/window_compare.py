@@ -1,5 +1,6 @@
 """Replay binary and 64-window Forth with the same compiler and Bitcoin transactions."""
 import argparse
+from dataclasses import replace
 from hashlib import sha256
 import json
 import os
@@ -14,6 +15,7 @@ from fourthgraph import PROJECT_VERSION
 from fourthgraph.benchmark.validation import CONTEXT_PIN, Node, chain_metadata
 from fourthgraph.compiler.curve_lowering import compile_fixed_generator
 from fourthgraph.compiler.curve_windows import CURVES, GLV_REFERENCE, GLV_SCALED, JOINT_STRATEGIES
+from fourthgraph.compiler.lowering import DATAFLOW
 from fourthgraph.compiler.script_builder import ScriptBuilder
 
 
@@ -60,13 +62,24 @@ def main():
     auto = plan_by_name["compiler-auto"]
     manual, offset = compiled_template(bytes(20))
     args.output.parent.mkdir(parents=True, exist_ok=True)
-    variants = {}
-    scaled_joint_code = []
+    variants, scaled_joint_codes, rewrites = {}, {}, {}
     if args.joint_lowerings:
         for strategy in JOINT_STRATEGIES:
-            code_trace = scaled_joint_code if strategy == GLV_SCALED else None
-            detached, lock, _, _ = compile_window_candidate(auto, linked=True, strategy=strategy, joint_code=code_trace)
+            code_trace = [] if strategy == GLV_SCALED else None
+            detached, lock, info, _ = compile_window_candidate(auto, linked=True, strategy=strategy, joint_code=code_trace)
             variants[strategy] = detached, lock
+            rewrites[strategy] = info["runtime_rewrites"]
+            if code_trace:
+                scaled_joint_codes[strategy] = code_trace[0]
+        dataflow = replace(auto, runtime=DATAFLOW)
+        for batch in (False, True):
+            label = f"{GLV_SCALED}/dataflow" + ("/batch" if batch else "")
+            joint_code = []
+            detached, lock, info, _ = compile_window_candidate(dataflow, linked=True, strategy=GLV_SCALED,
+                                                               joint_code=joint_code, batch=batch)
+            variants[label] = detached, lock
+            scaled_joint_codes[label] = joint_code[0]
+            rewrites[label] = info["runtime_rewrites"]
     if args.matrix_only:
         activation = int(os.environ["SCRIPT_LAB_CHRONICLE_HEIGHT"])
         if activation < 3:
@@ -123,9 +136,12 @@ def main():
               "selected_automatic": min((name for name in timing_names if name != "manual-v0.17.0"),
                                         key=lambda name: rows[name]["lock_bytes"])}
     if variants:
-        report["scaled_vs_manual_regions"] = compare_scaled_regions(
-            builds["manual-v0.17.0"], builds[GLV_SCALED], scaled_joint_code[0],
-        )
+        selected = report["selected_automatic"]
+        report["compiler_rewrites"] = rewrites
+        if selected in scaled_joint_codes:
+            report["scaled_vs_manual_regions"] = compare_scaled_regions(
+                builds["manual-v0.17.0"], builds[selected], scaled_joint_codes[selected],
+            )
     args.output.write_text(json.dumps(report, indent=2) + "\n")
 
 

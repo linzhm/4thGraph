@@ -13,7 +13,7 @@ from fourthgraph.bsv.script import asm, decode_num, encode_num, push
 from fourthgraph.bsv.transaction import Input, Output, Transaction
 from fourthgraph.compiler.curve_lowering import compile_fixed_generator, compile_joint_generator_point
 from fourthgraph.compiler.curve_windows import CURVES, GLV_REFERENCE, JOINT_STRATEGIES, P256, SECP256K1, SM2, fixed_table, scalar_plans
-from fourthgraph.compiler.lowering import compile_word
+from fourthgraph.compiler.lowering import DATAFLOW, compile_word
 from fourthgraph.compiler.source import CompileError, SourceCompiler
 from fourthgraph.stdlib.weierstrass import CoordinateScale
 
@@ -152,7 +152,7 @@ class CurveWindowsTests(unittest.TestCase):
         program = json.loads(subprocess.check_output((*command, "curve-multiply", "--curve", "p256",
                                                       "--strategy", "fixed-window-4")))
         self.assertEqual(program["script_hex"], self.fixed["p256"]["fixed-window-4"].script.hex())
-        for optimization in ("baseline", "safe", "stack"):
+        for optimization in ("baseline", "safe", "stack", DATAFLOW):
             options = {name: compile_joint_generator_point(SECP256K1, name, optimization=optimization)
                        for name in JOINT_STRATEGIES}
             program = json.loads(subprocess.check_output((*command, "curve-multiply", "--curve", "secp256k1",

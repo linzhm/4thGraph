@@ -9,7 +9,7 @@ from tempfile import TemporaryDirectory
 from fourthgraph.verification.circuit_backend import CircuitProgram, emit_circuit, select_circuit
 from fourthgraph.verification.circuit_tools import CircuitFixture
 from fourthgraph.compiler.source import MAX_EXPANSION, PROJECT_NAME, PROJECT_VERSION, SourceCompiler, evaluate
-from fourthgraph.compiler.lowering import BASELINE, OPTIMIZATIONS, compile_word
+from fourthgraph.compiler.lowering import BASELINE, OPTIMIZATIONS, STACK_OPTIMIZATIONS, compile_word
 from fourthgraph.workflow.protocol import (
     normalize_target,
     BINDING_CODE, DEFAULT_TARGET, FLAG, OUTPUTS_HASH, ROOT_VALUE, TARGETS, TERMINAL_VALUE,
@@ -166,7 +166,7 @@ class ProofContract(StateContract):
         self.key = key.key if isinstance(key, CircuitFixture) else key
         word = compile_word(self.route, optimization, max_expansion=max_expansion)
         plain = self.compile(word.script, compact=False)
-        compact = self.compile(word.script, compact=True) if optimization == "stack" else plain
+        compact = self.compile(word.script, compact=True) if optimization in STACK_OPTIMIZATIONS else plain
         self.root = Output(ROOT_VALUE, compact if len(compact) < len(plain) else plain)
         self.optimization = optimization
         self.rewrites = list(word.describe()["rewrites"])

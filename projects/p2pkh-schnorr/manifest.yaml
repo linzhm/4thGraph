@@ -140,6 +140,7 @@ sections:
         and the v0.17.0 hand-tuned build. [Build and replay](docs/high-level-forth.en.md)
         · [64-window results](docs/high-level-forth.en.md#64-window-lowering)
         · [Joint lowering candidates](docs/high-level-forth.en.md#joint-lowering-candidates)
+        · [Dataflow iteration](docs/high-level-forth.en.md#dataflow-iteration)
     zh-CN:
       - |-
         ```sh
@@ -154,6 +155,7 @@ sections:
       - 高阶 Forth 实验对比普通二进制验签器、自动编译的 64 窗口 GLV 验签器和 v0.17.0 手工版本。[构建与复放](docs/high-level-forth.zh-CN.md)
         · [64 窗口结果](docs/high-level-forth.zh-CN.md#64-window-lowering)
         · [联合点乘候选](docs/high-level-forth.zh-CN.md#joint-lowering-candidates)
+        · [数据流优化迭代](docs/high-level-forth.zh-CN.md#dataflow-iteration)
   script_sizes:
     en:
       - |-

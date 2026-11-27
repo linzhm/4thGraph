@@ -14,6 +14,7 @@ from fourthgraph.bsv.script import asm, number
 
 from fourthgraph.compiler import pels_language
 from fourthgraph.compiler.ranges import NUMERIC_TYPES, RangeType, Slot, primitive_outputs, range_bound, script_num_checks
+from fourthgraph.compiler.stack_schedule import emit_steps
 from fourthgraph.stdlib import (
     LIBRARIES, WALLET_BACKEND, LibraryImport, interface_digest, numeric_stack_vocabulary, read_library, required_source,
 )
@@ -735,6 +736,25 @@ class SourceCompiler:
                                      primitive.location, name=name.name)
         self.definitions[name.name] = name
 
+    def declare_layout(self, at):
+        name = named_token(self.tokens, at, "layout name")
+        terms = self.tokens.stack_effect()
+        if not terms or terms.count("--") != 1 or name.name in self.words or name.name in BUILTIN_WORDS:
+            raise at.error("expected a new layout name and a named stack effect")
+        split = terms.index("--")
+        inputs = [term.split(":") for term in terms[:split]]
+        if any(len(pair) != 2 or not pair[0] or pair[1] not in self.stack_types for pair in inputs):
+            raise at.error("layout inputs require names and declared base types")
+        labels = {label: index for index, (label, _) in enumerate(inputs)}
+        if len(labels) != len(inputs) or any(value not in labels for value in terms[split + 1:]):
+            raise at.error("layout results must name declared inputs")
+        takes = tuple(kind for _, kind in inputs)
+        order = tuple(labels[value] for value in terms[split + 1:])
+        gives = tuple(takes[index] for index in order)
+        code = emit_steps(tuple(range(len(takes))), (), order, compact=True)
+        self.words[name.name] = Primitive(takes, gives, code, lambda *items: tuple(items[index] for index in order),
+                                          "typed layout permutation", repeatable=True)
+
     def declaration(self, token):
         tokens = self.tokens
         match token.name:
@@ -748,6 +768,8 @@ class SourceCompiler:
                 self.declare_bytes_param(token)
             case "curve-multiply:":
                 self.declare_curve_multiply(token)
+            case "layout:":
+                self.declare_layout(token)
             case "lock:":
                 self.define_lock(token)
             case ":":
