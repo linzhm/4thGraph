@@ -16,8 +16,9 @@ from signature import SpendAuthorization, authorization, current_input_unlock
 from test_payment import fixture_signature, signer
 
 from fourthgraph.benchmark.cases import seed
-from fourthgraph.benchmark.validation import CONTEXT_PIN, Node, chain_metadata, chain_verdict
-from fourthgraph.bsv.chain_gang import engine_transaction
+from fourthgraph.benchmark.validation import (ACTIVATION_HEIGHT, CONTEXT_PIN, SPEND_HEIGHT, UTXO_HEIGHT,
+                                              Node, chain_metadata, chain_verdict)
+from fourthgraph.bsv.chain_gang import engine_transaction, validate_at_heights
 from fourthgraph.bsv.differential import require_chain_gang_pin
 from fourthgraph.bsv.evaluate import ScriptError, evaluate
 from fourthgraph.bsv.script import asm, decode_num, encode_num, push
@@ -151,22 +152,39 @@ class BaselineAutoTests(unittest.TestCase):
         self.assertEqual(report["selected"], "formula")
         self.assertEqual(script, self.candidates["formula"])
 
-    def test_complete_spends_under_chain_gang(self):
+    def test_complete_spends_check_transaction_binding(self):
         try:
             engine = chain_metadata()
         except PackageNotFoundError:
             self.skipTest("requires pinned chain-gang")
         if engine["commit"] != CONTEXT_PIN:
             self.skipTest("requires pinned chain-gang")
+        cookie = os.environ.get("REGTEST_COOKIE")
+        node = Node(os.environ["REGTEST_URL"], cookie) if cookie else None
+        sponsor = parent(asm("OP_1"), "baseline-sponsor")
+        stale_rejection = "Script evaluated without error but finished with a false/empty top stack element"
         for name, script in self.candidates.items():
             previous = parent(script, "baseline-payment")
-            unsigned = Transaction((Input(previous.txid_wire(), 0),), (Output(9_000, asm("OP_1")),))
-            for flag in (0x41, 0x61, 0x63):
-                with self.subTest(plan=name, flag=flag):
-                    auth = authorization(engine_transaction(unsigned), 0, 10_000, flag)
-                    tx = sign(unsigned, 0, auth, self.key, self.public)
-                    self.assertTrue(chain_verdict(tx, (previous,)))
-                    self.assertFalse(chain_verdict(replace(tx, locktime=1), (previous,)))
+            for flag, unpaired in ((0x41, False), (0x61, False), (0x63, False), (0x63, True)):
+                with self.subTest(plan=name, flag=flag, unpaired=unpaired):
+                    parents = (sponsor, previous) if unpaired else (previous,)
+                    inputs = tuple(Input(funding.txid_wire(), 0) for funding in parents)
+                    value = sum(funding.outputs[0].value for funding in parents) - 1_000
+                    unsigned = Transaction(inputs, (Output(value, asm("OP_1")),))
+                    index = len(inputs) - 1
+                    auth = authorization(engine_transaction(unsigned), index, previous.outputs[0].value, flag)
+                    self.assertEqual(auth.companion, unpaired)
+                    tx = sign(unsigned, index, auth, self.key, self.public)
+                    stale = replace(tx, locktime=1)
+                    context = {"spend_height": SPEND_HEIGHT, "activation_height": ACTIVATION_HEIGHT,
+                               "utxo_heights": (UTXO_HEIGHT,) * len(inputs)}
+                    validate_at_heights(tx, parents, **context)
+                    with self.assertRaisesRegex(ValueError, r"^Error evaluating the script `Top of stack is false`$"):
+                        validate_at_heights(stale, parents, **context)
+                    if node is not None:
+                        self.assertEqual(node.verdicts(tx, parents, **context, timeout_us=1_000_000), [True] * len(inputs))
+                        self.assertEqual(node.verdicts(stale, parents, **context, timeout_us=1_000_000,
+                                                       expected_rejection=stale_rejection), [True] * index + [False])
 
 
 @unittest.skipUnless(os.environ.get("REGTEST_COOKIE"), "requires the isolated regtest launcher")

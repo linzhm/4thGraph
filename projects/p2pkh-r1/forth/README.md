@@ -65,8 +65,9 @@ python -m unittest -v test_r1_baseline.BaselineAutoTests
 32 个候选。候选用计划名去重。`optimization.window_region.search` 记录每轮
 的候选、累计最优和停止原因。请求的轮数是上限，达到候选上限时可提前结束。
 
-花费测试使用固定版 chain-gang，覆盖 BIP143 ALL、OTDA ALL 和配对的
-OTDA SINGLE。正例使用测试签名和实际夹具父输出；改动花费的锁定时间后应拒绝。
+花费测试使用固定版 chain-gang，覆盖 BIP143 ALL、OTDA ALL、配对和无配对的
+OTDA SINGLE。正例使用测试签名和实际夹具父输出。改动花费的锁定时间后，测试必须观察到
+交易绑定失败。用上文的隔离 regtest 启动器运行同一组测试时，BSV Node 也核对这些判定。
 这个入口供编译实验使用，钱包继续使用版本清单。
 
 `msm.fth` 用显式的 P‑256 双标量乘法表达窗口计算。编译器扫描固定生成元、标量范围和曲线点校验，比较各构造的实际锁与付款字节数，并逐字节核对 OTDA 重建。

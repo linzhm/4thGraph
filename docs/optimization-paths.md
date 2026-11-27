@@ -26,9 +26,9 @@ Freeze `r1-baseline-lock` and its imports, then measure the current compiler bef
 | Existing `--optimize` | 139,333 | 139,786 | 24 / 39 |
 | `--auto`, selected `split-5x4-affine-g-ifdup` | 41,264 | 41,715 | 161 / 119 |
 
-The transaction metric is for one synthetic input spending into one output. The development evaluator observes the stack peaks. All six candidates pass the complete spend with pinned chain-gang under BIP143 ALL, OTDA ALL and paired OTDA SINGLE, and reject the stale witness after a locktime change. The result shows a size and stack tradeoff, with this opt-in compiler entry and fixture providing review evidence. [Build and replay](../projects/p2pkh-r1/forth/README.md)
+The transaction metric is for one synthetic input spending into one output. The development evaluator observes the stack peaks. Pinned chain-gang and BSV Node regtest verify all six candidates under BIP143 ALL, OTDA ALL and both paired and unpaired OTDA SINGLE. Each rejects the stale witness at the transaction binding check after a locktime change. [Build and replay](../projects/p2pkh-r1/forth/README.md)
 
-With `--auto-rounds 6`, the search compiled 32 distinct candidates in five rounds and stopped at the candidate budget. Adjusting the window widths and guard choices left the winning Script at 41,264 B. The JSON records which candidates entered each round and the best lock through that round.
+With `--auto-rounds 6`, the search compiled 32 distinct candidates in five rounds and stopped at the candidate budget. The same spend checks cover all 32 candidates. Adjusting the window widths and guard choices left the winning Script at 41,264 B. The JSON records which candidates entered each round and the best lock through that round.
 
 ## Ordered formula rules
 
