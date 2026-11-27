@@ -22,7 +22,7 @@ from .test_backend import check_spend, g1_json, g2_json, spend_fixture
 
 
 HIGH_LEVEL = (Path(__file__).resolve().parents[2]
-              / "projects/groth16-verifier/experiments/high-level/verifier.fth")
+              / "projects/groth16-bls12-381/experiments/high-level/verifier.fth")
 
 
 class ForthVerifierTests(unittest.TestCase):

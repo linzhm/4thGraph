@@ -193,9 +193,9 @@ PY
 
 编译器保存公式的中间表示。调用构造器能证明某个参数为常量时，可在生成字节前绑定该参数并重新推导中间量范围，生成少一个运行时输入的内核。R1 的仿射点加只在选中的固定生成元表项满足 `Z=1` 时进入该内核，零下标由组单位元分支处理。 [R1 前置扫描和候选](../../projects/p2pkh-r1/forth/README.md#点乘窗口候选)
 
-`compiler.curve_windows.signed_radix4` 接收已证明的非负标量上界。每个完整窗口把标量拆成 `4*q+d`，其中 `q=floor((n+1)/4)` 且 `d` 在 `[-1,2]` 内。编译器按商的上界继续规划窗口，必要时保留末尾进位。宿主端与 Script 后端可用同一窗口计划生成数位。[Groth16 MSM 对照](../../projects/groth16-verifier/versions/v0.8.0/measurements.json)
+`compiler.curve_windows.signed_radix4` 接收已证明的非负标量上界。每个完整窗口把标量拆成 `4*q+d`，其中 `q=floor((n+1)/4)` 且 `d` 在 `[-1,2]` 内。编译器按商的上界继续规划窗口，必要时保留末尾进位。宿主端与 Script 后端可用同一窗口计划生成数位。[Groth16 MSM 对照](../../projects/groth16-bls12-381/versions/v0.8.0/measurements.json)
 
-固定基点的生成器可用 `double_from_affine_slope` 从受信的预计算切线斜率重建仿射二倍点。它以调用方提供的域运算发出坐标乘法、减法和约减。连续的 radix-4 窗口可用两次重建得到当前的二倍点和下一窗口的四倍点。[点表表示对照](../../projects/groth16-verifier/versions/v0.9.0/measurements.json)
+固定基点的生成器可用 `double_from_affine_slope` 从受信的预计算切线斜率重建仿射二倍点。它以调用方提供的域运算发出坐标乘法、减法和约减。连续的 radix-4 窗口可用两次重建得到当前的二倍点和下一窗口的四倍点。[点表表示对照](../../projects/groth16-bls12-381/versions/v0.9.0/measurements.json)
 
 ## 电路入口
 
