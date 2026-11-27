@@ -56,9 +56,13 @@ def runar_overlay(repository):
         compact = directory / "compilers/go/codegen/compact_groth16.go"
         compact.write_bytes((RUNAR_EXTENSION / compact.name).read_bytes())
         checked(["git", "apply", "--unidiff-zero", str(RUNAR_EXTENSION / "forth_groth16.patch")], cwd=directory)
+        forth = compact.with_name("forth_groth16.go")
+        forth.write_bytes((RUNAR_EXTENSION / forth.name).read_bytes())
+        checked(["git", "apply", "--unidiff-zero", str(RUNAR_EXTENSION / "forth_liveness.patch")], cwd=directory)
         for extension in RUNAR_EXTENSION.glob("*.go"):
+            patched = compact.parent / extension.name
             files[str(repository / "compilers/go/codegen" / extension.name)] = str(
-                compact if extension.name == compact.name else extension)
+                patched if patched.exists() else extension)
         overlay = directory / "overlay.json"
         overlay.write_text(json.dumps({"Replace": files}), encoding="utf-8")
         yield overlay, repository / "compilers/go", {**os.environ, "GOWORK": str(repository / "go.work")}
