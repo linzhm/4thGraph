@@ -24,7 +24,12 @@ BASE_FIELD = 2188824287183927522224640574525727508869631115729782366268903789464
 PUBLIC_COUNT = 5
 ADAPTER = Path(__file__).resolve().parent / "groth16_bn254_adapter.go"
 RUNAR_EXTENSION = ADAPTER.parent / "runar"
-RUNAR_FILES = ("compilers/go/codegen/bn254_groth16.go", "compilers/go/compiler/groth16_wa.go")
+RUNAR_FILES = (
+    "compilers/go/codegen/bn254.go",
+    "compilers/go/codegen/bn254_ext.go",
+    "compilers/go/codegen/bn254_groth16.go",
+    "compilers/go/compiler/groth16_wa.go",
+)
 COMPACT_SUBGROUP = "projective-naf"
 COMPACT_MODULO_THRESHOLD = 64
 
@@ -42,7 +47,7 @@ def runar_overlay(repository):
     revision = checked(["git", "rev-parse", "HEAD"], cwd=repository).strip()
     if revision != RUNAR_REVISION or checked(["git", "status", "--porcelain", "-uno"], cwd=repository).strip():
         raise ValueError(f"expected an unmodified Rúnar checkout at {RUNAR_REVISION}")
-    # Apply the verifier extension to copies of the two pinned source files.
+    # Apply the verifier extension to copies of pinned source files.
     # Go overlays use those copies without editing the caller's checkout.
     with TemporaryDirectory(prefix="4thgraph-runar-overlay-") as temporary:
         directory = Path(temporary)
@@ -59,6 +64,7 @@ def runar_overlay(repository):
         forth = compact.with_name("forth_groth16.go")
         forth.write_bytes((RUNAR_EXTENSION / forth.name).read_bytes())
         checked(["git", "apply", "--unidiff-zero", str(RUNAR_EXTENSION / "forth_liveness.patch")], cwd=directory)
+        checked(["git", "apply", "--unidiff-zero", str(RUNAR_EXTENSION / "forth_fp12_rename.patch")], cwd=directory)
         for extension in RUNAR_EXTENSION.glob("*.go"):
             patched = compact.parent / extension.name
             files[str(repository / "compilers/go/codegen" / extension.name)] = str(

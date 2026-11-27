@@ -1,0 +1,27 @@
+--- a/compilers/go/codegen/bn254.go
++++ b/compilers/go/codegen/bn254.go
+@@ -85,0 +86,2 @@
++	// When enabled, Fp12 result names are rebound at their existing indices.
++	fp12RenameInPlace bool
+--- a/compilers/go/codegen/bn254_ext.go
++++ b/compilers/go/codegen/bn254_ext.go
+@@ -1232,0 +1233,11 @@
++	if t.fp12RenameInPlace {
++		var slots [12]int
++		// Resolve every coefficient before updating the tracker.
++		for i, name := range appendFp12SlotNames(nil, srcPrefix) {
++			slots[i] = len(t.nm) - 1 - t.findDepth(name)
++		}
++		for i, name := range appendFp12SlotNames(nil, dstPrefix) {
++			t.nm[slots[i]] = name
++		}
++		return
++	}
+--- a/compilers/go/codegen/forth_groth16.go
++++ b/compilers/go/codegen/forth_groth16.go
+@@ -18 +18,2 @@
+-	JacobianLastUse bool
++	JacobianLastUse   bool
++	Fp12RenameInPlace bool
+@@ -174,0 +176 @@
++	t.fp12RenameInPlace = plan.Fp12RenameInPlace
