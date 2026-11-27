@@ -72,6 +72,7 @@ sections:
       - The payment wrapper checks the public-key hash and binds the verified message to the actual input.
         The released verifier uses coordinate scaling, paired doubling and secp256k1 GLV.
         [Payment protocol and curve formulas](docs/spec.en.md) · [Forth payment source](reference/schnorr.fth)
+      - <a name="secp256k1-arithmetic"></a>
       - Contracts performing secp256k1 point arithmetic in Script can reuse these curve kernels.
         [secp256k1 library](../../src/fourthgraph/stdlib/secp256k1.fth)
     zh-CN:
@@ -80,6 +81,7 @@ sections:
         2. 用原始 `r`、x-only 公钥和消息计算 BIP340 标签哈希，再对群阶取模得到 `e`。
         3. 用 64 个两位窗口计算 `sG − eP`。检查射影坐标 Z 非零，再比对偶数 nonce 点的两个坐标。
       - 付款封装校验公钥哈希，并把已验证的消息绑定到实际输入。发布版验签器使用坐标缩放、连续倍点和 secp256k1 GLV。[付款协议与曲线公式](docs/spec.zh-CN.md) · [Forth 付款源码](reference/schnorr.fth)
+      - <a name="secp256k1-运算"></a>
       - 在 Script 中执行 secp256k1 点运算的合约可以复用这些曲线内核。[secp256k1 库](../../src/fourthgraph/stdlib/secp256k1.fth)
   reproduction:
     en:
@@ -137,10 +139,12 @@ sections:
         owner before approving the outputs and fee. Use `signPayment` for a single-input BIP143 ALL
         payment or `signInput` for a prepared transaction. The signer receives a 32-byte BIP340
         message and returns a 64-byte signature. [SDK quickstart](docs/sdk.en.md#quickstart)
+      - <a name="build-from-forth"></a>
       - Load `REQUIRE stdlib/bip340.fth` for the detached verifier. The reference payment code adds
         ownership and transaction binding. [Forth source](reference/schnorr.fth) · [Version index](versions/index.json)
     zh-CN:
       - 用 x-only 公钥或其 HASH160 调用 `createLock`。批准输出和手续费前，核验入金 outpoint、金额和所有者。单输入 BIP143 ALL 付款用 `signPayment`，已组装交易用 `signInput`。签名器接收 32 字节 BIP340 消息并返回 64 字节签名。[SDK 快速上手](docs/sdk.zh-CN.md#quickstart)
+      - <a name="从-forth-构建"></a>
       - 用 `REQUIRE stdlib/bip340.fth` 加载独立验签器。参考付款代码加入所有者校验和交易绑定。[Forth 源码](reference/schnorr.fth) · [版本目录](versions/index.json)
   transactions:
     en:

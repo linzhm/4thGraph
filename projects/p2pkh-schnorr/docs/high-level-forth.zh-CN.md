@@ -59,6 +59,7 @@ REGTEST_CHRONICLE_HEIGHT=5 PYTHONPATH=src:. bash tools/verify_node.sh --profile 
 以下各阶段均用同一两进两出 OTDA ALL 构造器夹具。链接给出各构建及对照的原始记录。
 
 <a name="64-window-lowering"></a>
+<a name="曲线专用的-64-窗口-lowering"></a>
 
 ### 64 窗口 lowering
 

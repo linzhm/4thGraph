@@ -34,6 +34,8 @@
 
 付款封装校验公钥哈希，并把已验证的消息绑定到实际输入。发布版验签器使用坐标缩放、连续倍点和 secp256k1 GLV。[付款协议与曲线公式](docs/spec.zh-CN.md) · [Forth 付款源码](reference/schnorr.fth)
 
+<a name="secp256k1-运算"></a>
+
 在 Script 中执行 secp256k1 点运算的合约可以复用这些曲线内核。[secp256k1 库](../../src/fourthgraph/stdlib/secp256k1.fth)
 
 ## 复现方法
@@ -77,6 +79,8 @@ bash tools/verify_node.sh -- bash sdk/verify_wallet.sh p2pkh-schnorr
 ## 开发和钱包接入
 
 用 x-only 公钥或其 HASH160 调用 `createLock`。批准输出和手续费前，核验入金 outpoint、金额和所有者。单输入 BIP143 ALL 付款用 `signPayment`，已组装交易用 `signInput`。签名器接收 32 字节 BIP340 消息并返回 64 字节签名。[SDK 快速上手](docs/sdk.zh-CN.md#quickstart)
+
+<a name="从-forth-构建"></a>
 
 用 `REQUIRE stdlib/bip340.fth` 加载独立验签器。参考付款代码加入所有者校验和交易绑定。[Forth 源码](reference/schnorr.fth) · [版本目录](versions/index.json)
 

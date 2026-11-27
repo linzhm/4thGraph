@@ -59,6 +59,7 @@ The binary source implements the BIP340 equation with a 256-round joint multipli
 The following milestones use the same two-input, two-output OTDA ALL constructor fixture. Each link leads to the measured build and its controls.
 
 <a name="64-window-lowering"></a>
+<a name="curve-aware-64-window-lowering"></a>
 
 ### 64-window lowering
 

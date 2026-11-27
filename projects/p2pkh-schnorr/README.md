@@ -34,6 +34,8 @@ The high-level 64-window Forth experiment records the current automatic build an
 
 The payment wrapper checks the public-key hash and binds the verified message to the actual input. The released verifier uses coordinate scaling, paired doubling and secp256k1 GLV. [Payment protocol and curve formulas](docs/spec.en.md) · [Forth payment source](reference/schnorr.fth)
 
+<a name="secp256k1-arithmetic"></a>
+
 Contracts performing secp256k1 point arithmetic in Script can reuse these curve kernels. [secp256k1 library](../../src/fourthgraph/stdlib/secp256k1.fth)
 
 ## Reproduce the checks
@@ -77,6 +79,8 @@ The owner field starts at byte offset 189. The release record includes paired me
 ## Developer and wallet integration
 
 Use `createLock` with the x-only key or its HASH160. Verify the funding outpoint, amount and owner before approving the outputs and fee. Use `signPayment` for a single-input BIP143 ALL payment or `signInput` for a prepared transaction. The signer receives a 32-byte BIP340 message and returns a 64-byte signature. [SDK quickstart](docs/sdk.en.md#quickstart)
+
+<a name="build-from-forth"></a>
 
 Load `REQUIRE stdlib/bip340.fth` for the detached verifier. The reference payment code adds ownership and transaction binding. [Forth source](reference/schnorr.fth) · [Version index](versions/index.json)
 
