@@ -291,7 +291,7 @@ The stack-table preparation serializes the checked nonnegative scalar `s` once i
 | Direct byte packing | 2,970 B | 22,855 B | 56,306 B |
 | Handwritten v0.17.0 | 2,763 B | 22,435 B | 54,626 B |
 
-Both automatic builds use the same `dataflow` configuration and the same transaction fixtures. The 18,379 B window sequence is byte-identical. The 420 B gap to the handwritten lock comprises 207 B before the joint word, 207 B in joint preparation, and 6 B after the windows. Packing tests cover every 2-bit position of each lane, the all-zero and all-ones cases, and deterministic mixed inputs. Both engines replayed the verifier and payment cases and the eight constructor scenarios. [Measurements](../experiments/high-level/fixed-scalar-measurements.json) · [Transaction matrix](../experiments/high-level/fixed-scalar-matrix.json)
+At `06ad1aa`, both automatic builds use the same `dataflow` configuration and transaction fixtures. The 18,379 B window sequence is byte-identical. The 420 B gap to the handwritten lock comprises 207 B before the joint word, 207 B in joint preparation, and 6 B after the windows. Packing tests cover every 2-bit position of each lane, the all-zero and all-ones cases, and deterministic mixed inputs. Both engines replayed the verifier and payment cases and the eight constructor scenarios. [Measurements](../experiments/high-level/fixed-scalar-measurements.json) · [Transaction matrix](../experiments/high-level/fixed-scalar-matrix.json)
 
 ```sh
 PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
@@ -300,4 +300,25 @@ PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
 REGTEST_CHRONICLE_HEIGHT=5 PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
   "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/experiments/high-level/window_compare.py \
   --joint-lowerings --forth-tuning --matrix-only --output workspace/schnorr-high-level/fixed-scalar-matrix.json
+```
+
+## Sharing the group order with the GLV split
+
+The tuned verifier reduces the challenge just after mapping the affine points. It checks `s < n`, computes `k = n - (hash mod n)`, and passes the same registered order `n` to the existing split-with-order word. The digest still uses the original encodings. The explicit-order joint word receives the checked scalars and the registered field and order. [Verifier Forth](../experiments/high-level/window-verifier-tuned.fth) · [Joint Forth](../../../src/fourthgraph/compiler/secp256k1-joint-stack.fth)
+
+| Build | Before the joint word | Joint preparation | Payment lock | 2×2 OTDA ALL with reconstruction |
+| --- | ---: | ---: | ---: | ---: |
+| Embedded GLV order at `06ad1aa` | 616 B | 2,970 B | 22,855 B | 56,306 B |
+| Shared order | 624 B | 2,939 B | 22,832 B | 56,214 B |
+| Handwritten v0.17.0 | 409 B | 2,763 B | 22,435 B | 54,626 B |
+
+Passing the order adds 8 B before the joint word and saves 31 B in its preparation. The 18,379 B window sequence is byte-identical. The 397 B gap to the handwritten lock comprises 215 B before the joint word, 176 B in preparation, and 6 B after the windows. The two mapped joint words return identical coordinates at scalar boundaries. Both engines replayed the verifier and payment cases and the eight constructor scenarios. [Measurements](../experiments/high-level/shared-order-measurements.json) · [Transaction matrix](../experiments/high-level/shared-order-matrix.json)
+
+```sh
+PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
+  "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/experiments/high-level/window_compare.py \
+  --joint-lowerings --forth-tuning --output workspace/schnorr-high-level/shared-order-measurements.json
+REGTEST_CHRONICLE_HEIGHT=5 PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
+  "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/experiments/high-level/window_compare.py \
+  --joint-lowerings --forth-tuning --matrix-only --output workspace/schnorr-high-level/shared-order-matrix.json
 ```
