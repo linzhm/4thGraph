@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 
 from assemble import TEMPLATE_VERSION, TEMPLATE_VERSIONS, forth_compiler, sm3_blocks
-from assemble import AFFINE_GENERATOR_TEMPLATE_VERSION, SPLIT_ROTATION_TEMPLATE_VERSION
+from assemble import AFFINE_GENERATOR_TEMPLATE_VERSION, CARRIED_FIELD_TEMPLATE_VERSION, SPLIT_ROTATION_TEMPLATE_VERSION
 from p2pkh_sm2 import MIXED_OTDA_VERSIONS, _canonical
 from sm3_script import SPLIT_ROTATION_WRAP
 from fourthgraph.bsv.evaluate import evaluate
@@ -100,7 +100,7 @@ def earlier_spans(raw, options):
         matches.append(cursor)
 
 
-def encode_suffix(raw, references, library):
+def encode_suffix(raw, references, library, *, literal_runs=None):
     """Serialize one compression plan and count its selected fragments."""
     cat = asm("OP_CAT")
     options = [entry.copy() for entry in references]
@@ -135,7 +135,10 @@ def encode_suffix(raw, references, library):
         while cursor < len(raw) and choices[cursor] is None:
             cursor += 1
         if cursor != start:
-            program.extend(push(raw[start:cursor]) + cat)
+            literal = raw[start:cursor]
+            if literal_runs is not None:
+                literal_runs.append(literal)
+            program.extend(push(literal) + cat)
         if cursor < len(raw):
             width, code = choices[cursor]
             if code in cached:
@@ -151,7 +154,17 @@ def encode_suffix(raw, references, library):
     return bytes(program), uses, copy_savings
 
 
-def compile_suffix(raw, library, *, optimize_library=False):
+def literal_fragments(literal_runs, library):
+    """Suggest four cache entries from bytes the first parse still pushes literally."""
+    counts = Counter(literal[offset:offset+width] for literal in literal_runs for width in range(4, 32)
+                     for offset in range(len(literal)-width+1))
+    gains = {fragment: (len(fragment)-3)*uses-len(push(fragment)) for fragment, uses in counts.items()
+             if uses > 1 and fragment not in library}
+    return sorted((fragment for fragment, gain in gains.items() if gain > 0),
+                  key=gains.__getitem__, reverse=True)[:4]
+
+
+def compile_suffix(raw, library, *, optimize_library=False, refine_library=False):
     """Encode literal runs, cached fragments and copies of earlier bytes."""
     references = [{} for _ in raw]
     earlier_spans(raw, references)
@@ -167,8 +180,20 @@ def compile_suffix(raw, library, *, optimize_library=False):
     augmented, uses, _ = encode_suffix(raw, references, expanded)
     # Place frequently used entries nearest the top, where picking is cheaper.
     ordered = sorted(expanded, key=uses.__getitem__)
-    reordered, _, _ = encode_suffix(raw, references, ordered)
-    return min((baseline, reduced, augmented, reordered), key=len)
+    literal_runs = [] if refine_library else None
+    reordered, _, _ = encode_suffix(raw, references, ordered, literal_runs=literal_runs)
+    candidates = [baseline, reduced, augmented, reordered]
+    if literal_runs:
+        proposed = ordered + literal_fragments(literal_runs, ordered)
+        _, uses, _ = encode_suffix(raw, references, proposed)
+        retained = sorted((fragment for fragment in proposed if uses[fragment] > 1), key=uses.__getitem__)
+        rescored, _, _ = encode_suffix(raw, references, retained)
+        candidates.append(rescored)
+        # Removing even a reused entry can lower copy costs for the other entries.
+        for index in range(len(retained)):
+            pruned, _, _ = encode_suffix(raw, references, retained[:index] + retained[index+1:])
+            candidates.append(pruned)
+    return min(candidates, key=len)
 
 
 def generate(version=TEMPLATE_VERSION):
@@ -176,6 +201,7 @@ def generate(version=TEMPLATE_VERSION):
     prefix, suffix = lock[:offset], lock[offset + 20:]
     program = push(prefix) + compile_suffix(
         suffix, function_library(version), optimize_library=version != TEMPLATE_VERSION,
+        refine_library=version >= CARRIED_FIELD_TEMPLATE_VERSION,
     )
     if evaluate(program) != ([prefix, suffix], []):
         raise ValueError("OTDA constructor does not reproduce the canonical SM2 template")

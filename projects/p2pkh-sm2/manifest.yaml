@@ -51,7 +51,7 @@ sections:
       - 如果付款会新建 SM2 输出，用相同的输入输出数量比较 BIP143 和 OTDA。钱包会为符合条件的 Chronicle 花费重建签名预映像，缩短 OTDA 解锁脚本。每个新输出携带所选模板的完整锁定脚本。[重建实测](#otda-constructor)
   algorithm:
     en:
-      - '[v1.10.0 candidate](#v1100)'
+      - '[v1.11.0 candidate](#v1110)'
       - '[Protocol](docs/spec.en.md) · [Security](docs/developer.en.md#security) · [Verify](#developer-checks-and-cost-analysis)
         · [Transaction costs](#complete-transactions-and-stack-measurements)'
       - |-
@@ -64,14 +64,14 @@ sections:
       - '### Project version and locking template'
       - Version 1.1.0 enables OTDA reconstruction by default for locking template `1` from the first public
         release, v1.0.0. Versions 1.2.0 through 1.7.0 correspond to templates `2` through `7`. Versions
-        1.9.0 and 1.10.0 add templates `8` and `9`. The wallet recognizes and spends all nine templates
+        1.9.0 through 1.11.0 add templates `8` through `10`. The wallet recognizes and spends all ten templates
         from the previous output's exact bytes.
       - |-
         | Property | Value |
         | --- | --- |
         | Recipient identifier | HASH160 of the 65-byte public key `04 \|\| X_BE32 \|\| Y_BE32` |
         | SM2 user ID | The fixed ASCII value `1234567812345678` |
-        | Locking script | 144,925 bytes for template `1`, 131,565 for `2`, 125,616 for `3`, 121,847 for `4`, 110,747 for `5`, 100,663 for `6`, 98,362 for `7`, 96,616 for `8`, and 95,790 for `9` |
+        | Locking script | 144,925 bytes for template `1`, 131,565 for `2`, 125,616 for `3`, 121,847 for `4`, 110,747 for `5`, 100,663 for `6`, 98,362 for `7`, 96,616 for `8`, 95,790 for `9`, and 94,355 for `10` |
         | Unlocking script | 291 bytes with BIP143, 294 bytes with unpaired OTDA SINGLE, and transaction-dependent for other OTDA modes |
         | Unlocking stack | Signing preimage, uncompressed public key, and 64-byte `r \|\| s` signature |
         | Signature modes | BIP143 and Chronicle OTDA, each with ALL, NONE, or SINGLE and optional ANYONECANPAY |
@@ -83,8 +83,8 @@ sections:
       - <a name="otda-constructor"></a>
       - '### Reconstruct OTDA outputs'
       - The constructor is part of `scriptSig`. It uses 12,703 bytes for template `1`, 11,816 for `2`,
-        11,807 for `3`, 11,618 for `4`, 11,549 for `5`, 9,363 for `6`, 9,447 for `7`, 7,644 for `8`, and
-        7,718 for `9`. Templates `2` through `9` select reusable fragments from the initial encoding and
+        11,807 for `3`, 11,618 for `4`, 11,549 for `5`, 9,363 for `6`, 9,447 for `7`, 7,644 for `8`, 7,718 for `9`, and
+        7,754 for `10`. Templates `2` through `10` select reusable fragments from the initial encoding and
         place frequently used fragments near the top of the stack. The constructor reconstructs the exact
         signing preimage and fills each eligible output's HASH160 slot. The signing callback receives
         the same message and SM2 user ID as the literal encoding. Use the final signed transaction ID
@@ -107,7 +107,7 @@ sections:
         build. The table uses benchmark profile `v1.1.0` for template `1` with automatic reconstruction
         and `v1.0.0` for the literal encoding.
     zh-CN:
-      - '[v1.10.0 候选版](#v1100)'
+      - '[v1.11.0 候选版](#v1110)'
       - '[协议规范](docs/spec.zh-CN.md) · [安全分析](docs/developer.zh-CN.md#security) · [复现与验证](#开发复现与输入输出分析)
         · [交易成本](#完整交易与栈测量)'
       - |-
@@ -116,14 +116,13 @@ sections:
         用户标识摘要 ZA 和消息摘要，然后验证 SM2 签名，并通过 PUSHTX 和原生
         `OP_CHECKSIG` 将授权绑定到实际的花费交易。
       - '### 项目版本与锁定模板'
-      - v1.1.0 为首个公开版本 v1.0.0 的锁定模板 `1` 默认启用 OTDA 重建。v1.2.0 至 v1.7.0 依次对应模板 `2` 至 `7`。v1.9.0 和 v1.10.0
-        增加模板 `8` 和 `9`。钱包按上一输出的完整字节识别并花费九种模板。
+      - v1.1.0 为首个公开版本 v1.0.0 的锁定模板 `1` 默认启用 OTDA 重建。v1.2.0 至 v1.7.0 依次对应模板 `2` 至 `7`。v1.9.0 至 v1.11.0 依次增加模板 `8` 至 `10`。钱包按上一输出的完整字节识别并花费十种模板。
       - |-
         | 项目 | 取值 |
         | --- | --- |
         | 收款标识 | 65 字节公钥 `04 \|\| X_BE32 \|\| Y_BE32` 的 HASH160 |
         | SM2 用户标识 | 固定的 ASCII 字符串 `1234567812345678` |
-        | 锁定脚本 | 模板 `1` 为 144,925 字节，`2` 为 131,565 字节，`3` 为 125,616 字节，`4` 为 121,847 字节，`5` 为 110,747 字节，`6` 为 100,663 字节，`7` 为 98,362 字节，`8` 为 96,616 字节，`9` 为 95,790 字节 |
+        | 锁定脚本 | 模板 `1` 为 144,925 字节，`2` 为 131,565 字节，`3` 为 125,616 字节，`4` 为 121,847 字节，`5` 为 110,747 字节，`6` 为 100,663 字节，`7` 为 98,362 字节，`8` 为 96,616 字节，`9` 为 95,790 字节，`10` 为 94,355 字节 |
         | 解锁脚本 | BIP143 为 291 字节，无配对输出的 OTDA SINGLE 为 294 字节，其他 OTDA 模式的长度随交易变化 |
         | 解锁栈 | 签名预映像、未压缩公钥，以及 64 字节的 `r \|\| s` 签名 |
         | 交易签名模式 | BIP143 和 Chronicle OTDA 均支持 ALL、NONE、SINGLE，每种模式均可选用 ANYONECANPAY |
@@ -133,7 +132,7 @@ sections:
       - <a name="otda-constructor"></a>
       - '### 重建 OTDA 输出'
       - 构造器是 `scriptSig` 的一部分，模板 `1` 使用 12,703 字节，`2` 使用 11,816 字节，`3` 使用 11,807 字节，`4` 使用 11,618 字节，`5`
-        使用 11,549 字节，`6` 使用 9,363 字节，`7` 使用 9,447 字节，`8` 使用 7,644 字节，`9` 使用 7,718 字节。模板 `2` 至 `9` 从初始编码实际复制的指令中选出可复用片段，并把高频片段放在靠近栈顶的位置。构造器逐字节重建签名预映像，把收款人的
+        使用 11,549 字节，`6` 使用 9,363 字节，`7` 使用 9,447 字节，`8` 使用 7,644 字节，`9` 使用 7,718 字节，`10` 使用 7,754 字节。模板 `2` 至 `10` 从初始编码实际复制的指令中选出可复用片段，并把高频片段放在靠近栈顶的位置。构造器逐字节重建签名预映像，把收款人的
         HASH160 填入各个适用输出。签名回调接收与原样编码一致的消息和 SM2 用户标识。构建子交易时使用最终已签交易的 ID。
       - Chronicle 激活后，版本 2 的 OTDA ALL 交易可以按原顺序重建匹配的输出。配对 OTDA SINGLE 可以重建同索引输出，并保留预映像中前置的空输出。两种模式均支持 `ANYONECANPAY`。其他模板的输出按原字节写入。BIP143、NONE、无配对
         SINGLE、版本 1 及体积未缩小的交易继续使用原样解锁。[SDK 选项](docs/sdk.zh-CN.md) · [构造器与生成方式](reference/README.zh-CN.md#otda-constructor)
@@ -186,6 +185,47 @@ sections:
         字节的输出锁本身外，两个已有输入的解锁也会变长。下表分项列出这些开销。交易版本和 SignedData 的两层版本值分别按各自的编码规则处理。
   script_sizes:
     en:
+      - <a name="v1110"></a>
+      - '### v1.11.0 candidate'
+      - Template `10` carries the field prime and `3b` across the scalar windows and reuses the projective
+        addition kernel in the public-key table. The 4thGraph `0.2.7` compiler at revision `64624db`
+        compared 21 pass and rule plans on 16 fixed comparisons per plan. The selected plan uses
+        `rewrite`, `share`, `stack`, and `search`. The new byte-layout compiler binds a packed reversal for six
+        32-byte fields. The PUSHTX DER encoder shares that reversal. The OTDA generator scores new
+        cache entries discovered in literal spans, then tries removing each selected entry once.
+      - |-
+        | Measured bytes | v1.10.0 | v1.11.0 |
+        | --- | ---: | ---: |
+        | Locking script | 95,790 | 94,355 |
+        | OTDA constructor | 7,718 | 7,754 |
+        | BIP143 ALL, 2 inputs and 2 outputs | 192,284 | 189,414 |
+        | OTDA ALL, 2 inputs and 2 outputs | 207,778 | 204,980 |
+        | OTDA ALL, 12 inputs and 1 output | 197,213 | 196,210 |
+        | OTDA ALL, 24 inputs and 1 output | 310,421 | 309,850 |
+        | OTDA ALL, 40 inputs and 1 output | 479,733 | 479,738 |
+      - In the 34 shared construction cases, 33 shrink and the native-only destination case stays at
+        719 bytes. The 36-case matrix adds 12-input and 24-input payments. A separate 40-input replay
+        grows by five bytes because each reconstructed input carries another 36 bytes. In the 2×2 case,
+        peak stack payload rises by 29 bytes for BIP143 ALL and falls by 5,740 bytes for OTDA ALL.
+      - 'Select template `10` with `--version 10` or SDK `template: "v1.11.0"`. [Compiler tuning](reference/README.md#window-tuning)
+        · [Byte bindings](reference/README.md#byte-tuning) · [Template fingerprint](versions/v1.11.0/layout.json) · [Measurements](versions/v1.11.0/measurements.json)
+        · [36 transaction cases](versions/v1.11.0/latest-template-coverage.json)'
+      - <a name="p2pkh-sponsorship"></a>
+      - '#### P2PKH interactions and zero-fee sponsorship'
+      - Funded regtest exercised P2PKH funding of template `10`, a same-template SM2 payment with a P2PKH
+        fee input, and an SM2 exit to P2PKH with sponsor change. Under the launcher's default policy profile,
+        the BIP143 and OTDA cases all admitted and mined those funded transactions.
+      - |-
+        | Scenario | Funded regtest result |
+        | --- | --- |
+        | Append a P2PKH fee input before submission | The BIP143 `0xc1` and OTDA `0xe1` SM2 witnesses remained valid with the same outputs. A separately confirmed P2PKH UTXO paid 150,000 sat and the completed transactions mined. |
+        | Plan a sponsor change output | The approved transaction paid the full 10,000,000 sat principal to a template `10` or P2PKH output, returned 50,000 sat to the sponsor and paid a 150,000 sat fee. Adding a change output after signing ALL invalidated the SM2 witness. |
+        | Submit zero fee first, then try a sponsored replacement | The zero-fee transaction entered the mempool and stayed unmined in three blocks. The same-input sponsored transaction returned `txn-mempool-conflict`. |
+        | Pay from a child transaction | Both zero-fee parents included a P2PKH output. A P2PKH child spending that output and a sponsor UTXO paid 150,000 sat. Each parent and child mined in the same block. |
+      - The isolated node used a 0.5 sat/B mining floor. The raised-profile run also checks the complete
+        scripts on BSV Node and chain-gang and rejects an appended input with ordinary ALL. [Default policy
+        replay](versions/v1.11.0/p2pkh-default.json) · [Raised policy replay](versions/v1.11.0/p2pkh-raised.json)
+        · [Reproduction](reference/README.md#p2pkh-sponsorship)
       - <a name="v1100"></a>
       - '### v1.10.0 candidate'
       - Template `9` stores fixed generator points as affine X and Y pairs and uses an addition kernel
@@ -202,22 +242,6 @@ sections:
         | OTDA ALL, 2×2 transaction with reconstruction | 209,282 | 207,778 | −0.7% |
       - 'Select template `9` with `--version 9` or SDK `template: "v1.10.0"`. [Template fingerprint](versions/v1.10.0/layout.json)
         · [Measurements](versions/v1.10.0/measurements.json) · [34 latest-template cases](versions/v1.10.0/latest-template-coverage.json)'
-      - <a name="p2pkh-sponsorship"></a>
-      - '#### P2PKH interactions and zero-fee sponsorship'
-      - Funded regtest exercised P2PKH funding of template `9`, a same-template SM2 payment with a P2PKH
-        fee input, and an SM2 exit to P2PKH with sponsor change. Under the launcher's default policy profile,
-        the BIP143 and OTDA cases all admitted and mined those funded transactions.
-      - |-
-        | Scenario | Funded regtest result |
-        | --- | --- |
-        | Append a P2PKH fee input before submission | The BIP143 `0xc1` and OTDA `0xe1` SM2 witnesses remained valid with the same outputs. A separately confirmed P2PKH UTXO paid 150,000 sat and the completed transactions mined. |
-        | Plan a sponsor change output | The approved transaction paid the full 10,000,000 sat principal to a template `9` or P2PKH output, returned 50,000 sat to the sponsor and paid a 150,000 sat fee. Adding a change output after signing ALL invalidated the SM2 witness. |
-        | Submit zero fee first, then try a sponsored replacement | The zero-fee transaction entered the mempool and stayed unmined in three blocks. The same-input sponsored transaction returned `txn-mempool-conflict`. |
-        | Pay from a child transaction | Both zero-fee parents included a P2PKH output. A P2PKH child spending that output and a sponsor UTXO paid 150,000 sat. Each parent and child mined in the same block. |
-      - The isolated node used a 0.5 sat/B mining floor. The raised-profile run also checks the complete
-        scripts on BSV Node and chain-gang and rejects an appended input with ordinary ALL. [Default policy
-        replay](versions/v1.10.0/p2pkh-default.json) · [Raised policy replay](versions/v1.10.0/p2pkh-raised.json)
-        · [Reproduction](reference/README.md#p2pkh-sponsorship)
       - <a name="v190"></a>
       - '### v1.9.0'
       - Template `8` checks for infinity once per group of five doublings and reuses one copy of the SM2
@@ -361,6 +385,36 @@ sections:
         · [Recorded measurements](versions/v1.2.0/measurements.json) · [Forth lock](../../src/fourthgraph/stdlib/wallet/p2pkh-sm2.fth)
         · [Benchmark reproduction](../../docs/benchmark.md#run)'
     zh-CN:
+      - <a name="v1110"></a>
+      - '### v1.11.0 候选版'
+      - 模板 `10` 在标量乘法窗口之间保留域模数和 `3b`，构建公钥表时也复用投影加点内核。提交 `64624db` 上的 4thGraph `0.2.7` 比较了 21 组编译阶段和规则组合，每组核对 16 个固定用例。选定方案使用
+        `rewrite`、`share`、`stack` 和 `search`。新版字节布局编译器为六个 32 字节字段绑定批量反转内核。PUSHTX 的 DER 编码复用这一内核。OTDA 构造器为原样片段新增缓存候选，再逐项尝试移除缓存。
+      - |-
+        | 实测字节数 | v1.10.0 | v1.11.0 |
+        | --- | ---: | ---: |
+        | 锁定脚本 | 95,790 | 94,355 |
+        | OTDA 构造器 | 7,718 | 7,754 |
+        | BIP143 ALL，两进两出 | 192,284 | 189,414 |
+        | OTDA ALL，两进两出 | 207,778 | 204,980 |
+        | OTDA ALL，十二进一出 | 197,213 | 196,210 |
+        | OTDA ALL，二十四进一出 | 310,421 | 309,850 |
+        | OTDA ALL，四十进一出 | 479,733 | 479,738 |
+      - 同样的 34 个构造用例中，33 个字节数下降，全部支付给原生 P2PKH 的用例仍为 719 字节。36 例矩阵新增十二输入和二十四输入付款。每个使用重建的输入增加 36 字节，单独实测的四十进一出整笔增加 5 字节。两进两出时，BIP143 ALL 的栈载荷峰值增加 29 字节，OTDA ALL 下降 5,740 字节。
+      - '用 `--version 10` 或 SDK 的 `template: "v1.11.0"` 选用模板 `10`。[编译优化复现](reference/README.zh-CN.md#window-tuning) ·
+        [字节布局复现](reference/README.zh-CN.md#byte-tuning) · [模板指纹](versions/v1.11.0/layout.json) · [测量记录](versions/v1.11.0/measurements.json) · [36 个交易用例](versions/v1.11.0/latest-template-coverage.json)'
+      - <a name="p2pkh-sponsorship"></a>
+      - '#### P2PKH 交互与零费补费'
+      - 有资金的 regtest 覆盖了 P2PKH 向模板 `10` 入金、原生 P2PKH 为同模板 SM2 转账补费，以及 SM2 退出到 P2PKH 并给赞助方找零。启动器的默认策略下，BIP143
+        和 OTDA 两组入金、补费及退出交易均进入内存池并入块。
+      - |-
+        | 场景 | 有资金的 regtest 实测 |
+        | --- | --- |
+        | 广播前追加 P2PKH 补费输入 | SM2 预签 BIP143 `0xc1` 或 OTDA `0xe1`，保留原输出和原 SM2 解锁脚本。独立确认的 P2PKH UTXO 支付 150,000 sat，整笔入块。 |
+        | 预先纳入赞助方找零 | 同一笔交易把完整的 10,000,000 sat 本金付给模板 `10` 或 P2PKH 输出，赞助方收到 50,000 sat 找零，费用为 150,000 sat。ALL 签名后再追加找零会使 SM2 解锁失效。 |
+        | 先广播零费版，再提交补费版 | 零费版进入内存池，连续三个区块未入块。花费相同上一输出的补费版返回 `txn-mempool-conflict`。 |
+        | 用子交易补费（CPFP） | 零费父交易包含一个预先签入的 P2PKH 输出。子交易花费该输出及赞助方 UTXO，支付 150,000 sat，父子同块入账。 |
+      - 隔离节点的挖矿费率下限为 0.5 sat/B。放宽策略的回放还用 BSV Node 和 chain-gang 验证了完整脚本，并确认普通 ALL 会拒绝签名后追加输入。[默认策略回放](versions/v1.11.0/p2pkh-default.json)
+        · [放宽策略回放](versions/v1.11.0/p2pkh-raised.json) · [复现方式](reference/README.zh-CN.md#p2pkh-sponsorship)
       - <a name="v1100"></a>
       - '### v1.10.0 候选版'
       - 模板 `9` 的固定生成元表只存仿射 X、Y 坐标，点加使用第二个点为仿射坐标的专用公式。32 字节换序改为逐级二分。两进两出 OTDA ALL 整笔节省 1,504 字节，每个使用重建的输入的构造器增加
@@ -374,19 +428,6 @@ sections:
         | OTDA ALL，两进两出整笔，启用重建 | 209,282 | 207,778 | −0.7% |
       - '用 `--version 9` 或 SDK 的 `template: "v1.10.0"` 选用模板 `9`。[模板指纹](versions/v1.10.0/layout.json) ·
         [测量记录](versions/v1.10.0/measurements.json) · [34 个最新模板用例](versions/v1.10.0/latest-template-coverage.json)'
-      - <a name="p2pkh-sponsorship"></a>
-      - '#### P2PKH 交互与零费补费'
-      - 有资金的 regtest 覆盖了 P2PKH 向模板 `9` 入金、原生 P2PKH 为同模板 SM2 转账补费，以及 SM2 退出到 P2PKH 并给赞助方找零。启动器的默认策略下，BIP143
-        和 OTDA 两组入金、补费及退出交易均进入内存池并入块。
-      - |-
-        | 场景 | 有资金的 regtest 实测 |
-        | --- | --- |
-        | 广播前追加 P2PKH 补费输入 | SM2 预签 BIP143 `0xc1` 或 OTDA `0xe1`，保留原输出和原 SM2 解锁脚本。独立确认的 P2PKH UTXO 支付 150,000 sat，整笔入块。 |
-        | 预先纳入赞助方找零 | 同一笔交易把完整的 10,000,000 sat 本金付给模板 `9` 或 P2PKH 输出，赞助方收到 50,000 sat 找零，费用为 150,000 sat。ALL 签名后再追加找零会使 SM2 解锁失效。 |
-        | 先广播零费版，再提交补费版 | 零费版进入内存池，连续三个区块未入块。花费相同上一输出的补费版返回 `txn-mempool-conflict`。 |
-        | 用子交易补费（CPFP） | 零费父交易包含一个预先签入的 P2PKH 输出。子交易花费该输出及赞助方 UTXO，支付 150,000 sat，父子同块入账。 |
-      - 隔离节点的挖矿费率下限为 0.5 sat/B。放宽策略的回放还用 BSV Node 和 chain-gang 验证了完整脚本，并确认普通 ALL 会拒绝签名后追加输入。[默认策略回放](versions/v1.10.0/p2pkh-default.json)
-        · [放宽策略回放](versions/v1.10.0/p2pkh-raised.json) · [复现方式](reference/README.zh-CN.md#p2pkh-sponsorship)
       - <a name="v190"></a>
       - '### v1.9.0'
       - 模板 `8` 每组五次倍点只检查一次无穷远点，并在组内复用 SM2 域模数。SM3 随压缩轮次展开消息字，运行时保留 16 个消息字的滑动窗口。缩短后的字节码也让整笔付款都用模板 `8`

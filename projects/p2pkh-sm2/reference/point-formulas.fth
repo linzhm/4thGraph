@@ -1,17 +1,9 @@
 REQUIRE BSV
+REQUIRE point-double-prime.fth
 
 ( Homogeneous formulas for a = -3, as used by the R1 project. )
 ( The surrounding SM2 verifier supplies the field prime and 3b at stack depths )
 ( measured from the bottom. Every coordinate is a signed residue. )
-range: coordinate script-int
-    $-fffffffeffffffffffffffffffffffffffffffff00000000fffffffffffffffe
-    $fffffffeffffffffffffffffffffffffffffffff00000000ffffffffffffffff ;
-range: field-prime script-int
-    $fffffffeffffffffffffffffffffffffffffffff00000000ffffffffffffffff
-    $fffffffeffffffffffffffffffffffffffffffff000000010000000000000000 ;
-range: three-b script-int
-    $7abdefdbd8de1a9ce80fdae36e2f1cf7dac69ddf4102aeb8993637c3e8bc2bb9
-    $7abdefdbd8de1a9ce80fdae36e2f1cf7dac69ddf4102aeb8993637c3e8bc2bba ;
 
 formula: sm2-double-finite ( coordinate coordinate coordinate -- coordinate coordinate coordinate )
     {: x y z :}
@@ -52,20 +44,6 @@ formula: sm2-add-kernel ( coordinate coordinate coordinate coordinate coordinate
     op-dup op-0notequal op-if
         sm2-double-finite
     op-endif
-;
-
-formula: sm2-double-with-prime ( field-prime coordinate coordinate coordinate -- field-prime coordinate coordinate coordinate )
-    {: p x y z :}
-    3 x z int- x z int+ int* int* let w
-    2 y z int* int* let s
-    y s int* let r
-    2 x r int* int* let b
-    w w int* 2 b int* int- let h
-
-    p
-    h s int* p int-rem
-    b h int- w int* 2 r r int* int* int- p int-rem
-    s s int* s int* p int-rem
 ;
 
 : sm2-double-window-kernel ( script -- script )

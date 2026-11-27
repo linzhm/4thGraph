@@ -14,11 +14,16 @@ from assemble import PACKED_SM3_TEMPLATE_VERSION, SIGNED_RESIDUE_TEMPLATE_VERSIO
 from assemble import POINT_KERNEL_FILE, TEMPLATE_VERSION, TEMPLATE_VERSIONS
 from assemble import WINDOW_DOUBLING_TEMPLATE_VERSION, WINDOW_KERNEL_FILE
 from assemble import AFFINE_GENERATOR_TEMPLATE_VERSION, AFFINE_KERNEL_FILE
+from assemble import CARRIED_FIELD_TEMPLATE_VERSION, CARRIED_KERNEL_FILE
+from assemble import BYTE_KERNEL_FILE
 from assemble import assemble, forth_compiler, sm3_blocks
+from byte_fields import BYTE_KERNEL_NAMES, compile_byte_kernels
 from point_kernels import AFFINE_KERNEL_NAME, WINDOW_KERNEL_NAME, compile_kernels, load_kernels
+from point_kernels import CARRIED_KERNEL_NAMES, compile_carried_kernels
 from p2pkh_sm2 import *
 from sm2 import *
 from sm3_script import hash_script,compress,IV
+from tune_window import evaluate_kernels, window_vectors
 from fourthgraph.bsv.evaluate import evaluate,ScriptError
 from fourthgraph.bsv.script import asm, decode_num, encode_num, push, number, assemble as assemble_blocks
 from fourthgraph.bsv.transaction import *
@@ -224,7 +229,7 @@ class SM2Tests(unittest.TestCase):
 
     def test_signed_windows_match_scalar_multiplication(self):
         for version in (SIGNED_WINDOW_TEMPLATE_VERSION, WINDOW_DOUBLING_TEMPLATE_VERSION,
-                        AFFINE_GENERATOR_TEMPLATE_VERSION):
+                        AFFINE_GENERATOR_TEMPLATE_VERSION, CARRIED_FIELD_TEMPLATE_VERSION):
             with self.subTest(version=version):
                 self.check_signed_windows(version)
 
@@ -251,6 +256,27 @@ class SM2Tests(unittest.TestCase):
                 inverse_z = pow(z, -1, P) if z else None
                 actual = (x*inverse_z % P, y*inverse_z % P) if z else None
                 self.assertEqual(actual, add(mul(s), mul(t, (qx, qy))))
+
+    def test_carried_window_kernels_reproduce_template_9(self):
+        kernels = compile_carried_kernels()
+        self.assertEqual(kernels, load_kernels(CARRIED_KERNEL_FILE, CARRIED_KERNEL_NAMES))
+        evaluate_kernels(kernels, window_vectors())
+
+    def test_packed_fields_preserve_unsigned_values_and_stack_order(self):
+        kernels, _ = compile_byte_kernels()
+        self.assertEqual(kernels, load_kernels(BYTE_KERNEL_FILE, BYTE_KERNEL_NAMES))
+        compiler = forth_compiler(bytes(20), CARRIED_FIELD_TEMPLATE_VERSION)
+        unpack = compiler.emit("sm2-unpack-packed-fields", b"")
+        fields = (bytes(192), bytes(range(192)), b"\xff"*192)
+        for data in fields:
+            r, s, x, y, e, digest = (data[index:index+32] for index in range(0, len(data), 32))
+            setup = push(b"flag") + asm("OP_TOALTSTACK") + push(digest) + asm("OP_TOALTSTACK")
+            stack = [b"preimage", b"\x04"+x+y, r+s, e]
+            expected = [encode_num(int.from_bytes(part, "big")) for part in (digest, e, y, x, s, r)]
+            self.assertEqual(evaluate(setup+unpack, stack), ([b"preimage"], [b"flag", *expected]))
+            stack[1] = b"\x02"+x+y
+            with self.assertRaises(ScriptError):
+                evaluate(setup+unpack, stack)
 
     def test_affine_kernel_reproduces_projective_addition(self):
         names = (AFFINE_KERNEL_NAME,)
@@ -368,7 +394,7 @@ class SM2Tests(unittest.TestCase):
         for version in TEMPLATE_VERSIONS[1:]:
             candidate = assemble(base_owner, version)
             self.assertEqual(subprocess.check_output([*cli, '--version', str(version), '--format', 'raw']), candidate)
-        for version in (0, 10, 11):
+        for version in (0, TEMPLATE_VERSIONS[-1] + 1, TEMPLATE_VERSIONS[-1] + 2):
             with self.subTest(version=version):
                 for construct in (assemble, locking_script_from_owner_hash):
                     with self.assertRaisesRegex(ValueError, 'unsupported P2PKH-SM2 template'):

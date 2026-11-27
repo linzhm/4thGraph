@@ -6,7 +6,11 @@ REQUIRE BSV
     2 bsv-num op-pick op-size op-4 op-sub op-split op-nip ;
 
 : sm2-zero32 ( script -- script )
-    bytes-hex 0000000000000000000000000000000000000000000000000000000000000000 bsv-push ;
+    packed-fields? if
+        sm2-zero32-kernel bsv-cat-code
+    else
+        bytes-hex 0000000000000000000000000000000000000000000000000000000000000000 bsv-push
+    then ;
 
 : sm2-check-owner ( script -- script )
     op-over op-size 65 bsv-num op-numequalverify op-drop op-size 64 bsv-num op-numequalverify
@@ -41,13 +45,37 @@ REQUIRE BSV
         bsv-empty sm2-append-byte 31 bsv-repeat-code bsv-cat-code
     then ;
 
+: sm2-uint256le ( script -- script )
+    bytes-hex 00 bsv-push op-cat op-bin2num ;
+
 : sm2-uint256be ( script -- script )
-    sm2-reverse32 bytes-hex 00 bsv-push op-cat op-bin2num ;
+    sm2-reverse32 sm2-uint256le ;
 
 : sm2-unpack-sm2-inputs ( script -- script )
     op-swap 1 bsv-num op-split op-swap op-4 op-equalverify 32 bsv-num op-split sm2-uint256be
     op-toaltstack sm2-uint256be op-toaltstack 32 bsv-num op-split sm2-uint256be op-toaltstack
     sm2-uint256be op-toaltstack ;
+
+: sm2-save-uint256 ( script cell -- script )
+    bsv-num op-split sm2-uint256le op-toaltstack ;
+
+: sm2-unpack-packed-fields ( script -- script )
+    ( Main stack ends in preimage key signature e. The raw hash is on the altstack. )
+    op-fromaltstack op-cat op-rot op-1 op-split op-swap op-4 op-equalverify
+    op-swap op-cat op-cat
+    ( Convert r || s || X || Y || e || hash, then consume from the right. )
+    sm2-reverse-fields-kernel bsv-cat-code
+    160 sm2-save-uint256 128 sm2-save-uint256 96 sm2-save-uint256
+    64 sm2-save-uint256 32 sm2-save-uint256 sm2-uint256le op-toaltstack ;
+
+: sm2-reverse-der-field ( script -- script )
+    packed-fields? if
+        ( Repeat the 32-byte value to share the packed reversal in the OTDA constructor. )
+        op-dup op-cat op-dup op-dup op-cat op-cat
+        sm2-reverse-fields-kernel bsv-cat-code 32 bsv-num op-split op-drop
+    else
+        sm2-reverse32
+    then ;
 
 : sm2-field ( script -- script )
     bytes-hex fffffffeffffffffffffffffffffffffffffffff00000000ffffffffffffffff bsv-num-be ;
@@ -191,6 +219,12 @@ REQUIRE BSV
 : sm2-cached-b3 ( script -- script )
     op-depth op-2 op-sub op-pick ;
 
+: sm2-load-field ( script -- script )
+    sm2-cached-b3 op-depth op-1sub op-pick ;
+
+: sm2-drop-field ( script -- script )
+    op-3 op-roll op-drop op-3 op-roll op-drop ;
+
 : sm2-add-points-unrolled ( script -- script )
     5 bsv-num op-pick 3 bsv-num op-pick op-mul 5 bsv-num op-pick 3 bsv-num op-pick op-mul 5 bsv-num
     op-pick 3 bsv-num op-pick op-mul 8 bsv-num op-pick 8 bsv-num op-pick op-add 6 bsv-num op-pick
@@ -212,7 +246,13 @@ REQUIRE BSV
     compiled-points? if sm2-double-kernel bsv-cat-code else sm2-double-point-unrolled then ;
 
 : sm2-add-points ( script -- script )
-    compiled-points? if sm2-add-kernel bsv-cat-code else sm2-add-points-unrolled then ;
+    carried-field? if
+        ( Reuse the window kernel while building the Q table. )
+        sm2-load-field bsv-empty 7 bsv-num op-roll 6 bsv-repeat-code bsv-cat-code
+        sm2-window-add-projective bsv-cat-code sm2-drop-field
+    else
+        compiled-points? if sm2-add-kernel bsv-cat-code else sm2-add-points-unrolled then
+    then ;
 
 : sm2-digits-split4 ( script -- script )
     op-over 16 bsv-num op-mod op-toaltstack op-dup 16 bsv-num op-mod op-toaltstack 16 bsv-num op-div
@@ -238,26 +278,31 @@ REQUIRE BSV
     swap op-fromaltstack op-dup op-0 op-lessthan op-toaltstack op-abs op-3 op-mul
     swap bsv-num op-swap op-sub
     op-dup op-pick op-over op-pick op-fromaltstack op-if op-negate op-endif
-    op-rot op-1sub op-pick sm2-add-points ;
+    op-rot op-1sub op-pick
+    carried-field? if sm2-window-add-projective bsv-cat-code else sm2-add-points then ;
 
 : sm2-add-signed-generator ( script -- script )
     ( The fixed table contains affine pairs for magnitudes 1 through 16. )
     op-fromaltstack op-ifdup op-if
         op-dup op-0 op-lessthan op-toaltstack op-abs op-2 op-mul
-        88 bsv-num op-swap op-sub op-dup op-pick op-over op-pick
+        carried-field? if 90 else 88 then bsv-num op-swap op-sub op-dup op-pick op-over op-pick
         op-fromaltstack op-if op-negate op-endif op-rot op-drop
-        sm2-add-affine-kernel bsv-cat-code
+        carried-field? if sm2-window-add-affine else sm2-add-affine-kernel then bsv-cat-code
     op-endif ;
 
 : sm2-add-split5 ( script -- script )
-    54 sm2-add-signed-selected
+    carried-field? if 56 else 54 then sm2-add-signed-selected
     affine-generator? if sm2-add-signed-generator else 105 sm2-add-signed-selected then ;
 
 : sm2-step-split5 ( script -- script )
-    window-doubling? if
-        sm2-double-window-kernel bsv-cat-code
+    carried-field? if
+        sm2-window-double-five bsv-cat-code
     else
-        bsv-empty sm2-double-point 5 bsv-repeat-code bsv-cat-code
+        window-doubling? if
+            sm2-double-window-kernel bsv-cat-code
+        else
+            bsv-empty sm2-double-point 5 bsv-repeat-code bsv-cat-code
+        then
     then sm2-add-split5 ;
 
 : sm2-generator-z ( script -- script )
@@ -298,8 +343,11 @@ REQUIRE BSV
 : sm2-window-split5 ( script -- script )
     op-fromaltstack op-fromaltstack op-swap bsv-empty sm2-digits-split5 51 bsv-repeat-code bsv-cat-code
     ( The residual scalars are the leading digits, at most 2. Start without doubling infinity. )
-    op-swap op-toaltstack op-toaltstack op-0 op-1 op-0 sm2-add-split5
-    bsv-empty sm2-step-split5 51 bsv-repeat-code bsv-cat-code ;
+    op-swap op-toaltstack op-toaltstack
+    carried-field? if sm2-load-field then
+    op-0 op-1 op-0 sm2-add-split5
+    bsv-empty sm2-step-split5 51 bsv-repeat-code bsv-cat-code
+    carried-field? if sm2-drop-field then ;
 
 : sm2-window ( script -- script )
     sm2-window-table signed-windows? if sm2-window-split5 else sm2-window-split4 then ;
@@ -343,15 +391,19 @@ REQUIRE BSV
 
 : sm2-k1-bind-digest ( script -- script )
     sm2-k1-gx op-add sm2-k1-n op-mod op-dup op-verify op-dup sm2-k1-n op-swap op-sub op-min
-    op-size op-toaltstack 32 bsv-num op-num2bin sm2-reverse32 32 bsv-num op-fromaltstack op-sub
+    op-size op-toaltstack 32 bsv-num op-num2bin sm2-reverse-der-field 32 bsv-num op-fromaltstack op-sub
     op-split op-nip op-size op-tuck op-toaltstack op-cat sm2-der-r op-swap op-cat
     op-fromaltstack 36 bsv-num op-add bytes-hex 30 bsv-push op-swap op-cat op-swap op-cat
     op-fromaltstack op-cat sm2-k1-pub ;
 
 : sm2-verify-owner-signature ( script -- script )
-    2 bsv-num op-pick op-hash256 op-dup sm2-uint256be op-toaltstack 2 bsv-num op-pick op-1 op-split
+    2 bsv-num op-pick op-hash256 op-dup
+    packed-fields? if else sm2-uint256be then
+    op-toaltstack 2 bsv-num op-pick op-1 op-split
     op-nip za-tail bsv-cat-code op-swap op-cat sm3-za bsv-cat-code op-swap op-cat
-    sm3-message bsv-cat-code sm2-uint256be op-toaltstack sm2-unpack-sm2-inputs op-drop
+    sm3-message bsv-cat-code
+    packed-fields? if sm2-unpack-packed-fields else sm2-uint256be op-toaltstack sm2-unpack-sm2-inputs then
+    op-drop
     sm2-check-sm2-fields sm2-verify-sm2-point op-fromaltstack sm2-k1-bind-digest ;
 
 : sm2-one-der ( script -- script )
