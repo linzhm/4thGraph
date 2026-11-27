@@ -22,3 +22,19 @@ python3 -m fourthgraph.workflow.protocol pels-witness lock.json \
 ```
 
 The compile example uses a synthetic fixture output. For witness assembly provide the actual parent and matching unsigned candidate as serialized transaction hex. For a dual-mode build pass `--sighash-family bip143` or `--sighash-family otda` to select an included path. The compiled artifact records Script bytes, candidates, fragment ranges and hashes, and each path's witness layout. Independently verify the assembled spend against its parent and applicable chain context. [Acceptance tests](../tests/test_pels_lock.py)
+
+## Dynamic successor
+
+A dynamic build links an application rule to the bundled `pels-verify` template. The rule has the Forth build effect `( script -- script )`. Its emitted code takes the current five-byte state and authenticated previous amount as a ScriptNum. It leaves the successor's five-byte state and eight-byte little-endian amount, under the standard library's stack contract. Review and test the rule's runtime behavior with the actual previous output.
+
+```sh
+python3 -m fourthgraph.workflow.protocol status.fth --entry status-rule \
+  --pels-successor-state 0300000000 --target chronicle-v2 \
+  --sighash-family auto --explain > successor.json
+python3 -m fourthgraph.workflow.protocol pels-witness successor.json \
+  --parent parent.hex --unsigned unsigned.hex > spend.json
+```
+
+This template authenticates the previous amount using BIP143 ALL. On a Chronicle target, `auto` selects BIP143 and records why OTDA was excluded. Explicit `otda` and `both` sighash policies fail. The target still controls the permitted transaction versions, including in Script.
+
+Compile each state with the same rule and target. The artifact records the exact previous-output Script and its `scriptCode` anchor. Witness assembly checks that the transaction spends that output and has one successor output carrying the same code. The actual previous output must cover the successor amount. The independent Script check enforces the rule's successor state and amount. The executable fixture uses two synthetic transactions for the draft-to-ready and ready-to-draft transitions and exercises rejection cases under pinned chain-gang. [Fixture source and acceptance tests](../tests/test_pels_successor_library.py)

@@ -85,6 +85,8 @@ In this regtest replay, all five candidates passed both settlement and review, f
 
 For another run, pass `--objective peak-validation` to change the ranking or `--available-authorizers operator` to model a first step where only the operator can sign. Save a separate replay and report for each run so you can compare exclusions, successful paths, and rejections. The next step for scaffolding is to let more projects generate the same artifacts from their stage declarations and test fixtures. [Gated example source](../projects/workflow-examples/gated.fth)
 
+For a three-stage linear BIP143 workflow, use `--mode fused-prefix` to combine the first two stages while retaining a separately authorized terminal spend. The first two authorizers must be available at the first spend, and either stage's independent-submission requirement excludes fusion. This layout requires a workflow without recovery. The three-stage default is serial. Use `--search --explain` to compare both and the offline replay to check actual parents and compare serialized sizes. [Replay command](toolchain.md#可执行交易图)
+
 <a name="agent-tuning-loop"></a>
 
 ## The Agent development and tuning loop
@@ -114,7 +116,66 @@ python3 -m fourthgraph.workflow.protocol experiment replay workspace/tuning/seco
   --parent workspace/tuning/first.json
 ```
 
-Formula reports cover the registered function fixture. Use the existing workflow replay for complete-spend evidence. [Workflow replay](toolchain.md#复放与编译) · [Agent skill](../skills/4thgraph/SKILL.md)
+For the registered `square` or `bezier` spend fixture, set `"evaluation":"spend"` and use the same commands in an environment with [pinned chain-gang](../tools/requirements-chronicle.txt). The runner first checks the formula vectors, then links the candidate into synthetic funding outputs and checks complete spends against those parents offline. Each vector expects one acceptance and one rejection. Formula evaluation remains the default.
+
+```sh
+printf '%s\n' '{"fixture":"square","evaluation":"spend","workers":2,"plans":[{},{"passes":["stack"]}]}' |
+  python3 -m fourthgraph.workflow.protocol experiment run - > workspace/tuning/spend.json
+python3 -m fourthgraph.workflow.protocol experiment next workspace/tuning/spend.json > workspace/tuning/spend-next.json
+python3 -m fourthgraph.workflow.protocol experiment run workspace/tuning/spend-next.json \
+  --parent workspace/tuning/spend.json > workspace/tuning/spend-second.json
+python3 -m fourthgraph.workflow.protocol experiment replay workspace/tuning/spend-second.json \
+  --parent workspace/tuning/spend.json
+```
+
+Spend evaluation ranks passing candidates by the maximum serialized funding-plus-spend bytes across the vectors. The path total adds both transactions from the same vector. The individual maxima for lock, witness, funding, and spend can come from different vectors. The report records the engine pin, Script hashes, and transaction IDs. The reported stack peaks describe the formula evaluation. Complete-spend stack peaks are unmeasured for these fixtures. [Workflow replay](toolchain.md#复放与编译) · [Agent skill](../skills/4thgraph/SKILL.md)
+
+To run the two Bézier batches above through the same spend check, add `"evaluation":"spend"` to the first request. All 625 vectors run with the same Forth and transaction context across candidates. The linked lock checks both position and tangent. The rejection set includes cases where only the position changes and cases where only the tangent changes. The report carries those spend receipts into `next` and `replay`.
+
+Add `"trace":true` when comparing terminal schedules. The report links the final formula snapshot to graph slots through `formula_slots`. Under `trace.target_stack_plan`, `steps` lists the selected execution order, actual operand order, abstract stack slots before and after each step, and exact spans in the emitted Script. `operation_offset` marks where the operation starts after stack rearrangement. `finish` records return placement and cleanup. The schedule records whether source order or a beam-search order won. Follow-up requests preserve tracing, and replay checks the trace, Script, test verdicts, deterministic costs, and ranking. Trace collection adds work to observed compile times.
+
+To compare the shortlisted plans, run axis B once per plan with tracing off and a single worker. Each run holds the plan fixed while comparing `bezier` and `bezier-linear`. From the repository root, with `PYTHONPATH` set as above and the pinned engine installed:
+
+```sh
+for plan in stack search; do
+  passes='["stack"]'
+  if [ "$plan" = search ]; then passes='["rewrite","share","stack","search"]'; fi
+  printf '{"fixture":"bezier","axis":"B","evaluation":"spend","trace":false,"plans":[{"implementation":"bezier","passes":%s},{"implementation":"bezier-linear","passes":%s}]}\n' "$passes" "$passes" |
+    python3 -m fourthgraph.workflow.protocol experiment run - > "workspace/tuning/bezier-$plan.json"
+  python3 -m fourthgraph.workflow.protocol experiment replay "workspace/tuning/bezier-$plan.json" > "workspace/tuning/bezier-$plan-replay.json"
+done
+```
+
+| Implementation | Plan | Full path | Formula Script | Formula main / alt peak items |
+| --- | --- | ---: | ---: | ---: |
+| `bezier-linear` | `rewrite`, `share`, `stack`, `search` | 176 B | 34 B | 8 / 1 |
+| `bezier-linear` | `stack` | 179 B | 37 B | 8 / 1 |
+| `bezier` | `rewrite`, `share`, `stack`, `search` | 188 B | 46 B | 10 / 1 |
+| `bezier` | `stack` | 189 B | 47 B | 9 / 1 |
+
+Each combination has 625 accepted and 625 rejected spends. The shortest path uses `bezier-linear` with all four passes. When path bytes tie, ranking prefers the plan with fewer passes and ordered rules. Read `metrics.compile_ns` from the trace-off runs or replays for observed compile time.
+
+### Call-site selection
+
+The standard library maintains curve kernels and their input ranges, coordinate representations, and edge behavior. The compiler maintains call-site matching and binding plans and accounts for adaptation, guards, and linking. Compare bindings with the same Forth caller and fixed kernels. A range-specialized kernel uses the same process and requires evidence of its bounds at the call site.
+
+```sh
+printf '%s\n' '{"fixture":"point-add","evaluation":"spend","enumerate":"bindings","workers":2}' |
+  python3 -m fourthgraph.workflow.protocol experiment run - > workspace/tuning/point-add.json
+python3 -m fourthgraph.workflow.protocol experiment replay workspace/tuning/point-add.json
+```
+
+Call site 0 uses a constant verified at build time and admits complete projective addition or affine-right addition. Call site 1 receives a valid projective point on the runtime stack. It admits complete projective addition or the registered `secp256k1-add-affine-guarded` binding. The latter selects the affine kernel on an exact byte match for canonical ScriptNum `1` in the right operand's `Z`, and otherwise uses complete projective addition. The caller's valid-point contract still applies. Linked size includes the guard and both branches. The fixture covers `Z` values of 0, 1, 2, and 11 and checks the computation against an independent group oracle and pinned chain-gang. [Fixture source](../src/fourthgraph/benchmark/fixtures/point-add.fth)
+
+Use `"plans":[{"bindings":[{"site":1,"kernel":"secp256k1-add-affine-guarded"}]}]` to test one explicit binding. Read `compile.lowering.call_sites` for evidence, exclusions, the selected implementation, and the costs in `guard_bytes`, `kernel_bytes`, and `bytes` (the linked call site). `adapter_bytes` includes the guard when present. A guarded binding also records both kernel digests and their offsets relative to the call site. The compiler rejects wrong curves, duplicate bindings, unknown call sites, and forced kernels whose preconditions are unproved.
+
+| Constant site | Runtime site | Runtime guard / kernels / linked | Full path |
+| --- | --- | ---: | ---: |
+| Affine | General | 0 / 97 / 97 B | 777 B |
+| General | General | 0 / 97 / 97 B | 789 B |
+| General | Guarded | 7 / 183 / 190 B | 882 B |
+
+All three plans pass the same 13 accepted and 13 rejected spends. The byte-ranked winner uses the constant affine binding and the runtime general binding. The guarded runtime binding remains available for replay.
 
 <a name="documentation-index"></a>
 
