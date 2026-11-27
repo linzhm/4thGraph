@@ -4,7 +4,7 @@ import argparse
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict
 from hashlib import sha256
-from itertools import chain, combinations
+from itertools import chain, combinations, islice
 import json
 from pathlib import Path
 import platform
@@ -184,6 +184,7 @@ def run(request, previous=None, *, replaying=False):
         raise ValueError("binding fixtures require the call-site axis and formula fixtures require axis A or B")
     plans = request.get("plans")
     mode = request.get("enumerate")
+    truncated = False
     if mode is not None:
         if plans is not None:
             raise ValueError("enumeration requires a request without explicit plans")
@@ -196,8 +197,16 @@ def run(request, previous=None, *, replaying=False):
             plans = [{"passes": p} for p in pass_sets()]
         elif axis == "A" and mode == "orders":
             ir = ScriptBuilder(sources[fixture.name].decode(), formula_passes=()).formula_ir[fixture.entry]
-            plans = [{"rules": list(r), "passes": request.get("terminal", ["stack"])}
-                     for r in enumerate_orders(ir, request.get("depth", MAX_DEPTH))]
+            terminal = request.get("terminal", ["stack"])
+            orders = enumerate_orders(ir, request.get("depth", MAX_DEPTH))
+            candidates = ({"rules": list(order), "passes": terminal} for order in orders)
+            # The unoptimized anchor gives next() a verified path delta even
+            # when every ordered candidate uses a nonempty terminal plan.
+            if terminal:
+                candidates = chain(({},), candidates)
+            plans = list(islice(candidates, LIMIT + 1))
+            truncated = len(plans) > LIMIT
+            plans = plans[:LIMIT]
         else:
             raise ValueError("unknown enumeration mode")
     minimum = 0 if replaying else 1
@@ -241,7 +250,7 @@ def run(request, previous=None, *, replaying=False):
     plans = unique
     rows, cache = [], {}
     deadline = None if replaying else monotonic() + timeout / 1000
-    stop = "exhausted" if limit >= len(plans) else "candidate_budget"
+    stop = "exhausted" if limit >= len(plans) and not truncated else "candidate_budget"
     with ThreadPoolExecutor(max_workers=workers) as pool:
         for start in range(0, min(limit,len(plans)), workers):
             if deadline is not None and monotonic() >= deadline:
@@ -324,7 +333,7 @@ def run(request, previous=None, *, replaying=False):
         replay["parent_run"] = previous["run_id"]
     if spend:
         replay["evaluation"] = evaluation
-    tie_break = "fewer explicit bindings" if call_site else "fewer passes"
+    tie_break = "fewer explicit bindings" if call_site else "fewer passes and ordered rules"
     scope = "maximum fixture funding plus spend bytes" if spend else "fixture script bytes"
     report = {"schema": SCHEMA, "snapshot": identity, "frozen": frozen, "request": replay, "candidates": rows,
               "baseline": baseline, "baseline_bytes": base_size, "ranking": [r["id"] for r in order],
