@@ -294,7 +294,7 @@ def fuse_verifications(steps, uses):
     return fused
 
 
-def emit_steps(inputs, steps, returns, *, last_use=True, compact=False, trim_suffix=False):
+def emit_steps(inputs, steps, returns, *, last_use=True, compact=False, trim_suffix=False, group_operands=False):
     """Schedule already ordered operations with any number of results."""
     uses = Counter(returns)
     uses.update(arg for _, args, _ in steps for arg in args)
@@ -309,7 +309,7 @@ def emit_steps(inputs, steps, returns, *, last_use=True, compact=False, trim_suf
     for script, args, results in fuse_verifications(steps, uses):
         if not args and len(results) == 1 and results[0] in literals:
             continue
-        stack.execute(script, args, results, last_use=last_use, compact=compact)
+        stack.execute(script, args, results, last_use=last_use, compact=compact, group_operands=group_operands)
     return stack.finish(returns, last_use=last_use, trim_suffix=trim_suffix)
 
 
@@ -320,9 +320,9 @@ class Layout:
         self.literals = literals
         self.code = bytearray()
 
-    def execute(self, script, args, results, *, last_use, compact, trace=None):
-        if compact and last_use and 0 < len(args) <= 2:
-            self.arrange(args, commutative=script in COMMUTATIVE)
+    def execute(self, script, args, results, *, last_use, compact, trace=None, group_operands=False):
+        if compact and last_use and args and (group_operands or len(args) <= 2):
+            self.arrange(args, commutative=script in COMMUTATIVE, group_operands=group_operands)
         else:
             for staged, operand in enumerate(args):
                 self.access(operand, staged, last_use=last_use)
@@ -336,22 +336,31 @@ class Layout:
 
     def finish(self, returns, *, last_use, trim_suffix=False):
         if tuple(self.slots) != tuple(returns):
-            discarded = len(self.slots) - len(returns)
-            # A live suffix can be parked above the existing altstack, then restored
-            # in reverse pop order. Neither the caller's stacks nor the result order change.
-            if trim_suffix and discarded > 0 and tuple(self.slots[discarded:]) == tuple(returns):
-                direct = asm("OP_2DROP") * (discarded // 2) + asm("OP_DROP") * (discarded % 2)
-                parked = asm("OP_TOALTSTACK") * len(returns) + direct + asm("OP_FROMALTSTACK") * len(returns)
-                start = len(self.code)
-            else:
-                parked = None
+            shorter = self.remove_dead_slots(returns) if trim_suffix else None
+            start = len(self.code)
             for staged, result in enumerate(returns):
                 self.access(result, staged, last_use=last_use)
             for _ in range(len(self.slots) - len(returns)):
                 self.discard(len(returns))
-            if parked is not None and len(parked) < len(self.code) - start:
-                self.code[start:] = parked
+            if shorter is not None and len(shorter) < len(self.code) - start:
+                self.code[start:] = shorter
         return bytes(self.code)
+
+    def remove_dead_slots(self, returns):
+        """Preserve live values that already occur in return order."""
+        wanted = set(returns)
+        if tuple(slot for slot in self.slots if slot in wanted) != tuple(returns):
+            return None
+        first_live = next((index for index, slot in enumerate(self.slots) if slot in wanted), len(self.slots))
+        if tuple(self.slots[first_live:]) == tuple(returns):
+            # Park the live suffix above the caller's altstack and restore it in order.
+            direct = asm("OP_2DROP") * (first_live // 2) + asm("OP_DROP") * (first_live % 2)
+            return asm("OP_TOALTSTACK") * len(returns) + direct + asm("OP_FROMALTSTACK") * len(returns)
+        candidate = Layout(self.slots, Counter())
+        for index in range(len(self.slots) - 1, -1, -1):
+            if self.slots[index] not in wanted:
+                candidate.discard(len(candidate.slots) - index - 1)
+        return candidate.code
 
     def access(self, value, staged, *, last_use):
         if self.literals and value in self.literals:
@@ -375,7 +384,7 @@ class Layout:
             self.copy(depth)
         self.slots.append(value)
 
-    def arrange(self, args, *, commutative=False):
+    def arrange(self, args, *, commutative=False, group_operands=False):
         if len(args) == 2:
             left, right = args
             if self.uses[left] == 1 and self.uses[right] > 1 and self.slots[-2:] == [left, right]:
@@ -394,6 +403,15 @@ class Layout:
         # quadratic in the number of operations.
         uses = Counter({operand: self.uses[operand] for operand in args})
         for order in orders:
+            if group_operands and len(order) > 2:
+                grouped = Layout(self.slots, uses.copy(), literals=self.literals)
+                staged = 0
+                while staged < len(order):
+                    count = grouped.stage_group(order, staged)
+                    if not count:
+                        grouped.access(order[staged], staged, last_use=True)
+                    staged += count or 1
+                candidates.append(grouped)
             for staged in range(len(order) + 1):
                 prefix = order[:staged]
                 if staged and (tuple(self.slots[-staged:]) != prefix
@@ -413,6 +431,30 @@ class Layout:
         for operand in uses:
             self.uses[operand] = best.uses[operand]
         self.code.extend(best.code)
+
+    def stage_group(self, order, staged):
+        """Stage a native copy or move of adjacent values wholly outside the staged suffix."""
+        groups = ((3, 0, False, "OP_3DUP"), (2, 0, False, "OP_2DUP"), (2, 2, False, "OP_2OVER"),
+                  (2, 2, True, "OP_2SWAP"), (2, 4, True, "OP_2ROT"))
+        for count, depth, moves, opcode in groups:
+            start = len(self.slots) - depth - count
+            if depth < staged or start < 0 or len(order) - staged < count:
+                continue
+            requested = order[staged:staged + count]
+            if tuple(self.slots[start:start + count]) != requested:
+                continue
+            uses = Counter(requested)
+            if moves:
+                if any(self.uses[value] != needed for value, needed in uses.items()):
+                    continue
+                del self.slots[start:start + count]
+            elif any(self.uses[value] <= needed for value, needed in uses.items()):
+                continue
+            self.uses.subtract(uses)
+            self.code.extend(asm(opcode))
+            self.slots.extend(requested)
+            return count
+        return 0
 
     def pair(self, args, uses):
         counts = Counter(args)

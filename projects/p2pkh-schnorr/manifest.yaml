@@ -141,6 +141,7 @@ sections:
         · [64-window results](docs/high-level-forth.en.md#64-window-lowering)
         · [Joint lowering candidates](docs/high-level-forth.en.md#joint-lowering-candidates)
         · [Dataflow iteration](docs/high-level-forth.en.md#dataflow-iteration)
+        · [Stack and model boundaries](docs/high-level-forth.en.md#stack-and-model-boundaries)
     zh-CN:
       - |-
         ```sh
@@ -156,6 +157,7 @@ sections:
         · [64 窗口结果](docs/high-level-forth.zh-CN.md#64-window-lowering)
         · [联合点乘候选](docs/high-level-forth.zh-CN.md#joint-lowering-candidates)
         · [数据流优化迭代](docs/high-level-forth.zh-CN.md#dataflow-iteration)
+        · [栈和坐标模型边界](docs/high-level-forth.zh-CN.md#stack-and-model-boundaries)
   script_sizes:
     en:
       - |-

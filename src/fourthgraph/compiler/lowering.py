@@ -11,7 +11,7 @@ from fourthgraph.compiler.source import (
     entry_range_checks, expanded, lower, require_script,
 )
 from fourthgraph.compiler.ranges import PRIMITIVE_NAMES, Slot, primitive_outputs, raw_interval, remainder_is_identity
-from fourthgraph.compiler.stack_schedule import Graph, emit_steps
+from fourthgraph.compiler.stack_schedule import VERIFY_FORMS, Graph, emit_steps
 from fourthgraph.compiler.wordsets import NUMERIC_RANGES, PRIMITIVES, SHUFFLES, U32, WRAP_CELL, WRAP_U32, Literal, Primitive
 
 BASELINE = "baseline"
@@ -19,6 +19,7 @@ DATAFLOW = "dataflow"
 STACK_OPTIMIZATIONS = ("stack", DATAFLOW)
 OPTIMIZATIONS = (BASELINE, "safe", *STACK_OPTIMIZATIONS)
 NORMALIZE_FLAG = asm("OP_0NOTEQUAL")
+COMPARISON_VERIFY_FORMS = VERIFY_FORMS | {asm("OP_NUMEQUAL"): asm("OP_NUMEQUALVERIFY")}
 
 
 @dataclass(frozen=True)
@@ -223,12 +224,23 @@ def emit_lock_block(block, inputs, rewrites, *, optimize, dataflow=False):
     previous = None
     for step in block.steps:
         node = step.node
+        previous_predicate = (previous.node.branch_code if previous is not None and isinstance(previous.node, Primitive)
+                              else None)
+        if (dataflow and node is PRIMITIVES["op_verify"] and previous_predicate is not None
+                and previous.results == step.args and uses[step.args[0]] == 1):
+            code = COMPARISON_VERIFY_FORMS.get(previous_predicate, previous_predicate + node.code)
+            at = step.source
+            before = len(steps[-1][0]) + len(node.code)
+            steps[-1] = (code, previous.args, ())
+            rewrites.append(Rewrite("comparison-feeds-verify", at.line if at else None, at.column if at else None,
+                                    (Slot.of("cell"),), (before, len(code)), module=at.module if at else None))
+            previous = step
+            continue
         if isinstance(node, LockBranch):
             prefix = NORMALIZE_FLAG
             flag = step.args[-1]
-            if (optimize and previous is not None and isinstance(previous.node, Primitive)
-                    and previous.node.branch_code is not None and previous.results == (flag,) and uses[flag] == 1):
-                code = previous.node.branch_code
+            if optimize and previous_predicate is not None and previous.results == (flag,) and uses[flag] == 1:
+                code = previous_predicate
                 at = step.source
                 line, column = (at.line, at.column) if at is not None else (None, None)
                 module = at.module if at is not None else None
@@ -244,7 +256,7 @@ def emit_lock_block(block, inputs, rewrites, *, optimize, dataflow=False):
             script = node.lower() if isinstance(node, Literal) else node.code
         steps.append((script, step.args, step.results))
         previous = step
-    return emit_steps(inputs, steps, block.returns, compact=True, trim_suffix=dataflow)
+    return emit_steps(inputs, steps, block.returns, compact=True, trim_suffix=dataflow, group_operands=dataflow)
 
 
 def compile_word(word, optimization=BASELINE, *, check_input_ranges=True, spend_entry=False,

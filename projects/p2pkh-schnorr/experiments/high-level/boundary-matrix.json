@@ -1,0 +1,549 @@
+{
+  "compiler": "0.2.7",
+  "chain_gang": {
+    "version": "0.13.2",
+    "commit": "74676b9c002c452e7f21a9ed9265f4972bef03f6"
+  },
+  "bsv_node": 101020300,
+  "chronicle_height": 5,
+  "automatic_lock_sha256": "26fc9c2ade9c8dcc54ad19aade683a9da30523ef659b25e9a01168b651a291ec",
+  "rows": [
+    {
+      "case": "automatic-rollover/41",
+      "input_types": [
+        "compiler-auto"
+      ],
+      "output_types": {
+        "compiler-auto": 1
+      },
+      "version": 2,
+      "spend_height": 6,
+      "funding_heights": [
+        5
+      ],
+      "sighashes": [
+        "41"
+      ],
+      "constructor_choices": [
+        "literal"
+      ],
+      "signing_digests_sha256d": [
+        "a8f04ea65bd852a8fa2e577cf3a53e985adc5816b45eb563ee2058f9e0d1625f"
+      ],
+      "distinct_signed_encodings": 1,
+      "transactions": {
+        "literal": {
+          "bytes": 23583,
+          "txid": "0f479048eda624444ffb4a13196275f6371e92753645f7491c5c5a32dab2977f",
+          "unlock_bytes": [
+            329
+          ]
+        },
+        "template": {
+          "bytes": 23583,
+          "txid": "0f479048eda624444ffb4a13196275f6371e92753645f7491c5c5a32dab2977f",
+          "unlock_bytes": [
+            329
+          ]
+        },
+        "auto": {
+          "bytes": 23583,
+          "txid": "0f479048eda624444ffb4a13196275f6371e92753645f7491c5c5a32dab2977f",
+          "unlock_bytes": [
+            329
+          ]
+        }
+      },
+      "mutation_input_verdicts": {
+        "locktime": [
+          false
+        ],
+        "recipient-amount": [
+          false
+        ],
+        "sequence": [
+          false
+        ]
+      }
+    },
+    {
+      "case": "automatic-rollover/61",
+      "input_types": [
+        "compiler-auto"
+      ],
+      "output_types": {
+        "compiler-auto": 1
+      },
+      "version": 2,
+      "spend_height": 6,
+      "funding_heights": [
+        5
+      ],
+      "sighashes": [
+        "61"
+      ],
+      "constructor_choices": [
+        "repeat-preimage"
+      ],
+      "signing_digests_sha256d": [
+        "821e4cd282b62da1d9d7286ddfef1cdabe5b5f4753f8db634553178ba2182c02"
+      ],
+      "distinct_signed_encodings": 3,
+      "transactions": {
+        "literal": {
+          "bytes": 46683,
+          "txid": "ba39249e67fcc89b0b0b0dcdb88de6537004058b7d27a22394f821b54e98155b",
+          "unlock_bytes": [
+            23429
+          ]
+        },
+        "template": {
+          "bytes": 28746,
+          "txid": "808905d520b45e5a305320ba54f57f13eee672695f600dd984e34018a7af162e",
+          "unlock_bytes": [
+            5492
+          ]
+        },
+        "auto": {
+          "bytes": 28728,
+          "txid": "08754bf3a8c0c1447099d08c96372ee99631a56d9e8f71b5397c6a359ff84038",
+          "unlock_bytes": [
+            5474
+          ]
+        }
+      },
+      "mutation_input_verdicts": {
+        "locktime": [
+          false
+        ],
+        "recipient-amount": [
+          false
+        ],
+        "sequence": [
+          false
+        ]
+      }
+    },
+    {
+      "case": "automatic-payment-and-change/41",
+      "input_types": [
+        "compiler-auto"
+      ],
+      "output_types": {
+        "native-p2pkh": 1,
+        "compiler-auto": 1
+      },
+      "version": 2,
+      "spend_height": 6,
+      "funding_heights": [
+        5
+      ],
+      "sighashes": [
+        "41"
+      ],
+      "constructor_choices": [
+        "literal"
+      ],
+      "signing_digests_sha256d": [
+        "ee98c99d7f1e033cba94fa6909f2dd600873b92cced23d65fdd81889b57f2364"
+      ],
+      "distinct_signed_encodings": 1,
+      "transactions": {
+        "literal": {
+          "bytes": 23617,
+          "txid": "4ed1d61483a1fd8b63c825a0249ce7c2f239e5830370eb5ce206bd9ea9c5e1c4",
+          "unlock_bytes": [
+            329
+          ]
+        },
+        "template": {
+          "bytes": 23617,
+          "txid": "4ed1d61483a1fd8b63c825a0249ce7c2f239e5830370eb5ce206bd9ea9c5e1c4",
+          "unlock_bytes": [
+            329
+          ]
+        },
+        "auto": {
+          "bytes": 23617,
+          "txid": "4ed1d61483a1fd8b63c825a0249ce7c2f239e5830370eb5ce206bd9ea9c5e1c4",
+          "unlock_bytes": [
+            329
+          ]
+        }
+      },
+      "mutation_input_verdicts": {
+        "locktime": [
+          false
+        ],
+        "recipient-amount": [
+          false
+        ],
+        "output-order": [
+          false
+        ],
+        "sequence": [
+          false
+        ]
+      }
+    },
+    {
+      "case": "automatic-payment-and-change/61",
+      "input_types": [
+        "compiler-auto"
+      ],
+      "output_types": {
+        "native-p2pkh": 1,
+        "compiler-auto": 1
+      },
+      "version": 2,
+      "spend_height": 6,
+      "funding_heights": [
+        5
+      ],
+      "sighashes": [
+        "61"
+      ],
+      "constructor_choices": [
+        "repeat-preimage"
+      ],
+      "signing_digests_sha256d": [
+        "496361e955bc8cfa961b6dc1c5a3ec2840c4143f6d99ea94d1339bdfeccfaa16"
+      ],
+      "distinct_signed_encodings": 3,
+      "transactions": {
+        "literal": {
+          "bytes": 46751,
+          "txid": "aa3ae70085729faedd20766db7b88c247fd3d0984bf1e2f0de40844480b16f87",
+          "unlock_bytes": [
+            23463
+          ]
+        },
+        "template": {
+          "bytes": 28816,
+          "txid": "64dabeaaec1508086a018902e05cb9064bf3f9b7d03100d46fde2abb69516734",
+          "unlock_bytes": [
+            5528
+          ]
+        },
+        "auto": {
+          "bytes": 28796,
+          "txid": "a959f7f24406d5153de45ef27025fd6929a2c22dbb8c276dd464ddeabf8dc4ec",
+          "unlock_bytes": [
+            5508
+          ]
+        }
+      },
+      "mutation_input_verdicts": {
+        "locktime": [
+          false
+        ],
+        "recipient-amount": [
+          false
+        ],
+        "output-order": [
+          false
+        ],
+        "sequence": [
+          false
+        ]
+      }
+    },
+    {
+      "case": "automatic-turnover/41",
+      "input_types": [
+        "compiler-auto",
+        "compiler-auto"
+      ],
+      "output_types": {
+        "compiler-auto": 2
+      },
+      "version": 2,
+      "spend_height": 6,
+      "funding_heights": [
+        5,
+        5
+      ],
+      "sighashes": [
+        "41",
+        "41"
+      ],
+      "constructor_choices": [
+        "literal",
+        "literal"
+      ],
+      "signing_digests_sha256d": [
+        "d380835b2c960b42391c15918c8ca7fc8b7625d9e641545a49511c9b19a438f0",
+        "cc311dc522eb4e40d11aee74b3a95f5d8ed500920c3a9d9e43ad7ed9ba7f5a76"
+      ],
+      "distinct_signed_encodings": 1,
+      "transactions": {
+        "literal": {
+          "bytes": 47156,
+          "txid": "1ef1cf878da8c668dea438f02d90fe2bae9dd971a607560709530df34bf4040d",
+          "unlock_bytes": [
+            329,
+            329
+          ]
+        },
+        "template": {
+          "bytes": 47156,
+          "txid": "1ef1cf878da8c668dea438f02d90fe2bae9dd971a607560709530df34bf4040d",
+          "unlock_bytes": [
+            329,
+            329
+          ]
+        },
+        "auto": {
+          "bytes": 47156,
+          "txid": "1ef1cf878da8c668dea438f02d90fe2bae9dd971a607560709530df34bf4040d",
+          "unlock_bytes": [
+            329,
+            329
+          ]
+        }
+      },
+      "mutation_input_verdicts": {
+        "locktime": [
+          false,
+          false
+        ],
+        "recipient-amount": [
+          false,
+          false
+        ],
+        "output-order": [
+          false,
+          false
+        ],
+        "sequence": [
+          false,
+          false
+        ]
+      }
+    },
+    {
+      "case": "automatic-turnover/61",
+      "input_types": [
+        "compiler-auto",
+        "compiler-auto"
+      ],
+      "output_types": {
+        "compiler-auto": 2
+      },
+      "version": 2,
+      "spend_height": 6,
+      "funding_heights": [
+        5,
+        5
+      ],
+      "sighashes": [
+        "61",
+        "61"
+      ],
+      "constructor_choices": [
+        "template-0/repeated",
+        "template-0/repeated"
+      ],
+      "signing_digests_sha256d": [
+        "a2714ba72278ce48354bcdb331c1c2b6c7f055dfe436f406db9dbf3f42abf273",
+        "57c4f1aa10afb9462ce918ac91a4fab6834e5b13cb252317589a7b782bec6838"
+      ],
+      "distinct_signed_encodings": 2,
+      "transactions": {
+        "literal": {
+          "bytes": 139840,
+          "txid": "ac2aa5c29a733d5a391c82a0a20dbece3d928ba10c44e97e863ed6c8b3968a5a",
+          "unlock_bytes": [
+            46671,
+            46671
+          ]
+        },
+        "template": {
+          "bytes": 57646,
+          "txid": "b93b23d2db100576eb7e8cf9892f2a4ed220afa43a00e19fbfc57fa3e9688211",
+          "unlock_bytes": [
+            5574,
+            5574
+          ]
+        },
+        "auto": {
+          "bytes": 57646,
+          "txid": "b93b23d2db100576eb7e8cf9892f2a4ed220afa43a00e19fbfc57fa3e9688211",
+          "unlock_bytes": [
+            5574,
+            5574
+          ]
+        }
+      },
+      "mutation_input_verdicts": {
+        "locktime": [
+          false,
+          false
+        ],
+        "recipient-amount": [
+          false,
+          false
+        ],
+        "output-order": [
+          false,
+          false
+        ],
+        "sequence": [
+          false,
+          false
+        ]
+      }
+    },
+    {
+      "case": "automatic-mixed-output/41",
+      "input_types": [
+        "compiler-auto",
+        "v0.17.0"
+      ],
+      "output_types": {
+        "v0.17.0": 1,
+        "compiler-auto": 1,
+        "native-p2pkh": 1
+      },
+      "version": 2,
+      "spend_height": 6,
+      "funding_heights": [
+        5,
+        5
+      ],
+      "sighashes": [
+        "41",
+        "41"
+      ],
+      "constructor_choices": [
+        "literal",
+        "literal"
+      ],
+      "signing_digests_sha256d": [
+        "99fcec5df2c6361b21091d96f8bd4dc1a419185ea8a0dd3f4b209b42952bc736",
+        "c180de9c49d13a1cbfb1f41bfcff21afe00c1889efe3b054141d38c1251da9cd"
+      ],
+      "distinct_signed_encodings": 1,
+      "transactions": {
+        "literal": {
+          "bytes": 46435,
+          "txid": "675fb8404f0a0079d515e85331b1c460e0fcac39f6f09fcc88889cc67b4fb03f",
+          "unlock_bytes": [
+            329,
+            329
+          ]
+        },
+        "template": {
+          "bytes": 46435,
+          "txid": "675fb8404f0a0079d515e85331b1c460e0fcac39f6f09fcc88889cc67b4fb03f",
+          "unlock_bytes": [
+            329,
+            329
+          ]
+        },
+        "auto": {
+          "bytes": 46435,
+          "txid": "675fb8404f0a0079d515e85331b1c460e0fcac39f6f09fcc88889cc67b4fb03f",
+          "unlock_bytes": [
+            329,
+            329
+          ]
+        }
+      },
+      "mutation_input_verdicts": {
+        "locktime": [
+          false,
+          false
+        ],
+        "recipient-amount": [
+          false,
+          false
+        ],
+        "output-order": [
+          false,
+          false
+        ],
+        "sequence": [
+          false,
+          false
+        ]
+      }
+    },
+    {
+      "case": "automatic-mixed-output/61",
+      "input_types": [
+        "compiler-auto",
+        "v0.17.0"
+      ],
+      "output_types": {
+        "v0.17.0": 1,
+        "compiler-auto": 1,
+        "native-p2pkh": 1
+      },
+      "version": 2,
+      "spend_height": 6,
+      "funding_heights": [
+        5,
+        5
+      ],
+      "sighashes": [
+        "61",
+        "61"
+      ],
+      "constructor_choices": [
+        "mixed/shared",
+        "mixed/shared"
+      ],
+      "signing_digests_sha256d": [
+        "ea99f15a74dfb33b13e753bd09dd17a68d2996ec6cc9ba3e795281b2ce644f65",
+        "0f5cd7a15a51a3a616f9dd5388ea7715ff86af58df23a44aa341e510852989de"
+      ],
+      "distinct_signed_encodings": 3,
+      "transactions": {
+        "literal": {
+          "bytes": 137677,
+          "txid": "cb71db53b23284572d0a2e64f386bd15d821f094a5e699bda8dc5640ac435bee",
+          "unlock_bytes": [
+            45950,
+            45950
+          ]
+        },
+        "template": {
+          "bytes": 65929,
+          "txid": "b1f6fcc78790ab378da7e3c3db73d0095a33ec2e55524c5ffcae7881828c4669",
+          "unlock_bytes": [
+            10076,
+            10076
+          ]
+        },
+        "auto": {
+          "bytes": 64361,
+          "txid": "3b6a48cd10c97ca35745283da2f400f49604ecf06c330fef5d4b68fe951eff73",
+          "unlock_bytes": [
+            9292,
+            9292
+          ]
+        }
+      },
+      "mutation_input_verdicts": {
+        "locktime": [
+          false,
+          false
+        ],
+        "recipient-amount": [
+          false,
+          false
+        ],
+        "output-order": [
+          false,
+          false
+        ],
+        "sequence": [
+          false,
+          false
+        ]
+      }
+    }
+  ],
+  "selected_automatic": "glv-joint-scaled-2/dataflow/batch"
+}

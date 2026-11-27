@@ -176,3 +176,28 @@ REGTEST_CHRONICLE_HEIGHT=5 PYTHONPATH=src:. bash tools/verify_node.sh --profile 
   "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/experiments/high-level/window_compare.py \
   --joint-lowerings --matrix-only --output workspace/schnorr-high-level/dataflow-matrix.json
 ```
+
+<a name="stack-and-model-boundaries"></a>
+
+## 栈和坐标模型边界
+
+栈候选让域模数从仿射映射一直保留到联合建表之后。仿射和齐次坐标转换比较预计算因子与在运行时从单个缩放因子求幂的写法。数据流调度器成组搬运相邻操作数，清理返回序列中夹杂的死值，并融合仅由 `verify` 消费的比较。共享解码库通过倍增和拼接生成重复掩码。[编译器和基础库](../../../docs/optimization-paths.zh-CN.md#数据流和返回边界)
+
+| 构建 | 付款锁 | 两进两出 OTDA ALL，使用模板构造器 |
+| --- | ---: | ---: |
+| 上轮数据流与批量解码 | 23,484 B | 58,822 B |
+| 栈与坐标模型边界优化 | 23,190 B | 57,646 B |
+| 手工 v0.17.0 | 22,435 B | 54,626 B |
+
+表格和实测文件对应提交 `e1ee42b`。从该提交的检出目录运行下列命令，可逐字节复现实测脚本。与 `main` 的 `c02df4a` 合并后，选中构建的付款锁为 23,188 B，两进两出的重建交易为 57,638 B。 [实测提交](https://github.com/linzhm/4thGraph/tree/e1ee42b455225934d580d172e562540286c42c56)
+
+18,379 B 的窗口循环与冻结手工版逐字节相同。每锁剩余 755 B，分布在联合点乘准备 441 B、见证和挑战值处理 250 B、清栈和 nonce 点比较 64 B。验签器复放 BIP340 向量、错误见证、12 种成对付款模式和两种普通输出退出。选中候选也通过构造器矩阵的八个场景。[实测](../experiments/high-level/boundary-measurements.json) · [交易矩阵](../experiments/high-level/boundary-matrix.json)
+
+```sh
+PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
+  "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/experiments/high-level/window_compare.py \
+  --joint-lowerings --output workspace/schnorr-high-level/boundary-measurements.json
+REGTEST_CHRONICLE_HEIGHT=5 PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
+  "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/experiments/high-level/window_compare.py \
+  --joint-lowerings --matrix-only --output workspace/schnorr-high-level/boundary-matrix.json
+```

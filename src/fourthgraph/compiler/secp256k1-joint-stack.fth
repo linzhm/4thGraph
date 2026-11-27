@@ -7,8 +7,7 @@ layout: restore-signs ( s:script-int k1:script-int k2:script-int
 
 : prepare-stack-windows ( script-int script-int script-int script-int --
                            script-int script-int script-int script-int script-int bytes )
-    expose-public map-public restore-public
-    field-prime joint-variable split-glv retain-signs signed-bases restore-signs
+    map-public split-glv retain-signs signed-bases restore-signs
     int-abs swap int-abs swap rot split-fixed 2swap pack-windows
 ;
 
