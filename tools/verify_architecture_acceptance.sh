@@ -26,38 +26,42 @@ wheel=("$out"/wheel/fourthgraph-*.whl)
 "$wheel_py" -m pip install --no-deps --no-index --target "$out/site" "${wheel[0]}"
 export PYTHONPATH="$out/site${PYTHONPATH:+:$PYTHONPATH}:$root"
 cd "$out/run"
+reports="$PWD"
+replay_cwd="$(mktemp -d /tmp/4thgraph-acceptance.XXXXXX)"
+trap 'rmdir -- "$replay_cwd" 2>/dev/null || true' EXIT
 
-fourthgraph() { "$py" -m fourthgraph.workflow.protocol "$@"; }
+installed() { (cd "$replay_cwd" && "$py" "$@"); }
+fourthgraph() { installed -m fourthgraph.workflow.protocol "$@"; }
 experiment() { fourthgraph experiment "$@"; }
 
 fourthgraph --capabilities > compiler-capabilities.json
 experiment capabilities > experiment-capabilities.json
 printf '%s\n' '{"fixture":"bezier","evaluation":"spend","trace":true,"plans":[{},{"passes":["stack"]},{"passes":["rewrite","share","stack"]}]}' |
     experiment run - > bezier-first.json
-experiment next bezier-first.json > bezier-next.json
-experiment run bezier-next.json --parent bezier-first.json > bezier-second.json
-experiment replay bezier-second.json --parent bezier-first.json > bezier-replay.json
+experiment next "$reports/bezier-first.json" > bezier-next.json
+experiment run "$reports/bezier-next.json" --parent "$reports/bezier-first.json" > bezier-second.json
+experiment replay "$reports/bezier-second.json" --parent "$reports/bezier-first.json" > bezier-replay.json
 
 for implementation in bezier bezier-linear; do
     printf '{"fixture":"bezier","evaluation":"spend","axis":"A","plans":[{"implementation":"%s","passes":["stack"]},{"implementation":"%s","passes":["rewrite","share","stack","search"]}]}\n' \
         "$implementation" "$implementation" | experiment run - > "$implementation-matrix.json"
-    experiment replay "$implementation-matrix.json" > "$implementation-matrix-replay.json"
+    experiment replay "$reports/$implementation-matrix.json" > "$implementation-matrix-replay.json"
 done
 printf '%s\n' '{"fixture":"bezier","evaluation":"spend","axis":"B","plans":[{"implementation":"bezier","passes":["stack"]},{"implementation":"bezier-linear","passes":["stack"]}]}' |
     experiment run - > source-axis.json
-experiment replay source-axis.json > source-axis-replay.json
+experiment replay "$reports/source-axis.json" > source-axis-replay.json
 printf '%s\n' '{"fixture":"point-add","evaluation":"spend","enumerate":"bindings"}' |
     experiment run - > point-add.json
-experiment replay point-add.json > point-add-replay.json
+experiment replay "$reports/point-add.json" > point-add-replay.json
 
-"$py" -m unittest -v tests.test_pels_lock tests.test_pels_successor_library > pels-tests.log 2>&1
-"$py" -m fourthgraph.replay.prefix_workflow "$root/projects/workflow-examples/serial-graph.fth" > three-stage.json
+installed -m unittest -v tests.test_pels_lock tests.test_pels_successor_library > pels-tests.log 2>&1
+installed -m fourthgraph.replay.prefix_workflow "$root/projects/workflow-examples/serial-graph.fth" > three-stage.json
 
 for project in workflow-examples p2pkh-r1; do
-    "$py" "$root/tools/build_project_contract.py" "$project" "$out/$project" --verify > "$project-build.json"
+    installed "$root/tools/build_project_contract.py" "$project" "$out/$project" --verify > "$project-build.json"
     approval="$(sha256sum "$out/$project/manifest.json" | cut -d' ' -f1)"
-    "$py" "$root/tools/verify_project_contract.py" "$out/$project/manifest.json" --approved-sha256 "$approval" \
-        --replay "$out/$project/receipt.json" --output "$project-replay.json"
+    installed "$root/tools/verify_project_contract.py" "$out/$project/manifest.json" --approved-sha256 "$approval" \
+        --replay "$out/$project/receipt.json" --output "$reports/$project-replay.json"
 done
 
 "$py" - "$commit" "${wheel[0]}" <<'PY'
