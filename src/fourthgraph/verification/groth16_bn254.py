@@ -11,7 +11,9 @@ import subprocess
 from tempfile import TemporaryDirectory
 
 from fourthgraph.compiler.source import MAX_EXPANSION, PROJECT_NAME, CompileError, SourceCompiler, check_word_expansion, expanded
+from fourthgraph.compiler.stack_schedule import compact_pair_moves
 from fourthgraph.compiler.wordsets import Primitive, TYPES
+from fourthgraph.verification import bn254_forth
 from fourthgraph.verification.r1cs import FIELD, scalar
 from fourthgraph.workflow.protocol import FLAG, artifact_digest, authorize, build_artifact, is_compressed_public_key
 from fourthgraph.bsv.script import asm
@@ -50,8 +52,12 @@ def runar_overlay(repository):
             path.write_bytes((repository / name).read_bytes())
             files[str(repository / name)] = str(path)
         checked(["git", "apply", "--unidiff-zero", str(RUNAR_EXTENSION / "compact_groth16.patch")], cwd=directory)
+        compact = directory / "compilers/go/codegen/compact_groth16.go"
+        compact.write_bytes((RUNAR_EXTENSION / compact.name).read_bytes())
+        checked(["git", "apply", "--unidiff-zero", str(RUNAR_EXTENSION / "forth_groth16.patch")], cwd=directory)
         for extension in RUNAR_EXTENSION.glob("*.go"):
-            files[str(repository / "compilers/go/codegen" / extension.name)] = str(extension)
+            files[str(repository / "compilers/go/codegen" / extension.name)] = str(
+                compact if extension.name == compact.name else extension)
         overlay = directory / "overlay.json"
         overlay.write_text(json.dumps({"Replace": files}), encoding="utf-8")
         yield overlay, repository / "compilers/go", {**os.environ, "GOWORK": str(repository / "go.work")}
@@ -126,7 +132,7 @@ class ScriptVerifier:
         self.key_digest = sha256(verification_key).hexdigest()
 
     def emit(self, signals, proof=None, *, fixed_msm=False, compact_statement=False,
-             compact_subgroup=COMPACT_SUBGROUP, modulo_threshold=COMPACT_MODULO_THRESHOLD):
+             compact_subgroup=COMPACT_SUBGROUP, modulo_threshold=COMPACT_MODULO_THRESHOLD, forth_plan=None):
         key = self.adapter_key
         if fixed_msm:
             key = {**key, "pinnedPublicInputs": dict(enumerate(signals))}
@@ -136,6 +142,8 @@ class ScriptVerifier:
             request = {"VK": str(key_path), "Public": signals, "Proof": proof}
             if compact_statement:
                 request.update(CompactStatement=True, CompactSubgroup=compact_subgroup, ModuloThreshold=modulo_threshold)
+            if forth_plan is not None:
+                request["ForthPlan"] = forth_plan
             return bytes.fromhex(json.loads(checked([self.adapter], stdin=json.dumps(request))))
 
     @staticmethod
@@ -144,8 +152,8 @@ class ScriptVerifier:
             raise ValueError("owner must be a valid compressed secp256k1 public key")
         return authorize(owner)
 
-    def compile_predicate(self, signals, *, fixed_msm=False, compact_statement=False):
-        template = self.emit(signals, fixed_msm=fixed_msm, compact_statement=compact_statement)
+    def compile_predicate(self, signals, *, fixed_msm=False, compact_statement=False, forth_plan=None):
+        template = self.emit(signals, fixed_msm=fixed_msm, compact_statement=compact_statement, forth_plan=forth_plan)
         prefix = asm("OP_0 OP_CHECKSIGVERIFY")
         if not template.startswith(prefix):
             raise ValueError("unexpected owner constructor slot in Rúnar artifact")
@@ -193,6 +201,7 @@ BN254_WORDS = {
                                 guard + verifier.compile_predicate(statement, fixed_msm=True, compact_statement=True),
                             ), "fixed pairing terms and projective G2 subgroup check", build_only=True),
 }
+BN254_WORDS.update(bn254_forth.WORDS)
 BN254_TYPES = TYPES | {kind for word in BN254_WORDS.values() for kind in (*word.takes, *word.gives)}
 
 
@@ -213,15 +222,17 @@ class ForthVerifier(ScriptVerifier):
             if all(instruction is not stage for stage in BN254_WORDS.values()):
                 raise token.error(f"{token.text!r} cannot build a BN254 verifier lock")
         self.libraries = frontend.library_imports
-        self.compact_statement = any(instruction is BN254_WORDS[COMPACT_WORD]
-                                     for instruction, _ in self.instructions)
+        planned = any(instruction is BN254_WORDS[bn254_forth.PLAN_ENTRY] for instruction, _ in self.instructions)
+        self.forth_plan = bn254_forth.source_plan(frontend, self.instructions) if planned else None
+        self.compact_statement = planned or any(instruction is BN254_WORDS[COMPACT_WORD]
+                                                for instruction, _ in self.instructions)
 
     def compile(self, signals, owner):
         stack = []
         for instruction, _ in self.instructions:
             start = len(stack) - len(instruction.takes)
             stack[start:] = instruction.run(self, signals, owner, *stack[start:])
-        return stack[0]
+        return compact_pair_moves(stack[0]) if self.forth_plan is not None else stack[0]
 
     def artifact(self, signals, owner, script):
         document = super().artifact(signals, owner, script)
@@ -232,6 +243,12 @@ class ForthVerifier(ScriptVerifier):
                 for name in ("compact_groth16.go", "compact_groth16.patch")
             })
             document.update(subgroup_schedule=COMPACT_SUBGROUP, modulo_threshold=COMPACT_MODULO_THRESHOLD)
+        if self.forth_plan is not None:
+            document.update(forth_plan=self.forth_plan, stack_optimization="paired-moves")
+            document["runar_extension_sha256"].update({
+                name: sha256((RUNAR_EXTENSION / name).read_bytes()).hexdigest()
+                for name in ("forth_groth16.go", "forth_groth16.patch")
+            })
         return build_artifact(document, self.source)
 
     def witness(self, signals, proof):
