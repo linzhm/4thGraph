@@ -217,6 +217,7 @@ STACK_OPTIMIZATIONS = {
     bn254_forth.PLAN_ENTRY: ("paired-moves", compact_pair_moves),
     bn254_forth.COMPACT_STACK_ENTRY: ("compact-moves", compact_stack_moves),
     bn254_forth.LAST_USE_ENTRY: ("compact-moves", compact_stack_moves),
+    bn254_forth.OPTIMIZED_ENTRY: ("compact-moves", compact_stack_moves),
 }
 BN254_TYPES = TYPES | {kind for word in BN254_WORDS.values() for kind in (*word.takes, *word.gives)}
 
@@ -272,6 +273,8 @@ class ForthVerifier(ScriptVerifier):
             extensions = ("forth_groth16.go", "forth_groth16.patch")
             if self.forth_plan.get("JacobianLastUse"):
                 extensions += ("forth_liveness.go", "forth_liveness.patch")
+            if self.forth_plan.get("Fp12RenameInPlace"):
+                extensions += ("forth_fp12_rename.patch",)
             document["runar_extension_sha256"].update({
                 name: sha256((RUNAR_EXTENSION / name).read_bytes()).hexdigest() for name in extensions
             })
