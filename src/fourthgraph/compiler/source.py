@@ -753,7 +753,7 @@ class SourceCompiler:
         gives = tuple(takes[index] for index in order)
         code = emit_steps(tuple(range(len(takes))), (), order, compact=True)
         self.words[name.name] = Primitive(takes, gives, code, lambda *items: tuple(items[index] for index in order),
-                                          "typed layout permutation", repeatable=True)
+                                          "typed layout permutation", repeatable=True, permutation=order)
 
     def declaration(self, token):
         tokens = self.tokens

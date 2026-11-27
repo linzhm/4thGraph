@@ -14,13 +14,13 @@ from .stack_schedule import emit_steps
 from .wordsets import NATIVE_PRIMITIVES, Primitive, script_word
 
 
-def numeric_fragment(code, inputs, outputs, *, may_fail=False):
+def numeric_fragment(code, inputs, outputs, *, may_fail=False, stack_local=False):
     def run(*values):
         result, _ = evaluate(code, list(map(encode_num, values)))
         return tuple(map(decode_num, result))
 
     return Primitive(("script-int",) * inputs, ("script-int",) * outputs, code, run,
-                     "compiled numeric kernel", may_fail=may_fail)
+                     "compiled numeric kernel", may_fail=may_fail, stack_local=stack_local)
 
 
 def padded(value, width):
@@ -228,7 +228,8 @@ def _optimized_joint_words(vocabulary, optimization, *, scaled):
                                                 _pack_fixed_scalar_windows),
         "double-pair": numeric_fragment(library.emit(prefix + "double-pair-with-field", b"", 1), 4, 4),
         "double-point": numeric_fragment(library.emit(prefix + "double-with-field", b"", 1), 4, 4),
-        "add-fixed-affine": numeric_fragment(library.emit(prefix + "add-affine-with-field", b"", 1), 6, 4),
+        "add-fixed-affine": numeric_fragment(library.emit(prefix + "add-affine-with-field", b"", 1), 6, 4,
+                                              stack_local=True),
         "map-row-coordinates": numeric_fragment(library.emit("secp-window-map-row-coordinates", b""), 11, 9),
     }
     points = fixed_table(SECP256K1, split_bits=128)
