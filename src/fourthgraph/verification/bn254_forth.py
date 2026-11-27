@@ -7,6 +7,7 @@ from fourthgraph.compiler.wordsets import Primitive
 PLAN_ENTRY = "bn254-emit-verified"
 COMPACT_STACK_ENTRY = "bn254-emit-compact-stack"
 LAST_USE_ENTRY = "bn254-emit-last-use"
+OPTIMIZED_ENTRY = "bn254-emit-optimized"
 
 
 def begin(_verifier, _signals, _owner, guard, statement):
@@ -64,6 +65,8 @@ WORDS.update({
                                    finish, "emit with compact Script stack moves", build_only=True),
     LAST_USE_ENTRY: Primitive(("bn254-checked",), ("bn254-verified",), None,
                                finish, "emit with last-use Jacobian operand scheduling", build_only=True),
+    OPTIMIZED_ENTRY: Primitive(("bn254-checked",), ("bn254-verified",), None,
+                                finish, "emit using the optimized BN254 stack schedule", build_only=True),
 })
 EVENTS = {id(WORDS[name]): event for name, _, _, event in STAGES if event is not None}
 FP2 = "bn254-fp2"
@@ -109,6 +112,8 @@ def source_plan(frontend, instructions):
     for instruction, token in instructions:
         if instruction is WORDS[LAST_USE_ENTRY]:
             plan["JacobianLastUse"] = True
+        elif instruction is WORDS[OPTIMIZED_ENTRY]:
+            plan.update(JacobianLastUse=True, Fp12RenameInPlace=True)
         event = EVENTS.get(id(instruction))
         if isinstance(event, str):
             plan["Stages"].append(event)

@@ -1,0 +1,197 @@
+{
+  "version": "0.6.0",
+  "compiler_revision": "c286d4e3ee3c1684f201958dee9360fdda2f379f",
+  "runar_revision": "dbcc4269f8e0895c4738cf86948b05b7d62a2010",
+  "fixture_sha256": "d8eee6da5ed5780fb71dc91fa08744d1644ff1db7f53974aafb48bb26c2dd10c",
+  "phase_measurement": {
+    "method": "Label emitted StackOps by verification phase using Rúnar source locations. The fixed-line block includes the signed point setup before a variable-line addition. Apply the normal paired and compact Script passes by phase. The resulting lock lengths and SHA-256 digests match the published artifacts.",
+    "cases": {
+      "wrap": {
+        "compiled_lock_bytes": {
+          "owner": 44,
+          "prime": 38,
+          "curve-a": 110,
+          "curve-c": 107,
+          "curve-b": 379,
+          "subgroup": 65157,
+          "pairs": 16,
+          "inverse": 2309,
+          "miller": 62,
+          "miller-square": 96460,
+          "miller-var-line": 35884,
+          "miller-var-mul": 95460,
+          "miller-fixed-line-and-mul": 108438,
+          "miller-residue-fold": 43923,
+          "miller-cleanup": 10948,
+          "fixed": 3261,
+          "frobenius": 7919,
+          "identity": 206,
+          "cleanup": 60
+        },
+        "blocks": {
+          "owner": 1,
+          "prime": 1,
+          "curve-a": 1,
+          "curve-c": 1,
+          "curve-b": 1,
+          "subgroup": 1,
+          "pairs": 1,
+          "inverse": 1,
+          "miller": 1,
+          "miller-square": 65,
+          "miller-var-line": 86,
+          "miller-var-mul": 86,
+          "miller-fixed-line-and-mul": 86,
+          "miller-residue-fold": 21,
+          "miller-cleanup": 1,
+          "fixed": 1,
+          "frobenius": 1,
+          "identity": 1,
+          "cleanup": 1
+        },
+        "witness_bytes": {
+          "field_modulus": 33,
+          "miller_slopes": 5675,
+          "residue_and_selector": 793,
+          "proof_points": 264
+        },
+        "script_sha256": "c6ae1c906532d79ba4c65ba36d1f7209f39f130264d54148c8d4b0502f62ba6f",
+        "miller_total_bytes": 391175
+      },
+      "other": {
+        "compiled_lock_bytes": {
+          "owner": 44,
+          "prime": 38,
+          "curve-a": 110,
+          "curve-c": 107,
+          "curve-b": 379,
+          "subgroup": 65157,
+          "pairs": 16,
+          "inverse": 2309,
+          "miller": 62,
+          "miller-square": 96460,
+          "miller-var-line": 35884,
+          "miller-var-mul": 95460,
+          "miller-fixed-line-and-mul": 108438,
+          "miller-residue-fold": 43923,
+          "miller-cleanup": 10948,
+          "fixed": 3259,
+          "frobenius": 7919,
+          "identity": 206,
+          "cleanup": 60
+        },
+        "blocks": {
+          "owner": 1,
+          "prime": 1,
+          "curve-a": 1,
+          "curve-c": 1,
+          "curve-b": 1,
+          "subgroup": 1,
+          "pairs": 1,
+          "inverse": 1,
+          "miller": 1,
+          "miller-square": 65,
+          "miller-var-line": 86,
+          "miller-var-mul": 86,
+          "miller-fixed-line-and-mul": 86,
+          "miller-residue-fold": 21,
+          "miller-cleanup": 1,
+          "fixed": 1,
+          "frobenius": 1,
+          "identity": 1,
+          "cleanup": 1
+        },
+        "witness_bytes": {
+          "field_modulus": 33,
+          "miller_slopes": 5673,
+          "residue_and_selector": 791,
+          "proof_points": 264
+        },
+        "script_sha256": "6e05dc104505e9ed26412a7f780f935c5c0467d37d0a286be2fbf9d46d84ce34",
+        "miller_total_bytes": 391175
+      }
+    },
+    "reproduce": "PYTHONPATH=src:. python3 projects/groth16-bn254/reference/profile_phases.py --runar workspace/runar --check --output projects/groth16-bn254/workspace/build/phase-profile.json"
+  },
+  "additional_stack_pass": {
+    "method": "Reapply compact_stack_moves to each published locking script.",
+    "lock_bytes_saved": {
+      "wrap": 0,
+      "other": 0
+    }
+  },
+  "experimental_fp12_rename": {
+    "status": "local regtest experiment",
+    "method": "Using a temporary compiler overlay, replace the body of bn254Fp12RenamePrefix in codegen/bn254_ext.go with bn254Fp6RenamePrefix(t, srcPrefix + \"_a\", dstPrefix + \"_a\") and bn254Fp6RenamePrefix(t, srcPrefix + \"_b\", dstPrefix + \"_b\"). Compile the v0.6.0 Forth entry and replay its two fixed statements.",
+    "node_version": 101020300,
+    "chain_gang": {
+      "version": "0.13.2",
+      "commit": "74676b9c002c452e7f21a9ed9265f4972bef03f6"
+    },
+    "activation_height": 2,
+    "funded_replays": {
+      "wrap": {
+        "lock_bytes": 464397,
+        "lock_bytes_saved": 6384,
+        "script_sha256": "a38aa210d508e7f8b5dd30365c618fe3cfea4fc73e2c29debbbcfa5d7a79ff04",
+        "witness_prefix_sha256": "c1483d42242f4545184abd5b9fffe90569bfebe50c2bd95a324520230b321f47",
+        "deployment": {
+          "txid": "e7185cc38e97e0931e8e4bdef422a099075f45e6de82af0f125636391dbc7170",
+          "bytes": 464533,
+          "mempool": true,
+          "mined": true,
+          "block": "095f7fdb173d9d6325385f4c92dce17b43b3276ff12288955913a0f96a6990e4",
+          "height": 103
+        },
+        "valid_spend": {
+          "txid": "6fc8519a0ea520751f2987030c9723b02cb9d9a66ece372d307f50ad48aae589",
+          "bytes": 6935,
+          "mempool": true,
+          "mined": true,
+          "block": "1237b5039f7c2f3252e72a59ed82794d42141ba815f66299f3c694fd939ef1b3",
+          "height": 104,
+          "chain_gang": true
+        },
+        "deployment_plus_spend_bytes": 471468,
+        "rejected_by_bsv_node_and_chain_gang": [
+          "changed_output_with_stale_signature",
+          "g2_outside_subgroup",
+          "negated_proof_point",
+          "valid_proof_for_another_statement",
+          "wrong_sighash"
+        ]
+      },
+      "other": {
+        "lock_bytes": 464395,
+        "lock_bytes_saved": 6384,
+        "script_sha256": "d345d061ca24aac4b3f54661c97b522b33860b64390f6fe96e3add2a5e42feed",
+        "witness_prefix_sha256": "24109899b736c96c0c4e057dbadc2920aff3375bd041d36ecc3edad6a5ae39ad",
+        "deployment": {
+          "txid": "bca2aa392c3c73935af2300b2c948f3b94b72a08c5031299824a272d3758b0ec",
+          "bytes": 464532,
+          "mempool": true,
+          "mined": true,
+          "block": "2ee714b675eea20c4577930a03e2a0965ed6078b4064a6915d684840bb55bffe",
+          "height": 103
+        },
+        "valid_spend": {
+          "txid": "dde077018e83a26b4c1ee31f1a019c5f5ba004fa95f898ffbf9c5cc882966e16",
+          "bytes": 6931,
+          "mempool": true,
+          "mined": true,
+          "block": "41684db4ca37e5591f54b8be18be3e59667d03272ba071651f08dbcdd1dfb1bc",
+          "height": 104,
+          "chain_gang": true
+        },
+        "deployment_plus_spend_bytes": 471463,
+        "rejected_by_bsv_node_and_chain_gang": [
+          "changed_output_with_stale_signature",
+          "g2_outside_subgroup",
+          "negated_proof_point",
+          "valid_proof_for_another_statement",
+          "wrong_sighash"
+        ]
+      }
+    }
+  }
+}

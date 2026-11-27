@@ -27,10 +27,11 @@ class Groth16EncodingTests(unittest.TestCase):
         key = json.dumps(fixture["verification_key"]).encode()
         lock = asm("OP_0 OP_CHECKSIGVERIFY 5 OP_ROLL 5 OP_ROLL OP_DROP OP_DROP OP_1")
 
-        for name, optimization, assembly, last_use in (
-            ("verifier.fth", "paired-moves", "OP_2ROT OP_DROP OP_DROP OP_1", False),
-            ("compact-stack-verifier.fth", "compact-moves", "OP_2ROT OP_2DROP OP_1", False),
-            ("last-use-verifier.fth", "compact-moves", "OP_2ROT OP_2DROP OP_1", True),
+        for name, optimization, assembly, last_use, rename_fp12 in (
+            ("verifier.fth", "paired-moves", "OP_2ROT OP_DROP OP_DROP OP_1", False, False),
+            ("compact-stack-verifier.fth", "compact-moves", "OP_2ROT OP_2DROP OP_1", False, False),
+            ("last-use-verifier.fth", "compact-moves", "OP_2ROT OP_2DROP OP_1", True, False),
+            ("optimized-verifier.fth", "compact-moves", "OP_2ROT OP_2DROP OP_1", True, True),
         ):
             with self.subTest(source=name):
                 source = project / "forth" / name
@@ -50,6 +51,7 @@ class Groth16EncodingTests(unittest.TestCase):
                     self.assertEqual(artifact["stack_optimization"], optimization)
                     self.assertEqual("forth_liveness.go" in artifact["runar_extension_sha256"], last_use)
                     self.assertEqual("forth_liveness.patch" in artifact["runar_extension_sha256"], last_use)
+                    self.assertEqual("forth_fp12_rename.patch" in artifact["runar_extension_sha256"], rename_fp12)
                     verifier.witness(signals, json.dumps(fixture["wrap"]["proof"]))
                     bad_source = source.read_bytes().replace(b"    require-g2-subgroup\n", b"")
                     with self.assertRaises(CompileError):
@@ -57,6 +59,7 @@ class Groth16EncodingTests(unittest.TestCase):
                 lock_request, witness_request = calls
                 plan = lock_request["ForthPlan"]
                 self.assertEqual(plan.get("JacobianLastUse"), True if last_use else None)
+                self.assertEqual(plan.get("Fp12RenameInPlace"), True if rename_fp12 else None)
                 self.assertTrue(witness_request["CompactStatement"])
                 self.assertNotIn("ForthPlan", witness_request)
                 self.assertEqual((len(plan["Subgroup"]), len(plan["Miller"])), (127, 65))
