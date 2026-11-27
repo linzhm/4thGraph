@@ -7,7 +7,7 @@ from fourthgraph.bsv.script import tile_top
 from .wordsets import PRIMITIVES, Literal, Primitive, script_word
 
 
-def reuse_values(block, *, recognize_tiles=True):
+def reuse_values(block, *, recognize_tiles=True, alias_layouts=True):
     """Return a rewritten block and the reasons for its replacements."""
     constants, widths, aliases, seen = {}, {}, {}, {}
     emitted, reused = [], []
@@ -15,6 +15,10 @@ def reuse_values(block, *, recognize_tiles=True):
         args = tuple(aliases.get(slot, slot) for slot in step.args)
         step = replace(step, args=args)
         node = step.node
+        if alias_layouts and isinstance(node, Primitive) and node.permutation is not None:
+            aliases.update(zip(step.results, (args[index] for index in node.permutation), strict=True))
+            reused.append((step, "layout-value-aliasing", "declared layout reuses its original input slots", None))
+            continue
         if isinstance(node, Literal):
             key = node
         elif isinstance(node, Primitive) and node.repeatable and not node.requires_checksig:

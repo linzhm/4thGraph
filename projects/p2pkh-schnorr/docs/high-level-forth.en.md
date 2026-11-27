@@ -220,7 +220,7 @@ REGTEST_CHRONICLE_HEIGHT=5 PYTHONPATH=src:. bash tools/verify_node.sh --profile 
 
 ## Source tuning for the 64-window verifier
 
-The tuned Forth carries the same field prime through the four coordinate bounds, the public curve equation, and the paired coordinate map. The script checks the original encodings and both ordinate parities before mapping, then checks the two modular residuals and rejects `Z = 0`. The compiler uses the same `dataflow` profile and secp256k1 joint word as the paired build. [Tuned Forth](../experiments/high-level/window-verifier-tuned.fth)
+The tuned Forth carries the same field prime through the four coordinate bounds, the public curve equation, and the paired coordinate map. The script checks the original encodings and both ordinate parities before mapping, then checks the two modular residuals and rejects `Z = 0`. At `f4b29f9`, the compiler uses the same `dataflow` profile and secp256k1 joint word as the paired build. [Tuned Forth](../experiments/high-level/window-verifier-tuned.fth)
 
 | Build | Before the windows | After the windows | Payment lock | 2×2 OTDA ALL with reconstruction |
 | --- | ---: | ---: | ---: | ---: |
@@ -238,3 +238,138 @@ REGTEST_CHRONICLE_HEIGHT=5 PYTHONPATH=src:. bash tools/verify_node.sh --profile 
   "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/experiments/high-level/window_compare.py \
   --joint-lowerings --forth-tuning --matrix-only --output workspace/schnorr-high-level/forth-tuning-matrix.json
 ```
+
+## Sharing the endomorphism at two row starts
+
+At `7d53334`, the variable table maps `2P` and `3P` to `2Q` and `3Q` before extending their rows. The Forth word compares the signed ordinates of `P` and `Q` once. A single formula then maps both inputs as `(X, Y, Z) → (βX mod p, ±Y, Z)` with the same field prime, sign, and β. Both the scaled and original-model stack tables use it. [Forth source for the two row maps](https://github.com/linzhm/4thGraph/blob/7d5333405102e2950dfeb9c172187a25acc4618a/src/fourthgraph/stdlib/secp256k1-window.fth)
+
+| Build | Joint preparation | Payment lock | 2×2 OTDA ALL with reconstruction |
+| --- | ---: | ---: | ---: |
+| Separate row maps at `f4b29f9` | 3,107 B | 22,992 B | 56,854 B |
+| Shared row map | 3,055 B | 22,940 B | 56,646 B |
+| Handwritten v0.17.0 | 2,763 B | 22,435 B | 54,626 B |
+
+The shared map saves 52 B, all in joint preparation. The 18,379 B window sequence is byte-identical across the three builds. Compared with the handwritten lock, the remaining 505 B consists of 207 B before the joint word, 292 B in joint preparation, and 6 B after the windows. Both engines replayed the standalone and payment cases and the eight constructor scenarios. [Measurements](../experiments/high-level/table-tuning-measurements.json) · [Transaction matrix](../experiments/high-level/table-tuning-matrix.json)
+
+```sh
+PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
+  "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/experiments/high-level/window_compare.py \
+  --joint-lowerings --forth-tuning --output workspace/schnorr-high-level/table-tuning-measurements.json
+REGTEST_CHRONICLE_HEIGHT=5 PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
+  "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/experiments/high-level/window_compare.py \
+  --joint-lowerings --forth-tuning --matrix-only --output workspace/schnorr-high-level/table-tuning-matrix.json
+```
+
+## Sharing β across all variable-table row starts
+
+Preparation computes the signed ordinates and the window digits. It defers `Q.x = βP.x mod p` until table construction, where one Forth formula produces `Q`, `2Q`, and `3Q`. The three abscissas use the same field prime and β. The first ordinate comes from the prepared signed `Q.y`; the other two use the relative sign, and their projective denominators pass through the formula. [Forth composition](../../../src/fourthgraph/compiler/secp256k1-joint-stack.fth) · [Row map formula](../../../src/fourthgraph/stdlib/secp256k1-window.fth)
+
+| Build | Joint preparation | Payment lock | 2×2 OTDA ALL with reconstruction |
+| --- | ---: | ---: | ---: |
+| Shared map for `2Q` and `3Q` at `7d53334` | 3,055 B | 22,940 B | 56,646 B |
+| Shared map for `Q`, `2Q`, and `3Q` | 3,017 B | 22,902 B | 56,494 B |
+| Handwritten v0.17.0 | 2,763 B | 22,435 B | 54,626 B |
+
+The comparison at `380ecae` uses the same `dataflow` settings and transaction fixtures. The 18,379 B window sequence is byte-identical. The 467 B gap to the handwritten lock comprises 207 B before the joint word, 254 B in joint preparation, and 6 B after the windows. BSV Node and chain-gang replayed the standalone and payment cases and the eight constructor scenarios. [Measurements](../experiments/high-level/window-beta-measurements.json) · [Transaction matrix](../experiments/high-level/window-beta-matrix.json)
+
+```sh
+PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
+  "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/experiments/high-level/window_compare.py \
+  --joint-lowerings --forth-tuning --output workspace/schnorr-high-level/window-beta-measurements.json
+REGTEST_CHRONICLE_HEIGHT=5 PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
+  "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/experiments/high-level/window_compare.py \
+  --joint-lowerings --forth-tuning --matrix-only --output workspace/schnorr-high-level/window-beta-matrix.json
+```
+
+## Packing the fixed-base scalar directly
+
+The stack-table preparation serializes the checked nonnegative scalar `s` once into a 33-byte little-endian ScriptNum. Two 16-byte slices supply the fixed-base lanes, and the last byte holds the sign even when bit 255 is set. The two GLV magnitudes and these slices feed the existing lane transpose in the same order. This removes division and remainder by `2^128` and the separate numeric encoding of each fixed-base lane. [Forth packing](../../../src/fourthgraph/stdlib/secp256k1-window.fth)
+
+| Build | Joint preparation | Payment lock | 2×2 OTDA ALL with reconstruction |
+| --- | ---: | ---: | ---: |
+| Numeric split at `380ecae` | 3,017 B | 22,902 B | 56,494 B |
+| Direct byte packing | 2,970 B | 22,855 B | 56,306 B |
+| Handwritten v0.17.0 | 2,763 B | 22,435 B | 54,626 B |
+
+At `06ad1aa`, both automatic builds use the same `dataflow` configuration and transaction fixtures. The 18,379 B window sequence is byte-identical. The 420 B gap to the handwritten lock comprises 207 B before the joint word, 207 B in joint preparation, and 6 B after the windows. Packing tests cover every 2-bit position of each lane, the all-zero and all-ones cases, and deterministic mixed inputs. Both engines replayed the verifier and payment cases and the eight constructor scenarios. [Measurements](../experiments/high-level/fixed-scalar-measurements.json) · [Transaction matrix](../experiments/high-level/fixed-scalar-matrix.json)
+
+```sh
+PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
+  "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/experiments/high-level/window_compare.py \
+  --joint-lowerings --forth-tuning --output workspace/schnorr-high-level/fixed-scalar-measurements.json
+REGTEST_CHRONICLE_HEIGHT=5 PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
+  "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/experiments/high-level/window_compare.py \
+  --joint-lowerings --forth-tuning --matrix-only --output workspace/schnorr-high-level/fixed-scalar-matrix.json
+```
+
+## Sharing the group order with the GLV split
+
+The tuned verifier reduces the challenge just after mapping the affine points. It checks `s < n`, computes `k = n - (hash mod n)`, and passes the same registered order `n` to the existing split-with-order word. The digest still uses the original encodings. The explicit-order joint word receives the checked scalars and the registered field and order. [Verifier Forth](../experiments/high-level/window-verifier-tuned.fth) · [Joint Forth](../../../src/fourthgraph/compiler/secp256k1-joint-stack.fth)
+
+| Build | Before the joint word | Joint preparation | Payment lock | 2×2 OTDA ALL with reconstruction |
+| --- | ---: | ---: | ---: | ---: |
+| Embedded GLV order at `06ad1aa` | 616 B | 2,970 B | 22,855 B | 56,306 B |
+| Shared order | 624 B | 2,939 B | 22,832 B | 56,214 B |
+| Handwritten v0.17.0 | 409 B | 2,763 B | 22,435 B | 54,626 B |
+
+At `91ac397`, passing the order adds 8 B before the joint word and saves 31 B in its preparation. The 18,379 B window sequence is byte-identical. The 397 B gap to the handwritten lock comprises 215 B before the joint word, 176 B in preparation, and 6 B after the windows. The two mapped joint words return identical coordinates at scalar boundaries. Both engines replayed the verifier and payment cases and the eight constructor scenarios. [Measurements](../experiments/high-level/shared-order-measurements.json) · [Transaction matrix](../experiments/high-level/shared-order-matrix.json)
+
+```sh
+PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
+  "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/experiments/high-level/window_compare.py \
+  --joint-lowerings --forth-tuning --output workspace/schnorr-high-level/shared-order-measurements.json
+REGTEST_CHRONICLE_HEIGHT=5 PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
+  "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/experiments/high-level/window_compare.py \
+  --joint-lowerings --forth-tuning --matrix-only --output workspace/schnorr-high-level/shared-order-matrix.json
+```
+
+## Scheduling named layouts with dataflow
+
+The comparison compiles the Forth at `91ac397` with the same `dataflow` profile on both sides. The compiler carries declared layout slots across calls. Each of the three variable-table rows drops from 348 B to 264 B. The outer verifier saves another 115 B. The 18,379 B window sequence is byte-identical. [Compiler tests](../../../tests/test_dataflow.py)
+
+| Build | Before the joint word | Joint preparation | Payment lock | 2×2 OTDA ALL with reconstruction |
+| --- | ---: | ---: | ---: | ---: |
+| `91ac397` | 624 B | 2,939 B | 22,832 B | 56,214 B |
+| Layout-aware dataflow | 509 B | 2,687 B | 22,465 B | 54,746 B |
+| Handwritten v0.17.0 | 409 B | 2,763 B | 22,435 B | 54,626 B |
+
+The dual-engine run covers 27 detached cases, 14 payment cases with their locktime mutations, and eight constructor scenarios. [Measurements](../experiments/high-level/layout-dataflow-measurements.json) · [Transaction matrix](../experiments/high-level/layout-dataflow-matrix.json)
+
+```sh
+PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
+  "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/experiments/high-level/window_compare.py \
+  --joint-lowerings --forth-tuning --output workspace/schnorr-high-level/layout-dataflow-measurements.json
+REGTEST_CHRONICLE_HEIGHT=5 PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
+  "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/experiments/high-level/window_compare.py \
+  --joint-lowerings --forth-tuning --matrix-only --output workspace/schnorr-high-level/layout-dataflow-matrix.json
+```
+
+<a name="variable-table-row-starts"></a>
+
+## Reusing unchanged variable-table coordinates
+
+The row mapping returns only the three transformed X coordinates and the two signed projective Y coordinates. The dataflow scheduler reuses the existing signed affine Y, the affine Z = 1, and the projective Z coordinates of 2P and 3P. Both the variable-table row bodies and the 18,379 B window loop retain their previous bytes. [Forth formula](../../../src/fourthgraph/stdlib/secp256k1-window.fth)
+
+| Build | Variable table | Payment lock | 2-input, 2-output OTDA ALL with constructor |
+| --- | ---: | ---: | ---: |
+| Layout-aware dataflow | 1,107 B | 22,465 B | 54,746 B |
+| Shared row coordinates | 1,078 B | 22,436 B | 54,630 B |
+| Manual v0.17.0 | 1,054 B | 22,435 B | 54,626 B |
+
+BSV Node 1.2.3 and pinned chain-gang replayed the tuned verifier and the eight constructor shapes. The default wallet still recognizes the published lock. The compiled lock uses the experimental constructor. [Replay summary](../experiments/high-level/row-start-layout.json)
+
+The layout-aware control comes from commit `5f72078`. Run the same benchmark commands above on the current checkout, writing the new results to separate files.
+
+<a name="paired-witness-ordinate-check"></a>
+
+## Checking both witness ordinates together
+
+The batch decoder supplies two unsigned ordinates. The tuned Forth checks that the sum of their individual remainders modulo 2 is zero. Each remainder is 0 or 1, so the sum is zero exactly when both ordinates are even. The compiler keeps the existing decoded field order and the four field bounds.
+
+| Build | Payment lock | 2-input, 2-output OTDA ALL with constructor |
+| --- | ---: | ---: |
+| Shared row coordinates | 22,436 B | 54,630 B |
+| Paired ordinate check | 22,434 B | 54,622 B |
+| Manual v0.17.0 | 22,435 B | 54,626 B |
+
+BSV Node 1.2.3 and pinned chain-gang reject the added witness with both ordinates odd. An isolated replay also checks all four parity combinations at small values and near the field bound. The constructor matrix retains the verdicts from commit `e52283a`. Reproduce the lock and transaction measurements with the commands above. [Forth source](../experiments/high-level/window-verifier-tuned.fth) · [Replay summary](../experiments/high-level/witness-ordinate-check.json)

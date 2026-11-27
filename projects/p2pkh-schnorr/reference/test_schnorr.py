@@ -66,6 +66,8 @@ def malformed_witnesses(public, message, signature):
         ("off-curve public ordinate", detached_unlock(message, public, signature, y=(y + 2) % FIELD)),
         ("noncanonical public ordinate", detached_unlock(message, public, signature, y=FIELD)),
         ("odd nonce ordinate", detached_unlock(message, public, signature, nonce_y=FIELD - nonce_y)),
+        ("both ordinates odd",
+         detached_unlock(message, public, signature, y=FIELD - y, nonce_y=FIELD - nonce_y)),
         ("off-curve nonce ordinate", detached_unlock(message, public, signature, nonce_y=(nonce_y + 2) % FIELD)),
         ("noncanonical nonce ordinate", detached_unlock(message, public, signature, nonce_y=FIELD)),
         ("short signature", detached_unlock(message, public, signature[:-1])),
@@ -456,6 +458,15 @@ class SchnorrTests(unittest.TestCase):
 
     def test_window_stream_packing(self):
         pack = _contract().emit("bip340-pack-windows", b"")
+        pack_fixed_scalar = _contract().emit("secp-window-pack-fixed-scalar", b"")
+
+        def check_packing(lanes, expected):
+            low, high, first, second = lanes
+            fixed = (low | (high << 128), first, second)
+            for script, values in ((pack, lanes), (pack_fixed_scalar, fixed)):
+                self.assertEqual(evaluate(script, [b"outer", *map(encode_num, values)]),
+                                 ([b"outer", expected], []))
+
         for lane in range(4):
             for digit in range(64):
                 with self.subTest(lane=lane, digit=digit):
@@ -463,13 +474,12 @@ class SchnorrTests(unittest.TestCase):
                     values[lane] = 3 << (2 * digit)
                     expected = bytearray(64)
                     expected[63 - digit] = 3 << (2 * lane)
-                    self.assertEqual(evaluate(pack, [b"outer", *map(encode_num, values)]),
-                                     ([b"outer", bytes(expected)], []))
+                    check_packing(values, bytes(expected))
         rng = Random(340)
         vectors = ([0] * 4, [HALF_RADIX - 1] * 4,
                    *(tuple(rng.getrandbits(128) for _ in range(4)) for _ in range(64)))
         for scalars in vectors:
-            self.assertEqual(evaluate(pack, list(map(encode_num, scalars))), ([self.window_stream(scalars)], []))
+            check_packing(scalars, self.window_stream(scalars))
 
     def test_joint_window_table_and_selectors(self):
         contract = _contract()

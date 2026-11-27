@@ -19,7 +19,7 @@ def compile_window_candidate(plan, *, trace=False, linked=False, strategy=GLV_RE
 
     def link(vocabulary, optimization):
         words = link_joint_word(vocabulary, optimization, strategy=strategy, scaled_output=scaled_output,
-                                mapped_input=mapped_input)
+                                mapped_input=mapped_input, order_input=comparison == "tuned")
         if joint_code is not None:
             kernel, = words.values()
             joint_code.append(kernel.code)

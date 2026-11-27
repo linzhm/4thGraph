@@ -1,5 +1,6 @@
 """Exercise reusable dataflow rules across checked bytes and stack boundaries."""
 import unittest
+from dataclasses import replace
 
 from fourthgraph.bsv.evaluate import ScriptError, evaluate
 from fourthgraph.bsv.script import asm, decode_num, encode_num
@@ -7,7 +8,7 @@ from fourthgraph.compiler.lowering import DATAFLOW, compile_word
 from fourthgraph.compiler.script_builder import ScriptBuilder
 from fourthgraph.compiler.source import CompileError, SourceCompiler
 from fourthgraph.compiler.stack_schedule import emit_steps
-from fourthgraph.compiler.wordsets import script_word
+from fourthgraph.compiler.wordsets import Primitive, script_word
 
 
 class DataflowTests(unittest.TestCase):
@@ -20,6 +21,46 @@ class DataflowTests(unittest.TestCase):
         self.assertEqual(evaluate(code, [b"a", encode_num(7)]), ([b"a", b"a"], []))
         with self.assertRaisesRegex(CompileError, "layout results"):
             SourceCompiler("layout: invalid ( item:bytes -- unknown )")
+
+    def test_layout_scheduling_supports_multiple_returns_and_requires_local_operands(self):
+        two_results = Primitive(("script-int", "script-int"), ("script-int", "script-int"),
+                                asm("OP_2DUP OP_SUB OP_TOALTSTACK OP_ADD OP_FROMALTSTACK"),
+                                lambda left, right: (left + right, left - right),
+                                "sum and difference", stack_local=True)
+        program = """
+            layout: exchange ( first:script-int second:script-int -- second first )
+            : combine ( script-int script-int -- script-int script-int )
+                exchange exchange both-results
+            ;
+        """
+        word = SourceCompiler(program, vocabulary={"both-results": two_results}).words["combine"]
+        plain, optimized = (compile_word(word, mode) for mode in ("stack", DATAFLOW))
+        self.assertLess(len(optimized.script), len(plain.script))
+        self.assertIn("layout-value-aliasing", {rule.rule for rule in optimized.rewrites})
+        stack = [b"caller", encode_num(7), encode_num(2)]
+        actual = evaluate(asm("17 OP_TOALTSTACK") + optimized.script, stack)
+        self.assertEqual(actual, ([b"caller", encode_num(9), encode_num(5)], [encode_num(17)]))
+        opaque = replace(two_results, stack_local=False)
+        word = SourceCompiler(program, vocabulary={"both-results": opaque}).words["combine"]
+        self.assertEqual(compile_word(word, DATAFLOW).script, compile_word(word, "stack").script)
+
+    def test_lock_layout_aliases_keep_branch_result_order(self):
+        source = SourceCompiler("""
+            REQUIRE BSV
+            layout: exchange ( first:cell second:cell -- second first )
+            lock: select ( left:cell right:cell flag:cell )
+                left right exchange exchange flag IF exchange ELSE exchange exchange THEN -
+            ;
+        """)
+        word = source.words["select"]
+        plain, optimized = (compile_word(word, mode) for mode in ("stack", DATAFLOW))
+        self.assertLess(len(optimized.script), len(plain.script))
+        self.assertIn("layout-value-aliasing", {rule.rule for rule in optimized.rewrites})
+        for flag, result in ((0, 5), (-1, -5)):
+            with self.subTest(flag=flag):
+                stack = [b"caller", *map(encode_num, (7, 2, flag))]
+                actual = evaluate(asm("17 OP_TOALTSTACK") + optimized.script, stack)
+                self.assertEqual(actual, ([b"caller", encode_num(result)], [encode_num(17)]))
 
     def test_trim_dead_prefix_preserves_live_suffix_and_caller_stacks(self):
         marker = b"reserved by the caller"

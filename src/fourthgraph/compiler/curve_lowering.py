@@ -6,7 +6,7 @@ from hashlib import sha256
 from fourthgraph.bsv.evaluate import evaluate
 from fourthgraph.bsv.script import asm, decode_num, encode_num, number, push
 from .curve_windows import CURVES, GLV_PACKED, GLV_REFERENCE, GLV_SCALED, JOINT_STRATEGIES, SECP256K1, fixed_table, scalar_plans
-from .lowering import DATAFLOW, compile_word
+from .lowering import BASELINE, DATAFLOW, compile_word
 from .modular_scale import lower_modular_scale
 from .script_builder import ScriptBuilder
 from .source import SourceCompiler
@@ -14,13 +14,13 @@ from .stack_schedule import emit_steps
 from .wordsets import NATIVE_PRIMITIVES, Primitive, script_word
 
 
-def numeric_fragment(code, inputs, outputs, *, may_fail=False):
+def numeric_fragment(code, inputs, outputs, *, may_fail=False, stack_local=False):
     def run(*values):
         result, _ = evaluate(code, list(map(encode_num, values)))
         return tuple(map(decode_num, result))
 
     return Primitive(("script-int",) * inputs, ("script-int",) * outputs, code, run,
-                     "compiled numeric kernel", may_fail=may_fail)
+                     "compiled numeric kernel", may_fail=may_fail, stack_local=stack_local)
 
 
 def padded(value, width):
@@ -202,8 +202,8 @@ def joint_vocabulary(library):
 
 
 @cache
-def _joint_library():
-    return ScriptBuilder("REQUIRE stdlib/secp256k1.fth\nREQUIRE stdlib/secp256k1-window.fth")
+def _joint_library(*, optimize=False):
+    return ScriptBuilder("REQUIRE stdlib/secp256k1.fth\nREQUIRE stdlib/secp256k1-window.fth", optimize=optimize)
 
 
 def _pack_windows(*lanes):
@@ -211,15 +211,27 @@ def _pack_windows(*lanes):
                  for shift in range(126, -1, -2))
 
 
+def _pack_fixed_scalar_windows(scalar, first, second):
+    high, low = divmod(scalar, 1 << 128)
+    return _pack_windows(low, high, first, second)
+
+
 def _optimized_joint_words(vocabulary, optimization, *, scaled):
-    library = _joint_library()
+    library = _joint_library(optimize=optimization != BASELINE)
     prefix = "secp256k1-scaled-" if scaled else "secp256k1-"
     words = vocabulary | {
+        "split-glv-with-order": numeric_fragment(library.emit("secp256k1-lambda-split-with-order", b""), 2, 2),
         "pack-windows": script_word("script-int script-int script-int script-int", "bytes",
                                     library.emit("secp-window-pack-windows", b""), _pack_windows),
+        "pack-fixed-scalar-windows": script_word("script-int script-int script-int", "bytes",
+                                                library.emit("secp-window-pack-fixed-scalar", b""),
+                                                _pack_fixed_scalar_windows),
         "double-pair": numeric_fragment(library.emit(prefix + "double-pair-with-field", b"", 1), 4, 4),
         "double-point": numeric_fragment(library.emit(prefix + "double-with-field", b"", 1), 4, 4),
-        "add-fixed-affine": numeric_fragment(library.emit(prefix + "add-affine-with-field", b"", 1), 6, 4),
+        "add-fixed-affine": numeric_fragment(library.emit(prefix + "add-affine-with-field", b"", 1), 6, 4,
+                                              stack_local=True),
+        "map-row-coordinates": numeric_fragment(library.emit("secp-window-map-row-coordinates", b""), 11, 9),
+        "map-glv-components": numeric_fragment(library.emit("secp-window-map-row-components", b""), 8, 5),
     }
     points = fixed_table(SECP256K1, split_bits=128)
     scale_public = restore = b""
@@ -241,8 +253,10 @@ def _optimized_joint_words(vocabulary, optimization, *, scaled):
 
 def _variable_stack_table(frontend, words, optimization):
     """Schedule the three nonzero rows around the shared P, 2P and 3P."""
-    p, px, py, qx, qy = inputs = (0, 1, 2, 3, 4)
-    map_row = compile_word(frontend.words["map-row-start"], optimization).script
+    p, px, py, qy = inputs = (0, 1, 2, 3)
+    dataflow = optimization == DATAFLOW
+    map_word = "map-row-components" if dataflow else "map-row-starts"
+    map_rows = compile_word(frontend.words[map_word], optimization).script
     row = compile_word(frontend.words["stack-table-row"], optimization).script
 
     def schedule(preserve_field):
@@ -257,25 +271,30 @@ def _variable_stack_table(frontend, words, optimization):
             return outputs
 
         one, = emit(number(1), (), 1)
-        P, Q = (px, py, one), (qx, qy, one)
+        P = (px, py, one)
         retained = (p,) if preserve_field else ()
         drop = b"" if preserve_field else asm("3 OP_ROLL OP_DROP")
         P2 = emit(words["double-point"].code + drop, (p, *P), 3, retained)
         P3 = emit(words["add-fixed-affine"].code + drop, (p, *P2, px, py), 3, retained)
-        Q2, Q3 = (emit(map_row, (p, py, qy, *point), 3) for point in (P2, P3))
+        if dataflow:
+            x2, y2, z2 = P2
+            x3, y3, z3 = P3
+            q2y, q3y, qx, q2x, q3x = emit(map_rows, (p, px, x2, y2, x3, y3, qy, py), 5)
+            Q, Q2, Q3 = (qx, qy, one), (q2x, q2y, z2), (q3x, q3y, z3)
+        else:
+            starts = emit(map_rows, (p, px, *P2, *P3, qy, py), 9)
+            Q, Q2, Q3 = starts[:3], starts[3:6], starts[6:]
         rows = [emit(row, (p, px, py, *point), 12) for point in (Q, Q2, Q3)]
         returns = (p, *P, *P2, *P3, *(slot for values in rows for slot in values))
-        return emit_steps(inputs, steps, returns, compact=True, trim_suffix=optimization == DATAFLOW,
-                          group_operands=optimization == DATAFLOW)
+        return emit_steps(inputs, steps, returns, compact=True, trim_suffix=dataflow, group_operands=dataflow)
 
     plain = schedule(False)
-    return min((plain, schedule(True)), key=len) if optimization == DATAFLOW else plain
+    return min((plain, schedule(True)), key=len) if dataflow else plain
 
 
-def _stack_joint_script(frontend, words, points, optimization, *, scaled_output=False, mapped_input=False):
+def _stack_joint_script(frontend, words, points, optimization, *, preparation, scaled_output=False):
     """Compile a loop whose immutable prefix is 15 projective and 15 affine entries."""
     library = _joint_library()
-    preparation = "prepare-mapped-windows" if mapped_input else "prepare-stack-windows"
     prepare = compile_word(frontend.words[preparation], optimization).script
     # The common depth encoder targets this exact stack layout. The runtime variable
     # table is in ascending order, the fixed table descending, both without index 0.
@@ -301,17 +320,21 @@ def _stack_joint_script(frontend, words, points, optimization, *, scaled_output=
     return prepare + initial + step * 63 + cleanup + output
 
 
-def link_joint_word(vocabulary, optimization, *, strategy=GLV_REFERENCE, scaled_output=False, mapped_input=False):
+def link_joint_word(vocabulary, optimization, *, strategy=GLV_REFERENCE, scaled_output=False, mapped_input=False,
+                    order_input=False):
     """Link GLV for checked inputs and an explicitly declared coordinate model.
 
-    A mapped input includes the registered field p above Px, Py, s, k. A
-    scaled output returns p, X, Y, Z in the kernel's model.
+    The mapped word takes Px, Py, s, k, p. With an explicit group order its
+    inputs are Px, Py, p, s, k, n. Both p and n must be the registered values.
+    A scaled output returns p, X, Y, Z in the kernel's model.
     """
     name = "secp256k1-joint-window-2"
     if (scaled_output or mapped_input) and strategy != GLV_SCALED:
         raise ValueError("scaled coordinates require the scaled joint strategy")
     if mapped_input and not scaled_output:
         raise ValueError("mapped inputs use the model-preserving joint word")
+    if order_input and not mapped_input:
+        raise ValueError("an explicit group order requires the mapped joint word")
     if strategy == GLV_REFERENCE:
         frontend = SourceCompiler(joint_source(), vocabulary=vocabulary)
         kernel = compile_word(frontend.words[name], optimization).script
@@ -324,13 +347,20 @@ def link_joint_word(vocabulary, optimization, *, strategy=GLV_REFERENCE, scaled_
             kernel = compile_word(frontend.words["packed-joint"], optimization).script
         else:
             frontend = SourceCompiler(stack_joint_source(), vocabulary=words)
+            preparation = "prepare-mapped-windows" if mapped_input else "prepare-stack-windows"
+            if order_input:
+                preparation = "prepare-mapped-windows-with-order"
             kernel = _stack_joint_script(frontend, words, points, optimization, scaled_output=scaled_output,
-                                         mapped_input=mapped_input)
-    if mapped_input:
-        name = "secp256k1-joint-mapped-point"
+                                         preparation=preparation)
+    if order_input:
+        name, inputs = "secp256k1-joint-mapped-with-order", 6
+    elif mapped_input:
+        name, inputs = "secp256k1-joint-mapped-point", 5
     elif scaled_output:
-        name = "secp256k1-joint-scaled-point"
-    return {name: numeric_fragment(kernel, 5 if mapped_input else 4, 4)}
+        name, inputs = "secp256k1-joint-scaled-point", 4
+    else:
+        inputs = 4
+    return {name: numeric_fragment(kernel, inputs, 4)}
 
 
 JOINT_CHECKS = """

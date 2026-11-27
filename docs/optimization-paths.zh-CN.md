@@ -164,6 +164,8 @@ P-256 使用同一套坐标模型接口及原 `a=-3` 内核。它的六次幂判
 
 返回边界有一段连续的活值位于栈顶时，调度器比较逐项移除死值和暂存活值后成对丢弃的两种写法，再按原顺序恢复活值和调用方的备用栈。标准 Forth 前端也支持 `layout:`，可用名称和类型声明栈重排。
 
+`dataflow` 可以为 `layout:` 的各个输出沿用原输入的值编号，让最终调度器把复制、丢弃和重排与前后调用一起安排。候选适用于类型化的锁脚本以及只读取声明操作数的直线 Forth 词，包括多返回值的调用。编译器比较完整生成结果，选择更短的调度。[编译器回归用例](../tests/test_dataflow.py) · [Schnorr 复放](../projects/p2pkh-schnorr/docs/high-level-forth.zh-CN.md#scheduling-named-layouts-with-dataflow)
+
 共享 Script 库可解码单个 32 字节大端字段，也可解码编译期定数量的连续字段。它与窗口索引打包共享掩码和位组交换词。批量解码保留字段顺序和无符号语义。[共享实现](../src/fourthgraph/stdlib/script-fragments.fth) · [Schnorr 对照](../projects/p2pkh-schnorr/docs/high-level-forth.zh-CN.md#dataflow-iteration)
 
 数据流调度器也会比较连续操作数成组搬运和逐项搬运。移动时保留已就位操作数的顺序，并检查被移动值的剩余用途。返回值已按顺序排好时，可直接移除夹在其中的死值。比较结果只供 `verify` 消费时，可使用脚本引擎提供的融合指令。[边界复放](../projects/p2pkh-schnorr/docs/high-level-forth.zh-CN.md#stack-and-model-boundaries)

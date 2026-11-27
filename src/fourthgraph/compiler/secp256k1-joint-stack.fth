@@ -1,36 +1,52 @@
-( Prepare signed bases and leave the digit stream above them. )
+( Prepare the signed ordinates and the digit stream. The table computes Qx. )
 layout: retain-signs ( s:script-int p:script-int px:script-int py:script-int k1:script-int k2:script-int --
                       s k1 k2 p px py k1 k2 )
 layout: restore-signs ( s:script-int k1:script-int k2:script-int
-                        p:script-int px:script-int py:script-int qx:script-int qy:script-int --
-                        p px py qx qy s k1 k2 )
+                        p:script-int px:script-int py:script-int qy:script-int --
+                        p px py qy s k1 k2 )
+layout: second-ordinate ( p:script-int px:script-int py:script-int k2:script-int signed-y:script-int --
+                          p px signed-y py k2 )
 
-: pack-signed-bases ( script-int script-int script-int script-int script-int --
-                      script-int script-int script-int script-int script-int bytes )
-    split-glv retain-signs signed-bases restore-signs
-    int-abs swap int-abs swap rot split-fixed 2swap pack-windows
+: signed-row-ordinates ( script-int script-int script-int script-int script-int --
+                         script-int script-int script-int script-int )
+    signed-p sign-ordinate second-ordinate sign-ordinate
+;
+
+: pack-row-ordinates ( script-int script-int script-int script-int script-int script-int --
+                       script-int script-int script-int script-int bytes )
+    retain-signs signed-row-ordinates restore-signs
+    int-abs swap int-abs swap pack-fixed-scalar-windows
 ;
 
 : prepare-stack-windows ( script-int script-int script-int script-int --
-                           script-int script-int script-int script-int script-int bytes )
-    map-public pack-signed-bases
+                           script-int script-int script-int script-int bytes )
+    map-public split-glv pack-row-ordinates
 ;
 
 : prepare-mapped-windows ( script-int script-int script-int script-int script-int --
-                            script-int script-int script-int script-int script-int bytes )
-    joint-variable pack-signed-bases
+                            script-int script-int script-int script-int bytes )
+    joint-variable split-glv pack-row-ordinates
 ;
 
-( Map 2P and 3P into 2Q and 3Q. The endomorphism preserves y and an affine
-  secp256k1 point has nonzero y, so comparing the ordinates recovers the relative sign. )
-layout: expose-map ( p:script-int py:script-int qy:script-int x:script-int y:script-int z:script-int --
-                     z x p y py qy )
-layout: expose-map-x ( z:script-int x:script-int p:script-int y:script-int -- y z x p )
+layout: joint-variable-with-order ( px:script-int py:script-int p:script-int s:script-int k:script-int n:script-int --
+                                    s p px py k n )
 
-: map-row-start ( script-int script-int script-int script-int script-int script-int --
-                  script-int script-int script-int )
-    expose-map int= IF ELSE int-negate THEN
-    expose-map-x swap glv-beta int* swap int-rem rot rot
+: prepare-mapped-windows-with-order ( script-int script-int script-int script-int script-int script-int --
+                                       script-int script-int script-int script-int bytes )
+    joint-variable-with-order split-glv-with-order pack-row-ordinates
+;
+
+( Input order: p, Px, 2P, 3P, Qy, Py. The endomorphism leaves the nonzero
+  affine ordinate unchanged, so comparing the signed ordinates gives the relative sign. )
+: map-row-starts ( script-int script-int script-int script-int script-int script-int script-int script-int script-int script-int --
+                   script-int script-int script-int script-int script-int script-int script-int script-int script-int )
+    over int= IF 1 ELSE -1 THEN cell>int glv-beta map-row-coordinates
+;
+
+( Input: p, Px, X2, Y2, X3, Y3, Qy, Py. Return Q2y, Q3y, Qx, Q2x, Q3x. )
+: map-row-components ( script-int script-int script-int script-int script-int script-int script-int script-int --
+                       script-int script-int script-int script-int script-int )
+    int= IF 1 ELSE -1 THEN cell>int glv-beta map-glv-components
 ;
 
 ( A row consumes its affine P and projective jQ, and appends four projective entries. )

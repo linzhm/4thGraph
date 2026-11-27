@@ -230,7 +230,7 @@ REGTEST_CHRONICLE_HEIGHT=5 PYTHONPATH=src:. bash tools/verify_node.sh --profile 
 
 ## 64 窗口验签器的 Forth 调优
 
-调优后的 Forth 将同一个域模数用于四个坐标的上界检查、公钥曲线方程和两个仿射点的映射。在映射前检查原始编码及两个纵坐标的偶性，点乘后验证两个模余数为零并排除 `Z = 0`。编译器使用与上一版相同的 `dataflow` 选项和 secp256k1 联合点乘词。[调优后的 Forth](../experiments/high-level/window-verifier-tuned.fth)
+调优后的 Forth 将同一个域模数用于四个坐标的上界检查、公钥曲线方程和两个仿射点的映射。在映射前检查原始编码及两个纵坐标的偶性，点乘后验证两个模余数为零并排除 `Z = 0`。在 `f4b29f9` 上，编译器使用与上一版相同的 `dataflow` 选项和 secp256k1 联合点乘词。[调优后的 Forth](../experiments/high-level/window-verifier-tuned.fth)
 
 | 构建 | 窗口前 | 窗口后 | 付款锁 | 两进两出 OTDA ALL，使用构造器 |
 | --- | ---: | ---: | ---: | ---: |
@@ -248,3 +248,148 @@ REGTEST_CHRONICLE_HEIGHT=5 PYTHONPATH=src:. bash tools/verify_node.sh --profile 
   "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/experiments/high-level/window_compare.py \
   --joint-lowerings --forth-tuning --matrix-only --output workspace/schnorr-high-level/forth-tuning-matrix.json
 ```
+
+<a name="sharing-the-endomorphism-at-two-row-starts"></a>
+
+## 两个建表行首共用自同态
+
+在 `7d53334` 上，变基表将 `2P`、`3P` 映射为 `2Q`、`3Q` 后再展开对应的行。Forth 词只比较一次 `P` 和 `Q` 的带符号纵坐标，再用一条公式执行两次 `(X, Y, Z) → (βX mod p, ±Y, Z)`，共用域模数、相对符号和 β。原曲线和缩放模型的栈表都使用这段实现。[两行映射的 Forth 源码](https://github.com/linzhm/4thGraph/blob/7d5333405102e2950dfeb9c172187a25acc4618a/src/fourthgraph/stdlib/secp256k1-window.fth)
+
+| 构建 | 联合点乘准备 | 付款锁 | 两进两出 OTDA ALL，使用构造器 |
+| --- | ---: | ---: | ---: |
+| `f4b29f9` 的独立行首映射 | 3,107 B | 22,992 B | 56,854 B |
+| 共用行首映射 | 3,055 B | 22,940 B | 56,646 B |
+| 手工 v0.17.0 | 2,763 B | 22,435 B | 54,626 B |
+
+省下的 52 B 都在联合点乘准备阶段。三个版本的 18,379 B 窗口主体逐字节相同。每锁剩余 505 B，联合点乘调用前占 207 B，联合点乘准备占 292 B，窗口后占 6 B。双引擎复放涵盖独立验签、付款和八种构造器场景。[实测](../experiments/high-level/table-tuning-measurements.json) · [交易矩阵](../experiments/high-level/table-tuning-matrix.json)
+
+```sh
+PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
+  "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/experiments/high-level/window_compare.py \
+  --joint-lowerings --forth-tuning --output workspace/schnorr-high-level/table-tuning-measurements.json
+REGTEST_CHRONICLE_HEIGHT=5 PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
+  "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/experiments/high-level/window_compare.py \
+  --joint-lowerings --forth-tuning --matrix-only --output workspace/schnorr-high-level/table-tuning-matrix.json
+```
+
+<a name="sharing-beta-across-all-variable-table-row-starts"></a>
+
+## 变基表的三个行首共用 β
+
+准备阶段计算带符号的纵坐标并打包窗口索引。`Q.x = βP.x mod p` 延后到建表，由同一个 Forth 公式构造 `Q`、`2Q` 和 `3Q`。三个横坐标共用域模数和 β。第一个纵坐标沿用已准备的带符号 `Q.y`，另两个用相对符号调整纵坐标，射影分母原样传出。[Forth 组合](../../../src/fourthgraph/compiler/secp256k1-joint-stack.fth) · [行首映射公式](../../../src/fourthgraph/stdlib/secp256k1-window.fth)
+
+| 构建 | 联合点乘准备 | 付款锁 | 两进两出 OTDA ALL，使用构造器 |
+| --- | ---: | ---: | ---: |
+| `7d53334` 的 `2Q`、`3Q` 共用映射 | 3,055 B | 22,940 B | 56,646 B |
+| `Q`、`2Q`、`3Q` 共用映射 | 3,017 B | 22,902 B | 56,494 B |
+| 手工 v0.17.0 | 2,763 B | 22,435 B | 54,626 B |
+
+`380ecae` 上的两份自动版使用同一 `dataflow` 配置及交易夹具，18,379 B 的窗口主体逐字节相同。每锁剩余 467 B，联合点乘调用前占 207 B，联合点乘准备占 254 B，窗口后占 6 B。BSV Node 和 chain-gang 复放了独立验签、付款和八种构造器场景。[实测](../experiments/high-level/window-beta-measurements.json) · [交易矩阵](../experiments/high-level/window-beta-matrix.json)
+
+```sh
+PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
+  "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/experiments/high-level/window_compare.py \
+  --joint-lowerings --forth-tuning --output workspace/schnorr-high-level/window-beta-measurements.json
+REGTEST_CHRONICLE_HEIGHT=5 PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
+  "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/experiments/high-level/window_compare.py \
+  --joint-lowerings --forth-tuning --matrix-only --output workspace/schnorr-high-level/window-beta-matrix.json
+```
+
+<a name="packing-the-fixed-base-scalar-directly"></a>
+
+## 固定基标量直接打包
+
+栈表准备把已检查的非负标量 `s` 一次编码成 33 字节小端 ScriptNum，再切出两个 16 字节半段。即使第 255 位为 1，最后一个字节也单独保留符号。两个半段和 GLV 分解所得的两个标量幅值按原顺序进入同一个转置词。这省去了对 `2^128` 的整数除法、取余，以及两个半段各自的数值编码。[Forth 打包源码](../../../src/fourthgraph/stdlib/secp256k1-window.fth)
+
+| 构建 | 联合点乘准备 | 付款锁 | 两进两出 OTDA ALL，使用构造器 |
+| --- | ---: | ---: | ---: |
+| `380ecae` 的数值拆分 | 3,017 B | 22,902 B | 56,494 B |
+| 直接切分字节 | 2,970 B | 22,855 B | 56,306 B |
+| 手工 v0.17.0 | 2,763 B | 22,435 B | 54,626 B |
+
+`06ad1aa` 上的两份自动版使用同一 `dataflow` 配置及交易夹具，18,379 B 的窗口主体逐字节相同。每锁剩余 420 B，联合点乘调用前和准备阶段各占 207 B，窗口后占 6 B。打包测试覆盖四个分量的每个两位位置、全零、全一及固定的混合输入。双引擎复放覆盖验签、付款和八种构造器场景。[实测](../experiments/high-level/fixed-scalar-measurements.json) · [交易矩阵](../experiments/high-level/fixed-scalar-matrix.json)
+
+```sh
+PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
+  "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/experiments/high-level/window_compare.py \
+  --joint-lowerings --forth-tuning --output workspace/schnorr-high-level/fixed-scalar-measurements.json
+REGTEST_CHRONICLE_HEIGHT=5 PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
+  "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/experiments/high-level/window_compare.py \
+  --joint-lowerings --forth-tuning --matrix-only --output workspace/schnorr-high-level/fixed-scalar-matrix.json
+```
+
+<a name="sharing-the-group-order-with-the-glv-split"></a>
+
+## 挑战约减与 GLV 分解共用曲线阶
+
+调优版在两个仿射点映射后约减挑战值。它检查 `s < n`，计算 `k = n - (hash mod n)`，再把同一个已登记的曲线阶 `n` 交给现有的 GLV 分解词。挑战哈希仍使用原始编码。带曲线阶参数的联合点乘词接收已检查的标量及已登记的域模数和曲线阶。[验签 Forth](../experiments/high-level/window-verifier-tuned.fth) · [联合点乘 Forth](../../../src/fourthgraph/compiler/secp256k1-joint-stack.fth)
+
+| 构建 | 联合点乘调用前 | 联合点乘准备 | 付款锁 | 两进两出 OTDA ALL，使用构造器 |
+| --- | ---: | ---: | ---: | ---: |
+| `06ad1aa` 的 GLV 内置曲线阶 | 616 B | 2,970 B | 22,855 B | 56,306 B |
+| 共用曲线阶 | 624 B | 2,939 B | 22,832 B | 56,214 B |
+| 手工 v0.17.0 | 409 B | 2,763 B | 22,435 B | 54,626 B |
+
+在 `91ac397` 上，传递曲线阶在联合点乘调用前增加 8 B，在点乘准备中省下 31 B。18,379 B 的窗口主体逐字节相同。每锁剩余 397 B，联合点乘调用前占 215 B，准备阶段占 176 B，窗口后占 6 B。两个映射点乘词在标量边界返回相同坐标。双引擎复放覆盖验签、付款和八种构造器场景。[实测](../experiments/high-level/shared-order-measurements.json) · [交易矩阵](../experiments/high-level/shared-order-matrix.json)
+
+```sh
+PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
+  "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/experiments/high-level/window_compare.py \
+  --joint-lowerings --forth-tuning --output workspace/schnorr-high-level/shared-order-measurements.json
+REGTEST_CHRONICLE_HEIGHT=5 PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
+  "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/experiments/high-level/window_compare.py \
+  --joint-lowerings --forth-tuning --matrix-only --output workspace/schnorr-high-level/shared-order-matrix.json
+```
+
+<a name="scheduling-named-layouts-with-dataflow"></a>
+
+## 让命名布局参与数据流调度
+
+对照使用 `91ac397` 的同一份 Forth 和 `dataflow` 编译配置。编译器让布局输出沿用输入值编号，使变基表三行各从 348 B 降到 264 B。外层验签再省下 115 B。18,379 B 的窗口主体逐字节相同。[编译器测试](../../../tests/test_dataflow.py)
+
+| 构建 | 联合点乘调用前 | 联合点乘准备 | 付款锁 | 两进两出 OTDA ALL，使用构造器 |
+| --- | ---: | ---: | ---: | ---: |
+| `91ac397` | 624 B | 2,939 B | 22,832 B | 56,214 B |
+| 布局参与数据流调度 | 509 B | 2,687 B | 22,465 B | 54,746 B |
+| 手工 v0.17.0 | 409 B | 2,763 B | 22,435 B | 54,626 B |
+
+双引擎复放覆盖 27 个独立验签用例、14 个付款用例及相应的锁定时间篡改用例，以及八种构造器场景。[实测](../experiments/high-level/layout-dataflow-measurements.json) · [交易矩阵](../experiments/high-level/layout-dataflow-matrix.json)
+
+```sh
+PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
+  "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/experiments/high-level/window_compare.py \
+  --joint-lowerings --forth-tuning --output workspace/schnorr-high-level/layout-dataflow-measurements.json
+REGTEST_CHRONICLE_HEIGHT=5 PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
+  "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/experiments/high-level/window_compare.py \
+  --joint-lowerings --forth-tuning --matrix-only --output workspace/schnorr-high-level/layout-dataflow-matrix.json
+```
+
+<a name="variable-table-row-starts"></a>
+
+## 复用变基表行起点的坐标
+
+行起点公式只返回三个变换后的 X 坐标和两个带符号的射影 Y 坐标。数据流调度复用带符号的仿射 Y、仿射 Z = 1，以及 2P、3P 的射影 Z。变基表三行的计算主体和 18,379 B 的窗口循环保持逐字节一致。[Forth 公式](../../../src/fourthgraph/stdlib/secp256k1-window.fth)
+
+| 构建 | 变基表 | 付款锁 | 两进两出 OTDA ALL，使用构造器 |
+| --- | ---: | ---: | ---: |
+| 布局参与数据流调度 | 1,107 B | 22,465 B | 54,746 B |
+| 复用行起点坐标 | 1,078 B | 22,436 B | 54,630 B |
+| 手工 v0.17.0 | 1,054 B | 22,435 B | 54,626 B |
+
+BSV Node 1.2.3 和固定版本的 chain-gang 复放了调优验证器与八种构造器场景。默认钱包仍识别已发布的付款锁，编译版通过实验构造器复放。[复放摘要](../experiments/high-level/row-start-layout.json)
+
+布局调度基线对应提交 `5f72078`。在当前版本运行上节相同的基准命令，将结果写入新的文件即可复现。
+
+<a name="paired-witness-ordinate-check"></a>
+
+## 合并见证纵坐标的偶性检查
+
+批量解码器输出两个无符号纵坐标。调优的 Forth 分别对两个值取模 2，再检查余数之和是否为零。每个余数都是 0 或 1，因此和为零等价于两个纵坐标都为偶数。编译沿用原有的解码字段顺序和四项域边界检查。
+
+| 构建 | 付款锁 | 两进两出 OTDA ALL，使用构造器 |
+| --- | ---: | ---: |
+| 复用行起点坐标 | 22,436 B | 54,630 B |
+| 合并纵坐标偶性检查 | 22,434 B | 54,622 B |
+| 手工 v0.17.0 | 22,435 B | 54,626 B |
+
+BSV Node 1.2.3 和固定版本的 chain-gang 均拒绝新增的双奇数见证。单独复放还在小值和接近域上界的输入上覆盖了四种奇偶组合。构造器矩阵的判定与提交 `e52283a` 一致。锁脚本和交易大小可用上面的命令复现。[Forth 源码](../experiments/high-level/window-verifier-tuned.fth) · [复放摘要](../experiments/high-level/witness-ordinate-check.json)

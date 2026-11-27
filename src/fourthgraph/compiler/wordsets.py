@@ -51,6 +51,8 @@ class Primitive:
     build_only: bool = False
     repeatable: bool = False  # Deterministic from explicit inputs, with no transaction or stack context.
     fixed_width_code: tuple[int, bytes] | None = None  # Equivalent code for an exact first byte operand width.
+    permutation: tuple[int, ...] | None = None  # Exact output-to-input mapping for a declared layout.
+    stack_local: bool = False  # Code only observes its declared stack operands.
 
     @property
     def location(self):

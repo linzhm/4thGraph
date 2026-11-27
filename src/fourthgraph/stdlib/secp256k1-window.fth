@@ -1,15 +1,44 @@
 REQUIRE BSV
 REQUIRE stdlib/script-fragments.fth
 
+range: secp-window-coordinate script-int $-ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
+                                         $10000000000000000000000000000000000000000000000000000000000000000 ;
+range: secp-window-field script-int 2 $10000000000000000000000000000000000000000000000000000000000000000 ;
+range: secp-window-sign script-int -1 2 ;
+
+( Q starts with the signed affine ordinate. Its x and the two projective
+  x coordinates use the same endomorphism constant and field modulus. )
+formula: secp-window-map-row-coordinates ( secp-window-field secp-window-coordinate
+    secp-window-coordinate secp-window-coordinate secp-window-coordinate
+    secp-window-coordinate secp-window-coordinate secp-window-coordinate
+    secp-window-coordinate secp-window-sign secp-window-coordinate --
+    secp-window-coordinate secp-window-coordinate secp-window-coordinate
+    secp-window-coordinate secp-window-coordinate secp-window-coordinate
+    secp-window-coordinate secp-window-coordinate secp-window-coordinate )
+    {: p x x2 y2 z2 x3 y3 z3 qy sign beta :}
+    x beta int* p int-rem qy 1
+    x2 beta int* p int-rem y2 sign int* z2
+    x3 beta int* p int-rem y3 sign int* z3
+;
+
+( The stack table already owns Qy, 1, Z2 and Z3. Return only transformed
+  coordinates, with the signed ordinates below the three mapped abscissas. )
+formula: secp-window-map-row-components ( secp-window-field secp-window-coordinate
+    secp-window-coordinate secp-window-coordinate secp-window-coordinate secp-window-coordinate
+    secp-window-sign secp-window-coordinate --
+    secp-window-coordinate secp-window-coordinate secp-window-coordinate secp-window-coordinate secp-window-coordinate )
+    {: p x x2 y2 x3 y3 sign beta :}
+    y2 sign int* y3 sign int*
+    x beta int* p int-rem x2 beta int* p int-rem x3 beta int* p int-rem
+;
+
 ( Pack four secp256k1 GLV lanes and read the associated table depths. )
 : secp-window-uint128le ( script -- script )
     ( The magnitude is below 2^128. Drop the separate positive sign byte. )
     17 bsv-num op-num2bin op-16 op-split op-drop
 ;
 
-: secp-window-pack-windows ( script -- script )
-    ( s0 s1 abs-k1 abs-k2 -> 64 bytes with one fixed and one variable index per window. )
-    secp-window-uint128le bsv-empty op-swap secp-window-uint128le op-cat 3 script-append-repeated
+: secp-window-transpose-lanes ( script -- script )
     ( Digit positions are numbered from the low end of the 512-bit string. )
     ( Transpose lane and digit bits. The first four swaps also reverse little-endian byte order. )
     ( Swap position bits 4 and 6, complementing both. )
@@ -27,6 +56,19 @@ REQUIRE stdlib/script-fragments.fth
     6 bytes-hex 00cc 5 script-repeat-mask script-swap-bit-groups
     ( Swap position bits 1 and 3. )
     12 bytes-hex 0000f0f0 4 script-repeat-mask script-swap-bit-groups
+;
+
+: secp-window-pack-windows ( script -- script )
+    ( s0 s1 abs-k1 abs-k2 -> 64 bytes with one fixed and one variable index per window. )
+    secp-window-uint128le bsv-empty op-swap secp-window-uint128le op-cat 3 script-append-repeated
+    secp-window-transpose-lanes
+;
+
+: secp-window-pack-fixed-scalar ( script -- script )
+    ( s abs-k1 abs-k2. The extra byte holds the sign even when bit 255 is set. )
+    secp-window-uint128le op-swap secp-window-uint128le op-cat
+    op-swap 33 bsv-num op-num2bin op-16 op-split op-16 op-split op-drop
+    op-swap op-cat op-cat secp-window-transpose-lanes
 ;
 
 : secp-window-nonzero-window-digits ( script -- script )

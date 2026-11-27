@@ -8,7 +8,7 @@ from fourthgraph.bsv.script import asm
 from fourthgraph.compiler.lock_reuse import reuse_values
 from fourthgraph.compiler.source import (
     MAX_EXPANSION, CompileError, Conditional, LockBranch, Shuffle, Token, check_word_expansion,
-    entry_range_checks, expanded, lower, require_script,
+    entry_range_checks, expanded, lower, plan_lock_block, require_script,
 )
 from fourthgraph.compiler.ranges import PRIMITIVE_NAMES, Slot, primitive_outputs, raw_interval, remainder_is_identity
 from fourthgraph.compiler.stack_schedule import VERIFY_FORMS, Graph, emit_steps
@@ -211,9 +211,9 @@ def emit(operations):
     return b"".join(op.script for op in operations)
 
 
-def emit_lock_block(block, inputs, rewrites, *, optimize, dataflow=False, recognize_tiles=True):
+def emit_lock_block(block, inputs, rewrites, *, optimize, dataflow=False, recognize_tiles=True, alias_layouts=True):
     if dataflow:
-        block, reused = reuse_values(block, recognize_tiles=recognize_tiles)
+        block, reused = reuse_values(block, recognize_tiles=recognize_tiles, alias_layouts=alias_layouts)
         for step, rule, basis, sizes in reused:
             at = step.source
             rewrites.append(Rewrite(rule, at.line if at else None, at.column if at else None, (), sizes,
@@ -249,7 +249,8 @@ def emit_lock_block(block, inputs, rewrites, *, optimize, dataflow=False, recogn
                 prefix = b""
                 rewrites.append(Rewrite("comparison-feeds-if", line, column, (Slot.of("cell"),),
                                         (before, len(code)), module=module))
-            branch_options = dict(optimize=optimize, dataflow=dataflow, recognize_tiles=recognize_tiles)
+            branch_options = dict(optimize=optimize, dataflow=dataflow, recognize_tiles=recognize_tiles,
+                                  alias_layouts=alias_layouts)
             yes = emit_lock_block(node.yes, node.inputs, rewrites, **branch_options)
             no = emit_lock_block(node.no, node.inputs, rewrites, **branch_options)
             script = prefix + asm("OP_IF") + yes + asm("OP_ELSE") + no + asm("OP_ENDIF")
@@ -258,6 +259,39 @@ def emit_lock_block(block, inputs, rewrites, *, optimize, dataflow=False, recogn
         steps.append((script, step.args, step.results))
         previous = step
     return emit_steps(inputs, steps, block.returns, compact=True, trim_suffix=dataflow, group_operands=dataflow)
+
+
+def dataflow_candidate(block, inputs, *, alias_layouts=True):
+    rewrites = []
+    script = emit_lock_block(block, inputs, rewrites, optimize=True, dataflow=True, alias_layouts=alias_layouts)
+    if any(change.rule == "tile-repeated-bytes" for change in rewrites):
+        plain_rewrites = []
+        plain = emit_lock_block(block, inputs, plain_rewrites, optimize=True, dataflow=True,
+                                recognize_tiles=False, alias_layouts=alias_layouts)
+        if len(plain) <= len(script):
+            return plain, plain_rewrites
+    return script, rewrites
+
+
+def layout_word_candidate(word):
+    """Schedule a straight-line typed word with declared layouts and local operands."""
+    first_layout = None
+    for node, at in expanded(word.body):
+        if isinstance(node, (Literal, Shuffle)):
+            continue
+        if not isinstance(node, Primitive):
+            return None
+        if node.permutation is not None:
+            if first_layout is None:
+                first_layout = at
+        elif not (node.stack_local or id(node) in PRIMITIVE_NAMES and not node.requires_checksig):
+            return None
+    if first_layout is None:
+        return None
+    inputs = tuple(range(len(word.takes)))
+    block, _ = plan_lock_block(word.body, list(inputs), len(inputs))
+    script, rewrites = dataflow_candidate(block, inputs)
+    return Operation(first_layout, (), (), script, len(inputs)), rewrites
 
 
 def compile_word(word, optimization=BASELINE, *, check_input_ranges=True, spend_entry=False,
@@ -273,23 +307,24 @@ def compile_word(word, optimization=BASELINE, *, check_input_ranges=True, spend_
     prefix = entry_range_checks(word, spend_entry=spend_entry) if check_input_ranges else b""
     try:
         if word.lock is not None:
-            script = emit_lock_block(word.lock, tuple(range(len(word.takes))), rewrites,
-                                     optimize=optimization != BASELINE)
+            inputs = tuple(range(len(word.takes)))
+            script = emit_lock_block(word.lock, inputs, rewrites, optimize=optimization != BASELINE)
             if optimization == DATAFLOW:
-                candidate_rewrites = []
-                inputs = tuple(range(len(word.takes)))
-                candidate = emit_lock_block(word.lock, inputs, candidate_rewrites, optimize=True, dataflow=True)
-                if any(change.rule == "tile-repeated-bytes" for change in candidate_rewrites):
-                    plain_rewrites = []
-                    plain = emit_lock_block(word.lock, inputs, plain_rewrites, optimize=True, dataflow=True,
-                                            recognize_tiles=False)
-                    if len(plain) <= len(candidate):
-                        candidate, candidate_rewrites = plain, plain_rewrites
+                candidate, candidate_rewrites = dataflow_candidate(word.lock, inputs)
+                if any(change.rule == "layout-value-aliasing" for change in candidate_rewrites):
+                    previous, previous_rewrites = dataflow_candidate(word.lock, inputs, alias_layouts=False)
+                    if len(previous) <= len(candidate):
+                        candidate, candidate_rewrites = previous, previous_rewrites
                 if len(candidate) < len(script):
                     script, rewrites = candidate, candidate_rewrites
             return CompiledWord(prefix + script, rewrites=tuple(rewrites))
         operations = build_block(word.body, list(word.slots(word.takes)), rewrites,
                                  schedule=optimization in STACK_OPTIMIZATIONS)
+        script = emit(operations)
+        if optimization == DATAFLOW and (candidate := layout_word_candidate(word)) is not None:
+            operation, candidate_rewrites = candidate
+            if len(operation.script) < len(script):
+                return CompiledWord(prefix + operation.script, (operation,), tuple(candidate_rewrites))
     except RecursionError as error:
         raise CompileError("expanded conditional nesting exceeds the compiler's recursion limit") from error
-    return CompiledWord(prefix + emit(operations), operations, tuple(rewrites))
+    return CompiledWord(prefix + script, operations, tuple(rewrites))
