@@ -37,6 +37,20 @@ def unsigned_spend(parent, output):
     return Transaction((Input(parent.txid_wire(), 0),), (output,))
 
 
+class PreparedAuthorizationTests(unittest.TestCase):
+    def test_prepare_authorization_requires_one_successor_output(self):
+        lock = push(bytes(5)) + asm("OP_CODESEPARATOR OP_1")
+        parent = funding(lock, "pels-output-count")
+        successor = Output(9_000, lock)
+        tx = unsigned_spend(parent, successor)
+        expected = hash256(preimage_forkid(tx, 0, parent.outputs[0].value, lock[7:], 0x41))
+        self.assertEqual(prepare_authorization(tx, parent).digest, expected)
+
+        for outputs in ((), (successor, Output(0, asm("OP_0 OP_RETURN")))):
+            with self.subTest(output_count=len(outputs)), self.assertRaisesRegex(ValueError, "one successor output"):
+                prepare_authorization(replace(tx, outputs=outputs), parent)
+
+
 class R1MathTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):

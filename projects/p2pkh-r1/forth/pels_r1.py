@@ -25,13 +25,13 @@ class PreparedAuthorization:
 
 
 def prepare_authorization(tx, parent):
-    """Prepare a single-input counter spend against its actual previous output.
+    """Prepare a counter spend with one input and one successor output.
 
     The caller approves the transaction and selects a previous output known to
     use this reference lock. The returned digest is the sole signing input.
     """
-    if len(tx.inputs) != 1 or not tx.outputs:
-        raise ValueError("the reference PELS spend needs one input and an output")
+    if len(tx.inputs) != 1 or len(tx.outputs) != 1:
+        raise ValueError("the reference PELS spend needs one input and one successor output")
     txin = tx.inputs[0]
     if txin.script or txin.txid != parent.txid_wire() or not 0 <= txin.vout < len(parent.outputs):
         raise ValueError("the unsigned input must select the supplied previous output")
