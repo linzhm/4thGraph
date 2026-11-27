@@ -9,6 +9,7 @@
 | [PELS Counter](pels-counter/README.md) | Compile a state transition and replay an incrementing covenant |
 | [Transaction workflows](workflow-examples/README.md) | Compare parallel, joined, and serial transaction plans, including Gforth input |
 | [Proof counter](proof-counter/README.md) | Build a public state transition with Script, Circom, or a proof backend |
+| [Groth16 verifier](groth16-verifier/README.md) | Call the BLS12-381 standard library from Forth and replay funded proof spends |
 
 ## Payments and signing schemes
 
@@ -25,7 +26,7 @@
 
 ## Transaction tests
 
-The [transaction runner](../tests/project_transactions.py) builds and validates complete transactions for every project in the index. Payment examples cover funding, turnover, and exit. Deferred R1 also covers activation with a sponsor input. The PELS counter advances twice, the serial workflow runs in both BIP143 ALL and OTDA ALL, and the proof counter spends through its direct Script backend.
+The transaction runner builds and validates complete payment and workflow transactions. Payment examples cover funding, turnover, and exit. Deferred R1 also covers activation with a sponsor input. The PELS counter advances twice, the serial workflow runs in both BIP143 ALL and OTDA ALL, and the proof counter spends through its direct Script backend. The Groth16 verifier uses its funded replay. [Transaction runner](../tests/project_transactions.py) · [Groth16 replay](groth16-verifier/docs/verification.en.md)
 
 From the repository root, use a Python environment with chain-gang, `ecdsa`, `coincurve` and `cryptography`. The ML-DSA fixture signer requires OpenSSL 3.5 or later. Pass a project directory name to run just that project.
 

@@ -49,6 +49,8 @@ class Primitive:
     expansion_cost: int = 1
     branch_code: bytes | None = None  # Emits canonical Script truth for OP_IF.
     build_only: bool = False
+    repeatable: bool = False  # Deterministic from explicit inputs, with no transaction or stack context.
+    fixed_width_code: tuple[int, bytes] | None = None  # Equivalent code for an exact first byte operand width.
 
     @property
     def location(self):
@@ -57,10 +59,10 @@ class Primitive:
         return "host" if self.code is None else "script"
 
 
-def script_word(takes, gives, code, run, *, may_fail=False, build_only=False):
+def script_word(takes, gives, code, run, *, may_fail=False, build_only=False, repeatable=False, fixed_width_code=None):
     evidence = "build-time Script construction" if build_only else "script execution"
     return Primitive(tuple(takes.split()), (gives,), code, lambda *values: (run(*values),), evidence,
-                     may_fail=may_fail, build_only=build_only)
+                     may_fail=may_fail, build_only=build_only, repeatable=repeatable, fixed_width_code=fixed_width_code)
 
 
 def wrap_cell(value):
@@ -87,7 +89,8 @@ def cell_arithmetic(takes, opcode, operation):
 def cell_comparison(takes, code, compare):
     # Forth true flags have every bit set. Our canonical ScriptNum for that cell is -1.
     return Primitive(tuple(takes.split()), ("cell",), code + asm("OP_NEGATE"),
-                     lambda *values: (-int(compare(*values)),), "script execution", comparison=True, branch_code=code)
+                     lambda *values: (-int(compare(*values)),), "script execution", comparison=True, branch_code=code,
+                     repeatable=True)
 
 
 UNSIGNED_CELL = add_modulus_if_negative(CELL_MODULUS)
@@ -127,19 +130,20 @@ def check_byte_size(value, size):
 
 
 BSV_PRIMITIVES = {
-    "cell>int": script_word("cell", "script-int", b"", int),
+    "cell>int": script_word("cell", "script-int", b"", int, repeatable=True),
     "int+": script_word("script-int script-int", "script-int", asm("OP_ADD"), add),
     "int-": script_word("script-int script-int", "script-int", asm("OP_SUB"), sub),
     "int*": script_word("script-int script-int", "script-int", asm("OP_MUL"), mul),
-    "int-rem": script_word("script-int script-int", "script-int", asm("OP_MOD"), signed_remainder, may_fail=True),
+    "int-rem": script_word("script-int script-int", "script-int", asm("OP_MOD"), signed_remainder,
+                           may_fail=True, repeatable=True),
     "u32+": script_word("u32 u32", "u32", asm("OP_ADD") + WRAP_U32, lambda x, y: (x + y) % U32),
     "u32<": cell_comparison("u32 u32", asm("OP_LESSTHAN"), lambda x, y: x < y),
     "cell>u32": script_word("cell", "u32", residue(U32), lambda x: x % U32),
     "u32>cell": script_word("u32", "cell", b"", lambda x: x),
-    "bytes-cat": script_word("bytes bytes", "bytes", asm("OP_CAT"), lambda x, y: x + y),
+    "bytes-cat": script_word("bytes bytes", "bytes", asm("OP_CAT"), lambda x, y: x + y, repeatable=True),
     "bytes-check-size": script_word("bytes cell", "bytes", asm("OP_OVER OP_SIZE OP_NIP OP_NUMEQUALVERIFY"),
-                                     check_byte_size, may_fail=True),
-    "bytes-sha256": script_word("bytes", "bytes", asm("OP_SHA256"), lambda x: sha256(x).digest()),
+                                     check_byte_size, may_fail=True, repeatable=True),
+    "bytes-sha256": script_word("bytes", "bytes", asm("OP_SHA256"), lambda x: sha256(x).digest(), repeatable=True),
     "bytes=": cell_comparison("bytes bytes", asm("OP_EQUAL"), lambda x, y: x == y),
 }
 
@@ -173,13 +177,13 @@ NATIVE_PRIMITIVES = {
     "op_mod": BSV_PRIMITIVES["int-rem"],
     "op_cat": BSV_PRIMITIVES["bytes-cat"],
     "op_split": Primitive(("bytes", "cell"), ("bytes", "bytes"), asm("OP_SPLIT"), split_bytes,
-                          "script execution", may_fail=True),
+                          "script execution", may_fail=True, repeatable=True),
     "op_size": Primitive(("bytes",), ("bytes", "cell"), asm("OP_SIZE"), lambda data: (data, len(data)),
                          "script execution"),
     "op_equal": script_word("bytes bytes", "cell", asm("OP_EQUAL"), lambda x, y: int(x == y)),
     "op_equalverify": Primitive(("bytes", "bytes"), (), asm("OP_EQUALVERIFY"), lambda x, y: verify(x == y),
                                 "script execution", may_fail=True),
-    "op_verify": Primitive(("cell",), (), asm("OP_VERIFY"), verify, "script execution", may_fail=True),
+    "op_verify": Primitive(("cell",), (), asm("OP_VERIFY"), verify, "script execution", may_fail=True, repeatable=True),
     "op_ripemd160": script_word("bytes", "bytes", asm("OP_RIPEMD160"), ripemd160),
     "op_sha1": script_word("bytes", "bytes", asm("OP_SHA1"), lambda data: sha1(data).digest()),
     "op_sha256": BSV_PRIMITIVES["bytes-sha256"],
@@ -260,6 +264,8 @@ CORE_SCRIPT = CORE_PRIMITIVES.keys() | CORE_SHUFFLES.keys() | {"if", "else", "th
 CORE_EXT_SCRIPT = CORE_EXT_PRIMITIVES.keys() | CORE_EXT_SHUFFLES.keys() | CORE_EXT_LITERALS.keys() | {"?do"}
 DECLARATIONS = {
     "bytes-param:": "<name> <size> ;",
+    "curve-multiply:": "<name> <curve> <generator|joint> <strategy> ;",
+    "layout:": "<name> ( <name>:<base-type> ... -- <name> ... )",
     "lock:": "<name> ( <input-name>:<type> ... ) <verification> ;",
     "range:": "<name> <base> <lower> <upper> ;",
     "work:": "<step> <input> <word> <signer-role> ;",

@@ -178,15 +178,14 @@ class R1MSMCompiler:
         affine = self.affine[0] if plan.strategy.affine_g else None
         return window_program(plan, *self.kernels, affine=affine)
 
-    def finish(self, table_points):
-        if table_points % 2:
-            raise ValueError("R1 table cleanup expects an even number of points")
-        slots = 3 * table_points
+    def finish(self, slots):
+        if slots % 2:
+            raise ValueError("R1 table cleanup expects an even number of stack slots")
         return self.optimized.emit("r1-msm-after", b"", slots, (slots + 6) // 2)
 
     def link(self, program):
         prefix, before = self.prepare.split(OWNER)
-        after = self.finish(program.table_points)
+        after = self.finish(program.table_slots)
         # Both consumers use the same ordered pieces and repetition counts.
         window = self.optimized.emit("r1-mul2", b"", program.emit())
         suffix = before + window + after

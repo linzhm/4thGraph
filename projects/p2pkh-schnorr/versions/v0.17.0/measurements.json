@@ -1,0 +1,331 @@
+{
+  "template_version": "0.17.0",
+  "compiler_base": "64624dbdac83bdcc03fed150b93472cc7b1d080c",
+  "compiler_version": "0.2.7",
+  "engines": {
+    "bsv_node_version": 101020300,
+    "chain_gang": {
+      "version": "0.13.2",
+      "commit": "74676b9c002c452e7f21a9ed9265f4972bef03f6"
+    },
+    "verification_profile": "raised",
+    "admission_profile": "default"
+  },
+  "verifier_comparison": {
+    "lock_bytes": {
+      "v0.16.0": 22515,
+      "v0.17.0": 22435
+    },
+    "detached_verifier_bytes": {
+      "v0.16.0": 21705,
+      "v0.17.0": 21625
+    },
+    "detached_verifier_sha256": {
+      "v0.16.0": "13e8ce627a1faa7cf7921690989bcb61fcf1127f7bcb07599d1ebbce0349f3c4",
+      "v0.17.0": "961935071094a9844e2747fb55e17be638c780829a47d3611177b5feee03dcb6"
+    },
+    "preimage_encoding": "literal",
+    "native_p2pkh_exit_shape": {
+      "inputs": 1,
+      "outputs": 1
+    },
+    "native_p2pkh_exit_both_versions": {
+      "bip143": {
+        "tx_bytes": 416,
+        "unlock_bytes": 329,
+        "output_lock_bytes": 25
+      },
+      "otda": {
+        "tx_bytes": 348,
+        "unlock_bytes": 261,
+        "output_lock_bytes": 25
+      }
+    },
+    "official_bip340_vectors": 19,
+    "paired_timings": {
+      "sampling": "alternate candidate order; the same passing official BIP340 witnesses and deterministic payment keys; BSV Node times include loopback RPC",
+      "warmups_per_candidate": 8,
+      "timed_runs_per_candidate": 56,
+      "median_ms": {
+        "v0.16.0": {
+          "detached": {
+            "chain_gang": 3.109,
+            "bsv_node": 12.947
+          },
+          "bip143": {
+            "chain_gang": 3.215,
+            "bsv_node": 13.856
+          },
+          "otda": {
+            "chain_gang": 3.828,
+            "bsv_node": 12.251
+          }
+        },
+        "v0.17.0": {
+          "detached": {
+            "chain_gang": 3.043,
+            "bsv_node": 12.148
+          },
+          "bip143": {
+            "chain_gang": 3.075,
+            "bsv_node": 12.067
+          },
+          "otda": {
+            "chain_gang": 3.619,
+            "bsv_node": 12.024
+          }
+        }
+      }
+    }
+  },
+  "schnorr_payment_shape": {
+    "inputs": 2,
+    "outputs": 2
+  },
+  "templates": {
+    "v0.16.0": {
+      "bip143-all": {
+        "spend_txid": "e84f859fe8d73e08079dbcdac32db4670c19f40d8672ff96c40806b7001fbffa",
+        "lock_bytes_per_output": 22515,
+        "unlock_bytes_by_input": [
+          329,
+          329
+        ],
+        "payment_bytes": 45806,
+        "extra_input_bytes": 372,
+        "extra_output_bytes": 22526,
+        "fund_and_exit_bytes": 46032,
+        "one_turnover_bytes": 91838,
+        "first_input_peak_stack_payload_bytes": 3403,
+        "bsv_node_inputs": [
+          true,
+          true
+        ],
+        "chain_gang_transaction": true,
+        "locktime_mutation": {
+          "txid": "882b1dada5f944f03cda035e8edb05797bc3b23393325923b113256716aac56d",
+          "bsv_node_inputs": [
+            false,
+            false
+          ],
+          "chain_gang_transaction": false
+        },
+        "first_input_peak_stack_items": {
+          "main": 90,
+          "alt": 13
+        }
+      },
+      "otda-all": {
+        "spend_txid": "fdd0a2e64dc2984219a3c355ba20c9da632d3fe922a3a02a09582b73f48be01b",
+        "lock_bytes_per_output": 22515,
+        "unlock_bytes_by_input": [
+          45321,
+          45321
+        ],
+        "payment_bytes": 135790,
+        "extra_input_bytes": 45487,
+        "extra_output_bytes": 67586,
+        "fund_and_exit_bytes": 46046,
+        "one_turnover_bytes": 181835,
+        "first_input_peak_stack_payload_bytes": 90474,
+        "bsv_node_inputs": [
+          true,
+          true
+        ],
+        "chain_gang_transaction": true,
+        "locktime_mutation": {
+          "txid": "32c52609ecefb08988019967da36a3077c644191a7741f08bd6f91f24b4b9d92",
+          "bsv_node_inputs": [
+            false,
+            false
+          ],
+          "chain_gang_transaction": false
+        },
+        "first_input_peak_stack_items": {
+          "main": 90,
+          "alt": 13
+        }
+      }
+    },
+    "v0.17.0": {
+      "bip143-all": {
+        "spend_txid": "701d24183f9ede5a62c3d8816a83f2c84f107b22377d2f3d272b75e309d2edde",
+        "lock_bytes_per_output": 22435,
+        "unlock_bytes_by_input": [
+          329,
+          329
+        ],
+        "payment_bytes": 45646,
+        "extra_input_bytes": 372,
+        "extra_output_bytes": 22446,
+        "fund_and_exit_bytes": 45872,
+        "one_turnover_bytes": 91518,
+        "first_input_peak_stack_payload_bytes": 3401,
+        "bsv_node_inputs": [
+          true,
+          true
+        ],
+        "chain_gang_transaction": true,
+        "locktime_mutation": {
+          "txid": "354e77c1af2999dccae64c39ce371a49e6b5405b6629ee1813abae0a9fa42071",
+          "bsv_node_inputs": [
+            false,
+            false
+          ],
+          "chain_gang_transaction": false
+        },
+        "default_regtest_admission": {
+          "funding": {
+            "mempool": true,
+            "mined": true
+          },
+          "turnover": {
+            "mempool": true,
+            "mined": true
+          },
+          "exit": {
+            "mempool": true,
+            "mined": true
+          }
+        },
+        "first_input_peak_stack_items": {
+          "main": 90,
+          "alt": 13
+        }
+      },
+      "otda-all": {
+        "spend_txid": "708c0ef153dd8ac1d7288be20310eeb254df8bb34b0a56f5d5b3f18ac88022e8",
+        "lock_bytes_per_output": 22435,
+        "unlock_bytes_by_input": [
+          45161,
+          45161
+        ],
+        "payment_bytes": 135310,
+        "extra_input_bytes": 45327,
+        "extra_output_bytes": 67346,
+        "fund_and_exit_bytes": 45886,
+        "one_turnover_bytes": 181195,
+        "first_input_peak_stack_payload_bytes": 90154,
+        "bsv_node_inputs": [
+          true,
+          true
+        ],
+        "chain_gang_transaction": true,
+        "locktime_mutation": {
+          "txid": "2e1125000f9f6b5c1d41036d988050e01863832927dc1d8621af34e819b0de4e",
+          "bsv_node_inputs": [
+            false,
+            false
+          ],
+          "chain_gang_transaction": false
+        },
+        "default_regtest_admission": {
+          "funding": {
+            "mempool": true,
+            "mined": true
+          },
+          "turnover": {
+            "mempool": true,
+            "mined": true
+          },
+          "exit": {
+            "mempool": true,
+            "mined": true
+          }
+        },
+        "first_input_peak_stack_items": {
+          "main": 90,
+          "alt": 13
+        }
+      }
+    }
+  },
+  "optimization": {
+    "selected": "seed the first accumulator with the selected variable point using O + P = P",
+    "first_window_selector_pairs_checked_per_point_and_scalar_fixture": 256,
+    "compiler_calibration": {
+      "request": {
+        "axis": "call-site",
+        "evaluation": "spend",
+        "fixture": "byte-layout",
+        "plans": [
+          {},
+          {
+            "bindings": [
+              {
+                "kernel": "byte-reverse-six-fields",
+                "site": 0
+              }
+            ]
+          },
+          {
+            "bindings": [
+              {
+                "kernel": "byte-constant-repeat",
+                "site": 1
+              }
+            ]
+          }
+        ],
+        "snapshot": "8bca1800e305d0a78bc75918953e4137a3a68ec38be0f2d5a31605bbf2aaeea5",
+        "time_ms": 300000,
+        "trace": false,
+        "workers": 1
+      },
+      "experiment_run_id": "d3f1ae05fad3fe81c25744dcc201eb770de0959c9a5a3061c289a325a979ba81",
+      "source_sha256": "16b5e981bef83a7a97fe3c01c85bb92c96d55a0b6a888b9bbc5b21a98242faa6",
+      "winner_bindings": [
+        {
+          "kernel": "byte-reverse-six-fields",
+          "site": 0
+        }
+      ],
+      "baseline_path_bytes": 1720,
+      "winner_path_bytes": 1090,
+      "winner_script_sha256": "e5986c3037064fdd1a93cba456cb1a8709f6f6b28511441e766e1c406485aa8e",
+      "vectors": 24,
+      "replay_matched": true
+    },
+    "rejected_delayed_x_reductions": {
+      "compiler_base": "d0abe6f568d2a866e3f0043f7dd6959344a7de6a",
+      "timed_runs_per_candidate": 12,
+      "samples": {
+        "v0.16.0": {
+          "lock_bytes": 22515,
+          "detached_chain_gang_median_ms": 2.919,
+          "detached_bsv_node_rpc_median_ms": 11.952
+        },
+        "omit X reduction after paired doubles": {
+          "lock_bytes": 22326,
+          "detached_chain_gang_median_ms": 3.636,
+          "detached_bsv_node_rpc_median_ms": 12.77
+        },
+        "reduce X only in the variable addition": {
+          "lock_bytes": 22134,
+          "detached_chain_gang_median_ms": 4.22,
+          "detached_bsv_node_rpc_median_ms": 14.056
+        },
+        "reduce X every 1 window(s)": {
+          "lock_bytes": 22320,
+          "detached_chain_gang_median_ms": 4.497,
+          "detached_bsv_node_rpc_median_ms": 13.781
+        },
+        "reduce X every 2 window(s)": {
+          "lock_bytes": 22128,
+          "detached_chain_gang_median_ms": 6.192,
+          "detached_bsv_node_rpc_median_ms": 17.15
+        },
+        "reduce X every 4 window(s)": {
+          "lock_bytes": 22032,
+          "detached_chain_gang_median_ms": 11.121,
+          "detached_bsv_node_rpc_median_ms": 22.216
+        },
+        "reduce X every 8 window(s)": {
+          "lock_bytes": 21984,
+          "detached_chain_gang_median_ms": 20.086,
+          "detached_bsv_node_rpc_median_ms": 37.053
+        }
+      }
+    }
+  }
+}

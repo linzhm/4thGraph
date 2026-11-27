@@ -1,0 +1,948 @@
+{
+  "compiler": "0.2.7",
+  "chain_gang": {
+    "version": "0.13.2",
+    "commit": "74676b9c002c452e7f21a9ed9265f4972bef03f6"
+  },
+  "bsv_node": 101020300,
+  "samples": 12,
+  "timings_ms": {
+    "manual-v0.17.0": {
+      "detached": {
+        "chain_gang": 3.016,
+        "bsv_node_rpc": 11.886
+      },
+      "1x1/41": {
+        "chain_gang": 4.949,
+        "bsv_node_rpc": 10.71
+      },
+      "1x1/61": {
+        "chain_gang": 3.154,
+        "bsv_node_rpc": 11.495
+      }
+    },
+    "glv-joint-window-2": {
+      "detached": {
+        "chain_gang": 4.812,
+        "bsv_node_rpc": 19.072
+      },
+      "1x1/41": {
+        "chain_gang": 7.652,
+        "bsv_node_rpc": 18.413
+      },
+      "1x1/61": {
+        "chain_gang": 4.49,
+        "bsv_node_rpc": 18.786
+      }
+    },
+    "glv-joint-packed-2": {
+      "detached": {
+        "chain_gang": 3.447,
+        "bsv_node_rpc": 14.281
+      },
+      "1x1/41": {
+        "chain_gang": 6.246,
+        "bsv_node_rpc": 14.245
+      },
+      "1x1/61": {
+        "chain_gang": 3.41,
+        "bsv_node_rpc": 15.205
+      }
+    },
+    "glv-joint-stack-2": {
+      "detached": {
+        "chain_gang": 3.485,
+        "bsv_node_rpc": 11.779
+      },
+      "1x1/41": {
+        "chain_gang": 5.376,
+        "bsv_node_rpc": 11.986
+      },
+      "1x1/61": {
+        "chain_gang": 3.146,
+        "bsv_node_rpc": 11.902
+      }
+    },
+    "glv-joint-scaled-2": {
+      "detached": {
+        "chain_gang": 3.545,
+        "bsv_node_rpc": 11.055
+      },
+      "1x1/41": {
+        "chain_gang": 5.178,
+        "bsv_node_rpc": 11.992
+      },
+      "1x1/61": {
+        "chain_gang": 3.238,
+        "bsv_node_rpc": 11.862
+      }
+    },
+    "glv-joint-scaled-2/dataflow": {
+      "detached": {
+        "chain_gang": 2.999,
+        "bsv_node_rpc": 11.271
+      },
+      "1x1/41": {
+        "chain_gang": 5.228,
+        "bsv_node_rpc": 11.405
+      },
+      "1x1/61": {
+        "chain_gang": 3.016,
+        "bsv_node_rpc": 11.18
+      }
+    },
+    "glv-joint-scaled-2/dataflow/batch": {
+      "detached": {
+        "chain_gang": 3.093,
+        "bsv_node_rpc": 11.289
+      },
+      "1x1/41": {
+        "chain_gang": 5.096,
+        "bsv_node_rpc": 11.047
+      },
+      "1x1/61": {
+        "chain_gang": 3.071,
+        "bsv_node_rpc": 11.34
+      }
+    }
+  },
+  "fixed_generator_lowering": {
+    "secp256k1": [
+      {
+        "algorithm": "binary",
+        "window_bits": 1,
+        "windows": 256,
+        "table_bytes": 198,
+        "script_bytes": 55212,
+        "sha256": "38230b02d99010ec2ad280a7cadbfb2079ac560e757a496be03c689c42e6b57e"
+      },
+      {
+        "algorithm": "fixed-window-2",
+        "window_bits": 2,
+        "windows": 128,
+        "table_bytes": 396,
+        "script_bytes": 35059,
+        "sha256": "b4eb3a191afa8bb74a1b914981da61c6b9035c5360a6512eaf283fec12abc739"
+      },
+      {
+        "algorithm": "fixed-window-4",
+        "window_bits": 4,
+        "windows": 64,
+        "table_bytes": 1584,
+        "script_bytes": 26071,
+        "sha256": "b0182bc0dadecbfe0e0213b446385d2d13a2b80c05bc8c9a678eddd345aa8fee"
+      }
+    ],
+    "p256": [
+      {
+        "algorithm": "binary",
+        "window_bits": 1,
+        "windows": 256,
+        "table_bytes": 198,
+        "script_bytes": 86219,
+        "sha256": "007fa930c8c3ff883cbb4d20285eb1957a829949d6e042be70207d48ed21162c"
+      },
+      {
+        "algorithm": "fixed-window-2",
+        "window_bits": 2,
+        "windows": 128,
+        "table_bytes": 396,
+        "script_bytes": 55826,
+        "sha256": "c31237086be7a4c0d164e8ede6fa51e53e3f498412303f92c641dec03bb93891"
+      },
+      {
+        "algorithm": "fixed-window-4",
+        "window_bits": 4,
+        "windows": 64,
+        "table_bytes": 1584,
+        "script_bytes": 41718,
+        "sha256": "02a593507d95109d73d250387c63eebeae860da3b66b322ec80d2e71e9467ba2"
+      }
+    ],
+    "sm2": [
+      {
+        "algorithm": "binary",
+        "window_bits": 1,
+        "windows": 256,
+        "table_bytes": 198,
+        "script_bytes": 86219,
+        "sha256": "3785eb4ab83d3bf89d39682e834ff1ba79857fec042b91461a50d4eea28007ee"
+      },
+      {
+        "algorithm": "fixed-window-2",
+        "window_bits": 2,
+        "windows": 128,
+        "table_bytes": 396,
+        "script_bytes": 55826,
+        "sha256": "aa28fc3d7963d8395e8368626274a8b2b3e6ee809b6f5e884194929c6618b155"
+      },
+      {
+        "algorithm": "fixed-window-4",
+        "window_bits": 4,
+        "windows": 64,
+        "table_bytes": 1584,
+        "script_bytes": 41718,
+        "sha256": "d731626e9bf734f3eb89f9f6a95418507e04521325c477c4a0353f349409ae3f"
+      }
+    ]
+  },
+  "results": {
+    "manual-v0.17.0": {
+      "verifier_bytes": 21625,
+      "verifier_sha256": "961935071094a9844e2747fb55e17be638c780829a47d3611177b5feee03dcb6",
+      "lock_bytes": 22435,
+      "lock_sha256": "8ccf6e1e0070112603e45e0521a9194efcf61c601d55aadef9c0e20466e734c2",
+      "verification": {
+        "detached_cases": 27,
+        "positive_payments": 14,
+        "changed_locktime_rejections": 14,
+        "transactions": {
+          "2x2/41": {
+            "bytes": 45646,
+            "txid": "e9935ca3476c0d2bb40d6b2c4a8653d720b9525535b3cabf99f4f6f21487fde3",
+            "unlock_bytes": [
+              329,
+              329
+            ],
+            "output_lock_bytes": [
+              22435,
+              22435
+            ],
+            "input_zero_stack_peak": {
+              "source": "development evaluator; native CHECKSIG modeled as true",
+              "main_items": 90,
+              "alt_items": 13,
+              "combined_payload_bytes": 3398
+            }
+          },
+          "2x2/61": {
+            "bytes": 135310,
+            "txid": "ccf8f7110ad068d91220a45cc656e8c7e97a7310ffd7d09b471f3aeb40292505",
+            "unlock_bytes": [
+              45161,
+              45161
+            ],
+            "output_lock_bytes": [
+              22435,
+              22435
+            ],
+            "input_zero_stack_peak": {
+              "source": "development evaluator; native CHECKSIG modeled as true",
+              "main_items": 90,
+              "alt_items": 13,
+              "combined_payload_bytes": 90154
+            }
+          },
+          "1x1/41": {
+            "bytes": 416,
+            "txid": "0c800eef2d2065ff43bedf13d262db4e04c33b459b712141d25874a36835addc",
+            "unlock_bytes": [
+              329
+            ],
+            "output_lock_bytes": [
+              25
+            ],
+            "input_zero_stack_peak": {
+              "source": "development evaluator; native CHECKSIG modeled as true",
+              "main_items": 90,
+              "alt_items": 13,
+              "combined_payload_bytes": 3391
+            }
+          },
+          "1x1/61": {
+            "bytes": 348,
+            "txid": "65f68e61d513b673b3fac64db39165db564cdf3b3da36d23be013ba58ba9548b",
+            "unlock_bytes": [
+              261
+            ],
+            "output_lock_bytes": [
+              25
+            ],
+            "input_zero_stack_peak": {
+              "source": "development evaluator; native CHECKSIG modeled as true",
+              "main_items": 90,
+              "alt_items": 13,
+              "combined_payload_bytes": 3399
+            }
+          }
+        }
+      },
+      "2x2_otda_all": {
+        "literal": {
+          "transaction_bytes": 135310,
+          "txid": "ccf8f7110ad068d91220a45cc656e8c7e97a7310ffd7d09b471f3aeb40292505",
+          "unlock_bytes": [
+            45161,
+            45161
+          ]
+        },
+        "reconstructed": {
+          "transaction_bytes": 54626,
+          "txid": "55b49929976830c485a98936e86cde4f07033d09d4601a7f1b4e6c16e34b007b",
+          "unlock_bytes": [
+            4819,
+            4819
+          ]
+        }
+      },
+      "constructor_bytes": 4465
+    },
+    "glv-joint-window-2": {
+      "verifier_bytes": 43189,
+      "verifier_sha256": "30c7165a48f35b783f54b002c5239e833aadefbf45bf18fd61596126fdbc662a",
+      "lock_bytes": 43999,
+      "lock_sha256": "bfdda238c696b76281bcd53ef00085904dd7ac13800f991e13f87da7796ef046",
+      "verification": {
+        "detached_cases": 27,
+        "positive_payments": 14,
+        "changed_locktime_rejections": 14,
+        "transactions": {
+          "2x2/41": {
+            "bytes": 88774,
+            "txid": "468868743aae60a514d901f21c1a09af5083a5f04202cdf9b0eb7736cba6e53f",
+            "unlock_bytes": [
+              329,
+              329
+            ],
+            "output_lock_bytes": [
+              43999,
+              43999
+            ],
+            "input_zero_stack_peak": {
+              "source": "development evaluator; native CHECKSIG modeled as true",
+              "main_items": 41,
+              "alt_items": 3,
+              "combined_payload_bytes": 5175
+            }
+          },
+          "2x2/61": {
+            "bytes": 264702,
+            "txid": "feb779e9bb2d0e9fe18140c9ccc3ff43cd249fb8b3117bd1c037d738146b2df2",
+            "unlock_bytes": [
+              88291,
+              88291
+            ],
+            "output_lock_bytes": [
+              43999,
+              43999
+            ],
+            "input_zero_stack_peak": {
+              "source": "development evaluator; native CHECKSIG modeled as true",
+              "main_items": 41,
+              "alt_items": 3,
+              "combined_payload_bytes": 176410
+            }
+          },
+          "1x1/41": {
+            "bytes": 416,
+            "txid": "149ae01a66a700609e68948619ab1c3abd276720390cad919eb0e6cf016770ff",
+            "unlock_bytes": [
+              329
+            ],
+            "output_lock_bytes": [
+              25
+            ],
+            "input_zero_stack_peak": {
+              "source": "development evaluator; native CHECKSIG modeled as true",
+              "main_items": 41,
+              "alt_items": 3,
+              "combined_payload_bytes": 5174
+            }
+          },
+          "1x1/61": {
+            "bytes": 348,
+            "txid": "c84e3cef9ee35ebf3109f9df9b0898b8576022b397b807c5e95ef8fdcb53c17d",
+            "unlock_bytes": [
+              261
+            ],
+            "output_lock_bytes": [
+              25
+            ],
+            "input_zero_stack_peak": {
+              "source": "development evaluator; native CHECKSIG modeled as true",
+              "main_items": 41,
+              "alt_items": 3,
+              "combined_payload_bytes": 5173
+            }
+          }
+        }
+      },
+      "2x2_otda_all": {
+        "literal": {
+          "transaction_bytes": 264702,
+          "txid": "feb779e9bb2d0e9fe18140c9ccc3ff43cd249fb8b3117bd1c037d738146b2df2",
+          "unlock_bytes": [
+            88291,
+            88291
+          ]
+        },
+        "reconstructed": {
+          "transaction_bytes": 107404,
+          "txid": "da959df3e717dcf6e727737599711c847968310e62b2434faf0d62cca3c9b068",
+          "unlock_bytes": [
+            9644,
+            9644
+          ]
+        }
+      },
+      "constructor_bytes": 9290
+    },
+    "glv-joint-packed-2": {
+      "verifier_bytes": 32547,
+      "verifier_sha256": "7dca14f7f9718dd6c97f5837ad6e143b900ccb86d315cc2aea31c1f213e21c62",
+      "lock_bytes": 33357,
+      "lock_sha256": "abe1e12b3ee4723612ad94d204c174436b790ce896df1c1e7389dc0f114d88c1",
+      "verification": {
+        "detached_cases": 27,
+        "positive_payments": 14,
+        "changed_locktime_rejections": 14,
+        "transactions": {
+          "2x2/41": {
+            "bytes": 67490,
+            "txid": "0796b6cb823d04ea14885706671e1a20109607e786ca57d27a7724c904545fce",
+            "unlock_bytes": [
+              329,
+              329
+            ],
+            "output_lock_bytes": [
+              33357,
+              33357
+            ],
+            "input_zero_stack_peak": {
+              "source": "development evaluator; native CHECKSIG modeled as true",
+              "main_items": 41,
+              "alt_items": 3,
+              "combined_payload_bytes": 4615
+            }
+          },
+          "2x2/61": {
+            "bytes": 200850,
+            "txid": "958ac3f427bf745752327347148a36dd1dc3a33c2fef622b7ef80e52e85757ca",
+            "unlock_bytes": [
+              67007,
+              67007
+            ],
+            "output_lock_bytes": [
+              33357,
+              33357
+            ],
+            "input_zero_stack_peak": {
+              "source": "development evaluator; native CHECKSIG modeled as true",
+              "main_items": 41,
+              "alt_items": 3,
+              "combined_payload_bytes": 133842
+            }
+          },
+          "1x1/41": {
+            "bytes": 416,
+            "txid": "4edb6a5ecb76d4c3a62209bc81c1facbe1bd6dcbe66f4feae0b7e8c9421c448a",
+            "unlock_bytes": [
+              329
+            ],
+            "output_lock_bytes": [
+              25
+            ],
+            "input_zero_stack_peak": {
+              "source": "development evaluator; native CHECKSIG modeled as true",
+              "main_items": 41,
+              "alt_items": 3,
+              "combined_payload_bytes": 4614
+            }
+          },
+          "1x1/61": {
+            "bytes": 348,
+            "txid": "36f2993d91accd8a4bdc2861856fd2b21f956ebfd0660ba76ecd81b4e87cdb9a",
+            "unlock_bytes": [
+              261
+            ],
+            "output_lock_bytes": [
+              25
+            ],
+            "input_zero_stack_peak": {
+              "source": "development evaluator; native CHECKSIG modeled as true",
+              "main_items": 41,
+              "alt_items": 3,
+              "combined_payload_bytes": 4612
+            }
+          }
+        }
+      },
+      "2x2_otda_all": {
+        "literal": {
+          "transaction_bytes": 200850,
+          "txid": "958ac3f427bf745752327347148a36dd1dc3a33c2fef622b7ef80e52e85757ca",
+          "unlock_bytes": [
+            67007,
+            67007
+          ]
+        },
+        "reconstructed": {
+          "transaction_bytes": 84302,
+          "txid": "4769d1eac7071fe529dcb9b0fb24a0c1511a103cfcecf206e3a40f56116d4738",
+          "unlock_bytes": [
+            8735,
+            8735
+          ]
+        }
+      },
+      "constructor_bytes": 8381
+    },
+    "glv-joint-stack-2": {
+      "verifier_bytes": 24887,
+      "verifier_sha256": "d0270f77fe1291d9af7aaf74eb4906085699de6a4c27a6a42a9cd939880f4bbc",
+      "lock_bytes": 25697,
+      "lock_sha256": "955f415c7c31ac5add710bf6c91ccd1c271eef5f9b455fe15e43a4337039499c",
+      "verification": {
+        "detached_cases": 27,
+        "positive_payments": 14,
+        "changed_locktime_rejections": 14,
+        "transactions": {
+          "2x2/41": {
+            "bytes": 52170,
+            "txid": "97435259e0b782aad6d537ec8aa3408918932ca72c6467b625b4ee8f1269c337",
+            "unlock_bytes": [
+              329,
+              329
+            ],
+            "output_lock_bytes": [
+              25697,
+              25697
+            ],
+            "input_zero_stack_peak": {
+              "source": "development evaluator; native CHECKSIG modeled as true",
+              "main_items": 93,
+              "alt_items": 5,
+              "combined_payload_bytes": 3502
+            }
+          },
+          "2x2/61": {
+            "bytes": 154882,
+            "txid": "bf51bb5e21136aae1422618b4fff953ff13b0ce613417e3623aec3b26952f485",
+            "unlock_bytes": [
+              51685,
+              51685
+            ],
+            "output_lock_bytes": [
+              25697,
+              25697
+            ],
+            "input_zero_stack_peak": {
+              "source": "development evaluator; native CHECKSIG modeled as true",
+              "main_items": 93,
+              "alt_items": 5,
+              "combined_payload_bytes": 103202
+            }
+          },
+          "1x1/41": {
+            "bytes": 416,
+            "txid": "178a69486e4bfcde47fdb76b63a801cc739df98ec0c7d12e09c5201a06f5d9c3",
+            "unlock_bytes": [
+              329
+            ],
+            "output_lock_bytes": [
+              25
+            ],
+            "input_zero_stack_peak": {
+              "source": "development evaluator; native CHECKSIG modeled as true",
+              "main_items": 93,
+              "alt_items": 5,
+              "combined_payload_bytes": 3500
+            }
+          },
+          "1x1/61": {
+            "bytes": 348,
+            "txid": "18e7004d8291c2d1ba3f9eb5eb23bd5796aabe31215e8ec688df64ec1a69e3a9",
+            "unlock_bytes": [
+              261
+            ],
+            "output_lock_bytes": [
+              25
+            ],
+            "input_zero_stack_peak": {
+              "source": "development evaluator; native CHECKSIG modeled as true",
+              "main_items": 93,
+              "alt_items": 5,
+              "combined_payload_bytes": 3508
+            }
+          }
+        }
+      },
+      "2x2_otda_all": {
+        "literal": {
+          "transaction_bytes": 154882,
+          "txid": "bf51bb5e21136aae1422618b4fff953ff13b0ce613417e3623aec3b26952f485",
+          "unlock_bytes": [
+            51685,
+            51685
+          ]
+        },
+        "reconstructed": {
+          "transaction_bytes": 64946,
+          "txid": "eeb349a2717017d809e05c7b5ddebd86a404db562ffd4c9c78debf4918a61cc5",
+          "unlock_bytes": [
+            6717,
+            6717
+          ]
+        }
+      },
+      "constructor_bytes": 6363
+    },
+    "glv-joint-scaled-2": {
+      "verifier_bytes": 23655,
+      "verifier_sha256": "0a1926423f061f228cdb518a312bcd4a416bad046f45aaa892a2fb3b79c44f6d",
+      "lock_bytes": 24465,
+      "lock_sha256": "0e0d060c061e4a9384a21532ce16ac504e06432f4e9fd2b9eba681e4f750a172",
+      "verification": {
+        "detached_cases": 27,
+        "positive_payments": 14,
+        "changed_locktime_rejections": 14,
+        "transactions": {
+          "2x2/41": {
+            "bytes": 49706,
+            "txid": "317bd93818fd5f881e592be1dd13907384516d03604a009d0106b206fd23a385",
+            "unlock_bytes": [
+              329,
+              329
+            ],
+            "output_lock_bytes": [
+              24465,
+              24465
+            ],
+            "input_zero_stack_peak": {
+              "source": "development evaluator; native CHECKSIG modeled as true",
+              "main_items": 93,
+              "alt_items": 5,
+              "combined_payload_bytes": 3493
+            }
+          },
+          "2x2/61": {
+            "bytes": 147490,
+            "txid": "97d49eb008fd733031c7c3900cedcdcaeae737ea0ac0f805acfa37c80f4d1716",
+            "unlock_bytes": [
+              49221,
+              49221
+            ],
+            "output_lock_bytes": [
+              24465,
+              24465
+            ],
+            "input_zero_stack_peak": {
+              "source": "development evaluator; native CHECKSIG modeled as true",
+              "main_items": 93,
+              "alt_items": 5,
+              "combined_payload_bytes": 98274
+            }
+          },
+          "1x1/41": {
+            "bytes": 416,
+            "txid": "b7a886f559ea3178ff8bf9f6ccf9d05adada10d8365679f9234d7d562409c4e3",
+            "unlock_bytes": [
+              329
+            ],
+            "output_lock_bytes": [
+              25
+            ],
+            "input_zero_stack_peak": {
+              "source": "development evaluator; native CHECKSIG modeled as true",
+              "main_items": 93,
+              "alt_items": 5,
+              "combined_payload_bytes": 3496
+            }
+          },
+          "1x1/61": {
+            "bytes": 348,
+            "txid": "0f185644577ddd63c087815828903117c324f5433c7ab00210baa3eefd3c3167",
+            "unlock_bytes": [
+              261
+            ],
+            "output_lock_bytes": [
+              25
+            ],
+            "input_zero_stack_peak": {
+              "source": "development evaluator; native CHECKSIG modeled as true",
+              "main_items": 93,
+              "alt_items": 5,
+              "combined_payload_bytes": 3491
+            }
+          }
+        }
+      },
+      "2x2_otda_all": {
+        "literal": {
+          "transaction_bytes": 147490,
+          "txid": "97d49eb008fd733031c7c3900cedcdcaeae737ea0ac0f805acfa37c80f4d1716",
+          "unlock_bytes": [
+            49221,
+            49221
+          ]
+        },
+        "reconstructed": {
+          "transaction_bytes": 62746,
+          "txid": "1251b9a14c62f6f863d1038bda6bea1193f5d6723c680f844ecb8e32ef497f91",
+          "unlock_bytes": [
+            6849,
+            6849
+          ]
+        }
+      },
+      "constructor_bytes": 6495
+    },
+    "glv-joint-scaled-2/dataflow": {
+      "verifier_bytes": 23060,
+      "verifier_sha256": "b00a7ae22cbf0927cf45b1cf54f7fac53e56553980eabf3cdf98869e257b30a2",
+      "lock_bytes": 23870,
+      "lock_sha256": "3596e470ac27ac545e71d75a3a6b7ad1900f839c8a0ded618b01129225af1a0c",
+      "verification": {
+        "detached_cases": 27,
+        "positive_payments": 14,
+        "changed_locktime_rejections": 14,
+        "transactions": {
+          "2x2/41": {
+            "bytes": 48516,
+            "txid": "8b636c71c8856ae02bf50d17adf87ca2a433e71558d7978f37ff94602ef66513",
+            "unlock_bytes": [
+              329,
+              329
+            ],
+            "output_lock_bytes": [
+              23870,
+              23870
+            ],
+            "input_zero_stack_peak": {
+              "source": "development evaluator; native CHECKSIG modeled as true",
+              "main_items": 91,
+              "alt_items": 7,
+              "combined_payload_bytes": 3398
+            }
+          },
+          "2x2/61": {
+            "bytes": 143920,
+            "txid": "dd9da0cf86587643bf3ccf0941ec6ad537c16bfbd2d1bf3a9a8428751765b274",
+            "unlock_bytes": [
+              48031,
+              48031
+            ],
+            "output_lock_bytes": [
+              23870,
+              23870
+            ],
+            "input_zero_stack_peak": {
+              "source": "development evaluator; native CHECKSIG modeled as true",
+              "main_items": 91,
+              "alt_items": 7,
+              "combined_payload_bytes": 95894
+            }
+          },
+          "1x1/41": {
+            "bytes": 416,
+            "txid": "38fd69157a42de7a373da78edfefdae3706d345d867f31e8608d0c48342c6952",
+            "unlock_bytes": [
+              329
+            ],
+            "output_lock_bytes": [
+              25
+            ],
+            "input_zero_stack_peak": {
+              "source": "development evaluator; native CHECKSIG modeled as true",
+              "main_items": 91,
+              "alt_items": 7,
+              "combined_payload_bytes": 3400
+            }
+          },
+          "1x1/61": {
+            "bytes": 348,
+            "txid": "2900446ef3c14c5b2a22af539a61fab2808f256128b12cce098860c4d239382a",
+            "unlock_bytes": [
+              261
+            ],
+            "output_lock_bytes": [
+              25
+            ],
+            "input_zero_stack_peak": {
+              "source": "development evaluator; native CHECKSIG modeled as true",
+              "main_items": 91,
+              "alt_items": 7,
+              "combined_payload_bytes": 3397
+            }
+          }
+        }
+      },
+      "2x2_otda_all": {
+        "literal": {
+          "transaction_bytes": 143920,
+          "txid": "dd9da0cf86587643bf3ccf0941ec6ad537c16bfbd2d1bf3a9a8428751765b274",
+          "unlock_bytes": [
+            48031,
+            48031
+          ]
+        },
+        "reconstructed": {
+          "transaction_bytes": 60366,
+          "txid": "87bc3b45698386712df5e1e5b08ee7fba911ab28df1e19902680c229d4c44d5b",
+          "unlock_bytes": [
+            6254,
+            6254
+          ]
+        }
+      },
+      "constructor_bytes": 5900
+    },
+    "glv-joint-scaled-2/dataflow/batch": {
+      "verifier_bytes": 22674,
+      "verifier_sha256": "af66d6f9e3ed08897aa9e5f6e0f324ff00a63f266a065091ac69e174451a1cac",
+      "lock_bytes": 23484,
+      "lock_sha256": "a29f40a3df298ce05f88fae65d2fabd13034fa4c037ba507180b9b73dca93cc1",
+      "verification": {
+        "detached_cases": 27,
+        "positive_payments": 14,
+        "changed_locktime_rejections": 14,
+        "transactions": {
+          "2x2/41": {
+            "bytes": 47744,
+            "txid": "0bf16485b7657ae4c28bfd982fc635d5aefa19e082b7469cf8914e2657174d9f",
+            "unlock_bytes": [
+              329,
+              329
+            ],
+            "output_lock_bytes": [
+              23484,
+              23484
+            ],
+            "input_zero_stack_peak": {
+              "source": "development evaluator; native CHECKSIG modeled as true",
+              "main_items": 91,
+              "alt_items": 7,
+              "combined_payload_bytes": 3396
+            }
+          },
+          "2x2/61": {
+            "bytes": 141604,
+            "txid": "4e0074114346bd200eb7976c859fdb68ee8700450cf9685eda8d747f0e717c13",
+            "unlock_bytes": [
+              47259,
+              47259
+            ],
+            "output_lock_bytes": [
+              23484,
+              23484
+            ],
+            "input_zero_stack_peak": {
+              "source": "development evaluator; native CHECKSIG modeled as true",
+              "main_items": 91,
+              "alt_items": 7,
+              "combined_payload_bytes": 94350
+            }
+          },
+          "1x1/41": {
+            "bytes": 416,
+            "txid": "8be44fbe8d6f7b0f3e8743e73bbde85825ff2a79d50c0ce2cd214038a73323de",
+            "unlock_bytes": [
+              329
+            ],
+            "output_lock_bytes": [
+              25
+            ],
+            "input_zero_stack_peak": {
+              "source": "development evaluator; native CHECKSIG modeled as true",
+              "main_items": 91,
+              "alt_items": 7,
+              "combined_payload_bytes": 3395
+            }
+          },
+          "1x1/61": {
+            "bytes": 348,
+            "txid": "e0bab780499df0d914da68624c3b2fa1e04b897c40baecc7f23c39ca99c99ce2",
+            "unlock_bytes": [
+              261
+            ],
+            "output_lock_bytes": [
+              25
+            ],
+            "input_zero_stack_peak": {
+              "source": "development evaluator; native CHECKSIG modeled as true",
+              "main_items": 91,
+              "alt_items": 7,
+              "combined_payload_bytes": 3400
+            }
+          }
+        }
+      },
+      "2x2_otda_all": {
+        "literal": {
+          "transaction_bytes": 141604,
+          "txid": "4e0074114346bd200eb7976c859fdb68ee8700450cf9685eda8d747f0e717c13",
+          "unlock_bytes": [
+            47259,
+            47259
+          ]
+        },
+        "reconstructed": {
+          "transaction_bytes": 58822,
+          "txid": "5867d5510565f1b3fe4943f6bf1c22d6fda03f1e24b9ebc445092eec91f84cd0",
+          "unlock_bytes": [
+            5868,
+            5868
+          ]
+        }
+      },
+      "constructor_bytes": 5514
+    }
+  },
+  "selected_automatic": "glv-joint-scaled-2/dataflow/batch",
+  "compiler_rewrites": {
+    "glv-joint-window-2": {
+      "comparison-feeds-if": 1
+    },
+    "glv-joint-packed-2": {
+      "comparison-feeds-if": 1
+    },
+    "glv-joint-stack-2": {
+      "comparison-feeds-if": 1
+    },
+    "glv-joint-scaled-2": {
+      "comparison-feeds-if": 1
+    },
+    "glv-joint-scaled-2/dataflow": {
+      "fixed-width-replacement": 6,
+      "reuse-dominating-expression": 39,
+      "comparison-feeds-if": 1
+    },
+    "glv-joint-scaled-2/dataflow/batch": {
+      "reuse-dominating-expression": 17,
+      "comparison-feeds-if": 1
+    }
+  },
+  "scaled_vs_manual_regions": {
+    "identical_window_script": true,
+    "depth_and_challenge": {
+      "manual_bytes": 409,
+      "automatic_bytes": 801,
+      "difference_bytes": 392
+    },
+    "joint_preparation": {
+      "manual_bytes": 2763,
+      "automatic_bytes": 3312,
+      "difference_bytes": 549
+    },
+    "windows": {
+      "manual_bytes": 18379,
+      "automatic_bytes": 18379,
+      "difference_bytes": 0
+    },
+    "cleanup_and_nonce_check": {
+      "manual_bytes": 74,
+      "automatic_bytes": 182,
+      "difference_bytes": 108
+    },
+    "owner_and_transaction_binding": {
+      "manual_bytes": 810,
+      "automatic_bytes": 810,
+      "difference_bytes": 0
+    },
+    "payment_lock": {
+      "manual_bytes": 22435,
+      "automatic_bytes": 23484,
+      "difference_bytes": 1049
+    }
+  }
+}

@@ -10,7 +10,10 @@ import unittest
 from unittest.mock import patch
 
 from fourthgraph.bsv.artifacts import describe_script
+from fourthgraph.bsv.evaluate import evaluate
+from fourthgraph.bsv.script import without_codeseparators
 from fourthgraph.bsv.transaction import Input, Output, Transaction
+from fourthgraph.workflow.preimage_constructor import build as compile_constructor
 from fourthgraph.workflow.project_contract import ContractError, ProjectContract
 from tools.verify_project_contract import verify_bundle
 
@@ -36,6 +39,24 @@ class ProjectContractTests(unittest.TestCase):
             saved = json.loads((output/"receipt.json").read_text())
             self.assertEqual([step["path"] for step in saved["steps"]], ["bip143", "otda"])
             self.assertEqual([step["unlock_bytes"] for step in saved["steps"]], [57, 49])
+            for step in saved["steps"]:
+                parent = Transaction.parse(bytes.fromhex(step["parent_tx"]))
+                tx = Transaction.parse(bytes.fromhex(step["raw_tx"])).with_script(0, b"")
+                path = step["path"]
+                prepared = host.prepare(parent, tx, 0, path)
+                rule = host.package["paths"][path]
+                code = parent.outputs[tx.inputs[0].vout].script[rule["script_code_offset"]:]
+                if path == "otda":
+                    code = without_codeseparators(code)
+                request = {"parent_hex": parent.serialize().hex(), "transaction_hex": tx.serialize().hex(),
+                           "input_index": 0, "sighash": rule["mode"], "script_code_hex": code.hex(),
+                           "chronicle_active": path == "otda", "prepared": prepared}
+                planned = compile_constructor(request)
+                self.assertEqual(planned["signing_digest_sha256d"], prepared["digest"])
+                self.assertEqual(evaluate(bytes.fromhex(planned["program_hex"])),
+                                 ([bytes.fromhex(prepared["preimage"])], []))
+                with self.assertRaisesRegex(ValueError, "WASM prepared result differs"):
+                    compile_constructor(dict(request, prepared=dict(prepared, digest="00" * 32)))
             self.assertIn("otda.before_activation", {case["id"] for case in saved["cases"]})
             for error in (RuntimeError("engine unavailable"), ValueError("unexpected validation error")):
                 with self.subTest(error=error):

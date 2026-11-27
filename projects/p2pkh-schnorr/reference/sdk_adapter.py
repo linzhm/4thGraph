@@ -25,9 +25,11 @@ def recognize(script, public_key):
 
 def sign_spend(tx, index, funding_raw, public_key, signer, sighash, options):
     return authorize(tx, index, funding_raw, public_key, signer, sighash=sighash,
-                     chronicle_active=options.get("chronicleActive", False))
+                     chronicle_active=options.get("chronicleActive", False),
+                     compress_otda=options.get("compressOtda"))
 
 
 def sign_previous(tx, index, previous, public_key, signer, sighash, options):
     return authorize_previous(tx, index, previous, public_key, signer, sighash=sighash,
-                              chronicle_active=options.get("chronicleActive", False))
+                              chronicle_active=options.get("chronicleActive", False),
+                              compress_otda=options.get("compressOtda"))

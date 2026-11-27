@@ -5,7 +5,7 @@ from hashlib import sha256
 from itertools import chain
 
 from .verifier import (
-    FIELD_BYTES, HOST, PSI_X, PSI_Y, Q, SEED_BITS, Curve, ScriptField, Tower,
+    FIELD_BYTES, HOST, PSI_X, PSI_Y, Q, SEED_BITS, Curve,
     VerifierStages, affine_lines, dynamic_slots, evaluated_line, fold_msm, prepare_key, proof_packet,
     proof_stack, public_packet, read_proof, require_affine, unpack_packet, unpack_public,
 )
@@ -83,15 +83,9 @@ class PackedFields:
         self.packet = packet
 
     def read(self, index, *, committed=False):
-        width = number(FIELD_BYTES)
-        if self.field.chronicle:
-            code = number(index * FIELD_BYTES) + width + asm("OP_SUBSTR") if index else width + asm("OP_LEFT")
-        else:
-            prefix = number(index * FIELD_BYTES) + asm("OP_SPLIT OP_NIP") if index else b""
-            code = prefix + width + asm("OP_SPLIT OP_DROP")
-        if not committed:
-            code += push(b"\x00") + asm("OP_CAT")
-        value = self.field.graph.define(code + asm("OP_BIN2NUM"), (self.packet,))
+        decode = (b"" if committed else push(b"\x00") + asm("OP_CAT")) + asm("OP_BIN2NUM")
+        value = self.field.graph.packet_slice(self.packet, index * FIELD_BYTES, FIELD_BYTES,
+                                              decode=decode, chronicle=self.field.chronicle)
         if not committed:
             self.field.all((self.field.op("OP_LESSTHAN", value, Q),))
         return value
@@ -141,15 +135,13 @@ def checked_b_line(curve, point, other, slope, *, doubling):
 
 
 class AffineStages(VerifierStages):
-    def __init__(self, key, sources, *, lines_in_witness, chronicle=False):
-        super().__init__(key, sources, chronicle=chronicle)
+    def __init__(self, key, sources, *, lines_in_witness, chronicle=False, optimize=False):
+        self.witness_items = 2 if lines_in_witness else 1
+        super().__init__(key, sources, chronicle=chronicle, optimize=optimize, extra_inputs=self.witness_items)
         if not self.slots:
             raise ValueError("an affine witness layout requires at least one spend-time public input")
         self.lines_in_witness = lines_in_witness
         self.windows = tuple(msm_windows(key, sources))
-        self.witness_items = 2 if lines_in_witness else 1
-        self.field = ScriptField(self.witness_items + self.proof_elements + len(self.slots), chronicle=chronicle)
-        self.tower = Tower(self.field)
         inputs = self.field.graph.inputs
         self.trace = PackedFields(self.field, inputs[self.witness_items - 1])
         self.lines = PackedFields(self.field, inputs[0]) if lines_in_witness else None

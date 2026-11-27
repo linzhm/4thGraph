@@ -12,7 +12,7 @@ LEGACY_GROTH16_ENTRY = "groth16-verify"
 WALLET_BACKEND = "wallet-construction"
 
 
-def p256_vocabulary():
+def numeric_stack_vocabulary():
     from fourthgraph.bsv.script import asm, number
 
     from fourthgraph.compiler.wordsets import Primitive, script_word
@@ -103,6 +103,11 @@ def library_resource(name):
     return Path("stdlib", name.removeprefix("std/") + ".fth")
 
 
+SECP256K1_DOUBLING_PLACEMENT = (
+    Parameter("placement", "cell", "Zero reads the field prime at stack bottom. A nonzero value reads it below the point."),
+)
+
+
 PELS_SUCCESSOR_BUILD_PARAMETERS = (
     Parameter("prefix", "script", "Serialized Script accumulator to extend. The assembled lock starts with a direct "
               "push of five state bytes followed immediately by OP_CODESEPARATOR."),
@@ -155,6 +160,16 @@ LIBRARIES = {
         p256_export("p256-add", ("p", "b3", "x1", "y1", "z1", "x2", "y2", "z2")),
         p256_export("p256-double", ("p", "b3", "x", "y", "z")),
     )),
+    "std/weierstrass": Library(ROOT / "stdlib/weierstrass.fth", (
+        Export("weierstrass-scale", ("script-int",) * 6, ("script-int",) * 4, ("host", "script"), (
+            Parameter("p", "script-int", "Positive field prime"),
+            Parameter("X", "script-int", "Homogeneous X coordinate"),
+            Parameter("Y", "script-int", "Homogeneous Y coordinate"),
+            Parameter("Z", "script-int", "Homogeneous Z coordinate"),
+            Parameter("u2", "script-int", "The square of the nonzero scale"),
+            Parameter("u3", "script-int", "The cube of the nonzero scale"),
+        ), "The caller provides a positive modulus and consistent scale factors. A zero modulus aborts."),
+    )),
     "std/hash-chain": Library(ROOT / "stdlib/hash-chain.fth", tuple(
         script_fragment(name, (Parameter("data", "bytes", "Initial byte string"),), takes=("script", "cell"),
                         build_parameters=(Parameter("count", "cell", count),),
@@ -188,6 +203,14 @@ LIBRARIES = {
                         failure="Pass a 32-byte element."),
         script_fragment("script-uint256be", (Parameter("value", "bytes", "Exactly 32 bytes"),),
                         failure="Pass a 32-byte element."),
+        script_fragment("script-reverse32-fields", (Parameter("fields", "bytes", "Concatenated 32-byte fields"),),
+                        takes=("script", "cell"), build_parameters=(Parameter("field-count", "cell", "Positive field count"),),
+                        failure="The input must contain exactly the selected number of 32-byte fields."),
+        script_fragment("script-uint256be-compact", (Parameter("value", "bytes", "Exactly 32 bytes"),),
+                        failure="Pass a 32-byte element."),
+        script_fragment("script-uint256be-fields", (Parameter("fields", "bytes", "Concatenated 32-byte fields"),),
+                        takes=("script", "cell"), build_parameters=(Parameter("field-count", "cell", "Positive field count"),),
+                        failure="The input must contain exactly the selected number of 32-byte fields."),
     ), WALLET_BACKEND),
     "std/secp256k1": Library(ROOT / "stdlib/secp256k1.fth", (
         script_fragment("secp256k1-field"),
@@ -215,6 +238,18 @@ LIBRARIES = {
         script_fragment("secp256k1-double", (
             Parameter("point", "projective-point", "Three homogeneous ScriptNum coordinates"),
         ), failure="The caller supplies a valid point and the field prime at the bottom of the main stack."),
+        script_fragment("secp256k1-double-with-field", (
+            Parameter("point", "projective-point", "Three homogeneous ScriptNum coordinates"),
+        ), takes=("script", "cell"), failure="Supply a valid point and the secp256k1 field prime at the selected slot.",
+                        build_parameters=SECP256K1_DOUBLING_PLACEMENT),
+        script_fragment("secp256k1-double-pair", (
+            Parameter("point", "projective-point", "Three reduced homogeneous ScriptNum coordinates"),
+        ), failure="Supply a valid point with coordinate magnitudes below the field prime at the bottom of the main stack."),
+        script_fragment("secp256k1-double-pair-with-field", (
+            Parameter("point", "projective-point", "Three reduced homogeneous ScriptNum coordinates"),
+        ), takes=("script", "cell"), failure="Supply a valid point with coordinate magnitudes below the field prime. "
+                                "Place the secp256k1 field prime at the selected slot.",
+                        build_parameters=SECP256K1_DOUBLING_PLACEMENT),
         script_fragment("secp256k1-scale-affine-pair", (
             Parameter("left", "affine-point", "Two secp256k1 coordinates"),
             Parameter("right", "affine-point", "Two secp256k1 coordinates"),
@@ -238,6 +273,7 @@ LIBRARIES = {
         ), takes=("script", "cell"),
                         failure="Supply a valid point on the scaled curve. Field placement 0 uses stack bottom and 1 uses the slot below the point."),
     ), WALLET_BACKEND),
+    "std/secp256k1-window": Library(ROOT / "stdlib/secp256k1-window.fth", backend=WALLET_BACKEND),
     "std/bip340": Library(ROOT / "stdlib/bip340.fth", (
         script_fragment("bip340-verify", (
             Parameter("message", "bytes", "BIP340 message of any supported length"),
