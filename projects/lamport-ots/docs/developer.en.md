@@ -12,7 +12,7 @@ The classic 16,384-byte public key contains 256 ordered pairs of SHA-256 commitm
 
 ## Forth optimization
 
-`forth_committed_locking_script(public_key)` compiles a typed Forth reconstruction fragment. The lock uses a byte mask to select the ordering of each public-key pair. It accepts the same proof layout and transaction modes as the original committed lock. Use SDK profile `committed-key-forth` to reproduce the candidate independently of the default full-key profile. [Stack invariant and byte breakdown](optimization.md) · [Forth source](../reference/committed-verifier.fth)
+`forth_committed_locking_script(public_key)` compiles a typed Forth reconstruction fragment. The lock uses a byte mask to select the ordering of each public-key pair. It accepts the same proof layout and transaction modes as the original committed lock. Use SDK profile `committed-key-forth` to reproduce the candidate independently of the default full-key profile. [Stack invariant and byte breakdown](optimization.md) · [Forth source](../forth/committed-verifier.fth)
 
 `compact_forth_committed_locking_script(public_key)` uses the same reconstruction fragment and compacts the fixed-r binding to reach 6,830 bytes. Select `committed-key-forth-compact` to create that experimental output. [Binding byte breakdown](optimization.md#compact-transaction-binding)
 

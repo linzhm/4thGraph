@@ -3,6 +3,9 @@ import json
 
 from tx_engine import Script, Tx, TxIn, TxOut, Wallet, hash160
 
+from fourthgraph.bsv.native_payments import p2pk_lock, p2pkh_lock
+from fourthgraph.bsv.transaction import blob
+
 OWNER = Wallet.from_int("BSV_Testnet", 1)
 OTHER = Wallet.from_int("BSV_Testnet", 2)
 OWNER_PUB = bytes.fromhex(OWNER.get_public_key_as_hexstr())
@@ -17,6 +20,10 @@ TEMPLATES = {
         f"0x{OWNER_PUB.hex()} OP_CHECKSIG",
         "210279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798ac",
     ),
+}
+COMPILED_LOCKS = {
+    "p2pk": p2pk_lock(OWNER_PUB),
+    "p2pkh": p2pkh_lock(bytes(hash160(OWNER_PUB))),
 }
 
 
@@ -41,7 +48,7 @@ def fixture(template, lock, signer, presented_key):
 def main():
     cases = []
     for name, (lock_asm, expected_hex) in TEMPLATES.items():
-        lock = Script.parse_string(lock_asm)
+        lock = Script.parse(blob(COMPILED_LOCKS[name]))
         lock_hex = bytes(lock.raw_serialize()).hex()
         if lock_hex != expected_hex:
             raise AssertionError(f"{name}: unexpected locking script hex {lock_hex}")

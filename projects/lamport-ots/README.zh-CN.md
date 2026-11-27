@@ -41,6 +41,8 @@ PYTHONPATH=src:. python projects/lamport-ots/reference/measure.py --benchmark
 bash projects/lamport-ots/reference/verify.sh
 ```
 
+全公钥和公钥承诺付款均从 [payment-lock.fth](forth/payment-lock.fth) 构建。紧凑承诺布局还编译[公钥承诺验证器](forth/committed-verifier.fth)或[固定重量验证器](forth/subset-verifier.fth)。
+
 在仓库根目录使用独立的 Python 3.12 环境。向量密钥均为公开测试数据。
 
 ```sh

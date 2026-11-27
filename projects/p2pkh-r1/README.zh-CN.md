@@ -38,7 +38,7 @@ PYTHONPATH=src:.:projects/p2pkh-r1/reference bash tools/verify_node.sh --profile
 
 ### 钱包接入
 
-参考钱包用 **v0.2.0** 创建新输出，也能花费已有的 v0.1.0 输出。统一 SDK 支持 TypeScript、Rust、Go 和 Python。接入已有 P‑256 签名器时，核对设备的摘要接口和签名编码，并跨签名进程持久保存随机数重复检测记录。 [SDK 指南](docs/sdk.zh-CN.md) · [参考钱包](reference/README.md) · [钱包模板](versions/v0.2.0/layout.json)
+在 TypeScript、Rust、Go 或 Python 的统一 SDK 中选择 **v0.8.0**，即可使用当前编译模板。钱包默认模板为 v0.2.0。接入已有 P‑256 签名器时，核对设备的摘要接口和签名编码，并跨签名进程持久保存随机数重复检测记录。 [SDK 指南](docs/sdk.zh-CN.md) · [参考钱包](reference/README.md) · [v0.8.0 布局](versions/v0.8.0/layout.json)
 
 R1 在入金时创建完整付款锁，收款人可用一次花费付款。Deferred R1 用较小的入金锁，并在独立的交易中启用。 [Deferred 流程](../p2pkh-r1-deferred/README.zh-CN.md)
 

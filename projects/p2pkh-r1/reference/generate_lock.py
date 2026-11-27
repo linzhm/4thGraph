@@ -5,7 +5,7 @@ import json
 import re
 import sys
 
-from fixed_templates import TEMPLATE_VERSION, TEMPLATE_VERSIONS
+from fixed_templates import OPTIMIZED_TEMPLATE_VERSION, TEMPLATE_VERSION, TEMPLATE_VERSIONS
 from p2pkh_r1 import locking_script_from_owner_hash, public_key_hash160, recognize
 
 
@@ -32,7 +32,7 @@ def main():
     owner.add_argument("--owner-hash160", type=owner_from_hash, metavar="HEX")
     parser.add_argument("--format", choices=("manifest", "raw"), default="manifest")
     variant = parser.add_mutually_exclusive_group()
-    variant.add_argument("--version", dest="template_version", choices=TEMPLATE_VERSIONS,
+    variant.add_argument("--version", dest="template_version", choices=(*TEMPLATE_VERSIONS, OPTIMIZED_TEMPLATE_VERSION),
                          help=f"P2PKH-R1 template version (default: {TEMPLATE_VERSION})")
     variant.add_argument("--compiled-curve", dest="compiled_curve", action="store_true", default=None,
                          help=argparse.SUPPRESS)

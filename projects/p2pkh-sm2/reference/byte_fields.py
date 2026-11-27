@@ -8,7 +8,7 @@ from fourthgraph.bsv.evaluate import ScriptError, evaluate
 from fourthgraph.compiler.byte_layout import ByteLayoutBuilder, LITERAL, PACKED, REPEAT, SPLIT
 
 
-SOURCE = Path(__file__).with_name("byte-fields.fth")
+SOURCE = Path(__file__).resolve().parents[1] / "forth" / "byte-fields.fth"
 REVERSE_NAME = "sm2-reverse-fields-kernel"
 ZERO_NAME = "sm2-zero32-kernel"
 BYTE_KERNEL_NAMES = (REVERSE_NAME, ZERO_NAME)

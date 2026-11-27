@@ -96,7 +96,7 @@ PYTHONPATH=src:. python projects/p2pkh-sm2/reference/point_kernels.py --affine /
 cmp /tmp/sm2-affine-kernel.json projects/p2pkh-sm2/versions/v1.10.0/affine-kernel.json
 ```
 
-[Point formulas](point-formulas.fth) · [Kernel compiler](point_kernels.py)
+[Point formulas](../forth/point-formulas.fth) · [Kernel compiler](point_kernels.py)
 
 <a name="window-tuning"></a>
 
@@ -115,7 +115,18 @@ python projects/p2pkh-sm2/reference/point_kernels.py --carried /tmp/sm2-window-k
 cmp /tmp/sm2-window-kernels.json projects/p2pkh-sm2/versions/v1.11.0/window-kernels.json
 ```
 
-[Window formulas](point-window.fth) · [4thGraph skill](../../../skills/4thgraph/SKILL.md) · [Complete-transaction measurements](../versions/v1.11.0/measurements.json)
+[Window formulas](../forth/point-window.fth) · [4thGraph skill](../../../skills/4thgraph/SKILL.md) · [Complete-transaction measurements](../versions/v1.11.0/measurements.json)
+
+To rebuild the released window kernels using the Forth files from the current checkout, load the recorded compiler from an isolated directory.
+
+```sh
+compiler=projects/p2pkh-sm2/workspace/compiler-v1.11.0
+mkdir -p "$compiler"
+git archive 64624db src | tar -x -C "$compiler"
+PYTHONPATH="$compiler/src:." python projects/p2pkh-sm2/reference/point_kernels.py \
+  --carried "$compiler/window-kernels.json"
+cmp "$compiler/window-kernels.json" projects/p2pkh-sm2/versions/v1.11.0/window-kernels.json
+```
 
 <a name="public-table-tuning"></a>
 
@@ -152,7 +163,7 @@ cmp /tmp/sm2-byte-kernels.json projects/p2pkh-sm2/versions/v1.11.0/byte-kernels.
 cmp /tmp/sm2-byte-tuning.json projects/p2pkh-sm2/versions/v1.11.0/byte-tuning.json
 ```
 
-[Forth caller](byte-fields.fth) · [Compiler binding evidence](../versions/v1.11.0/byte-tuning.json) · [Byte layout library](../../../docs/optimization-paths.md#fixed-width-fields-and-repeating-constants)
+[Forth caller](../forth/byte-fields.fth) · [Compiler binding evidence](../versions/v1.11.0/byte-tuning.json) · [Byte layout library](../../../docs/optimization-paths.md#fixed-width-fields-and-repeating-constants)
 
 <a name="otda-constructor"></a>
 

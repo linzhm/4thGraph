@@ -13,7 +13,7 @@ A receive output commits to HASH160 of a 32-byte BIP340 x-only public key. Fill 
 | Assemble | The wallet verifies the signature and derives the two public ordinates before building the input script. Each ordinate is an unsigned big-endian field element. |
 | Verify | Script checks the owner hash and BIP340 relation. PUSHTX binds the verified message to the actual input through native `OP_CHECKSIG`. The node evaluates the spend against its previous output and chain context. |
 
-[Payment Forth](../reference/schnorr.fth) · [Wallet signing flow](../reference/payment.py) · [Authorization inputs](../../../src/fourthgraph/bsv/spend_authorization.py)
+[Payment Forth](../forth/schnorr.fth) · [Wallet signing flow](../reference/payment.py) · [Authorization inputs](../../../src/fourthgraph/bsv/spend_authorization.py)
 
 ## Unlock stack and sighash
 
@@ -25,7 +25,7 @@ Read from bottom to top after the input script runs.
 | Packed witness | Public x (32 B), even public y (32 B), BIP340 `r \|\| s` (64 B), and even nonce y (32 B), in that order. |
 | Mode selector | Script number 0 for ordinary binding or 1 for unpaired OTDA SINGLE companion binding. |
 
-The wallet defaults to BIP143 ALL (`0x41`). For ALL, NONE, and SINGLE, output coverage follows the chosen BSV sighash. ANYONECANPAY changes input coverage. The SDK requires trusted Chronicle activation context for OTDA and a same-index output for SINGLE. The lock also implements the separately tested unpaired OTDA SINGLE companion branch. That branch binds the Schnorr message to a BIP143 SINGLE preimage with zero `hashOutputs` and checks the corresponding native OTDA SINGLE condition. The standard wallet path requires a paired output. [Binding and sighash checks](../reference/schnorr.fth) · [Acceptance cases](../reference/test_schnorr.py)
+The wallet defaults to BIP143 ALL (`0x41`). For ALL, NONE, and SINGLE, output coverage follows the chosen BSV sighash. ANYONECANPAY changes input coverage. The SDK requires trusted Chronicle activation context for OTDA and a same-index output for SINGLE. The lock also implements the separately tested unpaired OTDA SINGLE companion branch. That branch binds the Schnorr message to a BIP143 SINGLE preimage with zero `hashOutputs` and checks the corresponding native OTDA SINGLE condition. The standard wallet path requires a paired output. [Binding and sighash checks](../forth/schnorr.fth) · [Acceptance cases](../reference/test_schnorr.py)
 
 ### OTDA preimage encoding
 

@@ -2,7 +2,7 @@
 
 [English](integration.md) · [SDK 首页](../README.zh-CN.md) · [接口参考](reference.zh-CN.md)
 
-[桥接配置](#bridge-setup) · [钱包流程](#wallet-workflow) · [外部签名器](#first-payment) · [逐输入签名](#prepared-payments)
+[桥接配置](#bridge-setup) · [BSV SDK 与 Wallet Toolbox](#bsv-toolbox) · [钱包流程](#wallet-workflow) · [外部签名器](#first-payment) · [逐输入签名](#prepared-payments)
 
 <a name="bridge-setup"></a>
 
@@ -22,6 +22,28 @@ TypeScript 绑定需要 Node.js 24 或更新版本，Go 模块需要 Go 1.23 或
 原生 P2PK/P2PKH、R1、Deferred R1、Schnorr 和 SM2 的 Python 环境按项目指南安装。Lamport、WOTS+ 和 ML-DSA 付款接口使用 Python 标准库。ML-DSA 的测试签名器还需要支持纯模式 ML-DSA-44 的 OpenSSL。节点和 chain-gang 复放需要另装测试依赖。复放依赖不同 chain-gang 提交的项目时，分别建 Python 环境。[各项目接入指南](../README.zh-CN.md#scheme-integrations)
 
 将 `python` 指向已安装项目依赖的解释器，将 `bridge` 指向检出目录里的 `sdk/python/bridge.py`。以下示例使用离线上手时创建的原生付款环境。
+
+<a name="bsv-toolbox"></a>
+
+## 接入 BSV SDK 和 Wallet Toolbox
+
+在仓库根目录运行互操作验证。需要 Python 3.11 以上、Node.js 22 以上、Go 1.27.4 或启用工具链自动选择的 Go，以及 Rust 1.88 以上。ML-DSA 的测试签名器需要 OpenSSL 3.5 或更新版本。命令安装依赖后，使用公开测试密钥和模拟入金输出复放付款。
+
+```sh
+bash sdk/verify.sh --interop
+bash sdk/verify.sh --interop p2pkh-r1 p2pkh-sm2
+```
+
+| 语言 | BSV SDK | Wallet Toolbox |
+| --- | --- | --- |
+| TypeScript | `@bsv/sdk` 4.1.2 | `@bsv/wallet-toolbox`、`@bsv/wallet-toolbox-client`、`@bsv/wallet-toolbox-mobile` 2.18.0 |
+| Go | `go-sdk` v1.7.8 | `go-wallet-toolbox` v0.192.1 |
+| Python | `bsv-sdk` 2.5.0 | `bsv-wallet-toolbox` 2.0.2 |
+| Rust | `bsv-rs` 0.8.13 | — |
+
+各 Wallet Toolbox 实现派生出相同的 BRC-29 P2PKH 锁定脚本。4thGraph 生成签名请求，签名回调使用收款方的派生密钥。各 BSV SDK 根据模拟入金输出验签。浏览器包和移动端包均在 Node.js 中验证。[BRC-29 付款示例](../interop/python/payment.py)
+
+验证读取当前检出中各钱包项目的 `versions/index.json`，覆盖 `current` 版本和已登记的 `next` 候选版。4thGraph 钱包 API 复放付款或 Deferred 启用，chain-gang 校验交易输入，四种 BSV SDK 对照交易原始字节、outpoint 和交易 ID。用 `bash tools/verify_node.sh --profile raised -- bash sdk/verify.sh --interop` 可加跑 BSV Node 复核。[项目复放](../interop/python/projects.py) · [验证脚本](../verify.sh)
 
 <a name="wallet-workflow"></a>
 

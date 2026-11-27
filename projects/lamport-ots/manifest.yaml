@@ -58,6 +58,7 @@ sections:
   reproduction:
     en:
       - '### Run'
+      - The full-key and commitment payment builds start from [payment-lock.fth](forth/payment-lock.fth). The compact commitment layouts also compile [the committed verifier](forth/committed-verifier.fth) or [the fixed-weight verifier](forth/subset-verifier.fth).
       - From the repository root, use an isolated Python 3.12 environment. The vectors use public test
         keys.
       - |-
@@ -77,6 +78,7 @@ sections:
         Chronicle OTDA ALL. All ten transactions entered the default-policy regtest node's mempool and
         were mined. [Dual-engine and funded results](docs/validation.md#fixed-weight-candidate-replay)
     zh-CN:
+      - 全公钥和公钥承诺付款均从 [payment-lock.fth](forth/payment-lock.fth) 构建。紧凑承诺布局还编译[公钥承诺验证器](forth/committed-verifier.fth)或[固定重量验证器](forth/subset-verifier.fth)。
       - 在仓库根目录使用独立的 Python 3.12 环境。向量密钥均为公开测试数据。
       - |-
         ```sh

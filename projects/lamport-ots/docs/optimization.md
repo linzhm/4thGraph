@@ -8,7 +8,7 @@
 
 The original committed verifier converts each digest byte to an unsigned ScriptNum, then uses `MOD 2` and `DIV 2` to walk its bits from least to most significant. For each bit it hashes the disclosed secret and concatenates that hash with the sibling hash in public-key order. Each group of eight pairs forms a 512-byte chunk. SHA-256 of the concatenated chunks must equal the 32-byte commitment in the lock.
 
-The Forth word keeps one raw digest byte and applies masks `01 02 04 08 10 20 40 80`. The predicate `(digest_byte AND mask) == mask` produces a canonical Script boolean, including for `80`, which would be negative zero if used directly as a Script truth value. Bit zero orders the selected hash first. Bit one swaps the hashes. The loop keeps appending 512-byte chunks and checks that both proof and digest are fully consumed. The per-byte stack invariant is `[accumulated_key, remaining_proof, remaining_digest]` from bottom to top. The word balances its own alternate-stack entries and preserves the selector, type and digest that the transaction-binding wrapper saved there. [Forth source](../reference/committed-verifier.fth) · [Shared PUSHTX code](../../../src/fourthgraph/bsv/pushtx.py)
+The Forth word keeps one raw digest byte and applies masks `01 02 04 08 10 20 40 80`. The predicate `(digest_byte AND mask) == mask` produces a canonical Script boolean, including for `80`, which would be negative zero if used directly as a Script truth value. Bit zero orders the selected hash first. Bit one swaps the hashes. The loop keeps appending 512-byte chunks and checks that both proof and digest are fully consumed. The per-byte stack invariant is `[accumulated_key, remaining_proof, remaining_digest]` from bottom to top. The word balances its own alternate-stack entries and preserves the selector, type and digest that the transaction-binding wrapper saved there. [Forth source](../forth/committed-verifier.fth) · [Shared PUSHTX code](../../../src/fourthgraph/bsv/pushtx.py)
 
 | Reconstruction component | Original bytes | Forth bytes |
 | --- | ---: | ---: |
@@ -46,7 +46,7 @@ For OTDA ALL 2×2, each input falls from 30,171 to 17,526 bytes. The transaction
 
 The candidate splits both 32-byte proof fields before hashing the selected secret. This leaves the selected hash above its sibling, so `OP_NOTIF` swaps them for a clear bit. The same byte mask produces a canonical boolean. One fewer `OP_SWAP` in each of 256 pair steps saves 256 bytes, and the compiled digest-byte fragment shrinks from 190 to 182 bytes.
 
-The sighash guard requires `(type & 0x5c) == 0x40` and a nonzero `(type & 3)`. This requires ForkID, clears the three reserved bits and admits the three base modes with Chronicle and ANYONECANPAY as independent options. The companion branch masks off ANYONECANPAY and requires `0x43`. The guard still requires zero high type bytes and applies the same preimage shape and scriptCode checks. These changes save another 49 bytes in the guard. [Forth source](../reference/committed-verifier.fth) · [Authorization code](../../../src/fourthgraph/bsv/pushtx.py)
+The sighash guard requires `(type & 0x5c) == 0x40` and a nonzero `(type & 3)`. This requires ForkID, clears the three reserved bits and admits the three base modes with Chronicle and ANYONECANPAY as independent options. The companion branch masks off ANYONECANPAY and requires `0x43`. The guard still requires zero high type bytes and applies the same preimage shape and scriptCode checks. These changes save another 49 bytes in the guard. [Forth source](../forth/committed-verifier.fth) · [Authorization code](../../../src/fourthgraph/bsv/pushtx.py)
 
 The SDK creates `committed-key-forth-v0.2.0` from a pinned 6,525-byte template with one 32-byte commitment field. Its 871-byte OTDA program is pinned alongside it. With reconstruction enabled, the wallet compares both single-template programs and a mixed program for old compact and v0.2.0 outputs, then selects the shortest usable encoding. In the 2×2 workloads this saves 610 bytes in BIP143 ALL and 724 bytes in reconstructed OTDA ALL relative to the previous compact profile. Direct exits to native P2PKH still carry a 16,384-byte proof per Lamport input. [Pinned layout](../versions/v0.2.0/layout.json) · [Versioned measurements](../versions/v0.2.0/measurements.json)
 
@@ -57,7 +57,7 @@ retains full SHA-256 hashes and independent 32-byte secrets. The typed Forth
 build emits a 7,310-byte proof verifier using a 512-byte mask table and a
 212-byte word repeated for each digest byte. The complete lock is 8,003 bytes.
 Its OTDA dictionary program is 1,420 bytes and can be used alongside older
-dictionaries by the shortest-encoding selection. [Protocol and security argument](subset.en.md) · [Forth source](../reference/subset-verifier.fth)
+dictionaries by the shortest-encoding selection. [Protocol and security argument](subset.en.md) · [Forth source](../forth/subset-verifier.fth)
 
 | Measurement (bytes) | v0.2.0 | Fixed-weight | Change |
 | --- | ---: | ---: | ---: |

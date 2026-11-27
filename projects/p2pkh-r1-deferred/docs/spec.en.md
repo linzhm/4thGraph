@@ -32,7 +32,7 @@ Activation input `i` creates the committed equal-value output at index `i`. Both
 | BIP143 SINGLE `0x43`, `0xc3` | Push the 158-byte preimage for **160 bytes** total | Serialized scriptCode `01 ac` |
 | Ten other modes | Push `typeByte || HASH256(selectedPreimage)`, then the 161-byte BIP143 SINGLE preimage for **197 bytes** total | Check the output under serialized scriptCode `04 ad 68 ab ac`, then check the selected digest with `01 ac`. The `ANYONECANPAY` bits must agree |
 
-Genesis supports the six BIP143 modes. Chronicle enables six additional OTDA modes on the same locking template. An output at the input index is mandatory in every mode, including OTDA SINGLE `0x63` and `0xe3`. [Activation vectors](../versions/v0.3.0/sighash-modes.json) · [Forth source](../reference/deferred-activation.fth)
+Genesis supports the six BIP143 modes. Chronicle enables six additional OTDA modes on the same locking template. An output at the input index is mandatory in every mode, including OTDA SINGLE `0x63` and `0xe3`. [Activation vectors](../versions/v0.3.0/sighash-modes.json) · [Forth source](../forth/deferred-activation.fth)
 
 Arrange each activation input at the index of its corresponding output, append fee inputs and change, and construct preimages after finalizing the transaction. Any party can fund and activate an output. The wallet tracks the confirmed activation outpoint. The recipient then uses the existing external R1 signer for the ordinary R1 spend. [P2PKH-R1 specification](../../p2pkh-r1/docs/spec.en.md)
 

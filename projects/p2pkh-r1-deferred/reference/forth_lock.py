@@ -10,7 +10,7 @@ from fourthgraph.compiler.lowering import CompiledWord, compile_word
 from fourthgraph.compiler.source import SourceCompiler
 from fourthgraph.compiler.wordsets import Literal, Primitive, script_word
 
-SOURCE = Path(__file__).with_name("deferred-activation.fth")
+SOURCE = Path(__file__).resolve().parents[1] / "forth" / "deferred-activation.fth"
 DEFERRED_TEMPLATE_VERSION = "0.3.0"
 RELEASE_OPTIMIZATION = "stack"
 RELEASE_TEMPLATE = SOURCE.parents[1] / "versions" / f"v{DEFERRED_TEMPLATE_VERSION}"

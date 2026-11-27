@@ -11,7 +11,7 @@ from payment import sign_payment
 from sdk_fixture import cases as sdk_cases
 from script import (
     BUFFERED_PROFILES, CACHE_PROFILES, COMPACT_PROFILES, COMPANION_CODE, FIRST_ADDRESS_NORMALIZED_PROFILES,
-    LAZY_MESSAGE_PROFILES, ORDINARY_CODE, _buffered_message_digits, _message_digits, _packed_step_suffixes,
+    LAZY_MESSAGE_PROFILES, ORDINARY_CODE, _buffered_message_digits, _latest_builder, _message_digits,
     locking_script,
 )
 from fourthgraph.bsv.evaluate import ScriptError, evaluate
@@ -103,7 +103,8 @@ class WotsTests(unittest.TestCase):
         delta = bytes(87) + b"\x01"
         expected = [step.to_bytes(4, "big") + bytes(4) for step in reversed(range(15))]
         expected.insert(3, delta)
-        self.assertEqual(evaluate(_packed_step_suffixes(push(delta))), (expected, []))
+        table = _latest_builder().emit('wots-v11-step-table', b'')
+        self.assertEqual(evaluate(table), (expected, []))
 
     def test_compact_authorization_for_every_flag_byte(self):
         _, _, spend = mode_fixture(0x41)

@@ -7,7 +7,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "src"))
 
 from fourthgraph.bsv.pushtx import authorization_checks, check_binding
 from fourthgraph.bsv.script import asm, number, push
+from fourthgraph.compiler.script_builder import ScriptBuilder, build_word
 from wots import CHAINS, KEY_BYTES, N, SIGNATURE_BYTES, W
+
+FORTH = Path(__file__).resolve().parents[1] / 'forth'
 
 # ScriptCode suffixes differ from Lamport; the extra OP_NOPs are domain tags.
 ORDINARY_CODE = asm('OP_NOP OP_ENDIF OP_CHECKSIG')
@@ -92,6 +95,8 @@ def _packed_message_digits():
 
 
 def _buffered_message_digits(profile):
+    if profile == 'compact-v11':
+        return _latest_builder().emit('wots-v11-digest-checksum', b'')
     if profile in LAZY_MESSAGE_PROFILES:
         return _packed_digest_checksum(fold_by_division=True) + asm('OP_TOALTSTACK')
     if profile == 'compact-v9':
@@ -99,50 +104,55 @@ def _buffered_message_digits(profile):
     return _message_digits(step_counts=True, byte_suffix=NIBBLE_SUFFIXES.get(profile, MESSAGE_BYTE_SUFFIX))
 
 
+@cache
+def _canonical_builder(profile):
+    authorize = authorization_checks(ORDINARY_CODE, COMPANION_CODE)
+    binding = check_binding(COMPANION_CODE)
+    return ScriptBuilder.from_file(FORTH / 'canonical.fth', vocabulary={
+        'wots-u32be': build_word('cell', 'bytes', lambda value: value.to_bytes(4, 'big')),
+        'wots-zero-bytes': build_word('cell', 'bytes', bytes),
+        'wots-cache?': build_word('', 'cell', lambda: -int(bool(profile))),
+        'wots-step-cache?': build_word('', 'cell', lambda: -int(profile == 'steps')),
+        'wots-authorize': build_word('script', 'script', lambda code: code + authorize),
+        'wots-bind': build_word('script', 'script', lambda code: code + binding),
+    })
+
+
+def _canonical_script(entry, key, profile):
+    if not isinstance(key, bytes) or len(key) != KEY_BYTES:
+        raise ValueError('WOTS+ public key must be 64 bytes')
+    return _canonical_builder(profile).emit(entry, b'', key[:N], key[N:])
+
+
 def _chain(index, *, cached_constants):
-    # Entry: PRF prefix, checksum, accumulated endpoints, remaining signature.
-    code = bytearray(number(N) + asm('OP_SPLIT OP_SWAP OP_4 OP_PICK'))
-    code += push(index.to_bytes(4, 'big')) + asm('OP_CAT OP_SWAP OP_FROMALTSTACK')
-    if cached_constants:
-        # Fixed depths include the PRF prefix, checksum, and current chain state.
-        mask_zero = asm('OP_10 OP_PICK')
-        mask_one = asm('OP_9 OP_PICK')
-        function_prefix = asm('OP_9 OP_PICK')
-    else:
-        mask_zero = asm('OP_0 OP_4 OP_NUM2BIN')
-        mask_one = push(b'\0\0\0\1')
-        function_prefix = asm('OP_0') + number(N) + asm('OP_NUM2BIN')
-    # Complete the hash chain from the signed digit through step 14. The last
-    # eight bytes of ADRS encode the step and keyAndMask in big-endian order.
-    for step in range(W - 1):
-        code += asm('OP_DUP') + number(step) + asm('OP_GREATERTHAN OP_NOTIF OP_SWAP')
-        # There are eleven live items above the step table at this access.
-        step_bytes = (number(11 + W - 2 - step) + asm('OP_PICK') if cached_constants == 'steps'
-                      else push(step.to_bytes(4, 'big')))
-        code += asm('OP_2 OP_PICK') + step_bytes + asm('OP_CAT OP_DUP')
-        code += mask_zero + asm('OP_CAT OP_SHA256 OP_SWAP')
-        code += mask_one + asm('OP_CAT OP_SHA256 OP_ROT OP_XOR OP_CAT')
-        code += function_prefix + asm('OP_SWAP OP_CAT OP_SHA256 OP_SWAP OP_ENDIF')
-    # Drop the digit and chain prefix, then append the new endpoint.
-    code += asm('OP_DROP OP_NIP OP_ROT OP_SWAP OP_CAT OP_SWAP')
-    return bytes(code)
+    return _canonical_builder(cached_constants).emit('wots-canonical-chain', b'', index)
 
 
 @cache
 def _compact_builder():
-    from fourthgraph.compiler.script_builder import ScriptBuilder
+    return ScriptBuilder.from_file(FORTH / 'compact.fth')
 
-    return ScriptBuilder.from_file(Path(__file__).with_name('compact.fth'))
+
+@cache
+def _latest_builder():
+    authorization = authorization_checks(ORDINARY_CODE, COMPANION_CODE, compact=True, compact_shape=True)
+    binding = check_binding(COMPANION_CODE, compact=True, reuse_r=True, compact_companion=True)
+    return ScriptBuilder.from_file(FORTH / 'payment-lock.fth', vocabulary={
+        'wots-v11-authorize': build_word('script', 'script', lambda code: code + authorization),
+        'wots-v11-bind': build_word('script', 'script', lambda code: code + binding),
+    })
 
 
 @cache
 def _compact_chain(profile='compact'):
+    if profile == 'compact-v11':
+        return _latest_builder().emit('wots-v11-chain', b'')
     if profile in ('compact-v9', 'compact-v10'):
         return _compact_chain('compact-v8')
 
     builder = _compact_builder()
     # Open gates from step 14 to 0. The hashes run in order as the gates close.
-    frame = 'compact-v8' if profile == 'compact-v11' else profile
+    frame = profile
     start = 'compact-v6-chain-start' if frame == 'compact-v7' else f'{frame}-chain-start'
     code = builder.emit(start, b'')
     hash_step = f'{frame}-hash-step'
@@ -161,10 +171,8 @@ def _compact_chain(profile='compact'):
         code += asm('OP_OVER OP_NOTIF')
         table_depth = 11
     for step in range(W - 1):
-        # The packed table pushes the highest step first, reversing the stack order.
-        position = W - 2 - step if profile == 'compact-v11' else step
-        depth = table_depth + W - 2 - position
-        if frame == 'compact-v8' and position < DELTA_TABLE_OFFSET:
+        depth = table_depth + W - 2 - step
+        if frame == 'compact-v8' and step < DELTA_TABLE_OFFSET:
             depth += 1
         code = builder.emit(hash_step, code, depth)
         code += asm('OP_ENDIF')
@@ -227,17 +235,6 @@ def _padded_one(zero_bytes):
     return _zero_bytes(zero_bytes) + asm('OP_1 OP_CAT')
 
 
-def _packed_step_suffixes(address_delta):
-    # For q = 2**64, floor(2**24 * q**15 / (q - 1)**2) packs 14 down to 1
-    # at byte three of successive little-endian lanes. The fractional tail
-    # is smaller than one, and NUM2BIN appends the zero lane for step zero.
-    size = (W - 1) * STEP_SUFFIX_BYTES
-    code = _padded_one(size + 3) + _padded_one(STEP_SUFFIX_BYTES)
-    code += asm('OP_1SUB OP_DUP OP_MUL OP_DIV') + number(size) + asm('OP_NUM2BIN')
-    code += STEP_TABLE_SPLIT * DELTA_TABLE_OFFSET + address_delta + asm('OP_SWAP')
-    return code + STEP_TABLE_SPLIT * (W - 2 - DELTA_TABLE_OFFSET)
-
-
 def _compact_constants(public_seed, *, synthesize, carry_prefixes=False):
     # The chain appends its one-byte index to the first 23 address bytes.
     prf_base = push((3).to_bytes(N, 'big') + public_seed + bytes(23))
@@ -264,12 +261,9 @@ def _buffered_verifier(public_seed, commitment, *, profile):
     # As a little-endian Script number, the increment has a one at the chain
     # index position. That byte remains below 128 through the last increment.
     delta = _padded_one(len(prf_base) - 1)
-    if profile == 'compact-v11':
-        prefix += _packed_step_suffixes(delta)
-    else:
-        prefix += _step_suffixes(synthesize=True, address_delta=delta if main_buffer else b'')
-        if not main_buffer:
-            prefix += delta
+    prefix += _step_suffixes(synthesize=True, address_delta=delta if main_buffer else b'')
+    if not main_buffer:
+        prefix += delta
     prefix += _zero_bytes(N)
     if compact:
         prefix += (_zero_bytes(N - 1) + asm('OP_3 OP_CAT') + push(public_seed)
@@ -293,6 +287,8 @@ def _buffered_verifier(public_seed, commitment, *, profile):
 
 
 def _compact_verifier(public_seed, commitment, *, profile):
+    if profile == 'compact-v11':
+        return _latest_builder().emit('wots-v11-verify', b'', public_seed, commitment)
     if profile in BUFFERED_PROFILES:
         return _buffered_verifier(public_seed, commitment, profile=profile)
     synthesize = profile in ('compact-v3', 'compact-v4', 'compact-v5')
@@ -328,36 +324,16 @@ def verifier(key, *, cached_constants=False):
     public_seed, commitment = key[:N], key[N:]
     if cached_constants in COMPACT_PROFILES:
         return _compact_verifier(public_seed, commitment, profile=cached_constants)
-    prf_prefix = (3).to_bytes(N, 'big') + public_seed + bytes(20)
     if type(cached_constants) is not bool and cached_constants != 'steps':
         raise ValueError('unknown WOTS+ constant cache profile')
-    if cached_constants:
-        code = bytearray()
-        if cached_constants == 'steps':
-            code += b''.join(push(step.to_bytes(4, 'big')) for step in range(W - 1))
-        code += push(bytes(N)) + push(bytes(4)) + push(b'\0\0\0\1')
-        depth = 5 + (W - 1 if cached_constants == 'steps' else 0)
-        code += push(prf_prefix) + (number(depth) + asm('OP_ROLL')) * 2
-    else:
-        code = bytearray(push(prf_prefix) + asm('OP_ROT OP_ROT'))
-    code += _message_digits() + asm('OP_SWAP OP_0 OP_SWAP')
-    for index in range(2 * N):
-        code += _chain(index, cached_constants=cached_constants)
-    code += _checksum_digits(2)
-    for index in range(2 * N, CHAINS):
-        code += _chain(index, cached_constants=cached_constants)
-    code += asm('OP_0 OP_EQUALVERIFY OP_SHA256') + push(commitment)
-    code += asm('OP_EQUALVERIFY OP_2DROP')
-    if cached_constants:
-        code += asm('OP_2DROP OP_DROP')
-        if cached_constants == 'steps':
-            code += asm('OP_2DROP') * ((W - 1) // 2) + asm('OP_DROP')
-    return bytes(code)
+    return _canonical_builder(cached_constants).emit('wots-canonical-verify', b'', public_seed, commitment)
 
 
 def locking_script(key, *, transaction=True, cached_constants=False):
     """Build a payment lock or a detached digest verifier for tests."""
     if not transaction:
+        if type(cached_constants) is bool or cached_constants == 'steps':
+            return _canonical_script('wots-canonical-detached', key, cached_constants)
         shape = asm('OP_DEPTH OP_2 OP_NUMEQUALVERIFY OP_OVER OP_SIZE')
         shape += number(N) + asm('OP_NUMEQUALVERIFY OP_DROP OP_SIZE')
         shape += number(SIGNATURE_BYTES) + asm('OP_NUMEQUALVERIFY OP_SWAP')
@@ -370,6 +346,12 @@ def locking_script(key, *, transaction=True, cached_constants=False):
 
 
 def _payment_script(key, *, cached_constants):
+    if type(cached_constants) is bool or cached_constants == 'steps':
+        return _canonical_script('wots-canonical-lock', key, cached_constants)
+    if cached_constants == 'compact-v11':
+        if not isinstance(key, bytes) or len(key) != KEY_BYTES:
+            raise ValueError('WOTS+ public key must be 64 bytes')
+        return _latest_builder().emit('wots-v11-lock', b'', key[:N], key[N:])
     compact = cached_constants in ('compact-v3', 'compact-v4', 'compact-v5', *BUFFERED_PROFILES)
     shape = authorization_checks(
         ORDINARY_CODE, COMPANION_CODE, compact=compact,

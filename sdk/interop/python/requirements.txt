@@ -1,0 +1,6 @@
+-r ../../../projects/p2pkh-r1/reference/requirements.txt
+-r ../../../projects/p2pkh-sm2/reference/requirements-sdk.txt
+coincurve==21.0.0
+ecdsa==0.19.1
+bsv-sdk==2.5.0
+bsv-wallet-toolbox==2.0.2

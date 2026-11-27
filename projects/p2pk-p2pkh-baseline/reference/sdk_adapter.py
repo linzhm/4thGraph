@@ -5,6 +5,7 @@ from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import ec, utils
 
+from fourthgraph.bsv.native_payments import p2pk_lock, p2pkh_lock
 from fourthgraph.bsv.pushtx import N
 from fourthgraph.bsv.script import push
 from fourthgraph.bsv.transaction import CHRONICLE, SIGHASH_SINGLE, hash256, preimage_forkid, preimage_otda
@@ -19,7 +20,7 @@ def _key(public_key):
 def lock(public_key, profile):
     _key(public_key)
     if profile == "p2pk":
-        return push(public_key) + b"\xac"
+        return p2pk_lock(public_key)
     if profile not in (None, "p2pkh"):
         raise ValueError("expected p2pk or p2pkh")
     owner = new("ripemd160", sha256(public_key).digest()).digest()
@@ -29,9 +30,7 @@ def lock(public_key, profile):
 def lock_owner(owner, profile=None):
     if profile not in (None, "p2pkh"):
         raise ValueError("P2PK requires the full public key")
-    if len(owner) != 20:
-        raise ValueError("expected a 20-byte owner hash")
-    return b"\x76\xa9" + push(owner) + b"\x88\xac"
+    return p2pkh_lock(owner)
 
 
 def recognize(script, public_key, *, include_public_key=False):

@@ -1,6 +1,7 @@
 # Working on 4thGraph
 
 - Keep script projects self-contained under `projects/<name>/`. Put reusable compiler code and Forth libraries under `src/fourthgraph/`, SDK clients under `sdk/`, and developer launchers under `tools/`.
+- Keep each project's compiler entry and Forth modules in standalone `.fth` files. Put project Forth modules under `forth/` when grouping them. Host code loads the files, supplies parameters and compiler primitives, and handles signing or replay.
 - Start new projects with Copier using the [project scaffold](projects/template/README.md). Edit `manifest.yaml` and regenerate both READMEs when the project introduction or selected release changes.
 - Update the affected documentation alongside changes to protocol behavior, public APIs, reproduction commands, or measured results. Use the [documentation templates and maintenance guide](docs/maintaining-docs.md) and run its checks for documentation changes.
 - Use the local `workspace/` directories for dependencies, builds and logs. Keep selected artifacts, fixtures and evidence with their version under `projects/<name>/versions/` and link to them from the project and showcase pages.

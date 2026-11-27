@@ -38,7 +38,7 @@ The selected compiler release and the wallet’s default template have separate 
 
 ### Wallet integration
 
-The reference wallet uses **v0.2.0** for new outputs and can spend existing v0.1.0 outputs. Use the unified SDK in TypeScript, Rust, Go, or Python. For an existing P-256 signer, confirm its digest interface and signature encoding, and persist nonce-reuse history across signing processes. [SDK guide](docs/sdk.en.md) · [Reference wallet](reference/README.md) · [Wallet template](versions/v0.2.0/layout.json)
+Select **v0.8.0** to use the current compiler template with the unified SDK in TypeScript, Rust, Go, or Python. The default wallet template is v0.2.0. For an existing P-256 signer, confirm its digest interface and signature encoding, and persist nonce-reuse history across signing processes. [SDK guide](docs/sdk.en.md) · [Reference wallet](reference/README.md) · [v0.8.0 layout](versions/v0.8.0/layout.json)
 
 R1 creates the full lock at funding so the recipient can pay in one spend. Deferred R1 uses a smaller deposit lock and a separate activation transaction. [Deferred workflow](../p2pkh-r1-deferred/README.md)
 

@@ -7,8 +7,9 @@ from fourthgraph.bsv.script import asm
 from fourthgraph.compiler.script_builder import ScriptBuilder
 
 
-SOURCE = Path(__file__).with_name("point-formulas.fth")
-CARRIED_SOURCE = Path(__file__).with_name("point-window.fth")
+FORTH = Path(__file__).resolve().parents[1] / "forth"
+SOURCE = FORTH / "point-formulas.fth"
+CARRIED_SOURCE = FORTH / "point-window.fth"
 CARRIED_KERNEL_FILE = Path(__file__).resolve().parents[1] / "versions/v1.11.0/window-kernels.json"
 KERNEL_NAMES = ("sm2-add-kernel", "sm2-double-kernel")
 WINDOW_KERNEL_NAME = "sm2-double-window-kernel"

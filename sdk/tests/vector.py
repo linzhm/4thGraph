@@ -14,7 +14,7 @@ from sdk.python.client import Client, WalletClient
 from fourthgraph.bsv.transaction import Input, Output, Transaction
 
 
-def generate(project, node):
+def generate(project, node, profiles=()):
     adapter = adapter_for(project)
     path = ROOT / "projects" / project / "reference/sdk_fixture.py"
     spec = spec_from_file_location("sdk_fixture", path)
@@ -25,6 +25,8 @@ def generate(project, node):
     for case in fixture.cases():
         key = case["public_key"]
         profile = case["profile"]
+        if profiles and profile not in profiles:
+            continue
         lock = adapter.lock(key, profile)
         if "bytes" in case:
             assert len(lock) == case["bytes"]

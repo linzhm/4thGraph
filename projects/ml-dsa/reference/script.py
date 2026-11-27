@@ -17,6 +17,7 @@ from signature_script import signature_decode_script
 from fourthgraph.bsv.pushtx import authorization_checks, check_binding
 from fourthgraph.bsv.script import asm, number, push
 from fourthgraph.compiler.lowering import compile_word
+from fourthgraph.compiler.script_builder import ScriptBuilder, build_word
 from fourthgraph.compiler.source import SourceCompiler
 from fourthgraph.compiler.wordsets import Primitive
 
@@ -25,7 +26,9 @@ from fourthgraph.compiler.wordsets import Primitive
 _TAG = asm("OP_NOP OP_NOP OP_NOP")
 ORDINARY_CODE = _TAG + asm("OP_ENDIF OP_CHECKSIG")
 COMPANION_CODE = _TAG + asm("OP_IF OP_CHECKSIGVERIFY OP_ELSE OP_CODESEPARATOR") + ORDINARY_CODE
-_PAYMENT_SOURCE = Path(__file__).with_name("payment-lock.fth")
+_FORTH = Path(__file__).resolve().parents[1] / "forth"
+_PAYMENT_SOURCE = _FORTH / "payment-lock.fth"
+_CHALLENGE_SOURCE = _FORTH / "challenge.fth"
 
 
 class _VerifierVersion(IntEnum):
@@ -67,12 +70,15 @@ def _hints_script(version):
 
 def verify_message_script(public_key, message_bytes, *, context=b"", legacy=False):
     """Compile a verifier that consumes the message and signature from the stack."""
-    version = _VerifierVersion.ORIGINAL if legacy else _VerifierVersion.V11
-    challenges = _reconstruct_challenge(public_key, message_bytes, context=context, version=version)
-    return challenges + asm("OP_EQUAL")
+    if legacy:
+        challenges = _reconstruct_challenge(
+            public_key, message_bytes, context=context, version=_VerifierVersion.ORIGINAL,
+        )
+        return challenges + asm("OP_EQUAL")
+    return _challenge_builder(public_key, message_bytes, context).emit("ml-dsa-verify-message", b"")
 
 
-def _reconstruct_challenge(public_key, message_bytes, *, context=b"", version):
+def _validate_challenge_inputs(public_key, message_bytes, context):
     if not isinstance(public_key, bytes) or len(public_key) != PUBLIC_KEY_BYTES:
         raise ValueError("ML-DSA-44 public key must be 1,312 bytes")
     if not isinstance(context, bytes) or len(context) > 255:
@@ -80,6 +86,34 @@ def _reconstruct_challenge(public_key, message_bytes, *, context=b"", version):
     if type(message_bytes) is not int or message_bytes < 0:
         raise ValueError("ML-DSA message length must be a nonnegative integer")
 
+
+def _challenge_builder(public_key, message_bytes, context=b""):
+    _validate_challenge_inputs(public_key, message_bytes, context)
+    shake = _shake_options(_VerifierVersion.V11)
+    prefix = shake_256(public_key).digest(64) + bytes((0, len(context))) + context
+    kernels = {
+        "ml-dsa-decode-signature": signature_decode_script(
+            compact=True, signed_response=True, sparse_hints=True, packed_response=True,
+        ),
+        "ml-dsa-sample-challenge": sample_in_ball_script(**shake, signed=True, search=True, find_by_borrow=True),
+        "ml-dsa-verify-equation": packed_response_equation_script(public_key, compact_packing=True),
+        "ml-dsa-apply-hints": _hints_script(_VerifierVersion.V11),
+        "ml-dsa-hash-mu": shake256_script(len(prefix) + message_bytes, 64, **shake),
+        "ml-dsa-hash-challenge": shake256_script(64 + 768, CHALLENGE_BYTES, **shake),
+    }
+    vocabulary = {
+        name: build_word("script", "script", lambda code, kernel=kernel: code + kernel)
+        for name, kernel in kernels.items()
+    }
+    vocabulary.update({
+        "ml-dsa-message-bytes": build_word("", "cell", lambda: message_bytes),
+        "ml-dsa-mu-prefix": build_word("", "bytes", lambda: prefix),
+    })
+    return ScriptBuilder.from_file(_CHALLENGE_SOURCE, vocabulary=vocabulary)
+
+
+def _reconstruct_challenge(public_key, message_bytes, *, context=b"", version):
+    _validate_challenge_inputs(public_key, message_bytes, context)
     shake = _shake_options(version)
     compact = shake["compact"]
     signed = version >= _VerifierVersion.V02
@@ -119,7 +153,7 @@ def locking_script(public_key, *, legacy=False):
     """Bind the Pure ML-DSA-44 verifier to the current transaction input."""
     if legacy:
         return _historical_lock(public_key, compact=False)
-    challenges = _reconstruct_challenge(public_key, DIGEST_BYTES, version=_VerifierVersion.V11)
+    challenges = _challenge_builder(public_key, DIGEST_BYTES).emit("ml-dsa-challenge", b"")
     return _compile_payment_lock(challenges, compact_binding=True)
 
 

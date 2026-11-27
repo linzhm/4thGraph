@@ -13,7 +13,7 @@
 | 组装 | 钱包核验签名，从公开数据推导两个纵坐标，再生成输入解锁脚本。纵坐标按无符号大端域元素编码。 |
 | 验证 | Script 校验所有者哈希和 BIP340 等式。PUSHTX 通过原生 `OP_CHECKSIG` 把已验证消息绑定到实际输入。节点根据上一输出和链上下文验证花费。 |
 
-[付款 Forth](../reference/schnorr.fth) · [钱包签名流程](../reference/payment.py) · [授权输入](../../../src/fourthgraph/bsv/spend_authorization.py)
+[付款 Forth](../forth/schnorr.fth) · [钱包签名流程](../reference/payment.py) · [授权输入](../../../src/fourthgraph/bsv/spend_authorization.py)
 
 <a name="unlock-stack-and-sighash"></a>
 
@@ -27,7 +27,7 @@
 | 打包见证 | 按顺序拼接公钥 x（32 B）、偶数公钥 y（32 B）、BIP340 `r \|\| s`（64 B）和偶数 nonce y（32 B）。 |
 | 模式选择值 | 普通路径为 Script 数值 0，缺少同索引输出的 OTDA SINGLE 配套路径为 1。 |
 
-钱包默认使用 BIP143 ALL（`0x41`）。ALL、NONE 和 SINGLE 的输出承诺按所选 BSV sighash 规则执行，ANYONECANPAY 改变输入承诺范围。SDK 请求 OTDA 时需要可信的 Chronicle 激活上下文，请求 SINGLE 时需要同索引输出。锁还实现了单独验收的无配对 OTDA SINGLE 路径。该路径将 Schnorr 消息绑定到 `hashOutputs` 为零的 BIP143 SINGLE 预映像，并检查对应的原生 OTDA SINGLE 条件。常规钱包调用要求提供同索引输出。[绑定与 sighash 检查](../reference/schnorr.fth) · [验收用例](../reference/test_schnorr.py)
+钱包默认使用 BIP143 ALL（`0x41`）。ALL、NONE 和 SINGLE 的输出承诺按所选 BSV sighash 规则执行，ANYONECANPAY 改变输入承诺范围。SDK 请求 OTDA 时需要可信的 Chronicle 激活上下文，请求 SINGLE 时需要同索引输出。锁还实现了单独验收的无配对 OTDA SINGLE 路径。该路径将 Schnorr 消息绑定到 `hashOutputs` 为零的 BIP143 SINGLE 预映像，并检查对应的原生 OTDA SINGLE 条件。常规钱包调用要求提供同索引输出。[绑定与 sighash 检查](../forth/schnorr.fth) · [验收用例](../reference/test_schnorr.py)
 
 ### OTDA 预映像编码
 

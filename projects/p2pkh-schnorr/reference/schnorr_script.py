@@ -7,7 +7,7 @@ from pathlib import Path
 
 from fourthgraph.bsv.otda_reconstruction import Reconstruction, push_repeated_bytes
 from fourthgraph.compiler.script_builder import ScriptBuilder
-SOURCE = Path(__file__).with_name("schnorr.fth")
+SOURCE = Path(__file__).resolve().parents[1] / "forth" / "schnorr.fth"
 VERSIONS_DIR = SOURCE.resolve().parents[1] / "versions"
 TEMPLATE_VERSION = "v0.17.0"
 TEMPLATE_DIRS = {
@@ -33,7 +33,7 @@ def authorization_codes():
 @cache
 def verifier():
     """Consume message, public x, public y, BIP340 signature, and nonce y."""
-    return ScriptBuilder("REQUIRE stdlib/bip340.fth\n").emit("bip340-verify", b"")
+    return _contract().emit("bip340-verify", b"")
 
 
 def compile_unlock(preimage, companion, public_x, public_y, signature, nonce_y):

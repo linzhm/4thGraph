@@ -114,6 +114,16 @@ class LayoutTests(unittest.TestCase):
                     earlier_files.update(f"versions/v{version}/{name}" for name in listed)
                     previous = version
 
+    def test_projects_keep_forth_sources_separate_from_reference_code(self):
+        for project in project_directories(ROOT):
+            with self.subTest(project=project.name):
+                self.assertTrue(
+                    tuple(project.glob("*.fth")) or tuple((project / "forth").glob("*.fth")),
+                    "expected a standalone Forth build source",
+                )
+                self.assertFalse(tuple((project / "reference").rglob("*.fth")),
+                                 "put Forth sources outside the host reference tree")
+
     def test_sdk_quickstarts_are_reachable(self):
         for filename, language in (("README.md", "en"), ("README.zh-CN.md", "zh-CN")):
             overview = (ROOT / filename).read_text(encoding="utf-8")

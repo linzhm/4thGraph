@@ -57,7 +57,7 @@ See the [protocol specification](docs/spec.en.md), [SDK guide](docs/sdk.en.md), 
 
 ### 4thGraph Forth comparison
 
-The typed Forth lock implements the full activation check, including the BIP143 SINGLE output commitment, the optional selected BIP143 or OTDA digest, fixed-key signature construction, and both native signature checks. The `baseline`, `safe`, and `stack` builds use the same source with 4thGraph 0.2.7 from checkout `3133da7`. [Forth source](reference/deferred-activation.fth) · [Compiler report](versions/v0.3.0/forth-results.json)
+The typed Forth lock implements the full activation check, including the BIP143 SINGLE output commitment, the optional selected BIP143 or OTDA digest, fixed-key signature construction, and both native signature checks. The `baseline`, `safe`, and `stack` builds use the same source with 4thGraph 0.2.7 from checkout `3133da7`. [Forth source](forth/deferred-activation.fth) · [Compiler report](versions/v0.3.0/forth-results.json)
 
 | Build | Funding lock | Funding transaction | Funding + BIP143 ALL activation | First activation input main / alt peak |
 | --- | ---: | ---: | ---: | ---: |

@@ -6,7 +6,7 @@ from fourthgraph.bsv.script import asm
 from fourthgraph.compiler.source import SourceCompiler, lower
 from fourthgraph.compiler.wordsets import Literal, Primitive
 
-SOURCE = Path(__file__).with_name("committed-verifier.fth")
+SOURCE = Path(__file__).resolve().parents[1] / "forth" / "committed-verifier.fth"
 
 
 def runtime_word(takes, gives, opcodes):

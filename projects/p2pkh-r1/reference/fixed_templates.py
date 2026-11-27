@@ -8,13 +8,17 @@ from pathlib import Path
 
 TEMPLATE_VERSION = "0.2.0"
 LEGACY_TEMPLATE_VERSION = "0.1.0"
+OPTIMIZED_TEMPLATE_VERSION = "0.8.0"
 TEMPLATE_VERSIONS = (TEMPLATE_VERSION, LEGACY_TEMPLATE_VERSION)
+COMPILED_TEMPLATE_VERSIONS = (None, TEMPLATE_VERSION, OPTIMIZED_TEMPLATE_VERSION)
 VERSIONS_DIRECTORY = Path(__file__).resolve().parents[1] / "versions"
 TEMPLATE_DIRECTORY = VERSIONS_DIRECTORY / f"v{LEGACY_TEMPLATE_VERSION}" / "compiled"
 RELEASE_DIRECTORY = VERSIONS_DIRECTORY / f"v{TEMPLATE_VERSION}"
 
 
-def _directory(scheduled):
+def _directory(scheduled, template_version):
+    if template_version is not None:
+        return VERSIONS_DIRECTORY / f"v{template_version}"
     return RELEASE_DIRECTORY if scheduled else TEMPLATE_DIRECTORY
 
 
@@ -45,8 +49,8 @@ class CompiledTemplate:
 
 
 @cache
-def _layout(*, scheduled=False):
-    return json.loads((_directory(scheduled) / "layout.json").read_text(encoding="ascii"))
+def _layout(directory):
+    return json.loads((directory / "layout.json").read_text(encoding="ascii"))
 
 
 def _load_bytes(directory, file, size, digest):
@@ -68,14 +72,17 @@ def read_compiled_template(directory, layout):
 
 
 @cache
-def compiled_template(*, scheduled=False):
-    return read_compiled_template(_directory(scheduled), _layout(scheduled=scheduled))
+def compiled_template(*, scheduled=False, template_version=None):
+    directory = _directory(scheduled, template_version)
+    return read_compiled_template(directory, _layout(directory))
 
 
 def compiled_owner(raw):
-    for scheduled in (False, True):
-        if len(raw) == _layout(scheduled=scheduled)["script_bytes"]:
-            return compiled_template(scheduled=scheduled).owner(raw)
+    for version in COMPILED_TEMPLATE_VERSIONS:
+        if len(raw) == _layout(_directory(False, version))["script_bytes"]:
+            owner = compiled_template(template_version=version).owner(raw)
+            if owner is not None:
+                return owner
     return None
 
 
@@ -86,12 +93,18 @@ def read_otda_reconstruction(directory, layout, *, shared_kernels=False):
 
 
 @cache
-def otda_reconstruction(*, shared_kernels=False, scheduled=False):
-    return read_otda_reconstruction(_directory(scheduled), _layout(scheduled=scheduled)["compressed_preimage"],
-                                    shared_kernels=shared_kernels and not scheduled)
+def otda_reconstruction(*, shared_kernels=False, scheduled=False, template_version=None):
+    directory = _directory(scheduled, template_version)
+    return read_otda_reconstruction(
+        directory, _layout(directory)["compressed_preimage"],
+        shared_kernels=shared_kernels and directory == TEMPLATE_DIRECTORY,
+    )
 
 
 @cache
-def otda_pattern(*, shared_kernels=False, scheduled=False):
-    version, program = otda_reconstruction(shared_kernels=shared_kernels, scheduled=scheduled)
-    return version, compiled_template(scheduled=scheduled).reconstruction(program)
+def otda_pattern(*, shared_kernels=False, scheduled=False, template_version=None):
+    version, program = otda_reconstruction(
+        shared_kernels=shared_kernels, scheduled=scheduled, template_version=template_version,
+    )
+    template = compiled_template(scheduled=scheduled, template_version=template_version)
+    return version, template.reconstruction(program)

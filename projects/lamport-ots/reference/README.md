@@ -8,9 +8,9 @@ Git revision. Negative cases require a known script rejection or the expected
 prevout error for a deliberately invalid outpoint.
 
 - `lamport.py`: random key generation, strict digest API, process-local one-time guard.
-- `subset.py`, `subset-verifier.fth`: fixed-weight key generation, signing, proof packing and typed Script reconstruction. Create a candidate lock with `subset_locking_script(public_key)`. [Encoding and security](../docs/subset.en.md)
+- `subset.py` and [`subset-verifier.fth`](../forth/subset-verifier.fth) implement fixed-weight key generation, signing, proof packing and typed Script reconstruction. Create a candidate lock with `subset_locking_script(public_key)`. [Encoding and security](../docs/subset.en.md)
 - `script.py`: full-key, legacy and committed-key lock factories with fixed-r PUSHTX binding. `compact_forth_committed_locking_script(public_key)` adds the 6,830-byte profile.
-- `committed-verifier.fth`, `forth_verifier.py`: typed reconstruction and lowering for `forth_committed_locking_script(public_key)`.
+- [`committed-verifier.fth`](../forth/committed-verifier.fth) and `forth_verifier.py` define typed reconstruction and lowering for `forth_committed_locking_script(public_key)`. [`payment-lock.fth`](../forth/payment-lock.fth) defines the full-key and committed-key payment locks.
 - `fixed_template.py`, `generate_template.py`: load and reproduce the v0.2.0 candidate files. Run `python projects/lamport-ots/reference/generate_template.py --check` from the repository root. [Pinned files](../versions/v0.2.0/manifest.json)
 - `payment.py`: prepared-input and single-input wallet APIs, external signer, fresh-change guard.
 - `fixtures.py`: public deterministic secrets for tests only, adversarial case matrix.
