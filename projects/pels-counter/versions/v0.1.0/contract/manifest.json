@@ -1,0 +1,74 @@
+{
+  "abi": "4thgraph.project-contract/1",
+  "anchors": [
+    {
+      "bytes": 1,
+      "offset": 6,
+      "op": "OP_CODESEPARATOR"
+    },
+    {
+      "bytes": 1,
+      "offset": 704,
+      "op": "OP_CHECKSIG"
+    }
+  ],
+  "fixture": "counter-successors",
+  "fixtures": {
+    "bytes": 1740,
+    "file": "cases.json",
+    "sha256": "3ad1d2fd4463ef0104bfc2308c131fec03fda02130fce4ca8a8ac868a51077da"
+  },
+  "forth_inputs": {
+    "dependencies": [
+      {
+        "interface_sha256": "8f13bbd5b91b3741175765fe94333e7ecdcae74ef43f7e5e15e83a5dae3a166d",
+        "name": "std/bsv",
+        "sha256": "92f4510c9d3e8e0371d9b41d08f9f7e639324c9795e6d0a1c3f9779e9179b404"
+      },
+      {
+        "interface_sha256": "235e20b899dfa23a22d4cff4b73f64b3e00b43d9b634c7221f38f5abbeb07167",
+        "name": "std/u32",
+        "sha256": "d1a493031110afbf5e2799ec8148f7a6020bd553afbe6e9b3fc8899ea836e93c"
+      }
+    ],
+    "source_sha256": "d17ee96774e4f700d2d80c520b8606020cd2e350e7695952e13c0af475779492"
+  },
+  "listing": {
+    "bytes": 9238,
+    "file": "template.asm",
+    "sha256": "7814d47f680d89f1d7d52fa365f42f1a514355dded169cb578b1acf2597024c7"
+  },
+  "module": {
+    "bytes": 3332384,
+    "file": "advance.wasm",
+    "sha256": "916ef3e293e74e7c10b565d4b795e39e5db214af20327536b8e8030126c57265"
+  },
+  "parameters": [
+    {
+      "length": 5,
+      "name": "counter_u32_le",
+      "offset": 1
+    }
+  ],
+  "paths": {
+    "advance": {
+      "mode": 65,
+      "script_code_offset": 7,
+      "signatures": 0
+    }
+  },
+  "profile": "pels-counter",
+  "role": "counter",
+  "script": {
+    "bytes": 705,
+    "file": "template.script",
+    "sha256": "8b757966d492adfadb003bd7e5d0766fa44261d5034da10fed85befd31367917"
+  },
+  "template_version": "0.1.0/full-preimage-fixed-fee",
+  "wasm_builder": "go version go1.25.14 linux/amd64",
+  "wasm_sources": {
+    "projects/pels-counter/contract/main.go": "372d68865425b658cc213655d15786422bd855db031ab95e90731b3daf0e400d",
+    "sdk/go/contractabi/contract.go": "3fe649576086002847da77ee1df9914171d93891a9f244f377dbbc2b2f37b23e",
+    "sdk/go/contractabi/reactor_wasip1.go": "20c4942389dfae85e9af320d481ed0a992ec5f3c7977905a2743a4eb2d3e5f2d"
+  }
+}

@@ -22,5 +22,5 @@ version = {attr = "fourthgraph.PROJECT_VERSION"}
 
 [tool.setuptools.package-data]
 "fourthgraph.stdlib" = ["*.fth", "wallet/*.fth"]
-"fourthgraph.workflow" = ["*.fs", "*.fth"]
+"fourthgraph.workflow" = ["*.fs", "*.fth", "*.mjs"]
 "fourthgraph.verification" = ["*.go"]
