@@ -1,5 +1,7 @@
 # Install 4thGraph
 
+[简体中文](install.zh-CN.md) · [Documentation index](README.md)
+
 Install the CLI for direct use from a terminal, CI, or a script. Install the Agent Skill in Codex to give it a workflow for authoring Forth, compiling, and checking the result.
 
 ## CLI
@@ -35,6 +37,8 @@ Use `--mode fused` to require a single post-deployment spend, or `--mode split` 
 ```
 
 Use the same checkout revision for the CLI and skill. Use `4thgraph-circuit` to emit Circom and `4thgraph-verify` to build a `relation:` declaration. Run funded replay with the checkout's [regtest workflow](toolchain.md#复放与编译), BSV Node, and the pinned chain-gang build. [Syntax book](language/syntax.md) · [Verification paths](language/stdlib.md#verification-paths)
+
+Run `4thgraph cpn --help` for staged work. Use `plan` to compare layouts and stage proof backends, `tune` to compare lowering profiles, and `replay` and `verify` to produce and check a funded-test receipt. [Runnable CPN guide](../skills/4thgraph/references/cpn.md)
 
 Install the Python package from the checkout when developing against the SDK or Python API:
 

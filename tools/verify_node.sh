@@ -20,6 +20,11 @@ if [[ ! $chronicle_height =~ ^[0-9]{1,10}$ ]] || (( 10#$chronicle_height < 2 || 
   exit 2
 fi
 readonly chronicle_height=$((10#$chronicle_height))
+min_mining_fee=${REGTEST_MIN_MINING_FEE:-0.000005}
+if [[ ! "$min_mining_fee" =~ ^[0-9]+(\.[0-9]{1,8})?$ ]]; then
+  printf '%s\n' 'REGTEST_MIN_MINING_FEE must be a nonnegative coin amount per kilobyte.' >&2
+  exit 2
+fi
 policy=()
 case "$profile" in
   script|raised)
@@ -60,7 +65,7 @@ node_bin="$node_dir/bitcoin-sv-1.2.3/bin/bitcoind"
 cli="$(dirname "$node_bin")/bitcoin-cli"
 data="$node_dir/regtest-data"
 mkdir "$data"
-"$node_bin" -regtest -server -rpcport="$rpc_port" -minminingtxfee=0.000005 -datadir="$data" \
+"$node_bin" -regtest -server -rpcport="$rpc_port" -minminingtxfee="$min_mining_fee" -datadir="$data" \
   -listen=0 -connect=0 -dnsseed=0 -discover=0 -genesisactivationheight=1 -chronicleactivationheight="$chronicle_height" \
   -excessiveblocksize=1000000000 -maxstackmemoryusageconsensus=100000000 \
   "${policy[@]}" -printtoconsole >"$node_dir/node.log" 2>&1 &

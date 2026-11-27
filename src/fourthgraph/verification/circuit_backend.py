@@ -1,6 +1,7 @@
 """Lower bounded Forth u32 arithmetic and route selection to Circom."""
 
 import argparse
+import json
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
@@ -64,7 +65,8 @@ class Wire:
 
 
 class CircuitBuilder:
-    def __init__(self):
+    def __init__(self, *, stage=False):
+        self.stage = stage
         self.lines = []
         self.count = 0
         self.steps = 0
@@ -116,7 +118,7 @@ class CircuitBuilder:
             return Wire(value.kind, value.expr, flag=f"(-{value.expr})")
         return value
 
-    def block(self, body, stack):
+    def block(self, body, stack, *, guarded=False):
         for node, token in expanded(body):
             self.steps += 1
             if self.steps > MAX_STEPS:
@@ -132,8 +134,8 @@ class CircuitBuilder:
                 if guard.flag is None and guard.literal is None:
                     raise token.error("circuit IF requires a literal or a u32< comparison")
                 yes, no = list(stack), list(stack)
-                self.block(node.yes, yes)
-                self.block(node.no, no)
+                self.block(node.yes, yes, guarded=True)
+                self.block(node.no, no, guarded=True)
                 if guard.literal is not None:
                     stack[:] = yes if guard.literal else no
                 else:
@@ -146,9 +148,14 @@ class CircuitBuilder:
             elif node is PRIMITIVES["u32<"]:
                 right, left = stack.pop(), stack.pop()
                 stack.append(self.less_u32(left, right))
+            elif self.stage and not guarded and getattr(node, "checked_bounds", None) and stack[-1].kind == "u32":
+                low, high = node.checked_bounds
+                value = stack[-1].expr
+                self.add(f"{self.bits(f'{value} + {U32} - {low}', 33)} === 1;")
+                self.add(f"{self.bits(f'{high} + {U32} - {value}', 33)} === 1;")
             else:
                 raise token.error(f"{token.text!r} is outside the bounded circuit word set")
-            if self.wires > MAX_WIRES:
+            if not self.stage and self.wires > MAX_WIRES:
                 raise token.error(f"generated circuit exceeds the {MAX_WIRES}-wire budget")
 
 
@@ -159,7 +166,8 @@ def select_circuit(frontend, entries=None):
     if frontend.relation:
         transition, route = frontend.relation
         if (frontend.workflow_input or frontend.stages or frontend.work or frontend.gate or frontend.join
-                or frontend.operator or frontend.independent or frontend.recovery):
+                or frontend.operator or frontend.independent or frontend.recovery
+                or frontend.stage_verification_declared or frontend.recursions):
             raise transition.error("relation: cannot be combined with transaction workflow declarations")
         declared = (transition.name, route.name)
         if names is not None and names != declared:
@@ -222,14 +230,56 @@ def emit_circuit(program, *, max_expansion=MAX_EXPANSION):
     return "\n".join(code).encode()
 
 
+def emit_stage_circuit(stage):
+    """Compile a typed workflow word with a canonical transaction-binding ABI."""
+    if stage.word.gives not in (("route",), ("u32",)):
+        raise stage.declaration.error("proof stage must return a u32 state or a route")
+    output = "route" if stage.word.gives == ("route",) else "next"
+    builder = CircuitBuilder(stage=True)
+    names = ["state", *(f"witness{i}" for i in range(len(stage.witnesses)))]
+    for name in names:
+        builder.bits(name, 32)
+    for name in ("bindLo", "bindHi"):
+        builder.bits(name, 128)
+    stack = [Wire("u32", name) for name in names]
+    builder.block(stage.word.body, stack)
+    result, = stack
+    builder.add(f"{output} <== {result.expr};")
+    public = ["state", "bindLo", "bindHi",
+              *(name for name, (_, private) in zip(names[1:], stage.witnesses, strict=True) if not private)]
+    template = "RouteStage" if output == "route" else "AdvanceStage"
+    return "\n".join([
+        BIT_DECOMPOSITION, f"template {template}() {{", f"    signal output {output};",
+        *(f"    signal input {name};" for name in (*names, "bindLo", "bindHi")),
+        *builder.lines, "}",
+        f"component main {{public [{', '.join(public)}]}} = {template}();", "",
+    ]).encode(), (output, *public)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("source", type=Path)
-    parser.add_argument("--entries", nargs=2, metavar=("TRANSITION", "ROUTE"), help="select two Forth words")
+    entry = parser.add_mutually_exclusive_group()
+    entry.add_argument("--entries", nargs=2, metavar=("TRANSITION", "ROUTE"), help="select two Forth words")
+    entry.add_argument("--stage", help="compile one stage with its spend-binding inputs")
+    entry.add_argument("--lineage", help="emit a typed statement for a recursive edge")
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     try:
-        code = compile_circuit(args.source.read_bytes(), entries=args.entries, source_path=args.source)
+        source = args.source.read_bytes()
+        if args.stage is not None or args.lineage is not None:
+            frontend = SourceCompiler(source.decode(), source_path=args.source)
+        if args.stage is not None:
+            stage = next((stage for stage in frontend.workflow().stages if stage.name == args.stage), None)
+            if stage is None:
+                raise CompileError(f"unknown proof stage {args.stage!r}")
+            code, _ = emit_stage_circuit(stage)
+        elif args.lineage is not None:
+            from fourthgraph.verification.lineage import lineage_statement
+
+            code = (json.dumps(lineage_statement(frontend, args.lineage), indent=2) + "\n").encode()
+        else:
+            code = compile_circuit(source, entries=args.entries, source_path=args.source)
         args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_bytes(code)
     except (OSError, ValueError) as error:

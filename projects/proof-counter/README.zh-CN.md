@@ -20,6 +20,8 @@
 
 [公开关系](verify-state.fth)导入同一份[计数规则](counter.fth)，供直接 Script 验证和 Circom 后端使用。[工作流示例](workflow.fth)把计数器用作一个交易阶段。
 
+[工作流规划器](../../docs/design/README.zh-CN.md#构建选择与复放)比较交易布局和各阶段后端。[私有见证示例](workflow-private.fth)要求末段使用零知识证明。
+
 ## 复现方法
 
 使用 Python 3.11 或更新版本，从仓库根目录运行版本命令。入金复放使用固定的 Chronicle 绑定和隔离节点。[Regtest 环境](../../docs/infrastructure.md)

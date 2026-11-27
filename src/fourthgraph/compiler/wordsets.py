@@ -6,6 +6,7 @@ from hashlib import new, sha1, sha256
 from operator import add, mul, sub
 import re
 
+from fourthgraph.bsv.transaction import Outpoint
 from fourthgraph.bsv.script import asm, number, push
 
 CELL_BITS = 64
@@ -232,7 +233,24 @@ def host_word(takes, gives, method, evidence):
                      lambda context, value: (getattr(context, method)(value),), evidence)
 
 
+def transaction_outpoint(_, tx, slot):
+    if not 0 <= slot < len(tx.outputs):
+        raise ValueError("invalid transaction output slot")
+    return (Outpoint(tx.txid_wire(), slot),)
+
+
+def transaction_prevout(_, tx, slot):
+    if not 0 <= slot < len(tx.inputs):
+        raise ValueError("invalid transaction input slot")
+    txin = tx.inputs[slot]
+    return (Outpoint(txin.txid, txin.vout),)
+
+
 HOST_WORDS = {
+    "tx-input-prevout": Primitive(("transaction", "cell"), ("outpoint",), None,
+                                  transaction_prevout, "actual transaction input"),
+    "tx-output-outpoint": Primitive(("transaction", "cell"), ("outpoint",), None,
+                                      transaction_outpoint, "finalized transaction output"),
     "bsv-lookup-utxo": host_word("outpoint", "utxo", "lookup", "live UTXO provider"),
     "bsv-sign": host_word("request", "bytes", "sign", "external signer and native CHECKSIG"),
     "bsv-submit": host_word("transaction", "bytes", "submit", "node transaction admission"),
@@ -279,6 +297,13 @@ DECLARATIONS = {
     "workflow-input:": "<value> u32 ;",
     "stage:": "<stage> <word> <input-value> <output-value> <signer-role> ;",
     "relation:": "<transition-word> <route-word> ;",
+    "place:": "<value> <type> <public|private> ;",
+    "witness:": "<stage> <name> u32 ;",
+    "private-witness:": "<stage> <name> u32 ;",
+    "policy:": "<stage> <allow-direct|require-proof|require-zk> ;",
+    "assignment-disclosure:": "<stage> allow ;",
+    "atomic:": "<first-stage> <second-stage> ;",
+    "recursive:": "<name> <edge-word> ;",
 }
 LEGACY_DECLARATIONS = {"independent-submit": "independent-submit:", "verify:": "relation:",
                        "bsv-effect:": "stack-effect comment after the definition name"}

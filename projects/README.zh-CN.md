@@ -7,7 +7,7 @@
 | 项目 | 构建与验证 |
 | --- | --- |
 | [PELS 计数器](pels-counter/README.zh-CN.md) | 编译状态转换并复放逐笔递增的合约 |
-| [交易工作流](workflow-examples/README.zh-CN.md) | 比较并行、汇合和串行的交易计划，包含 Gforth 示例 |
+| [CPN 工作流示例](workflow-examples/README.zh-CN.md) | 从 Forth 生成 CPN、比较交易计划并复放入金示例 |
 | [证明计数器](proof-counter/README.zh-CN.md) | 用 Script、Circom 或证明后端构建同一个公开状态转换 |
 | [BLS12-381 Groth16](groth16-bls12-381/README.zh-CN.md) | 编译模块化 Forth 验证器并回放入金花费 |
 | [BN254 Groth16](groth16-bn254/README.zh-CN.md) | 构建固定声明的 Forth 验证器并在 Chronicle 回放 |

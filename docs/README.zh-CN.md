@@ -51,7 +51,7 @@ flowchart LR
 
 递归证明面向**每一步都要验证状态来源、而历史又会不断增长**的应用。已有串行例子让后续花费携带前序交易字节并回查部署根，阶段越多，见证越长。递归方案从可信的初始状态或发行锚开始，由新证明验证前序证明和本次转换，再把前序证明认证的状态绑定到当前输入，并约束下一状态。这让验证者有机会用一份证明检查累积的历史关系，证明成本和链上验证开销仍需针对实际电路测量。交易是否入块、输出是否仍可花费，仍以节点验证的链状态为准。[当前串行验证](language/specification.md#交易声明) · [证明计数器](../projects/proof-counter/README.zh-CN.md)
 
-当前工具链已经支持有界状态关系的证明构建。**递归证明和跨阶段联合选择仍在研究。** 项目希望把交易切分和每阶段的验证后端一起搜索，在授权、数据可用性和隐私要求成立时，再比较证明体积、出证时间、整路交易成本和确认依赖。[路线图](toolchain.md#路线图)
+分阶段 CPN 规划器已能比较受支持的有界工作流布局，以及 Script、透明 R1CS 和 Groth16。通用递归与自动发现切点仍在路线图中。[工作流与验证统一设计](design/README.zh-CN.md) · [路线图](toolchain.md#路线图)
 
 <a name="build-and-measure"></a>
 
@@ -183,11 +183,12 @@ python3 -m fourthgraph.workflow.protocol experiment replay workspace/tuning/poin
 
 | 目标 | 文档 |
 | --- | --- |
-| 构建第一个合约 | [用 Agent 开始](../README.zh-CN.md#start-with-agent) · [安装 CLI 和 skill](install.md) · [可运行项目](../projects/README.zh-CN.md) |
+| 构建第一个合约 | [用 Agent 开始](../README.zh-CN.md#start-with-agent) · [安装 CLI 和 skill](install.zh-CN.md) · [可运行项目](../projects/README.zh-CN.md) |
 | 选择、验证和复跑优化候选 | [Agent 开发与调优循环](#agent-tuning-loop) |
 | 用 Forth 写 BSV 合约 | [SDL 规范、语法书和标准库](language/README.md) |
-| 编译并复放交易工作流 | [工具链手册](toolchain.md) · [Regtest 环境](infrastructure.md) · [Chronicle 回归测试](chronicle-regression.md) |
+| 编译并复放交易工作流 | [CPN 规划、调优与验证](../skills/4thgraph/references/cpn.zh-CN.md) · [工具链手册](toolchain.md) · [Regtest 环境](infrastructure.md) · [Chronicle 回归测试](chronicle-regression.md) |
 | 生成或验证证明 | [证明计数器](../projects/proof-counter/README.zh-CN.md) · [BLS12-381 Groth16](groth16-bls12-381.md) · [Winterfell SHA-256 STARK](../projects/stark-winterfell-sha256/README.zh-CN.md) |
+| 了解交易断言及逐迁移验证 | [工作流与验证统一设计](design/README.zh-CN.md) |
 | 接入钱包和签名器 | [钱包 SDK](../sdk/README.zh-CN.md) |
 | 查阅或复现实测结果 | [项目成果](../showcase/README.md) · [完整交易基准](benchmark.zh-CN.md) |
 | 查找源码、夹具和工作区 | [仓库目录](repository-layout.md) |

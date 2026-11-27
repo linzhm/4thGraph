@@ -20,6 +20,8 @@ Compile and verify a public counter transition with direct Script or a proof bac
 
 [The public relation](verify-state.fth) imports shared [counter rules](counter.fth). Use the same rules for direct Script and Circom. The [Forth workflow](workflow.fth) uses the counter as a stage.
 
+The [workflow planner](../../docs/design/README.md#build-select-and-replay) compares layouts and per-stage backends. The [private-witness variant](workflow-private.fth) requires zero knowledge for its terminal stage.
+
 ## Reproduce the checks
 
 Run the release commands from the repository root with Python 3.11 or later. The funded replay uses the pinned Chronicle binding and an isolated node. [Regtest infrastructure](../../docs/infrastructure.md)

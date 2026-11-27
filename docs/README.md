@@ -51,7 +51,7 @@ If the contract declares a timeout refund, the ordinary path and the refund can 
 
 Recursive proofs address applications that must **authenticate the origin of each new state as its history grows**. The existing serial example carries prior transaction bytes and traces them back to the deployment root. Its witness grows with the number of stages. A recursive construction would start from a trusted initial state or issuance anchor. The next proof would verify the preceding proof and the current transition, with the authenticated previous state bound to the input being spent and the next state constrained. A verifier could check the accumulated history relation with one proof. Measuring proving cost and on-chain verification requires the actual circuit. Node-validated chain state still determines whether the transaction is included and whether the output remains spendable. [Current serial verification](language/specification.md#交易声明) · [Proof counter](../projects/proof-counter/README.md)
 
-The toolchain supports proof builds for bounded state relations today. **Recursive proofs and joint selection across stages remain research.** The goal is to search transaction boundaries and per-stage verification backends together, satisfy authorization, data availability, and privacy requirements, then compare proof size, proving time, total transaction bytes, and confirmation dependencies. [Roadmap](toolchain.md#路线图)
+The staged CPN planner compares layouts and Script, transparent R1CS, and Groth16 for supported bounded workflows. General recursion and automatic cut discovery remain roadmap items. [Workflow and verification design](design/README.md) · [Roadmap](toolchain.md#路线图)
 
 <a name="build-and-measure"></a>
 
@@ -186,8 +186,9 @@ All three plans pass the same 13 accepted and 13 rejected spends. The byte-ranke
 | Build a first contract | [Start with an Agent](../README.md#start-with-agent) · [Install the CLI and skill](install.md) · [Runnable projects](../projects/README.md) |
 | Compare and replay optimization candidates | [Agent development and tuning loop](#agent-tuning-loop) |
 | Write Forth for BSV | [SDL specification, syntax, and standard library](language/README.md) |
-| Compile and replay a transaction workflow | [Toolchain guide](toolchain.md) · [Regtest infrastructure](infrastructure.md) · [Chronicle regression](chronicle-regression.md) |
+| Compile and replay a transaction workflow | [CPN plan, tune and verify](../skills/4thgraph/references/cpn.md) · [Toolchain guide](toolchain.md) · [Regtest infrastructure](infrastructure.md) · [Chronicle regression](chronicle-regression.md) |
 | Generate or verify a proof | [Proof counter](../projects/proof-counter/README.md) · [BLS12-381 Groth16](groth16-bls12-381.md) · [Winterfell SHA-256 STARK](../projects/stark-winterfell-sha256/README.md) |
+| Understand transaction assertions and stage verification | [Workflow and verification design](design/README.md) |
 | Connect a wallet and signer | [Wallet SDK](../sdk/README.md) |
 | Review or reproduce measurements | [Showcase](../showcase/README.md) · [Transaction benchmarks](benchmark.md) |
 | Find source, fixtures, and workspaces | [Repository layout](repository-layout.md) |

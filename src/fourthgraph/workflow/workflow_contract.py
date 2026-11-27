@@ -1,6 +1,6 @@
 """Bind a typed workflow to fused, serial or atomic covenant spends."""
 
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from types import MappingProxyType
 
 from fourthgraph.compiler.source import (
@@ -107,10 +107,26 @@ def check_sighash_target(family, target):
 class WorkflowContracts:
     def __init__(self, workflow, keys, current, *, mode="auto", target=DEFAULT_TARGET, optimization=BASELINE,
                  available_authorizers=None, context_layout=None, objective="path-bytes", max_tx_bytes=None,
-                 sighash_family="bip143"):
+                 sighash_family="bip143", proof=None, first_proof=None):
         target = normalize_target(target)
         sighash_family = normalize_sighash_family(sighash_family)
         self.plan = plan_workflow(workflow, mode, available_authorizers=available_authorizers)
+        if workflow.recursive:
+            raise CompileError("a recursive declaration needs an executable verifier for its evidence")
+        self.proof, self.first_proof = proof, first_proof
+        if first_proof and (self.plan.mode != "atomic" or first_proof.stage is not workflow.stages[0]
+                            or first_proof.stage.witnesses):
+            raise CompileError("a proved first stage requires an atomic layout and a public state operand")
+        for stage in workflow.stages:
+            if any(item and stage is item.stage for item in (proof, first_proof)):
+                continue
+            if stage.policy != "allow-direct" or stage.witnesses:
+                raise CompileError(f"{stage.name}: the stage requires a compatible evidence backend")
+        if any(visibility.name == "private" for _, _, visibility in workflow.places):
+            raise CompileError("this workflow layout requires public state at each boundary")
+        if ((proof or first_proof) and (len(workflow.stages) != 2 or sighash_family != "bip143" or workflow.recovery)
+                or proof and proof.stage is not workflow.stages[-1]):
+            raise CompileError("proof stages require a two-stage BIP143 workflow without a recovery branch")
         self.current = input_value({workflow.input.name: current}, workflow.input.name)
         self.target, self.optimization = target, optimization
         self.versions, self.era = TARGETS[target]
@@ -140,7 +156,7 @@ class WorkflowContracts:
         self.terminals = tuple(Output(TERMINAL_VALUE, p2pk(self.keys[role])) for role in ("review", "settle"))
         self.words = {stage.name: compile_word(stage.word, optimization) for stage in workflow.stages}
         linked = {}
-        for template in self.plan.templates:
+        for template in (() if self.proof or self.first_proof else self.plan.templates):
             # The state and terminal constructors commit every output in the indicated order.
             outputs = ("state",) if template.outputs == ("state",) else ("terminal", "receipt")
             # These predicates read the outpoint and state, and construct output amounts directly.
@@ -177,8 +193,8 @@ class WorkflowContracts:
         templates = self.plan.templates
         names = templates[0].executes if templates[0].outputs == ("state",) else templates[0].executes[:-1]
         advance = number(self.current) + b"".join(self.words[name].script for name in names)
-        decide = terminal_check(self.words[workflow.stages[-1].name].script, self.terminals)
-        decide += self.output_check(templates[-1])
+        decide = self.terminal_code(templates[-1])
+        proof_fields = self.proof_field_count
         if self.plan.mode == "atomic":
             self.deployment_outputs = self.atomic_outputs(advance, decide)
             self.root = self.deployment_outputs[0]
@@ -196,7 +212,7 @@ class WorkflowContracts:
                 else:
                     opening = (open_ancestry(depth, offset) + asm("OP_ROT")
                                + self.authorize(self.keys[owner]))
-                state_code = (asm("OP_DEPTH") + number(depth + 4) + asm("OP_NUMEQUALVERIFY OP_ROT")
+                state_code = (self.check_depth(depth + 4 + proof_fields) + asm("OP_ROT")
                               + self.context_entry(template) + opening + asm("OP_BIN2NUM")
                               + validate_u32() + asm("OP_SWAP") + body + self.finish())
                 producer = templates[depth - 1]
@@ -213,12 +229,30 @@ class WorkflowContracts:
         else:
             body = root_txid(self.outpoint_offset(templates[0])) + decide
         auth = templates[0].authorizers
-        lock = (self.check_depth(len(auth) + 1) + self.context_entry(templates[0])
+        lock = (self.check_depth(len(auth) + 1 + (proof_fields if templates[0].outputs != ("state",) else 0))
+                + self.context_entry(templates[0])
                 + check_slot(ZERO_INDEX, self.outpoint_offset(templates[0]))
                 + b"".join(self.authorize(self.keys[role]) for role in auth)
                 + advance + body + self.finish())
         self.root = Output(ROOT_VALUE, self.with_recovery(lock, ROOT_VALUE))
         self.deployment_outputs = (self.root,)
+
+    @property
+    def proof_field_count(self):
+        return len(self.proof.proof_widths) + 1 if self.proof else 0
+
+    def terminal_code(self, template):
+        if self.proof is None:
+            return terminal_check(self.words[self.plan.program.stages[-1].name].script,
+                                  self.terminals) + self.output_check(template)
+        # [...proof, public packet, state, root]. Both the output assertion and
+        # the proof verifier consume the same public values.
+        packet = asm("OP_2 OP_PICK")
+        binding = packet + self.proof.binding_check() + asm("OP_DROP")
+        state = (packet + field(1, 4) + push(b"\0") + asm("OP_CAT OP_BIN2NUM OP_2 OP_PICK OP_NUMEQUALVERIFY"))
+        route = packet + field(0, 1) + asm("OP_BIN2NUM")
+        return (binding + state + route + terminal_outputs(self.terminals) + self.output_check(template)
+                + self.proof.script + asm("OP_VERIFY"))
 
     @staticmethod
     def check_depth(depth):
@@ -263,11 +297,23 @@ class WorkflowContracts:
         # The first input checks the state. The second checks the route for that state.
         # Each commits the same root and state in the receipt and the route in output zero.
         route = (asm("OP_DUP OP_DUP OP_BIN2NUM OP_EQUALVERIFY OP_DUP OP_0 OP_2 OP_WITHIN OP_VERIFY"))
-        first_lock = (self.check_depth(4) + begin(self.versions) + check_siblings(ZERO_INDEX) + authorize(self.keys[first.owner])
-                      + asm("OP_OVER") + validate_u32() + advance + asm("OP_NUMEQUALVERIFY")
+        first_depth = 4
+        first_check = asm("OP_OVER") + validate_u32() + advance + asm("OP_NUMEQUALVERIFY")
+        first_verify = b""
+        if self.first_proof:
+            proof = self.first_proof
+            first_depth += len(proof.proof_widths) + 1
+            packet = asm("OP_2 OP_PICK")
+            decode = push(b"\0") + asm("OP_CAT OP_BIN2NUM")
+            first_check = (packet + proof.binding_check() + asm("OP_DROP")
+                           + packet + field(4, 4) + decode + number(self.current) + asm("OP_NUMEQUALVERIFY")
+                           + packet + field(0, 4) + decode + asm("OP_2 OP_PICK OP_NUMEQUALVERIFY"))
+            first_verify = proof.script + asm("OP_VERIFY")
+        first_lock = (self.check_depth(first_depth) + begin(self.versions) + check_siblings(ZERO_INDEX)
+                      + authorize(self.keys[first.owner]) + first_check
                       + route + root_txid() + asm("OP_SWAP") + terminal_outputs(self.terminals)
-                      + asm("OP_HASH256") + check_field(OUTPUTS_HASH) + finish())
-        second_lock = (self.check_depth(3) + begin(self.versions) + check_siblings(SIBLING_INDEX) + authorize(self.keys[second.owner])
+                      + asm("OP_HASH256") + check_field(OUTPUTS_HASH) + first_verify + finish())
+        second_lock = (self.check_depth(3 + self.proof_field_count) + begin(self.versions) + check_siblings(SIBLING_INDEX) + authorize(self.keys[second.owner])
                        + validate_u32() + root_txid() + decide + finish())
         return tuple(Output(value, self.with_recovery(lock, value))
                      for value, lock in ((STATE_VALUE, first_lock), (ROOT_VALUE - STATE_VALUE, second_lock)))
@@ -313,7 +359,10 @@ class WorkflowContracts:
             ancestor = parent
         raise ValueError(f"unknown state output {reference.text()}")
 
-    def prepare(self, name, completed, *, version=None, sighash_family=None):
+    def estimate_draft(self, name, completed):
+        return self.prepare(name, completed, _estimate=True)
+
+    def prepare(self, name, completed, *, version=None, sighash_family=None, witnesses=None, _estimate=False):
         template = self.templates.get(name)
         if template is None:
             raise ValueError(f"unknown workflow step {name!r}")
@@ -329,7 +378,7 @@ class WorkflowContracts:
         utxo, root_id, value, ancestry = self.bound_state(completed, reference)
         previous = (utxo,)
         payload = (tuple(tx.serialize() for tx in ancestry),)
-        roles = None
+        roles, proof_vin, operands = None, None, ()
         words = {stage.name: stage.word for stage in self.plan.program.stages}
         if template.outputs == ("state",):
             for step in template.executes:
@@ -338,7 +387,15 @@ class WorkflowContracts:
         else:
             for step in template.executes[:-1]:
                 value, = evaluate(words[step], value)
-            route, = evaluate(words[template.executes[-1]], value)
+            if self.proof:
+                stage = self.proof.stage
+                names = tuple(name.name for name, _ in stage.witnesses)
+                provided = witnesses if witnesses is not None else {}
+                if not _estimate and set(provided) != set(names):
+                    raise ValueError(f"{stage.name}: supply exactly the declared witness operands")
+                operands = tuple(provided[name] for name in names) if not _estimate else ()
+                proof_vin = 1 if self.plan.mode == "atomic" else 0
+            route = 0 if _estimate and self.proof else evaluate(words[template.executes[-1]], value, *operands)[0]
             outputs = (self.terminals[route], self.receipt(root_id, value))
             if self.plan.mode == "atomic":
                 previous = (utxo, UTXO(utxo.parent, template.inputs[1].vout))
@@ -347,8 +404,18 @@ class WorkflowContracts:
         tx = Transaction(tuple(Input(item.outpoint.txid, item.vout) for item in previous), outputs, version=version)
         selector = False if self.plan.program.recovery else None
         context = self.contexts.get(name)
-        return Draft(template, tx, previous, payload, self.keys, selector, roles,
-                     context_encoder=context.pack if context else None, sighash=sighash)
+        draft = Draft(template, tx, previous, payload, self.keys, selector, roles,
+                      context_encoder=context.pack if context else None, sighash=sighash)
+        if proof_vin is None and self.first_proof is None:
+            return draft
+        rows = list(payload)
+        if self.first_proof:
+            proof = self.first_proof.placeholder() if _estimate else self.first_proof.prove(draft, 0, self.current, ())
+            rows[0] = (*proof, *rows[0])
+        if proof_vin is not None:
+            proof = self.proof.placeholder() if _estimate else self.proof.prove(draft, proof_vin, value, operands)
+            rows[proof_vin] = (*proof, *rows[proof_vin])
+        return replace(draft, payload=tuple(rows))
 
     def prepare_refund(self, reference, completed, *, version=None):
         recovery = self.plan.program.recovery
@@ -433,6 +500,8 @@ class WorkflowContracts:
             "word_builds": {name: word.describe() for name, word in self.words.items()},
             "estimated_cost": estimate_cost(self),
         }
+        if self.first_proof or self.proof:
+            spec["stage_evidence"] = [item.describe() for item in (self.first_proof, self.proof) if item]
         if self.dual_sighash:
             context = self.contexts[self.plan.templates[0].name]
             spec["sighash_families"] = {
