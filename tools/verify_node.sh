@@ -26,6 +26,11 @@ case "$profile" in
     policy=(-maxtxsizepolicy=100000000 -maxscriptsizepolicy=100000000
             -maxstdtxvalidationduration=1000 -maxnonstdtxvalidationduration=2000)
     ;;
+  long-script)
+    policy=(-maxtxsizepolicy=100000000 -maxscriptsizepolicy=100000000
+            -maxstdtxvalidationduration=15000 -maxnonstdtxvalidationduration=30000
+            -maxtxnvalidatorasynctasksrunduration=40000)
+    ;;
   default) ;;
   *) echo "Unknown regtest profile: $profile" >&2; exit 2 ;;
 esac
