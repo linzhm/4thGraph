@@ -15,6 +15,7 @@ if [[ -n $(git -C "$root" status --porcelain) ]]; then
     exit 2
 fi
 commit="$(git -C "$root" rev-parse HEAD)"
+export SOURCE_DATE_EPOCH="$(git -C "$root" show -s --format=%ct "$commit")"
 py="${PYTHON:-python3}"
 wheel_py="${WHEEL_PYTHON:-python3}"
 unset REGTEST_URL REGTEST_COOKIE
@@ -82,8 +83,13 @@ with ZipFile(wheel) as archive:
 def read(name):
     return json.loads(Path(name).read_bytes())
 
-for name in ("bezier-first", "bezier-second", "bezier-matrix", "bezier-linear-matrix", "source-axis", "point-add"):
-    if any(row["test"]["status"] != "passed" for row in read(name + ".json")["candidates"]):
+fixtures = {"bezier-first": (3, 625), "bezier-second": (2, 625), "bezier-matrix": (2, 625),
+            "bezier-linear-matrix": (2, 625), "source-axis": (2, 625), "point-add": (3, 13)}
+for name, (count, vectors) in fixtures.items():
+    rows = read(name + ".json")["candidates"]
+    if len(rows) != count or any(row["test"]["status"] != "passed"
+                                 or row["test"]["spend"]["accepted"] != vectors
+                                 or row["test"]["spend"]["rejected"] != vectors for row in rows):
         raise ValueError(f"fixture failed: {name}")
 matrix = {}
 for name in ("bezier", "bezier-linear"):
