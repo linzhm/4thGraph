@@ -220,6 +220,7 @@ def _optimized_joint_words(vocabulary, optimization, *, scaled):
     library = _joint_library(optimize=optimization != BASELINE)
     prefix = "secp256k1-scaled-" if scaled else "secp256k1-"
     words = vocabulary | {
+        "split-glv-with-order": numeric_fragment(library.emit("secp256k1-lambda-split-with-order", b""), 2, 2),
         "pack-windows": script_word("script-int script-int script-int script-int", "bytes",
                                     library.emit("secp-window-pack-windows", b""), _pack_windows),
         "pack-fixed-scalar-windows": script_word("script-int script-int script-int", "bytes",
@@ -282,10 +283,9 @@ def _variable_stack_table(frontend, words, optimization):
     return min((plain, schedule(True)), key=len) if optimization == DATAFLOW else plain
 
 
-def _stack_joint_script(frontend, words, points, optimization, *, scaled_output=False, mapped_input=False):
+def _stack_joint_script(frontend, words, points, optimization, *, preparation, scaled_output=False):
     """Compile a loop whose immutable prefix is 15 projective and 15 affine entries."""
     library = _joint_library()
-    preparation = "prepare-mapped-windows" if mapped_input else "prepare-stack-windows"
     prepare = compile_word(frontend.words[preparation], optimization).script
     # The common depth encoder targets this exact stack layout. The runtime variable
     # table is in ascending order, the fixed table descending, both without index 0.
@@ -311,17 +311,21 @@ def _stack_joint_script(frontend, words, points, optimization, *, scaled_output=
     return prepare + initial + step * 63 + cleanup + output
 
 
-def link_joint_word(vocabulary, optimization, *, strategy=GLV_REFERENCE, scaled_output=False, mapped_input=False):
+def link_joint_word(vocabulary, optimization, *, strategy=GLV_REFERENCE, scaled_output=False, mapped_input=False,
+                    order_input=False):
     """Link GLV for checked inputs and an explicitly declared coordinate model.
 
-    A mapped input includes the registered field p above Px, Py, s, k. A
-    scaled output returns p, X, Y, Z in the kernel's model.
+    The mapped word takes Px, Py, s, k, p. With an explicit group order its
+    inputs are Px, Py, p, s, k, n. Both p and n must be the registered values.
+    A scaled output returns p, X, Y, Z in the kernel's model.
     """
     name = "secp256k1-joint-window-2"
     if (scaled_output or mapped_input) and strategy != GLV_SCALED:
         raise ValueError("scaled coordinates require the scaled joint strategy")
     if mapped_input and not scaled_output:
         raise ValueError("mapped inputs use the model-preserving joint word")
+    if order_input and not mapped_input:
+        raise ValueError("an explicit group order requires the mapped joint word")
     if strategy == GLV_REFERENCE:
         frontend = SourceCompiler(joint_source(), vocabulary=vocabulary)
         kernel = compile_word(frontend.words[name], optimization).script
@@ -334,13 +338,20 @@ def link_joint_word(vocabulary, optimization, *, strategy=GLV_REFERENCE, scaled_
             kernel = compile_word(frontend.words["packed-joint"], optimization).script
         else:
             frontend = SourceCompiler(stack_joint_source(), vocabulary=words)
+            preparation = "prepare-mapped-windows" if mapped_input else "prepare-stack-windows"
+            if order_input:
+                preparation = "prepare-mapped-windows-with-order"
             kernel = _stack_joint_script(frontend, words, points, optimization, scaled_output=scaled_output,
-                                         mapped_input=mapped_input)
-    if mapped_input:
-        name = "secp256k1-joint-mapped-point"
+                                         preparation=preparation)
+    if order_input:
+        name, inputs = "secp256k1-joint-mapped-with-order", 6
+    elif mapped_input:
+        name, inputs = "secp256k1-joint-mapped-point", 5
     elif scaled_output:
-        name = "secp256k1-joint-scaled-point"
-    return {name: numeric_fragment(kernel, 5 if mapped_input else 4, 4)}
+        name, inputs = "secp256k1-joint-scaled-point", 4
+    else:
+        inputs = 4
+    return {name: numeric_fragment(kernel, inputs, 4)}
 
 
 JOINT_CHECKS = """

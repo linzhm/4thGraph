@@ -12,8 +12,8 @@ from fourthgraph.benchmark.validation import Node, chain_verdict
 from fourthgraph.bsv.evaluate import ScriptError, evaluate
 from fourthgraph.bsv.script import asm, decode_num, encode_num, push
 from fourthgraph.bsv.transaction import Input, Output, Transaction
-from fourthgraph.compiler.curve_lowering import compile_fixed_generator, compile_joint_generator_point
-from fourthgraph.compiler.curve_windows import CURVES, GLV_REFERENCE, JOINT_STRATEGIES, P256, SECP256K1, SM2, fixed_table, scalar_plans
+from fourthgraph.compiler.curve_lowering import compile_fixed_generator, compile_joint_generator_point, joint_vocabulary, link_joint_word
+from fourthgraph.compiler.curve_windows import CURVES, GLV_REFERENCE, GLV_SCALED, JOINT_STRATEGIES, P256, SECP256K1, SM2, fixed_table, scalar_plans
 from fourthgraph.compiler.lowering import DATAFLOW, compile_word
 from fourthgraph.compiler.modular_scale import lower_affine_pair_scale, lower_modular_scale, lower_scaled_residuals
 from fourthgraph.compiler.script_builder import ScriptBuilder
@@ -217,6 +217,21 @@ class CurveWindowsTests(unittest.TestCase):
             auto = compile_fixed_generator(curve)
             winner = min(self.fixed[curve.name].values(), key=lambda row: len(row.script))
             self.assertEqual((auto.selected, auto.script), (winner.selected, winner.script))
+
+    def test_mapped_joint_with_shared_order_matches_embedded_order(self):
+        library = ScriptBuilder("REQUIRE stdlib/secp256k1.fth")
+        vocabulary = joint_vocabulary(library)
+        options = dict(strategy=GLV_SCALED, scaled_output=True, mapped_input=True)
+        direct, = link_joint_word(vocabulary, DATAFLOW, **options).values()
+        shared, = link_joint_word(vocabulary, DATAFLOW, order_input=True, **options).values()
+        x, y = SECP256K1.normalized_a0().affine(SECP256K1.generator)
+        p, n = SECP256K1.field, SECP256K1.order
+        save = asm("17 OP_TOALTSTACK")
+        for s, k in ((0, 0), (0, n), (0, 1), (n - 1, 0), (1 << 255, n - 1), (7, n // 2)):
+            with self.subTest(s=s, k=k):
+                before = [b"caller", *map(encode_num, (x, y, s, k, p))]
+                after = [b"caller", *map(encode_num, (x, y, p, s, k, n))]
+                self.assertEqual(evaluate(save + shared.code, after), evaluate(save + direct.code, before))
 
     @unittest.skipUnless(which("openssl"), "requires OpenSSL for independent point multiplication")
     def test_joint_glv_edges_and_input_guards(self):

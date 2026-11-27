@@ -12,20 +12,28 @@ layout: second-ordinate ( p:script-int px:script-int py:script-int k2:script-int
     signed-p sign-ordinate second-ordinate sign-ordinate
 ;
 
-: pack-row-ordinates ( script-int script-int script-int script-int script-int --
+: pack-row-ordinates ( script-int script-int script-int script-int script-int script-int --
                        script-int script-int script-int script-int bytes )
-    split-glv retain-signs signed-row-ordinates restore-signs
+    retain-signs signed-row-ordinates restore-signs
     int-abs swap int-abs swap pack-fixed-scalar-windows
 ;
 
 : prepare-stack-windows ( script-int script-int script-int script-int --
                            script-int script-int script-int script-int bytes )
-    map-public pack-row-ordinates
+    map-public split-glv pack-row-ordinates
 ;
 
 : prepare-mapped-windows ( script-int script-int script-int script-int script-int --
                             script-int script-int script-int script-int bytes )
-    joint-variable pack-row-ordinates
+    joint-variable split-glv pack-row-ordinates
+;
+
+layout: joint-variable-with-order ( px:script-int py:script-int p:script-int s:script-int k:script-int n:script-int --
+                                    s p px py k n )
+
+: prepare-mapped-windows-with-order ( script-int script-int script-int script-int script-int script-int --
+                                       script-int script-int script-int script-int bytes )
+    joint-variable-with-order split-glv-with-order pack-row-ordinates
 ;
 
 ( Input order: p, Px, 2P, 3P, Qy, Py. The endomorphism leaves the nonzero

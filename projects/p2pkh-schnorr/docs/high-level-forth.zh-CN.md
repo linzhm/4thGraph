@@ -307,7 +307,7 @@ REGTEST_CHRONICLE_HEIGHT=5 PYTHONPATH=src:. bash tools/verify_node.sh --profile 
 | 直接切分字节 | 2,970 B | 22,855 B | 56,306 B |
 | 手工 v0.17.0 | 2,763 B | 22,435 B | 54,626 B |
 
-两份自动版使用同一 `dataflow` 配置及交易夹具，18,379 B 的窗口主体逐字节相同。每锁剩余 420 B，联合点乘调用前和准备阶段各占 207 B，窗口后占 6 B。打包测试覆盖四个分量的每个两位位置、全零、全一及固定的混合输入。双引擎复放覆盖验签、付款和八种构造器场景。[实测](../experiments/high-level/fixed-scalar-measurements.json) · [交易矩阵](../experiments/high-level/fixed-scalar-matrix.json)
+`06ad1aa` 上的两份自动版使用同一 `dataflow` 配置及交易夹具，18,379 B 的窗口主体逐字节相同。每锁剩余 420 B，联合点乘调用前和准备阶段各占 207 B，窗口后占 6 B。打包测试覆盖四个分量的每个两位位置、全零、全一及固定的混合输入。双引擎复放覆盖验签、付款和八种构造器场景。[实测](../experiments/high-level/fixed-scalar-measurements.json) · [交易矩阵](../experiments/high-level/fixed-scalar-matrix.json)
 
 ```sh
 PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
@@ -316,4 +316,27 @@ PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
 REGTEST_CHRONICLE_HEIGHT=5 PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
   "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/experiments/high-level/window_compare.py \
   --joint-lowerings --forth-tuning --matrix-only --output workspace/schnorr-high-level/fixed-scalar-matrix.json
+```
+
+<a name="sharing-the-group-order-with-the-glv-split"></a>
+
+## 挑战约减与 GLV 分解共用曲线阶
+
+调优版在两个仿射点映射后约减挑战值。它检查 `s < n`，计算 `k = n - (hash mod n)`，再把同一个已登记的曲线阶 `n` 交给现有的 GLV 分解词。挑战哈希仍使用原始编码。带曲线阶参数的联合点乘词接收已检查的标量及已登记的域模数和曲线阶。[验签 Forth](../experiments/high-level/window-verifier-tuned.fth) · [联合点乘 Forth](../../../src/fourthgraph/compiler/secp256k1-joint-stack.fth)
+
+| 构建 | 联合点乘调用前 | 联合点乘准备 | 付款锁 | 两进两出 OTDA ALL，使用构造器 |
+| --- | ---: | ---: | ---: | ---: |
+| `06ad1aa` 的 GLV 内置曲线阶 | 616 B | 2,970 B | 22,855 B | 56,306 B |
+| 共用曲线阶 | 624 B | 2,939 B | 22,832 B | 56,214 B |
+| 手工 v0.17.0 | 409 B | 2,763 B | 22,435 B | 54,626 B |
+
+传递曲线阶在联合点乘调用前增加 8 B，在点乘准备中省下 31 B。18,379 B 的窗口主体逐字节相同。每锁剩余 397 B，联合点乘调用前占 215 B，准备阶段占 176 B，窗口后占 6 B。两个映射点乘词在标量边界返回相同坐标。双引擎复放覆盖验签、付款和八种构造器场景。[实测](../experiments/high-level/shared-order-measurements.json) · [交易矩阵](../experiments/high-level/shared-order-matrix.json)
+
+```sh
+PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
+  "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/experiments/high-level/window_compare.py \
+  --joint-lowerings --forth-tuning --output workspace/schnorr-high-level/shared-order-measurements.json
+REGTEST_CHRONICLE_HEIGHT=5 PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
+  "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/experiments/high-level/window_compare.py \
+  --joint-lowerings --forth-tuning --matrix-only --output workspace/schnorr-high-level/shared-order-matrix.json
 ```
