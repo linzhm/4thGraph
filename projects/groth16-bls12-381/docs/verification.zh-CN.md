@@ -58,6 +58,8 @@ v0.13.0 比较 1、4、8、16 次 G1 倍点的 Z 坐标分批方案，每种分�
 
 将上面的构建和入金命令改用 `--release v0.14.0-projective-cofactor` 或 `--release v0.14.0-affine-witness`，即可选定见证编码及算术计划。目录和索引仍使用数字版本号。每种计划分别锁定 Genesis 和 Chronicle 的脚本摘要。[版本清单](../versions/v0.14.0/manifest.json)
 
+为每种布局和 Script 时代指定不同的 `--output` 目录。回放工具在覆盖文件前会校验目录中已有的发布元数据、锁和入金报告。
+
 `projective-cofactor` 用 G2 齐次射影公式计算配对线，并通过校验两个有效余因子原像来检查 A、C 的 G1 子群归属。它复用 v0.13.0 的模块化 Forth、带符号 MSM 窗口表、分段 Miller 归约和布尔发码。`affine-witness` 沿用 v0.13.0 的仿射算术计划，花费时提交带哈希承诺的 Γ、Δ 配对线表。[实测与入金回放](../versions/v0.14.0/measurements.json)
 
 | 版本标签 | Genesis 锁 | Chronicle 锁 | 单次见证 | 栈数据峰值 |

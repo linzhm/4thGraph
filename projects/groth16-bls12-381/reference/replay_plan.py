@@ -92,6 +92,65 @@ def replay_funded(plan, era, lock, witnesses, plan_digest):
     return report
 
 
+def read_output(path):
+    try:
+        document = json.loads(path.read_bytes())
+    except FileNotFoundError:
+        if not path.is_symlink():
+            return None
+        raise
+    if not isinstance(document, dict):
+        raise ValueError(f"{path} must contain a JSON object")
+    return document
+
+
+def check_output(output, release_info):
+    release_path = output / "release.json"
+    previous = read_output(release_path)
+    if previous is not None:
+        check(f"{release_path} release metadata", previous, release_info)
+
+    lock_path = output / "lock.json"
+    lock = read_output(lock_path)
+    if lock is not None:
+        check(f"{lock_path} artifact SHA-256", lock.get("artifact_sha256"), release_info["artifact_sha256"])
+
+    replay_path = output / "replay.json"
+    replay = read_output(replay_path)
+    if replay is not None:
+        # Older replays did not record a release ID. The two digests still bind their plan and artifact.
+        for field in ("release_id", "script_era"):
+            if field in replay:
+                check(f"{replay_path} {field}", replay[field], release_info[field])
+        check(f"{replay_path} plan SHA-256", replay.get("replay_plan_sha256"), release_info["replay_plan_sha256"])
+        artifact = replay.get("artifact")
+        check(f"{replay_path} artifact SHA-256", artifact.get("artifact_sha256") if isinstance(artifact, dict) else None,
+              release_info["artifact_sha256"])
+
+
+def write_output(output, release_info, artifact, witnesses, report):
+    output.mkdir(parents=True, exist_ok=True)
+    with TemporaryDirectory(dir=output) as temporary:
+        staged = Path(temporary)
+        metadata = staged / "release.json"
+        metadata.write_text(json.dumps(release_info, indent=2) + "\n", encoding="utf-8")
+        (staged / "lock.json").write_text(json.dumps(artifact, indent=2) + "\n", encoding="utf-8")
+        for name, witness in witnesses.items():
+            (staged / f"{name}-witness.hex").write_text(witness.hex() + "\n", encoding="utf-8")
+        if report is not None:
+            report.update(release_id=release_info["release_id"], script_era=release_info["script_era"])
+            (staged / "replay.json").write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+
+        # Publish complete metadata once, so concurrent runs cannot mix layouts or eras.
+        try:
+            os.link(metadata, output / metadata.name)
+        except FileExistsError:
+            check_output(output, release_info)
+        for path in staged.iterdir():
+            if path != metadata:
+                path.replace(output / path.name)
+
+
 def main():
     cli = argparse.ArgumentParser(description=__doc__)
     cli.add_argument("--release", default="0.9.0",
@@ -124,26 +183,20 @@ def main():
             check("pinned witness layout", layout, planned_layout)
         release_id = f"v{release}-{layout}"
         plan_digest = digest(raw_plan)
+        directory_label = release_id if "witness_layout" in manifest or separator else f"v{release}"
+        output = args.output or PROJECT / "workspace/build" / f"pinned-{directory_label}" / args.script_era
+        release_info = {
+            "version": release, "witness_layout": layout, "release_id": release_id, "script_era": args.script_era,
+            "replay_plan_sha256": plan_digest, "artifact_sha256": plan["script_eras"][args.script_era]["artifact_sha256"],
+        }
+        check_output(output, release_info)
         artifact, witnesses = build(plan, args.script_era)
         report = (replay_funded(plan, args.script_era, bytes.fromhex(artifact["script_hex"]), witnesses, plan_digest)
                   if args.funded else None)
-    except (OSError, ValueError, subprocess.CalledProcessError) as error:
+        write_output(output, release_info, artifact, witnesses, report)
+    except (KeyError, OSError, ValueError, subprocess.CalledProcessError) as error:
         cli.error(str(error))
 
-    directory_label = release_id if "witness_layout" in manifest or separator else f"v{release}"
-    output = args.output or PROJECT / "workspace/build" / f"pinned-{directory_label}" / args.script_era
-    output.mkdir(parents=True, exist_ok=True)
-    release_info = {
-        "version": release, "witness_layout": layout, "release_id": release_id, "script_era": args.script_era,
-        "replay_plan_sha256": plan_digest, "artifact_sha256": artifact["artifact_sha256"],
-    }
-    (output / "release.json").write_text(json.dumps(release_info, indent=2) + "\n", encoding="utf-8")
-    (output / "lock.json").write_text(json.dumps(artifact, indent=2) + "\n", encoding="utf-8")
-    for name, witness in witnesses.items():
-        (output / f"{name}-witness.hex").write_text(witness.hex() + "\n", encoding="utf-8")
-    if report is not None:
-        report["release_id"] = release_id
-        (output / "replay.json").write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
     print(output)
 
 

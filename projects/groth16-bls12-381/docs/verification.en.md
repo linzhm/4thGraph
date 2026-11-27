@@ -58,6 +58,8 @@ v0.13.0 compares G1 Z batches of 1, 4, 8 and 16 doublings with and without compa
 
 Use `--release v0.14.0-projective-cofactor` or `--release v0.14.0-affine-witness` in the build and funded commands above. The full release label pins the witness encoding and arithmetic plan. The numeric release number remains the version directory and catalog key. Genesis and Chronicle each have their own lock digest within the selected plan. [Release manifest](../versions/v0.14.0/manifest.json)
 
+Use a separate `--output` directory for each layout and Script era. The runner checks existing release metadata, lock and funded report before overwriting any files.
+
 `projective-cofactor` uses homogeneous G2 Miller lines and verifies G1 membership of A and C by checking two effective-cofactor preimages. It reuses the v0.13.0 modular Forth source, signed MSM tables, split Miller reductions and boolean lowering. `affine-witness` uses the v0.13.0 affine arithmetic plan and supplies the committed Γ and Δ line table at spend time. [Measurements and funded replay](../versions/v0.14.0/measurements.json)
 
 | Release label | Genesis lock | Chronicle lock | Witness per spend | Peak stack payload |
