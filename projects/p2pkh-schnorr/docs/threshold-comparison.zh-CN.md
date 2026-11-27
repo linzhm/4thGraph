@@ -19,7 +19,9 @@
 
 在两进两出的夹具中，chain-gang 中位耗时在 BIP143 下为 MuSig2 **6.93 ms**、原生多签 **0.39 ms**，在 OTDA 下分别为 **5.61 ms** 和 **0.39 ms**。BSV Node 本地 RPC 的中位耗时在 BIP143 下分别为 **21.22 ms** 和 **0.70 ms**，在 OTDA 下分别为 **36.34 ms** 和 **0.71 ms**。每组预热一次后测量 15 次，耗时包含输入准备和验证。Node 测量还包含本地 RPC 开销。
 
-OTDA ALL 的大头是当前模板把所承诺的完整输出字节放入每份预映像。只有退出、且新输出是普通 P2PKH 时，MuSig2 的两个 OTDA 解锁见证各为 336 字节。原生 `CHECKMULTISIG` 由节点直接从交易构造签名摘要，因此解锁见证只包含 dummy 项和两条签名。
+表中的 OTDA ALL 使用原样压栈，每份预映像包含所承诺的完整输出字节。[构造器实测](high-level-forth.zh-CN.md#otda-constructor)
+
+只有退出、且新输出是普通 P2PKH 时，MuSig2 的两个 OTDA 解锁见证各为 336 字节。原生 `CHECKMULTISIG` 由节点直接从交易构造签名摘要，因此解锁见证只包含 dummy 项和两条签名。
 
 ## 链下签名成本和验收
 

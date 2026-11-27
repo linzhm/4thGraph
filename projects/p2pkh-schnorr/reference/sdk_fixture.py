@@ -3,7 +3,8 @@
 from coincurve import PrivateKey
 
 from musig2_fixture import Policy, fixture_keys, fixture_sign
-from schnorr_script import TEMPLATE_VERSION
+from schnorr_script import TEMPLATE_VERSION, lock_for_owner
+from fourthgraph.bsv.transaction import Output
 
 
 def cases():
@@ -39,6 +40,15 @@ def cases():
         key = PrivateKey.from_int(scalar)
         yield dict(public_key=key.public_key_xonly.format(), signer=sign_with(key),
                    profile=version, sighash=sighash)
+
+    key = PrivateKey.from_int(3)
+    outputs = (Output(4_950, lock_for_owner(bytes(20))),
+               Output(4_950, lock_for_owner(bytes(range(20)), version="v0.16.0")))
+    case = dict(public_key=key.public_key_xonly.format(), signer=sign_with(key), outputs=outputs,
+                profile=TEMPLATE_VERSION, sighash=0x61)
+    yield dict(case, reconstructed=True)
+    yield dict(case, compress_otda=True, reconstructed=True)
+    yield dict(case, compress_otda=False, reconstructed=False)
 
     keys = fixture_keys("wallet-sdk/musig2")
     policy = Policy(tuple(key.public_key.format() for key in keys))

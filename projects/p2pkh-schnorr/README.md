@@ -24,7 +24,7 @@ The detached verifier covers BIP340 signer interoperability with empty and varia
 
 Two parties can use BIP327 MuSig2. The lock commits to the aggregate x-only key and verifies the final BIP340 signature through the same wallet interface. The fixtures cover signing-session interruptions and compare the same all-participants policy with native `CHECKMULTISIG`. [MuSig2 and native 2-of-2](docs/threshold-comparison.en.md)
 
-Each Schnorr output carries a 22,435-byte lock. Under OTDA ALL, every input witness also carries the serialized outputs, so the cost of adding an output grows with the number of inputs. The measured one-input exit to ordinary P2PKH is 416 bytes under BIP143 ALL and 348 bytes under OTDA ALL for both v0.16.0 and v0.17.0. The lock reduction saves bytes in the transaction that creates the Schnorr UTXO. [Recorded measurements](versions/v0.17.0/measurements.json)
+Each Schnorr output carries a 22,435-byte lock. With literal OTDA ALL, every input witness also carries the serialized outputs, so the cost of adding an output grows with the number of inputs. The measured one-input exit to ordinary P2PKH is 416 bytes under BIP143 ALL and 348 bytes under OTDA ALL for both v0.16.0 and v0.17.0. The lock reduction saves bytes in the transaction that creates the Schnorr UTXO. [Recorded measurements](versions/v0.17.0/measurements.json)
 
 ## Algorithm and execution
 
@@ -86,7 +86,7 @@ The owner field starts at byte offset 189. The release record includes paired me
 
 1. Create a receive lock with `createLock` using the x-only key or its HASH160. Before spending, recognize the authenticated funding output, check the outpoint and amount, and approve the destinations and fee. The SDK defaults to v0.17.0 and recognizes and spends all releases from v0.6.0 to v0.17.0.
 2. Use `signPayment` for a single-input payment or `signInput` for a prepared transaction. The signer callback takes the supplied 32 bytes as the BIP340 message and returns the standard 64-byte signature. The SDK verifies it with libsecp256k1 and derives the two public y coordinates.
-3. The SDK calls the Forth `schnorr-unlock` word with the approved preimage and public witness. Every spend pushes the complete literal preimage. The lock uses PUSHTX and native `OP_CHECKSIG` to bind the digest to the actual input after validating the BIP340 signature.
+3. The SDK provides the approved preimage and public witness. In eligible Chronicle version-2 spends it uses a constructor when that shortens the input script. Both encodings put the same complete preimage on the stack. The lock verifies BIP340 and binds the digest to the actual input with PUSHTX and native `OP_CHECKSIG`.
 
 [SDK quickstart](docs/sdk.en.md#quickstart) · [Payment protocol](docs/spec.en.md) · [Current-input binding](../../src/fourthgraph/bsv/pushtx.py)
 
@@ -98,7 +98,7 @@ Load `REQUIRE stdlib/bip340.fth` to reuse the detached verifier. The payment exa
 
 <a name="measured-sizes"></a>
 
-The v0.17.0 fixtures spend two Schnorr outputs and create two Schnorr outputs. BSV Node 1.2.3 and pinned chain-gang verify complete inputs with explicit prevouts. The development evaluator measures stack peaks for input zero. The main and alternate item peaks and combined payload peak are recorded independently. Transaction and payload sizes are in bytes. [Recorded measurements](versions/v0.17.0/measurements.json) · [Benchmark method](../../docs/benchmark.md)
+The v0.17.0 literal fixtures spend two Schnorr outputs and create two Schnorr outputs. BSV Node 1.2.3 and pinned chain-gang verify complete inputs with explicit prevouts. The development evaluator measures stack peaks for input zero. The main and alternate item peaks and combined payload peak are recorded independently. Transaction and payload sizes are in bytes. [Recorded measurements](versions/v0.17.0/measurements.json) · [Benchmark method](../../docs/benchmark.md)
 
 | Mode | Inputs × outputs | Previous locks | Unlocks | New locks | Total | Main / alt items | Stack payload |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
@@ -109,6 +109,8 @@ The v0.17.0 fixtures spend two Schnorr outputs and create two Schnorr outputs. B
 PYTHONPATH=src:. bash tools/verify_node.sh -- "$SCRIPT_LAB_SDK_PYTHON" -m fourthgraph.benchmark.run \
   --project p2pkh-schnorr --venvs-dir projects/p2pkh-schnorr/workspace --output projects/p2pkh-schnorr/workspace/build/benchmark
 ```
+
+For the same two-input, two-output OTDA ALL payment, the constructor reduces each unlock from 45,161 to 4,819 bytes and the transaction from 135,310 to 54,626 bytes. The reconstructed payment was mined on default-policy regtest. [Constructor comparison](docs/high-level-forth.en.md#otda-constructor)
 
 Under BSV Node 1.2.3's default regtest policy, funding, turnover, and exit entered the mempool and were mined in both modes.
 

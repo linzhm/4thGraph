@@ -29,7 +29,7 @@ const signedHex = wallet.signPayment({
 }, ({ payload }) => signer.signBip340(payload));
 ```
 
-For a prepared transaction, use `signInput` and supply the current input index and its authenticated prevout. For Chronicle OTDA, supply `chronicleActive` from the actual chain context. SINGLE requires a same-index output. The same methods are available in Python, Rust, and Go. [Shared API table](../../../sdk/docs/reference.md#calls-and-data)
+For a prepared transaction, use `signInput` and supply the current input index and its authenticated prevout. For Chronicle OTDA, supply `chronicleActive` from the actual chain context. SINGLE requires a same-index output. For version-2 OTDA ALL or paired SINGLE, the wallet uses a shorter preimage constructor where available. Set `compressOtda: false` (`compress_otda=False` in Python) to request a literal push. The same methods are available in Python, Rust, and Go. [Shared API table](../../../sdk/docs/reference.md#calls-and-data)
 
 ## Integrate MuSig2
 

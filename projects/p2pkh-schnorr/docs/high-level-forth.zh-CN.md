@@ -41,3 +41,25 @@ PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
 OTDA ALL 见证包含序列化输出，收款锁变短也会缩短每个输入的签名预映像。2×2 BIP143 夹具中，高阶构建第一个输入的主栈峰值从 62 项降到 44 项，两栈载荷峰值从 3,351 B 降到 1,236 B。栈峰值用开发求值器测量，完整输入由 BSV Node 和 chain-gang 使用对应上一输出独立验证。[栈与交易记录](../experiments/high-level/measurements.json)
 
 每种构建在每个引擎上交替测量 12 次独立验签。高阶基线、自动优化版和 v0.17.0 的 chain-gang 中位数分别是 16.381、11.627 和 3.308 ms。BSV Node 本机 RPC 中位数分别是 132.240、83.314 和 13.953 ms，包含上一输出锁的序列化和传输时间。[交替测量](../experiments/high-level/measurements.json)
+
+<a name="otda-constructor"></a>
+
+## OTDA 构造器
+
+用构造器复放相同的两进两出 OTDA ALL 交易。每个输入只携带一份识别到的模板片段，再按原顺序拼入各输出的金额和所有者哈希。模板内的重复字节用 Script 拼接展开。两种编码的签名器和锁脚本都拿到同一份完整预映像。[预映像构造](../../../src/fourthgraph/bsv/otda_reconstruction.py)
+
+| 构建 | 原样编码交易 | 重建交易 | 重建后每个输入的解锁脚本 |
+| --- | ---: | ---: | ---: |
+| v0.17.0 | 135,310 B | 54,626 B | 4,819 B |
+| 高阶基线 | 2,602,122 B | 880,172 B | 6,458 B |
+| 高阶自动优化 | 1,312,926 B | 446,920 B | 4,698 B |
+
+三种构建退出到普通 P2PKH 都用原样见证，整笔 348 B。钱包默认识别已冻结的发布模板。两份高阶构建在实验中接入同一个构造器。复现发布模板的入金和出块时，将项目首页入网复现命令的模板设为 `v0.17.0-reconstructed`。
+
+```sh
+PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
+  "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/experiments/high-level/compare_otda.py \
+  --output workspace/schnorr-high-level/otda-measurements.json
+```
+
+[对照实测](../experiments/high-level/otda-measurements.json)

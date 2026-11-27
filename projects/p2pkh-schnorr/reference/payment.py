@@ -3,9 +3,13 @@
 from coincurve import PublicKeyXOnly
 
 from bip340 import lift_x, to_bytes
-from schnorr_script import authorization_codes, compile_unlock, lock_for_owner, owner_hash, recognize
+from schnorr_script import (
+    TEMPLATE_DIRS, authorization_codes, compile_reconstructed_unlock, compile_unlock, lock_for_owner,
+    owner_hash, recognize, recognize_template, reconstruction_for_version,
+)
+from fourthgraph.bsv.otda_reconstruction import shorter_reconstruction
 from fourthgraph.bsv.spend_authorization import DEFAULT_SIGHASH, prepare_authorization
-from fourthgraph.bsv.transaction import CHRONICLE, SIGHASH_SINGLE, SIGHASH_TYPES, Input, Transaction, amount
+from fourthgraph.bsv.transaction import CHRONICLE, SIGHASH_ALL, SIGHASH_SINGLE, SIGHASH_TYPES, Input, Transaction, amount
 
 
 def lock_for_public_key(public_key, *, version=None):
@@ -14,7 +18,8 @@ def lock_for_public_key(public_key, *, version=None):
     return lock_for_owner(owner_hash(public_key), version=version)
 
 
-def sign_spend(tx, index, funding_raw, public_key, signer, *, sighash=DEFAULT_SIGHASH, chronicle_active=False):
+def sign_spend(tx, index, funding_raw, public_key, signer, *, sighash=DEFAULT_SIGHASH, chronicle_active=False,
+               compress_otda=None):
     """Request one signature over the approved BSV digest from signer(message32)."""
     if type(index) is not int or not 0 <= index < len(tx.inputs):
         raise ValueError("input index out of range")
@@ -22,18 +27,38 @@ def sign_spend(tx, index, funding_raw, public_key, signer, *, sighash=DEFAULT_SI
     funding = Transaction.parse(funding_raw)
     if current.txid != funding.txid_wire() or not 0 <= current.vout < len(funding.outputs):
         raise ValueError("select an unsigned input matching the funding outpoint")
-    return sign_previous(tx, index, funding.outputs[current.vout], public_key, signer,
-                         sighash=sighash, chronicle_active=chronicle_active)
+    return sign_previous(tx, index, funding.outputs[current.vout], public_key, signer, sighash=sighash,
+                         chronicle_active=chronicle_active, compress_otda=compress_otda)
 
 
-def sign_previous(tx, index, previous, public_key, signer, *, sighash=DEFAULT_SIGHASH, chronicle_active=False):
+def _otda_program(tx, index, auth):
+    if tx.version != 2 or auth.companion or not auth.requested_type & CHRONICLE:
+        return None
+    base = auth.requested_type & 31
+    if base == SIGHASH_ALL:
+        outputs = tx.outputs
+    elif base == SIGHASH_SINGLE:
+        outputs = (tx.outputs[index],)
+    else:
+        return None
+    versions = {match[0] for output in outputs if (match := recognize_template(output.script)) is not None}
+    patterns = tuple(reconstruction_for_version(version) for version in TEMPLATE_DIRS if version in versions)
+    return shorter_reconstruction(auth.preimage, outputs, patterns)
+
+
+def sign_previous(tx, index, previous, public_key, signer, *, sighash=DEFAULT_SIGHASH, chronicle_active=False,
+                  compress_otda=None):
     """Sign a prepared input after its outpoint and previous output are matched."""
     if type(index) is not int or not 0 <= index < len(tx.inputs) or tx.inputs[index].script:
         raise ValueError("select an unsigned input")
     if type(sighash) is not int or sighash not in SIGHASH_TYPES:
         raise ValueError("unsupported sighash")
+    if compress_otda is not None and type(compress_otda) is not bool:
+        raise ValueError("compress_otda must be a boolean")
     if sighash & CHRONICLE and chronicle_active is not True:
         raise ValueError("Chronicle authorization requires an active spend context")
+    if compress_otda is True and chronicle_active is not True:
+        raise ValueError("OTDA reconstruction requires an active spend context")
     if not tx.outputs:
         raise ValueError("payment requires outputs")
     if sighash & 31 == SIGHASH_SINGLE and index >= len(tx.outputs):
@@ -47,6 +72,7 @@ def sign_previous(tx, index, previous, public_key, signer, *, sighash=DEFAULT_SI
     ordinary_code, companion_code = authorization_codes()
     auth = prepare_authorization(tx, index, previous.value, sighash,
                                  ordinary_code=ordinary_code, companion_code=companion_code)
+    program = _otda_program(tx, index, auth) if compress_otda is not False else None
     message = auth.checked_digest()
     signature = signer(message)
     if (not isinstance(signature, bytes) or len(signature) != 64
@@ -54,8 +80,9 @@ def sign_previous(tx, index, previous, public_key, signer, *, sighash=DEFAULT_SI
         raise ValueError("invalid BIP340 signature from external signer")
 
     nonce_point = lift_x(signature[:32])
-    unlock = compile_unlock(auth.preimage, auth.companion, public_key, to_bytes(point[1]),
-                            signature, to_bytes(nonce_point[1]))
+    witness = public_key, to_bytes(point[1]), signature, to_bytes(nonce_point[1])
+    unlock = (compile_reconstructed_unlock(program, *witness) if program is not None
+              else compile_unlock(auth.preimage, auth.companion, *witness))
     return tx.with_script(index, unlock)
 
 

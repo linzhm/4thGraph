@@ -41,3 +41,25 @@ The optional passes save **214,866 B (49.6%)** in the payment lock. The point fo
 An OTDA ALL witness includes the serialized outputs, so smaller destination locks also shrink each signing preimage. For the 2×2 BIP143 fixture, the high-level build's input-zero stack peaks dropped from 62 to 44 main items and from 3,351 to 1,236 bytes of combined stack payload. The development evaluator measures those peaks. BSV Node and chain-gang independently verify the complete inputs using the supplied prevouts. [Stack and transaction records](../experiments/high-level/measurements.json)
 
 For 12 alternating detached verification runs per build and engine, chain-gang medians were 16.381 ms for the high-level baseline, 11.627 ms for the automatic build, and 3.308 ms for v0.17.0. BSV Node medians were 132.240, 83.314, and 13.953 ms. These host-specific RPC timings include serialization and transmission of the previous output lock. [Paired measurements](../experiments/high-level/measurements.json)
+
+<a name="otda-constructor"></a>
+
+## OTDA constructor
+
+The same 2×2 OTDA ALL transactions were replayed with output constructors. Each constructor stores the recognized template fragments once per input and assembles the original ordered outputs with their amounts and owner hashes. It expands repeated byte ranges in the template using Script byte concatenation. The signer and locking script see the same complete preimage in both encodings. [Preimage construction](../../../src/fourthgraph/bsv/otda_reconstruction.py)
+
+| Build | Literal transaction | Reconstructed transaction | Reconstructed unlock per input |
+| --- | ---: | ---: | ---: |
+| v0.17.0 | 135,310 B | 54,626 B | 4,819 B |
+| High-level baseline | 2,602,122 B | 880,172 B | 6,458 B |
+| High-level automatic | 1,312,926 B | 446,920 B | 4,698 B |
+
+The native P2PKH exit uses a literal witness and measures 348 B for all three builds. Only the frozen release templates participate in default wallet recognition. The high-level builds use the constructor in the experiment. To replay funded admission with the release template, use `v0.17.0-reconstructed` as the template in the project overview’s admission command.
+
+```sh
+PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
+  "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/experiments/high-level/compare_otda.py \
+  --output workspace/schnorr-high-level/otda-measurements.json
+```
+
+[Comparison evidence](../experiments/high-level/otda-measurements.json)

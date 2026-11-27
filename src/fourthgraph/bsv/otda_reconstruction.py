@@ -4,6 +4,52 @@ from dataclasses import dataclass
 from fourthgraph.bsv.script import asm, number, push
 
 
+def _repeated_run(data):
+    """Find a run of at least eight identical blocks in a fixed byte string."""
+    marker_width = 12
+    previous = {}
+    for second in range(len(data) - marker_width + 1):
+        marker = data[second:second + marker_width]
+        start = previous.get(marker)
+        previous[marker] = second
+        if start is None:
+            continue
+        width = second - start
+        if width < marker_width or start + 8 * width > len(data):
+            continue
+        block = data[start:second]
+        if not data.startswith(block * 7, second):
+            continue
+        end = start + 8 * width
+        while data.startswith(block, end):
+            end += width
+        return start, block, end
+    return None
+
+
+def push_repeated_bytes(data):
+    """Emit a Script that leaves exactly one fixed byte string on the stack."""
+    parts = []
+    while (run := _repeated_run(data)) is not None:
+        start, block, end = run
+        if start:
+            parts.append(push(data[:start]))
+        size = end - start
+        copies = size // len(block)
+        doublings = (copies - 1).bit_length()
+        expanded = push(block) + asm("OP_DUP OP_CAT") * doublings
+        if copies != 1 << doublings:
+            expanded += number(size) + asm("OP_SPLIT OP_DROP")
+        literal = push(data[start:end])
+        parts.append(min(literal, expanded, key=len))
+        data = data[end:]
+    if not parts:
+        return push(data)
+    if data:
+        parts.append(push(data))
+    return parts[0] + b"".join(part + asm("OP_CAT") for part in parts[1:])
+
+
 @dataclass(frozen=True)
 class Reconstruction:
     program: bytes
@@ -59,6 +105,17 @@ def reconstruct_mixed(preimage, outputs, patterns, *, combine_programs=None):
         selected,
         constructor=combine_programs(selected) if combine_programs is not None else None,
     )
+
+
+def shorter_reconstruction(preimage, outputs, patterns):
+    """Select a fixed-output constructor only when it beats a literal push."""
+    if not patterns:
+        return None
+    programs = [pattern.build(preimage, outputs) for pattern in patterns]
+    if len(patterns) > 1:
+        programs.append(reconstruct_mixed(preimage, outputs, patterns))
+    literal_size = len(push(preimage))
+    return min((code for code in programs if code is not None and len(code) < literal_size), key=len, default=None)
 
 
 def _build(preimage, slots, patterns, *, constructor=None):

@@ -24,7 +24,7 @@
 
 两方可用 BIP327 MuSig2 共同出款。锁承诺聚合 x-only 公钥，钱包沿用同一接口提交最终 BIP340 签名。夹具覆盖签名会话中断，并与同样要求双方都签字的原生 `CHECKMULTISIG` 对照。[MuSig2 与原生 2-of-2](docs/threshold-comparison.zh-CN.md)
 
-每个 Schnorr 输出携带 22,435 字节的锁。OTDA ALL 的每个输入见证还包含本笔交易的序列化输出，因此加一个输出的成本随输入数增加。v0.16.0 与 v0.17.0 在一进一出退出到普通 P2PKH 的实测中，BIP143 ALL 均为 416 字节，OTDA ALL 均为 348 字节。锁的缩减体现在创建 Schnorr UTXO 的交易中。[实测记录](versions/v0.17.0/measurements.json)
+每个 Schnorr 输出携带 22,435 字节的锁。使用原样 OTDA ALL 编码时，每个输入见证还包含本笔交易的序列化输出，因此加一个输出的成本随输入数增加。v0.16.0 与 v0.17.0 在一进一出退出到普通 P2PKH 的实测中，BIP143 ALL 均为 416 字节，OTDA ALL 均为 348 字节。锁的缩减体现在创建 Schnorr UTXO 的交易中。[实测记录](versions/v0.17.0/measurements.json)
 
 ## 算法与执行
 
@@ -86,7 +86,7 @@ bash tools/verify_node.sh -- bash sdk/verify_wallet.sh p2pkh-schnorr
 
 1. 调用 `createLock`，用 x-only 公钥或其 HASH160 生成收款锁。花费前识别已经核验的入金输出，检查 outpoint 和金额，再批准收款输出及手续费。SDK 默认创建 v0.17.0 输出，支持识别和花费 v0.6.0 至 v0.17.0 的各版本输出。
 2. 单输入付款用 `signPayment`，已排好输入输出的交易用 `signInput`。外部签名器将收到的 32 字节作为 BIP340 消息，返回标准 64 字节签名。SDK 用 libsecp256k1 验签并推导两个公开 y 坐标。
-3. SDK 将批准的预映像和公开见证交给 Forth 的 `schnorr-unlock`。每个解锁脚本都直接压入完整预映像。锁验证 BIP340 签名后，通过 PUSHTX 和原生 `OP_CHECKSIG` 把摘要绑定到实际输入。
+3. SDK 提供批准的预映像和公开见证。满足条件的 Chronicle 版本 2 交易在能缩短解锁脚本时使用构造器。两种编码都把相同的完整预映像放到栈上。锁验证 BIP340 签名后，通过 PUSHTX 和原生 `OP_CHECKSIG` 把摘要绑定到实际输入。
 
 [SDK 快速上手](docs/sdk.zh-CN.md#quickstart) · [付款协议](docs/spec.zh-CN.md) · [当前输入绑定](../../src/fourthgraph/bsv/pushtx.py)
 
@@ -98,7 +98,7 @@ bash tools/verify_node.sh -- bash sdk/verify_wallet.sh p2pkh-schnorr
 
 <a name="交易实测"></a>
 
-v0.17.0 夹具花费两个 Schnorr 输出，再创建两个 Schnorr 输出。BSV Node 1.2.3 和固定版本的 chain-gang 通过显式提供上一输出来验证完整输入。栈数据由开发求值器从第一个输入的成功路径取得。主栈项数、备用栈项数和两栈载荷分别取各自的峰值。交易和载荷以字节计。[实测记录](versions/v0.17.0/measurements.json) · [基准口径](../../docs/benchmark.zh-CN.md)
+v0.17.0 原样编码夹具花费两个 Schnorr 输出，再创建两个 Schnorr 输出。BSV Node 1.2.3 和固定版本的 chain-gang 通过显式提供上一输出来验证完整输入。栈数据由开发求值器从第一个输入的成功路径取得。主栈项数、备用栈项数和两栈载荷分别取各自的峰值。交易和载荷以字节计。[实测记录](versions/v0.17.0/measurements.json) · [基准口径](../../docs/benchmark.zh-CN.md)
 
 | 模式 | 输入 × 输出 | 上一输出锁定 | 解锁 | 新输出锁定 | 整笔 | 主栈 / 备用栈 | 两栈载荷 |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
@@ -109,6 +109,8 @@ v0.17.0 夹具花费两个 Schnorr 输出，再创建两个 Schnorr 输出。BSV
 PYTHONPATH=src:. bash tools/verify_node.sh -- "$SCRIPT_LAB_SDK_PYTHON" -m fourthgraph.benchmark.run \
   --project p2pkh-schnorr --venvs-dir projects/p2pkh-schnorr/workspace --output projects/p2pkh-schnorr/workspace/build/benchmark
 ```
+
+相同的两进两出 OTDA ALL 付款，使用构造器后每个解锁脚本从 45,161 B 降到 4,819 B，整笔交易从 135,310 B 降到 54,626 B，并在默认 regtest 策略下出块。[构造器对照](docs/high-level-forth.zh-CN.md#otda-constructor)
 
 在 BSV Node 1.2.3 的默认 regtest 策略下，两种模式的入金、周转和退出均进入内存池并出块。
 
