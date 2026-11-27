@@ -67,11 +67,15 @@ def chain_gang_valid(spend, funding, *, expect_bad_prevout=False, expect_push_on
         elif expect_push_only:
             expected = reason == _CHAIN_GANG_PUSH_ONLY_REJECTION
         else:
-            expected = reason in _CHAIN_GANG_SCRIPT_REJECTIONS
+            expected = is_chain_gang_script_rejection(error)
         if not expected:
             raise
         return False
     return True
+
+
+def is_chain_gang_script_rejection(error):
+    return isinstance(error, ValueError) and str(error) in _CHAIN_GANG_SCRIPT_REJECTIONS
 
 
 def node_script_valid(response, flags, *, chronicle_active=True, expect_push_only=False):

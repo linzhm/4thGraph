@@ -93,12 +93,29 @@ def wallet_library(module, entries, *, accumulator="bytes", parameters=()):
     return Library(ROOT / library_resource(f"std/wallet/{module}"), exports, WALLET_BACKEND)
 
 
-def script_fragment(name, runtime_inputs=(), *, takes=("script",), failure=""):
-    return Export(name, takes, ("script",), (WALLET_BACKEND,), runtime_inputs, failure)
+def script_fragment(name, runtime_inputs=(), *, takes=("script",), failure="",
+                    build_parameters=(), transaction_context=()):
+    return Export(name, takes, ("script",), (WALLET_BACKEND,), runtime_inputs, failure,
+                  build_parameters=build_parameters, transaction_context=transaction_context)
 
 
 def library_resource(name):
     return Path("stdlib", name.removeprefix("std/") + ".fth")
+
+
+PELS_SUCCESSOR_BUILD_PARAMETERS = (
+    Parameter("prefix", "script", "Serialized Script accumulator to extend. The assembled lock starts with a direct "
+              "push of five state bytes followed immediately by OP_CODESEPARATOR."),
+    Parameter("state-amount-rule", "script", "Consumes the five-byte state and the previous amount as a ScriptNum. "
+              "Leaves a five-byte successor state followed by an eight-byte unsigned little-endian amount."),
+)
+PELS_SUCCESSOR_TRANSACTION_CONTEXT = (
+    Parameter("sighash", "enum", "BIP143 ALL (0x41)"),
+    Parameter("input-count", "cell", "Exactly one input"),
+    Parameter("output-count", "cell", "Exactly one successor output"),
+    Parameter("script-code", "bytes", "The suffix after the state separator is the scriptCode and is copied verbatim "
+              "into the successor lock."),
+)
 
 
 GROTH16_VERIFY = Export(
@@ -212,6 +229,26 @@ LIBRARIES = {
     ), WALLET_BACKEND),
     "std/groth16-bls12-381": Library(ROOT / library_resource("std/groth16-bls12-381"), (GROTH16_VERIFY,), "groth16-bls12-381"),
     "std/verify": Library(ROOT / "stdlib/verify.fth", declarations=("relation:",)),
+    "std/wallet/pels-binding": Library(ROOT / library_resource("std/wallet/pels-binding"), backend=WALLET_BACKEND),
+    "std/wallet/pels-successor": Library(ROOT / library_resource("std/wallet/pels-successor"), (
+        script_fragment("pels-assert-successor", (
+            Parameter("state", "bytes", "Five-byte state supplied by the executing lock"),
+            Parameter("preimage", "bytes", "Full BIP143 ALL preimage"),
+        ), takes=("script", "script"),
+            failure="Rejects invalid input count or successor commitment. The caller must authenticate the same preimage.",
+            build_parameters=PELS_SUCCESSOR_BUILD_PARAMETERS,
+            transaction_context=PELS_SUCCESSOR_TRANSACTION_CONTEXT),
+    ), WALLET_BACKEND),
+    "std/wallet/pels-verify": Library(ROOT / library_resource("std/wallet/pels-verify"), (
+        script_fragment("pels-verify", (
+            Parameter("tail", "bytes", "Final eight preimage bytes, locktime then sighash. Push before head."),
+            Parameter("head", "bytes", "Preimage bytes preceding hashOutputs. Push after tail."),
+            Parameter("state", "bytes", "Five-byte state supplied by the executing lock"),
+        ), takes=("script", "script"),
+            failure="Rejects invalid context, successor or binding. Leaves the authenticated digest.",
+            build_parameters=PELS_SUCCESSOR_BUILD_PARAMETERS,
+            transaction_context=PELS_SUCCESSOR_TRANSACTION_CONTEXT),
+    ), WALLET_BACKEND),
     "std/wallet/r1": wallet_library("r1", ("r1-lock",), accumulator="script", parameters=(
         ("owner-hash", "20-byte P-256 public-key hash"), ("optimize", "Select the R1 doubling rewrite"),
     )),

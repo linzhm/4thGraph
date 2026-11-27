@@ -1,4 +1,4 @@
-REQUIRE pels-verify.fth
+REQUIRE stdlib/wallet/pels-verify.fth
 REQUIRE r1-verify-owner.fth
 
 : increment-and-pay-fee ( script -- script )

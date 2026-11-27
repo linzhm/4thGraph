@@ -1,4 +1,4 @@
-"""Compile, execute, compare and replay bounded Forth formula experiments."""
+"""Compile, execute, compare and replay bounded Forth experiments."""
 
 import argparse
 from concurrent.futures import ThreadPoolExecutor
@@ -14,9 +14,12 @@ from time import monotonic, perf_counter_ns
 from fourthgraph import PROJECT_VERSION
 from fourthgraph.bsv.artifacts import describe_script
 from fourthgraph.compiler.formula_experiment import MAX_DEPTH, RULES, enumerate_orders, validate_rules
+from fourthgraph.compiler.point_add import normalize_bindings
 from fourthgraph.compiler.script_builder import ScriptBuilder
 from fourthgraph.compiler.script_formula import FORMULA_PASSES, validate_formula_passes
 from .formula_fixture import FIXTURES
+from .point_add_fixture import PointAddFixture
+from .spend_fixture import SPEND_FIXTURES, check_spends, spend_profile
 
 SCHEMA = "4thgraph.formula-experiment/1"
 LIMIT = 32
@@ -38,6 +41,8 @@ def pass_sets():
 def capabilities():
     return {"schema": SCHEMA, "compiler": PROJECT_VERSION, "target": TARGET,
             "fixtures": {name: list(fix.implementations) for name, fix in FIXTURES.items()},
+            "call_site_fixtures": {PointAddFixture.name: {"axis": "call-site", "enumerate": "bindings"}},
+            "evaluations": {"formula": {"default": True}, "spend": {"fixtures": tuple(SPEND_FIXTURES)}},
             "plan_sets": pass_sets(), "requires": {"search": ["stack"]},
             "ordered_rules": RULES, "max_rule_depth": MAX_DEPTH, "max_candidates": LIMIT, "max_workers": WORKERS,
             "stages": ["formula", "graph", "terminal schedule and emission"], "commands": ["run", "next", "replay"]}
@@ -47,7 +52,9 @@ def freeze(fixture):
     # Include actual implementation files and resolved Forth imports, even for a dirty checkout.
     components = sorted(ROOT.rglob("*.py"))
     sources = {key: fixture.source(key) for key in fixture.implementations}
-    builder = ScriptBuilder(sources[fixture.name].decode(), formula_passes=())
+    source = sources[fixture.name]
+    builder = (fixture.builder(source) if isinstance(fixture, PointAddFixture)
+               else ScriptBuilder(source.decode(), formula_passes=()))
     frozen = {"schema": SCHEMA, "compiler_version": PROJECT_VERSION, "python": platform.python_version(),
               "fixture": fixture.name, "entry": fixture.entry, "target": TARGET, "engine": "fourthgraph.bsv.evaluate",
               "sources": {k: sha256(v).hexdigest() for k, v in sources.items()},
@@ -58,6 +65,11 @@ def freeze(fixture):
 
 
 def plan_spec(raw, fixture):
+    if isinstance(fixture, PointAddFixture):
+        if not isinstance(raw, dict) or set(raw) - {"bindings", "parent_id"}:
+            raise ValueError("point-add plans accept bindings with the source and internal passes fixed")
+        return {"implementation": fixture.name, "rules": [], "passes": [],
+                "bindings": normalize_bindings(raw.get("bindings", []))}
     if not isinstance(raw, dict) or set(raw) - {"passes", "rules", "implementation", "parent_id"}:
         raise ValueError("candidate must contain only passes, rules, implementation or parent_id")
     passes = raw.get("passes", [])
@@ -76,16 +88,24 @@ def compile_row(raw, fixture, sources, frozen, trace):
     try:
         spec = plan_spec(raw, fixture)
         row.update(id=digest([digest(frozen), spec, raw.get("parent_id")]), applied=spec)
-        builder = ScriptBuilder(sources[spec["implementation"]].decode(), formula_passes=spec["passes"],
-                                experimental_rules=spec["rules"], trace_formulas=trace)
+        source = sources[spec["implementation"]]
+        point_add = isinstance(fixture, PointAddFixture)
+        if point_add:
+            builder = fixture.builder(source)
+            code, sites = builder.emit_plan(fixture.entry, spec["bindings"])
+            lowering = {"call_sites": sites}
+        else:
+            builder = ScriptBuilder(source.decode(), formula_passes=spec["passes"],
+                                    experimental_rules=spec["rules"], trace_formulas=trace)
+            code, lowering = builder.emit(fixture.entry, b""), builder.formulas[fixture.entry]
         if [asdict(lib) for lib in builder.library_imports] != frozen["dependencies"]:
             raise ValueError("dependencies differ from the frozen contract")
-        code, lowering = builder.emit(fixture.entry, b""), builder.formulas[fixture.entry]
         elapsed = perf_counter_ns() - started
         row.update(compile={"status": "passed", "lowering": lowering},
                    artifact=describe_script(code, listing=trace), source_sha256=frozen["sources"][spec["implementation"]])
-        if trace:
-            row["trace"] = {"formula_snapshots": builder.formula_snapshots[fixture.entry], "target_stack_plan": "not_instrumented"}
+        if trace and not point_add:
+            row["trace"] = {"formula_snapshots": builder.formula_snapshots[fixture.entry],
+                            "target_stack_plan": builder.formula_stack_plans[fixture.entry]}
     except (ValueError, TypeError, KeyError) as exc:
         elapsed = perf_counter_ns() - started
         row["compile"]["diagnostic"] = str(exc)
@@ -96,6 +116,7 @@ def compile_row(raw, fixture, sources, frozen, trace):
 def stable(row):
     fields = ("requested", "id", "source_sha256", "applied", "artifact", "test", "next", "trace")
     return {**{key: row.get(key) for key in fields},
+            "metrics": {key: value for key, value in row.get("metrics", {}).items() if key != "compile_ns"},
             "delta": {key: value for key, value in row.get("delta", {}).items() if not key.endswith("_ns_observed")},
             "compile": {key: value for key, value in row["compile"].items() if key != "elapsed_ns"}}
 
@@ -103,20 +124,26 @@ def stable(row):
 def report_id(report):
     request = report["request"]
     return digest([report["snapshot"], request["axis"], request.get("parent_run"),
-                   report["baseline"], report["baseline_bytes"], [stable(row) for row in report["candidates"]]])
+                   report["baseline"], report["baseline_bytes"], report.get("baseline_path_bytes"),
+                   report["ranking"], report["winner_including_parents"], [stable(row) for row in report["candidates"]]])
 
 
 def matching_baseline(axis, fixture, eligible, parents, previous):
     if not eligible:
         return None
     plan = dict(eligible[0]["applied"])
-    if axis == "A":
+    if axis == "call-site":
+        plan["bindings"] = []
+    elif axis == "A":
         plan.update(passes=[], rules=[])
     else:
         plan["implementation"] = fixture.name
     for row in chain(eligible, parents.values()):
         if row["applied"] == plan:
-            return {"id": row["id"], "applied": plan, "bytes": row["artifact"]["bytes"]}
+            baseline = {"id": row["id"], "applied": plan, "bytes": row["artifact"]["bytes"]}
+            if "spend" in row["test"]:
+                baseline["path_bytes"] = row["test"]["spend"]["max_bytes"]["path_bytes"]
+            return baseline
     inherited = previous["baseline"] if previous else None
     return inherited if inherited is not None and inherited["applied"] == plan else None
 
@@ -129,10 +156,19 @@ def counted(value, low, high, name):
 
 def run(request, previous=None, *, replaying=False):
     if not isinstance(request, dict) or set(request) - {"fixture","plans","workers","trace","snapshot","parent_run",
-                                                        "axis","max_candidates","time_ms","enumerate","depth","terminal"}:
+                                                        "axis","max_candidates","time_ms","enumerate","depth","terminal",
+                                                        "evaluation"}:
         raise ValueError("unknown experiment request fields")
-    fixture = FIXTURES[request["fixture"]]
+    point_add = request["fixture"] == PointAddFixture.name
+    fixture = PointAddFixture() if point_add else FIXTURES[request["fixture"]]
+    evaluation = request.get("evaluation", "formula")
+    if evaluation not in ("formula", "spend"):
+        raise ValueError("choose formula or spend evaluation")
+    spend = evaluation == "spend"
+    profile = spend_profile(fixture) if spend else None
     frozen, sources = freeze(fixture)
+    if spend:
+        frozen["spend"] = profile
     identity = digest(frozen)
     if request.get("snapshot", identity) != identity:
         raise ValueError("frozen snapshot mismatch")
@@ -141,17 +177,22 @@ def run(request, previous=None, *, replaying=False):
     if previous and (previous["snapshot"] != identity or previous["run_id"] != request["parent_run"]
                      or previous["run_id"] != report_id(previous)):
         raise ValueError("parent run or snapshot mismatch")
-    axis = request.get("axis", "A")
-    if axis not in ("A","B"):
-        raise ValueError("choose axis A or B")
+    axis = request.get("axis", "call-site" if point_add else "A")
+    if axis not in (("call-site",) if point_add else ("A", "B")):
+        raise ValueError("point-add requires call-site exploration and formula fixtures require axis A or B")
     plans = request.get("plans")
     mode = request.get("enumerate")
     if mode is not None:
-        if plans is not None or axis != "A":
-            raise ValueError("enumeration requires axis A without explicit plans")
-        if mode == "sets":
+        if plans is not None:
+            raise ValueError("enumeration requires a request without explicit plans")
+        if axis == "call-site" and mode == "bindings":
+            _, sites = fixture.builder(sources[fixture.name]).emit_plan(fixture.entry, [])
+            plans = [{}] + [{"bindings": [{"site": row["site"], "kernel": choice["kernel"]}]}
+                            for row in sites for choice in row["candidates"]
+                            if choice["eligible"] and choice["kernel"] != row["kernel"]]
+        elif axis == "A" and mode == "sets":
             plans = [{"passes": p} for p in pass_sets()]
-        elif mode == "orders":
+        elif axis == "A" and mode == "orders":
             ir = ScriptBuilder(sources[fixture.name].decode(), formula_passes=()).formula_ir[fixture.entry]
             plans = [{"rules": list(r), "passes": request.get("terminal", ["stack"])}
                      for r in enumerate_orders(ir, request.get("depth", MAX_DEPTH))]
@@ -210,7 +251,14 @@ def run(request, previous=None, *, replaying=False):
                     artifact = row["artifact"]
                     key = identity, artifact["sha256"]
                     if key not in cache:
-                        cache[key] = fixture.check(bytes.fromhex(artifact["hex"]))
+                        script = bytes.fromhex(artifact["hex"])
+                        test = fixture.check(script)
+                        if spend:
+                            receipt = check_spends(fixture, script) if test["status"] == "passed" else {"status": "not_run"}
+                            local = "caller_status" if point_add else "formula_status"
+                            test = {**test, local: test["status"], "spend": receipt,
+                                    "status": "passed" if receipt["status"] == "passed" else "failed"}
+                        cache[key] = test
                     row["test"] = cache[key]
                 rows.append(row)
     if deadline is not None and monotonic() >= deadline:
@@ -218,6 +266,11 @@ def run(request, previous=None, *, replaying=False):
     eligible = [r for r in rows if r["test"]["status"] == "passed"]
     baseline = matching_baseline(axis, fixture, eligible, parents, previous)
     base_size = baseline["bytes"] if baseline else None
+
+    def path_bytes(row):
+        return row["test"]["spend"]["max_bytes"]["path_bytes"]
+
+    base_path = baseline.get("path_bytes") if spend and baseline else None
     for row in eligible:
         size = row["artifact"]["bytes"]
         parent = parents.get(row["requested"].get("parent_id"))
@@ -227,6 +280,12 @@ def run(request, previous=None, *, replaying=False):
         row["metrics"] = {"script_bytes": size, "compile_ns": row["compile"]["elapsed_ns"],
                           "main_peak_items": row["test"]["main_peak_items"], "alt_peak_items": row["test"]["alt_peak_items"],
                           "transaction_bytes": {"status":"not_measured"}, "caller_bytes":{"status":"not_measured"}}
+        if spend:
+            row["metrics"].update(row["test"]["spend"]["max_bytes"])
+            row["metrics"]["caller_bytes"] = row["metrics"]["lock_script_bytes"]
+            row["metrics"]["spend_stack_peaks"] = {"status": "not_measured"}
+            row["delta"]["baseline_path_bytes"] = path_bytes(row) - base_path if base_path is not None else None
+            row["delta"]["parent_path_bytes"] = path_bytes(row) - path_bytes(parent) if parent else None
         if parent:
             row["delta"]["parent_main_peak_items"] = row["test"]["main_peak_items"] - parent["test"]["main_peak_items"]
             row["delta"]["parent_alt_peak_items"] = row["test"]["alt_peak_items"] - parent["test"]["alt_peak_items"]
@@ -234,10 +293,18 @@ def run(request, previous=None, *, replaying=False):
         row["next"] = []
         if axis == "A" and "stack" in spec["passes"] and "search" not in spec["passes"]:
             row["next"].append({**spec, "passes": spec["passes"]+["search"], "parent_id":row["id"]})
-    order = sorted(eligible, key=lambda r:(r["artifact"]["bytes"], len(r["applied"]["passes"])+len(r["applied"]["rules"]), r["id"]))
+    primary_cost = "path_bytes" if spend else "script_bytes"
+
+    def rank(row):
+        spec = row["applied"]
+        size = path_bytes(row) if spend else row["artifact"]["bytes"]
+        return size, len(spec["passes"]) + len(spec["rules"]) + len(spec.get("bindings", ())), row["id"]
+
+    order = sorted(eligible, key=rank)
+    frontier_costs = [primary_cost, "main_peak_items", "alt_peak_items", "compile_ns"]
+
     def costs(row):
-        return (row["artifact"]["bytes"], row["test"]["main_peak_items"], row["test"]["alt_peak_items"],
-                row["compile"]["elapsed_ns"])
+        return tuple(row["metrics"][name] for name in frontier_costs)
     frontier = []
     for row in eligible:
         current = costs(row)
@@ -245,29 +312,36 @@ def run(request, previous=None, *, replaying=False):
                    for other in eligible):
             frontier.append(row["id"])
     incumbents = list(parents.values()) + eligible
-    def rank(r):
-        return r["artifact"]["bytes"], len(r["applied"]["rules"])+len(r["applied"]["passes"]), r["id"]
     winner = min(incumbents, key=rank)["id"] if incumbents else None
     # Replays fix the exact admitted sequence, independent of the original wall-clock cutoff.
     replay = {"fixture": fixture.name, "plans": [r["requested"] for r in rows], "axis": axis, "trace": trace,
               "workers": 1, "time_ms": 300_000, "snapshot": identity}
     if previous:
         replay["parent_run"] = previous["run_id"]
+    if spend:
+        replay["evaluation"] = evaluation
+    tie_break = "fewer explicit bindings" if point_add else "fewer passes"
+    scope = "maximum fixture funding plus spend bytes" if spend else "fixture script bytes"
     report = {"schema": SCHEMA, "snapshot": identity, "frozen": frozen, "request": replay, "candidates": rows,
               "baseline": baseline, "baseline_bytes": base_size, "ranking": [r["id"] for r in order],
-              "ranking_scope": "fixture script bytes, then fewer passes", "winner_including_parents": winner,
-              "observed_frontier": frontier, "frontier_costs": ["script_bytes", "main_peak_items", "alt_peak_items", "compile_ns"],
+              **({"baseline_path_bytes": base_path} if spend else {}),
+              "ranking_scope": f"{scope}, then {tie_break}",
+              "winner_including_parents": winner, "observed_frontier": frontier, "frontier_costs": frontier_costs,
               "requested": request, "deduplicated_plans": duplicates, "stop": stop}
     return {**report, "run_id": report_id(report)}
 
 
 def next_request(report):
+    spend = "spend" in report["frozen"]
+    baseline = "baseline_path_bytes" if spend else "baseline_bytes"
     plans = [p for row in report["candidates"] if row["test"]["status"] == "passed"
-             and row["delta"]["baseline_bytes"] is not None and row["delta"]["baseline_bytes"] < 0 for p in row["next"]]
+             and row["delta"][baseline] is not None and row["delta"][baseline] < 0 for p in row["next"]]
     if not plans:
         return {"stop": "no_improving_expansion"}
     return {"fixture": report["frozen"]["fixture"], "plans": plans[:LIMIT],
-            "snapshot": report["snapshot"], "parent_run": report["run_id"]}
+            "snapshot": report["snapshot"], "parent_run": report["run_id"],
+            **({"trace": True} if report["request"].get("trace") else {}),
+            **({"evaluation": "spend"} if spend else {})}
 
 
 def read(path):
@@ -295,8 +369,8 @@ def main(argv=None):
             result = run(data["request"] if replaying else data, read(args.parent) if args.parent else None,
                          replaying=replaying)
             if replaying and (data["run_id"] != result["run_id"] or data["run_id"] != report_id(data)):
-                raise ValueError("replay differs from the recorded baseline, artifacts, verdicts, or formula traces")
+                raise ValueError("replay differs from the recorded baseline, artifacts, verdicts, formula traces, or costs")
         print(json.dumps(result, sort_keys=True))
-    except (KeyError, ValueError, TypeError, OSError) as exc:
+    except (ImportError, KeyError, ValueError, TypeError, OSError) as exc:
         print(json.dumps({"schema": SCHEMA, "status":"failed", "diagnostic":str(exc)}))
         raise SystemExit(2) from exc
