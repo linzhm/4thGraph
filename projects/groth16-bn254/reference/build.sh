@@ -3,6 +3,7 @@ set -euo pipefail
 project=projects/groth16-bn254
 fixture="$project/versions/v0.1.0/fixture.json"
 out="$project/workspace/build"
+source="${2:-$project/verifier.fth}"
 mkdir -p "$out"
 owner="$(python3 - "$fixture" "$out" <<'PYBUILD'
 import json
@@ -18,6 +19,6 @@ print(fixture["owner_public_key"])
 PYBUILD
 )"
 PYTHONPATH=src:. python3 -m fourthgraph.verification.groth16_bn254 \
-  --runar "${1:-workspace/runar}" --go "${GROTH16_GO:-go}" --source "$project/verifier.fth" \
+  --runar "${1:-workspace/runar}" --go "${GROTH16_GO:-go}" --source "$source" \
   --verification-key "$out/vk.json" --public "$out/public.json" --proof "$out/proof.json" \
   --owner "$owner" --output "$out/lock.json" --witness-output "$out/witness.hex"
