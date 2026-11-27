@@ -1,6 +1,8 @@
 """Build a complete R1 lock by evaluating Forth Script-construction words."""
 
 import argparse
+from dataclasses import replace
+from itertools import islice
 from hashlib import sha256
 import json
 from pathlib import Path
@@ -23,6 +25,9 @@ BASELINE_DEPENDENCIES = {
     "std/bsv": "92f4510c9d3e8e0371d9b41d08f9f7e639324c9795e6d0a1c3f9779e9179b404",
 }
 WINDOW_PLANS = ("split-4", "joint-2", "split-5x4-affine-g", "split-5x4-affine-g-ifdup")
+MAX_AUTO_ROUNDS = 6
+MAX_AUTO_CANDIDATES = 32
+AUTO_BATCH = 8
 ENTRY_SOURCES = {
     "r1-lock": SOURCE,
     PAYMENT_ENTRY: SOURCE.with_name("r1-baseline.fth"),
@@ -59,7 +64,78 @@ def dependencies(compiler):
     return {item.name: item.sha256 for item in compiler.library_imports}
 
 
-def baseline_plans(source, owner, *, source_path=ENTRY_SOURCES[PAYMENT_ENTRY]):
+def neighboring_windows(strategy):
+    if strategy.joint:
+        for delta in (-1, 1):
+            yield replace(strategy, width=strategy.width + delta)
+        return
+
+    g = strategy.width
+    q = strategy.q_width or g
+    for dg, dq in ((-1, 0), (1, 0), (0, -1), (0, 1), (-1, -1), (1, 1)):
+        q_width = q + dq
+        if strategy.q_width is None and g + dg == q_width:
+            q_width = None
+        yield replace(strategy, width=g + dg, q_width=q_width)
+    if strategy.affine_g:
+        yield replace(strategy, affine_guard_ifdup=not strategy.affine_guard_ifdup)
+        yield replace(strategy, affine_g=False, affine_guard_ifdup=False)
+    else:
+        yield replace(strategy, affine_g=True)
+        yield replace(strategy, affine_g=True, affine_guard_ifdup=True)
+
+
+def next_window_plans(backend, tested, candidates):
+    seen = set(tested)
+    # Explore the best linked locks first. Ties keep the original build order.
+    for name in sorted(tested, key=lambda name: len(candidates[name])):
+        for strategy in neighboring_windows(tested[name].strategy):
+            if strategy.name in seen:
+                continue
+            seen.add(strategy.name)
+            try:
+                plan = backend.plan(strategy.name)
+            except ValueError:
+                continue
+            yield plan
+
+
+def window_search(backend, before, after, candidates, rounds):
+    fragments, tested, history = {}, {}, []
+    plans = [backend.plan(name) for name in WINDOW_PLANS]
+    seed_names = list(candidates)
+    stop = "round_budget"
+    for index in range(rounds):
+        for plan in plans:
+            program = backend.lower(plan)
+            # The original result check expects only the projective result above p, 3b, r.
+            cleanup = (asm("OP_TOALTSTACK") * 3 + asm("OP_2DROP") * (3 * program.table_points // 2)
+                       + asm("OP_FROMALTSTACK") * 3)
+            fragment = program.emit() + cleanup
+            name = plan.strategy.name
+            tested[name] = plan
+            candidates[name] = before + fragment + after
+            fragments[name] = {"offset": len(before), "bytes": len(fragment),
+                               "sha256": sha256(fragment).hexdigest()}
+        winner = select_baseline_plan(candidates)
+        history.append({"round": index + 1, "candidates": seed_names + [p.strategy.name for p in plans],
+                        "best": winner, "best_lock_bytes": len(candidates[winner])})
+        seed_names = []
+        available = MAX_AUTO_CANDIDATES - len(candidates)
+        if not available:
+            stop = "candidate_budget"
+            break
+        if index + 1 < rounds:
+            plans = list(islice(next_window_plans(backend, tested, candidates), min(AUTO_BATCH, available)))
+            if not plans:
+                stop = "exhausted"
+                break
+    return fragments, history, stop
+
+
+def baseline_plans(source, owner, *, source_path=ENTRY_SOURCES[PAYMENT_ENTRY], rounds=1):
+    if type(rounds) is not int or not 1 <= rounds <= MAX_AUTO_ROUNDS:
+        raise ValueError(f"auto rounds must be an integer between 1 and {MAX_AUTO_ROUNDS}")
     raw = compile_source(source, owner, source_path=source_path)
     optimized = compile_source(source, owner, optimize=True, source_path=source_path)
     imports = dependencies(raw)
@@ -78,18 +154,16 @@ def baseline_plans(source, owner, *, source_path=ENTRY_SOURCES[PAYMENT_ENTRY]):
         # Keep the original prologue, result check and transaction binding.
         before = optimized.emit("r1-prepare-scalars", optimized.emit("r1-prepare-lock", b""))
         after = optimized.emit("r1-bind-transaction", optimized.emit("r1-baseline-check-x", b""))
-        fragments = {}
-        for name in WINDOW_PLANS:
-            program = backend.lower(backend.plan(name))
-            # The original result check expects only the projective result above p, 3b, r.
-            cleanup = (asm("OP_TOALTSTACK") * 3 + asm("OP_2DROP") * (3 * program.table_points // 2)
-                       + asm("OP_FROMALTSTACK") * 3)
-            fragment = program.emit() + cleanup
-            candidates[name] = before + fragment + after
-            fragments[name] = {"offset": len(before), "bytes": len(fragment),
-                               "sha256": sha256(fragment).hexdigest()}
+        fragments, history, stop = window_search(backend, before, after, candidates, rounds)
         region = {"status": "matched", "backend": backend.source_identity, "fragments": fragments}
-    return raw, optimized, candidates, region
+    else:
+        winner = select_baseline_plan(candidates)
+        history = [{"round": 1, "candidates": list(candidates), "best": winner,
+                    "best_lock_bytes": len(candidates[winner])}]
+        stop = "ineligible"
+    search = {"requested_rounds": rounds, "candidate_limit": MAX_AUTO_CANDIDATES,
+              "rounds": history, "stop": stop}
+    return raw, optimized, candidates, {**region, "search": search}
 
 
 def select_baseline_plan(candidates):
@@ -97,8 +171,8 @@ def select_baseline_plan(candidates):
     return min(candidates, key=lambda name: len(candidates[name]))
 
 
-def compile_auto(source, owner, *, source_path=ENTRY_SOURCES[PAYMENT_ENTRY]):
-    raw, optimized, candidates, region = baseline_plans(source, owner, source_path=source_path)
+def compile_auto(source, owner, *, source_path=ENTRY_SOURCES[PAYMENT_ENTRY], rounds=1):
+    raw, optimized, candidates, region = baseline_plans(source, owner, source_path=source_path, rounds=rounds)
     selected = select_baseline_plan(candidates)
     report = {
         "objective": "lock_script_bytes", "region": "r1-baseline-mul2", "window_region": region,
@@ -137,15 +211,20 @@ def main():
     optimization.add_argument("--optimize", action="store_true")
     optimization.add_argument("--auto", action="store_true",
                               help="select an audited R1 baseline lowering by emitted lock size")
+    parser.add_argument("--auto-rounds", type=int, choices=range(1, MAX_AUTO_ROUNDS + 1),
+                        help="window search rounds when using --auto (default: 1)")
     parser.add_argument("--version", action="version", version=VERSION)
     args = parser.parse_args()
+    if args.auto_rounds is not None and not args.auto:
+        parser.error("--auto-rounds requires --auto")
     source_path = args.source or ENTRY_SOURCES[args.entry]
     source = source_path.read_bytes()
     try:
         if args.auto:
             if args.entry != PAYMENT_ENTRY or args.counter_state is not None:
                 raise ValueError("--auto requires the r1-baseline-lock payment entry")
-            compiler, lock, report = compile_auto(source, args.owner_hash160, source_path=source_path)
+            compiler, lock, report = compile_auto(source, args.owner_hash160, source_path=source_path,
+                                                  rounds=args.auto_rounds or 1)
             blocks = {"optimization": report}
         else:
             compiler = compile_source(source, args.owner_hash160, optimize=args.optimize, source_path=source_path)

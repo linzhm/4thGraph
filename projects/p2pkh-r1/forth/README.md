@@ -60,6 +60,11 @@ python "$project/forth/compile_r1.py" --entry r1-baseline-lock --auto > /tmp/r1-
 python -m unittest -v test_r1_baseline.BaselineAutoTests
 ```
 
+需要多轮搜索时加 `--auto-rounds 6`。默认一轮。从第二轮起，编译器优先
+扩展当前较小锁的窗口宽度和守卫选择，每轮最多编译 8 个新计划，总上限为
+32 个候选。候选用计划名去重。`optimization.window_region.search` 记录每轮
+的候选、累计最优和停止原因。请求的轮数是上限，达到候选上限时可提前结束。
+
 花费测试使用固定版 chain-gang，覆盖 BIP143 ALL、OTDA ALL 和配对的
 OTDA SINGLE。正例使用测试签名和实际夹具父输出；改动花费的锁定时间后应拒绝。
 这个入口供编译实验使用，钱包继续使用版本清单。

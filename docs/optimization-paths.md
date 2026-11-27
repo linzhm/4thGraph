@@ -28,6 +28,8 @@ Freeze `r1-baseline-lock` and its imports, then measure the current compiler bef
 
 The transaction metric is for one synthetic input spending into one output. The development evaluator observes the stack peaks. All six candidates pass the complete spend with pinned chain-gang under BIP143 ALL, OTDA ALL and paired OTDA SINGLE, and reject the stale witness after a locktime change. The result shows a size and stack tradeoff, with this opt-in compiler entry and fixture providing review evidence. [Build and replay](../projects/p2pkh-r1/forth/README.md)
 
+With `--auto-rounds 6`, the search compiled 32 distinct candidates in five rounds and stopped at the candidate budget. Adjusting the window widths and guard choices left the winning Script at 41,264 B. The JSON records which candidates entered each round and the best lock through that round.
+
 ## Ordered formula rules
 
 Use these rules on closed formulas whose caller establishes canonical ScriptNum encodings and the declared input intervals.

@@ -9,8 +9,8 @@ import unittest
 
 from ecdsa import NIST256p, ellipticcurve
 
-from compile_r1 import (COUNTER_ENTRY, ENTRY_SOURCES, PAYMENT_ENTRY, baseline_plans, compile_auto, compile_source,
-                        emit_lock, select_baseline_plan)
+from compile_r1 import (COUNTER_ENTRY, ENTRY_SOURCES, MAX_AUTO_CANDIDATES, MAX_AUTO_ROUNDS, PAYMENT_ENTRY,
+                        baseline_plans, compile_auto, compile_source, emit_lock, select_baseline_plan)
 from curve_compiler import B3, FIELD
 from signature import SpendAuthorization, authorization, current_input_unlock
 from test_payment import fixture_signature, signer
@@ -108,14 +108,17 @@ class BaselineAutoTests(unittest.TestCase):
         cls.source_path = ENTRY_SOURCES[PAYMENT_ENTRY]
         cls.source = cls.source_path.read_bytes()
         cls.key, cls.public, cls.owner = signer(7)
-        cls.raw, cls.optimized, cls.candidates, cls.region = baseline_plans(cls.source, cls.owner)
+        cls.raw, cls.optimized, cls.candidates, cls.region = baseline_plans(
+            cls.source, cls.owner, rounds=MAX_AUTO_ROUNDS)
 
     def test_automatic_selection_preserves_the_payment_boundaries(self):
         self.assertEqual(self.region["status"], "matched")
         self.assertEqual((len(self.candidates["baseline"]), len(self.candidates["formula"])), (415058, 139333))
         self.assertEqual(self.candidates["baseline"], emit_lock(self.raw, PAYMENT_ENTRY))
         self.assertEqual(self.candidates["formula"], emit_lock(self.optimized, PAYMENT_ENTRY))
-        self.assertEqual(select_baseline_plan(self.candidates), "split-5x4-affine-g-ifdup")
+        first_round = self.region["search"]["rounds"][0]
+        self.assertEqual(len(first_round["candidates"]), 6)
+        self.assertEqual(first_round["best"], "split-5x4-affine-g-ifdup")
         before = self.optimized.emit("r1-prepare-scalars", self.optimized.emit("r1-prepare-lock", b""))
         after = self.optimized.emit("r1-bind-transaction", self.optimized.emit("r1-baseline-check-x", b""))
         for name, span in self.region["fragments"].items():
@@ -126,9 +129,25 @@ class BaselineAutoTests(unittest.TestCase):
                 self.assertEqual(script[end:], after)
                 self.assertEqual(sha256(script[start:end]).hexdigest(), span["sha256"])
 
+    def test_rounds_expand_without_repeats_and_respect_the_candidate_budget(self):
+        search = self.region["search"]
+        rounds = search["rounds"]
+        names = [name for row in rounds for name in row["candidates"]]
+        self.assertGreater(len(rounds), 1)
+        self.assertEqual(search["stop"], "candidate_budget")
+        self.assertEqual(len(names), MAX_AUTO_CANDIDATES)
+        self.assertEqual(names, list(self.candidates))
+        seen = {}
+        for row in rounds:
+            seen.update((name, self.candidates[name]) for name in row["candidates"])
+            best = select_baseline_plan(seen)
+            self.assertEqual((row["best"], row["best_lock_bytes"]), (best, len(seen[best])))
+
     def test_distinct_source_uses_the_existing_formula_path(self):
-        _, script, report = compile_auto(self.source + b"\n( local revision )\n", self.owner)
+        _, script, report = compile_auto(self.source + b"\n( local revision )\n", self.owner, rounds=4)
         self.assertEqual(report["window_region"]["status"], "ineligible")
+        self.assertEqual(report["window_region"]["search"]["stop"], "ineligible")
+        self.assertEqual(list(report["candidates"]), ["baseline", "formula"])
         self.assertEqual(report["selected"], "formula")
         self.assertEqual(script, self.candidates["formula"])
 
