@@ -41,13 +41,21 @@ In v0.7.0 the compiler renames the Fp12 result slots in place. Later arithmetic 
 
 The v0.6.0 phase profile accounts for all 470,781 B of the `wrap` lock. The compiler adds stage information to the emitted operations. The resulting bytecode matches the published lock hash. Applying the same Script compaction pass again saves 0 B on either fixture. [Phase profile and Fp12 experiment](../versions/v0.6.0/optimization-profile.json)
 
+From the repository root, run the profiler to regenerate and check both fixture reports.
+
+```sh
+PYTHONPATH=src:. python3 projects/groth16-bn254/reference/profile_phases.py \
+  --runar workspace/runar --check \
+  --output projects/groth16-bn254/workspace/build/phase-profile.json
+```
+
 | Phase | Lock bytes | Share |
 | --- | ---: | ---: |
 | Miller loop, including residue folds | 391,175 B | 83.1% |
 | G2 subgroup check | 65,157 B | 13.8% |
 | Other checks and setup | 14,449 B | 3.1% |
 
-Fp12 squaring occupies 96,460 B within the Miller loop. Variable-line sparse multiplication occupies 95,460 B, and fixed-line construction plus multiplication occupies 108,438 B. These sizes give the scale of the work for a compiler pass that specializes Fp12 arithmetic or combines line multiplications. The entire `wrap` witness prefix is 6,765 B, including 5,675 B for slopes.
+Fp12 squaring occupies 96,460 B within the Miller loop. Variable-line sparse multiplication occupies 95,460 B, and the fixed-line block occupies 108,438 B, including the signed point setup before variable-line additions. These sizes give the scale of the work for a compiler pass that specializes Fp12 arithmetic or combines line multiplications. The entire `wrap` witness prefix is 6,765 B, including 5,675 B for slopes.
 
 From the v0.7.0 `wrap` total, reaching 450,000 B requires another 21,468 B. That is about 5.5% of the measured v0.6.0 Miller code. Reaching 400,000 B requires 71,468 B, about 18.3% of that code. Both figures are target budgets. Each new arithmetic lowering needs a separate bytecode build and regtest replay. [Current measured transactions](../versions/v0.7.0/measurements.json)
 

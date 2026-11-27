@@ -4,7 +4,7 @@
   "runar_revision": "dbcc4269f8e0895c4738cf86948b05b7d62a2010",
   "fixture_sha256": "d8eee6da5ed5780fb71dc91fa08744d1644ff1db7f53974aafb48bb26c2dd10c",
   "phase_measurement": {
-    "method": "Label emitted StackOps by verification phase using Rúnar source locations. Apply the normal paired and compact Script passes by phase. The resulting lock lengths and SHA-256 digests match the published artifacts.",
+    "method": "Label emitted StackOps by verification phase using Rúnar source locations. The fixed-line block includes the signed point setup before a variable-line addition. Apply the normal paired and compact Script passes by phase. The resulting lock lengths and SHA-256 digests match the published artifacts.",
     "cases": {
       "wrap": {
         "compiled_lock_bytes": {
@@ -110,7 +110,8 @@
         "script_sha256": "6e05dc104505e9ed26412a7f780f935c5c0467d37d0a286be2fbf9d46d84ce34",
         "miller_total_bytes": 391175
       }
-    }
+    },
+    "reproduce": "PYTHONPATH=src:. python3 projects/groth16-bn254/reference/profile_phases.py --runar workspace/runar --check --output projects/groth16-bn254/workspace/build/phase-profile.json"
   },
   "additional_stack_pass": {
     "method": "Reapply compact_stack_moves to each published locking script.",
