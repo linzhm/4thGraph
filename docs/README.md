@@ -132,6 +132,27 @@ To run the two Bézier batches above through the same spend check, add `"evaluat
 
 Add `"trace":true` when comparing terminal schedules. The report links the final formula snapshot to graph slots through `formula_slots`. Under `trace.target_stack_plan`, `steps` lists the selected execution order, actual operand order, abstract stack slots before and after each step, and exact spans in the emitted Script. `operation_offset` marks where the operation starts after stack rearrangement. `finish` records return placement and cleanup. The schedule records whether source order or a beam-search order won. Follow-up requests preserve tracing, and replay checks the trace with the Script and test verdicts. Trace collection adds work to observed compile times.
 
+To compare the shortlisted plans, run axis B once per plan with tracing off and a single worker. Each run holds the plan fixed while comparing `bezier` and `bezier-linear`. From the repository root, with `PYTHONPATH` set as above and the pinned engine installed:
+
+```sh
+for plan in stack search; do
+  passes='["stack"]'
+  if [ "$plan" = search ]; then passes='["rewrite","share","stack","search"]'; fi
+  printf '{"fixture":"bezier","axis":"B","evaluation":"spend","trace":false,"plans":[{"implementation":"bezier","passes":%s},{"implementation":"bezier-linear","passes":%s}]}\n' "$passes" "$passes" |
+    python3 -m fourthgraph.workflow.protocol experiment run - > "workspace/tuning/bezier-$plan.json"
+  python3 -m fourthgraph.workflow.protocol experiment replay "workspace/tuning/bezier-$plan.json" > "workspace/tuning/bezier-$plan-replay.json"
+done
+```
+
+| Implementation | Plan | Full path | Formula Script | Formula main / alt peak items |
+| --- | --- | ---: | ---: | ---: |
+| `bezier-linear` | `rewrite`, `share`, `stack`, `search` | 176 B | 34 B | 8 / 1 |
+| `bezier-linear` | `stack` | 179 B | 37 B | 8 / 1 |
+| `bezier` | `rewrite`, `share`, `stack`, `search` | 188 B | 46 B | 10 / 1 |
+| `bezier` | `stack` | 189 B | 47 B | 9 / 1 |
+
+Each combination has 625 accepted and 625 rejected spends. The shortest path uses `bezier-linear` with all four passes. When path bytes tie, ranking prefers the plan with fewer passes and ordered rules. Read `metrics.compile_ns` from the trace-off runs or replays for observed compile time.
+
 <a name="documentation-index"></a>
 
 ## Documentation index

@@ -132,6 +132,27 @@ python3 -m fourthgraph.workflow.protocol experiment replay workspace/tuning/spen
 
 比较终端栈调度时加 `"trace":true`。报告用 `formula_slots` 把最后一份公式快照的节点关联到图槽位。在 `trace.target_stack_plan` 中，`steps` 记录实际选中的执行顺序、操作数排布、每步前后的抽象栈槽和 Script 字节范围。经过栈调整后，`operation_offset` 指向实际操作的起始字节。最后的 `finish` 记录返回值排布和清理。报告标明选中源码顺序还是束搜索顺序。后续请求沿用追踪开关，重放会核对追踪、Script 和测试判定。开启追踪会增加所测的编译耗时。
 
+四格对照按两套入围计划分别运行 B 轴，关闭追踪并使用单个编译 worker。每轮固定计划，比较 `bezier` 和 `bezier-linear`。在仓库根目录执行，沿用上面的 `PYTHONPATH` 和固定版本的评估引擎。
+
+```sh
+for plan in stack search; do
+  passes='["stack"]'
+  if [ "$plan" = search ]; then passes='["rewrite","share","stack","search"]'; fi
+  printf '{"fixture":"bezier","axis":"B","evaluation":"spend","trace":false,"plans":[{"implementation":"bezier","passes":%s},{"implementation":"bezier-linear","passes":%s}]}\n' "$passes" "$passes" |
+    python3 -m fourthgraph.workflow.protocol experiment run - > "workspace/tuning/bezier-$plan.json"
+  python3 -m fourthgraph.workflow.protocol experiment replay "workspace/tuning/bezier-$plan.json" > "workspace/tuning/bezier-$plan-replay.json"
+done
+```
+
+| 实现 | 计划 | 完整路径 | 公式 Script | 公式主栈／备用栈峰值项数 |
+| --- | --- | ---: | ---: | ---: |
+| `bezier-linear` | `rewrite`、`share`、`stack`、`search` | 176 B | 34 B | 8／1 |
+| `bezier-linear` | `stack` | 179 B | 37 B | 8／1 |
+| `bezier` | `rewrite`、`share`、`stack`、`search` | 188 B | 46 B | 10／1 |
+| `bezier` | `stack` | 189 B | 47 B | 9／1 |
+
+每种组合均有 625 个花费通过和 625 个花费拒绝。最短路径用 `bezier-linear` 的四 pass 计划。路径字节相同时，优先选择 pass 和有序规则合计较少的计划。实际编译耗时可从关闭追踪的运行或重放报告中读取 `metrics.compile_ns`。
+
 <a name="documentation-index"></a>
 
 ## 文档索引

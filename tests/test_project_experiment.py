@@ -9,7 +9,7 @@ from unittest.mock import patch
 from fourthgraph.benchmark.experiment import capabilities, digest, next_request, run
 from fourthgraph.benchmark.validation import CONTEXT_PIN, chain_metadata
 from fourthgraph.bsv.evaluate import evaluate
-from fourthgraph.bsv.script import encode_num
+from fourthgraph.bsv.script import asm, encode_num, number
 from fourthgraph.compiler.formula_experiment import enumerate_orders
 from fourthgraph.compiler.script_builder import ScriptBuilder
 
@@ -119,23 +119,51 @@ class FormulaExperiments(unittest.TestCase):
         self.assertEqual(plans[-2]["steps"], plans[1]["steps"])
         self.assertNotEqual(plans[-1]["steps"], plans[2]["steps"])
         for row, plan in zip(rows, plans, strict=True):
+            code = bytes.fromhex(row["artifact"]["hex"])
+            boundaries = {item["offset"] for item in row["artifact"]["instructions"]} | {len(code)}
+            formula = row["trace"]["formula_snapshots"][-1]
+            operations = {"int+": asm("OP_ADD"), "int-": asm("OP_SUB"), "int*": asm("OP_MUL")}
+            definitions = {plan["formula_slots"][node["id"]]: node for node in formula["steps"]}
+
+            def markers(slots):
+                return [encode_num(slot + 1) for slot in slots]
+
             state = plan["inputs"]
             offset = 0
             for step in plan["steps"]:
                 self.assertEqual(step["before"], state)
                 self.assertEqual(step["offset"], offset)
-                self.assertCountEqual(step["args"], step["operands"])
-                self.assertGreaterEqual(step["operation_offset"], step["offset"])
-                self.assertLess(step["operation_offset"], offset + step["bytes"])
+                end = offset + step["bytes"]
+                operation = step["operation_offset"]
+                self.assertTrue({offset, operation, end} <= boundaries)
+                self.assertTrue(offset <= operation < end)
+                node = definitions[step["slot"]]
+                args = [plan["formula_slots"][i] for i in node["args"]]
+                opcode = code[operation:end]
+                if opcode == asm("OP_DUP OP_ADD"):
+                    self.assertEqual(node["op"], "int*")
+                    self.assertIn(step["args"][0], args)
+                    self.assertIn(2, [formula["steps"][i]["immediate"] for i in node["args"]])
+                else:
+                    expected = number(node["immediate"]) if node["op"] == "literal" else operations[node["op"]]
+                    self.assertEqual(opcode, expected)
+                    self.assertEqual(step["args"], args)
+                if opcode == asm("OP_SUB"):
+                    self.assertEqual(step["args"], step["operands"])
+                else:
+                    self.assertCountEqual(step["args"], step["operands"])
+
+                staged = step["after"][:-1] + step["operands"]
+                self.assertEqual(evaluate(code[offset:operation], markers(state)), (markers(staged), []))
                 state = step["after"]
                 self.assertEqual(state[-1], step["slot"])
-                offset += step["bytes"]
+                offset = end
             finish = plan["finish"]
             self.assertEqual(finish["before"], state)
             self.assertEqual(finish["after"], plan["returns"])
             self.assertEqual(finish["offset"], offset)
             self.assertEqual(offset + finish["bytes"], row["artifact"]["bytes"])
-            formula = row["trace"]["formula_snapshots"][-1]
+            self.assertEqual(evaluate(code[offset:], markers(state)), (markers(plan["returns"]), []))
             self.assertEqual([plan["formula_slots"][i] for i in formula["returns"]], plan["returns"])
         self.assertEqual(run(second["request"], first)["run_id"], second["run_id"])
         first["candidates"][1]["trace"]["target_stack_plan"]["steps"][0]["offset"] += 1
@@ -219,13 +247,16 @@ class FormulaExperiments(unittest.TestCase):
     def test_bezier_spend_checks_both_outputs_and_replays_the_search_delta(self):
         self._require_pinned_chain()
         self.assertIn("bezier", capabilities()["evaluations"]["spend"]["fixtures"])
-        first = run({"fixture": "bezier", "evaluation": "spend", "workers": 3,
+        first = run({"fixture": "bezier", "evaluation": "spend", "workers": 3, "trace": True,
                      "plans": [{}, {"passes": ["stack"]}, {"passes": ["rewrite", "share", "stack"]}]})
         follow = next_request(json.loads(json.dumps(first)))
         self.assertEqual(len(follow["plans"]), 2)
         second = run(follow, first)
         rows = first["candidates"] + second["candidates"]
         self.assertEqual([row["metrics"]["script_bytes"] for row in rows], [118, 47, 47, 47, 46])
+        self.assertNotEqual(rows[1]["id"], rows[2]["id"])
+        self.assertEqual([row["requested"]["parent_id"] for row in second["candidates"]],
+                         [rows[1]["id"], rows[2]["id"]])
         self.assertEqual(len({row["source_sha256"] for row in rows}), 1)
         for row in rows:
             receipt = row["test"]["spend"]
@@ -309,3 +340,23 @@ class FormulaExperiments(unittest.TestCase):
         self.assertNotEqual(*[r["source_sha256"] for r in traced["candidates"]])
         self.assertTrue(all(r["test"]["passed"]==625 for r in base["candidates"]))
         self.assertEqual(digest(base["frozen"]),base["snapshot"])
+
+    def test_bezier_shortlisted_plans_compare_each_algorithm_in_full_spends(self):
+        self._require_pinned_chain()
+        for passes, expected_path_bytes in (
+            (["stack"], (189, 179)),
+            (["rewrite", "share", "stack", "search"], (188, 176)),
+        ):
+            with self.subTest(passes=passes):
+                report = run({"fixture": "bezier", "axis": "B", "evaluation": "spend", "plans": [
+                    {"implementation": implementation, "passes": passes}
+                    for implementation in ("bezier", "bezier-linear")
+                ]})
+                reference, linear = report["candidates"]
+                self.assertNotEqual(reference["source_sha256"], linear["source_sha256"])
+                self.assertEqual(report["baseline"]["id"], reference["id"])
+                self.assertEqual(report["ranking"], [linear["id"], reference["id"]])
+                self.assertEqual(tuple(row["metrics"]["path_bytes"] for row in (reference, linear)), expected_path_bytes)
+                for row in (reference, linear):
+                    spend = row["test"]["spend"]
+                    self.assertEqual((spend["status"], spend["accepted"], spend["rejected"]), ("passed", 625, 625))
