@@ -31,6 +31,8 @@ Leave the reconstruction option unset to use the scheme's default. SM2 and Schno
 
 For Lamport and WOTS+ in Python, call `sign_once = durable_signer(database, project, spend_key, sign_digest)` to wrap the digest signer. Pass the wrapper as `lambda request: sign_once(request.payload)`. Use the same database and canonical public key across wallet processes and template formats. [One-time signer](../../src/fourthgraph/bsv/one_time_signer.py)
 
+Lamport fixed-weight keys request `lamport-ots-subset` and a 4,096-byte raw signature. Use independent keys for each scheme and keep one-time state for the applicable key and all its templates. [Fixed-weight integration](../../projects/lamport-ots/docs/sdk.en.md#fixed-weight-candidate)
+
 <a name="troubleshooting"></a>
 
 ## Troubleshooting and retries

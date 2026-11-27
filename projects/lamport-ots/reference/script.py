@@ -99,8 +99,14 @@ def v020_forth_committed_locking_script(key):
     return _bind_commitment(key, v020_forth_pattern())
 
 
-def _bind_commitment(key, pattern):
-    require_bytes(key, KEY_BYTES, 'public key')
+def subset_locking_script(key):
+    from subset import KEY_BYTES as SUBSET_KEY_BYTES
+
+    return _bind_commitment(key, subset_forth_pattern(), key_bytes=SUBSET_KEY_BYTES)
+
+
+def _bind_commitment(key, pattern, *, key_bytes=KEY_BYTES):
+    require_bytes(key, key_bytes, 'public key')
     prefix, suffix = pattern.fixed_parts
     return prefix + sha256(key).digest() + suffix
 
@@ -114,8 +120,20 @@ def compact_forth_pattern():
 def compile_forth_pattern(*, packed=False):
     from forth_verifier import committed_verifier_parts
 
-    start, one_byte, finish = committed_verifier_parts(packed=packed)
-    prefix = _payment_guard(KEY_BYTES, compact_types=packed) + start
+    return _commitment_pattern(committed_verifier_parts(packed=packed), KEY_BYTES, compact_types=packed)
+
+
+@cache
+def subset_forth_pattern():
+    from forth_verifier import subset_verifier_parts
+    from subset import KEY_BYTES as SUBSET_KEY_BYTES
+
+    return _commitment_pattern(subset_verifier_parts(), SUBSET_KEY_BYTES, compact_types=True)
+
+
+def _commitment_pattern(parts, proof_bytes, *, compact_types):
+    start, one_byte, finish = parts
+    prefix = _payment_guard(proof_bytes, compact_types=compact_types) + start
     commitment_push = finish + b'\x20'  # Direct push of the 32-byte commitment.
     suffix = asm('OP_EQUALVERIFY') + _payment_binding(compact=True)
     # Rebuild the 32 identical fragments without executing their contents.

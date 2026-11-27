@@ -7,8 +7,8 @@ test keys. [Wire and payment rules](spec.md)
 ## Transaction-bound payment profiles
 
 The same domain runs for `full-key`, `committed-key`, `committed-key-forth` and
-the two compact Forth profiles, `committed-key-forth-compact` and
-`committed-key-forth-v0.2.0`.
+the Forth profiles `committed-key-forth-compact`, `committed-key-forth-v0.2.0` and
+`committed-key-forth-subset`.
 It fixes the input being signed at index one of a two-input transaction
 with one or two outputs. The fixture crosses all twelve advertised sighash
 bytes, versions 1 and 2, and both output shapes. It keeps the initial witness
@@ -35,15 +35,17 @@ repeated rows, requires the observed row set to equal the entire expected
 set, and compares each chain-gang and BSV Node result with the expected
 verdict. [Fixture](../reference/test_acceptance.py)
 
-Each committed profile also checks a valid proof, 512 one-bit mutations covering
-every selected-secret and sibling-hash block, and short and long proofs. Each
-committed profile runs 96 BSV Node activation cases across modes, transaction
-versions and creation/spend eras. A development evaluator test checks all 256
-possible byte values and one mixed digest for the Forth reconstruction word.
+Each committed profile checks a valid proof, a one-bit mutation in each proof
+block, and short and long proofs. This covers 512 positions for each classic
+committed profile and 352 for the fixed-weight candidate. Each committed profile
+runs 96 BSV Node activation cases across modes, transaction versions and
+creation/spend eras. The development evaluator checks the Forth reconstruction
+for all 256 byte values and a mixed digest. The fixed-weight test also compares
+the mask table with an independently enumerated set and checks digest binding.
 [Current execution record](validation.md)
 
-The reconstruction suite repeats the 408-row authorization domain with compact
-outputs for each of the two reconstructible profiles. Six v2-to-v1 edits per
+The reconstruction suite repeats the 408-row authorization domain with matching
+outputs for the compact, v0.2.0 and fixed-weight profiles. Six v2-to-v1 edits per
 profile retain functional unlocking and expect the explicit push-only rejection.
 Focused cases compare literal and reconstructed witness stacks, including mixed
 output order, and verify literal fallback. The v0.2.0 guard is compared with the

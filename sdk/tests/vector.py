@@ -90,6 +90,8 @@ def generate(project, node):
         })
         if signer_id is not None:
             vectors[-1]["request"]["signerIdentifier"] = signer_id.hex()
+        if "algorithm" in case:
+            vectors[-1]["algorithm"] = case["algorithm"]
     return vectors
 
 

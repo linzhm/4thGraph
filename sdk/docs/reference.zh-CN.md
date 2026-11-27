@@ -31,6 +31,8 @@ TypeScript、Rust、Go 用偶数长度、无前缀的十六进制传递交易、
 
 Python 接入 Lamport 或 WOTS+ 时，用 `sign_once = durable_signer(database, project, spend_key, sign_digest)` 封装摘要签名器，再传入回调 `lambda request: sign_once(request.payload)`。各钱包进程和各模板格式共用同一个数据库和规范化的公钥。[一次性签名器](../../src/fourthgraph/bsv/one_time_signer.py)
 
+Lamport 固定重量密钥的回调请求使用 `lamport-ots-subset`，签名器返回 4,096 字节原始签名。两种签名格式各自使用独立密钥，同一把密钥在其适用模板间共用一次性状态。[固定重量接入](../../projects/lamport-ots/docs/sdk.zh-CN.md#固定重量候选)
+
 <a name="troubleshooting"></a>
 
 ## 排错与重试

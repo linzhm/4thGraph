@@ -8,6 +8,7 @@ Git revision. Negative cases require a known script rejection or the expected
 prevout error for a deliberately invalid outpoint.
 
 - `lamport.py`: random key generation, strict digest API, process-local one-time guard.
+- `subset.py`, `subset-verifier.fth`: fixed-weight key generation, signing, proof packing and typed Script reconstruction. Create a candidate lock with `subset_locking_script(public_key)`. [Encoding and security](../docs/subset.en.md)
 - `script.py`: full-key, legacy and committed-key lock factories with fixed-r PUSHTX binding. `compact_forth_committed_locking_script(public_key)` adds the 6,830-byte profile.
 - `committed-verifier.fth`, `forth_verifier.py`: typed reconstruction and lowering for `forth_committed_locking_script(public_key)`.
 - `fixed_template.py`, `generate_template.py`: load and reproduce the v0.2.0 candidate files. Run `python projects/lamport-ots/reference/generate_template.py --check` from the repository root. [Pinned files](../versions/v0.2.0/manifest.json)
@@ -43,8 +44,10 @@ including the unpaired SINGLE paths.
 Use `sign_payment(funding_raw, vout, outputs, fee, public_key, signer)` for an
 ordinary single-input payment. Use
 `sign_spend(tx, input_index, funding_raw, public_key, signer, sighash=...)`
-for a prepared transaction. Each API accepts `signer(digest32) -> signature8192`
-and returns a signed transaction. The callback is invoked once after preflight.
+for a prepared transaction. Each API accepts a `signer(digest32)` callback
+and returns a signed transaction. The callback returns 8,192 raw signature bytes
+for a classic key or 4,096 for a key from `subset.generate_keypair()`. The
+callback is invoked once after preflight.
 A `SINGLE` input with no output at its index commits to no outputs. Approve that
 scope explicitly with `allow_unpaired_single=True` on `sign_spend` when the
 application deliberately uses it. This applies to both BIP143 and OTDA.
