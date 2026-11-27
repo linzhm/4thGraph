@@ -22,7 +22,7 @@ class HashChainBuilder(ScriptBuilder):
         super().__init__(source, vocabulary={"sha256-chain": SHA256_CHAIN})
 
     def emit_plan(self, entry, bindings):
-        return emit_bound_calls(self, entry, SHA256_CHAIN, bindings, self.lower_call)
+        return emit_bound_calls(self, entry, bindings, ((SHA256_CHAIN, self.lower_call),))
 
     def lower_call(self, token, site, name, rounds):
         if not 0 <= rounds <= 256:
