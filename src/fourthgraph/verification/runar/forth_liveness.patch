@@ -1,0 +1,10 @@
+--- a/compilers/go/codegen/forth_groth16.go
++++ b/compilers/go/codegen/forth_groth16.go
+@@ -16,0 +17,2 @@
++
++	JacobianLastUse bool
+@@ -185,2 +187,2 @@
+-				func(t *BN254Tracker, p compactJacobian) { plan.Double.emit(t, p) },
+-				func(t *BN254Tracker, p compactJacobian, x, y compactFp2) { plan.MixedAdd.emit(t, p, x, y) })
++				func(t *BN254Tracker, p compactJacobian) { plan.emitJacobian(plan.Double, t, p) },
++				func(t *BN254Tracker, p compactJacobian, x, y compactFp2) { plan.emitJacobian(plan.MixedAdd, t, p, x, y) })
