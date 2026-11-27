@@ -1,5 +1,6 @@
 import json
 from hashlib import sha256
+import os
 import subprocess
 import sys
 from importlib.metadata import PackageNotFoundError
@@ -8,16 +9,109 @@ import unittest
 from unittest.mock import patch
 
 from fourthgraph.benchmark.experiment import capabilities, digest, next_request, run
-from fourthgraph.benchmark.validation import CONTEXT_PIN, chain_metadata
+from fourthgraph.benchmark.fixtures import FIXTURES, HashChainFixture
+from fourthgraph.benchmark.spend_fixture import CONTEXT, linked_spends
+from fourthgraph.benchmark.validation import CONTEXT_PIN, Node, chain_metadata
 from fourthgraph.bsv.evaluate import evaluate
 from fourthgraph.bsv.script import asm, encode_num, number
 from fourthgraph.compiler.formula_experiment import enumerate_orders
+from fourthgraph.compiler.hash_chain import PAIRS, SINGLE, HashChainBuilder
 from fourthgraph.compiler.point_add import AFFINE, GENERAL, GUARDED, PointAddBuilder
 from fourthgraph.benchmark.point_add_fixture import PointAddFixture
 from fourthgraph.compiler.script_builder import ScriptBuilder
 
 
 class FormulaExperiments(unittest.TestCase):
+    def test_large_matrix_keeps_the_smallest_linked_plan(self):
+        self._require_pinned_chain()
+        report = run({"fixture": "matrix-mul", "axis": "B", "evaluation": "spend", "trace": True, "plans": [
+            {"passes": ["stack", "search"]},
+            {"implementation": "matrix-mul-strassen", "passes": ["stack", "search"]},
+        ]})
+        direct, strassen = report["candidates"]
+        self.assertEqual(report["ranking"][0], direct["id"])
+        self.assertNotEqual(direct["source_sha256"], strassen["source_sha256"])
+        for row, multiplications in ((direct, 8), (strassen, 7)):
+            self.assertEqual(row["test"]["status"], "passed")
+            self.assertEqual((row["test"]["spend"]["accepted"], row["test"]["spend"]["rejected"]), (64, 64))
+            self.assertEqual(sum(op["op"] == "OP_MUL" for op in row["artifact"]["instructions"]), multiplications)
+            self.assertGreater(row["metrics"]["peak_payload_bytes"], 256)
+        self.assertEqual([row["metrics"]["path_bytes"] for row in (direct, strassen)], [710, 753])
+        same_source = run({"fixture": "matrix-mul", "evaluation": "spend", "plans": [
+            {}, {"passes": ["stack"]}, {"passes": ["rewrite", "share", "stack", "search"]},
+            {"passes": ["stack", "search"]},
+        ]})
+        base, scheduled, full, simpler = same_source["candidates"]
+        self.assertEqual([row["metrics"]["path_bytes"] for row in (base, scheduled, full, simpler)],
+                         [788, 712, 710, 710])
+        self.assertEqual(same_source["ranking"][:2], [simpler["id"], full["id"]])
+
+    def test_hash_chain_binds_the_long_region_and_retains_the_checkpoint(self):
+        self._require_pinned_chain()
+        report = run({"fixture": "hash-chain", "evaluation": "spend", "enumerate": "bindings"})
+        base, paired = report["candidates"]
+        self.assertEqual(report["ranking"][0], paired["id"])
+        self.assertEqual(base["source_sha256"], paired["source_sha256"])
+        self.assertEqual([row["metrics"]["path_bytes"] for row in (base, paired)], [4363, 4331])
+        first, final = paired["compile"]["lowering"]["call_sites"]
+        self.assertEqual((first["kernel"], final["kernel"]), (SINGLE, PAIRS))
+        self.assertFalse(first["candidates"][1]["eligible"])
+        self.assertEqual((final["evidence"]["rounds"], final["kernel_bytes"], final["adapter_bytes"]), (65, 32, 1))
+        code = bytes.fromhex(paired["artifact"]["hex"])
+        start = final["offset"]
+        self.assertEqual(code[start:start + final["bytes"]], asm("OP_HASH256") * 32 + asm("OP_SHA256"))
+        for row in (base, paired):
+            self.assertEqual(row["test"]["status"], "passed")
+            self.assertEqual((row["test"]["spend"]["accepted"], row["test"]["spend"]["rejected"]), (29, 29))
+        self.assertEqual(run(report["request"])["run_id"], report["run_id"])
+
+    def test_hash_chain_rejects_bindings_without_compatible_rounds(self):
+        report = run({"fixture": "hash-chain", "plans": [
+            {"bindings": [{"site": 0, "kernel": PAIRS}]},
+            {"bindings": [{"site": 1, "kernel": AFFINE}]},
+        ]})
+        self.assertEqual(report["ranking"], [])
+        self.assertIn("at least two", report["candidates"][0]["compile"]["diagnostic"])
+        self.assertIn("wrong operation", report["candidates"][1]["compile"]["diagnostic"])
+        for rounds in (0, 2, 64, 256):
+            with self.subTest(rounds=rounds):
+                builder = HashChainBuilder(f"REQUIRE stdlib/hash-chain.fth\n"
+                                           f": fold ( script -- script ) {rounds} sha256-chain ;")
+                bindings = [{"site": 0, "kernel": PAIRS}] if rounds else []
+                code, _ = builder.emit_plan("fold", bindings)
+                self.assertEqual(code, asm("OP_HASH256") * (rounds // 2))
+        builder = HashChainBuilder("REQUIRE stdlib/hash-chain.fth\n: fold ( script -- script ) 257 sha256-chain ;")
+        with self.assertRaisesRegex(ValueError, "between 0 and 256"):
+            builder.emit_plan("fold", [])
+
+    def test_hash_chain_spans_follow_repeated_fragments(self):
+        source = """REQUIRE stdlib/hash-chain.fth
+        : pair ( script -- script ) 2 sha256-chain ;
+        : repeated ( script -- script ) op-nop bsv-empty pair 3 bsv-repeat-code bsv-cat-code ;
+        """
+        builder = HashChainBuilder(source)
+        code, sites = builder.emit_plan("repeated", [{"site": 0, "kernel": PAIRS}])
+        self.assertEqual(code, asm("OP_NOP OP_HASH256 OP_HASH256 OP_HASH256"))
+        self.assertEqual([(site["site"], site["offset"], site["bytes"]) for site in sites],
+                         [(0, 1, 1), (0, 2, 1), (0, 3, 1)])
+
+    @unittest.skipUnless(os.environ.get("REGTEST_COOKIE"), "requires tools/verify_node.sh")
+    def test_large_arithmetic_and_hash_spends_match_regtest(self):
+        self._require_pinned_chain()
+        node = Node(os.environ["REGTEST_URL"], os.environ["REGTEST_COOKIE"])
+        matrix = FIXTURES["matrix-mul"]
+        matrix_plans = [{"implementation": implementation, "passes": ["stack", "search"]}
+                        for implementation in matrix.implementations]
+        for fixture, options in ((matrix, {"axis": "B", "plans": matrix_plans}),
+                                 (HashChainFixture(), {"enumerate": "bindings"})):
+            report = run({"fixture": fixture.name, "evaluation": "spend", **options})
+            for row in report["candidates"]:
+                self.assertEqual(row["test"]["status"], "passed")
+                script = bytes.fromhex(row["artifact"]["hex"])
+                for case, parent, spend, rejected in linked_spends(fixture, script):
+                    self.assertEqual(node.verdicts(spend, (parent,), **CONTEXT), [True], case)
+                    self.assertEqual(node.verdicts(rejected, (parent,), **CONTEXT), [False], case)
+
     def test_cross_axis_baseline_uses_the_same_compiler_plan(self):
         first = run({"fixture": "bezier", "plans": [{}, {"passes": ["stack"]}]})
         _, stack = first["candidates"]
