@@ -29,7 +29,7 @@ The v0.5.0 Forth entry selects a compiler pass that combines removals of stack i
 | v0.6.0 | `wrap` | 470,781 B | 6,765 B | 477,627 B | 470,917 B | 6,935 B | **477,852 B** |
 | v0.6.0 | `other` | 470,779 B | 6,761 B | 477,620 B | 470,916 B | 6,930 B | **477,846 B** |
 
-Each v0.5.0 lock is 13,172 B smaller than its v0.4.0 counterpart. The totals include full serialization of the deployment and one spend. Regtest funding transactions are separate. The combined stack payload peaks at 8,872 B for `wrap` and 8,870 B for `other`. [v0.5.0 measurements](../versions/v0.5.0/measurements.json)
+Each v0.5.0 lock is 13,172 B smaller than its v0.4.0 counterpart. The table records regtest runs and counts the fully serialized deployment and one spend. Regtest funding transactions are separate. DER signature lengths can change the serialized script path and transaction totals across replays. Each release and fixture has fixed lock and proof witness-prefix digests. The combined stack payload peaks at 8,872 B for `wrap` and 8,870 B for `other`. [v0.5.0 measurements](../versions/v0.5.0/measurements.json)
 
 In v0.6.0 the backend counts the remaining uses of each Fp2 operand in a Jacobian formula. It consumes the original slot on its last use and keeps borrowed affine coordinates available to subsequent rounds. The tracker binds returned coordinate names at their current stack positions. Both locks shrink by 21,226 B. The witness prefix hashes, arithmetic schedules and measured peak stack payloads match v0.5.0. [Compiler pass](../../../src/fourthgraph/verification/runar/forth_liveness.go) · [v0.6.0 measurements](../versions/v0.6.0/measurements.json)
 
