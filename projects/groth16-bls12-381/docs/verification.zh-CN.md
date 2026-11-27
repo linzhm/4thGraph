@@ -48,9 +48,11 @@ REGTEST_CHRONICLE_HEIGHT=1000 bash tools/verify_node.sh --profile raised -- \
   python3 projects/groth16-bls12-381/reference/replay_plan.py --release current --funded
 ```
 
-Chronicle 回放使用激活高度 `2`，并加 `--script-era chronicle`。构建器校验文件、锁和见证摘要，产物写入 `projects/groth16-bls12-381/workspace/build/pinned-v0.12.0/`。入金回放另外输出交易验证报告。[v0.12.0 锁定计划](../versions/v0.12.0/replay-plan.json)
+Chronicle 回放使用激活高度 `2`，并加 `--script-era chronicle`。构建器校验文件、锁和见证摘要，产物写入 `projects/groth16-bls12-381/workspace/build/pinned-v0.13.0/`。入金回放另外输出交易验证报告。[v0.13.0 锁定计划](../versions/v0.13.0/replay-plan.json)
 
 v0.12.0 沿用 v0.11.0 的 MSM 和 Miller 计划，比较每次 G1 倍点归约与连续两次倍点后归约。合并后两个时代均减少 1,282 B。对夹具的五个有界动态输入，锁加见证为 Genesis 238,122 B、Chronicle 237,217 B。 实测栈峰值为 29,891 B，配对测量的验证耗时有所上升。[v0.12.0 实测](../versions/v0.12.0/measurements.json)
+
+v0.13.0 比较 1、4、8、16 次 G1 倍点的 Z 坐标分批方案，每种分别测试布尔优化。搜索选中启用布尔优化的 16 次分批方案。锁加见证为 Genesis 237,225 B、Chronicle 236,566 B。两份见证哈希一致，实测栈峰值为 29,891 B。配对验证耗时有升有降，报告记录了 4、8、16 次分批方案与 v0.12.0 的中位数。[v0.13.0 实测](../versions/v0.13.0/measurements.json)
 
 nChain 对照使用相同的 BLS12-381 验证密钥、两份证明和五个有界动态输入。v0.11.0 路径为 239,404 B，nChain `fc20fb7` 三种布局、三档取模阈值中最短的路径为 394,212–396,635 B。nChain 投影布局的见证为 1,112–1,134 B。[同夹具对照实测](../versions/v0.11.0/nchain-comparison.json)
 

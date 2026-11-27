@@ -48,9 +48,11 @@ REGTEST_CHRONICLE_HEIGHT=1000 bash tools/verify_node.sh --profile raised -- \
   python3 projects/groth16-bls12-381/reference/replay_plan.py --release current --funded
 ```
 
-For Chronicle set the activation height to `2` and add `--script-era chronicle`. The runner writes the checked lock and both witnesses under `projects/groth16-bls12-381/workspace/build/pinned-v0.12.0/`, with a replay report for funded runs. The pinned plan verifies file and bytecode digests. [v0.12.0 replay plan](../versions/v0.12.0/replay-plan.json)
+For Chronicle set the activation height to `2` and add `--script-era chronicle`. The runner writes the checked lock and both witnesses under `projects/groth16-bls12-381/workspace/build/pinned-v0.13.0/`, with a replay report for funded runs. The pinned plan verifies file and bytecode digests. [v0.13.0 replay plan](../versions/v0.13.0/replay-plan.json)
 
 v0.12.0 retains the v0.11.0 MSM and Miller plan and compares G1 reduction after each doubling against reduction after a pair of consecutive doublings. Pairing these reductions saves 1,282 bytes in either era. The serialized lock and witness total 238,122 bytes on Genesis and 237,217 bytes on Chronicle for the five bounded dynamic inputs in the fixture. The measured stack peak stays at 29,891 bytes and verification takes longer in the paired timing samples. [v0.12.0 measurements](../versions/v0.12.0/measurements.json)
+
+v0.13.0 compares G1 Z batches of 1, 4, 8 and 16 doublings with and without compact numeric boolean lowering. The search selects 16 with the boolean pass enabled. The serialized lock and witness total 237,225 bytes on Genesis and 236,566 bytes on Chronicle. Both fixture witnesses retain their hashes and the measured stack peak is 29,891 bytes. Paired verification timings are mixed across the two engines and Script eras. The report records the medians for batch sizes 4, 8 and 16 against v0.12.0. [v0.13.0 measurements](../versions/v0.13.0/measurements.json)
 
 The nChain rerun uses the same BLS12-381 key, two proofs and five bounded dynamic inputs. It measures v0.11.0 against three layouts and three reduction thresholds from upstream `fc20fb7`. The best nChain path in that sweep was 394,212–396,635 bytes, and the v0.11.0 path was 239,404 bytes. The nChain projective path has a 1,112–1,134 byte witness. [Same-fixture comparison](../versions/v0.11.0/nchain-comparison.json)
 
