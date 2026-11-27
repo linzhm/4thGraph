@@ -8,12 +8,14 @@ from itertools import product
 import unittest
 from unittest.mock import patch
 
+from fourthgraph.benchmark.doubling_window_fixture import DoublingWindowFixture, double_coordinates
 from fourthgraph.benchmark.experiment import binding_plans, capabilities, digest, next_request, run
 from fourthgraph.benchmark.fixtures import ByteLayoutFixture, FIXTURES, HashChainFixture
 from fourthgraph.benchmark.spend_fixture import CONTEXT, linked_spends
 from fourthgraph.benchmark.validation import CONTEXT_PIN, NODE_GENESIS_FLAGS, Node, chain_metadata
-from fourthgraph.bsv.evaluate import evaluate
+from fourthgraph.bsv.evaluate import ScriptError, evaluate
 from fourthgraph.bsv.script import asm, encode_num, number
+from fourthgraph.compiler.doubling_window import LOCAL, LOCAL_PAIRED, PAIRED, DoublingWindowBuilder
 from fourthgraph.compiler.formula_experiment import RULES, enumerate_orders, transform
 from fourthgraph.compiler.byte_layout import PACKED as PACKED_BYTES, REPEAT as REPEAT_BYTES
 from fourthgraph.compiler.hash_chain import PAIRS, SINGLE, HashChainBuilder
@@ -29,6 +31,94 @@ FALSE_TOP_REJECTION = "Script evaluated without error but finished with a false/
 
 
 class FormulaExperiments(unittest.TestCase):
+    def test_doubling_window_records_the_reduction_proof_and_field_placement_cost(self):
+        self._require_pinned_chain()
+        request = {"fixture": "doubling-window", "evaluation": "spend", "enumerate": "binding-combinations",
+                   "trace": True}
+        report = run(request)
+        rows = report["candidates"]
+        baseline, _, paired, local, combined, *_ = rows
+        self.assertEqual([row["metrics"]["path_bytes"] for row in rows], [1171, 1180, 1155, 1156, 1144, 1164, 1165, 1153])
+        self.assertEqual([row["metrics"]["peak_payload_bytes"] for row in rows[:5]], [653, 653, 748, 686, 781])
+        self.assertEqual(report["ranking"][0], combined["id"])
+        self.assertEqual(report["baseline_path_bytes"], 1171)
+        for row in rows:
+            spend = row["test"]["spend"]
+            self.assertEqual((spend["status"], spend["accepted"], spend["rejected"]), ("passed", 32, 32))
+            first, window = row["compile"]["lowering"]["call_sites"]
+            self.assertEqual(first["evidence"]["rounds"], 1)
+            self.assertEqual(window["evidence"]["rounds"], 9)
+            self.assertEqual(window["adapter_bytes"] + window["kernel_bytes"], window["bytes"])
+            code = bytes.fromhex(row["artifact"]["hex"])
+            for site in (first, window):
+                offset = site["offset"]
+                self.assertEqual(site["linked_sha256"], sha256(code[offset:offset + site["bytes"]]).hexdigest())
+                for segment in site["segments"]:
+                    start = offset + segment["relative_offset"]
+                    kernel = code[start:start + segment["kernel_bytes"]]
+                    self.assertEqual(sha256(kernel).hexdigest(), segment["kernel_sha256"])
+                    copies = code[start:start + segment["kernel_bytes"] * segment["copies"]]
+                    self.assertEqual(copies, kernel * segment["copies"])
+        window = combined["compile"]["lowering"]["call_sites"][1]
+        self.assertEqual(window["evidence"]["paired_input_proof"], "preceding-reduction")
+        self.assertEqual(window["evidence"]["field_slot"], "below-point")
+        self.assertEqual([(s["kernel"], s["copies"]) for s in window["segments"]], [(LOCAL, 1), (LOCAL_PAIRED, 4)])
+        for row, expected in ((baseline, 30), (paired, 26), (combined, 26)):
+            self.assertEqual(sum(op["op"] == "OP_MOD" for op in row["artifact"]["instructions"]), expected)
+
+        bounded = run({**request, "max_payload_bytes": 700})
+        self.assertEqual(bounded["ranking"][0], local["id"])
+        self.assertEqual(run(bounded["request"], replaying=True)["run_id"], bounded["run_id"])
+
+    def test_doubling_pair_cannot_cross_a_checkpoint_and_emits_the_even_window_tail(self):
+        report = run({"fixture": "doubling-window", "plans": [
+            {"bindings": [{"site": 0, "kernel": kernel}]} for kernel in (PAIRED, LOCAL_PAIRED)
+        ]})
+        self.assertEqual(report["ranking"], [])
+        for row in report["candidates"]:
+            self.assertIn("complete first round", row["compile"]["diagnostic"])
+
+        source = "REQUIRE stdlib/secp256k1.fth\n: window ( script -- script ) 4 secp256k1-double-window ;"
+        builder = DoublingWindowBuilder(source)
+        code, sites = builder.emit_plan("window", [{"site": 0, "kernel": LOCAL_PAIRED}])
+        self.assertEqual([segment["rounds_per_copy"] for segment in sites[0]["segments"]], [1, 2, 1])
+        fixture = DoublingWindowFixture()
+        field, *coords = list(fixture.vectors())[6][0]
+        result = coords
+        for _ in range(4):
+            result = double_coordinates(result)
+        marker = b"caller"
+        main, alt = evaluate(asm("OP_TOALTSTACK") + code,
+                             [encode_num(field), marker, *map(encode_num, coords), marker])
+        self.assertEqual(main, [encode_num(field), marker, *map(encode_num, result)])
+        self.assertEqual(alt, [marker])
+        with self.assertRaisesRegex(ScriptError, "NUMEQUALVERIFY"):
+            evaluate(code, list(map(encode_num, (field - 1, *coords))))
+
+    @unittest.skipUnless(os.environ.get("REGTEST_COOKIE"), "requires tools/verify_node.sh")
+    def test_doubling_window_checkpoint_and_field_checks_match_both_engines(self):
+        from fourthgraph.bsv.chain_gang import validate_at_heights
+
+        self._require_pinned_chain()
+        fixture = DoublingWindowFixture()
+        node = Node(os.environ["REGTEST_URL"], os.environ["REGTEST_COOKIE"])
+        report = run({"fixture": fixture.name, "evaluation": "spend", "enumerate": "binding-combinations"})
+        for row in report["candidates"]:
+            self.assertEqual(row["test"]["status"], "passed")
+            script = bytes.fromhex(row["artifact"]["hex"])
+            for case, parent, spend, rejected in linked_spends(fixture, script):
+                self.assertEqual(node.verdicts(spend, (parent,), **CONTEXT), [True], case)
+                self.assertEqual(node.verdicts(rejected, (parent,), **CONTEXT,
+                                               expected_rejection=EQUALVERIFY_REJECTION), [False], case)
+                with self.assertRaisesRegex(ValueError, r"^Error evaluating the script `OP_EQUALVERIFY operands are not equal`$"):
+                    validate_at_heights(rejected, (parent,), **CONTEXT)
+            field, *coords = case["operands"]
+            malformed = spend.with_script(0, b"".join(map(number, (field - 1, *coords))))
+            self.assertEqual(node.verdicts(malformed, (parent,), **CONTEXT,
+                                           expected_rejection="Script failed an OP_NUMEQUALVERIFY operation"), [False])
+            with self.assertRaisesRegex(ValueError, r"^Error evaluating the script `Numbers are not equal`$"):
+                validate_at_heights(malformed, (parent,), **CONTEXT)
+
     def test_byte_layout_composes_distinct_bindings_and_respects_the_payload_budget(self):
         self._require_pinned_chain()
         request = {"fixture": "byte-layout", "evaluation": "spend", "enumerate": "binding-combinations"}

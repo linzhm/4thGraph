@@ -130,6 +130,17 @@ class Secp256k1LibraryTests(unittest.TestCase):
                     if right is not None:
                         self.check_kernel(affine, prefix, (*lhs, *self.scale(right)), expected)
 
+    def test_doubling_exports_declare_the_field_placement_parameter(self):
+        for word in ("secp256k1-double-with-field", "secp256k1-double-pair-with-field"):
+            with self.subTest(word=word):
+                _, export = self.app.imported_words[word]
+                self.assertEqual([(parameter.name, parameter.type) for parameter in export.build_parameters],
+                                 [("placement", "cell")])
+                bottom = self.app.emit(word, b"", 0)
+                nearby = self.app.emit(word, b"", 1)
+                self.assertNotEqual(bottom, nearby)
+                self.assertEqual(self.app.emit(word, b"", -1), nearby)
+
     def test_scaled_doubling_and_paired_doubling(self):
         for placement, prefix in ((0, (FIELD, -19)), (1, (-19, FIELD))):
             single = self.app.emit("secp256k1-scaled-double-with-field", b"", placement)

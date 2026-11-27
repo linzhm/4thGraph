@@ -44,7 +44,7 @@ PELS 在架构上归属标准库模板族，应用提供输出和字段约束，
 | `std/script-fragments` | 构造栈搬运、32 字节反序和无符号大端整数解码片段 | [库源码](../../src/fourthgraph/stdlib/script-fragments.fth) |
 | `std/hash-chain` | `sha256-chain-single` 和 `sha256-chain-pairs` 按构建期给定的次数生成 SHA-256 单轮或配对片段，各片段从运行时栈消费一个字节串 | [哈希内核](../../src/fourthgraph/stdlib/hash-chain.fth) |
 | `std/byte-layout` | 在调用方检查宽度后反转打包的 32 字节字段，或用字面量、重复种子生成固定字节串。 | [字节内核](../../src/fourthgraph/stdlib/byte-layout.fth) · [绑定实验](../optimization-paths.zh-CN.md) |
-| `std/secp256k1` | 齐次射影点加、仿射混合点加、倍点及对应的缩放坐标内核。`secp256k1-lambda-split` 分解标量。群阶已在栈上时，`secp256k1-lambda-split-with-order` 接收 `k n`。 | [曲线内核](../../src/fourthgraph/stdlib/secp256k1.fth) |
+| `std/secp256k1` | 齐次射影点加、仿射混合点加、逐轮与成对倍点，以及缩放坐标内核。支持显式域模数位置的倍点词在构建期接收栈槽选择。群阶已在栈上时，`secp256k1-lambda-split-with-order` 接收 `k n`。 | [曲线内核](../../src/fourthgraph/stdlib/secp256k1.fth) · [倍点窗口对照](../optimization-paths.zh-CN.md) |
 | `std/bip340` | `bip340-verify ( script -- script )`，构造 BIP340 验签片段 | [付款示例](../../projects/p2pkh-schnorr/README.zh-CN.md) |
 | `std/groth16-bls12-381` | `groth16-bls12-381-verify ( -- groth16-verified )`，由 BLS12-381 verifier 后端编译 | [Groth16 Forth 源码](../../src/fourthgraph/stdlib/groth16-bls12-381.fth) · [项目调用](../../projects/groth16-verifier/verifier.fth) |
 | `std/verify` | `relation: TRANSITION ROUTE ;`，声明一个可用多种后端验证的关系 | [状态验证示例](../../projects/proof-counter/verify-state.fth) |
