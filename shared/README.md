@@ -15,3 +15,25 @@ Cryptographic parameters, identity policy, witness format and authorization cove
 
 - [Signed transaction benchmark](benchmark.md) and [简体中文](benchmark.zh-CN.md) describe
   the cross-project cost, acceptance, and funded regtest reports.
+
+## Workspace regression runner
+
+Run from the 4thGraph repository root with Python 3.12, the
+[transaction matrix dependencies](benchmark.md#optimization-regression-matrix),
+and the toolchains for the selected repositories on `PATH`. For the default
+run, place `bsv-script-lean` and `chain-gang` beside 4thGraph or pass their
+parent directory with `--workspace`.
+
+```sh
+python -m shared.test_workspace
+python -m shared.test_workspace --project p2pkh-r1 --project chain-gang
+bash shared/verify_node.sh -- python -m shared.test_workspace
+```
+
+The runner reports each group's result and exits nonzero if any group fails
+or cannot start. It includes shared Python tests, a transaction matrix for each
+of the nine Script Lab projects, the Lean number, flow, sighash, Script and
+transaction vector checks, and the default Rust tests with the lockfile.
+The regtest launcher adds BSV Node verdicts to the transaction matrices.
+The standalone Lean release gates, SDK suites and Rust tests marked ignored
+have their own entry points.
