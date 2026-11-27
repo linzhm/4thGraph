@@ -67,22 +67,27 @@ def cases():
 
 
 def mode_fixture(flag, *, paired=True, version=2, lock_factory=None, compress_otda=False):
-    from script import locking_script
+    import lamport
+    import subset
+    from script import locking_script, subset_locking_script
     from payment import sign_spend
 
-    secret = test_secret(b'universal/' + bytes([flag, paired]))
-    key = public_key(secret)
     lock_factory = lock_factory or locking_script
+    scheme = subset if lock_factory is subset_locking_script else lamport
+    prefix = b'subset/' if scheme is subset else b''
+    secret = test_secret(prefix + b'universal/' + bytes([flag, paired]))[:scheme.KEY_BYTES]
+    key = scheme.public_key(secret)
     parent = Transaction((Input(b'\x62'*32, 0),), (Output(10000, lock_factory(key)),))
     other = Transaction((Input(b'\x44'*32, 0),), (Output(1000, b'\x51'),))
     outputs = (Output(500, b'\x51'), Output(10400, b'\x51')) if paired else (Output(10900, b'\x51'),)
     if compress_otda:
         outputs = tuple(
-            replace(output, script=lock_factory(public_key(test_secret(b'compact output/' + bytes([i])))))
+            replace(output, script=lock_factory(scheme.public_key(
+                test_secret(prefix + b'compact output/' + bytes([i]))[:scheme.KEY_BYTES])))
             for i, output in enumerate(outputs)
         )
     tx = Transaction((Input(other.txid_wire(), 0), Input(parent.txid_wire(), 0)), outputs, version=version)
-    signed = sign_spend(tx, 1, parent.serialize(), key, lambda digest: sign_digest(secret, digest),
+    signed = sign_spend(tx, 1, parent.serialize(), key, lambda digest: scheme.sign_digest(secret, digest),
                         sighash=flag, allow_unpaired_single=not paired, compress_otda=compress_otda)
     return secret, (other, parent), signed
 

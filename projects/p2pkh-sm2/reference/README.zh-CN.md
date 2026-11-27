@@ -109,6 +109,28 @@ cmp /tmp/sm2-window-kernels.json projects/p2pkh-sm2/versions/v1.11.0/window-kern
 
 [窗口公式](point-window.fth) · [4thGraph skill](../../../skills/4thgraph/SKILL.md) · [整笔交易实测](../versions/v1.11.0/measurements.json)
 
+<a name="public-table-tuning"></a>
+
+## 复现公钥点表调度
+
+在 4thGraph `0.2.7` 的提交 `1c44d28` 上，模板 `11` 比较了 24 个命名值栈调度。方案组合了二叉或线性加点链、仿射或投影基点、成组操作数和清理末尾失效值。二叉链也比较了重新编译倍点与复用模板 `10` 的 67 字节片段。曲线检查已确认有限公钥 Q，SM2 余因子为 1，生成的 1Q 至 16Q 都是有限点。单元测试用独立标量乘法核对全部调度的每个点。
+
+```sh
+export PYTHONPATH=src:.
+python projects/p2pkh-sm2/reference/compile_public_table.py /tmp/sm2-public-table.json \
+  --report /tmp/sm2-public-table-tuning.json
+cmp /tmp/sm2-public-table.json projects/p2pkh-sm2/versions/v1.12.0/public-table.json
+cmp /tmp/sm2-public-table-tuning.json projects/p2pkh-sm2/versions/v1.12.0/public-table-tuning.json
+python projects/p2pkh-sm2/reference/generate_lock.py --version 11 \
+  --owner-hash160 0000000000000000000000000000000000000000
+python projects/p2pkh-sm2/reference/generate_otda_constructor.py --version 11 /tmp/sm2-otda-v11.hex \
+  --report /tmp/sm2-point-cache-tuning.json
+cmp /tmp/sm2-otda-v11.hex projects/p2pkh-sm2/versions/v1.12.0/otda-constructor.hex
+cmp /tmp/sm2-point-cache-tuning.json projects/p2pkh-sm2/versions/v1.12.0/constructor-tuning.json
+```
+
+[点表编译器](compile_public_table.py) · [点表候选](../versions/v1.12.0/public-table-tuning.json) · [构造器候选](../versions/v1.12.0/constructor-tuning.json)
+
 <a name="byte-tuning"></a>
 
 ## 复现定长字节字段的编译绑定
@@ -159,7 +181,7 @@ cmp /tmp/sm2-constructor-tuning.json projects/p2pkh-sm2/versions/v1.11.0/constru
 
 构造器测试逐字节比对预映像、公钥和签名三项栈值，并由 BSV Node 和 chain-gang 验证完整花费。[布局与指纹](../versions/v1.1.0/layout.json) · [钱包接入](../docs/sdk.zh-CN.md)
 
-模板 `10` 的重建交易签入至少四个输入时，编译器也会比较输入前缀的两种编码。缓存方案在每个输入的 32 字节交易 ID 后追加相同的字节串，复用 OTDA 序列化器提供的实际签名输入。计入压栈、复制和清理指令后，钱包选择较短的编码。最新矩阵覆盖混入原生 P2PKH 输入、不同序列号和配对 SINGLE。[输入前缀编译器](../../../src/fourthgraph/compiler/preimage.py) · [尺寸对比](../versions/v1.11.0/measurements.json)
+模板 `10` 和 `11` 的重建交易签入至少四个输入时，编译器也会比较输入前缀的两种编码。缓存方案在每个输入的 32 字节交易 ID 后追加相同的字节串，复用 OTDA 序列化器提供的实际签名输入。计入压栈、复制和清理指令后，钱包选择较短的编码。最新矩阵覆盖混入原生 P2PKH 输入、不同序列号和配对 SINGLE。[输入前缀编译器](../../../src/fourthgraph/compiler/preimage.py) · [尺寸对比](../versions/v1.11.0/measurements.json)
 
 <a name="mixed-otda-constructor"></a>
 
@@ -182,18 +204,19 @@ cmp /tmp/sm2-otda-mixed.json projects/p2pkh-sm2/versions/v1.8.0/mixed-otda-const
 
 ```sh
 bash tools/verify_node.sh -- python projects/p2pkh-sm2/reference/test_otda_matrix.py \
-  --template 10 --report /tmp/sm2-latest-template-coverage.json
-cmp /tmp/sm2-latest-template-coverage.json projects/p2pkh-sm2/versions/v1.11.0/latest-template-coverage.json
+  --template 11 --report /tmp/sm2-latest-template-coverage.json
+cmp /tmp/sm2-latest-template-coverage.json projects/p2pkh-sm2/versions/v1.12.0/latest-template-coverage.json
 ```
 
-将命令改用 `--template 9`、`--template 8` 或 `--template 7` 可复现以前的报告。每次运行中，SM2 上一输出和可识别的 SM2 收款输出均使用同一种模板。模板 `10` 的 38 例矩阵包括十二进一出和二十四进一出的 OTDA ALL，也覆盖 ALL 和 SINGLE 的重复输入尾部。[模板 9 覆盖报告](../versions/v1.10.0/latest-template-coverage.json) · [模板 8 覆盖报告](../versions/v1.9.0/latest-template-coverage.json) · [模板 7 覆盖报告](../versions/v1.8.0/latest-template-coverage.json)
+将命令改用 `--template 10`、`--template 9`、`--template 8` 或 `--template 7` 可复现以前的报告。每次运行中，SM2 上一输出和可识别的 SM2 收款输出均使用同一种模板。模板 `11` 的 38 例矩阵包括十二进一出和二十四进一出的 OTDA ALL，也覆盖 ALL 和 SINGLE 的重复输入尾部。[模板 9 覆盖报告](../versions/v1.10.0/latest-template-coverage.json) · [模板 8 覆盖报告](../versions/v1.9.0/latest-template-coverage.json) · [模板 7 覆盖报告](../versions/v1.8.0/latest-template-coverage.json)
 
-尺寸对比还复放四十进一出的 OTDA ALL。每笔交易的输入和输出使用同一个 SM2 模板，两个版本都用报告中指定的编译器提交构建。
+尺寸对比还复放四十进一出的 OTDA ALL。每笔交易的输入和输出使用同一个 SM2 模板。两次运行使用同一组密钥和金额，以及报告中指定的编译器提交。
 
 ```sh
 bash tools/verify_node.sh -- python projects/p2pkh-sm2/reference/measure_template_sizes.py \
-  --compiler-commit a003c4f2e20b3ad53a46c378568531dd4b6c5856 --report /tmp/sm2-template-sizes.json
-cmp /tmp/sm2-template-sizes.json projects/p2pkh-sm2/versions/v1.11.0/measurements.json
+  --baseline 10 --candidate 11 --compiler-commit 1c44d2882e37d3f46e4b861e83063d630db66555 \
+  --report /tmp/sm2-template-sizes.json
+cmp /tmp/sm2-template-sizes.json projects/p2pkh-sm2/versions/v1.12.0/measurements.json
 ```
 
 <a name="p2pkh-sponsorship"></a>
@@ -204,9 +227,9 @@ cmp /tmp/sm2-template-sizes.json projects/p2pkh-sm2/versions/v1.11.0/measurement
 
 ```sh
 bash tools/verify_node.sh --profile default -- python projects/p2pkh-sm2/reference/verify_fee_sponsorship.py \
-  --template 10 --report /tmp/sm2-p2pkh-default.json
+  --template 11 --report /tmp/sm2-p2pkh-default.json
 bash tools/verify_node.sh --profile raised -- python projects/p2pkh-sm2/reference/verify_fee_sponsorship.py \
-  --template 10 --report /tmp/sm2-p2pkh-raised.json
+  --template 11 --report /tmp/sm2-p2pkh-raised.json
 ```
 
 入金交易 ID 和签名受本地生成的区块影响。复现时可核对接收、入块结果和字节数。

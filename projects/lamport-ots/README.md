@@ -8,13 +8,14 @@
 
 **[Wallet SDK quickstart](docs/sdk.en.md#quickstart)** · [Unified wallet SDK](../../sdk/README.md#quickstart)
 
-Lamport OTS binds an 8,192-byte one-time signature to a BSV transaction input. The v0.1.0 development baseline includes full-key and committed-key payment locks. The Forth experiments reduce the committed-key lock from 7,746 to 7,042 bytes, then to 6,830 bytes with a compact transaction binding. [Protocol](docs/spec.md) · [Forth design and measurements](docs/optimization.md)
+Lamport OTS uses SHA-256 commitments to independently generated secrets to authorize a BSV input. The fixed-weight research candidate reduces the committed proof from 16,384 to 11,264 bytes and the raw signature from 8,192 to 4,096 bytes. [Signature design](docs/subset.en.md) · [Protocol](docs/spec.md)
 
 [Protocol](docs/developer.en.md) · [Algorithm and execution](#algorithm-and-execution) · [Reproduce the checks](#reproduce-the-checks) · [Complete transactions and stack measurements](#complete-transactions-and-stack-measurements) · [Measurements data](versions/v0.1.0/measurements.json)
 
 | Entry point | Purpose |
 | --- | --- |
 | `locking_script` | Build the full-key or committed-key payment lock from the selected key representation. |
+| `subset_locking_script` | Build the fixed-weight candidate lock from the corresponding ordered public key. |
 | `sign_spend` | Bind a selected input to the transaction and call an external one-time signer. |
 
 ## Algorithm and execution
@@ -22,6 +23,8 @@ Lamport OTS binds an 8,192-byte one-time signature to a BSV transaction input. T
 The opt-in **v0.2.0 candidate** uses a 6,525-byte lock and an 871-byte OTDA reconstruction program pinned in the version catalog. [v0.2.0 manifest](versions/v0.2.0/manifest.json) · [Measurements](versions/v0.2.0/measurements.json)
 
 The full-key lock embeds the ordered Lamport public key. A committed-key lock stores its SHA-256 digest and checks the full key supplied at spend time. The transaction binding checks the current input. [Protocol](docs/spec.md)
+
+The opt-in fixed-weight candidate maps each digest byte to four of eleven slots. Changing the digest requires a previously unopened slot. The scheme uses its own key format and one independently generated key per output. [Signature format and security](docs/subset.en.md)
 
 ## Reproduce the checks
 
@@ -52,6 +55,8 @@ Run `bash projects/lamport-ots/reference/verify_apple.sh` on macOS with Apple Co
 
 The funded regtest replay confirmed mempool admission and mining for funding, one turnover and exit for both Forth profiles under BIP143 ALL and Chronicle OTDA ALL. It also replayed the same lifecycle with reconstruction enabled on the compact profile. [Funded results and reproduction](docs/validation.md#funded-regtest)
 
+The fixed-weight candidate completed direct exits and one-turnover flows under BIP143 ALL and Chronicle OTDA ALL. All ten transactions entered the default-policy regtest node's mempool and were mined. [Dual-engine and funded results](docs/validation.md#fixed-weight-candidate-replay)
+
 ## Developer and wallet integration
 
 ### Build a payment
@@ -75,11 +80,14 @@ The sizes below use ordinary BIP143 ALL (`0x41`) and Chronicle OTDA ALL (`0x61`)
 | `committed-key-forth` (experimental) | 7,042 | 16,549 | 47,300 | 75,392 |
 | `committed-key-forth-compact` (experimental) | 6,830 | 16,549 | 46,876 | 74,120 |
 | `committed-key-forth-v0.2.0` (candidate) | 6,525 | 16,549 | 46,266 | 72,290 |
+| `committed-key-forth-subset` (research) | 8,003 | 11,429 | 38,982 | 70,918 |
 
-Full-key inputs cost less to spend into ordinary outputs. The committed profiles store SHA-256 of the ordered public key and use an additional 8,192 bytes per input to reconstruct it. Shorter output locks also reduce OTDA ALL preimages, which serialize the outputs into each input's signing preimage. [Marginal and lifecycle costs](docs/optimization.md#transaction-and-lifecycle-costs)
+Full-key inputs cost less to spend into ordinary outputs. The classic committed profiles store SHA-256 of the ordered public key and use an additional 8,192 bytes per input to reconstruct it. Shorter output locks also reduce OTDA ALL preimages, which serialize the outputs into each input's signing preimage. [Marginal and lifecycle costs](docs/optimization.md#transaction-and-lifecycle-costs)
 
 For version-2 Chronicle spends, opt-in OTDA reconstruction reduces the compact profile's OTDA ALL 2×2 payment from **74,120 to 48,830 bytes** when both outputs use that profile. [Reconstruction and wallet options](docs/optimization.md#otda-unlocking-reconstruction)
 
 With both outputs using v0.2.0, OTDA reconstruction brings the same payment shape to **48,106 bytes**. [v0.2.0 design](docs/optimization.md#version-020-candidate)
+
+The fixed-weight candidate measures **41,920 bytes** with reconstructed OTDA ALL 2×2. A two-input direct exit to native P2PKH saves **10,240 bytes** in either ALL mode versus v0.2.0. [Fixed-weight costs](docs/optimization.md#fixed-weight-candidate)
 
 The reference supports all twelve BIP143 and OTDA ALL, NONE and SINGLE combinations with optional ANYONECANPAY. BIP143 ALL is the wallet default. The reference requires explicit approval for unpaired SINGLE, which commits to zero outputs. The legacy two-push BIP143 ALL profile remains spendable. The detached digest verifier is for tests only because the same proof can authorize a different transaction. [Wire and Script specification](docs/spec.md) · [Acceptance domain](docs/acceptance.md)

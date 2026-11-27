@@ -1,11 +1,12 @@
 """Transaction authorization using an external Lamport signer callback."""
 from dataclasses import dataclass
 
+import subset
 from lamport import bits, verify_digest
 from script import (
     COMPANION_CODE, ORDINARY_CODE, N, R, committed_locking_script, compact_forth_committed_locking_script,
     compact_forth_pattern, forth_committed_locking_script, legacy_locking_script, locking_script,
-    v020_forth_committed_locking_script, v020_forth_pattern,
+    subset_forth_pattern, subset_locking_script, v020_forth_committed_locking_script, v020_forth_pattern,
 )
 from fourthgraph.bsv.otda_reconstruction import reconstruct_mixed
 from fourthgraph.bsv.script import number, push
@@ -51,16 +52,13 @@ def _checked_digest(auth):
 
 
 def _reconstruct_otda(preimage, outputs):
-    patterns = (compact_forth_pattern(), v020_forth_pattern())
+    patterns = (compact_forth_pattern(), v020_forth_pattern(), subset_forth_pattern())
     programs = [pattern.build(preimage, outputs) for pattern in patterns]
     programs.append(reconstruct_mixed(preimage, outputs, patterns))
     return min((program for program in programs if program is not None), key=len, default=None)
 
 
-def current_input_unlock(auth, public_key, signature, *, committed=False):
-    if committed and auth.legacy:
-        raise ValueError('the legacy lock does not use committed proofs')
-    digest = _checked_digest(auth)
+def _classic_proof(public_key, digest, signature, *, committed):
     if not verify_digest(public_key, digest, signature):
         raise ValueError('invalid Lamport signature from external signer')
     proof = signature
@@ -71,6 +69,16 @@ def current_input_unlock(auth, public_key, signature, *, committed=False):
             sibling = 64 * index + 32 * (1 - choice)
             items.extend((signature[selected:selected+32], public_key[sibling:sibling+32]))
         proof = b''.join(items)
+    return proof
+
+
+def current_input_unlock(auth, public_key, signature, *, committed=False):
+    fixed_weight = subset.is_subset_key(public_key)
+    if (committed or fixed_weight) and auth.legacy:
+        raise ValueError('the legacy lock does not use committed proofs')
+    digest = _checked_digest(auth)
+    proof = (subset.proof(public_key, digest, signature) if fixed_weight
+             else _classic_proof(public_key, digest, signature, committed=committed))
     witness = push(auth.preimage) + push(proof)
     if auth.legacy:
         return witness
@@ -79,7 +87,7 @@ def current_input_unlock(auth, public_key, signature, *, committed=False):
 
 def sign_spend(tx, index, funding_raw, public_key, signer, *, sighash=DEFAULT_SIGHASH,
                allow_unpaired_single=False, compress_otda=False):
-    """Authorize a prepared input. signer(digest32) returns a packed 8192-byte signature.
+    """Authorize a prepared input using the signer for the selected key format.
 
     The caller authenticates the funding outpoint and verifies the required
     confirmation depth before approving the transaction and requested mode.
@@ -108,13 +116,17 @@ def sign_previous(tx, index, previous, public_key, signer, *, sighash=DEFAULT_SI
     """Authorize an input with its already matched previous output."""
     if type(compress_otda) is not bool:
         raise ValueError('compress_otda must be a boolean')
-    universal = locking_script(public_key)
-    legacy = legacy_locking_script(public_key)
-    committed = (committed_locking_script(public_key), forth_committed_locking_script(public_key),
-                 compact_forth_committed_locking_script(public_key), v020_forth_committed_locking_script(public_key))
-    if previous.script not in (universal, legacy, *committed):
+    if subset.is_subset_key(public_key):
+        legacy = None
+        committed = templates = own_scripts = (subset_locking_script(public_key),)
+    else:
+        legacy = legacy_locking_script(public_key)
+        committed = (committed_locking_script(public_key), forth_committed_locking_script(public_key),
+                     compact_forth_committed_locking_script(public_key), v020_forth_committed_locking_script(public_key))
+        templates = (locking_script(public_key), legacy, *committed)
+        own_scripts = (*templates, locking_script(public_key, transaction=False))
+    if previous.script not in templates:
         raise ValueError('funding output does not match public key and canonical template')
-    own_scripts = (universal, legacy, *committed, locking_script(public_key, transaction=False))
     if any(output.script in own_scripts for output in tx.outputs):
         raise ValueError('change must use a fresh Lamport key')
     auth = authorization(tx, index, previous.value, sighash, legacy=previous.script == legacy)

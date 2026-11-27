@@ -8,8 +8,10 @@ import json
 from pathlib import Path
 
 from assemble import TEMPLATE_VERSION, TEMPLATE_VERSIONS, forth_compiler, sm3_blocks
-from assemble import AFFINE_GENERATOR_TEMPLATE_VERSION, CARRIED_FIELD_TEMPLATE_VERSION, SPLIT_ROTATION_TEMPLATE_VERSION
+from assemble import AFFINE_GENERATOR_TEMPLATE_VERSION, CARRIED_FIELD_TEMPLATE_VERSION
+from assemble import PUBLIC_TABLE_TEMPLATE_VERSION, SPLIT_ROTATION_TEMPLATE_VERSION
 from p2pkh_sm2 import MIXED_OTDA_VERSIONS, _canonical
+from point_kernels import CARRIED_KERNEL_FILE, CARRIED_KERNEL_NAMES, load_kernels, split_window_doublings
 from sm3_script import SPLIT_ROTATION_WRAP
 from fourthgraph.bsv.evaluate import evaluate
 from fourthgraph.bsv.script import asm, number, push
@@ -272,7 +274,8 @@ def evaluate_cache_plans(encode, library, *, optimize_library, refine_library, f
     return best, min(best, follow_up_cache(encode, starting_cache), key=len) if follow_up else best
 
 
-def suffix_plans(raw, library, *, optimize_library=False, refine_library=False, share_cache=False):
+def suffix_plans(raw, library, *, optimize_library=False, refine_library=False, share_cache=False,
+                 point_library=None):
     references = [{} for _ in raw]
     earlier_spans(raw, references, pack_runs=share_cache)
     encode = partial(encode_suffix, raw, references)
@@ -282,6 +285,10 @@ def suffix_plans(raw, library, *, optimize_library=False, refine_library=False, 
         shared, tuned = evaluate_cache_plans(partial(encode, shared_cache=True), library,
                                             optimize_library=True, refine_library=True, follow_up=True)
         plans.update({"shared-cache": shared, "shared-cache-follow-up": tuned})
+    if point_library is not None:
+        point, tuned = evaluate_cache_plans(partial(encode, shared_cache=True), point_library,
+                                           optimize_library=True, refine_library=True, follow_up=True)
+        plans.update({"point-cache": point, "point-cache-follow-up": tuned})
     return plans
 
 
@@ -293,10 +300,15 @@ def compile_suffix(raw, library, *, optimize_library=False, refine_library=False
 def generate(version=TEMPLATE_VERSION, *, report=None):
     lock, offset = _canonical(version)
     prefix, suffix = lock[:offset], lock[offset + 20:]
+    point_library = None
+    if version >= PUBLIC_TABLE_TEMPLATE_VERSION:
+        carried = load_kernels(CARRIED_KERNEL_FILE, CARRIED_KERNEL_NAMES)
+        point_library = [split_window_doublings(carried["sm2-window-double-five"]),
+                         carried["sm2-window-add-affine"], carried["sm2-window-add-projective"], SPLIT_ROTATION_WRAP]
     plans = suffix_plans(
         suffix, function_library(version), optimize_library=version != TEMPLATE_VERSION,
         refine_library=version >= CARRIED_FIELD_TEMPLATE_VERSION,
-        share_cache=version >= CARRIED_FIELD_TEMPLATE_VERSION,
+        share_cache=version >= CARRIED_FIELD_TEMPLATE_VERSION, point_library=point_library,
     )
     constructors = {name: push(prefix) + program for name, program in plans.items()}
     for name, program in constructors.items():

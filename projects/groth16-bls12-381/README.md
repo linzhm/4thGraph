@@ -1,6 +1,6 @@
 <!-- Generated from manifest.yaml with Copier. -->
 
-# BLS12-381 Groth16 verifier v0.12.0
+# BLS12-381 Groth16 verifier v0.13.0
 
 [简体中文](README.zh-CN.md) · [4thGraph](../../README.md) · [Project index](../README.md) · [Versions](versions/index.json)
 
@@ -8,7 +8,7 @@
 
 Compile a modular BLS12-381 Groth16 verifier from Forth and reproduce pinned Genesis and Chronicle locks and witnesses.
 
-[Algorithm and execution](#algorithm-and-execution) · [Reproduce the checks](#reproduce-the-checks) · [Measurements data](versions/v0.12.0/measurements.json)
+[Algorithm and execution](#algorithm-and-execution) · [Reproduce the checks](#reproduce-the-checks) · [Measurements data](versions/v0.13.0/measurements.json)
 
 | Entry point | Purpose |
 | --- | --- |
@@ -52,6 +52,8 @@ The search also compares direct sparse line products, normalized G2 point update
 
 v0.12.0 groups consecutive G1 doublings under one reduction boundary. Genesis and Chronicle each save 1,282 bytes over v0.11.0 with the same witnesses. [v0.12.0 measurements](versions/v0.12.0/measurements.json)
 
+v0.13.0 batches the Jacobian Z scale and folds redundant Script numeric boolean conversions. The Genesis path drops by 897 bytes and the Chronicle path by 651 bytes. [v0.13.0 measurements](versions/v0.13.0/measurements.json)
+
 ## Reproduce the checks
 
 Run from the repository root with Python 3.11 or later. The build uses the Python standard library. Funded replay uses the pinned chain-gang binding and an isolated Linux BSV Node 1.2.3.
@@ -61,9 +63,9 @@ python3 -m pip install ecdsa -r tools/requirements-chronicle.txt
 ```
 
 ```sh
-PYTHONPATH=src:. python3 projects/groth16-bls12-381/reference/replay_plan.py --release 0.12.0
+PYTHONPATH=src:. python3 projects/groth16-bls12-381/reference/replay_plan.py --release 0.13.0
 REGTEST_CHRONICLE_HEIGHT=1000 bash tools/verify_node.sh --profile raised -- \
-  python3 projects/groth16-bls12-381/reference/replay_plan.py --release 0.12.0 --funded
+  python3 projects/groth16-bls12-381/reference/replay_plan.py --release 0.13.0 --funded
 ```
 
-The current pinned plan checks the Forth module hashes, lock bytes and both witnesses before writing artifacts. The funded replay mines both valid spends and rejects swapped statements and G1 points outside the subgroup. [Verification guide](docs/verification.en.md) · [nChain comparison](versions/v0.11.0/nchain-comparison.json)
+The current pinned plan checks the Forth module hashes, lock bytes and both witnesses before writing artifacts. The funded replay mines both valid spends and rejects swapped statements and G1 points outside the subgroup. [Verification guide](docs/verification.en.md) · [nChain and sCrypt comparison](docs/verification.en.md#nchain-and-scrypt-comparison)

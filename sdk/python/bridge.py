@@ -191,13 +191,14 @@ def run_wallet(project, adapter, operation, options, message):
         raise ValueError("wallet SINGLE requires a same-index output")
 
     algorithm, fmt = SIGNATURE_FORMATS[project]
+    public_key = hex_bytes(options["publicKey"])
+    if project == "lamport-ots":
+        algorithm = adapter.signing_algorithm(public_key)
     if "signerIdentifier" in options:
         fmt = "signed-data"
     is_message = project in ("p2pkh-sm2", "p2pkh-schnorr", "ml-dsa") or options.get("signMessage", False)
     metadata = {"algorithm": algorithm, "payloadKind": "message" if is_message else "digest",
                 "signatureFormat": fmt, "sighash": sighash}
-    public_key = hex_bytes(options["publicKey"])
-
     return authorize_signature(
         message, operation == "prepareWallet",
         lambda signer: adapter.sign_previous(tx, index, previous, public_key, signer, sighash, options),

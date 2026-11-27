@@ -51,15 +51,18 @@ def verify_digest(key, digest, signature):
 
 class OneTimeSigner:
     """Thread-safe, process-local guard. Not persistent, non-copyable secure storage."""
+    _public_key = staticmethod(public_key)
+    _sign_digest = staticmethod(sign_digest)
+
     def __init__(self, secret):
-        self.public_key = public_key(secret)
+        self.public_key = self._public_key(secret)
         self._secret = secret
         self._lock = Lock()
 
     def sign(self, digest):
-        bits(digest)  # malformed requests do not consume the key
+        require_bytes(digest, 32, 'digest')  # malformed requests do not consume the key
         with self._lock:
             if self._secret is None:
                 raise ValueError('one-time key already consumed')
             secret, self._secret = self._secret, None  # consume before disclosure
-            return sign_digest(secret, digest)
+            return self._sign_digest(secret, digest)

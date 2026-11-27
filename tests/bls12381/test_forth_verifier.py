@@ -87,7 +87,7 @@ class ForthVerifierTests(unittest.TestCase):
         with self.assertRaisesRegex(CompileError, r"line 5, column 3: body leaves .*groth16-checked-g1"):
             ForthVerifier(self.key, invalid)
 
-    def test_modular_forth_reuses_the_same_script_and_can_pair_g1_doublings(self):
+    def test_modular_forth_reuses_the_same_script_and_can_batch_g1_doublings(self):
         modular = HIGH_LEVEL.parents[2] / "forth/verifier.fth"
         plan = ArithmeticPlan(residue_association="accumulator-frobenius-first",
                               msm="signed-radix4", msm_table="deferred-doubling-slopes",
@@ -100,12 +100,19 @@ class ForthVerifierTests(unittest.TestCase):
         self.assertEqual(lock, old.compile(SOURCES))
         self.assertEqual({library.name for library in new.libraries},
                          {"miller.fth", "public-inputs.fth", "residue.fth", "std/bsv"})
-        paired = ForthVerifier(self.key, modular.read_bytes(), source_path=modular, entry="verify-proof",
-                               witness_layout="affine-inline", plan=replace(plan, g1_reductions="paired-doubles"))
-        compact = paired.compile(SOURCES)
-        self.assertLess(len(compact), len(lock))
-        for signals, proof in self.cases:
-            check_spend(*spend_fixture(compact, paired.witness(signals, proof, sources=SOURCES)))
+        paired_plan = replace(plan, g1_reductions="paired-doubles")
+        batched_plan = replace(paired_plan, g1_z_batch=16, compact_booleans=True)
+        for candidate in (paired_plan, batched_plan):
+            with self.subTest(plan=candidate):
+                verifier = ForthVerifier(self.key, modular.read_bytes(), source_path=modular, entry="verify-proof",
+                                         witness_layout="affine-inline", plan=candidate)
+                compact = verifier.compile(SOURCES)
+                self.assertLess(len(compact), len(lock))
+                for signals, proof in self.cases:
+                    witness = verifier.witness(signals, proof, sources=SOURCES)
+                    self.assertEqual(witness, old.witness(signals, proof, sources=SOURCES))
+                    check_spend(*spend_fixture(compact, witness))
+                lock = compact
 
     def test_high_level_requires_the_complete_miller_plan(self):
         source = HIGH_LEVEL.read_bytes()

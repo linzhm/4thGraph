@@ -226,10 +226,12 @@ def double_msm_point(field, point, trusted_point, *, defer_reductions):
 class AffineStages(VerifierStages):
     def __init__(self, key, sources, *, lines_in_witness, chronicle=False, optimize=False, fp2_rules=FP2_RULES,
                  fp2_selection="uniform", msm=MSM_STRATEGIES[0], msm_table=MSM_TABLES[0],
-                 miller_reductions=MILLER_REDUCTIONS[0], miller_kernel=MILLER_KERNELS[0], pair_g1_doubles=False):
+                 miller_reductions=MILLER_REDUCTIONS[0], miller_kernel=MILLER_KERNELS[0], pair_g1_doubles=False,
+                 g1_z_batch=1, compact_booleans=False):
         self.witness_items = 2 if lines_in_witness else 1
         super().__init__(key, sources, chronicle=chronicle, optimize=optimize, extra_inputs=self.witness_items,
-                         fp2_rules=fp2_rules, fp2_selection=fp2_selection, pair_g1_doubles=pair_g1_doubles)
+                         fp2_rules=fp2_rules, fp2_selection=fp2_selection, pair_g1_doubles=pair_g1_doubles,
+                         g1_z_batch=g1_z_batch, compact_booleans=compact_booleans)
         if not self.slots:
             raise ValueError("an affine witness layout requires at least one spend-time public input")
         self.lines_in_witness = lines_in_witness

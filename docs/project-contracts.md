@@ -12,6 +12,8 @@ python3 tools/build_project_contract.py pels-counter workspace/counter-package -
 
 Verification uses pinned chain-gang and the repository's offline fixture keys. `--smoke` uses fresh R1 keys in memory. `--with-bsv-node` also checks a configured local regtest node. The host requires Node.js for the WASI preview1 runtime. A public replay can verify the receipt with the approved manifest hash and the actual transactions recorded in the receipt.
 
+The R1 package uses the frozen v0.6.0 ordinary-path Script. The builder checks its layout and hash against the approved wallet bundle and builds the WASM reactor independently. [Archived wallet bundle](../projects/p2pkh-r1/versions/v0.6.0/contract/manifest.json)
+
 The generic ABI exposes `recognize`, `prepare_spend`, and `assemble_unlock`. Supply an explicit integer for `prevout.amount`, including zero. The module returns `MissingContext` when that amount is missing or `null`. R1 and PELS Counter use BIP143 ALL. The neutral settlement bundle pairs one exact lock with BIP143 ALL and Chronicle OTDA ALL. Each settlement path records its authenticated fields, signature anchor, chain context and witness layout. The host recalculates the selected preimage and the verifier replays both paths against the same actual fixture parent. PELS Counter advances modulo 2³². [Commands and failure cases](project-contracts.zh-CN.md) · [Host implementation](../src/fourthgraph/workflow/project_contract.py)
 
 <a name="preimage-constructor"></a>

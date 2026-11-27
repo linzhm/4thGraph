@@ -115,6 +115,63 @@ The report records txids, block hashes, heights, byte counts and admission
 verdicts for all three phases. Omit `--template` and `--turnover` to replay
 direct exits for every profile.
 
+## Fixed-weight experiment · 2026-11-28 (Asia/Shanghai)
+
+### Fixed-weight candidate replay
+
+The candidate was built with the repository compiler on main at
+`1c44d2882e37d3f46e4b861e83063d630db66555`. Validation used Python 3.12.16 and
+chain-gang 0.13.2 (`8b60b71a12a69fdcb465d3e627dbf6f43d6ed081`) on macOS arm64 and
+BSV Node 1.2.3 in the project's pinned Apple Container image. [Pinned requirements](../reference/requirements.txt) · [Compiler adapter](../reference/forth_verifier.py)
+
+| Check | Result |
+| --- | --- |
+| Independent Script replay | 19 methods passed, including 408 authorization verdicts with literal witnesses and 408 with reconstruction enabled for the new profile. Each 408-row domain had 168 accepts and 240 rejects on both engines. |
+| Proof and activation | Both engines rejected all 352 single-block mutations and short and long proofs. BSV Node matched the expected results for all 96 activation cases. The development evaluator covered all 256 byte values and one mixed digest. |
+| Benchmarks | Both engines verified all 144 signed synthetic transactions and rejected 18 changed-locktime controls. The 112 transactions from the v0.2.0 run retained their txids and sizes. |
+| Wallet SDK | Nine vectors replayed in Python, TypeScript, Go and Rust. Both engines verified the reference spends. The new vectors cover a literal BIP143 exit and reconstructed OTDA. |
+
+The independent Script check supplies synthetic prevouts. The funded check
+uses real regtest UTXOs and native wallet signatures. [Acceptance domain](acceptance.md) · [Transaction sizes](optimization.md#fixed-weight-candidate)
+
+### Funded default-policy replay
+
+The funded run used the default transaction policy on a peerless BSV Node
+with Genesis at height 1 and Chronicle at height 2. Each branch funded two
+Lamport outputs from the native wallet. The turnover spent both into two
+fresh Lamport outputs. Each exit spent both Lamport inputs into native
+P2PKH outputs. Turnovers and exits paid a 250,000 sat fixture fee. The profile
+enabled reconstruction, which selected a literal witness for direct P2PKH
+exits and a reconstructed witness for the Chronicle turnover.
+
+All ten transactions were present in the mempool after broadcast and found
+by txid in their generated block.
+
+| Flow | Lamport spend mode | Funding bytes / height | Turnover bytes / height | Exit bytes / height |
+| --- | --- | ---: | ---: | ---: |
+| Direct exit | BIP143 ALL (`0x41`) | 16,186 / 102 | — | 23,022 / 103 |
+| Direct exit | Chronicle OTDA ALL (`0x61`) | 16,220 / 104 | — | 23,036 / 105 |
+| One turnover | BIP143 ALL (`0x41`) | 16,220 / 106 | 38,982 / 107 | 23,022 / 108 |
+| One turnover | Chronicle OTDA ALL (`0x61`) | 16,219 / 109 | 41,920 / 110 | 23,036 / 111 |
+
+Native funding signatures and wallet change can vary across runs. The
+results describe local regtest policy and mining behavior. From the root,
+use `verify_apple.sh` (Apple Container) or `verify.sh` (Linux) for the Script
+suite, and `sdk/verify_wallet.sh lamport-ots` with the same node context for
+the vectors. Run the funded checks inside that project's Python environment
+on Linux as follows. [Benchmark guide](../../../docs/benchmark.md) · [SDK replay](sdk.en.md#replay-vectors)
+
+```sh
+bash tools/verify_node.sh --profile default -- \
+  projects/lamport-ots/workspace/venv/bin/python -m fourthgraph.benchmark.admission lamport-ots \
+  --template committed-key-forth-subset-reconstructed \
+  --output projects/lamport-ots/workspace/subset-direct.json
+bash tools/verify_node.sh --profile default -- \
+  projects/lamport-ots/workspace/venv/bin/python -m fourthgraph.benchmark.admission lamport-ots \
+  --template committed-key-forth-subset-reconstructed --turnover \
+  --output projects/lamport-ots/workspace/subset-turnover.json
+```
+
 ## Original v0.1.0 receipt · 2026-11-19 (Asia/Shanghai)
 
 Source base: `6b90bb0` on GitHub main. The local workspace also contained an

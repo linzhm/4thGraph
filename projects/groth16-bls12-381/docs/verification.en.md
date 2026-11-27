@@ -48,11 +48,51 @@ REGTEST_CHRONICLE_HEIGHT=1000 bash tools/verify_node.sh --profile raised -- \
   python3 projects/groth16-bls12-381/reference/replay_plan.py --release current --funded
 ```
 
-For Chronicle set the activation height to `2` and add `--script-era chronicle`. The runner writes the checked lock and both witnesses under `projects/groth16-bls12-381/workspace/build/pinned-v0.12.0/`, with a replay report for funded runs. The pinned plan verifies file and bytecode digests. [v0.12.0 replay plan](../versions/v0.12.0/replay-plan.json)
+For Chronicle set the activation height to `2` and add `--script-era chronicle`. The runner writes the checked lock and both witnesses under `projects/groth16-bls12-381/workspace/build/pinned-v0.13.0/`, with a replay report for funded runs. The pinned plan verifies file and bytecode digests. [v0.13.0 replay plan](../versions/v0.13.0/replay-plan.json)
 
 v0.12.0 retains the v0.11.0 MSM and Miller plan and compares G1 reduction after each doubling against reduction after a pair of consecutive doublings. Pairing these reductions saves 1,282 bytes in either era. The serialized lock and witness total 238,122 bytes on Genesis and 237,217 bytes on Chronicle for the five bounded dynamic inputs in the fixture. The measured stack peak stays at 29,891 bytes and verification takes longer in the paired timing samples. [v0.12.0 measurements](../versions/v0.12.0/measurements.json)
 
-The nChain rerun uses the same BLS12-381 key, two proofs and five bounded dynamic inputs. It measures v0.11.0 against three layouts and three reduction thresholds from upstream `fc20fb7`. The best nChain path in that sweep was 394,212–396,635 bytes, and the v0.11.0 path was 239,404 bytes. The nChain projective path has a 1,112–1,134 byte witness. [Same-fixture comparison](../versions/v0.11.0/nchain-comparison.json)
+v0.13.0 compares G1 Z batches of 1, 4, 8 and 16 doublings with and without compact numeric boolean lowering. The search selects 16 with the boolean pass enabled. The serialized lock and witness total 237,225 bytes on Genesis and 236,566 bytes on Chronicle. Both fixture witnesses retain their hashes and the measured stack peak is 29,891 bytes. Paired verification timings are mixed across the two engines and Script eras. The report records the medians for batch sizes 4, 8 and 16 against v0.12.0. [v0.13.0 measurements](../versions/v0.13.0/measurements.json)
+
+## nChain and sCrypt comparison
+
+The Genesis regtest compares the same BLS12-381 key, two proofs, five bounded spend-time inputs, and transaction version. The serialized script path is the lock plus the unlock with both CompactSize lengths. The ranges cover the two proofs. [v0.13.0 funded replay](../versions/v0.13.0/nchain-comparison.json)
+
+| Implementation and layout | Locking script | Unlocking script | Serialized script path |
+| --- | ---: | ---: | ---: |
+| 4thGraph v0.13.0, affine with inline lines | 227,839 B | 9,378 B | 237,225 B |
+| nChain affine, fixed pairing gradients in lock | 385,600 B | 8,604–11,027 B | 394,212–396,635 B |
+| nChain affine, pairing gradients in witness | 373,355 B | 21,926–24,349 B | 395,289–397,712 B |
+| nChain projective | 448,202 B | 1,112–1,134 B | 449,322–449,344 B |
+
+4thGraph's path is 39.8–40.2% smaller than the shortest tested nChain path. The nChain projective layout has the smallest unlock. All eight valid spends mined and both BSV Node and chain-gang rejected all eight crossed statements. The nChain rows use unmodified `fc20fb7` at a 6,400-bit reduction threshold, selected from the earlier three-threshold sweep. [nChain source](https://github.com/nchain-innovation/zkscript_package/tree/fc20fb743edbc5bc5aba9d16625d50d1f50a3ef4) · [Earlier sweep](../versions/v0.11.0/nchain-comparison.json)
+
+The public transactions below use the original examples' keys and statements. Their sizes come from the identified transaction inputs and outputs. The sCrypt BLS12-381 example supplies a deployment only, so its available measurement is the locking script. The sCrypt factorization tutorial uses BN254 and one fixed public input. [Transaction IDs and hashes](../versions/v0.13.0/public-comparison.json) · [nChain paper](https://eprint.iacr.org/2024/1498) · [sCrypt BLS12-381 example](https://scryptplatform.medium.com/guest-post-elliptic-curve-bls12-381-support-on-bitcoin-bc7bfa605135) · [sCrypt BN254 tutorial](https://docs.scrypt.io/bsv-docs/tutorials/zkp/)
+
+| Published example | Network and curve | Locking script | Unlocking script | Serialized script path |
+| --- | --- | ---: | ---: | ---: |
+| nChain Groth16 | BSV mainnet, BLS12-381 | 482,601 B | 39,876 B | 522,485 B |
+| BLS12-381 library example written in sCrypt | BSV testnet, BLS12-381 | 27,549,371 B | — | — |
+| sCrypt factorization tutorial | BSV testnet, BN254 | 1,515,332 B | 264 B | 1,515,604 B |
+
+Run from the repository root with the pinned chain-gang Python environment. The separate Python 3.12 environment installs the nChain generator dependencies. The final command downloads or reads cached raw transactions and checks both their IDs and the measured script sizes.
+
+```sh
+checkout="$PWD"
+ref="$checkout/projects/groth16-bls12-381/reference"
+out="$checkout/projects/groth16-bls12-381/workspace/build/comparison"
+git clone https://github.com/nchain-innovation/zkscript_package "$out/nchain"
+git -C "$out/nchain" checkout --detach fc20fb743edbc5bc5aba9d16625d50d1f50a3ef4
+(
+  cd "$out/nchain"
+  python3.12 -m venv .venv
+  .venv/bin/python -m pip install -r requirements.txt
+  PYTHONPATH=src:. .venv/bin/python "$ref/prepare_nchain.py" "$out/nchain-scripts.json"
+)
+REGTEST_CHRONICLE_HEIGHT=1000 bash tools/verify_node.sh --profile raised -- \
+  python3 "$ref/replay_nchain.py" "$out/nchain-scripts.json" "$out/nchain-replay.json"
+PYTHONPATH=src:. python3 "$ref/check_public_comparison.py"
+```
 
 ## High-level Forth experiment
 

@@ -1,6 +1,6 @@
 <!-- Generated from manifest.yaml with Copier. -->
 
-# P2PKH-SM2 v1.10.0
+# P2PKH-SM2 v1.11.0
 
 [English](README.md) · [4thGraph](../../README.zh-CN.md) · [项目目录](../README.zh-CN.md) · [版本](versions/index.json)
 
@@ -10,7 +10,7 @@
 
 选择原始 SM2 签名器或 SignedData 签名器。符合条件的付款会自动选择更短的 OTDA 解锁编码。
 
-[协议](docs/spec.zh-CN.md) · [算法与执行](#算法与执行) · [复现方法](#复现方法) · [完整交易与栈测量](#完整交易与栈测量) · [实测数据](versions/v1.10.0/measurements.json)
+[协议](docs/spec.zh-CN.md) · [算法与执行](#算法与执行) · [复现方法](#复现方法) · [完整交易与栈测量](#完整交易与栈测量) · [实测数据](versions/v1.11.0/measurements.json)
 
 | 入口 | 用途 |
 | --- | --- |
@@ -25,7 +25,7 @@
 
 ## 算法与执行
 
-[v1.11.0 候选版](#v1110)
+[v1.12.0 候选版](#v1120)
 
 [协议规范](docs/spec.zh-CN.md) · [安全分析](docs/developer.zh-CN.md#security) · [复现与验证](#开发复现与输入输出分析) · [交易成本](#完整交易与栈测量)
 
@@ -36,25 +36,25 @@
 
 ### 项目版本与锁定模板
 
-v1.1.0 为首个公开版本 v1.0.0 的锁定模板 `1` 默认启用 OTDA 重建。v1.2.0 至 v1.7.0 依次对应模板 `2` 至 `7`。v1.9.0 至 v1.11.0 依次增加模板 `8` 至 `10`。钱包按上一输出的完整字节识别并花费十种模板。
+v1.1.0 为首个公开版本 v1.0.0 的锁定模板 `1` 默认启用 OTDA 重建。v1.2.0 至 v1.7.0 依次对应模板 `2` 至 `7`。v1.9.0 至 v1.12.0 依次增加模板 `8` 至 `11`。钱包按上一输出的完整字节识别并花费十一种模板。
 
 | 项目 | 取值 |
 | --- | --- |
 | 收款标识 | 65 字节公钥 `04 \|\| X_BE32 \|\| Y_BE32` 的 HASH160 |
 | SM2 用户标识 | 固定的 ASCII 字符串 `1234567812345678` |
-| 锁定脚本 | 模板 `1` 为 144,925 字节，`2` 为 131,565 字节，`3` 为 125,616 字节，`4` 为 121,847 字节，`5` 为 110,747 字节，`6` 为 100,663 字节，`7` 为 98,362 字节，`8` 为 96,616 字节，`9` 为 95,790 字节，`10` 为 94,355 字节 |
+| 锁定脚本 | 模板 `1` 为 144,925 字节，`2` 为 131,565 字节，`3` 为 125,616 字节，`4` 为 121,847 字节，`5` 为 110,747 字节，`6` 为 100,663 字节，`7` 为 98,362 字节，`8` 为 96,616 字节，`9` 为 95,790 字节，`10` 为 94,355 字节，`11` 为 94,117 字节 |
 | 解锁脚本 | BIP143 为 291 字节，无配对输出的 OTDA SINGLE 为 294 字节，其他 OTDA 模式的长度随交易变化 |
 | 解锁栈 | 签名预映像、未压缩公钥，以及 64 字节的 `r \|\| s` 签名 |
 | 交易签名模式 | BIP143 和 Chronicle OTDA 均支持 ALL、NONE、SINGLE，每种模式均可选用 ANYONECANPAY |
 
 当前源码包含[模板布局](versions/v1.0.0/layout.json)、[SM2 标准向量](versions/v1.0.0/sm2-standard.json)、
-[完整付款向量](versions/v1.0.0/spend-all.json)和 [16 个签名预映像](versions/v1.0.0/sighash-modes.json)。[v1.0.0 发布页](https://github.com/linzhm/bsv-script-lab/releases/tag/p2pkh-sm2-v1.0.0)
+[完整付款向量](versions/v1.0.0/spend-all.json)和 [16 个签名预映像](versions/v1.0.0/sighash-modes.json)。[v1.0.0 源码](https://github.com/linzhm/4thGraph/tree/p2pkh-sm2-v1.0.0/projects/p2pkh-sm2)
 
 <a name="otda-constructor"></a>
 
 ### 重建 OTDA 输出
 
-构造器是 `scriptSig` 的一部分，模板 `1` 使用 12,703 字节，`2` 使用 11,816 字节，`3` 使用 11,807 字节，`4` 使用 11,618 字节，`5` 使用 11,549 字节，`6` 使用 9,363 字节，`7` 使用 9,447 字节，`8` 使用 7,644 字节，`9` 使用 7,718 字节，`10` 使用 7,417 字节。模板 `2` 至 `10` 从初始编码实际复制的指令中选出可复用片段，并把高频片段放在靠近栈顶的位置。构造器逐字节重建签名预映像，把收款人的 HASH160 填入各个适用输出。签名回调接收与原样编码一致的消息和 SM2 用户标识。构建子交易时使用最终已签交易的 ID。
+构造器是 `scriptSig` 的一部分，模板 `1` 使用 12,703 字节，`2` 使用 11,816 字节，`3` 使用 11,807 字节，`4` 使用 11,618 字节，`5` 使用 11,549 字节，`6` 使用 9,363 字节，`7` 使用 9,447 字节，`8` 使用 7,644 字节，`9` 使用 7,718 字节，`10` 使用 7,417 字节，`11` 使用 7,412 字节。模板 `2` 至 `11` 从初始编码实际复制的指令中选出可复用片段，并把高频片段放在靠近栈顶的位置。构造器逐字节重建签名预映像，把收款人的 HASH160 填入各个适用输出。签名回调接收与原样编码一致的消息和 SM2 用户标识。构建子交易时使用最终已签交易的 ID。
 
 Chronicle 激活后，版本 2 的 OTDA ALL 交易可以按原顺序重建匹配的输出。配对 OTDA SINGLE 可以重建同索引输出，并保留预映像中前置的空输出。两种模式均支持 `ANYONECANPAY`。其他模板的输出按原字节写入。BIP143、NONE、无配对 SINGLE、版本 1 及体积未缩小的交易继续使用原样解锁。[SDK 选项](docs/sdk.zh-CN.md) · [构造器与生成方式](reference/README.zh-CN.md#otda-constructor)
 
@@ -79,7 +79,7 @@ python -m pip install -r projects/p2pkh-sm2/reference/requirements.txt
 ```
 
 ```sh
-PYTHONPATH=src:. python projects/p2pkh-sm2/reference/point_kernels.py --affine /tmp/sm2-affine-kernel.json && python projects/p2pkh-sm2/reference/generate_otda_constructor.py --version 9 /tmp/sm2-otda-v9.hex
+export PYTHONPATH=src:. && python projects/p2pkh-sm2/reference/point_kernels.py --carried /tmp/sm2-window-kernels.json && python projects/p2pkh-sm2/reference/byte_fields.py /tmp/sm2-byte-kernels.json && python projects/p2pkh-sm2/reference/generate_otda_constructor.py --version 10 /tmp/sm2-otda-v10.hex
 bash projects/p2pkh-sm2/reference/verify.sh
 ```
 
@@ -98,6 +98,26 @@ bash verify.sh
 两进两出时，BIP143 ALL 的解锁为 291 字节。OTDA ALL 的原始解锁把两个完整输出放进每个输入的签名预映像，解锁增至 290,109 字节。新增第三个输出时，除 144,925 字节的输出锁本身外，两个已有输入的解锁也会变长。下表分项列出这些开销。交易版本和 SignedData 的两层版本值分别按各自的编码规则处理。
 
 ## 脚本尺寸
+
+<a name="v1120"></a>
+
+### v1.12.0 候选版
+
+提交 `1c44d28` 上的 4thGraph `0.2.7` 按命名值调度公钥点表。选定方案通过倍点生成偶数倍点，以已验证的仿射公钥生成奇数倍点，并复用标量窗口的有限点倍点片段。OTDA 字典以同一组点运算片段为初始条目，在缩短后的锁定脚本上将构造器从 7,461 降到 7,412 字节。
+
+| 实测字节数 | v1.11.0 | v1.12.0 |
+| --- | ---: | ---: |
+| 锁定脚本 | 94,355 | 94,117 |
+| OTDA 构造器 | 7,417 | 7,412 |
+| BIP143 ALL，两进两出 | 189,414 | 188,938 |
+| OTDA ALL，两进两出 | 204,306 | 203,820 |
+| OTDA ALL，十二进一出 | 191,615 | 191,317 |
+| OTDA ALL，二十四进一出 | 299,219 | 298,861 |
+| OTDA ALL，四十进一出 | 458,819 | 458,381 |
+
+两套引擎回放了 38 种交易构造。候选版回放中的每个 SM2 输入和可识别的 SM2 输出均使用模板 `11`。自动构造的交易有 37 种变小，纯 P2PKH 输出用例仍为 719 字节。两进两出的 BIP143 栈载荷峰值增加 2 字节，OTDA 栈载荷峰值减少 952 字节。默认和放宽策略的有资金回放覆盖原生 P2PKH 入金和退出、零费草稿补费、预先安排找零和 CPFP。[交易用例](versions/v1.12.0/latest-template-coverage.json) · [默认策略](versions/v1.12.0/p2pkh-default.json) · [放宽策略](versions/v1.12.0/p2pkh-raised.json)
+
+用 `--version 11` 或 SDK 的 `template: "v1.12.0"` 选用模板 `11`。[复现方式](reference/README.zh-CN.md#public-table-tuning) · [模板指纹](versions/v1.12.0/layout.json) · [测量记录](versions/v1.12.0/measurements.json)
 
 <a name="v1110"></a>
 

@@ -344,6 +344,8 @@ LIBRARIES = {
         ("signed-windows?", "Select signed five-bit scalar windows"),
         ("window-doubling?", "Select the supplied five-doubling window kernel"),
         ("affine-generator?", "Select the supplied affine generator kernel and compact byte reversal"),
+        ("compiled-public-table?", "Select the supplied SM2 public-key table kernel"),
+        ("sm2-public-table-kernel", "Runtime Script for the sixteen public-key point multiples"),
     )),
     "std/wallet/lamport-ots": wallet_library("lamport-ots", ("lamport-full-key", "lamport-committed-key"), parameters=(
         ("key", "Lamport public-key commitment or full-key verifier fragment"),
