@@ -48,7 +48,7 @@ v1.1.0 为首个公开版本 v1.0.0 的锁定模板 `1` 默认启用 OTDA 重建
 | 交易签名模式 | BIP143 和 Chronicle OTDA 均支持 ALL、NONE、SINGLE，每种模式均可选用 ANYONECANPAY |
 
 当前源码包含[模板布局](versions/v1.0.0/layout.json)、[SM2 标准向量](versions/v1.0.0/sm2-standard.json)、
-[完整付款向量](versions/v1.0.0/spend-all.json)和 [16 个签名预映像](versions/v1.0.0/sighash-modes.json)。[v1.0.0 发布页](https://github.com/linzhm/bsv-script-lab/releases/tag/p2pkh-sm2-v1.0.0)
+[完整付款向量](versions/v1.0.0/spend-all.json)和 [16 个签名预映像](versions/v1.0.0/sighash-modes.json)。[v1.0.0 源码](https://github.com/linzhm/4thGraph/tree/p2pkh-sm2-v1.0.0/projects/p2pkh-sm2)
 
 <a name="otda-constructor"></a>
 

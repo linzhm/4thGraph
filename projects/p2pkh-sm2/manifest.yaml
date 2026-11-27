@@ -79,7 +79,7 @@ sections:
         The current source includes the [layout manifest](versions/v1.0.0/layout.json),
         [standard SM2 vector](versions/v1.0.0/sm2-standard.json),
         [complete payment vector](versions/v1.0.0/spend-all.json), and
-        [16 signing preimages](versions/v1.0.0/sighash-modes.json). [v1.0.0 release](https://github.com/linzhm/bsv-script-lab/releases/tag/p2pkh-sm2-v1.0.0)
+        [16 signing preimages](versions/v1.0.0/sighash-modes.json). [v1.0.0 source](https://github.com/linzhm/4thGraph/tree/p2pkh-sm2-v1.0.0/projects/p2pkh-sm2)
       - <a name="otda-constructor"></a>
       - '### Reconstruct OTDA outputs'
       - The constructor is part of `scriptSig`. It uses 12,703 bytes for template `1`, 11,816 for `2`,
@@ -128,7 +128,7 @@ sections:
         | 交易签名模式 | BIP143 和 Chronicle OTDA 均支持 ALL、NONE、SINGLE，每种模式均可选用 ANYONECANPAY |
       - |-
         当前源码包含[模板布局](versions/v1.0.0/layout.json)、[SM2 标准向量](versions/v1.0.0/sm2-standard.json)、
-        [完整付款向量](versions/v1.0.0/spend-all.json)和 [16 个签名预映像](versions/v1.0.0/sighash-modes.json)。[v1.0.0 发布页](https://github.com/linzhm/bsv-script-lab/releases/tag/p2pkh-sm2-v1.0.0)
+        [完整付款向量](versions/v1.0.0/spend-all.json)和 [16 个签名预映像](versions/v1.0.0/sighash-modes.json)。[v1.0.0 源码](https://github.com/linzhm/4thGraph/tree/p2pkh-sm2-v1.0.0/projects/p2pkh-sm2)
       - <a name="otda-constructor"></a>
       - '### 重建 OTDA 输出'
       - 构造器是 `scriptSig` 的一部分，模板 `1` 使用 12,703 字节，`2` 使用 11,816 字节，`3` 使用 11,807 字节，`4` 使用 11,618 字节，`5`
