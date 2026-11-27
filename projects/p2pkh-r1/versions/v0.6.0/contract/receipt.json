@@ -20,7 +20,7 @@
       "id": "missing-prevout",
       "input_sha256": "4810ef9b165bdb6faecac59ff4f8ae0dbf3e0d1cb736bc9e43dacec8ae53b719",
       "passed": true,
-      "result_sha256": "95d6b07c28c39b137b5fe1ca82dd0e3c4f2c1e1e1a824f5eafced20c342cd794",
+      "result_sha256": "47276feb400cccaaab1f25b6c2465fe358b28e2e567053ad69e76f4bf79fba50",
       "step": 0
     },
     {
@@ -76,6 +76,17 @@
       "input_sha256": "d816bab1a451c771a881e02840984d71c629d7211b732e20e6d31c19ed90c74b",
       "passed": true,
       "result_sha256": "48e004055417cb49df61c02d9186a07e4febeca9b02de0ab51ca96e8e3b8e6f2",
+      "step": 0
+    },
+    {
+      "actual_status": "MissingContext",
+      "engines": {},
+      "entry": "prepare_spend",
+      "expected_status": "MissingContext",
+      "id": "null-prevout-amount",
+      "input_sha256": "3174076dc3cc504206e7854b4ae13f9be918f756d58c7d0efd9ec8046dbc2eaf",
+      "passed": true,
+      "result_sha256": "47276feb400cccaaab1f25b6c2465fe358b28e2e567053ad69e76f4bf79fba50",
       "step": 0
     },
     {
@@ -167,10 +178,10 @@
     "version": "0.13.2"
   },
   "fixture_key": "fixed-public-test-key",
-  "fixture_sha256": "4eb57f665a8deed07bffa0179c19482808c13ab9212d0f466711bc5db553add8",
+  "fixture_sha256": "3b3a0890ebc087c4beb81905cbe4ac582a51a501fc3dee1c91de8bb3a6d8f0ef",
   "flags": 3997710,
-  "manifest_sha256": "2dddac4e7a9eb6b2f08a16357c2db78461b6fc0e37b429c8fff29c4b64ef3d97",
-  "module_sha256": "310e0c0e12c794d11316d9c3120c133ec337f8e21f1084f209c10772eb1e88de",
+  "manifest_sha256": "38d4a27b01e35821107fdc7d49b2df04320ff406de7c672a78f95598d0bc1f8d",
+  "module_sha256": "e8bbca9ad2fa894e5b509270241f04905286da19bf752e328485c44594c2cdfa",
   "node_version": 101020300,
   "path": "ordinary-all",
   "profile": "p2pkh-r1",
@@ -193,10 +204,11 @@
   "template": "0.6.0",
   "template_sha256": "d4dc90255e60d8dff51e1f8464391304d4b0946457445e62f558c66e84edb27a",
   "utxo_height": 3,
+  "verification_level": "dual-engine",
   "verification_sources": {
     "src/fourthgraph/benchmark/validation.py": "bc2a1dfbf1a08a92cf639f24d1596f6591a2f35473843b1eb702780ceeb2fc9e",
     "src/fourthgraph/workflow/contract_runtime.mjs": "be241f1bfac15259eb50d8bf3a5dea6d41340d1a93109369f6327ed778316c60",
     "src/fourthgraph/workflow/project_contract.py": "8b479c3468f34a1225d1f36ef2e0c9782f34d42c2bcb1f6fadf7c58169414e45",
-    "tools/verify_project_contract.py": "ce9dbe1a79e17816fe50130de020a0fac66251fd2fcfbd511e68952f673f07b7"
+    "tools/verify_project_contract.py": "22ae68943c2c8ee69976a5b8e7eb9d8db1a12fbf3f1ba69634921f879748f9b1"
   }
 }

@@ -26,7 +26,7 @@ python tools/build_project_contract.py pels-counter workspace/counter --verify
 
 ```sh
 python tools/verify_project_contract.py workspace/holder/manifest.json \
-  --approved-sha256 2dddac4e7a9eb6b2f08a16357c2db78461b6fc0e37b429c8fff29c4b64ef3d97 \
+  --approved-sha256 38d4a27b01e35821107fdc7d49b2df04320ff406de7c672a78f95598d0bc1f8d \
   --replay workspace/holder/receipt.json --output workspace/holder-replay.json
 ```
 
@@ -34,7 +34,7 @@ python tools/verify_project_contract.py workspace/holder/manifest.json \
 
 ```sh
 bash tools/verify_node.sh --profile raised -- python tools/verify_project_contract.py \
-  workspace/holder/manifest.json --approved-sha256 2dddac4e7a9eb6b2f08a16357c2db78461b6fc0e37b429c8fff29c4b64ef3d97 \
+  workspace/holder/manifest.json --approved-sha256 38d4a27b01e35821107fdc7d49b2df04320ff406de7c672a78f95598d0bc1f8d \
   --replay workspace/holder/receipt.json --with-bsv-node --output workspace/holder-node-replay.json
 ```
 
@@ -48,9 +48,11 @@ bash tools/verify_node.sh --profile raised -- python tools/verify_project_contra
 
 ABI 标识为 `4thgraph.project-contract/1`。请求与回应用 UTF-8 JSON，字节串用十六进制，金额以整数聪计。outpoint 用 32 字节 wire 顺序 txid 加小端 vout。宿主调用 `abi_buffer(n)` 申请线性内存，写入请求后调用相应导出函数，传入长度。64 位返回值的高 32 位是返回区指针，低 32 位是字节数。请求与响应各限 8 MiB。模块的 WASI 环境没有预开放目录。R1 使用宿主提供的 HASH160 原语。[Go 数据类型](../sdk/go/contractabi/contract.go) · [WASM ABI](../sdk/go/contractabi/reactor_wasip1.go) · [运行适配器](../src/fourthgraph/workflow/contract_runtime.mjs)
 
+`prevout.amount` 必须显式传入整数，0 聪写为 `0`。省略该字段或传入 `null` 时，模块返回 `MissingContext`。
+
 宿主从本地认可的 manifest 摘要起步，检查模块与模板的精确摘要、参数槽和签名锚点。钱包程序从真实父交易取输出，按输入的 outpoint 对齐。宿主独立序列化候选、计算签名覆盖，签名回调可以查看完整父交易、候选、序号、路径与摘要。宿主只替换获准输入的见证，最后由独立验证器复核。收到未知模板时，`NoMatch` 表示这个钱包缺少匹配的项目包，链上有效性由交易验证决定。[宿主](../src/fourthgraph/workflow/project_contract.py)
 
-功能 Profile 选择本地理解的项目，模板版本固定具体的 Script、布局与 WASM。单次签署候选用精确交易字节绑定。模板字节升级要保留旧包以花费旧 UTXO。多步流程逐笔引用已构造并验证的父输出。PELS 归属标准库模板族。此处的 `pels-counter` 实例选用单输入、单后继、固定费用及保留代码的 `advance` 路径。R1 包支持 v0.6.0 的 `ordinary-all` 路径，MESA 签名槽对签后逆元的支持仍待单独评审。
+功能 Profile 选择本地理解的项目，模板版本固定具体的 Script、布局与 WASM。单次签署候选用精确交易字节绑定。模板字节升级要保留旧包以花费旧 UTXO。多步流程逐笔引用已构造并验证的父输出。PELS 归属标准库模板族。此处的 `pels-counter` 实例选用单输入、单后继、固定费用及保留代码的 `advance` 路径，计数按模 2³² 递增。R1 包支持 v0.6.0 的 `ordinary-all` 路径，MESA 签名槽对签后逆元的支持仍待单独评审。
 
 当前项目包宿主验证 BIP143 ALL（`0x41`）。扩展到多模式时，模板清单需要按路径绑定 sighash、有效 `scriptCode`、见证布局、已认证字段和适用链规则。一次 `prepare_spend` 使用一种已编入的模式，宿主按该路径重算原像并核对覆盖后再授权。
 

@@ -4,6 +4,7 @@ from importlib.metadata import PackageNotFoundError
 import json
 import os
 from pathlib import Path
+from runpy import run_path
 import shutil
 import subprocess
 import sys
@@ -12,7 +13,8 @@ import unittest
 from unittest.mock import patch
 
 from fourthgraph.benchmark.validation import CONTEXT_PIN, chain_metadata
-from fourthgraph.bsv.transaction import Transaction
+from fourthgraph.bsv.transaction import Input, Transaction
+from fourthgraph.compiler.source import SourceCompiler
 from tools import verify_project_contract as verifier
 
 
@@ -34,6 +36,51 @@ def integration_available():
 
 
 class ProjectReceiptTests(unittest.TestCase):
+    @unittest.skipUnless(integration_available(), "requires pinned chain-gang and Node WASI runtime")
+    def test_counter_wrap_matches_the_published_lock(self):
+        manifest, approval, _ = read_bundle(COUNTER)
+        host = verifier.ProjectContract(manifest, approval)
+        project = ROOT / "projects/pels-counter"
+        reference = run_path(str(project / "pels_counter.py"))
+        source = project / "pels-counter.fth"
+        advance = SourceCompiler(source.read_text(), source_path=source).words["advance"]
+        code = host.template[host.package["paths"]["advance"]["script_code_offset"]:]
+        parent = Transaction((Input(bytes(32), 0),), (reference["counter_output"](code, 0xffffffff, 10_000),))
+        _, successor, output = reference["next_counter"](parent, code, advance)
+        self.assertEqual(successor, 0)
+        reference_spend = reference["spend"](parent, code, output)
+        self.assertTrue(verifier.chain_verdict(reference_spend, (parent,)))
+        actual = host.spend(parent, reference_spend.with_script(0, b""), 0, "advance", b"",
+                            lambda *_: self.fail("counter must not request a signature"),
+                            lambda tx: verifier.chain_verdict(tx, (parent,)))
+        self.assertEqual(actual, reference_spend)
+
+    @unittest.skipUnless(shutil.which("node"), "requires Node WASI runtime")
+    def test_r1_abi_requires_an_explicit_prevout_amount(self):
+        manifest, approval, receipt = read_bundle(R1)
+        host = verifier.ProjectContract(manifest, approval)
+        row = receipt["steps"][0]
+        parent = Transaction.parse(bytes.fromhex(row["parent_tx"]))
+        candidate = Transaction.parse(bytes.fromhex(row["raw_tx"])).with_script(0, b"")
+        pubkey = bytes.fromhex(receipt["public_key"])
+        request = host.request(parent, candidate, 0, "ordinary-all", pubkey)
+        for change in ("missing", "null"):
+            with self.subTest(change=change):
+                prevout = dict(request["prevout"])
+                if change == "missing":
+                    del prevout["amount"]
+                else:
+                    prevout["amount"] = None
+                result = host.call("prepare_spend", {**request, "prevout": prevout})
+                self.assertEqual(result["status"], "MissingContext")
+                self.assertNotIn("prepared", result)
+                self.assertNotIn("unlock", result)
+
+        zero_parent = replace(parent, outputs=(replace(parent.outputs[0], value=0),))
+        zero_candidate = replace(candidate, inputs=(replace(candidate.inputs[0], txid=zero_parent.txid_wire()),),
+                                 outputs=(replace(candidate.outputs[0], value=0),))
+        self.assertEqual(host.prepare(zero_parent, zero_candidate, 0, "ordinary-all", pubkey)["mode"], 65)
+
     @unittest.skipUnless(integration_available(), "requires pinned chain-gang and Node WASI runtime")
     def test_cli_defaults_to_chain_gang_and_honors_node_opt_in(self):
         manifest, approval, _ = read_bundle(R1)

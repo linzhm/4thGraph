@@ -27,8 +27,8 @@
   "project_contract": {
     "abi": "4thgraph.project-contract/1",
     "manifest": "contract/manifest.json",
-    "sha256": "2dddac4e7a9eb6b2f08a16357c2db78461b6fc0e37b429c8fff29c4b64ef3d97",
+    "sha256": "38d4a27b01e35821107fdc7d49b2df04320ff406de7c672a78f95598d0bc1f8d",
     "receipt": "contract/receipt.json",
-    "receipt_sha256": "11c67f1a66048812a78e66453d8df5b839c3eb9355988a44ece54c4af609d17a"
+    "receipt_sha256": "f81fb72b827745dafc5b72c562543c45cde979d985db0f2e82f6052acfbce252"
   }
 }

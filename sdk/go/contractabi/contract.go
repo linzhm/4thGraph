@@ -23,8 +23,9 @@ type Output struct {
 	Lock   Bytes  `json:"lock"`
 }
 type Prevout struct {
-	Outpoint Bytes `json:"outpoint"`
-	Output
+	Outpoint Bytes   `json:"outpoint"`
+	Amount   *uint64 `json:"amount"`
+	Lock     Bytes   `json:"lock"`
 }
 type Input struct {
 	Outpoint Bytes  `json:"outpoint"`
@@ -98,8 +99,12 @@ func Push(data []byte) Bytes {
 // AllPreimage produces ordinary ForkID ALL using the project's path-specific scriptCode.
 func AllPreimage(r Request, code Bytes) (*Prepared, error) {
 	t := r.Transaction
+	if r.Prevout.Amount == nil {
+		return nil, fmt.Errorf("prevout amount is required")
+	}
+	amount := *r.Prevout.Amount
 	if r.Index < 0 || r.Index >= len(t.Inputs) || !bytes.Equal(t.Inputs[r.Index].Outpoint, r.Prevout.Outpoint) ||
-		r.Prevout.Amount > 2100000000000000 || len(t.Inputs[r.Index].Script) != 0 {
+		amount > 2100000000000000 || len(t.Inputs[r.Index].Script) != 0 {
 		return nil, fmt.Errorf("input does not spend this prevout or already has a witness")
 	}
 	raw := append(le32(t.Version), compact(len(t.Inputs))...)
@@ -125,6 +130,6 @@ func AllPreimage(r Request, code Bytes) (*Prepared, error) {
 	raw = append(raw, outputs...)
 	raw = append(raw, le32(t.Locktime)...)
 	pre := bytes.Join([][]byte{le32(t.Version), hash256(outpoints), hash256(sequences), r.Prevout.Outpoint,
-		blob(code), le64(r.Prevout.Amount), le32(t.Inputs[r.Index].Sequence), hash256(outputs), le32(t.Locktime), le32(0x41)}, nil)
+		blob(code), le64(amount), le32(t.Inputs[r.Index].Sequence), hash256(outputs), le32(t.Locktime), le32(0x41)}, nil)
 	return &Prepared{Hash(raw), r.Prevout.Outpoint, r.Index, r.Path, 0x41, pre, hash256(pre)}, nil
 }

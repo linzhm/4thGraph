@@ -24,9 +24,9 @@
   ],
   "fixture": "r1-ordinary",
   "fixtures": {
-    "bytes": 2610,
+    "bytes": 2833,
     "file": "cases.json",
-    "sha256": "4eb57f665a8deed07bffa0179c19482808c13ab9212d0f466711bc5db553add8"
+    "sha256": "3b3a0890ebc087c4beb81905cbe4ac582a51a501fc3dee1c91de8bb3a6d8f0ef"
   },
   "forth_inputs": {
     "dependencies": [
@@ -49,9 +49,9 @@
     "sha256": "774b0aabef429d5ad0fc63f7e24b1ea4f27dcdd8aa64612797d3b00159e24cc3"
   },
   "module": {
-    "bytes": 4792485,
+    "bytes": 4792861,
     "file": "holder.wasm",
-    "sha256": "310e0c0e12c794d11316d9c3120c133ec337f8e21f1084f209c10772eb1e88de"
+    "sha256": "e8bbca9ad2fa894e5b509270241f04905286da19bf752e328485c44594c2cdfa"
   },
   "parameters": [
     {
@@ -78,7 +78,7 @@
   "wasm_builder": "go version go1.25.14 linux/amd64",
   "wasm_sources": {
     "projects/p2pkh-r1/contract/main.go": "70c0c389ffc40bb39b5a020ea0db4212e4aafa3a3f9e3138804e7de15f73362b",
-    "sdk/go/contractabi/contract.go": "3fe649576086002847da77ee1df9914171d93891a9f244f377dbbc2b2f37b23e",
-    "sdk/go/contractabi/reactor_wasip1.go": "20c4942389dfae85e9af320d481ed0a992ec5f3c7977905a2743a4eb2d3e5f2d"
+    "sdk/go/contractabi/contract.go": "037876c2f42c84197484850b3736b989a53acddb0066ef4a27b42e884f33895e",
+    "sdk/go/contractabi/reactor_wasip1.go": "7e5a7bdbe241de4ff6c57dfc658aeb6bac9e102d8f0359ae246d8d98caf5e132"
   }
 }

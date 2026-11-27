@@ -73,6 +73,18 @@
       }
     },
     {
+      "id": "null-prevout-amount",
+      "entry": "prepare_spend",
+      "patch": {
+        "prevout": {
+          "amount": null
+        }
+      },
+      "expect": {
+        "status": "MissingContext"
+      }
+    },
+    {
       "id": "unknown-path",
       "entry": "prepare_spend",
       "patch": {

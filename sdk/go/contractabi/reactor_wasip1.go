@@ -34,8 +34,8 @@ func Run(project Project, op string, length uint32) uint64 {
 		reader := json.NewDecoder(bytes.NewReader(input))
 		reader.DisallowUnknownFields()
 		if err := reader.Decode(&r); err == nil && reader.Decode(&struct{}{}) == io.EOF {
-			if len(r.Prevout.Outpoint) != 36 || r.Prevout.Lock == nil {
-				result = Fail("MissingContext", "actual indexed prevout is required")
+			if len(r.Prevout.Outpoint) != 36 || r.Prevout.Amount == nil || r.Prevout.Lock == nil {
+				result = Fail("MissingContext", "actual prevout outpoint, amount, and lock are required")
 			} else if op != "recognize" && (r.Index < 0 || len(r.Transaction.Inputs) == 0) {
 				result = Fail("MissingContext", "spend requires a candidate and input index")
 			} else {

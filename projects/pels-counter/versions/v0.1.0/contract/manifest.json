@@ -39,9 +39,9 @@
     "sha256": "7814d47f680d89f1d7d52fa365f42f1a514355dded169cb578b1acf2597024c7"
   },
   "module": {
-    "bytes": 3332384,
+    "bytes": 3332477,
     "file": "advance.wasm",
-    "sha256": "916ef3e293e74e7c10b565d4b795e39e5db214af20327536b8e8030126c57265"
+    "sha256": "c58ee15c8f6a7e3a0a983a1eca7b5b4e42c0463c47bbdd83f770a49336409c05"
   },
   "parameters": [
     {
@@ -67,8 +67,8 @@
   "template_version": "0.1.0/full-preimage-fixed-fee",
   "wasm_builder": "go version go1.25.14 linux/amd64",
   "wasm_sources": {
-    "projects/pels-counter/contract/main.go": "372d68865425b658cc213655d15786422bd855db031ab95e90731b3daf0e400d",
-    "sdk/go/contractabi/contract.go": "3fe649576086002847da77ee1df9914171d93891a9f244f377dbbc2b2f37b23e",
-    "sdk/go/contractabi/reactor_wasip1.go": "20c4942389dfae85e9af320d481ed0a992ec5f3c7977905a2743a4eb2d3e5f2d"
+    "projects/pels-counter/contract/main.go": "2c5ba59802d8e9abd9a25722c9ad3cb00f2b659dbb284bfae5b3f2931368692a",
+    "sdk/go/contractabi/contract.go": "037876c2f42c84197484850b3736b989a53acddb0066ef4a27b42e884f33895e",
+    "sdk/go/contractabi/reactor_wasip1.go": "7e5a7bdbe241de4ff6c57dfc658aeb6bac9e102d8f0359ae246d8d98caf5e132"
   }
 }

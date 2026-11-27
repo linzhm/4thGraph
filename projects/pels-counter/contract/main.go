@@ -27,14 +27,13 @@ func (project) Prepare(r abi.Request) abi.Result {
 		return abi.Fail("UnsupportedPath", "expected advance")
 	}
 	tx := r.Transaction
-	if len(tx.Inputs) != 1 || len(tx.Outputs) != 1 || r.Index != 0 || r.Prevout.Amount <= 1000 || tx.Outputs[0].Amount != r.Prevout.Amount-1000 {
+	amount := *r.Prevout.Amount
+	if len(tx.Inputs) != 1 || len(tx.Outputs) != 1 || r.Index != 0 || amount <= 1000 || tx.Outputs[0].Amount != amount-1000 {
 		return abi.Fail("InvalidSuccessor", "expected one successor and the fixed fee")
 	}
 	next := append(abi.Bytes(nil), r.Prevout.Lock...)
 	state := binary.LittleEndian.Uint32(next[1:5])
-	if state == 0xffffffff {
-		return abi.Fail("InvalidSuccessor", "counter would wrap")
-	}
+	// uint32 addition wraps, matching the published Forth u32-inc.
 	binary.LittleEndian.PutUint32(next[1:5], state+1)
 	if !bytes.Equal(next, tx.Outputs[0].Lock) {
 		return abi.Fail("InvalidSuccessor", "next state or code differs")

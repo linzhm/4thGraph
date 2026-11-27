@@ -20,7 +20,7 @@
       "id": "missing-prevout",
       "input_sha256": "7ca8fe071ae34af9075be383ffd146b247a59b142c82fd0c8643c1126cf00203",
       "passed": true,
-      "result_sha256": "95d6b07c28c39b137b5fe1ca82dd0e3c4f2c1e1e1a824f5eafced20c342cd794",
+      "result_sha256": "47276feb400cccaaab1f25b6c2465fe358b28e2e567053ad69e76f4bf79fba50",
       "step": 0
     },
     {
@@ -122,7 +122,7 @@
       "id": "missing-prevout",
       "input_sha256": "5461a26857a2e5ead1ace7d7aaa77064fd683af74601a3e052f2786e2bbc6fad",
       "passed": true,
-      "result_sha256": "95d6b07c28c39b137b5fe1ca82dd0e3c4f2c1e1e1a824f5eafced20c342cd794",
+      "result_sha256": "47276feb400cccaaab1f25b6c2465fe358b28e2e567053ad69e76f4bf79fba50",
       "step": 1
     },
     {
@@ -213,8 +213,8 @@
   "fixture_key": "not_applicable",
   "fixture_sha256": "3ad1d2fd4463ef0104bfc2308c131fec03fda02130fce4ca8a8ac868a51077da",
   "flags": 3997710,
-  "manifest_sha256": "71a22e51890cef0efa13e31e8ec887622f4a54e71311975d3fc3f29dc7b3722e",
-  "module_sha256": "916ef3e293e74e7c10b565d4b795e39e5db214af20327536b8e8030126c57265",
+  "manifest_sha256": "5b9f758728c5b520ed97297a2b167561eb1ba1014e33e980d93b8f387569b78b",
+  "module_sha256": "c58ee15c8f6a7e3a0a983a1eca7b5b4e42c0463c47bbdd83f770a49336409c05",
   "node_version": 101020300,
   "path": "advance",
   "profile": "pels-counter",
@@ -247,10 +247,11 @@
   "template": "0.1.0/full-preimage-fixed-fee",
   "template_sha256": "8b757966d492adfadb003bd7e5d0766fa44261d5034da10fed85befd31367917",
   "utxo_height": 3,
+  "verification_level": "dual-engine",
   "verification_sources": {
     "src/fourthgraph/benchmark/validation.py": "bc2a1dfbf1a08a92cf639f24d1596f6591a2f35473843b1eb702780ceeb2fc9e",
     "src/fourthgraph/workflow/contract_runtime.mjs": "be241f1bfac15259eb50d8bf3a5dea6d41340d1a93109369f6327ed778316c60",
     "src/fourthgraph/workflow/project_contract.py": "8b479c3468f34a1225d1f36ef2e0c9782f34d42c2bcb1f6fadf7c58169414e45",
-    "tools/verify_project_contract.py": "ce9dbe1a79e17816fe50130de020a0fac66251fd2fcfbd511e68952f673f07b7"
+    "tools/verify_project_contract.py": "22ae68943c2c8ee69976a5b8e7eb9d8db1a12fbf3f1ba69634921f879748f9b1"
   }
 }
