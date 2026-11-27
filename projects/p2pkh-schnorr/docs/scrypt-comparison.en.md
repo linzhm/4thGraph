@@ -2,6 +2,8 @@
 
 [简体中文](scrypt-comparison.zh-CN.md) · [Project README](../README.md)
 
+The measurements below use the v0.6.0 Forth verifier. The project README gives the current verifier and payment sizes. [v0.6.0 source](https://github.com/linzhm/4thGraph/tree/bc6fe95784cc810e96fc51806f6106f5207cdb9d/projects/p2pkh-schnorr) · [Current payment measurements](../README.md#measured-sizes)
+
 The 2021 article illustrates a witness-assisted approach. Its archived contract calls `isMul` three times with off-chain point multiplication data. Each auxiliary array group declares 512 points and 510 slopes, giving 4,602 integer fields across the three groups before the other arguments. The companion article's roughly 400-byte figure describes the check for one point addition. These historical figures come from the source. [Schnorr article](https://scryptplatform.medium.com/schnorr-signatures-on-bitcoin-397ca51d8bda) · [Archived contract](https://github.com/sCrypt-Inc/boilerplate/blob/2284e11c9aa22faccd266d85a992e8a91a5b70f3/contracts/schnorr.scrypt) · [Archived arithmetic](https://github.com/sCrypt-Inc/boilerplate/blob/2284e11c9aa22faccd266d85a992e8a91a5b70f3/contracts/ec.scrypt) · [Point arithmetic article](https://scryptplatform.medium.com/efficient-elliptic-curve-point-addition-and-multiplication-in-scrypt-script-f7e143a752e2)
 
 The article's link now points to `legacy`. At the pinned revision, the contract computes `sG = R + eP` using affine point arithmetic and modular inversions. It has separate generator and variable-base multipliers. The challenge is untagged `SHA256(r || P || m)` reduced modulo the group order, with `P` encoded as a 65-byte uncompressed SEC1 key. The witness supplies both coordinates of `R`. [Pinned contract](https://github.com/sCrypt-Inc/boilerplate/blob/7b2cd79d005b2fcdc3c992d039efd619fb47abf7/contracts/schnorr.scrypt) · [Point arithmetic](https://github.com/sCrypt-Inc/boilerplate/blob/7b2cd79d005b2fcdc3c992d039efd619fb47abf7/contracts/ec.scrypt#L80-L153)
@@ -10,7 +12,7 @@ Script Lab uses the BIP340 tagged challenge, a 32-byte x-only public key, and tw
 
 ## Standalone verifier replay
 
-Each verifier receives a signature in its own format over the 32-byte message and public-key x-coordinate from official BIP340 vector 0. All three builds use synthetic one-input spends with explicit prevouts and pass BSV Node 1.2.3 `verifyscript` under the repository's raised script limits and the pinned chain-gang evaluator. The figures count serialized script bytes, including witness push opcodes. `scryptlib` 2.1.36's local interpreter reports `SCRIPT_ERR_SCRIPT_SIZE` on the default legacy build with its default flags. [BIP340 vectors](../template/bip340-vectors.csv) · [Runner](../reference/compare_scrypt.py) · [Isolated regtest](../../../shared/verify_node.sh)
+Each verifier receives a signature in its own format over the 32-byte message and public-key x-coordinate from official BIP340 vector 0. All three builds use synthetic one-input spends with explicit prevouts and pass BSV Node 1.2.3 `verifyscript` under the repository's raised script limits and the pinned chain-gang evaluator. The figures count serialized script bytes, including witness push opcodes. `scryptlib` 2.1.36's local interpreter reports `SCRIPT_ERR_SCRIPT_SIZE` on the default legacy build with its default flags. [BIP340 vectors](../versions/v0.6.0/bip340-vectors.csv) · [Runner](../reference/compare_scrypt.py) · [Isolated regtest](../../../tools/verify_node.sh)
 
 | Verifier | Lock bytes | Witness bytes | Combined script bytes | chain-gang median | BSV Node RPC median |
 | --- | ---: | ---: | ---: | ---: | ---: |
@@ -57,10 +59,10 @@ gh release download v1.19.1 --repo sCrypt-Inc/compiler_dist \
   --pattern 'scryptc-1.19.1-Linux-x86_64' --dir "$scratch"
 chmod +x "$scratch/scryptc-1.19.1-Linux-x86_64"
 export SCRYPTC="$scratch/scryptc-1.19.1-Linux-x86_64" GHCRTS=-N2
-PYTHONPATH=. bash shared/verify_node.sh -- \
-  .venv/p2pkh-schnorr/bin/python projects/p2pkh-schnorr/reference/compare_scrypt.py \
+PYTHONPATH=src:. bash tools/verify_node.sh -- \
+  projects/p2pkh-schnorr/workspace/p2pkh-schnorr/bin/python projects/p2pkh-schnorr/reference/compare_scrypt.py \
   "$scratch/boilerplate" --compiler-study --samples 15
-PYTHONPATH=. bash shared/verify_node.sh -- \
-  .venv/p2pkh-schnorr/bin/python projects/p2pkh-schnorr/reference/compare_bip340.py \
+PYTHONPATH=src:. bash tools/verify_node.sh -- \
+  projects/p2pkh-schnorr/workspace/p2pkh-schnorr/bin/python projects/p2pkh-schnorr/reference/compare_bip340.py \
   --compiler "$SCRYPTC" --samples 15
 ```

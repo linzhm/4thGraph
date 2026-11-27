@@ -1,6 +1,7 @@
-# Working on BSV Script Lab
+# Working on 4thGraph
 
-- Keep each script project self-contained under `projects/<name>/`; put only reusable infrastructure under `shared/`.
+- Keep script projects self-contained under `projects/<name>/`. Put reusable compiler code and Forth libraries under `src/fourthgraph/`, SDK clients under `sdk/`, and developer launchers under `tools/`.
+- Use the local `workspace/` directories for dependencies, builds and logs. Keep selected artifacts, fixtures and evidence with their version under `projects/<name>/versions/` and link to them from the project and showcase pages.
 - Preserve existing script bytes and vectors when moving directories. Update documentation links, SDK module paths and test working directories.
 - Prefer a cloud Linux environment or Apple Container for full node validation. Do not start Docker.
 - Use local Python/OpenSSL for focused development checks. Use GitHub Actions sparingly as a manual release check, not for the development iteration loop. Keep the project workflows manually triggered to avoid duplicate push/PR runs.

@@ -2,6 +2,8 @@
 
 [English](scrypt-comparison.en.md) · [项目首页](../README.zh-CN.md)
 
+下文记录 v0.6.0 Forth 验签器的实测数据。当前版本的验签器和付款交易大小见项目实测。[v0.6.0 源码](https://github.com/linzhm/4thGraph/tree/bc6fe95784cc810e96fc51806f6106f5207cdb9d/projects/p2pkh-schnorr) · [当前交易实测](../README.zh-CN.md#交易实测)
+
 2021 年文章介绍的是由见证数据辅助点乘的做法。归档合约调用三次 `isMul`。每组链下点乘辅助数据声明了 512 个点和 510 个斜率，三组共 4,602 个整数字段，此外还有其他参数。配套文章提到的约 400 字节是校验一次点加的开销。以上数字来自归档源码与原文。[Schnorr 原文](https://scryptplatform.medium.com/schnorr-signatures-on-bitcoin-397ca51d8bda) · [归档合约](https://github.com/sCrypt-Inc/boilerplate/blob/2284e11c9aa22faccd266d85a992e8a91a5b70f3/contracts/schnorr.scrypt) · [归档点运算实现](https://github.com/sCrypt-Inc/boilerplate/blob/2284e11c9aa22faccd266d85a992e8a91a5b70f3/contracts/ec.scrypt) · [点运算文章](https://scryptplatform.medium.com/efficient-elliptic-curve-point-addition-and-multiplication-in-scrypt-script-f7e143a752e2)
 
 原文的源码链接目前指向 `legacy` 分支。本次固定的提交在脚本内通过仿射点运算和求模逆来检查 `sG = R + eP`，分别计算固定基点和可变基点的点乘。挑战值为无标签的 `SHA256(r || P || m)` 对群阶取模，其中 `P` 是 65 字节的 SEC1 非压缩公钥。见证提供 `R` 的横纵坐标。[固定版本合约](https://github.com/sCrypt-Inc/boilerplate/blob/7b2cd79d005b2fcdc3c992d039efd619fb47abf7/contracts/schnorr.scrypt) · [点运算实现](https://github.com/sCrypt-Inc/boilerplate/blob/7b2cd79d005b2fcdc3c992d039efd619fb47abf7/contracts/ec.scrypt#L80-L153)
@@ -10,7 +12,7 @@ Script Lab 使用 BIP340 带标签的挑战哈希和 32 字节的公钥横坐标
 
 ## 独立验签器复放
 
-两边沿用 BIP340 官方向量第 0 条的 32 字节消息与公钥横坐标，各自使用本身的签名格式。夹具构造单输入交易并显式提供上一输出。三份构建产物均通过 BSV Node 1.2.3 在仓库放宽脚本限制配置下的 `verifyscript`，以及固定版本的 chain-gang 验证。表内统计序列化脚本字节，包含压入见证所用的操作码。`scryptlib` 2.1.36 自带解释器以默认标志执行 `legacy` 默认构建产物时，返回 `SCRIPT_ERR_SCRIPT_SIZE`。[BIP340 向量](../template/bip340-vectors.csv) · [复放程序](../reference/compare_scrypt.py) · [隔离 regtest 配置](../../../shared/verify_node.sh)
+两边沿用 BIP340 官方向量第 0 条的 32 字节消息与公钥横坐标，各自使用本身的签名格式。夹具构造单输入交易并显式提供上一输出。三份构建产物均通过 BSV Node 1.2.3 在仓库放宽脚本限制配置下的 `verifyscript`，以及固定版本的 chain-gang 验证。表内统计序列化脚本字节，包含压入见证所用的操作码。`scryptlib` 2.1.36 自带解释器以默认标志执行 `legacy` 默认构建产物时，返回 `SCRIPT_ERR_SCRIPT_SIZE`。[BIP340 向量](../versions/v0.6.0/bip340-vectors.csv) · [复放程序](../reference/compare_scrypt.py) · [隔离 regtest 配置](../../../tools/verify_node.sh)
 
 | 验签器 | 锁定脚本字节 | 见证脚本字节 | 脚本合计字节 | chain-gang 中位耗时 | BSV Node RPC 中位耗时 |
 | --- | ---: | ---: | ---: | ---: | ---: |
@@ -57,10 +59,10 @@ gh release download v1.19.1 --repo sCrypt-Inc/compiler_dist \
   --pattern 'scryptc-1.19.1-Linux-x86_64' --dir "$scratch"
 chmod +x "$scratch/scryptc-1.19.1-Linux-x86_64"
 export SCRYPTC="$scratch/scryptc-1.19.1-Linux-x86_64" GHCRTS=-N2
-PYTHONPATH=. bash shared/verify_node.sh -- \
-  .venv/p2pkh-schnorr/bin/python projects/p2pkh-schnorr/reference/compare_scrypt.py \
+PYTHONPATH=src:. bash tools/verify_node.sh -- \
+  projects/p2pkh-schnorr/workspace/p2pkh-schnorr/bin/python projects/p2pkh-schnorr/reference/compare_scrypt.py \
   "$scratch/boilerplate" --compiler-study --samples 15
-PYTHONPATH=. bash shared/verify_node.sh -- \
-  .venv/p2pkh-schnorr/bin/python projects/p2pkh-schnorr/reference/compare_bip340.py \
+PYTHONPATH=src:. bash tools/verify_node.sh -- \
+  projects/p2pkh-schnorr/workspace/p2pkh-schnorr/bin/python projects/p2pkh-schnorr/reference/compare_bip340.py \
   --compiler "$SCRYPTC" --samples 15
 ```

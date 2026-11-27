@@ -4,7 +4,7 @@ from functools import cache
 
 from fips204 import CHALLENGE_BYTES, CHALLENGE_SIGN_BYTES, CHALLENGE_WEIGHT, SAMPLE_IN_BALL_BYTES
 from shake_script import shake256_script
-from shared.script import asm, number, push
+from fourthgraph.bsv.script import asm, number, push
 from polynomial import DEGREE, MODULUS
 
 _COEFFICIENT_BYTES = 3

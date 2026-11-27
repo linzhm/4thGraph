@@ -4,8 +4,8 @@ from test_payment import fixture_signature, signer
 from p2pkh_r1 import locking_script_from_owner_hash
 from tx_engine import Tx
 from wallet import sign_spend
-from shared.benchmark_cases import Coin, Template, seed
-from shared.transaction import Output
+from fourthgraph.benchmark.cases import Coin, Template, seed
+from fourthgraph.bsv.transaction import Output
 
 ORDER = 0xffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc632551
 
@@ -46,5 +46,5 @@ def components(_samples):
 
     return {"compiled_output_bytes": len(locking_script_from_owner_hash(bytes(20), compiled_curve=True)),
             "mode_specific_experiment_output_bytes": {
-                family: len(specialized_lock(bytes(20), family)) for family in ("forkid", "otda")
+                family: len(specialized_lock(bytes(20), family)) for family in ("bip143", "otda")
             }}

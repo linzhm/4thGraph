@@ -9,8 +9,8 @@ import unittest
 from fixtures import fixture_seeds, funding_transaction, vector_document
 from payment import sign_payment
 from script import locking_script
-from shared.evaluate import ScriptError, evaluate
-from shared.transaction import Output
+from fourthgraph.bsv.evaluate import ScriptError, evaluate
+from fourthgraph.bsv.transaction import Output
 from wots import (
     CHAINS,
     KEY_BYTES,
@@ -151,7 +151,7 @@ class WotsTests(unittest.TestCase):
         self.assertEqual(len(calls), 1)
 
     def test_payment_vectors_are_reproducible(self):
-        path = Path(__file__).resolve().parents[1] / "template" / "vectors.json"
+        path = Path(__file__).resolve().parents[1] / "versions/v0.1.0" / "vectors.json"
         self.assertEqual(json.loads(path.read_text()), vector_document())
 
 

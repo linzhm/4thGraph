@@ -12,9 +12,9 @@ from tx_engine import Script, Tx, TxIn, TxOut, sig_hash_preimage
 from fixtures import fixture_seeds, funding_transaction, malformed_cases, mode_cases
 from payment import authorization, current_input_unlock, sign_payment, sign_spend
 from script import ORDINARY_CODE, locking_script
-from shared.benchmark_cases import SHAPES, batch
-from shared.evaluate import evaluate
-from shared.transaction import SIGHASH_TYPES, Input, Output, Transaction, hash256
+from fourthgraph.benchmark.cases import SHAPES, batch
+from fourthgraph.bsv.evaluate import evaluate
+from fourthgraph.bsv.transaction import SIGHASH_TYPES, Input, Output, Transaction, hash256
 from wots import OneTimeSigner
 from fixed_template import TEMPLATE_DIRECTORY, fixed_pattern
 from generate_reconstruction import build_artifacts

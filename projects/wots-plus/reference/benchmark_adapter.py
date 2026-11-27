@@ -2,9 +2,9 @@
 from payment import sign_spend
 from script import locking_script
 from wots import OneTimeSigner
-from shared.benchmark_cases import Coin, Template, seed
-from shared.transaction import Output
-from shared.one_time_signer import durable_signer
+from fourthgraph.benchmark.cases import Coin, Template, seed
+from fourthgraph.bsv.transaction import Output
+from fourthgraph.bsv.one_time_signer import durable_signer
 
 
 def coin(label, value, *, cached=False, compress=False):

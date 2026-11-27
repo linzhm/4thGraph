@@ -1,10 +1,10 @@
 # Reference implementation
 
-The wallet creates outputs from [the v0.2.0 template](../template/v0.2.0/template.hex) by default. The [v0.1.0 template](../template/template.hex) remains available for historical outputs. Its assembly is reproduced independently from [lock.asm](./asm/lock.asm). Conformance compares three owner vectors, validates three consecutive ordinary payments, and exercises the twelve paired sighash modes and four unpaired SINGLE modes. Both BSV Node and chain-gang must accept each valid complete input, including the two OTDA companion cases. This is input-level regtest validation with supplied UTXOs and explicit script flags.
+The wallet creates outputs from [the v0.2.0 template](../versions/v0.2.0/template.hex) by default. The [v0.1.0 template](../versions/v0.1.0/template.hex) remains available for historical outputs. Its assembly is reproduced independently from [lock.asm](./asm/lock.asm). Conformance compares three owner vectors, validates three consecutive ordinary payments, and exercises the twelve paired sighash modes and four unpaired SINGLE modes. Both BSV Node and chain-gang must accept each valid complete input, including the two OTDA companion cases. This is input-level regtest validation with supplied UTXOs and explicit script flags.
 
 Use Python 3.12 on Linux x86-64 with Git and a Rust toolchain available to build the pinned Python extension. Install the dependencies from requirements.txt before running the node comparison. It pins tx-engine to [8b60b71a12](https://github.com/linzhm/chain-gang/commit/8b60b71a12a69fdcb465d3e627dbf6f43d6ed081) from the fork's `fix/otda-complete-validation` branch. CI checks the installed Git commit before executing the full-input tests. The unified wallet SDK uses this reference environment for R1.
 
-Set `R1_OWNER_HASH160` to the recipient’s 20-byte HASH160 in hex. The canonical template’s embedded owner, layout vector C, and the [payment fixture](../template/spend-all.json) use the same publicly known test key. Outputs using that key are for offline and regtest use only.
+Set `R1_OWNER_HASH160` to the recipient’s 20-byte HASH160 in hex. The canonical template’s embedded owner, layout vector C, and the [payment fixture](../versions/v0.1.0/spend-all.json) use the same publicly known test key. Outputs using that key are for offline and regtest use only.
 
 ```sh
 cd projects/p2pkh-r1/reference
@@ -53,12 +53,12 @@ the complete signed transactions.
 
 | Path | Original lock | Compiled lock |
 | --- | ---: | ---: |
-| ForkID ALL, fund and exit | 120,159 B | 96,015 B |
-| ForkID ALL, one turnover | 240,093 B | 191,805 B |
+| BIP143 ALL, fund and exit | 120,159 B | 96,015 B |
+| BIP143 ALL, one turnover | 240,093 B | 191,805 B |
 | Chronicle OTDA ALL, fund and exit | 120,173 B | 96,029 B |
 | Chronicle OTDA ALL, one turnover | 478,367 B | 381,791 B |
 
-The ordinary ForkID unlocking script is 326 bytes for both locks. At two
+The ordinary BIP143 unlocking script is 326 bytes for both locks. At two
 R1 inputs and two R1 outputs, OTDA ALL witnesses shrink from 119,454 to
 95,310 bytes each because the preimage serializes both output scripts.
 Tests compare each kernel with literal assembly, exercise the rare `r+n`
@@ -68,7 +68,7 @@ both independent engines.
 
 ## Optimized full-mode template
 
-The [candidate layout](../template/candidates/layout.json) pins the script
+The [candidate layout](../versions/v0.1.0/compiled/layout.json) pins the script
 bytes, SHA-256 fingerprint, owner HASH160 offset and signing modes. The
 wallet fills the 20-byte owner field to create the lock and compares all
 fixed bytes when recognizing an output. The assembler and field compiler
@@ -85,14 +85,14 @@ the default for the wallet generator and the existing SDKs.
 
 | 2 R1 inputs and 2 R1 outputs | Unlock per input | Transaction | Extra R1 input | Extra R1 output |
 | --- | ---: | ---: | ---: | ---: |
-| ForkID ALL | 326 B | 95,790 B | 369 B | 47,521 B |
+| BIP143 ALL | 326 B | 95,790 B | 369 B | 47,521 B |
 | OTDA ALL, literal preimage | 95,310 B | 285,762 B | 95,478 B | 142,563 B |
 | OTDA ALL, reconstructed preimage | 6,176 B | 107,490 B | 6,342 B | 47,601 B |
 
 Call `sign_spend(..., compress_otda=True)` when Chronicle functional
 unlocking is available. For version 2 transactions with OTDA ALL
 (`0x61` or `0xe1`), the wallet starts with the
-[precomputed reconstruction program](../template/candidates/otda-all-reconstruct.hex)
+[precomputed reconstruction program](../versions/v0.1.0/compiled/otda-all-reconstruct.hex)
 and fills the output fields in transaction order. Only outputs matching
 the optimized template may use its reconstruction data. Other outputs
 are serialized literally. The wallet uses the literal preimage when the
@@ -121,14 +121,14 @@ The transaction still uses the 47,510-byte full-mode output template.
 
 The reference checks byte-for-byte stack equality, two independent engines
 and the version 1 and other-mode fallbacks. The TypeScript, Rust and Go SDKs
-recognize the compiled lock and replay its deterministic ForkID ALL vector
+recognize the compiled lock and replay its deterministic BIP143 ALL vector
 with the existing signer callback. The Python reference provides the complete
 sighash and reconstruction experiments.
 
 ### Signature-mode sizing experiment
 
 The compiled universal lock measures 47,510 bytes. With the same curve
-arithmetic, the ForkID-only experiment measures 47,262 bytes and the
+arithmetic, the BIP143-only experiment measures 47,262 bytes and the
 OTDA-only experiment 47,480 bytes. The savings are 248 and 30 bytes per
 output, respectively. The fixture checks each family's allowed modes
 and the other family's rejection, including unpaired SINGLE. These figures
@@ -136,12 +136,12 @@ support keeping the full-mode template for the SDK candidate.
 
 ### P2PKH-R1 v0.2.0
 
-The [versioned layout](../template/v0.2.0/layout.json) fixes the 46,302-byte lock
+The [versioned layout](../versions/v0.2.0/layout.json) fixes the 46,302-byte lock
 and its 3,913-byte reconstruction program. The generator defaults to v0.2.0.
 Use `--version 0.1.0` to reproduce an older output.
 The owner HASH160 occupies the same 20-byte field. The Python, TypeScript,
 Rust and Go SDKs recognize the prebuilt template. The three non-Python
-SDKs replay its [ForkID ALL payment vector](../template/v0.2.0/spend-all.json)
+SDKs replay its [BIP143 ALL payment vector](../versions/v0.2.0/spend-all.json)
 with their ordinary signer callbacks.
 
 In the Python reference wallet, `sign_spend(..., compress_otda="paired")`

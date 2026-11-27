@@ -7,8 +7,8 @@ import unittest
 from assemble import assemble
 from curve_compiler import ADD, ADD_INPUTS, B3, DOUBLE, DOUBLE_INPUTS, FIELD, curve_blocks, intermediate_bits
 from p2pkh_r1 import locking_script_from_owner_hash, recognize
-from shared.evaluate import ScriptError, evaluate
-from shared.script import decode_num, encode_num
+from fourthgraph.bsv.evaluate import ScriptError, evaluate
+from fourthgraph.bsv.script import decode_num, encode_num
 from signature import GROUP_ORDER_R1
 from test_payment import signer
 

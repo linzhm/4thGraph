@@ -55,7 +55,7 @@ generates dedicated test keys and checks signatures independently in OpenSSL.
 From the repository root:
 
 ```sh
-PYTHONPATH=.:projects/p2pkh-sm2/reference python -m unittest -v test_signed_data_acceptance
+PYTHONPATH=src:.:projects/p2pkh-sm2/reference python -m unittest -v test_signed_data_acceptance
 ```
 
 For BSV Node 1.2.3 replay, run `bash projects/p2pkh-sm2/reference/verify.sh`.
@@ -63,7 +63,7 @@ It builds the [independent Rust signer](interop/rust-signer/README.md) with
 Cargo and also invokes the [Python signer](interop/python-signer/README.md).
 Set `SM2_SIGNED_DATA_SIGNER` to the absolute executable path of a prebuilt
 Rust signer to skip the Cargo build. The tests exercise both CLIs, verify
-the signatures in OpenSSL and replay attached ForkID and detached Chronicle
+the signatures in OpenSSL and replay attached BIP143 and detached Chronicle
 OTDA spends through BSV Node and chain-gang.
 
 ## Complete enumeration of the declared domain

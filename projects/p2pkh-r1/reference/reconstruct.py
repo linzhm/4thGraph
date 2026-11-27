@@ -2,7 +2,7 @@
 import re
 
 from assemble import assemble
-from shared.script import number, push
+from fourthgraph.bsv.script import number, push
 
 
 def shared_kernel_program(prefix, suffix, *, injected=None):

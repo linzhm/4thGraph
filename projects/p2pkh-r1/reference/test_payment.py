@@ -162,15 +162,15 @@ class CurrentInputTests(unittest.TestCase):
 
     def test_signing_vector(self):
         for compiled, file in (
-            (False, "spend-all.json"),
-            (True, "candidates/spend-all.json"),
+            (False, "v0.1.0/spend-all.json"),
+            (True, "v0.1.0/compiled/spend-all.json"),
             ("scheduled", "v0.2.0/spend-all.json"),
         ):
             with self.subTest(compiled=compiled):
                 funding, signed, vector = signing_vector(compiled_curve=compiled)
                 check(signed, [funding], 0)
                 signed.validate([funding])
-                fixture = Path(__file__).resolve().parents[1] / "template" / file
+                fixture = Path(__file__).resolve().parents[1] / "versions" / file
                 self.assertEqual(vector, json.loads(fixture.read_text()))
 
 

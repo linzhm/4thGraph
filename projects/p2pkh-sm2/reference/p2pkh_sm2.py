@@ -3,23 +3,38 @@ from functools import cache
 from hashlib import sha256
 import json
 from pathlib import Path
-from assemble import TEMPLATE_VERSION, assemble
+from assemble import SCHEDULED_TEMPLATE_VERSION, TEMPLATE_VERSION, assemble
 from sighash import authorization
 from sm2 import USER_ID,hash256,public_key_hash160,verify
-from shared.otda_reconstruction import Reconstruction
-from shared.script import push
-from shared.transaction import Transaction,Input,Output,preimage_all,amount
+from fourthgraph.bsv.otda_reconstruction import Reconstruction, reconstruct_mixed
+from fourthgraph.bsv.script import push
+from fourthgraph.bsv.transaction import Transaction,Input,Output,preimage_all,amount
 
-MANIFEST=Path(__file__).resolve().parents[1]/'template/layout.json'
+VERSIONS = Path(__file__).resolve().parents[1] / 'versions'
+LOCK_LAYOUTS = {
+    TEMPLATE_VERSION: VERSIONS / 'v1.0.0/layout.json',
+    SCHEDULED_TEMPLATE_VERSION: VERSIONS / 'v1.2.0/layout.json',
+}
+CONSTRUCTOR_LAYOUTS = {
+    TEMPLATE_VERSION: VERSIONS / 'v1.1.0/layout.json',
+    SCHEDULED_TEMPLATE_VERSION: LOCK_LAYOUTS[SCHEDULED_TEMPLATE_VERSION],
+}
 RECONSTRUCT_ALL = frozenset((0x61, 0xe1))
 RECONSTRUCT_SINGLE = frozenset((0x63, 0xe3))
 
 
 @cache
-def _canonical():
-    layout=json.loads(MANIFEST.read_text())
-    raw=assemble(bytes(20))
-    if (layout['version']!=TEMPLATE_VERSION or len(raw)!=layout['script_bytes']
+def _layout(version):
+    if version not in LOCK_LAYOUTS:
+        raise ValueError('unsupported P2PKH-SM2 template version')
+    return json.loads(LOCK_LAYOUTS[version].read_text(encoding='utf-8'))
+
+
+@cache
+def _canonical(version=TEMPLATE_VERSION):
+    layout = _layout(version)
+    raw = assemble(bytes(20), version)
+    if (layout['version']!=version or len(raw)!=layout['script_bytes']
             or sha256(raw).hexdigest()!=layout['base_script_sha256']):
         raise ValueError('canonical SM2 template differs from manifest')
     start=layout['owner_hash160']['offset']
@@ -30,8 +45,7 @@ def _canonical():
 
 def locking_script_from_owner_hash(owner, *, version=TEMPLATE_VERSION):
     if not isinstance(owner,bytes) or len(owner)!=20: raise ValueError('expected a 20-byte owner hash')
-    if version != TEMPLATE_VERSION: raise ValueError('unsupported P2PKH-SM2 template version')
-    raw,start=_canonical()
+    raw,start=_canonical(version)
     return raw[:start]+owner+raw[start+20:]
 
 
@@ -43,10 +57,12 @@ def identify(raw):
     """Return (version, owner) after verifying the complete locking program."""
     if not isinstance(raw, bytes):
         return None
-    template, start = _canonical()
-    if (len(raw) == len(template) and raw[:start] == template[:start]
-            and raw[start+20:] == template[start+20:]):
-        return TEMPLATE_VERSION, raw[start:start+20]
+    for version in LOCK_LAYOUTS:
+        if len(raw) != _layout(version)['script_bytes']:
+            continue
+        template, start = _canonical(version)
+        if raw[:start] == template[:start] and raw[start+20:] == template[start+20:]:
+            return version, raw[start:start+20]
     return None
 
 
@@ -56,12 +72,13 @@ def recognize(raw):
 
 
 @cache
-def _otda_pattern():
-    layout = json.loads(MANIFEST.read_text())['otda_constructor']
-    program = bytes.fromhex(MANIFEST.with_name(layout['file']).read_text(encoding='ascii'))
+def _otda_pattern(version=TEMPLATE_VERSION):
+    path = CONSTRUCTOR_LAYOUTS[version]
+    layout = json.loads(path.read_text(encoding='utf-8'))['otda_constructor']
+    program = bytes.fromhex(path.with_name(layout['file']).read_text(encoding='ascii'))
     if len(program) != layout['bytes'] or sha256(program).hexdigest() != layout['sha256']:
         raise ValueError('SM2 OTDA constructor differs from its manifest')
-    template, start = _canonical()
+    template, start = _canonical(version)
     return Reconstruction(program, (template[:start], template[start+20:]), (20,))
 
 
@@ -79,14 +96,22 @@ def _preimage_script(tx, index, auth, *, compress_otda, chronicle_active):
         outputs = (tx.outputs[index],)
     else:
         return literal
-    program = _otda_pattern().build(auth.preimage, outputs)
-    return program if program is not None and len(program) < len(literal) else literal
+    output_sizes = {len(output.script) for output in outputs}
+    patterns = tuple(_otda_pattern(version) for version in LOCK_LAYOUTS
+                     if _layout(version)['script_bytes'] in output_sizes)
+    candidates = [literal]
+    for pattern in patterns:
+        if (program := pattern.build(auth.preimage, outputs)) is not None:
+            candidates.append(program)
+    if len(patterns) > 1 and (program := reconstruct_mixed(auth.preimage, outputs, patterns)) is not None:
+        candidates.append(program)
+    return min(candidates, key=len)
 
 
 def current_input_unlock(tx, index, previous_amount, key, signature, sighash_type=0x41,
                          *, chronicle_active=True, version=TEMPLATE_VERSION, compress_otda=None):
     public_key_hash160(key)
-    if version != TEMPLATE_VERSION:
+    if version not in LOCK_LAYOUTS:
         raise ValueError('unsupported P2PKH-SM2 template version')
     auth = authorization(tx, index, previous_amount, sighash_type, chronicle_active=chronicle_active)
     preimage_script = _preimage_script(tx, index, auth, compress_otda=compress_otda,
@@ -134,7 +159,7 @@ def sign_input(tx, index, funding_raw, key, signer, sighash_type=0x41, *, chroni
 
 
 def sign_payment(funding_raw,vout,outputs,fee,key,signer):
-    """One-input ForkID ALL payment. signer(SHA256d(P), user_id) returns r||s."""
+    """One-input BIP143 ALL payment. signer(SHA256d(P), user_id) returns r||s."""
     funding=Transaction.parse(funding_raw)
     if not 0<=vout<len(funding.outputs): raise ValueError('invalid funding output')
     previous=funding.outputs[vout]

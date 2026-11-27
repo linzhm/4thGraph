@@ -40,7 +40,8 @@ witness items.
 | --- | --- |
 | [`sm2.py`](sm2.py) | Curve parameters, ZA, signature verification, and a test signer that takes an explicit nonce |
 | [`sm3_script.py`](sm3_script.py) | Emits SM3 as unrolled Script bytecode |
-| [`asm/`](asm/) | Curve arithmetic, verification, and PUSHTX transaction binding |
+| [`p2pkh-sm2.fth`](../../../src/fourthgraph/stdlib/wallet/p2pkh-sm2.fth) | Lock construction, curve arithmetic, verification and PUSHTX transaction binding |
+| [`asm/`](asm/) | Reference assembly for byte-for-byte comparisons and isolated curve tests |
 | [`p2pkh_sm2.py`](p2pkh_sm2.py) | Wallet API and external signing callback |
 | [`signed_data.py`](signed_data.py) | SignedData payment adapter, structural validation, and signature verification |
 
@@ -52,34 +53,36 @@ for production keys.
 The zero-owner script is 144,925 bytes. Its SHA-256 is
 `196dfcb8244e863521447c7069297d31938fbd80a83d5976af618cf7fbcf9462`.
 The generator and Python constructors emit template version `1` by default.
-The [layout manifest](../template/layout.json) pins the canonical bytecode,
-and the [payment vector](../template/spend-all.json) pins a complete ForkID
-payment. [16 deterministic preimages](../template/sighash-modes.json)
+The [layout manifest](../versions/v1.0.0/layout.json) pins the canonical bytecode,
+and the [payment vector](../versions/v1.0.0/spend-all.json) pins a complete BIP143
+payment. [16 deterministic preimages](../versions/v1.0.0/sighash-modes.json)
 cover all paired modes and each unpaired SINGLE variant.
 
 The script executes all SM3 compression rounds. It reuses powers of two
 during rotations and reductions, uses shorter stack operations for nearby
 operands, and simplifies the Boolean functions in the last 48 rounds.
-The complete-input cases cover ForkID and Chronicle OTDA, including mixed
+The complete-input cases cover BIP143 and Chronicle OTDA, including mixed
 inputs, fully SM2 two-input/two-output payments, malformed preimages signed
 by the correct SM2 test key, and spends across the Chronicle activation
 boundary. The activation cases use transaction version 1 on both sides to
 isolate the effect of the activation flags.
 
-[Standard vector](../template/sm2-standard.json) · [BSV Node source](https://github.com/bitcoin-sv/bitcoin-sv/tree/6504a3aff65ba97c0f6c80962b033e35ecbfed4b) · [chain-gang source](https://github.com/linzhm/chain-gang/tree/8b60b71a12a69fdcb465d3e627dbf6f43d6ed081)
+[Standard vector](../versions/v1.0.0/sm2-standard.json) · [BSV Node source](https://github.com/bitcoin-sv/bitcoin-sv/tree/6504a3aff65ba97c0f6c80962b033e35ecbfed4b) · [chain-gang source](https://github.com/linzhm/chain-gang/tree/8b60b71a12a69fdcb465d3e627dbf6f43d6ed081)
 
 <a name="otda-constructor"></a>
 
 ## Reproduce the OTDA constructor
 
-The wallet loads the frozen program and checks its byte length and SHA-256 against the layout manifest. The offline generator collects named instruction ranges from the SM3 compiler, selects fixed fragments from those ranges, and combines them with the point arithmetic blocks. Rebuild the program from the repository root and compare it with the checked-in file.
+The wallet loads the frozen program and checks its byte length and SHA-256 against the layout manifest. The offline generator starts with named SM3 ranges and point arithmetic blocks. For template `2` it evaluates which copied fragments are worth caching, tries a dictionary ordered by reuse frequency and selects the smallest serialized encoding. Rebuild the program from the repository root and compare it with the checked-in file.
 
 ```sh
 python projects/p2pkh-sm2/reference/generate_otda_constructor.py /tmp/sm2-otda.hex
-cmp /tmp/sm2-otda.hex projects/p2pkh-sm2/template/otda-constructor.hex
+cmp /tmp/sm2-otda.hex projects/p2pkh-sm2/versions/v1.1.0/otda-constructor.hex
+python projects/p2pkh-sm2/reference/generate_otda_constructor.py --version 2 /tmp/sm2-otda-v2.hex
+cmp /tmp/sm2-otda-v2.hex projects/p2pkh-sm2/versions/v1.2.0/otda-constructor.hex
 ```
 
-The constructor tests compare exact preimage, public key, and signature stack values, then verify complete spends against BSV Node and chain-gang. [Layout and fingerprint](../template/layout.json) · [Wallet integration](../docs/sdk.en.md)
+The constructor tests compare exact preimage, public key, and signature stack values, then verify complete spends against BSV Node and chain-gang. [Layout and fingerprint](../versions/v1.1.0/layout.json) · [Wallet integration](../docs/sdk.en.md)
 
 ## SignedData payment interop
 
@@ -128,7 +131,7 @@ The [Rust signer](interop/rust-signer/README.md) uses RustCrypto `sm2` and
 `der`. The [Python signer](interop/python-signer/README.md) uses OpenSSL
 for the signature and `asn1crypto` for the envelope. Both provide the same
 CLI and JSON fields. `verify.sh` builds the Rust signer with Cargo and
-replays attached ForkID and detached Chronicle OTDA payments from both
+replays attached BIP143 and detached Chronicle OTDA payments from both
 signers through BSV Node and chain-gang. The suite also verifies emitted
 signatures in OpenSSL, rejects invalid envelopes and checks byte-for-byte
 witness equivalence with the raw-signature path.

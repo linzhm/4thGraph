@@ -6,9 +6,9 @@ import json
 
 from payment import authorization, sign_spend
 from script import COMPANION_CODE, locking_script
-from shared.evaluate import evaluate
-from shared.script import number, push
-from shared.transaction import (
+from fourthgraph.bsv.evaluate import evaluate
+from fourthgraph.bsv.script import number, push
+from fourthgraph.bsv.transaction import (
     ANYONECANPAY,
     CHRONICLE,
     SIGHASH_ALL,

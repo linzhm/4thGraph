@@ -1,0 +1,89 @@
+{
+  "template_version": "0.6.0",
+  "script_file": "template.hex",
+  "script_bytes": 41364,
+  "script_sha256": "d4dc90255e60d8dff51e1f8464391304d4b0946457445e62f558c66e84edb27a",
+  "owner_hash160": {
+    "offset": 208,
+    "length": 20
+  },
+  "fixed_bytes_sha256": "3f1f0afba36349ab0e2ced42237ea09bf93549c20f1e7d069dee444aeadebec6",
+  "supported_sighash_types": [
+    "41",
+    "42",
+    "43",
+    "61",
+    "62",
+    "63",
+    "c1",
+    "c2",
+    "c3",
+    "e1",
+    "e2",
+    "e3"
+  ],
+  "ordinary_script_code_hex": "68ac",
+  "compressed_preimage": {
+    "spend_transaction_version": 2,
+    "sighash_types": [
+      "61",
+      "63",
+      "e1",
+      "e3"
+    ],
+    "program_file": "otda-reconstruct.hex",
+    "program_bytes": 5658,
+    "program_sha256": "109b059b5e75bf888762397f8f58445d8c95d1c14727c8356c5bbb196b8f95bd"
+  },
+  "construction": "split-5x4-affine-g",
+  "build_source": {
+    "source_sha256": "654e8130d49704c4a99961b2763216eebcd1c76e880ad65e284033491128a94f",
+    "dependencies": {
+      "r1.fth": "8acaf9f81bc367c98f9a42d561e302c6f27cc376ad3f3f8c8d49f5176cbaa7d9"
+    }
+  },
+  "estimated": {
+    "window_sections_bytes": {
+      "table_setup": 3603,
+      "digit_extraction": 902,
+      "window_loop": 34451
+    },
+    "window_bytes": 38956,
+    "static_window_mul_opcodes": 5407,
+    "affine_g": {
+      "calls": 51,
+      "generic_kernel_bytes": 123,
+      "affine_kernel_bytes": 114,
+      "kernel_bytes_saved": 459,
+      "lookup_bytes_saved": 153,
+      "guard_bytes_added": 255,
+      "multiplications_removed_on_nonzero_path": 153,
+      "formula": {
+        "selected": "rewrite-and-schedule",
+        "candidates": {
+          "baseline": 393,
+          "schedule": 149,
+          "rewrite-and-schedule": 114
+        },
+        "rewrites": {
+          "multiply-by-one": 3,
+          "expand-cross-products": 3,
+          "fuse-cached-divisor-load": 3
+        },
+        "max_magnitude_bits": 1280
+      }
+    },
+    "lock_bytes": 41364,
+    "otda_program_bytes": 5658,
+    "payment_bytes": {
+      "bip143-all": 83498,
+      "otda-all": 94864,
+      "otda-single": 94793
+    },
+    "payment_peak_stack_payload_bytes": {
+      "bip143-all": 5384,
+      "otda-all": 165856,
+      "otda-single": 83128
+    }
+  }
+}

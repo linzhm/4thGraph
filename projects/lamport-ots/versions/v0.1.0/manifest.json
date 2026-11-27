@@ -1,0 +1,15 @@
+{
+  "version": "0.1.0",
+  "previous": null,
+  "artifacts": [],
+  "fixtures": [
+    "vector.json",
+    "universal-vectors.json"
+  ],
+  "evidence": [
+    "measurements.json"
+  ],
+  "integration": "docs/sdk.en.md",
+  "build": "PYTHONPATH=src:. python projects/lamport-ots/reference/measure.py --benchmark",
+  "verify": "bash projects/lamport-ots/reference/verify.sh"
+}

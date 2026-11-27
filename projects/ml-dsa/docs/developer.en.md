@@ -20,7 +20,7 @@ The public key is 1,312 bytes and the signature is 2,420 bytes. The detached ver
 
 Bind the expected public key to the authenticated funding outpoint and regenerate its fixed-key lock for comparison. Keep the payment signer's context empty and pass the supplied 32-byte message to the pure-mode implementation. Keep production key management outside the fixture code. Signing-mode coverage and the chain's authorization binding are separate from FIPS signature conformance.
 
-The large lock warrants explicit admission-policy verification in the intended environment. The present unified measurements use the documented script-test node profile. [Payment acceptance](../reference/payment-acceptance.md) · [Regtest admission method](../../../shared/benchmark.md#funded-regtest-measurements)
+The large lock warrants explicit admission-policy verification in the intended environment. The present unified measurements use the documented script-test node profile. [Payment acceptance](../reference/payment-acceptance.md) · [Regtest admission method](../../../docs/benchmark.md#funded-regtest-measurements)
 
 <a name="validation"></a>
 
@@ -28,7 +28,7 @@ The large lock warrants explicit admission-policy verification in the intended e
 
 The payment acceptance domain has 640 rows. Cross-checks include 80 Wycheproof cases and 15 external NIST ACVP pure-mode vectors. The deterministic lock fixture is 926,403 bytes, while compiled sizes vary slightly by public key. A distinct two-input, two-output OTDA ALL payment sample measures 5,563,725 bytes. The development evaluator's ML-DSA stack figures are unavailable at its current opcode coverage.
 
-Use Python 3.12 and OpenSSL 3.5 or later. See the [project replay commands](../README.md#reproduce-the-checks), [deterministic fixture](../template/deterministic.json), and [payment matrix](../reference/payment-acceptance.md).
+Use Python 3.12 and OpenSSL 3.5 or later. See the [project replay commands](../README.md#reproduce-the-checks), [deterministic fixture](../versions/v0.1.0/deterministic.json), and [payment matrix](../reference/payment-acceptance.md).
 
 <a name="sdk"></a>
 

@@ -12,7 +12,7 @@ For example, an ordinary P2PKH payment can create an R1 output for Alice. When A
 
 1. Validate the uncompressed 65-byte X9.63 encoding `04 || X_BE32 || Y_BE32` on secp256r1. Compute HASH160 of those 65 bytes. A wallet with the recipient's 20-byte hash may use it directly.
 2. Copy the v0.2.0 lock and write the recipient hash at the zero-based interval `[208, 228)`. The script has **46,302 bytes**.
-3. Check the length and the fixed-byte fingerprint before returning the owner hash. Compute `SHA256(raw[:208] || raw[228:])` from the first opcode. The v0.2.0 fingerprint is `52a1d9eb9e236403c66e845e18cf31d9c3a5f4c2e0ed7ca0270a60ba4e867ca6`. For v0.1.0 prevouts, use their original length and fingerprint. [v0.2.0](../template/v0.2.0/layout.json) · [v0.1.0](../template/layout.json)
+3. Check the length and the fixed-byte fingerprint before returning the owner hash. Compute `SHA256(raw[:208] || raw[228:])` from the first opcode. The v0.2.0 fingerprint is `52a1d9eb9e236403c66e845e18cf31d9c3a5f4c2e0ed7ca0270a60ba4e867ca6`. For v0.1.0 prevouts, use their original length and fingerprint. [v0.2.0](../versions/v0.2.0/layout.json) · [v0.1.0](../versions/v0.1.0/layout.json)
 
 Set `R1_OWNER_HASH160` to the recipient’s 20-byte HASH160 in hex.
 
@@ -39,7 +39,7 @@ The wallet MUST derive item 5 from the prepared transaction and the requested si
 
 When recognizing an incoming payment, verify the complete template fingerprint and the expected recipient hash. A sender can create arbitrary output scripts. A script that forces NONE on the recipient changes fixed program bytes and fails this template check. A sender's own signature type applies to the input it signs. Each recipient chooses a signature type when later spending their output.
 
-The lock checks HASH160(Q), verifies the R1 signature, and binds the authorization to the node's transaction context through the public PUSHTX construction and native `OP_CHECKSIG`. Neither a serialized parent nor an earlier signature occurs in the witness. For ordinary ForkID ALL, P is 159 bytes and includes serialized scriptCode `02 68 ac`. The five items occupy **326 bytes** (161 + 66 + 65 + 33 + 1). [Lock assembly](../reference/asm/lock.asm) · [Transaction binding](../reference/asm/binding.asm) · [nChain WP1605](https://nchain.com/wp-content/uploads/2022/03/WP1605_PUSHTX-and-its-Building-Blocks.pdf) · [BRC-21](https://github.com/bsv-blockchain/BRCs/blob/master/scripts/0021.md)
+The lock checks HASH160(Q), verifies the R1 signature, and binds the authorization to the node's transaction context through the public PUSHTX construction and native `OP_CHECKSIG`. Neither a serialized parent nor an earlier signature occurs in the witness. For ordinary BIP143 ALL, P is 159 bytes and includes serialized scriptCode `02 68 ac`. The five items occupy **326 bytes** (161 + 66 + 65 + 33 + 1). [Lock assembly](../reference/asm/lock.asm) · [Transaction binding](../reference/asm/binding.asm) · [nChain WP1605](https://nchain.com/wp-content/uploads/2022/03/WP1605_PUSHTX-and-its-Building-Blocks.pdf) · [BRC-21](https://github.com/bsv-blockchain/BRCs/blob/master/scripts/0021.md)
 
 The wallet first constructs P from the actual spend and signature type, hashes P, and asks the owner's R1 key to sign that digest. The R1 check proves owner authorization. The separate native secp256k1 PUSHTX check uses the same digest and public construction parameters; the spender needs only the R1 private key. The node evaluates that native signature against its own transaction context, within the chosen signature coverage. [nChain PUSHTX implementation](https://github.com/nchain-innovation/zkscript_package/blob/fc20fb743edbc5bc5aba9d16625d50d1f50a3ef4/src/zkscript/transaction_introspection/transaction_introspection.py)
 
@@ -55,7 +55,7 @@ confirmed txid, the owner can authorize a new child against that outpoint.
 
 ## Signature coverage
 
-Each input chooses its own type. The template supports the ForkID BIP143 and Chronicle OTDA algorithms. Each accepts ALL, NONE and SINGLE, with or without ANYONECANPAY. The payment helper uses `0x41`. The `0x20` signature-type bit selects OTDA under the applicable Chronicle activation rules. [Chronicle release](https://docs.bsvblockchain.org/network-topology/nodes/sv-node/chronicle-release) · [Node serialization and digest selection](https://github.com/bitcoin-sv/bitcoin-sv/blob/6504a3aff65ba97c0f6c80962b033e35ecbfed4b/src/script/interpreter.cpp#L1894-L2124)
+Each input chooses its own type. The template supports the BIP143 and Chronicle OTDA algorithms. Each accepts ALL, NONE and SINGLE, with or without ANYONECANPAY. The payment helper uses `0x41`. The `0x20` signature-type bit selects OTDA under the applicable Chronicle activation rules. [Chronicle release](https://docs.bsvblockchain.org/network-topology/nodes/sv-node/chronicle-release) · [Node serialization and digest selection](https://github.com/bitcoin-sv/bitcoin-sv/blob/6504a3aff65ba97c0f6c80962b033e35ecbfed4b/src/script/interpreter.cpp#L1894-L2124)
 
 | Requirement | Commitment |
 |---|---|
@@ -77,7 +77,7 @@ version || hashPrevouts || hashSequence || outpoint || 02 68 ac ||
 amount || sequence || hashOutputs || locktime || typeLE32
 ```
 
-The ordinary preimage has 159 bytes. The companion replaces `02 68 ac` with `06 63 ad 67 ab 68 ac`. BIP143 hashSequence is zero for NONE, SINGLE and ANYONECANPAY. An unpaired SINGLE has no placeholder output in the transaction. For paired OTDA SINGLE, the node's signing serialization uses null outputs at earlier indices; these placeholders exist only in that serialization. Use the node rules for the active network and spend context. The built-in payment SDKs serialize version 2, final sequence and zero locktime. [Payment vector](../template/spend-all.json) · [Reference builder](../reference/signature.py)
+The ordinary preimage has 159 bytes. The companion replaces `02 68 ac` with `06 63 ad 67 ab 68 ac`. BIP143 hashSequence is zero for NONE, SINGLE and ANYONECANPAY. An unpaired SINGLE has no placeholder output in the transaction. For paired OTDA SINGLE, the node's signing serialization uses null outputs at earlier indices; these placeholders exist only in that serialization. Use the node rules for the active network and spend context. The built-in payment SDKs serialize version 2, final sequence and zero locktime. [Payment vector](../versions/v0.1.0/spend-all.json) · [Reference builder](../reference/signature.py)
 
 ## Security and interoperability
 

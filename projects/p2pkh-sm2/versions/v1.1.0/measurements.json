@@ -1,0 +1,17 @@
+{
+  "payment_shape": {
+    "inputs": 2,
+    "outputs": 2
+  },
+  "lock_bytes": 144925,
+  "otda_program_bytes": 12703,
+  "payment_bytes": {
+    "bip143-all": 290554,
+    "otda-all": 316018
+  },
+  "previous_payment_bytes": {
+    "bip143-all": 290554,
+    "otda-all": 870194
+  },
+  "source": "README.md#complete-transactions-and-stack-measurements"
+}

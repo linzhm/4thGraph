@@ -5,15 +5,16 @@ from pathlib import Path
 import unittest
 
 from tx_engine import Script, Tx, sig_hash_preimage
+from assemble import TEMPLATE_VERSION, TEMPLATE_VERSIONS
 from p2pkh_sm2 import authorization, current_input_unlock, locking_script_from_public_key, sign_input
 from sighash import ANYONECANPAY, CHRONICLE, COMPANION_CODE, SINGLE, SUPPORTED_TYPES
 from sm2 import encode_public, fixture_sign, mul
-from shared.differential import chain_gang_valid, require_chain_gang_pin
-from shared.script import push
-from shared.transaction import Input, Output, Transaction, hash256
+from fourthgraph.bsv.differential import chain_gang_valid, require_chain_gang_pin
+from fourthgraph.bsv.script import push
+from fourthgraph.bsv.transaction import Input, Output, Transaction, hash256
 
 require_chain_gang_pin(Path(__file__).with_name('requirements.txt'))
-DIRECTORY = Path(__file__).resolve().parents[1] / 'template'
+DIRECTORY = Path(__file__).resolve().parents[1] / 'versions/v1.0.0'
 
 
 def script(raw):
@@ -35,12 +36,12 @@ def chain_check(tx, parents, index, valid=True):
         raise AssertionError(f'chain-gang accepted an invalid signature at input {index}')
 
 
-def scenario(paired=True, *, version=2):
+def scenario(paired=True, *, version=2, template_version=TEMPLATE_VERSION):
     key = encode_public(mul(7))
     def parent(tag, lock, value):
         return Transaction((Input(bytes([tag])*32, 4),), (Output(value, lock),))
     parents = (parent(0x22, b'\x51', 500),
-               parent(0x33, locking_script_from_public_key(key), 1500))
+               parent(0x33, locking_script_from_public_key(key, version=template_version), 1500))
     other, owned = parents
     inputs = (Input(other.txid_wire(), 0, sequence=5), Input(owned.txid_wire(), 0, sequence=8))
     outputs = (Output(400, b'\x51'), Output(1200, b'\x51'), Output(200, b'\x51')) if paired else (Output(1500,b'\x51'),)
@@ -52,9 +53,9 @@ def signed_case(tx, parents, key, flag, nonce):
                       lambda msg, uid: fixture_sign(7, msg, nonce, uid), flag)
 
 
-def mode_cases(check):
+def mode_cases(check, *, template_version):
     """Run the same positive and negative complete spends on each independent engine."""
-    key, parents, tx = scenario()
+    key, parents, tx = scenario(template_version=template_version)
     alternative = replace(parents[0], locktime=777)
     for flag in sorted(SUPPORTED_TYPES):
         base = flag & 31
@@ -71,7 +72,7 @@ def mode_cases(check):
         check(replace(signed, inputs=(replace(tx.inputs[0], sequence=10),signed.inputs[1])),
               parents, 1, bool(flag & ANYONECANPAY) or base != 1)
         check(replace(signed, locktime=43), parents, 1, False)
-    key, parents, tx = scenario(False)
+    key, parents, tx = scenario(False, template_version=template_version)
     # Sign the altered witness messages with the actual test key. Rejection must
     # come from the lock or its native transaction binding, not a stale SM2 signature.
     companion = authorization(tx, 1, 1500, 0x63).preimage
@@ -107,10 +108,10 @@ def mode_cases(check):
     check(mixed,parents,1)
 
 
-def activation_cases(check):
+def activation_cases(check, *, template_version):
     # Use transaction version 1 on both sides so only activation flags and UTXO era differ.
     for paired in (True, False):
-        key, parents, tx = scenario(paired, version=1)
+        key, parents, tx = scenario(paired, version=1, template_version=template_version)
         for flag in sorted(SUPPORTED_TYPES) if paired else (0x43, 0xc3, 0x63, 0xe3):
             signed = signed_case(tx, parents, key, flag, 1100 + flag)
             check(signed, parents, 1, not bool(flag & CHRONICLE), chronicle_active=False, old_output=True)
@@ -120,7 +121,9 @@ def activation_cases(check):
 
 class ModeTests(unittest.TestCase):
     def test_complete_modes(self):
-        mode_cases(chain_check)
+        for template_version in TEMPLATE_VERSIONS:
+            with self.subTest(template_version=template_version):
+                mode_cases(chain_check, template_version=template_version)
 
     def test_signing_vectors_against_engine(self):
         vectors = json.loads((DIRECTORY/'sighash-modes.json').read_text())

@@ -1,13 +1,13 @@
 """Size and verify mode-specific P2PKH-R1 locks as an experimental comparison."""
 from assemble import assemble
-from shared.script import asm
+from fourthgraph.bsv.script import asm
 
 
 def specialized_lock(owner, family):
     # Preserve the native scriptCode suffix so the standard signer can
     # generate both the positive and excluded-mode controls.
     p_type = assemble(owner, compiled_curve=True, entry="P_TYPE")
-    if family == "forkid":
+    if family in ("bip143", "forkid"):
         unsigned = assemble(owner, compiled_curve=True, entry="LE_UNSIGNED")
         overrides = {
             "SELECT_AUTHORIZATION": (
@@ -28,5 +28,5 @@ def specialized_lock(owner, family):
             ),
         }
     else:
-        raise ValueError("expected forkid or otda specialization")
+        raise ValueError("expected bip143 or otda specialization")
     return assemble(owner, compiled_curve=True, injected=overrides)

@@ -1,6 +1,6 @@
 """Construct signing messages for the published P2PKH-SM2 payment template."""
 from dataclasses import dataclass
-from shared.transaction import (ANYONECANPAY, CHRONICLE, SIGHASH_SINGLE as SINGLE,
+from fourthgraph.bsv.transaction import (ANYONECANPAY, CHRONICLE, SIGHASH_SINGLE as SINGLE,
                                 SIGHASH_TYPES as SUPPORTED_TYPES, hash256,
                                 preimage_forkid, preimage_otda)
 
@@ -22,7 +22,7 @@ class Authorization:
 def authorization(tx, index, previous_amount, sighash_type=0x41, *, chronicle_active=True):
     """Generate the message and witness P. Set chronicle_active from the spend context."""
     if type(sighash_type) is not int or sighash_type not in SUPPORTED_TYPES:
-        raise ValueError('unsupported ForkID sighash type')
+        raise ValueError('unsupported sighash type')
     if not 0 <= index < len(tx.inputs):
         raise ValueError('invalid input index')
     if sighash_type & CHRONICLE and not chronicle_active:

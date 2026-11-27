@@ -1,18 +1,20 @@
 # Reference implementation
 
 Python 3.12+; production primitive code uses only the standard library. Script
-serialization and transaction helpers are under the repository's `shared/` folder.
+serialization and transaction helpers are under the repository's `src/fourthgraph/bsv/` package.
 Independent tests use the pinned chain-gang commit and BSV Node 1.2.3.
 Install tx-engine from requirements.txt so the test adapter can verify its
 Git revision. Negative cases require a known script rejection or the expected
 prevout error for a deliberately invalid outpoint.
 
 - `lamport.py`: random key generation, strict digest API, process-local one-time guard.
-- `script.py`: deterministic unrolled verifier and fixed-r PUSHTX binding.
+- `script.py`: full-key, legacy and committed-key lock factories with fixed-r PUSHTX binding. `compact_forth_committed_locking_script(public_key)` adds the 6,830-byte profile.
+- `committed-verifier.fth`, `forth_verifier.py`: typed reconstruction and lowering for `forth_committed_locking_script(public_key)`.
 - `payment.py`: prepared-input and single-input wallet APIs, external signer, fresh-change guard.
 - `fixtures.py`: public deterministic secrets for tests only, adversarial case matrix.
 - `engines.py`: development ECDSA callback and complete-transaction chain-gang adapter.
 - `test_lamport.py`: unit, adversarial and differential tests; no node required.
+- `test_acceptance.py`: the payment matrix, committed proof mutations and Forth mask coverage.
 - `test_node.py`: required node conformance (not silently skipped when absent).
 - `measure.py`: reproducible vector and local benchmark.
 - `verify_apple.sh`: Apple Container on macOS, pinned official node image, automatic cleanup.
@@ -22,12 +24,13 @@ Run commands are in the [project README](../README.md). To export exact script
 bytes for your **public test key**, from repository root:
 
 ```sh
-.venv/bin/python - <<'PY'
+bash tools/setup-workspaces.sh
+PYTHONPATH=src:. projects/lamport-ots/workspace/venv/bin/python - <<'PY'
 import sys
 from pathlib import Path
 sys.path.insert(0, 'projects/lamport-ots/reference')
 from fixtures import fixture
-Path('/tmp/lamport-test-lock.bin').write_bytes(fixture()[2])
+Path('projects/lamport-ots/workspace/build/test-lock.bin').write_bytes(fixture()[2])
 PY
 ```
 
@@ -43,7 +46,7 @@ for a prepared transaction. Each API accepts `signer(digest32) -> signature8192`
 and returns a signed transaction. The callback is invoked once after preflight.
 A `SINGLE` input with no output at its index commits to no outputs. Approve that
 scope explicitly with `allow_unpaired_single=True` on `sign_spend` when the
-application deliberately uses it. This applies to both ForkID and OTDA.
+application deliberately uses it. This applies to both BIP143 and OTDA.
 Before calling the signer for a child payment, verify the parent has reached
 the required confirmation depth and use the verified, unspent outpoint. Approve
 the transaction and sighash. Keep private keys and durable one-use state in

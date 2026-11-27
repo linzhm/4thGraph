@@ -1,16 +1,16 @@
 # WOTS+（SHA-256）
 
-[English](README.md) · [BSV Script Lab](../../README.zh-CN.md)
+[English](README.md) · [4thGraph](../../README.zh-CN.md) · [项目目录](../README.zh-CN.md) · [版本](versions/index.json)
 
 ## 开发入口
 
-**[钱包 SDK 快速上手](docs/sdk.zh-CN.md#quickstart)** · [统一钱包 SDK](../../shared/sdk/README.zh-CN.md#quickstart)
+**[钱包 SDK 快速上手](docs/sdk.zh-CN.md#quickstart)** · [统一钱包 SDK](../../sdk/README.zh-CN.md#quickstart)
 
 选择收款模板并接入有持久化记录的一次性签名器。缓存步骤模板支持符合条件的 OTDA 重建。
 
 [协议规范](docs/developer.zh-CN.md#protocol) · [安全分析](docs/developer.zh-CN.md#security) · [复现与验证](#开发和钱包接入) · [交易成本](#完整交易与栈测量)
 
-WOTS+ 是 v0.1 开发基线，按 RFC 8391 的 `WOTSP-SHA2_256` 哈希链验证一次性签名。项目定义 64 字节的 BSV 公钥编码，原始签名为 2,144 字节。付款锁将证明绑定到实际花费的交易输入。 [编码规范](docs/spec.md) · [RFC 8391](https://www.rfc-editor.org/rfc/rfc8391)
+WOTS+ 是 v0.1.0 开发基线，按 RFC 8391 的 `WOTSP-SHA2_256` 哈希链验证一次性签名。项目定义 64 字节的 BSV 公钥编码，原始签名为 2,144 字节。付款锁将证明绑定到实际花费的交易输入。 [编码规范](docs/spec.md) · [RFC 8391](https://www.rfc-editor.org/rfc/rfc8391)
 
 ## 使用场景与取舍
 
@@ -26,11 +26,11 @@ WOTS+ 是 v0.1 开发基线，按 RFC 8391 的 `WOTSP-SHA2_256` 哈希链验证�
 | `cached_constants=True` | 36,283 字节 | 在栈上保存复用的常量 |
 | `cached_constants="steps"` | 33,956 字节 | 再缓存 15 个四字节步骤索引 |
 
-三种锁的普通 ForkID 解锁都为 2,310 字节。启用 Chronicle 并采用版本 2 交易时，可为缓存步骤输出显式启用 `compress_otda=True`。OTDA ALL 重建签名原文里的相关输出，配对 SINGLE 只重建同索引输出。未知输出原样处理，无配对 SINGLE 采用伴随验签。仅验证给定摘要的 `transaction=False` 模板用于算法测试。
+三种锁的普通 BIP143 解锁都为 2,310 字节。启用 Chronicle 并采用版本 2 交易时，可为缓存步骤输出显式启用 `compress_otda=True`。OTDA ALL 重建签名原文里的相关输出，配对 SINGLE 只重建同索引输出。未知输出原样处理，无配对 SINGLE 采用伴随验签。仅验证给定摘要的 `transaction=False` 模板用于算法测试。
 
 ## 开发和钱包接入
 
-钱包确认 outpoint、锁定格式、金额和所需确认，再安排收款、找零和费用。单输入付款调用 `sign_payment`，已构造交易逐输入调用 `sign_spend`。外部签名器接收 32 字节摘要，返回 2,144 字节原始签名。每个 UTXO 都使用新密钥，必须先持久化消耗记录再返回签名。未广播或确认失败也要保留该记录。 [付款接口](reference/payment.py) · [已签名向量](template/vectors.json)
+钱包确认 outpoint、锁定格式、金额和所需确认，再安排收款、找零和费用。单输入付款调用 `sign_payment`，已构造交易逐输入调用 `sign_spend`。外部签名器接收 32 字节摘要，返回 2,144 字节原始签名。每个 UTXO 都使用新密钥，必须先持久化消耗记录再返回签名。未广播或确认失败也要保留该记录。 [付款接口](reference/payment.py) · [已签名向量](versions/v0.1.0/vectors.json)
 
 在仓库根目录的独立 Python 环境运行以下命令。Linux x86-64 节点复放用 `verify.sh`，macOS 可用 `verify_apple.sh`。
 
@@ -41,7 +41,7 @@ python projects/wots-plus/reference/generate_reconstruction.py --check
 bash projects/wots-plus/reference/verify.sh
 ```
 
-[验证记录](docs/validation.md)包含 1,230 项支付矩阵、67 条签名链的变更测试和已支持的重放环境。栈调度与重建产物见[模板布局](template/cached-steps-layout.json)。
+[验证记录](docs/validation.md)包含 1,230 项支付矩阵、67 条签名链的变更测试和已支持的重放环境。栈调度与重建产物见[模板布局](versions/v0.1.0/cached-steps-layout.json)。
 
 可选用 [Lean Script 求值器](https://github.com/Calhooon/bsv-script-lean#try-it)重放同一批合成输入。
 
@@ -95,4 +95,4 @@ python projects/wots-plus/reference/test_lean.py /path/to/bsv-script-lean/eval/b
 | `cached-steps-reconstructed` · `0xe3` · 优化后 | 3×2 | 2,358 (0 / 2,315 / 43) | 2×3 | 33,967 (33,956 / 0 / 11) | 72,749 | 151,585 |
 | `cached-steps-reconstructed` · `0xe1` · 优化后 | 3×2 | 5,531 (0 / 5,488 / 43) | 2×3 | 34,145 (33,956 / 178 / 11) | 72,808 | 151,814 |
 
-[统一测量入口与复现口径](../../shared/benchmark.zh-CN.md)
+[统一测量入口与复现口径](../../docs/benchmark.zh-CN.md)

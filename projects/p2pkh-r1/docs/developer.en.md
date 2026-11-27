@@ -10,9 +10,9 @@ P-256 wallet payments. New outputs use the fixed v0.2.0 lock. Existing UTXOs ret
 
 ## Protocol specification
 
-The payer fills the 20-byte HASH160 of the recipient's validated, uncompressed P-256 public key at offsets `[208, 228)`. The spender supplies the public key and a signature over the current input's authorization. ForkID and Chronicle OTDA each support ALL, NONE and SINGLE, with optional ANYONECANPAY. On a Chronicle version 2 transaction, the wallet can rebuild eligible outputs in an OTDA unlock and reproduce the original signing preimage.
+The payer fills the 20-byte HASH160 of the recipient's validated, uncompressed P-256 public key at offsets `[208, 228)`. The spender supplies the public key and a signature over the current input's authorization. BIP143 and Chronicle OTDA each support ALL, NONE and SINGLE, with optional ANYONECANPAY. On a Chronicle version 2 transaction, the wallet can rebuild eligible outputs in an OTDA unlock and reproduce the original signing preimage.
 
-Use the fixed-byte fingerprints to identify v0.2.0 and v0.1.0. The older output's lock determines the spend rules. [Protocol and sighash specification](spec.en.md) · [v0.2.0 layout](../template/v0.2.0/layout.json) · [v0.1.0 layout](../template/layout.json)
+Use the fixed-byte fingerprints to identify v0.2.0 and v0.1.0. The older output's lock determines the spend rules. [Protocol and sighash specification](spec.en.md) · [v0.2.0 layout](../versions/v0.2.0/layout.json) · [v0.1.0 layout](../versions/v0.1.0/layout.json)
 
 <a name="security"></a>
 
@@ -26,9 +26,9 @@ Treat the documented dual-engine results as evidence for the tested contexts. Ph
 
 ## Validation and measurements
 
-The node fixture crosses twelve modes, two transaction versions, paired and unpaired outputs, three rule contexts and nine authorization cases. This gives 1,296 rows per template. The independent engine covers the declared Chronicle subset. Ordinary ForkID ALL uses a 326-byte unlock. The v0.2.0 two-input, two-output payment measures 93,374 bytes, compared with 119,934 for v0.1.0. The project README links measured templates and the reference report explains the OTDA witness costs.
+The node fixture crosses twelve modes, two transaction versions, paired and unpaired outputs, three rule contexts and nine authorization cases. This gives 1,296 rows per template. The independent engine covers the declared Chronicle subset. Ordinary BIP143 ALL uses a 326-byte unlock. The v0.2.0 two-input, two-output payment measures 93,374 bytes, compared with 119,934 for v0.1.0. The project README links measured templates and the reference report explains the OTDA witness costs.
 
-From the repository root, install the pinned [reference requirements](../reference/requirements.txt) and run `bash projects/p2pkh-r1/reference/verify.sh`. [Acceptance matrix](../reference/acceptance.md) · [v0.2.0 payment vector](../template/v0.2.0/spend-all.json) · [Reference measurements](../reference/README.md)
+From the repository root, install the pinned [reference requirements](../reference/requirements.txt) and run `bash projects/p2pkh-r1/reference/verify.sh`. [Acceptance matrix](../reference/acceptance.md) · [v0.2.0 payment vector](../versions/v0.2.0/spend-all.json) · [Reference measurements](../reference/README.md)
 
 <a name="sdk"></a>
 

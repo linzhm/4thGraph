@@ -305,7 +305,7 @@ class SignedDataAcceptance(SignedDataFixtures):
         COMPLETED_WITNESSES.add('external_signature')
 
     def test_appendix_a1_signature_replay(self):
-        path = Path(__file__).resolve().parents[1] / 'template' / 'signed-data-appendix-a1.hex'
+        path = Path(__file__).resolve().parents[1] / 'versions/v1.0.0' / 'signed-data-appendix-a1.hex'
         encoded = bytes.fromhex(path.read_text(encoding='ascii'))
         self.assertEqual(sha256(encoded).hexdigest(),
                          '42af73196f43e2b5ef62be4460b7991705e0eaccd54c42b6b1ef0248d4d40eea')

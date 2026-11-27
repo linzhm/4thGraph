@@ -15,15 +15,28 @@ signature format. The public deterministic fixture is a regression vector, not
 an official standard test vector. `generate_keypair()` uses OS-backed randomness;
 the fixture derivation is deliberately separate and must never hold funds.
 
-## Witness and supported modes
+## Witness and payment profiles
 
-The universal locking script embeds the full public key and expects three stack
-items, bottom to top: preimage P, packed 8,192-byte signature S, and a selector.
-The selector is exactly empty for ordinary authorization or the single byte
-`01` for the unpaired Chronicle SINGLE path. Each digest byte is converted to an
-unsigned Script number. MOD 2 selects one of the two inline commitments and
-DIV 2 advances the bit index. The verifier consumes all digest and signature
-bytes and leaves one true item and an empty altstack.
+The payment witness pushes the preimage P, packed proof, and selector in that
+order. The selector is the empty byte string for ordinary authorization or
+the single byte `01` for the unpaired Chronicle SINGLE path. The lock checks
+the proof length before evaluating the Lamport verifier.
+
+| Profile | Key data in the lock | Proof layout |
+| --- | --- | --- |
+| `full-key` | 512 ordered public hashes | 256 selected secrets, 8,192 bytes |
+| `committed-key` | SHA-256 of the ordered public key | 256 pairs of selected secret and sibling hash, 16,384 bytes |
+| `committed-key-forth` | Same 32-byte commitment | Same 16,384-byte proof |
+| `committed-key-forth-compact` | Same 32-byte commitment | Same 16,384-byte proof |
+
+For committed profiles, record i is `x[i][b[i]] || y[i][1-b[i]]`. The lock
+hashes the secret and orders the two hashes as `y[i][0] || y[i][1]` according to
+digest bit i. The hash of the concatenated pairs must match the commitment. The
+wallet needs the full ordered public key to construct this proof. All four
+profiles enforce the same preimage and selector rules and leave one true item
+and an empty altstack on success. [Forth implementation and costs](optimization.md)
+
+## Sighash modes
 
 | Output coverage | BIP143 | BIP143 + ANYONECANPAY | Chronicle OTDA | OTDA + ANYONECANPAY |
 |---|---|---|---|---|
@@ -31,8 +44,8 @@ bytes and leaves one true item and an empty altstack.
 | NONE | `42` | `c2` | `62` | `e2` |
 | SINGLE | `43` | `c3` | `63` | `e3` |
 
-All twelve types include FORKID, as required by the node under strict encoding
-with FORKID enabled. The hash type is the final four little-endian bytes of P.
+All twelve types set `SIGHASH_FORKID` (`0x40`). The hash type is the final
+four little-endian bytes of P.
 The script verifies the exact type, including zero high bytes, and uses the
 authenticated byte on the native signature. The wallet default is `41`.
 
@@ -73,7 +86,7 @@ never signs the constant.
 ## Previous template and detached verification
 
 `legacy_locking_script(key)` emits the original byte-identical two-push
-ForkID ALL template with 158-byte preimage and scriptCode `ac`.
+BIP143 ALL template with 158-byte preimage and scriptCode `ac`.
 `sign_spend` recognizes it and requires type `41`. New locks from
 `locking_script(key)` use the universal format. The digest-only variant takes
 a 32-byte digest and signature and provides detached verification.
@@ -89,10 +102,11 @@ never broadcasts or mines the transactions. This demonstrates Script acceptance
 under those settings, not mainnet relay policy, fee acceptance, UTXO existence,
 or network-wide consensus testing. Node tests also cross-check pinned chain-gang.
 
-Static opcode counts in `measurement.json` exclude payload bytes; both branches
-are counted in the encoded instruction totals, although only one public-key push
-per bit executes. The universal script has 256 SHA256 instructions, one HASH256 and two native
-signature instructions. Both signature checks execute only in the companion branch.
+Static opcode counts in `measurements.json` describe the v0.1.0 vectors. The
+full-key lock has 256 SHA256 instructions. Each commitment lock has 257 SHA256
+instructions, including the final public-key hash. The payment wrapper adds
+one HASH256 and two native signature instructions. The ordinary path executes
+one native check, and the companion path executes both.
 Node-native signature hashing performs additional work not counted by this static
 Script census. Timings include adapters and are local wall-clock samples.
 

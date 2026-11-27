@@ -1,16 +1,16 @@
 # Pure ML-DSA-44
 
-[简体中文](README.zh-CN.md) · [BSV Script Lab](../../README.md)
+[简体中文](README.zh-CN.md) · [4thGraph](../../README.md) · [Project index](../README.md) · [Versions](versions/index.json)
 
 ## Developer resources
 
-**[Wallet SDK quickstart](docs/sdk.en.md#quickstart)** · [Unified wallet SDK](../../shared/sdk/README.md#quickstart)
+**[Wallet SDK quickstart](docs/sdk.en.md#quickstart)** · [Unified wallet SDK](../../sdk/README.md#quickstart)
 
 Make a lock from the raw ML-DSA-44 public key and sign the payment message in Pure mode with an empty context.
 
 [Protocol](docs/developer.en.md#protocol) · [Security](docs/developer.en.md#security) · [Verify](#reproduce-the-checks) · [Transaction costs](#complete-transactions-and-stack-measurements)
 
-**Status** · v0.1 development baseline.
+**Status** · v0.1.0 development baseline.
 
 The verifier uses the FIPS 204 Pure ML-DSA-44 public-key and signature
 encodings. A public key is 1,312 bytes and a signature is 2,420 bytes.
@@ -26,18 +26,18 @@ The OpenSSL fixture uses a public test seed and deterministic signing.
 The Script compiler precomputes the matrix and transformed public-key
 polynomials. At execution the script checks the signature encoding, response
 norm and canonical hints, derives the challenge polynomial, and reconstructs
-and hashes the commitment. The payment wrapper supports all twelve ForkID and
+and hashes the commitment. The payment wrapper supports all twelve BIP143 and
 Chronicle OTDA sighash combinations. Unpaired OTDA `SINGLE` uses the companion
-ForkID binding. The wallet checks the funding output before requesting an
+BIP143 binding. The wallet checks the funding output before requesting an
 external signature. The caller authenticates the funding transaction and
 approves the transaction intent.
-[Transaction-binding construction](../../shared/pushtx.py)
+[Transaction-binding construction](../../src/fourthgraph/bsv/pushtx.py)
 
 ## Use cases and trade-offs
 
 Evaluate Pure ML-DSA-44 when measuring FIPS 204 signer interoperability or large-script resource limits. A lab can start with the detached conformance vectors and then run the payment wrapper with the same kind of public key and a dedicated payment signer. The wrapper passes a 32-byte payment message to Pure ML-DSA-44 with an empty context. Key and signature validation, transaction binding, and node admission each have their own evidence. [Reproduction steps](#reproduce-the-checks)
 
-The fixed-key payment lock is about 926 kB in the measured fixtures. Evaluate script size, transaction size and validation policy on the target node or miner before choosing this format for a funded workflow. [Funded regtest method](../../shared/benchmark.md#funded-regtest-measurements)
+The fixed-key payment lock is about 926 kB in the measured fixtures. Evaluate script size, transaction size and validation policy on the target node or miner before choosing this format for a funded workflow. [Funded regtest method](../../docs/benchmark.md#funded-regtest-measurements)
 
 ## Sampling boundary
 
@@ -51,7 +51,7 @@ Script sampler discards its intermediate stack values before failing.
 
 ```sh
 python -m unittest discover -s projects/ml-dsa/reference -p test_mldsa.py -v
-python -m pip install -r shared/requirements-chronicle.txt
+python -m pip install -r tools/requirements-chronicle.txt
 python projects/ml-dsa/reference/check_chain_gang.py -v
 python projects/ml-dsa/reference/test_shake_script.py -v
 python projects/ml-dsa/reference/test_signature_script.py -v
@@ -69,7 +69,7 @@ Use `ML_DSA_OPENSSL` to select a compatible OpenSSL executable.
 
 ```sh
 python projects/ml-dsa/reference/check_wycheproof.py "$WYCHEPROOF_VECTORS"
-PYTHONPATH=. python projects/ml-dsa/reference/check_acvp.py "$ACVP_PROMPT" "$ACVP_EXPECTED"
+PYTHONPATH=src:. python projects/ml-dsa/reference/check_acvp.py "$ACVP_PROMPT" "$ACVP_EXPECTED"
 ```
 
 [Pinned Wycheproof corpus](https://github.com/C2SP/wycheproof/blob/8e7fa6f87e6993d7b613cf48b46512a32df8084a/testvectors_v1/mldsa_44_standard_verify_test.json)
@@ -80,7 +80,7 @@ for `prompt.json` and `dba8bcfe5f090503c9390701c11677389752cecd` for
 `expectedResults.json`.
 
 The payment fixture enumerates 640 unique cases across transaction versions 1
-and 2, Genesis ForkID and Chronicle OTDA, paired and unpaired `SINGLE`, ordered
+and 2, Genesis BIP143 and Chronicle OTDA, paired and unpaired `SINGLE`, ordered
 prevout eras, and three single changes. Its coverage record gives the exact
 domain and expected decisions. [Payment acceptance](reference/payment-acceptance.md)
 
@@ -90,7 +90,7 @@ explicit script policy limit for the replay.
 The shared launchers set `-maxscriptsizepolicy=100000000` alongside the existing
 transaction-size and stack-memory limits. An isolated regtest can repeat the
 matrix through `REGTEST_COOKIE` and `REGTEST_URL`.
-[Shared regression evidence](../../shared/chronicle-regression.md)
+[Shared regression evidence](../../docs/chronicle-regression.md)
 
 ## Script sizes
 
@@ -108,11 +108,11 @@ The SHAKE measurements fix the input and output lengths at compile time.
 | Apply hints and encode high bits | 89,687 |
 | SHAKE256, 832-byte input to 32-byte output | 176,542 |
 | Complete payment lock | 926,403 |
-| One-input ForkID `ALL` unlock | 2,588 |
+| One-input BIP143 `ALL` unlock | 2,588 |
 
 The fixed-key equation accepts packed challenge and response coefficients and
 produces four canonical residual polynomials. The arithmetic and SHAKE scripts
-are also independently replayable. [Deterministic fixture](template/deterministic.json)
+are also independently replayable. [Deterministic fixture](versions/v0.1.0/deterministic.json)
 
 ### Signed-residue NTT experiment
 
@@ -162,4 +162,4 @@ Each marginal cell shows the **change in total bytes (output locks / input unloc
 | `pure-ml-dsa-44` · `0x41` | 3×2 | 2,627 (-4 / 2,588 / 43) | 2×3 | 926,418 (926,405 / 0 / 13) | 1,858,346 | 3,716,464 |
 | `pure-ml-dsa-44` · `0x61` | 3×2 | 1,855,545 (-2 / 1,855,502 / 45) | 2×3 | 2,779,266 (926,409 / 1,852,844 / 13) | 1,858,363 | 7,422,076 |
 
-[Unified benchmark and reproduction](../../shared/benchmark.md)
+[Unified benchmark and reproduction](../../docs/benchmark.md)

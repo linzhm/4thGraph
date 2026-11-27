@@ -10,9 +10,9 @@ v1.0.0 付款锁将 SM2 签名绑定到当前 BSV 输入。GB/T 35275-2026 的 S
 
 ## 协议规范
 
-锁定脚本按收款人的 65 字节未压缩 SM2 公钥的 HASH160 构造。脚本以模板规定的用户标识计算 ZA，验证 SM2 签名并绑定实际花费，支持 ForkID 与 Chronicle OTDA 的十二种签名类型。无配对 SINGLE 用伴随验签。付款适配器接受单个签名者的直接签名，要求 `SignedData.version = 1`、`SignerInfo.version = 2`，并把原始签名交给钱包构造解锁。
+锁定脚本按收款人的 65 字节未压缩 SM2 公钥的 HASH160 构造。脚本以模板规定的用户标识计算 ZA，验证 SM2 签名并绑定实际花费，支持 BIP143 与 Chronicle OTDA 的十二种签名类型。无配对 SINGLE 用伴随验签。付款适配器接受单个签名者的直接签名，要求 `SignedData.version = 1`、`SignerInfo.version = 2`，并把原始签名交给钱包构造解锁。
 
-[付款协议](spec.zh-CN.md) · [规范模板布局](../template/layout.json) · [GB/T 35275-2026](https://openstd.samr.gov.cn/bzgk/std/newGbInfo?hcno=28A18B702BDC318803E598F5E502E2CC)
+[付款协议](spec.zh-CN.md) · [规范模板布局](../versions/v1.0.0/layout.json) · [GB/T 35275-2026](https://openstd.samr.gov.cn/bzgk/std/newGbInfo?hcno=28A18B702BDC318803E598F5E502E2CC)
 
 <a name="security"></a>
 
@@ -26,9 +26,9 @@ v1.0.0 付款锁将 SM2 签名绑定到当前 BSV 输入。GB/T 35275-2026 的 S
 
 ## 验证与测量
 
-正式版锁为 144,925 字节，普通 ForkID 解锁为 291 字节。两进两出在 ForkID ALL 下为 290,554 字节，在 OTDA ALL 下为 870,194 字节，区别主要来自每个输入携带的输出原文。国标验收分别列出付款、通用验签、证书评估和附录 A.1 历史样例的依据。
+正式版锁为 144,925 字节，普通 BIP143 解锁为 291 字节。两进两出在 BIP143 ALL 下为 290,554 字节，在 OTDA ALL 下为 870,194 字节，区别主要来自每个输入携带的输出原文。国标验收分别列出付款、通用验签、证书评估和附录 A.1 历史样例的依据。
 
-使用 Python 3.12、支持 SM2/SM3 的 OpenSSL 和 Rust。安装[固定依赖](../reference/requirements.txt)，运行 `bash projects/p2pkh-sm2/reference/verify.sh`。 [标准向量](../template/sm2-standard.json) · [付款向量](../template/spend-all.json) · [节点重放](../reference/README.zh-CN.md) · [详细支出数据](../README.zh-CN.md)
+使用 Python 3.12、支持 SM2/SM3 的 OpenSSL 和 Rust。安装[固定依赖](../reference/requirements.txt)，运行 `bash projects/p2pkh-sm2/reference/verify.sh`。 [标准向量](../versions/v1.0.0/sm2-standard.json) · [付款向量](../versions/v1.0.0/spend-all.json) · [节点重放](../reference/README.zh-CN.md) · [详细支出数据](../README.zh-CN.md)
 
 <a name="sdk"></a>
 

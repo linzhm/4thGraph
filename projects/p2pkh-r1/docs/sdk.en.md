@@ -9,15 +9,15 @@
 Create new outputs with v0.2.0. The unified client can recognize existing and current templates. Use an uncompressed 65-byte P-256 key or pass `ownerHash160` for receiving. From the repository root, set up the project's reference environment.
 
 ```sh
-python3.12 -m venv .venv
-.venv/bin/python -m pip install -r projects/p2pkh-r1/reference/requirements.txt
+python3.12 -m venv projects/p2pkh-r1/workspace/venv
+projects/p2pkh-r1/workspace/venv/bin/python -m pip install -r projects/p2pkh-r1/reference/requirements.txt
 ```
 
-Use `config` from the [wallet quickstart](../../../shared/sdk/README.md) and authenticated wallet data.
+Use authenticated transaction data. Set `config.python` to the absolute path of `projects/p2pkh-r1/workspace/venv/bin/python` and `config.bridge` to this checkout’s `sdk/python/bridge.py`. [Shared integration example](../../../sdk/docs/integration.md#first-payment)
 
 ```ts
 import { resolve } from "node:path";
-import { WalletClient } from "./shared/sdk/typescript/index.ts";
+import { WalletClient } from "./sdk/typescript/index.ts";
 
 const wallet = new WalletClient("p2pkh-r1", { ...config, template: "v0.2.0" });
 const receiveScript = wallet.createLock({ publicKey: receiveKeyHex });
@@ -39,13 +39,13 @@ The signer returns a 64-byte `r ∥ s` signature. The default payload is `SHA256
 Replay the vector in all four languages from the repository root.
 
 ```sh
-SCRIPT_LAB_SDK_PYTHON="$PWD/.venv/bin/python" \
-  bash shared/verify_node.sh -- bash shared/sdk/verify_wallet.sh p2pkh-r1
+SCRIPT_LAB_SDK_PYTHON="$PWD/projects/p2pkh-r1/workspace/venv/bin/python" \
+  bash tools/verify_node.sh -- bash sdk/verify_wallet.sh p2pkh-r1
 ```
 
 ## Bring up a device signer
 
-1. Replay ordinary ForkID ALL with the test fixture. Confirm that recognition returns the expected owner hash and template before trying a physical device.
+1. Replay ordinary BIP143 ALL with the test fixture. Confirm that recognition returns the expected owner hash and template before trying a physical device.
 2. Use the default with a prehashed signer. Set `signMessage: true` when the device applies SHA-256 exactly once. Return fixed-width, 64-byte `r ∥ s`. Convert DER to that format if your device returns DER.
 3. Configure an absolute persistent `historyPath` on storage shared by signing processes. Exercise a restart using the same history. If the wallet blocks a key after detecting nonce reuse, investigate the signer and affected key before resuming payment.
 
@@ -60,17 +60,17 @@ SCRIPT_LAB_SDK_PYTHON="$PWD/.venv/bin/python" \
 ^760052a569766b7c8201[0-9a-f]{396}([0-9a-f]{40})$
 ```
 
-3. Hash the raw bytes `SHA256(script[0:208] || script[228:])`. Require `52a1d9eb9e236403c66e845e18cf31d9c3a5f4c2e0ed7ca0270a60ba4e867ca6` before returning the capture. Changing a single fixed suffix byte fails recognition. To replace an owner, overwrite `[208,228)` in a verified copy. [Layout](../template/v0.2.0/layout.json)
+3. Hash the raw bytes `SHA256(script[0:208] || script[228:])`. Require `52a1d9eb9e236403c66e845e18cf31d9c3a5f4c2e0ed7ca0270a60ba4e867ca6` before returning the capture. Changing a single fixed suffix byte fails recognition. To replace an owner, overwrite `[208,228)` in a verified copy. [Layout](../versions/v0.2.0/layout.json)
 
 ## Device signers and prepared inputs
 
 A digest signer receives `SHA256d(P)`. Set `signMessage: true` for a device that takes `SHA256(P)` and applies SHA-256 itself. Both paths return 64 raw bytes, with `r` and `s` each padded to 32 bytes in big-endian order. TypeScript clients can use `signPaymentAsync` and `signInputAsync` for asynchronous devices.
 
-Use `signInput` for mixed inputs and explicit sighash modes. The wallet assembles the intended transaction and verifies the previous output and fee before collecting signatures. If a different parent txid confirms, reconcile the outpoint and rebuild the child. [R1 signature and digest vector](../template/v0.2.0/spend-all.json) · [Recover a child payment](chronicle.md#recovering-a-child-payment)
+Use `signInput` for mixed inputs and explicit sighash modes. The wallet assembles the intended transaction and verifies the previous output and fee before collecting signatures. If a different parent txid confirms, reconcile the outpoint and rebuild the child. [R1 signature and digest vector](../versions/v0.2.0/spend-all.json) · [Recover a child payment](chronicle.md#recovering-a-child-payment)
 
 ## Current development version
 
-Use v0.2.0 for new outputs. Python uses it by default. For older UTXOs, use the original v0.1.0 layout. The shared client recognizes both versions and supports ordinary ForkID ALL payments. [v0.1.0 layout](../template/layout.json)
+Use v0.2.0 for new outputs. Python uses it by default. For older UTXOs, use the original v0.1.0 layout. The shared client recognizes both versions and supports ordinary BIP143 ALL payments. [v0.1.0 layout](../versions/v0.1.0/layout.json)
 
 In the Python reference, `sign_spend(..., compress_otda="paired")` enables
 output reconstruction in version 2 Chronicle OTDA transactions using ALL

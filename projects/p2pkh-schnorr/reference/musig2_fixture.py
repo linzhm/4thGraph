@@ -9,7 +9,7 @@ from coincurve._libsecp256k1 import ffi, lib
 from coincurve.context import GLOBAL_CONTEXT
 
 from bip340 import ORDER
-from shared.benchmark_cases import seed
+from fourthgraph.benchmark.cases import seed
 
 CTX = GLOBAL_CONTEXT.ctx
 

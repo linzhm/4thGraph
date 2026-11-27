@@ -51,7 +51,7 @@ branches also enforce the exact preimage length and scriptCode. The native
 signature checks apply the selected digest algorithm and its coverage rules.
 The binding protects fields committed by the chosen mode. In particular,
 NONE lets outputs change, and SINGLE leaves outputs other than the paired one
-mutable. ANYONECANPAY lets other inputs change. The default is ForkID ALL.
+mutable. ANYONECANPAY lets other inputs change. The default is BIP143 ALL.
 
 For unpaired Chronicle SINGLE, the first native check uses a fixed public
 signature to detect the OTDA constant, subject to the same small digest
@@ -63,7 +63,7 @@ and companion modes even where their BIP143 type bytes coincide.
 
 The prepared-input wallet API rejects unpaired SINGLE before calling the
 external signer unless the caller passes `allow_unpaired_single=True`.
-An unpaired ForkID or Chronicle SINGLE input commits to no outputs.
+An unpaired BIP143 or Chronicle SINGLE input commits to no outputs.
 Review that scope before approving the one-time signature.
 
 ## Unconfirmed parent txids
@@ -74,10 +74,10 @@ the same input outpoints and ordered outputs can confirm under a different txid.
 Any valid replacement that confirms under a different txid affects an existing child
 that spends a Lamport output. The child references the original `txid:vout`, and
 moving the spend to the confirmed outpoint changes the required signing digest.
-This applies to the legacy, universal, and committed payment profiles. If a
+This applies to the legacy, full-key and all committed payment profiles. If a
 replacement also changes transaction contents, verify that it still makes the
 intended payment.
-[Transaction serialization](../../../shared/transaction.py)
+[Transaction serialization](../../../src/fourthgraph/bsv/transaction.py)
 
 Transactions spending the same inputs compete for those UTXOs. First-seen
 information and conflict notifications help monitor a pending parent. Confirm
@@ -137,8 +137,9 @@ Production use requires durable state that survives restarts, parallel requests,
 and rollback. The callback owner must approve the transaction, sighash and fee
 before disclosure. A digest alone cannot communicate those choices.
 
-The payment helper rejects change to the same canonical key, but this is only a
-local guard. Script cannot remember that the same public key appears elsewhere.
+The payment helper rejects change to any recognized profile of the same key.
+Script cannot remember that the same public key appears elsewhere. Treat a key
+as consumed across profiles as soon as any signature leaves the signer.
 The tests deliberately show that two signatures on complementary raw digests
 reveal all blocks and allow forgery for any third digest. This is a primitive-level
 demonstration, not an assertion that real transaction hashes can be chosen freely.
@@ -158,4 +159,6 @@ transaction version, locktime, outputs, multiple inputs and fresh-key change.
 Both the development interpreter and the pinned independent chain-gang engine
 run the complete-input matrix. BSV Node checks the same matrix through verifyscript
 with explicit synthetic prevouts; it also demonstrates the detached-proof replay.
-No real coins, network submission, mining, or mainnet policy acceptance is tested.
+The funded regtest covers local mempool admission and mining for direct exits
+and for one same-template turnover before exit on both Forth profiles.
+Both suites use test keys and local regtest data. [Validation receipts](validation.md)

@@ -1,3 +1,5 @@
+REQUIRE BSV
+
 ( P2PKH-Schnorr payment example. Transaction policy lives in this source. )
 REQUIRE stdlib/script-fragments.fth
 REQUIRE stdlib/secp256k1.fth
@@ -27,7 +29,7 @@ REQUIRE stdlib/bip340.fth
 ;
 
 : check-companion ( script -- script )
-    ( Unpaired SINGLE uses ForkID 0x43 or 0xc3 and a zero hashOutputs. )
+    ( Unpaired SINGLE uses BIP143 0x43 or 0xc3 and a zero hashOutputs. )
     op-fromaltstack op-dup op-toaltstack op-dup bytes-hex 43 bsv-push op-equal op-swap
     bytes-hex c3 bsv-push op-equal op-boolor op-verify
     bsv-empty schnorr-companion-code check-forkid-shape
@@ -82,9 +84,15 @@ REQUIRE stdlib/bip340.fth
     3 script-pick-depth op-hash160
 ;
 
+: schnorr-check-owner ( script bytes -- script )
+    swap schnorr-lock-prefix swap bsv-push op-equalverify ;
+
+: schnorr-check-signature ( script -- script ) bip340-verify op-verify ;
+
 : schnorr-lock ( script bytes -- script )
-    swap schnorr-lock-prefix swap bsv-push op-equalverify
-    bip340-verify op-verify op-fromaltstack bind-current-input
+    schnorr-check-owner
+    schnorr-check-signature
+    op-fromaltstack bind-current-input
 ;
 
 ( The wallet supplies the approved preimage and the external signer's verified witness. )

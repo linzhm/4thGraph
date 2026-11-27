@@ -1,15 +1,17 @@
 """Build and authorize Schnorr spends with an external BIP340 signer."""
 
-from bip340 import lift_x, to_bytes, verify
+from coincurve import PublicKeyXOnly
+
+from bip340 import lift_x, to_bytes
 from schnorr_script import authorization_codes, compile_unlock, lock_for_owner, owner_hash, recognize
-from shared.spend_authorization import DEFAULT_SIGHASH, prepare_authorization
-from shared.transaction import CHRONICLE, SIGHASH_SINGLE, SIGHASH_TYPES, Input, Transaction, amount
+from fourthgraph.bsv.spend_authorization import DEFAULT_SIGHASH, prepare_authorization
+from fourthgraph.bsv.transaction import CHRONICLE, SIGHASH_SINGLE, SIGHASH_TYPES, Input, Transaction, amount
 
 
-def lock_for_public_key(public_key):
+def lock_for_public_key(public_key, *, version=None):
     if lift_x(public_key) is None:
         raise ValueError("invalid BIP340 public key")
-    return lock_for_owner(owner_hash(public_key))
+    return lock_for_owner(owner_hash(public_key), version=version)
 
 
 def sign_spend(tx, index, funding_raw, public_key, signer, *, sighash=DEFAULT_SIGHASH, chronicle_active=False):
@@ -47,7 +49,8 @@ def sign_previous(tx, index, previous, public_key, signer, *, sighash=DEFAULT_SI
                                  ordinary_code=ordinary_code, companion_code=companion_code)
     message = auth.checked_digest()
     signature = signer(message)
-    if not verify(public_key, message, signature):
+    if (not isinstance(signature, bytes) or len(signature) != 64
+            or not PublicKeyXOnly(public_key).verify(signature, message)):
         raise ValueError("invalid BIP340 signature from external signer")
 
     nonce_point = lift_x(signature[:32])
@@ -57,7 +60,7 @@ def sign_previous(tx, index, previous, public_key, signer, *, sighash=DEFAULT_SI
 
 
 def sign_payment(funding_raw, vout, outputs, fee, public_key, signer):
-    """Build a version-2 single-input ForkID ALL payment with an approved fee."""
+    """Build a version-2 single-input BIP143 ALL payment with an approved fee."""
     funding = Transaction.parse(funding_raw)
     if type(vout) is not int or not 0 <= vout < len(funding.outputs):
         raise ValueError("funding output index out of range")

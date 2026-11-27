@@ -1,19 +1,19 @@
 # P2PKH-Schnorr 钱包 SDK
 
-[English](sdk.en.md) · [项目首页](../README.zh-CN.md) · [统一钱包 SDK](../../../shared/sdk/README.zh-CN.md)
+[English](sdk.en.md) · [项目首页](../README.zh-CN.md) · [统一钱包 SDK](../../../sdk/README.zh-CN.md)
 
 <a name="quickstart"></a>
 
 ## 收款和花费
 
-在统一 SDK 中选择项目 `p2pkh-schnorr`，默认使用 `v0.6.0` 模板。创建收款脚本时传入 32 字节 x-only 公钥或其 20 字节 HASH160。客户端在 Forth 编译产物中填入所有者哈希，识别时核对实际脚本的全部固定字节。识别时也可以提供预期公钥。
+在统一 SDK 中选择项目 `p2pkh-schnorr`，默认使用 `v0.7.0` 模板。创建收款脚本时传入 32 字节 x-only 公钥或其 20 字节 HASH160。客户端在 Forth 编译产物中填入所有者哈希，识别时核对实际脚本的全部固定字节，也可以提供预期公钥。SDK 根据上一输出的脚本识别并花费两个版本的 UTXO。如需按原版创建输出，可将钱包的 `template` 设为 `v0.6.0`。
 
 签名请求的算法为 `schnorr-secp256k1`，数据类型为 `message`，签名格式为 `bip340`。把 32 字节载荷作为消息交给 BIP340 签名器，直接返回签名器给出的 64 字节。SDK 验证签名并推导见证所需的公开坐标，再调用 Forth 的 `schnorr-unlock` 生成解锁脚本。[Forth 源码](../reference/schnorr.fth)
 
-下面的 TypeScript 调用使用钱包已审批的数据和统一快速入门中的桥接配置。使用项目环境时，将配置指向 `.venv/p2pkh-schnorr` 中的 Python 解释器。调用前，钱包先核验入金 outpoint，再审批输出和手续费。[桥接配置](../../../shared/sdk/README.zh-CN.md#quickstart)
+以下示例使用已核验的交易数据。将桥接配置中的 `python` 指向 `projects/p2pkh-schnorr/workspace/p2pkh-schnorr/bin/python`，`bridge` 指向当前检出的 `sdk/python/bridge.py`。[共享接入示例](../../../sdk/docs/integration.zh-CN.md#first-payment) · [项目 Python 环境](../README.zh-CN.md#复现验收)
 
 ```ts
-import { WalletClient } from "./shared/sdk/typescript/index.ts";
+import { WalletClient } from "./sdk/typescript/index.ts";
 
 const wallet = new WalletClient("p2pkh-schnorr", config);
 const receiveScript = wallet.createLock({ publicKey: receiveKeyHex });
@@ -29,7 +29,7 @@ const signedHex = wallet.signPayment({
 }, ({ payload }) => signer.signBip340(payload));
 ```
 
-签署已组装的交易时，用 `signInput` 传入当前输入索引和已核验的上一输出。使用 Chronicle OTDA 时，根据实际链上下文填写 `chronicleActive`。SINGLE 需要同索引输出。Python、Rust 和 Go 也提供对应的接口。[统一调用表](../../../shared/sdk/README.zh-CN.md#调用与数据)
+签署已组装的交易时，用 `signInput` 传入当前输入索引和已核验的上一输出。使用 Chronicle OTDA 时，根据实际链上下文填写 `chronicleActive`。SINGLE 需要同索引输出。Python、Rust 和 Go 也提供对应的接口。[统一调用表](../../../sdk/docs/reference.zh-CN.md#calls-and-data)
 
 <a name="integrate-musig2"></a>
 
@@ -42,9 +42,9 @@ const signedHex = wallet.signPayment({
 按项目首页安装依赖，再运行离线示例。其中使用的密钥和辅助随机数均为公开测试数据。
 
 ```sh
-.venv/p2pkh-schnorr/bin/python -m shared.sdk.examples.receive_and_pay p2pkh-schnorr
-SCRIPT_LAB_SDK_PYTHON="$PWD/.venv/p2pkh-schnorr/bin/python" \
-  bash shared/verify_node.sh -- bash shared/sdk/verify_wallet.sh p2pkh-schnorr
+PYTHONPATH=src:. projects/p2pkh-schnorr/workspace/p2pkh-schnorr/bin/python -m sdk.examples.receive_and_pay p2pkh-schnorr
+SCRIPT_LAB_SDK_PYTHON="$PWD/projects/p2pkh-schnorr/workspace/p2pkh-schnorr/bin/python" \
+  bash tools/verify_node.sh -- bash sdk/verify_wallet.sh p2pkh-schnorr
 ```
 
 [环境与验收范围](../README.zh-CN.md#复现验收)

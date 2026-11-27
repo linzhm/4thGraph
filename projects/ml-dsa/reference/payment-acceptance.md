@@ -30,7 +30,7 @@ run in every height context. [Executable fixture](test_payment.py)
 | `SINGLE` without matching output | Accept | Accept | Reject | Reject |
 
 The table applies where the sighash family is active. Before Chronicle,
-all OTDA rows reject, including unpaired `SINGLE` with the companion ForkID
+all OTDA rows reject, including unpaired `SINGLE` with the companion BIP143
 binding. After applying the activation rule, 144 original transactions and 72
 output changes must pass. The other 424 rows must fail. The acceptance table
 uses declared commitment rules. Chain-gang and optional Lean and native Node
@@ -54,9 +54,9 @@ file. The Wycheproof driver checks unique case IDs and the published case count.
 ## Replay
 
 ```sh
-python -m pip install -r shared/requirements-chronicle.txt
-PYTHONPATH=.:projects/ml-dsa/reference python -m unittest -v test_payment
-PYTHONPATH=.:projects/ml-dsa/reference bash shared/verify_node.sh test_payment
+python -m pip install -r tools/requirements-chronicle.txt
+PYTHONPATH=src:.:projects/ml-dsa/reference python -m unittest -v test_payment
+PYTHONPATH=src:.:projects/ml-dsa/reference bash tools/verify_node.sh test_payment
 ```
 
 Set `ML_DSA_BSVS` to the absolute path to the Lean `bsvs` executable to add
@@ -67,7 +67,7 @@ explicit synthetic prevouts through `verifyscript` on a peerless regtest.
 ## Recorded replay
 
 The 640 rows matched on Linux x86-64 with the
-[pinned chain-gang build](../../../shared/requirements-chronicle.txt),
+[pinned chain-gang build](../../../tools/requirements-chronicle.txt),
 BSV Node 1.2.3 (`101020300`), and Lean `bsvs` from revision
 `1c051eaef1077cc95e5d1618686d5efacc4aa097`. OpenSSL 3.5.7 generated the test signatures.
 The pinned corpora also matched 15/15 ACVP cases in Python and Script and

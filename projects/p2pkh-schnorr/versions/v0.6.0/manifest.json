@@ -1,0 +1,16 @@
+{
+  "version": "0.6.0",
+  "previous": null,
+  "artifacts": [
+    "layout.json",
+    "template.hex"
+  ],
+  "fixtures": [
+    "bip340-vectors.csv",
+    "BIP340-LICENSE"
+  ],
+  "evidence": [],
+  "integration": "docs/sdk.en.md",
+  "build": "PYTHONPATH=src:. python projects/p2pkh-schnorr/reference/generate_template.py --check",
+  "verify": "PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- python -m unittest discover -s projects/p2pkh-schnorr/reference"
+}

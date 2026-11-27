@@ -1,24 +1,89 @@
 # Native P2PK and P2PKH baseline
 
-[简体中文](README.zh-CN.md) · [BSV Script Lab](../../README.md)
+[简体中文](README.zh-CN.md) · [4thGraph](../../README.md) · [Project index](../README.md) · [Versions](versions/index.json)
 
 ## Developer resources
 
-**[Wallet SDK quickstart](docs/sdk.en.md#quickstart)** · [Unified wallet SDK](../../shared/sdk/README.md#quickstart)
+**[Wallet SDK quickstart](docs/sdk.en.md#quickstart)** · [Unified wallet SDK](../../sdk/README.md#quickstart)
 
 Receive to P2PK or P2PKH, then sign a payment with your secp256k1 signer.
 
-[Protocol](docs/developer.en.md#protocol) · [Security](docs/developer.en.md#security) · [Verify](#run) · [Transaction costs](#complete-transactions-and-stack-measurements)
+[Protocol](docs/developer.en.md#protocol) · [Forth and compiled Script](#forth-source-and-compiled-script) · [Security](docs/developer.en.md#security) · [Verify](#run) · [Transaction costs](#complete-transactions-and-stack-measurements)
 
-Native P2PKH is the first wallet integration example and the transaction-cost baseline for Script Lab. P2PK uses the same secp256k1 signer and provides a control for placing the public key in the output lock. Both templates have public fixtures that you can replay as you integrate another project.
+Native P2PKH is the first wallet integration example and the transaction-cost baseline for 4thGraph. P2PK uses the same secp256k1 signer and provides a control for placing the public key in the output lock. Both templates have public fixtures that you can replay as you integrate another project.
 
-[Reproduce the benchmark](../../shared/benchmark.md)
+[Build locks from Forth](forth/README.md) · [Reproduce the benchmark](../../docs/benchmark.md)
+
+## Forth source and compiled Script
+
+The Forth constructors check the recipient field width and assemble the locking scripts. Both examples use the public fixture key.
+
+### P2PK
+
+The constructor takes a 33-byte compressed secp256k1 public key. The spending input supplies `<signature>`. [Example entry](forth/p2pk.fth) · [Standard library](../../src/fourthgraph/stdlib/p2pk.fth)
+
+```forth
+: p2pk-lock ( bytes -- bytes )
+    33 bytes-check-size
+    bytes-hex 21 swap bytes-cat bytes-hex ac bytes-cat ;
+
+: p2pk ( bytes -- bytes ) p2pk-lock ;
+```
+
+The 35-byte lock pushes the public key and executes `OP_CHECKSIG`.
+
+```text
+0x0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798 OP_CHECKSIG
+```
+
+```text
+210279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798ac
+```
+
+### P2PKH
+
+The constructor takes a 20-byte HASH160 of the public key. The spending input supplies `<signature> <public key>`. [Example entry](forth/p2pkh.fth) · [Standard library](../../src/fourthgraph/stdlib/p2pkh.fth)
+
+```forth
+: p2pkh-lock ( bytes -- bytes )
+    20 bytes-check-size
+    bytes-hex 76a914 swap bytes-cat bytes-hex 88ac bytes-cat ;
+
+: p2pkh ( bytes -- bytes ) p2pkh-lock ;
+```
+
+The 25-byte lock checks the supplied public key's hash before checking the signature.
+
+```text
+OP_DUP OP_HASH160 0x751e76e8199196d454941c45d1b3a323f1433bd6 OP_EQUALVERIFY OP_CHECKSIG
+```
+
+```text
+76a914751e76e8199196d454941c45d1b3a323f1433bd688ac
+```
+
+### Optimization and reproduction
+
+In 4thGraph 0.2.7, `baseline`, `safe`, and `stack` emit identical bytecode for each constructor. Evaluating that bytecode with the fixture inputs produces the 35-byte P2PK and 25-byte P2PKH locks above, byte for byte against the existing `lock_hex` values. The wallet build evaluates the Forth constructors off-chain and uses the resulting bytes as the transaction output scripts. [Baseline fixtures](versions/v0.1.0/baseline.json)
+
+From the repository root, print the locks and inspect the `stack` optimization reports for both constructors.
+
+```sh
+export PYTHONPATH=src:.
+forth=projects/p2pk-p2pkh-baseline/forth
+python3 "$forth/payments.py" --public-key 0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798
+python3 "$forth/payments.py" --hash160 751e76e8199196d454941c45d1b3a323f1433bd6
+
+for entry in p2pk p2pkh; do
+  python3 -m fourthgraph.workflow.protocol "$forth/$entry.fth" --entry "$entry" --optimize stack
+done
+```
 
 ## Use cases and trade-offs
 
 Start here when bringing up a transaction builder, a secp256k1 signing device, or a wallet migration. Check serialization with the public vector first. Then connect your own signer and use the same workflow to compare another signature scheme.
 
-P2PKH is the usual choice when a payment request provides a public-key hash. The spending wallet reveals the full public key with the signature. P2PK is useful as a control when the payer already has the recipient's public key. For ForkID ALL, P2PK moves 10 bytes into each receive output and saves about 34 bytes per spending input. Compare both sides if your wallet batches funding or consolidates many inputs. [Transaction costs](#complete-transactions-and-stack-measurements)
+P2PKH is the usual choice when a payment request provides a public-key hash. The spending wallet reveals the full public key with the signature. P2PK is useful as a control when the payer already has the recipient's public key. For BIP143 ALL, P2PK moves 10 bytes into each receive output and saves about 34 bytes per spending input. Compare both sides if your wallet batches funding or consolidates many inputs. [Transaction costs](#complete-transactions-and-stack-measurements)
 
 ## Run
 
@@ -33,8 +98,8 @@ The first run may download and build the pinned dependency. The script itself
 has no network operations. After provisioning, add `--offline` after `uv run`.
 It exits nonzero on a script encoding or validation mismatch and otherwise
 emits raw parent/spend transactions, ASM, script hex and per-case outcomes.
-`../template/baseline.json` is the checked-in output. To check reproducibility,
-pipe the same command into `cmp - ../template/baseline.json`.
+`../versions/v0.1.0/baseline.json` is the checked-in output. To check reproducibility,
+pipe the same command into `cmp - ../versions/v0.1.0/baseline.json`.
 
 ## Fixture contract
 
@@ -46,14 +111,14 @@ pipe the same command into `cmp - ../template/baseline.json`.
 Fixture key scalars are public constants (1 and 2). Never use them to hold
 funds. The parent references a made-up outpoint; the spend is verified by
 supplying that parent directly to the library. Both use version 1 and the
-signer uses SIGHASH_ALL with FORKID. These tests exercise parent-aware script
+signer uses BIP143 ALL (`SIGHASH_ALL | SIGHASH_FORKID`, `0x41`). These tests exercise parent-aware script
 validation, not prior-outpoint existence, node policy, regtest mining, or
 mainnet. Do not broadcast these fixtures.
 
 The offline generator and acceptance tests share the repository's Chronicle
 pin of the chain-gang Python binding. Projects using that exact pin can share
 the same environment. The Rust-backed binding supplies assembly, signing,
-and validation. [Shared dependency](../../shared/requirements-chronicle.txt)
+and validation. [Shared dependency](../../tools/requirements-chronicle.txt)
 
 To reproduce the original upstream control in its own environment, run
 `uv run --no-project --with 'tx-engine==0.13.1' python script_lab.py`.
@@ -71,7 +136,7 @@ acceptance are separate milestones for issue #1.
 
 The [native acceptance matrix](reference/acceptance.md) exhaustively covers
 2,880 complete-input combinations in its declared domain, including all
-12 paired ForkID and Chronicle OTDA sighash combinations. It also checks
+12 paired BIP143 and Chronicle OTDA sighash combinations. It also checks
 80 unpaired SINGLE mutation cases and 192 cases around Chronicle activation.
 Explicit transaction commitments determine the expected result for each row.
 
@@ -84,7 +149,7 @@ hash matches the lock. Use these fixtures to validate an existing wallet's
 serialization and signature handling. Authenticate the funding outpoint,
 value and locking script before requesting a signature.
 
-With the ForkID ALL benchmark, moving from P2PK to P2PKH saves 10 bytes
+With the BIP143 ALL benchmark, moving from P2PK to P2PKH saves 10 bytes
 on each output lock and adds about 34 bytes to each input unlock. The
 whole-transaction cost therefore depends on the number of each. The
 complete-input tests use the modes and activation contexts in the
@@ -112,4 +177,6 @@ Each marginal cell shows the **change in total bytes (output locks / input unloc
 | `p2pkh` · `0x41` | 3×2 | 146 (0 / 105 / 41) | 2×3 | 34 (25 / 0 / 9) | 598 | 972 |
 | `p2pkh` · `0x61` | 3×2 | 146 (0 / 105 / 41) | 2×3 | 33 (25 / -1 / 9) | 599 | 970 |
 
-[Unified benchmark and reproduction](../../shared/benchmark.md)
+[Unified benchmark and reproduction](../../docs/benchmark.md)
+
+[Compile the Forth locking scripts](forth/README.md).

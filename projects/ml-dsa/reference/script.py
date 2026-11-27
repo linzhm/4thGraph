@@ -9,8 +9,8 @@ from mldsa import DIGEST_BYTES
 from ntt_script import verification_equation_script
 from shake_script import shake256_script
 from signature_script import signature_decode_script
-from shared.pushtx import authorization_checks, check_binding
-from shared.script import asm, number, push
+from fourthgraph.bsv.pushtx import authorization_checks, check_binding
+from fourthgraph.bsv.script import asm, number, push
 
 # The ordinary and companion scriptCode suffixes distinguish ML-DSA from the
 # Lamport, WOTS+ and SLH-DSA templates.

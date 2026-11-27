@@ -4,10 +4,10 @@ from hashlib import sha256
 import json
 from pathlib import Path
 
-from shared.otda_reconstruction import Reconstruction
+from fourthgraph.bsv.otda_reconstruction import Reconstruction
 from wots import KEY_BYTES, N
 
-TEMPLATE_DIRECTORY = Path(__file__).resolve().parents[1] / "template"
+TEMPLATE_DIRECTORY = Path(__file__).resolve().parents[1] / "versions/v0.1.0"
 
 
 def _read_bytes(artifact):

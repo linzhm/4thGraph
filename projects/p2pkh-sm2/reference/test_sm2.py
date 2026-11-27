@@ -10,16 +10,16 @@ import subprocess
 import sys
 import tempfile
 import unittest
-from assemble import assemble
+from assemble import SCHEDULED_TEMPLATE_VERSION, TEMPLATE_VERSIONS, assemble, sm3_blocks
 from p2pkh_sm2 import *
 from sm2 import *
 from sm3_script import hash_script,compress,IV
-from shared.evaluate import evaluate,ScriptError
-from shared.script import push,number,assemble as assemble_blocks
-from shared.transaction import *
+from fourthgraph.bsv.evaluate import evaluate,ScriptError
+from fourthgraph.bsv.script import push,number,assemble as assemble_blocks
+from fourthgraph.bsv.transaction import *
 
 ROOT=Path(__file__).resolve().parents[1]
-SM3_PROFILES = ({}, {'optimized': True}, {'compact': True})
+SM3_PROFILES = ({}, {'optimized': True}, {'compact': True}, {'scheduled': True})
 
 
 def der(tag,raw):
@@ -79,7 +79,7 @@ def valid_script(lock,witness,tx,value=1000,index=0):
 
 class SM2Tests(unittest.TestCase):
     def test_standard_vector(self):
-        v=json.loads((ROOT/'template/sm2-standard.json').read_text())
+        v=json.loads((ROOT/'versions/v1.0.0/sm2-standard.json').read_text())
         q=bytes.fromhex(v['public_key']); m=bytes.fromhex(v['message']); sig=bytes.fromhex(v['signature'])
         self.assertEqual(za(q).hex(),v['za'])
         self.assertEqual(message_digest(q,m).hex(),v['digest'])
@@ -110,18 +110,19 @@ class SM2Tests(unittest.TestCase):
                     self.assertEqual(stack,[za(key)]); self.assertEqual(alt,[])
 
     def test_compact_sm3_preserves_lower_stack_and_checks_input_length(self):
-        script=hash_script(64,compact=True)
         lower=[(1 << 32).to_bytes(5,'little'), b'\x80', b'lower']
-        for data in (bytes(64), b'\xff'*64, b'\x80\x01'*32):
-            with self.subTest(word=data[:2].hex()):
-                self.assertEqual(evaluate(script,lower+[data]),(lower+[sm3(data)],[]))
-        for length in (63,65):
-            with self.subTest(length=length), self.assertRaisesRegex(ScriptError,'NUMEQUALVERIFY'):
-                evaluate(script,lower+[bytes(length)])
+        for profile in ({'compact': True}, {'scheduled': True}):
+            script=hash_script(64,**profile)
+            for data in (bytes(64), b'\xff'*64, b'\x80\x01'*32):
+                with self.subTest(profile=profile, word=data[:2].hex()):
+                    self.assertEqual(evaluate(script,lower+[data]),(lower+[sm3(data)],[]))
+            for length in (63,65):
+                with self.subTest(profile=profile, length=length), self.assertRaisesRegex(ScriptError,'NUMEQUALVERIFY'):
+                    evaluate(script,lower+[bytes(length)])
 
     def test_openssl_standard_and_round_trip(self):
         self.assertIsNotNone(shutil.which('openssl'),'OpenSSL with SM2 is required')
-        v=json.loads((ROOT/'template/sm2-standard.json').read_text())
+        v=json.loads((ROOT/'versions/v1.0.0/sm2-standard.json').read_text())
         with tempfile.TemporaryDirectory() as directory:
             d=Path(directory)
             (d/'pub.pem').write_bytes(public_pem(bytes.fromhex(v['public_key'])))
@@ -142,7 +143,7 @@ class SM2Tests(unittest.TestCase):
 
     def test_canonical_recognition(self):
         key,lock,*_=fixture()
-        manifest=json.loads((ROOT/'template/layout.json').read_text())
+        manifest=json.loads((ROOT/'versions/v1.0.0/layout.json').read_text())
         self.assertEqual(len(lock),manifest['script_bytes'])
         self.assertEqual(identify(lock),(1,public_key_hash160(key)))
         self.assertEqual(recognize(lock),public_key_hash160(key))
@@ -153,6 +154,19 @@ class SM2Tests(unittest.TestCase):
         with self.assertRaises(ValueError): locking_script_from_owner_hash(bytes(19))
         r1=bytes.fromhex('046b17d1f2e12c4247f8bce6e563a440f277037d812deb33a0f4a13945d898c2964fe342e2fe1a7f9b8ee7eb4a7c0f9e162bce33576b315ececbb6406837bf51f5')
         with self.assertRaises(ValueError): public_key_hash160(r1)
+
+    def test_forth_build_and_recognition(self):
+        owner = bytes(range(20))
+        for version in TEMPLATE_VERSIONS:
+            with self.subTest(version=version):
+                lock = locking_script_from_owner_hash(owner, version=version)
+                self.assertEqual(lock, assemble(owner, version))
+                self.assertEqual(lock, assemble_blocks(ROOT/'reference/asm', owner, sm3_blocks(version=version)))
+                self.assertEqual(identify(lock), (version, owner))
+                self.assertIsNone(identify(lock[:-1]))
+                self.assertIsNone(identify(lock[:-1] + b'\x51'))
+        self.assertLess(len(locking_script_from_owner_hash(owner, version=SCHEDULED_TEMPLATE_VERSION)),
+                        len(locking_script_from_owner_hash(owner)))
 
     def test_full_script_random_keys(self):
         for d,k in ((1,2),(7,19),(19,7),(N-2,N-1),(12345,67890)):
@@ -205,7 +219,7 @@ class SM2Tests(unittest.TestCase):
         self.assertEqual(evaluate(b''.join(number(v) for v in (P,r,s,*q,e))+point_code),([],[]))
 
     def test_payment_vector_and_consecutive_payments(self):
-        v=json.loads((ROOT/'template/spend-all.json').read_text())
+        v=json.loads((ROOT/'versions/v1.0.0/spend-all.json').read_text())
         key,lock,parent,tx,pre,sig=fixture()
         self.assertEqual(key.hex(),v['public_key'])
         self.assertEqual(parent.txid(),v['parent_txid'])
@@ -229,7 +243,7 @@ class SM2Tests(unittest.TestCase):
         with self.assertRaises(ValueError): Transaction.parse(parent.serialize()+b'\0')
 
     def test_release_defaults_to_pinned_v1(self):
-        manifest = json.loads((ROOT/'template/layout.json').read_text())
+        manifest = json.loads((ROOT/'versions/v1.0.0/layout.json').read_text())
         base_owner = bytes.fromhex(manifest['base_owner_hash160'])
         lock = assemble(base_owner)
         self.assertEqual(len(lock), 144925)
@@ -243,7 +257,9 @@ class SM2Tests(unittest.TestCase):
         self.assertEqual(result['script_sha256'], manifest['base_script_sha256'])
         self.assertEqual(subprocess.check_output([*cli, '--format', 'raw']), lock)
         self.assertEqual(subprocess.check_output([*cli, '--version', '1', '--format', 'raw']), lock)
-        for version in (0, 2, 3, 4):
+        candidate = assemble(base_owner, SCHEDULED_TEMPLATE_VERSION)
+        self.assertEqual(subprocess.check_output([*cli, '--version', '2', '--format', 'raw']), candidate)
+        for version in (0, 3, 4):
             with self.subTest(version=version):
                 for construct in (assemble, locking_script_from_owner_hash):
                     with self.assertRaisesRegex(ValueError, 'unsupported P2PKH-SM2 template'):

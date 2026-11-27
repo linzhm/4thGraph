@@ -23,18 +23,18 @@ Script Lab v0.2.0 基线直接使用现有钱包签名入口和固定模板。�
 
 | 模式 | 实现 | 每输入解锁 | 2×2 交易 | 新增输入 | 新增输出 | 入金后退出 | 含一次周转 |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| ForkID ALL | Script Lab | 326 | 93,374 | 369 | 46,313 | 93,599 | 186,974 |
-| ForkID ALL | sCrypt 内核 | 326 | 133,304 | 369 | 66,278 | 133,530 | 266,833 |
+| BIP143 ALL | Script Lab | 326 | 93,374 | 369 | 46,313 | 93,599 | 186,974 |
+| BIP143 ALL | sCrypt 内核 | 326 | 133,304 | 369 | 66,278 | 133,530 | 266,833 |
 | OTDA ALL | Script Lab | 4,264 | 101,250 | 4,430 | 46,393 | 93,613 | 194,863 |
 | OTDA ALL | sCrypt 内核 | 4,377 | 141,406 | 4,543 | 66,362 | 133,544 | 274,949 |
 
-单位均为字节。sCrypt 内核使锁超过 65,535 字节，输出的 CompactSize 长度字段从 3 字节变成 5 字节。OTDA 复用重建程序，所以每输入只多 113 字节。栈载荷峰值在 ForkID 为 3,474 / 4,216 字节，在 OTDA 为 185,613 / 265,473 字节，顺序均为 Script Lab / sCrypt 内核。数值为开发求值器测得的首输入主栈与备用栈数据量。[统一计量口径](../../../shared/benchmark.zh-CN.md)
+单位均为字节。sCrypt 内核使锁超过 65,535 字节，输出的 CompactSize 长度字段从 3 字节变成 5 字节。OTDA 复用重建程序，所以每输入只多 113 字节。栈载荷峰值在 BIP143 为 3,474 / 4,216 字节，在 OTDA 为 185,613 / 265,473 字节，顺序均为 Script Lab / sCrypt 内核。数值为开发求值器测得的首输入主栈与备用栈数据量。[统一计量口径](../../../docs/benchmark.zh-CN.md)
 
-两进两出的验证耗时也按 Script Lab / sCrypt 内核排序。ForkID 在 chain-gang 为 10.4 / 11.0 ms，在 BSV Node 本机 RPC 为 41.4 / 47.2 ms。OTDA 对应为 10.1 / 11.4 ms 和 42.0 / 50.0 ms。数据来自同一台 AMD EPYC 9V74 Linux 主机，每组预热一次，再取 15 次中位数，包含输入准备与验证。
+两进两出的验证耗时也按 Script Lab / sCrypt 内核排序。BIP143 在 chain-gang 为 10.4 / 11.0 ms，在 BSV Node 本机 RPC 为 41.4 / 47.2 ms。OTDA 对应为 10.1 / 11.4 ms 和 42.0 / 50.0 ms。数据来自同一台 AMD EPYC 9V74 Linux 主机，每组预热一次，再取 15 次中位数，包含输入准备与验证。
 
 算术差分覆盖 450 组坐标边界和确定性样本。两版分别复放 96 笔付款用例，覆盖交易版本 1 和 2、全部 12 种配对 sighash、未配对 SINGLE，以及锁定时间与输出金额变更。夹具也执行每版有效用例的 64 份见证，逐字节核对签名原像，并确认实际采用 50 份字面原像、10 份重建原像与 4 份伴随路径见证。BSV Node 1.2.3 在 Chronicle 已激活且上一输出创建于激活之后的 `verifyscript` 上下文逐输入核验，固定版本 chain-gang 核对整笔交易结果。[验收入口](../reference/compare_scrypt.py)
 
-另用未放宽脚本和交易大小策略的隔离 regtest 复放真实 UTXO。两版在 ForkID ALL 和 OTDA ALL 下的入金与直接退出共 8 笔交易，均进入内存池并出块。sCrypt 内核版的两笔入金各约 133 KB。上表的周转字节数来自 `verifyscript` 测量。 [入金与出块夹具](../../../shared/benchmark_admission.py) · [节点启动参数](../../../shared/verify_node.sh)
+另用未放宽脚本和交易大小策略的隔离 regtest 复放真实 UTXO。两版在 BIP143 ALL 和 OTDA ALL 下的入金与直接退出共 8 笔交易，均进入内存池并出块。sCrypt 内核版的两笔入金各约 133 KB。上表的周转字节数来自 `verifyscript` 测量。 [入金与出块夹具](../../../src/fourthgraph/benchmark/admission.py) · [节点启动参数](../../../tools/verify_node.sh)
 
 公开版最直接的体积改进是把点乘循环换为射影运算和窗口点乘，并把唯一的 ECDSA 标量逆元作为见证交给脚本核验。若要进一步压缩这份 sCrypt 候选，应缩短重复次数最多的倍点内核，并复用点加的中间量、减少通用函数生成的栈清理。独立验签、付款绑定和 OTDA 重建各自使用上面的数据口径。
 
@@ -43,18 +43,19 @@ Script Lab v0.2.0 基线直接使用现有钱包签名入口和固定模板。�
 按[开发入口](developer.zh-CN.md)配置 Python 环境，从仓库根目录运行。
 
 ```sh
-python3.12 -m venv .venv/p2pkh-r1
-.venv/p2pkh-r1/bin/python -m pip install \
+bash tools/setup-workspaces.sh
+python3.12 -m venv projects/p2pkh-r1/workspace/comparison-venv
+projects/p2pkh-r1/workspace/comparison-venv/bin/python -m pip install \
   -r projects/p2pkh-r1/reference/requirements.txt 'ecdsa==0.19.1'
 scratch=$(mktemp -d)
 gh release download v1.20.0 --repo sCrypt-Inc/compiler_dist \
   --pattern 'scryptc-1.20.0-Linux-x86_64' --dir "$scratch"
 chmod +x "$scratch/scryptc-1.20.0-Linux-x86_64"
-GHCRTS=-N2 PYTHONPATH=. bash shared/verify_node.sh -- \
-  .venv/p2pkh-r1/bin/python projects/p2pkh-r1/reference/compare_scrypt.py \
-  --compiler "$scratch/scryptc-1.20.0-Linux-x86_64" --output /tmp/r1-scrypt-comparison.json
-GHCRTS=-N2 PYTHONPATH=. bash shared/verify_node.sh --profile default -- \
-  .venv/p2pkh-r1/bin/python projects/p2pkh-r1/reference/compare_scrypt.py \
+GHCRTS=-N2 PYTHONPATH=src:. bash tools/verify_node.sh -- \
+  projects/p2pkh-r1/workspace/comparison-venv/bin/python projects/p2pkh-r1/reference/compare_scrypt.py \
+  --compiler "$scratch/scryptc-1.20.0-Linux-x86_64" --output projects/p2pkh-r1/workspace/build/scrypt-comparison.json
+GHCRTS=-N2 PYTHONPATH=src:. bash tools/verify_node.sh --profile default -- \
+  projects/p2pkh-r1/workspace/comparison-venv/bin/python projects/p2pkh-r1/reference/compare_scrypt.py \
   --compiler "$scratch/scryptc-1.20.0-Linux-x86_64" --admission \
-  --output /tmp/r1-scrypt-admission.json
+  --output projects/p2pkh-r1/workspace/build/scrypt-admission.json
 ```

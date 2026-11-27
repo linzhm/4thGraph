@@ -36,7 +36,8 @@ bash verify.sh
 | --- | --- |
 | [`sm2.py`](sm2.py) | 曲线参数、ZA、签名验证，以及需要显式指定随机数的测试签名函数 |
 | [`sm3_script.py`](sm3_script.py) | 将 SM3 各轮运算展开为 Script 字节码 |
-| [`asm/`](asm/) | 曲线运算、SM2 验签和基于 PUSHTX 的交易绑定 |
+| [`p2pkh-sm2.fth`](../../../src/fourthgraph/stdlib/wallet/p2pkh-sm2.fth) | 构建锁定脚本，包含曲线运算、SM2 验签和基于 PUSHTX 的交易绑定 |
+| [`asm/`](asm/) | 用于字节级比对和独立曲线测试的参考汇编 |
 | [`p2pkh_sm2.py`](p2pkh_sm2.py) | 钱包接口和外部签名回调 |
 | [`signed_data.py`](signed_data.py) | SignedData 付款适配、结构检查和签名验证 |
 
@@ -46,32 +47,34 @@ bash verify.sh
 
 收款哈希全为零时，锁定脚本长 144,925 字节，SHA-256 为
 `196dfcb8244e863521447c7069297d31938fbd80a83d5976af618cf7fbcf9462`。
-生成器和 Python 脚本构造接口默认使用模板编号 `1`。[布局清单](../template/layout.json)
-固定了基准字节码。[付款向量](../template/spend-all.json)记录了一笔完整的 ForkID 付款。
-[16 个确定性预映像](../template/sighash-modes.json)覆盖全部有配对模式和各种无配对
+生成器和 Python 脚本构造接口默认使用模板编号 `1`。[布局清单](../versions/v1.0.0/layout.json)
+固定了基准字节码。[付款向量](../versions/v1.0.0/spend-all.json)记录了一笔完整的 BIP143 付款。
+[16 个确定性预映像](../versions/v1.0.0/sighash-modes.json)覆盖全部有配对模式和各种无配对
 SINGLE 模式。
 
 脚本执行所有 SM3 压缩轮。实现复用循环移位和取模所需的二次幂常量，用较短的指令访问
-栈顶附近的操作数，并简化后 48 轮的布尔运算。完整输入测试覆盖 ForkID 和 Chronicle
+栈顶附近的操作数，并简化后 48 轮的布尔运算。完整输入测试覆盖 BIP143 和 Chronicle
 OTDA，包括混用签名模式的输入、全 SM2 的两进两出付款、由正确测试私钥签署的畸形
 预映像，以及跨越 Chronicle 激活边界的花费。激活测试两侧都使用交易版本 1，以便只
 检验激活标志带来的差异。
 
-[标准向量](../template/sm2-standard.json) · [BSV Node 源码](https://github.com/bitcoin-sv/bitcoin-sv/tree/6504a3aff65ba97c0f6c80962b033e35ecbfed4b)
+[标准向量](../versions/v1.0.0/sm2-standard.json) · [BSV Node 源码](https://github.com/bitcoin-sv/bitcoin-sv/tree/6504a3aff65ba97c0f6c80962b033e35ecbfed4b)
 · [chain-gang 源码](https://github.com/linzhm/chain-gang/tree/8b60b71a12a69fdcb465d3e627dbf6f43d6ed081)
 
 <a name="otda-constructor"></a>
 
 ## 复现 OTDA 构造器
 
-钱包加载固定构造器，并按布局清单核对字节数和 SHA-256。离线生成器从 SM3 编译器收集具名的指令范围，再从中提取固定片段，与点运算块组合。在仓库根目录生成并比对文件。
+钱包加载固定构造器，并按布局清单核对字节数和 SHA-256。离线生成器先使用 SM3 的具名片段和点运算块。为模板 `2` 生成构造器时，它评估复制片段的缓存收益，尝试按使用频率排列缓存，并选择序列化后最短的编码。在仓库根目录生成并比对文件。
 
 ```sh
 python projects/p2pkh-sm2/reference/generate_otda_constructor.py /tmp/sm2-otda.hex
-cmp /tmp/sm2-otda.hex projects/p2pkh-sm2/template/otda-constructor.hex
+cmp /tmp/sm2-otda.hex projects/p2pkh-sm2/versions/v1.1.0/otda-constructor.hex
+python projects/p2pkh-sm2/reference/generate_otda_constructor.py --version 2 /tmp/sm2-otda-v2.hex
+cmp /tmp/sm2-otda-v2.hex projects/p2pkh-sm2/versions/v1.2.0/otda-constructor.hex
 ```
 
-构造器测试逐字节比对预映像、公钥和签名三项栈值，并由 BSV Node 和 chain-gang 验证完整花费。[布局与指纹](../template/layout.json) · [钱包接入](../docs/sdk.zh-CN.md)
+构造器测试逐字节比对预映像、公钥和签名三项栈值，并由 BSV Node 和 chain-gang 验证完整花费。[布局与指纹](../versions/v1.1.0/layout.json) · [钱包接入](../docs/sdk.zh-CN.md)
 
 ## SignedData 付款接入
 
@@ -107,7 +110,7 @@ signed_tx = sign_input(tx, input_index, funding_raw, public_key, signer, sighash
 Rust 测试签名器用 RustCrypto 的 `sm2` 签名，并用 `der` 编码。Python 测试签名器
 用 OpenSSL 签名，并用 `asn1crypto` 编码。两者提供相同的命令行参数和 JSON 字段。
 `verify.sh` 用 Cargo 构建 Rust 版，并通过 BSV Node 和 chain-gang 重放两版签名器
-生成的附带内容 ForkID 付款和分离内容 Chronicle OTDA 付款。测试还用 OpenSSL 验证
+生成的附带内容 BIP143 付款和分离内容 Chronicle OTDA 付款。测试还用 OpenSSL 验证
 签名、检查畸形封装是否被拒绝，并逐字节对照适配器与原始签名路径生成的解锁脚本。
 [Python 测试签名器](interop/python-signer/README.zh-CN.md) · [Rust 测试签名器](interop/rust-signer/README.zh-CN.md)
 

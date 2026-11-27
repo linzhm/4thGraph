@@ -7,8 +7,8 @@ from functools import cache
 from pathlib import Path
 import sys
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
-from shared.script import asm, number
+sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "src"))
+from fourthgraph.bsv.script import asm, number
 from fips204 import verification_key_rows
 from polynomial import DEGREE, MODULUS, twiddle
 

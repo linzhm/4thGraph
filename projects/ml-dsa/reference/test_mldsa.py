@@ -11,9 +11,9 @@ from hint_script import apply_hints_script
 from mldsa import authorize_digest, test_only_vector as deterministic_test_vector, verify_openssl
 from ntt_script import ring_product_script, transform_script, verification_equation_script
 from polynomial import DEGREE, MODULUS, ROOT_OF_UNITY, inverse_ntt, ntt
-from shared.evaluate import ScriptError, evaluate
+from fourthgraph.bsv.evaluate import ScriptError, evaluate
 
-_FIXTURES = Path(__file__).resolve().parents[1] / "template"
+_FIXTURES = Path(__file__).resolve().parents[1] / "versions/v0.1.0"
 
 
 def pack(coefficients):

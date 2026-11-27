@@ -1,101 +1,56 @@
 # P2PKH-R1
 
-[简体中文](README.zh-CN.md) · [BSV Script Lab](../../README.md)
+[简体中文](README.zh-CN.md) · [4thGraph](../../README.md) · [Project index](../README.md) · [Versions](versions/index.json)
 
-## Developer resources
+P2PKH-R1 lets a BSV wallet use an existing P-256 signer. The output commits to the recipient's public-key HASH160. A spend supplies the uncompressed public key and a 64-byte ECDSA signature in `r || s` format.
 
-**[Wallet SDK quickstart](docs/sdk.en.md#quickstart)** · [Unified wallet SDK](../../shared/sdk/README.md#quickstart)
+**[Wallet SDK quickstart](docs/sdk.en.md#quickstart)** · [Protocol](docs/spec.en.md) · [Security](docs/developer.en.md#security) · [Verification](reference/acceptance.md)
 
-Create a P-256 receive script and sign an approved payment. The unified client supports prepared inputs and Chronicle OTDA.
+<a name="version-history"></a>
+<a name="complete-transactions-and-stack-measurements"></a>
+<a name="forth-experiment"></a>
 
-[Version history](#version-history) · [Protocol](docs/spec.en.md) · [Security](docs/developer.en.md#security) · [Verify](reference/acceptance.md) · [Transaction costs](#complete-transactions-and-stack-measurements)
+## Measured results
 
-P2PKH-R1 locks a BSV output to the HASH160 of the recipient's uncompressed secp256r1 (P-256) public key. The payer fills a 20-byte owner field. On spend, the wallet supplies the public key and one verified 64-byte `r || s` signature for the selected input.
+### v0.5.0 → v0.6.0
 
-## Use cases and trade-offs
+**v0.6.0** freezes `split-5x4-affine-g` as the latest compiler template. It saves **357 B per lock** and **714 B per BIP143 ALL payment**. The OTDA reconstruction program grows by 148 B, and each measured OTDA payment shrinks by **418 B**. Payments use two inputs and two outputs. [Frozen artifacts and hashes](versions/v0.6.0/layout.json) · [Build and replay](forth/README.md)
 
-Use ordinary R1 to evaluate a wallet whose existing device or signing service can authorize a BSV payment with P-256. For example, run a payment using a device that accepts an already computed digest, then repeat with a SHA-256-on-device interface. Check which payload the device accepts and how it encodes the signature before handling funds. The wallet keeps a persistent nonce-reuse history across its signing processes. [Device integration](docs/sdk.en.md#device-signers-and-prepared-inputs)
+| Version | Compiler construction | Lock | BIP143 ALL payment | OTDA ALL payment | OTDA SINGLE payment |
+| --- | --- | ---: | ---: | ---: | ---: |
+| v0.5.0 | `split-5x4` | 41,721 B | 84,212 B | 95,282 B | 95,211 B |
+| **v0.6.0** | `split-5x4-affine-g` | **41,364 B** | **83,498 B** | **94,864 B** | **94,793 B** |
 
-R1 creates the full payment lock when the payer funds the output. This suits a recipient who needs to make an ordinary signed payment from the resulting UTXO in one spend, subject to confirmation and relay policy. Evaluate Deferred when small deposit outputs are valuable and your wallet can accommodate a separate activation transaction. [Deferred workflow](../p2pkh-r1-deferred/README.md)
+Both versions compile the same Forth call to `P256.mul2(u,G,v,Q)` with 5-bit and 4-bit windows for `G` and `Q`. In v0.6.0, the compiler proves `Z=1` for nonzero entries in the fixed-generator table, specializes 51 additions, and guards the zero index. Both versions passed funded BSV Node and independent chain-gang replay for the three payment modes above and the R1 acceptance matrix. [High-level source](forth/msm.fth) · [Version measurements](versions/v0.6.0/comparison.json) · [Acceptance matrix](reference/acceptance.md)
 
-## Version history
+<details>
+<summary>Earlier version iterations</summary>
 
-| Version | Main change | Lock | 2×2 ForkID ALL | 2×2 OTDA ALL |
-| --- | --- | ---: | ---: | ---: |
-| Forth v0.3.0 experiment | Compiles the full lock from Forth and shortens internal point doubling | **45,776 B** | **92,322 B** | **100,192 B** |
-| v0.2.0 | Schedules P-256 arithmetic and adds shared-kernel OTDA reconstruction for eligible outputs | 46,302 B | 93,374 B | 101,250 B |
-| v0.1.0 | Introduces the fixed R1 payment template with literal OTDA preimages | 59,582 B | 119,934 B | 358,194 B |
+Each row shows the validated template selected that round. Payments use two inputs and two outputs.
 
-## Current template
+| Previous selection | Selected template | Main improvement | Lock | BIP143 ALL | OTDA ALL |
+| --- | --- | --- | ---: | ---: | ---: |
+| — | v0.1.0 | First fixed lock with literal OTDA preimages | 59,582 B | 119,934 B | 358,194 B |
+| v0.1.0 | v0.2.0 | Reschedule P-256 arithmetic and share curve kernels in OTDA reconstruction | 46,302 B | 93,374 B | 101,250 B |
+| v0.2.0 | Forth v0.3.0 | Generate the full lock from Forth and shorten 263 point doublings | 45,776 B | 92,322 B | 100,192 B |
+| Forth v0.3.0 | Forth v0.4.0 | Express point arithmetic as bounded formulas and let the compiler rewrite and schedule them | 42,536 B | 85,842 B | 93,664 B |
+| Forth v0.4.0 | v0.5.0 (`split-5x4`) | Compile the double-scalar multiplication with a 5-bit fixed table and a 4-bit public-key table to reduce loop additions | 41,721 B | 84,212 B | 95,282 B |
 
-The reference wallet uses the 46,302-byte v0.2.0 template for new outputs and can spend existing v0.1.0 outputs. Both use the owner field at offsets 208 through 227 and support all twelve ForkID and Chronicle OTDA sighash combinations. The wallet identifies the template from the fixed bytes of the actual prevout. [v0.2.0 template](template/v0.2.0/template.hex) · [Binary layout](template/v0.2.0/layout.json) · [v0.1.0 template](template/template.hex)
+The main sequence selects templates by lock and BIP143 payment size. The window iteration also selected `joint-2` for OTDA, where it still gives a 91,692 B two-input, two-output payment. [Window replay results](versions/v0.6.0/comparison.json)
 
-Ordinary payments use ForkID ALL (`0x41`) and a 326-byte unlock. The v0.2.0 two-input, two-output fixture is 93,374 bytes, compared with 119,934 bytes for v0.1.0. OTDA is available after Chronicle activation. On version 2 transactions, the reference wallet can reconstruct recognized outputs for OTDA ALL and same-index outputs for paired SINGLE. An unpaired SINGLE uses the companion path.
+In v0.4.0, the Forth names values in the formula. After computing `xx = x1*x2` and `yy = y1*y2`, the source expresses a cross term that can be expanded algebraically:
 
-## Forth experiment
+```diff
+- x1 y1 int+ x2 y2 int+ int* xx int- yy int- let xy
++ x1 y2 int* x2 y1 int* int+ let xy
+```
 
-The Forth source `r1.fth` reproduces the full v0.2.0 lock byte for byte. The v0.3.0 build saves two bytes at each of 263 internal point doublings, or 526 bytes in the full lock. The lock checks untrusted witness fields before curve arithmetic. On the same regtest node, the v0.2.0 baseline, v0.3.0 build, and 66,265 B matched sCrypt kernel build each completed payments using ForkID ALL, OTDA ALL, and paired OTDA SINGLE. [Forth source and replay](experiments/forth/README.md)
+Expanding all three cross terms reduces unoptimized point addition from 392 B to 345 B. Once the compiler learned that identity, the original formula compiled to 123 B with rewriting and stack scheduling enabled. The full lock from the original source measures 117,775 B with optimization off and 42,536 B with it on. The next round used the high-level double-scalar multiplication to let the compiler choose windows and specialize fixed-table additions. [Forth formulas](forth/r1.fth) · [Historical benchmarks](forth/history.md)
+
+</details>
 
 ## Wallet integration
 
-Use the unified SDK in TypeScript, Rust, Go, or Python for receiving and ordinary ForkID ALL payments. For prepared or mixed transactions, call `signInput` with the sighash for the selected input and supply the chain context for Chronicle OTDA. Authenticate each outpoint, amount and script, then approve the outputs and total fee before calling the signer. [SDK guide](docs/sdk.en.md) · [Python reference wallet](reference/README.md)
+The reference wallet uses **v0.2.0** for new outputs and can spend existing v0.1.0 outputs. Use the unified SDK in TypeScript, Rust, Go, or Python. For an existing P-256 signer, confirm its digest interface and signature encoding, and persist nonce-reuse history across signing processes. [SDK guide](docs/sdk.en.md) · [Reference wallet](reference/README.md) · [Wallet template](versions/v0.2.0/layout.json)
 
-```sh
-cd projects/p2pkh-r1/reference
-python -m pip install -r requirements.txt
-python generate_lock.py --owner-hash160 "${R1_OWNER_HASH160:?Set the recipient HASH160}"
-bash verify.sh
-```
-
-See the [protocol specification](docs/spec.en.md), [acceptance matrix](reference/acceptance.md), and [payment vector](template/v0.2.0/spend-all.json). Fixture keys are public test data. Independent review and physical-device validation remain open.
-
-## Complete transactions and stack measurements
-
-The v0.1.0 and v0.2.0 figures use deterministic fixtures at `beeb4dd`. The Forth v0.3.0 rows come from funded regtest transactions that BSV Node 1.2.3 mined and chain-gang `74676b9` independently verified. Sizes are in bytes. Script sizes follow input and output order, and `× n` indicates n equal sizes. The development evaluator measures peak main-stack items, altstack items, and combined payload for input zero.
-
-| Template and mode | Inputs×outputs | Previous locks | Unlocks | New locks | Total | Main / alt items | Stack payload |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| `v0.1.0` · `0x41` | 2×2 | 59,582 × 2 | 326 × 2 | 59,582 × 2 | 119,934 | 122 / 133 | 4,146 |
-| `v0.1.0` · `0x61` | 2×2 | 59,582 × 2 | 119,454 × 2 | 59,582 × 2 | 358,194 | 122 / 133 | 238,734 |
-| `compiled-literal` · `0x41` | 2×2 | 47,510 × 2 | 326 × 2 | 47,510 × 2 | 95,790 | 111 / 131 | 3,471 |
-| `compiled-literal` · `0x61` | 2×2 | 47,510 × 2 | 95,310 × 2 | 47,510 × 2 | 285,762 | 111 / 131 | 190,446 |
-| `compiled-reconstructed` · `0x41` | 2×2 | 47,510 × 2 | 326 × 2 | 47,510 × 2 | 95,790 | 111 / 131 | 3,473 |
-| `compiled-reconstructed` · `0x61` | 2×2 | 47,510 × 2 | 6,176 × 2 | 47,510 × 2 | 107,490 | 111 / 131 | 190,446 |
-| `compiled-shared-kernels` · `0x41` | 2×2 | 47,510 × 2 | 326 × 2 | 47,510 × 2 | 95,790 | 111 / 131 | 3,479 |
-| `compiled-shared-kernels` · `0x61` | 2×2 | 47,510 × 2 | 4,272 × 2 | 47,510 × 2 | 103,682 | 111 / 131 | 190,446 |
-| `v0.2.0` · `0x41` | 2×2 | 46,302 × 2 | 326 × 2 | 46,302 × 2 | 93,374 | 113 / 131 | 3,479 |
-| `v0.2.0` · `0x61` | 2×2 | 46,302 × 2 | 4,264 × 2 | 46,302 × 2 | 101,250 | 113 / 131 | 185,613 |
-| `compiled + v0.2.0` · `0x61` · before | 2×2 | 46,302 / 47,510 | 50,549 × 2 | 46,302 / 47,510 | 195,028 | 113 / 131 | 188,029 |
-| `compiled + v0.2.0` · `0x61` · after | 2×2 | 46,302 / 47,510 | 8,186 × 2 | 46,302 / 47,510 | 110,302 | 113 / 131 | 188,030 |
-| `compiled + v0.2.0` · `0xe1` · before | 2×2 | 46,302 / 47,510 | 50,507 × 2 | 46,302 / 47,510 | 194,944 | 113 / 131 | 187,947 |
-| `compiled + v0.2.0` · `0xe1` · after | 2×2 | 46,302 / 47,510 | 8,144 × 2 | 46,302 / 47,510 | 110,218 | 113 / 131 | 187,947 |
-| `v0.2.0` · `0x63` · after | 2×2 | 46,302 × 2 | 4,224 / 4,233 | 46,302 × 2 | 101,179 | 113 / 131 | 92,987 |
-| `v0.2.0` · `0xe3` · after | 2×2 | 46,302 × 2 | 4,182 / 4,191 | 46,302 × 2 | 101,095 | 113 / 131 | 92,905 |
-| Forth v0.3.0 · `0x41` | 2×2 | 45,776 × 2 | 326 × 2 | 45,776 × 2 | 92,322 | 113 / 131 | 3,478 |
-| Forth v0.3.0 · `0x61` | 2×2 | 45,776 × 2 | 4,261 × 2 | 45,776 × 2 | 100,192 | 113 / 131 | 183,510 |
-| Forth v0.3.0 · `0x63` | 2×2 | 45,776 × 2 | 4,221 / 4,230 | 45,776 × 2 | 100,121 | 113 / 131 | 91,935 |
-
-## Marginal and lifecycle costs
-
-Each marginal cell shows the **change in total bytes (output locks / input unlocks / other bytes)**. Other bytes include values, outpoints, sequence numbers, and CompactSize fields. Previous locks identify the coins being spent and belong to their funding transactions. Both lifecycle totals include native P2PKH funding and exit. The second adds one payment between project outputs.
-
-| Template and mode | Added-input shape | Added-input bytes | Added-output shape | Added-output bytes | Fund and exit | One turnover |
-| --- | --- | --- | --- | --- | --- | --- |
-| `v0.1.0` · `0x41` | 3×2 | 369 (0 / 326 / 43) | 2×3 | 59,593 (59,582 / 0 / 11) | 120,160 | 240,093 |
-| `v0.1.0` · `0x61` | 3×2 | 119,622 (0 / 119,577 / 45) | 2×3 | 178,779 (59,582 / 119,186 / 11) | 120,173 | 478,367 |
-| `compiled-literal` · `0x41` | 3×2 | 369 (0 / 326 / 43) | 2×3 | 47,521 (47,510 / 0 / 11) | 96,015 | 191,806 |
-| `compiled-literal` · `0x61` | 3×2 | 95,478 (0 / 95,433 / 45) | 2×3 | 142,563 (47,510 / 95,042 / 11) | 96,029 | 381,791 |
-| `compiled-reconstructed` · `0x41` | 3×2 | 369 (0 / 326 / 43) | 2×3 | 47,521 (47,510 / 0 / 11) | 96,016 | 191,806 |
-| `compiled-reconstructed` · `0x61` | 3×2 | 6,342 (0 / 6,299 / 43) | 2×3 | 47,601 (47,510 / 80 / 11) | 96,030 | 203,520 |
-| `compiled-shared-kernels` · `0x41` | 3×2 | 369 (0 / 326 / 43) | 2×3 | 47,521 (47,510 / 0 / 11) | 96,016 | 191,806 |
-| `compiled-shared-kernels` · `0x61` | 3×2 | 4,438 (0 / 4,395 / 43) | 2×3 | 47,601 (47,510 / 80 / 11) | 96,030 | 199,712 |
-| `v0.2.0` · `0x41` | 3×2 | 369 (0 / 326 / 43) | 2×3 | 46,313 (46,302 / 0 / 11) | 93,600 | 186,973 |
-| `v0.2.0` · `0x61` | 3×2 | 4,430 (0 / 4,387 / 43) | 2×3 | 46,393 (46,302 / 80 / 11) | 93,614 | 194,864 |
-| `compiled + v0.2.0` · `0x61` · before | 3×2 | 50,715 (0 / 50,672 / 43) | 2×3 | 48,793 (46,302 / 2,480 / 11) | 94,822 | 289,850 |
-| `compiled + v0.2.0` · `0x61` · after | 3×2 | 8,352 (0 / 8,309 / 43) | 2×3 | 46,393 (46,302 / 80 / 11) | 94,821 | 205,124 |
-| `compiled + v0.2.0` · `0xe1` · before | 3×2 | 50,550 (0 / 50,507 / 43) | 2×3 | 48,793 (46,302 / 2,480 / 11) | 94,740 | 289,683 |
-| `compiled + v0.2.0` · `0xe1` · after | 3×2 | 8,187 (0 / 8,144 / 43) | 2×3 | 46,393 (46,302 / 80 / 11) | 94,740 | 204,958 |
-| `v0.2.0` · `0x63` · after | 3×2 | 455 (0 / 412 / 43) | 2×3 | 46,313 (46,302 / 0 / 11) | 93,555 | 194,733 |
-| `v0.2.0` · `0xe3` · after | 3×2 | 373 (0 / 330 / 43) | 2×3 | 46,313 (46,302 / 0 / 11) | 93,472 | 194,567 |
-
-[Unified benchmark and reproduction](../../shared/benchmark.md) · [Matched sCrypt comparison](docs/scrypt-matched.en.md)
+R1 creates the full lock at funding so the recipient can pay in one spend. Deferred R1 uses a smaller deposit lock and a separate activation transaction. [Deferred workflow](../p2pkh-r1-deferred/README.md)

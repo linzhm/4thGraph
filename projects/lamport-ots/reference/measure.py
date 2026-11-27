@@ -8,11 +8,13 @@ from statistics import median
 from time import perf_counter_ns
 from lamport import generate_keypair, public_key, sign_digest, verify_digest
 from fixtures import fixture, mode_fixture, test_secret
-from script import committed_locking_script, locking_script, binding
+from script import (
+    binding, committed_locking_script, compact_forth_committed_locking_script, forth_committed_locking_script, locking_script,
+)
 from payment import authorization, sign_spend
 from engines import chain_valid, development_valid
-from shared.script import push
-from shared.transaction import Input, Output, SIGHASH_TYPES, Transaction, hash256
+from fourthgraph.bsv.script import push
+from fourthgraph.bsv.transaction import Input, Output, SIGHASH_TYPES, Transaction, hash256
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -93,8 +95,8 @@ def universal_sizes():
     return {
         'locking_script_bytes_including_key': len(lock),
         'locking_non_key_bytes_including_push_headers': len(lock)-16384,
-        'forkid_ordinary_unlocking_script_bytes': unlock_bytes,
-        'forkid_ordinary_total_lock_and_unlock_bytes': len(lock)+unlock_bytes,
+        'bip143_ordinary_unlocking_script_bytes': unlock_bytes,
+        'bip143_ordinary_total_lock_and_unlock_bytes': len(lock)+unlock_bytes,
         'unpaired_otda_single_unlocking_script_bytes': len(mode_fixture(0x63,paired=False)[2].inputs[1].script),
         'locking_instructions_including_pushes_and_both_branches': len(ops),
         'sha256_opcodes': sum(op==0xa8 and data is None for op,data in ops),
@@ -124,10 +126,11 @@ def _batch(lock_factory, flag, input_count, output_count):
 
 
 def committed_costs(iterations=30):
-    """Measure serialized payments and local chain-gang time with two Lamport formats."""
+    """Measure serialized payments and local chain-gang time across Lamport formats."""
     report = {}
     sample_key = public_key(test_secret(b'lock-size'))
-    for lock_factory in (locking_script, committed_locking_script):
+    for lock_factory in (locking_script, committed_locking_script, forth_committed_locking_script,
+                         compact_forth_committed_locking_script):
         modes = {}
         for flag in (0x41, 0x61):
             sizes = {}
@@ -167,7 +170,7 @@ def stack_profile():
     # Observe the development interpreter's actual stack for the public vector.
     # This is payload accounting, not the node's allocator/resource accounting.
     import sys
-    from shared.evaluate import evaluate
+    from fourthgraph.bsv.evaluate import evaluate
     from engines import native_checker
     _,_,lock,_,tx,pre,sig = fixture()
     peaks = dict(main_items=0, alt_items=0, combined_items=0, combined_payload_bytes=0)
@@ -224,8 +227,8 @@ if __name__ == '__main__':
     parser.add_argument('--committed-costs', action='store_true')
     args=parser.parse_args()
     if args.write_vector:
-        (ROOT/'template/vector.json').write_text(json.dumps(vector(),indent=2)+'\n')
-        (ROOT/'template/universal-vectors.json').write_text(json.dumps(universal_vector(),indent=2)+'\n')
+        (ROOT/'versions/v0.1.0/vector.json').write_text(json.dumps(vector(),indent=2)+'\n')
+        (ROOT/'versions/v0.1.0/universal-vectors.json').write_text(json.dumps(universal_vector(),indent=2)+'\n')
     if args.committed_costs:
         report = committed_costs()
     else:

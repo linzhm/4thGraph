@@ -6,7 +6,7 @@ import json
 from script import _chain, _payment_script
 from fixed_template import TEMPLATE_DIRECTORY
 from payment import COMPRESSIBLE_OTDA_TYPES
-from shared.script import asm, push
+from fourthgraph.bsv.script import asm, push
 from wots import CHAINS, N
 
 

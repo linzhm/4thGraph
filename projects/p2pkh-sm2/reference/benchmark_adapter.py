@@ -1,13 +1,14 @@
-"""Benchmark fixtures for the publicly released SM2 payment template."""
+"""Benchmark fixtures for the canonical SM2 payment templates."""
 from functools import partial
 
+from assemble import SCHEDULED_TEMPLATE_VERSION, TEMPLATE_VERSION
 from p2pkh_sm2 import locking_script_from_public_key, sign_input
 from sm2 import N, encode_public, fixture_sign, mul
-from shared.benchmark_cases import Coin, Template, seed
-from shared.transaction import Output
+from fourthgraph.benchmark.cases import Coin, Template, seed
+from fourthgraph.bsv.transaction import Output
 
 
-def sm2_coin(label, value, *, compress_otda=None):
+def sm2_coin(label, value, *, compress_otda=None, version=TEMPLATE_VERSION):
     scalar = 1 + int.from_bytes(seed(label), "big") % (N - 2)
     key = encode_public(mul(scalar))
 
@@ -18,12 +19,13 @@ def sm2_coin(label, value, *, compress_otda=None):
     def unlock(tx, index, parent, flag, _scratch):
         return sign_input(tx, index, parent.serialize(), key, sign, flag, compress_otda=compress_otda)
 
-    return Coin(Output(value, locking_script_from_public_key(key)), unlock)
+    return Coin(Output(value, locking_script_from_public_key(key, version=version)), unlock)
 
 
 TEMPLATES = {
     "v1.0.0": Template(partial(sm2_coin, compress_otda=False)),
     "v1.1.0": Template(sm2_coin),
+    "v1.2.0": Template(partial(sm2_coin, version=SCHEDULED_TEMPLATE_VERSION)),
 }
 
 
@@ -31,8 +33,8 @@ def components(samples):
     from pathlib import Path
 
     from assemble import sm3_blocks
-    from shared.benchmark_validation import timed
-    from shared.script import assemble
+    from fourthgraph.benchmark.validation import timed
+    from fourthgraph.bsv.script import assemble
     from signed_data import signed_data_signer
     from sm2 import USER_ID, verify
     from test_signed_data import ISSUER_AND_SERIAL, signed_data, der_signature

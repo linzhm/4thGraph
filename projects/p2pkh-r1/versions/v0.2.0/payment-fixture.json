@@ -1,0 +1,12 @@
+{
+  "transaction_version": 2,
+  "test_owner_scalars": [7, 19],
+  "test_recipient_scalars": [23, 29],
+  "funding_satoshis_per_output": 450000,
+  "payment_satoshis_per_output": 365000,
+  "sighash": {
+    "bip143-all": "41",
+    "otda-all": "61",
+    "otda-single": "63"
+  }
+}

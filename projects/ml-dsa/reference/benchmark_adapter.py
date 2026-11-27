@@ -4,8 +4,8 @@ import os
 from mldsa import test_only_vector
 from payment import sign_spend
 from script import locking_script
-from shared.benchmark_cases import Coin, Template, seed
-from shared.transaction import Output
+from fourthgraph.benchmark.cases import Coin, Template, seed
+from fourthgraph.bsv.transaction import Output
 
 
 def coin(label, value):

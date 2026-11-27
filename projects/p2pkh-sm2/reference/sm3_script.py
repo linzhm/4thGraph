@@ -1,6 +1,6 @@
 """Unroll fixed-length SM3 into ordinary BSV Script opcodes (no new opcode)."""
 from functools import cache
-from shared.script import asm, number, push
+from fourthgraph.bsv.script import asm, number, push
 
 MASK=0xffffffff
 IV=(0x7380166f,0x4914b2b9,0x172442d7,0xda8a0600,0xa96f30bc,0x163138aa,0xe38dee4d,0xb0fb0e4e)
@@ -49,14 +49,16 @@ REVERSE4=asm(' '.join(['OP_1 OP_SPLIT OP_SWAP OP_TOALTSTACK']*3+['OP_FROMALTSTAC
 # to push as literals than to copy from a cached stack slot.
 ROTATION_CONSTANTS = tuple(1 << exponent for exponent in (15, 17, 19, 20, 23, 25, 32))
 SHALLOW_DROPS = ('OP_DROP', 'OP_NIP', 'OP_ROT OP_DROP')
+SHALLOW_ROLLS = ('', 'OP_SWAP', 'OP_ROT')
 
 
 class Builder:
-    def __init__(self, optimized, compact):
+    def __init__(self, optimized, compact, scheduled):
         self.code=bytearray()
         self.stack=['data']
         self.optimized=optimized
         self.compact = compact
+        self.scheduled = scheduled
         self.constants = {value: f'constant_{value}' for value in ROTATION_CONSTANTS} if compact else {}
 
     def cache_constants(self):
@@ -79,6 +81,14 @@ class Builder:
                 self.raw(('OP_DUP', 'OP_OVER')[depth])
             else:
                 self.code.extend(number(depth) + asm('OP_PICK'))
+        elif e[0] == 'TAKE':
+            index = self.stack.index(e[1])
+            depth = len(self.stack) - 1 - index
+            if depth < len(SHALLOW_ROLLS):
+                self.raw(SHALLOW_ROLLS[depth])
+            else:
+                self.code.extend(number(depth) + asm('OP_ROLL'))
+            self.stack.pop(index)
         elif e[0]=='ROT':
             _, word, count = e
             self.expr(word)
@@ -111,6 +121,27 @@ class Builder:
             self.stack.pop(); return
         if binary: self.raw('5 OP_NUM2BIN')
         self.stack.append(None)
+    def last(self, name):
+        return ('TAKE', name) if self.scheduled else name
+
+    def advance_round(self):
+        if not self.scheduled:
+            for name, expression in (
+                ('d', 'c'), ('c', rot('b', 9)), ('b', 'a'), ('a', 'tt1'),
+                ('h', 'g'), ('g', rot('f', 19)), ('f', 'e'), ('e', perm('tt2', 9, 17)),
+            ):
+                self.assign(name, expression)
+            return
+
+        self.assign('next_c', rot(self.last('b'), 9))
+        self.assign('next_g', rot(self.last('f'), 19))
+        self.assign('next_e', xor(xor('tt2', rot('tt2', 9)), rot(self.last('tt2'), 17)))
+        # The other five words already occupy unique slots. Update their
+        # compile-time names without moving or copying the runtime values.
+        names = {'tt1': 'a', 'a': 'b', 'next_c': 'c', 'c': 'd',
+                 'next_e': 'e', 'e': 'f', 'next_g': 'g', 'g': 'h'}
+        self.stack = [names.get(name, name) for name in self.stack]
+
     def assign(self,name,e):
         self.expr(e)
         if name in self.stack: self.drop(name)
@@ -129,22 +160,25 @@ class Builder:
 
 
 @cache
-def hash_script(length, state=IV, processed=0, *, optimized=False, compact=False):
+def hash_script(length, state=IV, processed=0, *, optimized=False, compact=False, scheduled=False):
     """Top item is exactly length bytes. Replace it with SM3, preserving lower stack.
 
     state is a known fixed-prefix midstate; processed must be whole blocks.
     The default uses the baseline SM3 generator. optimized uses a static
     schedule for padding-only blocks. compact also enables constant, stack,
-    and Boolean optimizations.
+    and Boolean optimizations. scheduled also consumes last uses and
+    renames surviving state slots across rounds.
     """
-    return compile_hash(length, state, processed, optimized=optimized, compact=compact)
+    return compile_hash(length, state, processed, optimized=optimized, compact=compact, scheduled=scheduled)
 
 
-def compile_hash(length, state=IV, processed=0, *, optimized=False, compact=False, fragments=None):
+def compile_hash(length, state=IV, processed=0, *, optimized=False, compact=False, scheduled=False,
+                 fragments=None):
     """Emit SM3 Script and optionally collect named instruction ranges for construction."""
     if processed%64: raise ValueError('midstate must start on a block boundary')
+    compact = compact or scheduled
     optimized = optimized or compact
-    b=Builder(optimized, compact)
+    b=Builder(optimized, compact, scheduled)
     b.code.extend(asm('OP_SIZE')+number(length)+asm('OP_NUMEQUALVERIFY'))
     total=processed+length
     padding=b'\x80'+bytes((55-total)%64)+(total*8).to_bytes(8,'big')
@@ -167,8 +201,10 @@ def compile_hash(length, state=IV, processed=0, *, optimized=False, compact=Fals
                 if optimized:
                     b.assign('expansion_mix',x)
                     x='expansion_mix'
-                b.assign(words[j],xor(xor(perm(x,15,23),rot(words[j-13],7)),words[j-6]))
-                if optimized: b.drop('expansion_mix')
+                expanded = (xor(xor(x, rot(x, 15)), rot(b.last(x), 23))
+                            if scheduled else perm(x, 15, 23))
+                b.assign(words[j],xor(xor(expanded,rot(words[j-13],7)),words[j-6]))
+                if optimized and not scheduled: b.drop('expansion_mix')
                 if fragments is not None:
                     fragments.setdefault('message_expansion', []).append(bytes(b.code[start:]))
         for i,c in enumerate('abcdefgh'): b.assign(c,'h'+str(i))
@@ -179,8 +215,8 @@ def compile_hash(length, state=IV, processed=0, *, optimized=False, compact=Fals
                 b.assign('a_rot12',a_rot12)
                 a_rot12='a_rot12'
             b.assign('ss1',rot(plus(a_rot12,'e',rol(0x79cc4519 if j<16 else 0x7a879d8a,j)),7))
-            b.assign('ss2',xor('ss1',a_rot12))
-            if optimized: b.drop('a_rot12')
+            b.assign('ss2',xor('ss1',b.last(a_rot12)))
+            if optimized and not scheduled: b.drop('a_rot12')
             if j < 16:
                 ff = xor(xor('a', 'b'), 'c')
                 gg = xor(xor('e', 'f'), 'g')
@@ -191,24 +227,30 @@ def compile_hash(length, state=IV, processed=0, *, optimized=False, compact=Fals
                 ff = bor(bor(band('a', 'b'), band('a', 'c')), band('b', 'c'))
                 gg = bor(band('e', 'f'), band(xor('e', MASK), 'g'))
             cross_word=words[j]^words[j+4] if static_padding else xor(words[j],words[j+4])
-            b.assign('tt1',plus(ff,'d','ss2',cross_word))
-            b.assign('tt2',plus(gg,'h','ss1',words[j]))
-            for name,expr in [('d','c'),('c',rot('b',9)),('b','a'),('a','tt1'),('h','g'),('g',rot('f',19)),('f','e'),('e',perm('tt2',9,17))]: b.assign(name,expr)
+            b.assign('tt1',plus(ff,b.last('d'),b.last('ss2'),cross_word))
+            b.assign('tt2',plus(gg,b.last('h'),b.last('ss1'),words[j]))
+            b.advance_round()
             if fragments is not None:
                 kind = 'padding' if static_padding else 'data'
                 phase = 'early' if j < 16 else 'late'
                 fragments.setdefault(f'{kind}_round_{phase}', []).append(bytes(b.code[start:]))
-        for i,c in enumerate('abcdefgh'): b.assign('h'+str(i),xor('h'+str(i),c))
-        for name in [*(() if static_padding else words),*'abcdefgh','ss1','ss2','tt1','tt2']: b.drop(name)
+        for i,c in enumerate('abcdefgh'):
+            name = 'h' + str(i)
+            b.assign(name, xor(b.last(name), b.last(c)))
+        if not static_padding:
+            for name in words: b.drop(name)
+        if not scheduled:
+            for name in (*'abcdefgh','ss1','ss2','tt1','tt2'): b.drop(name)
     b.drop('data')
     for name in b.constants.values():
         b.drop(name)
     for i in range(8):
-        b.expr('h'+str(i))
+        b.expr(b.last('h'+str(i)))
         b.code.extend(asm('5 OP_NUM2BIN 4 OP_SPLIT OP_DROP')+REVERSE4)
         b.stack[-1]='out'+str(i)
     for _ in range(7): b.raw('OP_CAT'); b.stack.pop()
     b.stack[-1]='digest'
-    for i in range(8): b.drop('h'+str(i))
+    if not scheduled:
+        for i in range(8): b.drop('h'+str(i))
     assert b.stack==['digest']
     return bytes(b.code)

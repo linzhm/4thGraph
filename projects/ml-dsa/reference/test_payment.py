@@ -13,8 +13,8 @@ from fips204 import SIGNATURE_BYTES
 from mldsa import test_only_vector as make_test_vector
 from payment import authorization, sign_spend
 from script import locking_script
-from shared.chain_gang import validate_at_heights
-from shared.transaction import SIGHASH_TYPES, Input, Output, Transaction
+from fourthgraph.bsv.chain_gang import validate_at_heights
+from fourthgraph.bsv.transaction import SIGHASH_TYPES, Input, Output, Transaction
 
 
 TEST_SEED = bytes(range(32))

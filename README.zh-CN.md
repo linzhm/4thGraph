@@ -1,138 +1,115 @@
 # 4thGraph
 
-**4thGraph（4thG）把 Forth 编译成 BSV Script，也能编排多笔交易。** 仓库包含可运行的合约示例、钱包模板和 SDK。
+[English](README.md) · **简体中文**
 
-**[立即试用 4thG](#4thg-quickstart)** · [项目改造与对照](#4thg-comparisons) · [钱包 SDK 快速上手](shared/sdk/README.zh-CN.md#quickstart) · [钱包项目](#project-index) · [交易成本](#transaction-costs) · [English](README.md)
+> **用 Forth 写比特币合约，让应用状态随交易延续。**
+
+4thGraph 是面向 BSV 的合约描述语言（SDL）和工具链。你可以在同一个项目里定义花费条件、管理 UTXO 状态、构建相互依赖的交易，并为适合在链下完成的计算生成零知识证明，在链上验证结果。
+
+**[用 Agent 开始](#start-with-agent)** · [可运行项目](#project-index) · [钱包 SDK](sdk/README.zh-CN.md) · [文档](docs/README.zh-CN.md) · [实测结果](#results)
+
+---
+
+<a name="why-4thgraph"></a>
+
+## 为什么从整条交易链开始？
+
+脚本构建工具通常关注一笔花费，检查解锁数据能否满足这把锁。开发代币钱包还得追踪一连串花费。Alice 付给 Bob 的 275 枚代币，怎样才能成为 Bob 下一笔付款的有效输入，同时保证两次转账都没有凭空增加代币？
+
+### 两笔相连的 Token 付款
+
+沿**实线**追踪代币从哪个输出（`vout`）产生，又被哪个输入（`vin`）花费。**虚线**标出 Groth16 证明和持有人签名进入验证器输入的位置。
+
+```mermaid
+flowchart LR
+    accTitle: 代币输出及实际花费它们的输入
+    accDescr: Alice 付给 Bob 275，Bob 的下一笔付款用输入 2 花费这个输出。每笔结算的输入 1 用 Groth16 证明和持有人签名解锁验证器。
+    companion["伴随锁 · vout[0]"] -->|"vin[0]"| tx1(["TX₁<br/>Alice → Bob"])
+    verifier["验证器锁 · vout[0]"] -->|"vin[1]"| tx1
+    proof1(["π₁ · Groth16<br/>+ 持有人签名"]) -.->|"vin[1]"| tx1
+    mintA["铸造 A · vout[1]<br/>代币锁 · Alice 300"] -->|"vin[2]"| tx1
+    mintB["铸造 B · vout[1]<br/>代币锁 · Alice 200"] -->|"vin[3]"| tx1
+    tx1 --> bob["vout[0] · 代币锁<br/>Bob 275"]
+    tx1 --> alice["vout[1] · 代币锁<br/>Alice 225"]
+    bob -->|"vin[2]"| tx2(["TX₂<br/>Bob → Carol"])
+    mintC["铸造 C · vout[1]<br/>代币锁 · Bob 150"] -->|"vin[3]"| tx2
+    proof2(["π₂ · Groth16<br/>+ 持有人签名"]) -.->|"vin[1]"| tx2
+    tx2 --> carol["vout[0] · 代币锁<br/>Carol 350"]
+    tx2 --> change["vout[1] · 代币锁<br/>Bob 75"]
+    classDef lock fill:#ddf4e9,stroke:#34735d,color:#153b30
+    classDef tx fill:#ffdfb5,stroke:#946835,color:#3c2d22
+    classDef proof fill:#eee8fb,stroke:#8263a8,color:#402a61
+    class companion,verifier,mintA,mintB,mintC,bob,alice,carol,change lock
+    class tx1,tx2 tx
+    class proof1,proof2 proof
+```
+
+> **跟着 Bob 的 275 枚代币。** 第一笔把 300 和 200 分成 Bob 的 275 和 Alice 的找零 225。第二笔通过 `TX₂.vin[2]` 花费 `TX₁.vout[0]`，把这 275 和另一枚 150 分成 Carol 的 350 和 Bob 的找零 75。
+
+两笔付款各用一对新的伴随输出和验证器输出，图中在第一笔展开这对锁。代币锁要求本次花费同时消费规定的伴随输出。伴随锁核对实际花费的验证器，验证器用 `vin[1]` 提供的证明和签名检查这笔转账，把数量守恒和授权绑定到实际输入、输出。
+
+---
+
+<a name="start-with-agent"></a><a name="start-with-ai"></a><a name="pels-counter"></a>
+
+## 用 Agent 开始
+
+在 Codex 等能读写文件、运行命令的编程 Agent 中打开这个仓库，把下面的话发给它。
+
+```text
+读 skills/4thgraph/SKILL.md，用 PELS Counter 写一个从 0 开始的计数器。
+每笔花费只能加一，唯一的后继输出必须保留同一条规则。
+用项目工作区保存源码，编译完整锁，给我一条可复跑的命令。
+如果能运行 regtest，演示 0 → 1 → 2，再试一次从 0 直接跳到 2。
+```
+
+> [!TIP]
+> **验收结果**
+>
+> 检查 Agent 生成的 Forth 规则和完整锁。运行 regtest 后，两笔加一交易应当入块。BSV Node 和 chain-gang 都应拒绝从 0 直接跳到 2 的花费。[计数器源码与复放](projects/pels-counter/README.zh-CN.md)
 
 <a name="4thg-quickstart"></a>
 
-## 立即试用 4thG
+[手工配置 CLI 与 Agent skill](docs/install.md)
 
-**[PELS Counter](#pels-counter)** · [P2PKH](#p2pkh-example) · [P2PK](#p2pk-example) · [安装 CLI](projects/4thgraph/INSTALL.md)
+<a name="capabilities"></a><a name="project-index"></a><a name="p2pkh-example"></a><a name="p2pk-example"></a>
 
-<a name="pels-counter"></a>
+## 按开发目标选择项目
 
-### PELS Counter
-
-从 `0` 开始。每次花费把计数加一，并把同一套规则写入后继输出。
-
-**1. 获取源码。** 需要 Git 和 Python 3.11 或更新版本。
-
-```sh
-git clone https://github.com/linzhm/4thGraph.git
-cd 4thGraph
-export PYTHONPATH=.:projects/4thgraph
-counter=projects/4thgraph/examples/pels_counter.py
-```
-
-**2. 编译锁脚本。** 4thG 编译下面的 Forth 状态转换。示例再把这段规则绑定到实际交易的后继输出。[Forth 源码](projects/4thgraph/examples/pels-counter.fth)
-
-```forth
-bsv-effect: advance u32 -- u32 ;
-: advance 1 cell>u32 u32+ ;
-```
-
-```sh
-python3 "$counter" build
-```
-
-输出的 `script_hex` 是完整锁脚本。构建只用 Python 标准库。
-
-**3. 花费并验证。** 在装有 `curl`、Rust/Cargo 和 C 编译工具链的 Linux x86-64 上，安装复放依赖并运行。
-
-```sh
-python3 -m venv .venv
-. .venv/bin/activate
-python -m pip install ecdsa -r shared/requirements-chronicle.txt
-
-bash shared/verify_node.sh --profile default -- python "$counter" replay \
-  --output projects/4thgraph/build/pels-counter.json
-```
-
-复放先为 `0` 创建测试输出，再把 `0 → 1 → 2` 的两笔花费挖入区块。每次花费扣 **1,000 sat**。JSON 报告记录双引擎判定和入块结果。要单独构造花费，运行 `spend --parent` 并传入父交易原始字节。[花费与验证说明](projects/4thgraph/examples/README.md#spend-and-verify-on-regtest)
-
-<a name="p2pkh-example"></a>
-
-<details>
-<summary>P2PKH · 25 字节锁</summary>
-
-```sh
-python3 projects/4thgraph/examples/payments.py --hash160 751e76e8199196d454941c45d1b3a323f1433bd6
-```
-
-锁中写入公钥哈希。花费时压入签名和公钥。[Forth 源码](projects/4thgraph/examples/payments.fth) · [签名交易示例](projects/p2pk-p2pkh-baseline/README.zh-CN.md)
-
-</details>
-
-<a name="p2pk-example"></a>
-
-<details>
-<summary>P2PK · 35 字节锁</summary>
-
-```sh
-python3 projects/4thgraph/examples/payments.py --public-key 0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798
-```
-
-锁中写入压缩公钥。花费时压入签名。[Forth 源码](projects/4thgraph/examples/payments.fth) · [签名交易示例](projects/p2pk-p2pkh-baseline/README.zh-CN.md)
-
-</details>
-
-4thG 还支持栈优化、交易边界候选搜索和编译决策报告，可将受支持的 Forth 词编译为 Circom。[工具链手册](projects/4thgraph) · [Forth 语言规范](projects/4thgraph/language.md)
-
-<a name="4thg-comparisons"></a>
-
-## 4thG 项目改造与对照
-
-| 项目 | 对照结果 |
+| 我想做什么 | 可以从这里开始 |
 | --- | --- |
-| P2PKH-R1 Forth v0.3.0 探索版 | Forth 基线逐字节复现 v0.2.0 锁。优化后完整锁由 46,302 B 降到 **45,776 B**，两进两出 ForkID ALL 付款由 93,374 B 降到 **92,322 B**。复放还覆盖 OTDA，以及用 sCrypt 编译曲线内核的版本。[改造与复放](projects/p2pkh-r1/experiments/forth) |
-| BLS12-381 Groth16 验证器（开发中） | 用 Forth 编排链下证明的链上验证，支持全固定、混合以及花费时提供全部公开输入。与 nChain 的对照采用相同的公开输入域和配对预计算数据放置方式。 |
-| CCTP 交易布局（开发中） | 在单笔融合、同交易双输入和两笔串行布局中复放同一个 Groth16 验证任务，比较整条路径字节与最慢单笔花费的验证时间。 |
+| 构建付款、接入签名器 | 用原生 P2PK 或 P2PKH 生成锁和签名交易，再从 TypeScript、Rust、Go 或 Python 调用同一套钱包接口。[付款脚本](projects/p2pk-p2pkh-baseline/forth/README.md) · [钱包 SDK](sdk/README.zh-CN.md#quickstart) |
+| 让状态跨交易延续 | 修改计数器的状态转换，观察错误的计数、金额或后继脚本怎样使花费失败。[PELS Counter](projects/pels-counter/README.zh-CN.md) |
+| 让参与者分别提交、最后结算 | 在同一份 Forth 里声明分支和汇合，比较一次提交与分笔提交所需的交易、签名和字节数。[工作流示例](projects/workflow-examples/README.zh-CN.md) |
+| 为计算生成零知识证明 | 从同一份受支持的状态关系生成 Script 或 Circom，使用匹配的设置文件和见证生成 Groth16 证明，再验证它与实际花费的绑定。[证明计数器](projects/proof-counter/README.zh-CN.md) · [Groth16 验证器](docs/groth16-bls12-381.md) |
 
-<a name="project-index"></a>
+[浏览全部项目](projects/README.zh-CN.md)
 
-## 钱包项目
+<a name="results"></a><a name="4thg-comparisons"></a><a name="transaction-costs"></a>
 
-钱包项目提供可识别的锁定模板、统一的外部签名 SDK 和可复放的完整签名交易。项目覆盖普通付款、P‑256 与 SM2 签名器接入、延迟启用，以及一次性签名和后量子签名的实验验证。
+## 从实测看构建结果
 
-| 项目 | 适用场景 | 接入时的取舍 | 版本 | 钱包 SDK |
-| --- | --- | --- | --- | --- |
-| [原生 P2PK 与 P2PKH](projects/p2pk-p2pkh-baseline/README.zh-CN.md) | 钱包首次接入、普通 secp256k1 付款、交易成本对照 | 选择在输出里放公钥还是公钥哈希 | v0.1 开发版 | [接入指南](projects/p2pk-p2pkh-baseline/docs/sdk.zh-CN.md#quickstart) |
-| [P2PKH-R1](projects/p2pkh-r1/README.zh-CN.md) | 接入已有 P‑256 签名设备或服务，或对照 Forth 编译的锁 | 核对设备的签名方式，并持久保存 P‑256 签名随机数历史 | [v0.3.0 Forth 探索版](projects/p2pkh-r1/README.zh-CN.md#version-history) | [v0.2.0 SDK 指南](projects/p2pkh-r1/docs/sdk.zh-CN.md#quickstart) |
-| [P2PKH-R1-Deferred](projects/p2pkh-r1-deferred/README.zh-CN.md) | 先用短锁接收入金，可以稍后单独启用的场景 | 预留手续费输入和启用步骤，届时生成完整 R1 输出 | v0.2.0 开发版 | [接入指南](projects/p2pkh-r1-deferred/docs/sdk.zh-CN.md#quickstart) |
-| [P2PKH-SM2](projects/p2pkh-sm2/README.zh-CN.md) | 接入 SM2 签名器或 GB/T 35275‑2026 SignedData 服务，或重建符合条件的 OTDA 输出 | 核对 SM2 消息和用户标识，使用 SignedData 时绑定预期签名者 | v1.1.0 候选版 | [接入指南](projects/p2pkh-sm2/docs/sdk.zh-CN.md#quickstart) |
-| [P2PKH-Schnorr](projects/p2pkh-schnorr/README.zh-CN.md) | 向 BIP340 x-only 公钥哈希或 MuSig2 聚合公钥付款 | 使用外部 BIP340 签名器和 4thGraph 编译的模板 | v0.6.0 候选版 | [接入指南](projects/p2pkh-schnorr/docs/sdk.zh-CN.md#quickstart) |
-| [Lamport OTS](projects/lamport-ots/README.zh-CN.md) | 比较 SHA‑256 一次性签名在完整公钥锁和公钥承诺锁下的开销 | 每个 UTXO 使用新密钥，在更小的入金锁和更小的花费输入之间取舍 | v0.1 开发版 | [接入指南](projects/lamport-ots/docs/sdk.zh-CN.md#quickstart) |
-| [WOTS+](projects/wots-plus/README.zh-CN.md) | 研究更短的 SHA‑256 一次性签名及不同收款模板 | 管理一次性密钥，并比较缓存式锁和 OTDA 重建 | v0.1 开发版 | [接入指南](projects/wots-plus/docs/sdk.zh-CN.md#quickstart) |
-| [纯模式 ML-DSA-44](projects/ml-dsa/README.zh-CN.md) | 验证 FIPS 204 签名互操作，评估大脚本的花费成本 | 使用纯模式签名器，验证目标节点和矿工的大脚本接收策略 | v0.1 开发版 | [接入指南](projects/ml-dsa/docs/sdk.zh-CN.md#quickstart) |
+- **脚本优化省下多少交易字节？** P2PKH-R1 编译器实验从 v0.5.0 升至 v0.6.0 后，两进两出 BIP143 ALL 付款从 84,212 B 降到 **83,498 B**，OTDA ALL 付款从 95,282 B 降到 **94,864 B**。 [P2PKH-R1 实测结果](projects/p2pkh-r1/README.zh-CN.md#实测结果)
+- **链上验证一份证明要付出多少成本？** 在同一份 BLS12-381 Groth16 证明、同一组固定公开输入下，4thGraph 的部署加一次花费共 **280,731 字节**，受测 nChain 配置为 **393,553 字节**。两种花费都在 BSV regtest 入块。[实验条件、原始数据与交易 ID](projects/proof-counter/reference/fixed-statement/README.md)
 
-先用原生 P2PKH 跑通第一笔付款。统一 SDK 在 TypeScript、Rust、Go 和 Python 中提供同一套钱包流程。选定项目后，可按接入指南连接签名器、选择锁定模板并复放付款或启用交易。[钱包 SDK 快速接入](shared/sdk/README.zh-CN.md)
+[全部项目成果](showcase/README.md) · [钱包交易成本明细](docs/benchmark.zh-CN.md#transaction-costs)
 
-<a name="transaction-costs"></a>
+**BIP143 / OTDA** 表示这里比较的两种 BSV 签名摘要格式。两种格式均设置 `SIGHASH_FORKID`（`0x40`）。BSV 的 BIP143 格式使用交易各部分的哈希，Chronicle OTDA 加设 `0x20` 位，使用原始交易摘要算法。 [BIP143](https://github.com/bitcoin/bips/blob/master/bip-0143.mediawiki) · [Chronicle](https://docs.bsvblockchain.org/network-topology/nodes/sv-node/chronicle-release)
 
-## 比较交易成本
+<a name="architecture"></a><a name="toolchain"></a>
 
-P2PKH-R1 的两进两出 ForkID ALL 付款在 v0.1.0 为 **119,934 B**，在 v0.2.0 为 **93,374 B**，在 Forth v0.3.0 探索版为 **92,322 B**。Deferred 的入金锁为 **1,435 B**，启用时生成 **46,302 B** 的 R1 v0.2.0 锁。[R1 测量](projects/p2pkh-r1/README.zh-CN.md#完整交易与栈测量) · [Deferred 测量](projects/p2pkh-r1-deferred/README.zh-CN.md)
+## 工具链架构
 
-统一基准在提交 `beeb4dd` 测量了七个项目、32 种模板与签名模式组合，共 **260 笔完整交易**。混合输出和配对 `SINGLE` 另测 11 种组合，共 88 笔交易。Deferred v0.2.0 行采用提交 `9c5603d` 的重测结果。R1 Forth v0.3.0 行来自该实验有资金的 regtest 对照。 [R1 Forth 复放](projects/p2pkh-r1/README.zh-CN.md#forth-探索版)
+| 层次 | 开发者写什么，工具交付什么 |
+| --- | --- |
+| **语言与标准库** | 用带类型的 Forth 词描述计算，用合约声明描述参与角色、交易依赖和状态转换。编译器检查栈效果和数值范围。[SDL 规范](docs/language/specification.md) · [中文语法](docs/language/syntax.md) · [English syntax](docs/language/syntax.en.md) · [标准库](docs/language/stdlib.md) |
+| **编译与规划** | 编译器生成 BSV Script，规划器比较满足约束的交易布局及成本。证明后端为支持的关系生成电路和验证器。[工具链手册](docs/toolchain.md) |
+| **运行与验证** | 运行器绑定实际父输出、请求签名并组装见证。复放报告把构建产物与实际交易、BSV Node 和 chain-gang 的判定对应起来。[仓库目录](docs/repository-layout.md) · [复放流程](docs/toolchain.md#复放与编译) |
 
-| 项目和实测版本 | 输入 × 输出 | 上一输出锁 | ForkID ALL 解锁 | ForkID ALL 整笔 | OTDA ALL 整笔 | ForkID ALL 两栈载荷峰值 |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| 原生 P2PKH | 2 × 2 | 25 | 107 | 374 | 374 | 145 |
-| P2PKH-R1 v0.2.0 | 2 × 2 | 46,302 | 326 | 93,374 | 101,250 | 3,479 |
-| P2PKH-R1 Forth v0.3.0 探索版 | 2 × 2 | 45,776 | 326 | 92,322 | 100,192 | 3,478 |
-| P2PKH-R1-Deferred 启用 | 3 × 2 | 1,435 | 197 | 93,259 | 93,260 | 359 |
-| P2PKH-SM2 v1.1.0 候选版 | 2 × 2 | 144,925 | 291 | 290,554 | 316,018 | 4,147 |
-| Lamport OTS 公钥承诺模板 | 2 × 2 | 7,746 | 16,549 | 48,708 | 79,616 | 16,707 |
-| WOTS+ 缓存步骤及重建模板 | 2 × 2 | 33,956 | 2,310 | 72,650 | 79,090 | 2,701 |
-| 纯模式 ML-DSA-44 | 2 × 2 | 926,412 | 2,588 | 1,858,122 | 5,563,725 | — |
+**递归证明是研究方向。** 上图的 Token 转账逐笔验证直接父输出与本次状态转换。递归方案还要在新证明中核验前序证明，并把前序证明认证的状态绑定到本次实际花费的输出。[当前工具链支持的验证路径](docs/language/stdlib.md#验证路径)
 
-单位均为字节。锁定、解锁和栈开销取 ForkID ALL 的第一个输入。栈峰值由本地求值器测得，统计主栈与备用栈的合计数据载荷。Deferred 启用交易包含一条手续费赞助输入。ML‑DSA‑44 暂无栈数据。各项目 README 列有逐输入、逐输出的大小、增量成本和生命周期总量。
+---
 
-R1 v0.2.0 和 WOTS+ 缓存步骤模板的 OTDA ALL 数据取自显式启用重建的实测。
+## 许可证
 
-SM2 候选版沿用 v1.0.0 的锁定模板 `1`，自动选择更短的 OTDA 解锁编码。实测两进两出 OTDA ALL 交易的每个输入解锁脚本从 290,109 字节降至 13,023 字节，整笔从 870,194 字节降至 316,018 字节，缩小 63.7%。[SM2 重建测量](projects/p2pkh-sm2/README.zh-CN.md#otda-constructor)
-
-## 复现结果
-
-基准指南给出在 BSV Node 1.2.3 和仓库固定版本的 chain-gang 上复放签名交易的方法。各项目首页另有协议规范、安全分析、验收用例和 SDK 入口。[统一基准指南](shared/benchmark.zh-CN.md)
+4thGraph 采用 [MIT 许可证](LICENSE)。

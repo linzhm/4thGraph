@@ -1,10 +1,10 @@
-# P2PKH-SM2 v1.1.0 candidate
+# P2PKH-SM2
 
-[简体中文](README.zh-CN.md) · [BSV Script Lab](../../README.md)
+[简体中文](README.zh-CN.md) · [4thGraph](../../README.md) · [Project index](../README.md) · [Versions](versions/index.json)
 
 ## Developer resources
 
-**[Wallet SDK quickstart](docs/sdk.en.md#quickstart)** · [Unified wallet SDK](../../shared/sdk/README.md#quickstart)
+**[Wallet SDK quickstart](docs/sdk.en.md#quickstart)** · [v1.2.0 candidate](#v120) · [Unified wallet SDK](../../sdk/README.md#quickstart)
 
 Choose a raw SM2 or SignedData signer. The wallet automatically selects a shorter OTDA unlocking script for eligible payments.
 
@@ -21,25 +21,40 @@ transaction through PUSHTX and native `OP_CHECKSIG`.
 
 Evaluate P2PKH-SM2 when a wallet already uses an SM2 signing service. A provider that exposes a raw SM2 API returns the signature directly. A GB/T 35275-2026 provider can return a direct single-signer SignedData envelope under the wallet's trusted signer configuration. The SDK checks that off-chain envelope and writes the extracted 64-byte signature into the transaction. Track which provider operation the wallet uses and validate the exact message and user ID at integration time. [Signing contract](docs/sdk.en.md)
 
-For payments that create other SM2 outputs, compare ForkID and OTDA using the same input and output counts. On eligible Chronicle spends, the v1.1.0 candidate shortens the OTDA unlock by reconstructing the signed preimage. The cost of creating a new SM2 output still includes the 144,925-byte lock. [Reconstruction measurements](#otda-constructor)
+For payments that create other SM2 outputs, compare BIP143 and OTDA using the same input and output counts. On eligible Chronicle spends, the wallet shortens the OTDA unlock by reconstructing the signed preimage. Each new output also carries the full lock for its selected template. [Reconstruction measurements](#otda-constructor)
 
 ## Project version and locking template
 
-The v1.1.0 candidate adds default OTDA reconstruction to the unlocking script. The generator and wallet use the same 144,925-byte locking template `1` as the first public release, v1.0.0.
+Version 1.1.0 enables OTDA reconstruction by default for locking template `1` from the first public release, v1.0.0. The v1.2.0 candidate introduces opt-in template `2`. A wallet recognizes and spends either version from the previous output's exact bytes.
 
 | Property | Value |
 | --- | --- |
 | Recipient identifier | HASH160 of the 65-byte public key `04 \|\| X_BE32 \|\| Y_BE32` |
 | SM2 user ID | The fixed ASCII value `1234567812345678` |
-| Locking script | 144,925 bytes |
-| Unlocking script | 291 bytes with ForkID, 294 bytes with unpaired OTDA SINGLE, and transaction-dependent for other OTDA modes |
+| Locking script | 144,925 bytes for template `1`, 131,565 bytes for template `2` |
+| Unlocking script | 291 bytes with BIP143, 294 bytes with unpaired OTDA SINGLE, and transaction-dependent for other OTDA modes |
 | Unlocking stack | Signing preimage, uncompressed public key, and 64-byte `r \|\| s` signature |
-| Signature modes | ForkID and Chronicle OTDA, each with ALL, NONE, or SINGLE and optional ANYONECANPAY |
+| Signature modes | BIP143 and Chronicle OTDA, each with ALL, NONE, or SINGLE and optional ANYONECANPAY |
 
-The current source includes the [layout manifest](template/layout.json),
-[standard SM2 vector](template/sm2-standard.json),
-[complete payment vector](template/spend-all.json), and
-[16 signing preimages](template/sighash-modes.json). [v1.0.0 release](https://github.com/linzhm/bsv-script-lab/releases/tag/p2pkh-sm2-v1.0.0)
+The current source includes the [layout manifest](versions/v1.0.0/layout.json),
+[standard SM2 vector](versions/v1.0.0/sm2-standard.json),
+[complete payment vector](versions/v1.0.0/spend-all.json), and
+[16 signing preimages](versions/v1.0.0/sighash-modes.json). [v1.0.0 release](https://github.com/linzhm/bsv-script-lab/releases/tag/p2pkh-sm2-v1.0.0)
+
+<a name="v120"></a>
+
+## v1.2.0 candidate
+
+The generator builds both templates from the Forth lock. Template `2` consumes SM3 operands at their last use and reuses the stack slots of surviving state words across rounds. This saves 13,360 bytes per output. Both versions apply the same SM2, ZA, sighash and transaction-binding rules. The wallet can reconstruct both lock versions in the same OTDA ALL preimage.
+
+| Measured bytes | v1.1.0 | v1.2.0 | Change |
+| --- | ---: | ---: | ---: |
+| Locking script | 144,925 | 131,565 | −9.2% |
+| BIP143 ALL, 2×2 transaction | 290,554 | 263,834 | −9.2% |
+| OTDA ALL, 2×2 transaction with reconstruction | 316,018 | 287,524 | −9.0% |
+| OTDA ALL, unlocking script per input in that transaction | 13,023 | 12,136 | −6.8% |
+
+BSV Node 1.2.3 and the pinned chain-gang build replayed the complete inputs with explicit prevouts. To opt in for new outputs, use `--version 2` or SDK `template: "v1.2.0"`. [Template fingerprint](versions/v1.2.0/layout.json) · [Recorded measurements](versions/v1.2.0/measurements.json) · [Forth lock](../../src/fourthgraph/stdlib/wallet/p2pkh-sm2.fth) · [Benchmark reproduction](../../docs/benchmark.md#run)
 
 ## Generate a locking script
 
@@ -59,7 +74,7 @@ its hash. The generator validates the public key before hashing it.
 
 ## Authorize and verify a payment
 
-Use `sign_payment` for a one-input ForkID ALL payment (`0x41`). Use
+Use `sign_payment` for a one-input BIP143 ALL payment (`0x41`). Use
 `sign_input` to choose a signature mode for each input of a prepared
 transaction. For OTDA, pass the Chronicle activation state for the actual
 spend. The wallet calls an external signer and verifies the returned signature
@@ -90,7 +105,7 @@ outpoint, its value, required confirmations and the recipient's lock before
 asking the signer to approve a payment. The GB/T envelope is processed by
 the off-chain adapter. The unlock carries the extracted raw signature.
 
-In the 2×2 fixture, ForkID ALL uses a 291-byte unlock. The literal OTDA ALL encoding serializes
+In the 2×2 fixture, BIP143 ALL uses a 291-byte unlock. The literal OTDA ALL encoding serializes
 both outputs into each input's signing preimage and raises the unlock to
 290,109 bytes. A third output adds 144,925 bytes of output lock and also
 changes both existing OTDA unlocks. The marginal table shows those costs
@@ -102,7 +117,7 @@ BSV Node 1.2.3 and the project's pinned chain-gang validate the complete inputs 
 
 | Signing mode and unlocking encoding | Inputs×outputs | Previous locks | Unlocks | New locks | Total | Main / alt items | Stack payload |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| ForkID ALL `0x41` | 2×2 | 144,925 × 2 | 291 × 2 | 144,925 × 2 | 290,554 | 122 / 133 | 4,147 |
+| BIP143 ALL `0x41` | 2×2 | 144,925 × 2 | 291 × 2 | 144,925 × 2 | 290,554 | 122 / 133 | 4,147 |
 | OTDA ALL `0x61`, v1.1.0 default | 2×2 | 144,925 × 2 | 13,023 × 2 | 144,925 × 2 | 316,018 | 122 / 133 | 580,080 |
 | OTDA ALL `0x61`, v1.0.0 literal | 2×2 | 144,925 × 2 | 290,109 × 2 | 144,925 × 2 | 870,194 | 122 / 133 | 580,080 |
 
@@ -115,15 +130,15 @@ Each marginal cell shows the **change in total bytes (output locks / input unloc
 | `v1.0.0` · `0x41` | 3×2 | 334 (0 / 291 / 43) | 2×3 | 144,938 (144,925 / 0 / 13) | 290,780 | 581,334 |
 | `v1.0.0` · `0x61` | 3×2 | 290,277 (0 / 290,232 / 45) | 2×3 | 434,814 (144,925 / 289,876 / 13) | 290,794 | 1,160,988 |
 
-[Unified benchmark and reproduction](../../shared/benchmark.md)
+[Unified benchmark and reproduction](../../docs/benchmark.md)
 
 <a name="otda-constructor"></a>
 
 ## Reconstruct OTDA outputs
 
-The 12,703-byte constructor is part of `scriptSig`. It reuses SM3 round and message-expansion fragments, SM2 point addition and doubling, and repeated instruction runs to rebuild the same signing preimage. For each eligible output it fills the receiver's HASH160 slot in the 144,925-byte lock. The signing callback receives the same message and SM2 user ID as the literal encoding. Use the final signed transaction ID to build a child.
+The constructor is part of `scriptSig`. It uses 12,703 bytes for template `1` and 11,816 bytes for template `2`. Template `2` selects reusable fragments from the copies used in the initial encoding and places frequently used fragments near the top of the stack. It reconstructs the exact signing preimage and fills each eligible output's HASH160 slot. The signing callback receives the same message and SM2 user ID as the literal encoding. Use the final signed transaction ID to build a child.
 
-After Chronicle activation, version-2 OTDA ALL can reconstruct matching outputs in their original order. Paired OTDA SINGLE can reconstruct the same-index output and preserve the preceding null outputs in the preimage. Both support `ANYONECANPAY`. Other output templates keep their literal bytes. ForkID, NONE, unpaired SINGLE, version 1 and non-smaller encodings continue with the literal unlocking script. [SDK options](docs/sdk.en.md) · [Constructor and generator](reference/README.md#otda-constructor)
+After Chronicle activation, version-2 OTDA ALL can reconstruct matching outputs in their original order. Paired OTDA SINGLE can reconstruct the same-index output and preserve the preceding null outputs in the preimage. Both support `ANYONECANPAY`. Other output templates keep their literal bytes. BIP143, NONE, unpaired SINGLE, version 1 and non-smaller encodings continue with the literal unlocking script. [SDK options](docs/sdk.en.md) · [Constructor and generator](reference/README.md#otda-constructor)
 
 | OTDA ALL, bytes | Literal | Reconstructed |
 | --- | ---: | ---: |
@@ -134,4 +149,4 @@ After Chronicle activation, version-2 OTDA ALL can reconstruct matching outputs 
 | Fund and exit | 290,794 | 290,794 |
 | Fund, turn over once, and exit | 1,160,988 | 606,812 |
 
-Both encodings use the same fixture keys and amounts and pass BSV Node 1.2.3 and the pinned chain-gang build. The unified benchmark uses the `v1.1.0` profile for automatic reconstruction and `v1.0.0` for the literal encoding.
+Both encodings use the same fixture keys and amounts and pass BSV Node 1.2.3 and the pinned chain-gang build. The table uses benchmark profile `v1.1.0` for template `1` with automatic reconstruction and `v1.0.0` for the literal encoding.

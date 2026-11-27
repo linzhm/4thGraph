@@ -5,6 +5,9 @@ on:
 permissions:
   contents: read
 
+env:
+  PYTHONPATH: ${{ github.workspace }}/src:${{ github.workspace }}
+
 jobs:
   verify:
     runs-on: ubuntu-24.04
@@ -17,7 +20,7 @@ jobs:
         with:
           node-version: '24'
       - name: Type-check the shared TypeScript SDK
-        working-directory: shared/sdk/typescript
+        working-directory: sdk/typescript
         run: |
           npm install --ignore-scripts --no-audit --no-fund
           npm run check
@@ -43,8 +46,8 @@ jobs:
           if not re.fullmatch(r"[0-9a-f]{40}", pin) or source["vcs_info"]["commit_id"] != pin:
               raise SystemExit("installed tx-engine differs from the pinned commit")
           PY
-          PYTHONPATH=. python projects/p2pkh-r1-deferred/reference/generate_vectors.py
+          PYTHONPATH=src:. python projects/p2pkh-r1-deferred/reference/generate_vectors.py
           python -m unittest discover -s projects/p2pkh-r1-deferred/reference -p test_deferred.py -v
           bash projects/p2pkh-r1-deferred/reference/verify.sh
       - name: Replay the shared wallet SDK
-        run: bash shared/verify_node.sh -- bash shared/sdk/verify_wallet.sh p2pkh-r1-deferred
+        run: bash tools/verify_node.sh -- bash sdk/verify_wallet.sh p2pkh-r1-deferred
