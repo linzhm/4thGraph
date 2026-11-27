@@ -116,6 +116,7 @@ def compile_row(raw, fixture, sources, frozen, trace):
 def stable(row):
     fields = ("requested", "id", "source_sha256", "applied", "artifact", "test", "next", "trace")
     return {**{key: row.get(key) for key in fields},
+            "metrics": {key: value for key, value in row.get("metrics", {}).items() if key != "compile_ns"},
             "delta": {key: value for key, value in row.get("delta", {}).items() if not key.endswith("_ns_observed")},
             "compile": {key: value for key, value in row["compile"].items() if key != "elapsed_ns"}}
 
@@ -123,7 +124,8 @@ def stable(row):
 def report_id(report):
     request = report["request"]
     return digest([report["snapshot"], request["axis"], request.get("parent_run"),
-                   report["baseline"], report["baseline_bytes"], report.get("baseline_path_bytes"), [stable(row) for row in report["candidates"]]])
+                   report["baseline"], report["baseline_bytes"], report.get("baseline_path_bytes"),
+                   report["ranking"], report["winner_including_parents"], [stable(row) for row in report["candidates"]]])
 
 
 def matching_baseline(axis, fixture, eligible, parents, previous):
@@ -367,7 +369,7 @@ def main(argv=None):
             result = run(data["request"] if replaying else data, read(args.parent) if args.parent else None,
                          replaying=replaying)
             if replaying and (data["run_id"] != result["run_id"] or data["run_id"] != report_id(data)):
-                raise ValueError("replay differs from the recorded baseline, artifacts, verdicts, or formula traces")
+                raise ValueError("replay differs from the recorded baseline, artifacts, verdicts, formula traces, or costs")
         print(json.dumps(result, sort_keys=True))
     except (ImportError, KeyError, ValueError, TypeError, OSError) as exc:
         print(json.dumps({"schema": SCHEMA, "status":"failed", "diagnostic":str(exc)}))

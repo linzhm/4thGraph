@@ -246,6 +246,12 @@ class FormulaExperiments(unittest.TestCase):
         self.assertEqual(run(second["request"], first)["run_id"], second["run_id"])
         with self.assertRaisesRegex(ValueError, "frozen snapshot mismatch"):
             run({**follow, "evaluation": "formula"}, first)
+        edited = json.loads(json.dumps(first))
+        edited["candidates"][0]["metrics"]["path_bytes"] = 1
+        command = [sys.executable, "-m", "fourthgraph.workflow.protocol", "experiment", "replay", "-"]
+        replay = subprocess.run(command, input=json.dumps(edited), text=True, capture_output=True)
+        self.assertEqual(replay.returncode, 2, replay.stderr)
+        self.assertIn("costs", json.loads(replay.stdout)["diagnostic"])
 
     def test_bezier_spend_checks_both_outputs_and_replays_the_search_delta(self):
         self._require_pinned_chain()
