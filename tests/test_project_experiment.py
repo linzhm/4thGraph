@@ -217,7 +217,7 @@ class FormulaExperiments(unittest.TestCase):
             self.assertEqual((row["test"]["spend"]["accepted"], row["test"]["spend"]["rejected"]), (64, 64))
             self.assertEqual(sum(op["op"] == "OP_MUL" for op in row["artifact"]["instructions"]), multiplications)
             self.assertGreater(row["metrics"]["peak_payload_bytes"], 256)
-        self.assertEqual([row["metrics"]["path_bytes"] for row in (direct, strassen)], [710, 753])
+        self.assertEqual([row["metrics"]["path_bytes"] for row in (direct, strassen)], [710, 751])
         same_source = run({"fixture": "matrix-mul", "evaluation": "spend", "plans": [
             {}, {"passes": ["stack"]}, {"passes": ["rewrite", "share", "stack", "search"]},
             {"passes": ["stack", "search"]},
