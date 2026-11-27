@@ -4,10 +4,22 @@ import unittest
 
 from fourthgraph.bsv.evaluate import ScriptError, evaluate
 from fourthgraph.bsv.script import asm, decode_num, encode_num, push
-from fourthgraph.compiler.stack_schedule import Graph, Value, emit_steps
+from fourthgraph.compiler.stack_schedule import Graph, Value, compact_pair_moves, emit_steps
 
 
 class StackScheduleTests(unittest.TestCase):
+    def test_pair_moves_compact_copy_and_rotations_without_editing_push_data(self):
+        for source, target in (("3 OP_PICK 3 OP_PICK", "OP_2OVER"),
+                               ("3 OP_ROLL 3 OP_ROLL", "OP_2SWAP"),
+                               ("5 OP_ROLL 5 OP_ROLL", "OP_2ROT")):
+            with self.subTest(source=source):
+                raw = asm(source)
+                data = push(raw * 80)
+                stack = list(map(encode_num, range(8)))
+                self.assertEqual(compact_pair_moves(data + raw), data + asm(target))
+                self.assertEqual(evaluate(compact_pair_moves(raw), stack), evaluate(raw, stack))
+        self.assertEqual(compact_pair_moves(asm("3 OP_PICK 4 OP_PICK")), asm("3 OP_PICK 4 OP_PICK"))
+
     def test_select_expansion_reuses_the_parent_graph_and_discards_other_definitions(self):
         graph = Graph(1)
         value, = graph.inputs
