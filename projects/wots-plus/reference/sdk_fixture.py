@@ -1,3 +1,5 @@
+from functools import partial
+
 from script import locking_script
 from wots import public_key, sign_digest
 
@@ -20,6 +22,6 @@ def cases():
         (13, "compact-v11", "compact-v11", 21272, 0x63),
     ):
         secret, public = bytes([seed]) * 32, bytes([seed + 9]) * 32
-        yield dict(public_key=public_key(secret, public), signer=lambda digest: sign_digest(secret, public, digest),
+        yield dict(public_key=public_key(secret, public), signer=partial(sign_digest, secret, public),
                    profile=profile, bytes=length, sighash=sighash, compress_otda=sighash == 0x63,
                    destination=locking_script(destination_key, cached_constants=cache) if sighash == 0x63 else b"\x51")

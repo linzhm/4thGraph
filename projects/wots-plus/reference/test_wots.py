@@ -8,6 +8,7 @@ import unittest
 
 from fixtures import fixture_seeds, funding_transaction, mode_fixture, vector_document
 from payment import sign_payment
+from sdk_fixture import cases as sdk_cases
 from script import (
     BUFFERED_PROFILES, CACHE_PROFILES, COMPACT_PROFILES, COMPANION_CODE, FIRST_ADDRESS_NORMALIZED_PROFILES,
     LAZY_MESSAGE_PROFILES, ORDINARY_CODE, _buffered_message_digits, _message_digits, _packed_step_suffixes,
@@ -32,6 +33,12 @@ from wots import (
 
 
 class WotsTests(unittest.TestCase):
+    def test_buffered_sdk_cases_keep_their_own_signing_key(self):
+        digest = sha256(b"WOTS+ SDK fixture signer").digest()
+        for case in list(sdk_cases()):
+            with self.subTest(profile=case["profile"]):
+                self.assertTrue(verify_digest(case["public_key"], digest, case["signer"](digest)))
+
     def test_pinned_xmss_reference_c_vectors(self):
         # XMSS/xmss-reference at 171ccbd26f098542a67eb5d2b128281c80bd71a6.
         # wots_pkgen and wots_sign use WOTSP-SHA2_256 and an all-zero OTS
