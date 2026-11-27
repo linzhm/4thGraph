@@ -1089,7 +1089,7 @@ def run_primitive(instruction, args, *, context=None, checksig=None):
     return instruction.run(*args)
 
 
-def evaluate(word, *values, context=None, checksig=None):
+def evaluate(word, *values, context=None, checksig=None, build_call=None):
     if word.pels is not None:
         require_script(word)
     if len(values) != len(word.takes):
@@ -1110,7 +1110,7 @@ def evaluate(word, *values, context=None, checksig=None):
         if entry is None:
             frames.pop()
             continue
-        instruction, _ = entry
+        instruction, source = entry
         if isinstance(instruction, Literal):
             stack.append(instruction.value)
         elif isinstance(instruction, Conditional):
@@ -1121,7 +1121,10 @@ def evaluate(word, *values, context=None, checksig=None):
             stack[-count:] = [entries[i] for i in order]
         else:
             start = len(stack) - len(instruction.takes)
-            stack[start:] = run_primitive(instruction, stack[start:], context=context, checksig=checksig)
+            if build_call is not None and instruction.build_only:
+                stack[start:] = build_call(instruction, source, stack[start:])
+            else:
+                stack[start:] = run_primitive(instruction, stack[start:], context=context, checksig=checksig)
     return tuple(stack)
 
 

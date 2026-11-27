@@ -72,6 +72,10 @@ PYTHONPATH=src:. python -m fourthgraph.workflow.protocol "projects/workflow-exam
 
 ## Reusing PELS preimage reconstruction
 
+The dynamic PELS words require BIP143 ALL (`0x41`), one input, and one successor output. Both take a Script prefix and a state/amount rule at build time. Start the assembled lock with a direct push of the five-byte current state (`05` followed by the state bytes), immediately followed by `OP_CODESEPARATOR` (`ab`). The bytes after the separator form the `scriptCode` and are copied verbatim into the successor. At spend time the rule consumes the current state and the previous amount as a ScriptNum. It leaves a five-byte successor state followed by an eight-byte unsigned little-endian amount.
+
+With `REQUIRE stdlib/wallet/pels-verify.fth`, push `tail` first (the final eight preimage bytes, locktime followed by sighash type, four little-endian bytes each), then `head` (all preimage bytes before `hashOutputs`). The lock pushes `state` above them. `pels-verify` reconstructs and authenticates the preimage and leaves its digest. For the full-preimage variant, `pels-assert-successor` from `stdlib/wallet/pels-successor.fth` expects `preimage` at the top of the stack with `state` immediately below it. The caller must authenticate that same preimage against the actual input. [Standalone state-label fixture](../../tests/test_pels_successor_library.py) · [R1 composition example](../../projects/p2pkh-r1/forth/r1-pels-lock.fth)
+
 Keep witness compression in the transaction compiler. The contract defines and constructs the complete ordered output vector. The reconstructor assembles the preimage for the selected sighash mode, and the authentication fragment binds that preimage to the actual spend with native `OP_CHECKSIG`. The Counter's single-successor construction and Workflow's ordered multi-output construction use this boundary. [Counter build and replay](../../projects/pels-counter/README.md) · [Reconstruction implementation](../../src/fourthgraph/workflow/forkid_lowering.py)
 
 | Single-input path | Reconstructed fields | Requirements |
