@@ -256,8 +256,8 @@ CORE_SOURCE = {":", ";", "("}
 CORE_EXT_SOURCE = {"\\"}
 FILE_EXT_SOURCE = {"require"}
 FILE_EXT_WORDS = set(r'include require required refill rename-file restore-input save-input source-id s\"'.split())
-CORE_SCRIPT = CORE_PRIMITIVES.keys() | CORE_SHUFFLES.keys() | {"if", "else", "then"}
-CORE_EXT_SCRIPT = CORE_EXT_PRIMITIVES.keys() | CORE_EXT_SHUFFLES.keys() | CORE_EXT_LITERALS.keys()
+CORE_SCRIPT = CORE_PRIMITIVES.keys() | CORE_SHUFFLES.keys() | {"if", "else", "then", "do", "loop", "i"}
+CORE_EXT_SCRIPT = CORE_EXT_PRIMITIVES.keys() | CORE_EXT_SHUFFLES.keys() | CORE_EXT_LITERALS.keys() | {"?do"}
 DECLARATIONS = {
     "bytes-param:": "<name> <size> ;",
     "lock:": "<name> ( <input-name>:<type> ... ) <verification> ;",

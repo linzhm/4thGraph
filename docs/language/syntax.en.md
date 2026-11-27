@@ -27,12 +27,13 @@ symbol           = ascii-letter, { alphanumeric | "_" | "-" } ;
 
 definition       = ":", word-name, stack-effect, { instruction }, ";" ;
 stack-effect     = "(", { stack-type }, "--", { stack-type }, ")" ;
-instruction      = straight-instruction | branch ;
+instruction      = straight-instruction | branch | counted-loop ;
 straight-instruction = call | cell-literal | byte-literal | range-check ;
 call             = word-name ;
 byte-literal     = "bytes-hex", hex-pairs ;
 range-check      = "check-range", symbol ;
 branch           = "if", { instruction }, [ "else", { instruction } ], "then" ;
+counted-loop     = ( "do" | "?do" ), { instruction }, "loop" ;
 
 declaration      = bytes-param | lock | range | work | join | gate | split-authority | recovery
                  | independent | workflow-input | stage | relation ;
@@ -91,6 +92,7 @@ A `word-name` is a single token. Control words, source declarations, and the `bs
 
 - Top-level directives and declarations take effect as the compiler reads the source. Definition bodies call computation, conversion, construction, and verification words.
 - A stack-effect comment containing `--` follows the name in a colon definition. Standard Forth treats it as a comment. 4thGraph uses it as a static type contract. The signature can use the types known at that point, and the body can call definitions and imports already in scope or built-in words. `IF` consumes a `cell`. Both branches must leave the same ordered stack types at the join.
+- `limit start DO ... LOOP` and `limit start ?DO ... LOOP` take literal `cell` bounds. The compiler unrolls the body from start up to the exclusive limit and checks each iteration's stack effect. `I` is the innermost loop index. Equal bounds take zero iterations with `?DO`. Dynamic or descending bounds and expansions beyond the budget raise a build error.
 - The compiler resolves the computation words in `work:`, `gate:`, and `join:` as it reads them. It resolves the work steps named by `join:`, the computation words and value dependencies of `stage:`, and both words in `relation:` when building the corresponding plan. Stage declaration order can differ from dependency order.
 - A parallel plan needs two distinct work steps, a join, and a split signer role. A gate is optional. A linear plan needs an initial value, one or more `u32 -- u32` stages, and a final `u32 -- route` stage. Each linear value has one producer and at most one consumer. Two-stage plans support `fused`, `serial`, and `atomic`. Longer chains use `serial`. The step names `deploy`, `split`, and `fused` are reserved. Both plan styles can include a recovery rule and independent submission constraints. [Transaction graph (Chinese)](specification.md#交易图)
 - `relation:` requires `REQUIRE stdlib/verify.fth`. A source file can declare one relation independently of workflow declarations. The relation identifies the state transition to verify. The compiler selects an implementation based on available backends, policy, and budget. [Build and replay a relation](stdlib.md#verification-paths)

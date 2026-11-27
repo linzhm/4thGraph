@@ -3,6 +3,9 @@ from dataclasses import dataclass, replace
 from hashlib import sha256
 
 
+MAX_MONEY = 2_100_000_000_000_000
+
+
 def hash256(b): return sha256(sha256(b).digest()).digest()
 
 def compact(n):
@@ -12,7 +15,7 @@ def compact(n):
 def blob(b): return compact(len(b))+b
 
 def amount(n):
-    if type(n) is not int or not 0<=n<=2_100_000_000_000_000: raise ValueError('invalid satoshi amount')
+    if type(n) is not int or not 0<=n<=MAX_MONEY: raise ValueError('invalid satoshi amount')
     return n.to_bytes(8,'little')
 
 

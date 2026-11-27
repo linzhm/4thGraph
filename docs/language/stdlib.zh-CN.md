@@ -24,13 +24,16 @@
 | 链上重建 | PELS 和 Workflow 使用已知交易形状、链接的 `scriptCode` 和合约构造的输出恢复原像。可省字段由签名模式和合约约束共同决定。[重建实现](../../src/fourthgraph/workflow/forkid_lowering.py) |
 | 授权与绑定 | 钱包接口处理普通和 companion 路径，交易锁使用原生验签绑定实际花费。未配对 OTDA SINGLE 使用特殊摘要，该分支没有可序列化的交易原像。[授权接口](../../src/fourthgraph/bsv/spend_authorization.py) · [绑定实现](../../src/fourthgraph/bsv/pushtx.py) |
 
-若新增 Forth 共用入口，可先支持单输入、完整有序输出可构造的 BIP143 ALL。用现有链下序列化器逐字节验证链上结果，并测试变更输出或锁定时间后旧见证被拒绝。扩展到 OTDA ALL 时，调用方须明确规则是否依赖上一输出金额。各项目显式选用新增入口。
+Forth 公共入口表达输入形状、要认证的字段及输出约束。编译器结合编译目标的签名规则匹配原语。首个成员覆盖单输入及完整有序输出的 BIP143 ALL。OTDA 路径须为业务所需的前序金额另行认证来源。同一锁的多模式要求各路径都履行公开契约。[模式及约束表](../pels-locks.zh-CN.md#编译目标)
 
 ## 公开接口
+
+PELS 在架构上归属标准库模板族，应用提供输出和字段约束，编译器按编译目标选择实现。`REQUIRE stdlib/pels.fth` 提供单输入、完整输出向量的独立 `lock:`。模板族的后继状态和授权组合见评审稿。[模板族及公开接口评审](../pels-locks.zh-CN.md)
 
 | 模块 | 公开接口 | 现有项目 |
 | --- | --- | --- |
 | `std/bsv` | `REQUIRE BSV` 加载 `verify ( cell -- )` 和受支持的原生 `OP_*` 词 | [P2PKH 示例](../../projects/p2pk-p2pkh-baseline/forth/p2pkh.fth) |
+| `std/pels` | `tx-output` 构造预期输出，`inputs=` 和 `outputs=` 约束单输入及完整有序输出，`tx-locktime` 和 `tx-prevout-amount` 可与常量比较 | [构建与组装](../pels-locks.zh-CN.md) |
 | `std/u32` | `u32-inc ( u32 -- u32 )`，按 32 位回绕 | [PELS Counter](../../projects/pels-counter/pels-counter.fth) |
 | `std/p2pk` | `p2pk-lock ( bytes -- bytes )`，接收 33 字节压缩公钥并返回锁脚本 | [库源码](../../src/fourthgraph/stdlib/p2pk.fth) · [P2PK 示例](../../projects/p2pk-p2pkh-baseline/forth/p2pk.fth) |
 | `std/p2pkh` | `p2pkh-lock ( bytes -- bytes )`，接收 20 字节公钥哈希并返回锁脚本 | [库源码](../../src/fourthgraph/stdlib/p2pkh.fth) · [P2PKH 示例](../../projects/p2pk-p2pkh-baseline/forth/p2pkh.fth) |
