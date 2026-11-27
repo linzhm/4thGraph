@@ -1,5 +1,5 @@
 REQUIRE r1-baseline.fth
-REQUIRE pels-successor.fth
+REQUIRE stdlib/wallet/pels-successor.fth
 
 : r1-counter-advance ( script -- script )
     ( Runtime: state -- encoded u32 successor. Increment wraps as in PELS. )
