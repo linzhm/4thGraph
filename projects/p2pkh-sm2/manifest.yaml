@@ -1,0 +1,603 @@
+$schema: ../template/manifest.schema.json
+schema_version: 1
+title:
+  en: P2PKH-SM2
+  zh-CN: P2PKH-SM2
+summary:
+  en: Choose a raw SM2 or SignedData signer. The wallet automatically selects a shorter OTDA unlocking
+    script for eligible payments.
+  zh-CN: 选择原始 SM2 签名器或 SignedData 签名器。符合条件的付款会自动选择更短的 OTDA 解锁编码。
+entry_points:
+  - name: locking_script_from_public_key
+    description:
+      en: Build a payment lock from the uncompressed SM2 public key.
+      zh-CN: 用未压缩 SM2 公钥构造付款锁。
+  - name: sign_input
+    description:
+      en: Request and verify an external signature for a selected input and sighash mode.
+      zh-CN: 按所选输入和签名模式请求并验证外部签名。
+setup:
+  en:
+    - Run the release commands from the repository root with Python 3.12, Rust, and OpenSSL with SM2 and
+      SM3 support.
+    - |-
+      ```sh
+      export PYTHONPATH=src:.
+      python -m pip install -r projects/p2pkh-sm2/reference/requirements.txt
+      ```
+  zh-CN:
+    - 在仓库根目录使用 Python 3.12、Rust 和支持 SM2、SM3 的 OpenSSL 运行版本命令。
+    - |-
+      ```sh
+      export PYTHONPATH=src:.
+      python -m pip install -r projects/p2pkh-sm2/reference/requirements.txt
+      ```
+sections:
+  use_cases:
+    en:
+      - Evaluate P2PKH-SM2 when a wallet already uses an SM2 signing service. A provider that exposes
+        a raw SM2 API returns the signature directly. A GB/T 35275-2026 provider can return a direct single-signer
+        SignedData envelope under the wallet's trusted signer configuration. The SDK checks that off-chain
+        envelope and writes the extracted 64-byte signature into the transaction. Track which provider
+        operation the wallet uses and validate the exact message and user ID at integration time. [Signing
+        contract](docs/sdk.en.md)
+      - For payments that create other SM2 outputs, compare BIP143 and OTDA using the same input and output
+        counts. On eligible Chronicle spends, the wallet shortens the OTDA unlock by reconstructing the
+        signed preimage. Each new output also carries the full lock for its selected template. [Reconstruction
+        measurements](#otda-constructor)
+    zh-CN:
+      - 已有 SM2 签名服务的钱包可以评估 P2PKH-SM2。提供原始 SM2 接口的服务直接返回签名。使用 GB/T 35275‑2026 服务时，可按钱包的可信签名者配置处理单签名者的直接签名
+        SignedData 封装。SDK 在链下核验封装，将提取出的 64 字节签名写入交易。接入时应明确调用服务的哪个签名接口，并核对消息和用户标识。[签名接口](docs/sdk.zh-CN.md)
+      - 如果付款会新建 SM2 输出，用相同的输入输出数量比较 BIP143 和 OTDA。钱包会为符合条件的 Chronicle 花费重建签名预映像，缩短 OTDA 解锁脚本。每个新输出携带所选模板的完整锁定脚本。[重建实测](#otda-constructor)
+  algorithm:
+    en:
+      - '[v1.10.0 candidate](#v1100)'
+      - '[Protocol](docs/spec.en.md) · [Security](docs/developer.en.md#security) · [Verify](#developer-checks-and-cost-analysis)
+        · [Transaction costs](#complete-transactions-and-stack-measurements)'
+      - |-
+        P2PKH-SM2 lets a payer lock a BSV output to the HASH160 of the recipient’s
+        uncompressed SM2 public key. To spend the output, the recipient reveals the
+        public key and supplies one SM2 signature for the current input. Bitcoin Script
+        uses SM3 to compute the SM2 identity digest ZA and the message digest. It
+        verifies the SM2 signature and binds the authorization to the spending
+        transaction through PUSHTX and native `OP_CHECKSIG`.
+      - '### Project version and locking template'
+      - Version 1.1.0 enables OTDA reconstruction by default for locking template `1` from the first public
+        release, v1.0.0. Versions 1.2.0 through 1.7.0 correspond to templates `2` through `7`. Versions
+        1.9.0 and 1.10.0 add templates `8` and `9`. The wallet recognizes and spends all nine templates
+        from the previous output's exact bytes.
+      - |-
+        | Property | Value |
+        | --- | --- |
+        | Recipient identifier | HASH160 of the 65-byte public key `04 \|\| X_BE32 \|\| Y_BE32` |
+        | SM2 user ID | The fixed ASCII value `1234567812345678` |
+        | Locking script | 144,925 bytes for template `1`, 131,565 for `2`, 125,616 for `3`, 121,847 for `4`, 110,747 for `5`, 100,663 for `6`, 98,362 for `7`, 96,616 for `8`, and 95,790 for `9` |
+        | Unlocking script | 291 bytes with BIP143, 294 bytes with unpaired OTDA SINGLE, and transaction-dependent for other OTDA modes |
+        | Unlocking stack | Signing preimage, uncompressed public key, and 64-byte `r \|\| s` signature |
+        | Signature modes | BIP143 and Chronicle OTDA, each with ALL, NONE, or SINGLE and optional ANYONECANPAY |
+      - |-
+        The current source includes the [layout manifest](versions/v1.0.0/layout.json),
+        [standard SM2 vector](versions/v1.0.0/sm2-standard.json),
+        [complete payment vector](versions/v1.0.0/spend-all.json), and
+        [16 signing preimages](versions/v1.0.0/sighash-modes.json). [v1.0.0 release](https://github.com/linzhm/bsv-script-lab/releases/tag/p2pkh-sm2-v1.0.0)
+      - <a name="otda-constructor"></a>
+      - '### Reconstruct OTDA outputs'
+      - The constructor is part of `scriptSig`. It uses 12,703 bytes for template `1`, 11,816 for `2`,
+        11,807 for `3`, 11,618 for `4`, 11,549 for `5`, 9,363 for `6`, 9,447 for `7`, 7,644 for `8`, and
+        7,718 for `9`. Templates `2` through `9` select reusable fragments from the initial encoding and
+        place frequently used fragments near the top of the stack. The constructor reconstructs the exact
+        signing preimage and fills each eligible output's HASH160 slot. The signing callback receives
+        the same message and SM2 user ID as the literal encoding. Use the final signed transaction ID
+        to build a child.
+      - After Chronicle activation, version-2 OTDA ALL can reconstruct matching outputs in their original
+        order. Paired OTDA SINGLE can reconstruct the same-index output and preserve the preceding null
+        outputs in the preimage. Both support `ANYONECANPAY`. Other output templates keep their literal
+        bytes. BIP143, NONE, unpaired SINGLE, version 1 and non-smaller encodings continue with the literal
+        unlocking script. [SDK options](docs/sdk.en.md) · [Constructor and generator](reference/README.md#otda-constructor)
+      - |-
+        | OTDA ALL, bytes | Literal | Reconstructed |
+        | --- | ---: | ---: |
+        | Two inputs and two outputs | 870,194 | 316,018 |
+        | First input's unlocking script | 290,109 | 13,023 |
+        | Add one input | 290,277 | 13,189 |
+        | Add one output | 434,814 | 145,022 |
+        | Fund and exit | 290,794 | 290,794 |
+        | Fund, turn over once, and exit | 1,160,988 | 606,812 |
+      - Both encodings use the same fixture keys and amounts and pass BSV Node 1.2.3 and the pinned chain-gang
+        build. The table uses benchmark profile `v1.1.0` for template `1` with automatic reconstruction
+        and `v1.0.0` for the literal encoding.
+    zh-CN:
+      - '[v1.10.0 候选版](#v1100)'
+      - '[协议规范](docs/spec.zh-CN.md) · [安全分析](docs/developer.zh-CN.md#security) · [复现与验证](#开发复现与输入输出分析)
+        · [交易成本](#完整交易与栈测量)'
+      - |-
+        付款方可以用收款人未压缩 SM2 公钥的 HASH160 锁定一笔 BSV 输出。花费时，
+        持有人公开该公钥，并为当前输入提供一次 SM2 签名。Bitcoin Script 使用 SM3 计算 SM2
+        用户标识摘要 ZA 和消息摘要，然后验证 SM2 签名，并通过 PUSHTX 和原生
+        `OP_CHECKSIG` 将授权绑定到实际的花费交易。
+      - '### 项目版本与锁定模板'
+      - v1.1.0 为首个公开版本 v1.0.0 的锁定模板 `1` 默认启用 OTDA 重建。v1.2.0 至 v1.7.0 依次对应模板 `2` 至 `7`。v1.9.0 和 v1.10.0
+        增加模板 `8` 和 `9`。钱包按上一输出的完整字节识别并花费九种模板。
+      - |-
+        | 项目 | 取值 |
+        | --- | --- |
+        | 收款标识 | 65 字节公钥 `04 \|\| X_BE32 \|\| Y_BE32` 的 HASH160 |
+        | SM2 用户标识 | 固定的 ASCII 字符串 `1234567812345678` |
+        | 锁定脚本 | 模板 `1` 为 144,925 字节，`2` 为 131,565 字节，`3` 为 125,616 字节，`4` 为 121,847 字节，`5` 为 110,747 字节，`6` 为 100,663 字节，`7` 为 98,362 字节，`8` 为 96,616 字节，`9` 为 95,790 字节 |
+        | 解锁脚本 | BIP143 为 291 字节，无配对输出的 OTDA SINGLE 为 294 字节，其他 OTDA 模式的长度随交易变化 |
+        | 解锁栈 | 签名预映像、未压缩公钥，以及 64 字节的 `r \|\| s` 签名 |
+        | 交易签名模式 | BIP143 和 Chronicle OTDA 均支持 ALL、NONE、SINGLE，每种模式均可选用 ANYONECANPAY |
+      - |-
+        当前源码包含[模板布局](versions/v1.0.0/layout.json)、[SM2 标准向量](versions/v1.0.0/sm2-standard.json)、
+        [完整付款向量](versions/v1.0.0/spend-all.json)和 [16 个签名预映像](versions/v1.0.0/sighash-modes.json)。[v1.0.0 发布页](https://github.com/linzhm/bsv-script-lab/releases/tag/p2pkh-sm2-v1.0.0)
+      - <a name="otda-constructor"></a>
+      - '### 重建 OTDA 输出'
+      - 构造器是 `scriptSig` 的一部分，模板 `1` 使用 12,703 字节，`2` 使用 11,816 字节，`3` 使用 11,807 字节，`4` 使用 11,618 字节，`5`
+        使用 11,549 字节，`6` 使用 9,363 字节，`7` 使用 9,447 字节，`8` 使用 7,644 字节，`9` 使用 7,718 字节。模板 `2` 至 `9` 从初始编码实际复制的指令中选出可复用片段，并把高频片段放在靠近栈顶的位置。构造器逐字节重建签名预映像，把收款人的
+        HASH160 填入各个适用输出。签名回调接收与原样编码一致的消息和 SM2 用户标识。构建子交易时使用最终已签交易的 ID。
+      - Chronicle 激活后，版本 2 的 OTDA ALL 交易可以按原顺序重建匹配的输出。配对 OTDA SINGLE 可以重建同索引输出，并保留预映像中前置的空输出。两种模式均支持 `ANYONECANPAY`。其他模板的输出按原字节写入。BIP143、NONE、无配对
+        SINGLE、版本 1 及体积未缩小的交易继续使用原样解锁。[SDK 选项](docs/sdk.zh-CN.md) · [构造器与生成方式](reference/README.zh-CN.md#otda-constructor)
+      - |-
+        | OTDA ALL 场景，单位为字节 | 原始解锁 | 重建解锁 |
+        | --- | ---: | ---: |
+        | 两进两出整笔 | 870,194 | 316,018 |
+        | 首个输入解锁 | 290,109 | 13,023 |
+        | 新增一个输入 | 290,277 | 13,189 |
+        | 新增一个输出 | 434,814 | 145,022 |
+        | 入金与直接退出 | 290,794 | 290,794 |
+        | 入金、一次转付和退出 | 1,160,988 | 606,812 |
+      - 两种编码用相同的测试密钥和金额，均由 BSV Node 1.2.3 和固定版本的 chain-gang 验证。此表针对模板 `1`，用 `v1.1.0` 测量自动重建，用 `v1.0.0`
+        复现原样编码。
+  reproduction:
+    en:
+      - '### Developer checks and cost analysis'
+      - |-
+        From the reference directory, install the pinned dependencies and run the
+        Linux node replay.
+      - |-
+        ```sh
+        cd projects/p2pkh-sm2/reference
+        python -m pip install -r requirements.txt
+        bash verify.sh
+        ```
+      - |-
+        For SignedData integration, pin the signer key and DER issuer-and-serial
+        identifier in trusted wallet configuration. Verify the actual funding
+        outpoint, its value, required confirmations and the recipient's lock before
+        asking the signer to approve a payment. The GB/T envelope is processed by
+        the off-chain adapter. The unlock carries the extracted raw signature.
+      - |-
+        In the 2×2 fixture, BIP143 ALL uses a 291-byte unlock. The literal OTDA ALL encoding serializes
+        both outputs into each input's signing preimage and raises the unlock to
+        290,109 bytes. A third output adds 144,925 bytes of output lock and also
+        changes both existing OTDA unlocks. The marginal table shows those costs
+        separately. Transaction version and the two SignedData version fields apply to their own encodings.
+    zh-CN:
+      - '### 开发复现与输入输出分析'
+      - 在仓库根目录启动 Linux 节点复放。测试环境需要 Python 3.12、Rust 和支持 SM2、SM3 的 OpenSSL。
+      - |-
+        ```sh
+        cd projects/p2pkh-sm2/reference
+        python -m pip install -r requirements.txt
+        bash verify.sh
+        ```
+      - 接入 SignedData 的钱包通过可信配置固定签名公钥和完整的 DER 颁发者与序列号。签名前核对被花费的 outpoint、金额、确认数和收款锁。国标封装由链下适配器处理，解锁脚本带的是提取后的原始签名。
+      - 两进两出时，BIP143 ALL 的解锁为 291 字节。OTDA ALL 的原始解锁把两个完整输出放进每个输入的签名预映像，解锁增至 290,109 字节。新增第三个输出时，除 144,925
+        字节的输出锁本身外，两个已有输入的解锁也会变长。下表分项列出这些开销。交易版本和 SignedData 的两层版本值分别按各自的编码规则处理。
+  script_sizes:
+    en:
+      - <a name="v1100"></a>
+      - '### v1.10.0 candidate'
+      - Template `9` stores fixed generator points as affine X and Y pairs and uses an addition kernel
+        specialized for an affine second point. It also reverses 32-byte values by recursively splitting
+        the input in half. The 2×2 OTDA ALL payment saves 1,504 bytes. Each reconstructed input carries
+        a constructor that is 74 bytes larger. For a 12-input, one-output OTDA ALL payment, the total
+        grows from 197,151 to 197,213 bytes.
+      - |-
+        | Measured bytes | v1.9.0 | v1.10.0 | Change |
+        | --- | ---: | ---: | ---: |
+        | Locking script | 96,616 | 95,790 | −0.9% |
+        | OTDA constructor | 7,644 | 7,718 | +1.0% |
+        | BIP143 ALL, 2×2 transaction | 193,936 | 192,284 | −0.9% |
+        | OTDA ALL, 2×2 transaction with reconstruction | 209,282 | 207,778 | −0.7% |
+      - 'Select template `9` with `--version 9` or SDK `template: "v1.10.0"`. [Template fingerprint](versions/v1.10.0/layout.json)
+        · [Measurements](versions/v1.10.0/measurements.json) · [34 latest-template cases](versions/v1.10.0/latest-template-coverage.json)'
+      - <a name="p2pkh-sponsorship"></a>
+      - '#### P2PKH interactions and zero-fee sponsorship'
+      - Funded regtest exercised P2PKH funding of template `9`, a same-template SM2 payment with a P2PKH
+        fee input, and an SM2 exit to P2PKH with sponsor change. Under the launcher's default policy profile,
+        the BIP143 and OTDA cases all admitted and mined those funded transactions.
+      - |-
+        | Scenario | Funded regtest result |
+        | --- | --- |
+        | Append a P2PKH fee input before submission | The BIP143 `0xc1` and OTDA `0xe1` SM2 witnesses remained valid with the same outputs. A separately confirmed P2PKH UTXO paid 150,000 sat and the completed transactions mined. |
+        | Plan a sponsor change output | The approved transaction paid the full 10,000,000 sat principal to a template `9` or P2PKH output, returned 50,000 sat to the sponsor and paid a 150,000 sat fee. Adding a change output after signing ALL invalidated the SM2 witness. |
+        | Submit zero fee first, then try a sponsored replacement | The zero-fee transaction entered the mempool and stayed unmined in three blocks. The same-input sponsored transaction returned `txn-mempool-conflict`. |
+        | Pay from a child transaction | Both zero-fee parents included a P2PKH output. A P2PKH child spending that output and a sponsor UTXO paid 150,000 sat. Each parent and child mined in the same block. |
+      - The isolated node used a 0.5 sat/B mining floor. The raised-profile run also checks the complete
+        scripts on BSV Node and chain-gang and rejects an appended input with ordinary ALL. [Default policy
+        replay](versions/v1.10.0/p2pkh-default.json) · [Raised policy replay](versions/v1.10.0/p2pkh-raised.json)
+        · [Reproduction](reference/README.md#p2pkh-sponsorship)
+      - <a name="v190"></a>
+      - '### v1.9.0'
+      - Template `8` checks for infinity once per group of five doublings and reuses one copy of the SM2
+        field prime throughout the group. SM3 expands message words as compression rounds need them, with
+        a rolling schedule of 16 words. The shorter scripts and their byte layout also reduce the OTDA
+        constructor for a payment using template `8` throughout.
+      - |-
+        | Measured bytes | v1.7.0 | v1.9.0 | Change |
+        | --- | ---: | ---: | ---: |
+        | Locking script | 98,362 | 96,616 | −1.8% |
+        | OTDA constructor | 9,447 | 7,644 | −19.1% |
+        | BIP143 ALL, 2×2 transaction | 197,428 | 193,936 | −1.8% |
+        | OTDA ALL, 2×2 transaction with reconstruction | 216,380 | 209,282 | −3.3% |
+        | OTDA ALL, unlocking script per input in that transaction | 9,767 | 7,964 | −18.5% |
+      - In the 34-case transaction matrix, 33 transactions are smaller and the native-only destination
+        case has the same size. Six-input, two-output OTDA ALL falls from 256,604 to 242,294 bytes.
+      - 'Select template `8` for new outputs with `--version 8` or SDK `template: "v1.9.0"`. [Template
+        fingerprint](versions/v1.9.0/layout.json) · [Recorded measurements](versions/v1.9.0/measurements.json)
+        · [34 latest-template cases](versions/v1.9.0/latest-template-coverage.json)'
+      - <a name="v180"></a>
+      - '### v1.8.0'
+      - The wallet uses a shared OTDA constructor when an ALL payment includes outputs of both templates
+        `6` and `7`. It emits the common prefix once, then rebuilds both suffixes from shared byte spans.
+        The same constructor applies with ANYONECANPAY. This release uses the existing locking templates
+        and selects the shared encoding automatically when it is the shortest candidate.
+      - |-
+        | Measured bytes | v1.7.0 | v1.8.0 | Change |
+        | --- | ---: | ---: | ---: |
+        | Constructor for both templates | 18,810 | 9,681 | −48.5% |
+        | OTDA ALL, 2×2 transaction with mixed outputs | 237,409 | 219,151 | −7.7% |
+        | OTDA ALL, unlocking script per input in that transaction | 19,131 | 10,002 | −47.7% |
+      - The comparison uses the same inputs, output order and signing preimages. [Constructor](versions/v1.8.0/mixed-otda-constructor.json)
+        · [Reproduction](reference/README.md#mixed-otda-constructor) · [Recorded measurements](versions/v1.8.0/measurements.json)
+      - <a name="latest-template-coverage"></a>
+      - '#### Payments using template 7'
+      - The matrix uses v1.7.0 for every SM2 prevout and recipient. The v1.7.0 and v1.8.0 wallet revisions
+        produced identical transaction IDs and sizes for all 34 cases. The shared constructor requires
+        both templates `6` and `7` among the signed outputs, so the additional savings in this matrix
+        are zero.
+      - The existing single-template OTDA constructor still reduces eligible transactions compared with
+        literal preimages. BSV Node 1.2.3 and chain-gang verified both encodings in every case. The matrix
+        covers all 12 sighash types, paired and unpaired SINGLE, different input and output counts, multiple
+        prevouts from one funding transaction, native P2PKH inputs and outputs, and a transaction with
+        253 outputs. [Per-case sizes and transaction IDs](versions/v1.8.0/latest-template-coverage.json)
+        · [Reproduction](reference/README.md#latest-template-coverage)
+      - <a name="v170"></a>
+      - '### v1.7.0'
+      - The verifier computes `sG + tQ` with signed radix-32 digits. Each table holds magnitudes 0 through
+        16, with Y negated for negative digits. This reduces the unrolled window count from 64 to 52 and
+        the scalar multiplication block from 40,158 to 37,854 bytes.
+      - |-
+        | Measured bytes | v1.6.0 | v1.7.0 | Change |
+        | --- | ---: | ---: | ---: |
+        | Locking script | 100,663 | 98,362 | −2.3% |
+        | BIP143 ALL, 2×2 transaction | 202,030 | 197,428 | −2.3% |
+        | OTDA ALL, 2×2 transaction with reconstruction | 220,814 | 216,380 | −2.0% |
+        | OTDA ALL, unlocking script per input in that transaction | 9,683 | 9,767 | +0.9% |
+      - 'Select template `7` for a new output with `--version 7` or SDK `template: "v1.7.0"`. One OTDA
+        ALL preimage can contain reconstructed outputs of all seven templates. [Forth lock](../../src/fourthgraph/stdlib/wallet/p2pkh-sm2.fth)
+        · [Template fingerprint](versions/v1.7.0/layout.json) · [Recorded measurements](versions/v1.7.0/measurements.json)'
+      - <a name="v160"></a>
+      - '### v1.6.0'
+      - SM3 rotates a word left by multiplying it by the corresponding power of two, splitting the eight-byte
+        product into two 32-bit halves, and combining them with `OP_OR`. Selected round words stay in
+        five-byte form across bitwise operations. The ZA and message hash programs together save 10,084
+        bytes per output. The OTDA constructor finds reusable spans in the resulting bytecode.
+      - |-
+        | Measured bytes | v1.5.0 | v1.6.0 | Change |
+        | --- | ---: | ---: | ---: |
+        | Locking script | 110,747 | 100,663 | −9.1% |
+        | BIP143 ALL, 2×2 transaction | 222,198 | 202,030 | −9.1% |
+        | OTDA ALL, 2×2 transaction with reconstruction | 245,354 | 220,814 | −10.0% |
+        | OTDA ALL, unlocking script per input in that transaction | 11,869 | 9,683 | −18.4% |
+      - 'Select template `6` for a new output with `--version 6` or SDK `template: "v1.6.0"`. One OTDA
+        ALL preimage can contain reconstructed outputs of all six templates. [SM3 emitter](reference/sm3_script.py)
+        · [Template fingerprint](versions/v1.6.0/layout.json) · [Recorded measurements](versions/v1.6.0/measurements.json)'
+      - <a name="v150"></a>
+      - '### v1.5.0'
+      - The Forth formula compiler schedules the same homogeneous point arithmetic over the SM2 field.
+        The compiled point addition is 123 bytes and doubling is 74 bytes, down from 176 and 89. The generator
+        uses the frozen kernels at build time. Their compiler test compares the exact signed coordinates
+        produced by the previous kernels, including infinity, equal points, inverse points and negative
+        representatives.
+      - |-
+        | Measured bytes | v1.4.0 | v1.5.0 | Change |
+        | --- | ---: | ---: | ---: |
+        | Locking script | 121,847 | 110,747 | −9.1% |
+        | BIP143 ALL, 2×2 transaction | 244,398 | 222,198 | −9.1% |
+        | OTDA ALL, 2×2 transaction with reconstruction | 267,692 | 245,354 | −8.3% |
+        | OTDA ALL, unlocking script per input in that transaction | 11,938 | 11,869 | −0.6% |
+      - 'Select template `5` for a new output with `--version 5` or SDK `template: "v1.5.0"`. An OTDA
+        ALL preimage can contain reconstructed outputs of all five templates. [Point formulas and reproduction](reference/README.md#point-kernels)
+        · [Template fingerprint](versions/v1.5.0/layout.json) · [Recorded measurements](versions/v1.5.0/measurements.json)'
+      - <a name="v140"></a>
+      - '### v1.4.0'
+      - The SM3 emitter stores expanded message words and selected round state words as five-byte little-endian
+        values. The high byte is zero. Bitwise operations reuse those bytes directly, while arithmetic
+        reads use `OP_BIN2NUM`. Reversing each four-byte word by halves also shortens data loading and
+        digest output. Both SM3 programs together save 3,769 bytes per lock.
+      - |-
+        | Measured bytes | v1.3.0 | v1.4.0 | Change |
+        | --- | ---: | ---: | ---: |
+        | Locking script | 125,616 | 121,847 | −3.0% |
+        | BIP143 ALL, 2×2 transaction | 251,936 | 244,398 | −3.0% |
+        | OTDA ALL, 2×2 transaction with reconstruction | 275,608 | 267,692 | −2.9% |
+        | OTDA ALL, unlocking script per input in that transaction | 12,127 | 11,938 | −1.6% |
+      - 'Select template `4` for a new output with `--version 4` or SDK `template: "v1.4.0"`. An OTDA
+        ALL preimage can contain reconstructed outputs of all four templates. [Template fingerprint](versions/v1.4.0/layout.json)
+        · [Recorded measurements](versions/v1.4.0/measurements.json)'
+      - <a name="v130"></a>
+      - '### v1.3.0'
+      - The point-addition and doubling routines use one `OP_MOD` per coordinate and retain signed residues
+        modulo the SM2 field prime. The verifier rejects a zero projective Z coordinate, then makes X
+        and Z nonnegative before checking the two possible field x coordinates of the signature. This
+        saves 5,949 bytes per output. The same OTDA ALL preimage can contain reconstructed outputs of
+        all three templates.
+      - |-
+        | Measured bytes | v1.2.0 | v1.3.0 | Change |
+        | --- | ---: | ---: | ---: |
+        | Locking script | 131,565 | 125,616 | −4.5% |
+        | BIP143 ALL, 2×2 transaction | 263,834 | 251,936 | −4.5% |
+        | OTDA ALL, 2×2 transaction with reconstruction | 287,524 | 275,608 | −4.1% |
+        | OTDA ALL, unlocking script per input in that transaction | 12,136 | 12,127 | −0.1% |
+      - 'Select template `3` for a new output with `--version 3` or SDK `template: "v1.3.0"`. [Template
+        fingerprint](versions/v1.3.0/layout.json) · [Recorded measurements](versions/v1.3.0/measurements.json)
+        · [Forth lock](../../src/fourthgraph/stdlib/wallet/p2pkh-sm2.fth)'
+      - <a name="v120"></a>
+      - '### v1.2.0'
+      - Template `2` consumes SM3 operands at their last use and reuses the stack slots of surviving state
+        words across rounds. This saves 13,360 bytes per output. All templates apply the same SM2, ZA,
+        sighash and transaction-binding rules.
+      - |-
+        | Measured bytes | v1.1.0 | v1.2.0 | Change |
+        | --- | ---: | ---: | ---: |
+        | Locking script | 144,925 | 131,565 | −9.2% |
+        | BIP143 ALL, 2×2 transaction | 290,554 | 263,834 | −9.2% |
+        | OTDA ALL, 2×2 transaction with reconstruction | 316,018 | 287,524 | −9.0% |
+        | OTDA ALL, unlocking script per input in that transaction | 13,023 | 12,136 | −6.8% |
+      - 'BSV Node 1.2.3 and the pinned chain-gang build replayed the complete inputs with explicit prevouts.
+        To opt in for new outputs, use `--version 2` or SDK `template: "v1.2.0"`. [Template fingerprint](versions/v1.2.0/layout.json)
+        · [Recorded measurements](versions/v1.2.0/measurements.json) · [Forth lock](../../src/fourthgraph/stdlib/wallet/p2pkh-sm2.fth)
+        · [Benchmark reproduction](../../docs/benchmark.md#run)'
+    zh-CN:
+      - <a name="v1100"></a>
+      - '### v1.10.0 候选版'
+      - 模板 `9` 的固定生成元表只存仿射 X、Y 坐标，点加使用第二个点为仿射坐标的专用公式。32 字节换序改为逐级二分。两进两出 OTDA ALL 整笔节省 1,504 字节，每个使用重建的输入的构造器增加
+        74 字节。十二进一出 OTDA ALL 的整笔长度从 197,151 增至 197,213 字节。
+      - |-
+        | 实测字节数 | v1.9.0 | v1.10.0 | 变化 |
+        | --- | ---: | ---: | ---: |
+        | 锁定脚本 | 96,616 | 95,790 | −0.9% |
+        | OTDA 构造器 | 7,644 | 7,718 | +1.0% |
+        | BIP143 ALL，两进两出整笔 | 193,936 | 192,284 | −0.9% |
+        | OTDA ALL，两进两出整笔，启用重建 | 209,282 | 207,778 | −0.7% |
+      - '用 `--version 9` 或 SDK 的 `template: "v1.10.0"` 选用模板 `9`。[模板指纹](versions/v1.10.0/layout.json) ·
+        [测量记录](versions/v1.10.0/measurements.json) · [34 个最新模板用例](versions/v1.10.0/latest-template-coverage.json)'
+      - <a name="p2pkh-sponsorship"></a>
+      - '#### P2PKH 交互与零费补费'
+      - 有资金的 regtest 覆盖了 P2PKH 向模板 `9` 入金、原生 P2PKH 为同模板 SM2 转账补费，以及 SM2 退出到 P2PKH 并给赞助方找零。启动器的默认策略下，BIP143
+        和 OTDA 两组入金、补费及退出交易均进入内存池并入块。
+      - |-
+        | 场景 | 有资金的 regtest 实测 |
+        | --- | --- |
+        | 广播前追加 P2PKH 补费输入 | SM2 预签 BIP143 `0xc1` 或 OTDA `0xe1`，保留原输出和原 SM2 解锁脚本。独立确认的 P2PKH UTXO 支付 150,000 sat，整笔入块。 |
+        | 预先纳入赞助方找零 | 同一笔交易把完整的 10,000,000 sat 本金付给模板 `9` 或 P2PKH 输出，赞助方收到 50,000 sat 找零，费用为 150,000 sat。ALL 签名后再追加找零会使 SM2 解锁失效。 |
+        | 先广播零费版，再提交补费版 | 零费版进入内存池，连续三个区块未入块。花费相同上一输出的补费版返回 `txn-mempool-conflict`。 |
+        | 用子交易补费（CPFP） | 零费父交易包含一个预先签入的 P2PKH 输出。子交易花费该输出及赞助方 UTXO，支付 150,000 sat，父子同块入账。 |
+      - 隔离节点的挖矿费率下限为 0.5 sat/B。放宽策略的回放还用 BSV Node 和 chain-gang 验证了完整脚本，并确认普通 ALL 会拒绝签名后追加输入。[默认策略回放](versions/v1.10.0/p2pkh-default.json)
+        · [放宽策略回放](versions/v1.10.0/p2pkh-raised.json) · [复现方式](reference/README.zh-CN.md#p2pkh-sponsorship)
+      - <a name="v190"></a>
+      - '### v1.9.0'
+      - 模板 `8` 每组五次倍点只检查一次无穷远点，并在组内复用 SM2 域模数。SM3 随压缩轮次展开消息字，运行时保留 16 个消息字的滑动窗口。缩短后的字节码也让整笔付款都用模板 `8`
+        时的 OTDA 构造器更小。
+      - |-
+        | 实测字节数 | v1.7.0 | v1.9.0 | 变化 |
+        | --- | ---: | ---: | ---: |
+        | 锁定脚本 | 98,362 | 96,616 | −1.8% |
+        | OTDA 构造器 | 9,447 | 7,644 | −19.1% |
+        | BIP143 ALL，两进两出整笔 | 197,428 | 193,936 | −1.8% |
+        | OTDA ALL，两进两出整笔，启用重建 | 216,380 | 209,282 | −3.3% |
+        | 上述 OTDA ALL 交易每个输入的解锁脚本 | 9,767 | 7,964 | −18.5% |
+      - 34 个交易用例中，33 个缩小了，只有全部支付给原生 P2PKH 的用例字节数相同。六进两出 OTDA ALL 从 256,604 降至 242,294 字节。
+      - '创建新输出时，用 `--version 8` 或 SDK 的 `template: "v1.9.0"` 选用模板 `8`。[模板指纹](versions/v1.9.0/layout.json)
+        · [测量记录](versions/v1.9.0/measurements.json) · [34 个最新模板用例](versions/v1.9.0/latest-template-coverage.json)'
+      - <a name="v180"></a>
+      - '### v1.8.0'
+      - 当一笔 OTDA ALL 付款同时包含模板 `6` 和 `7` 的输出时，钱包可以共用一份构造器。构造器只写入一次公共前缀，并复用字节片段重建两个后缀。加上 ANYONECANPAY 时也适用。本版沿用现有锁定模板，钱包会在共享编码最短时自动选用。
+      - |-
+        | 实测字节数 | v1.7.0 | v1.8.0 | 变化 |
+        | --- | ---: | ---: | ---: |
+        | 两种模板的构造器 | 18,810 | 9,681 | −48.5% |
+        | OTDA ALL，两进两出混合模板整笔 | 237,409 | 219,151 | −7.7% |
+        | 上述 OTDA ALL 交易的单输入解锁脚本 | 19,131 | 10,002 | −47.7% |
+      - 对比使用相同的输入、输出顺序和签名预映像。[构造器](versions/v1.8.0/mixed-otda-constructor.json) · [复现方式](reference/README.zh-CN.md#mixed-otda-constructor)
+        · [测量记录](versions/v1.8.0/measurements.json)
+      - <a name="latest-template-coverage"></a>
+      - '#### 只用模板 7 的付款'
+      - 矩阵中的 SM2 上一输出和收款输出都用 v1.7.0。v1.7.0 和 v1.8.0 钱包代码在 34 个用例中生成的交易 ID 和大小完全一致。共享构造器要求签名覆盖的输出同时包含模板
+        `6` 和 `7`，因此在这个矩阵中的额外节省为 0 字节。
+      - 模板 7 现有的单模板 OTDA 重建仍能缩短符合条件的交易。BSV Node 1.2.3 和 chain-gang 逐例验证了原样编码与自动编码。矩阵覆盖 12 种签名模式、配对与无配对
+        SINGLE、不同输入输出数量、同一笔入金的多个上一输出、原生 P2PKH 输入和输出，以及 253 个输出的交易。[逐用例大小与交易 ID](versions/v1.8.0/latest-template-coverage.json)
+        · [复现方式](reference/README.zh-CN.md#latest-template-coverage)
+      - <a name="v170"></a>
+      - '### v1.7.0'
+      - 验签用有符号的 32 进制数位计算 `sG + tQ`。两张点表分别保存绝对值 0 至 16 对应的点，数位为负时对 Y 取反。展开的窗口从 64 组降到 52 组，标量乘法字节码从 40,158
+        降到 37,854 字节。
+      - |-
+        | 实测字节数 | v1.6.0 | v1.7.0 | 变化 |
+        | --- | ---: | ---: | ---: |
+        | 锁定脚本 | 100,663 | 98,362 | −2.3% |
+        | BIP143 ALL，两进两出整笔 | 202,030 | 197,428 | −2.3% |
+        | OTDA ALL，两进两出整笔，启用重建 | 220,814 | 216,380 | −2.0% |
+        | 上述 OTDA ALL 交易的单输入解锁脚本 | 9,683 | 9,767 | +0.9% |
+      - '创建新输出时，用 `--version 7` 或 SDK 的 `template: "v1.7.0"` 选用模板 `7`。同一份 OTDA ALL 预映像可重建七种模板的输出。[Forth
+        锁定脚本](../../src/fourthgraph/stdlib/wallet/p2pkh-sm2.fth) · [模板指纹](versions/v1.7.0/layout.json)
+        · [测量记录](versions/v1.7.0/measurements.json)'
+      - <a name="v160"></a>
+      - '### v1.6.0'
+      - SM3 把循环左移实现为乘以对应的二次幂，再把八字节乘积拆成两个 32 位字，用 `OP_OR` 合并。部分轮状态字在位运算间保留五字节表示。ZA 和交易消息的两段哈希程序合计为每个输出节省
+        10,084 字节。OTDA 构造器从生成的字节码中查找可复用片段。
+      - |-
+        | 实测字节数 | v1.5.0 | v1.6.0 | 变化 |
+        | --- | ---: | ---: | ---: |
+        | 锁定脚本 | 110,747 | 100,663 | −9.1% |
+        | BIP143 ALL，两进两出整笔 | 222,198 | 202,030 | −9.1% |
+        | OTDA ALL，两进两出整笔，启用重建 | 245,354 | 220,814 | −10.0% |
+        | 上述 OTDA ALL 交易的单输入解锁脚本 | 11,869 | 9,683 | −18.4% |
+      - '创建新输出时，用 `--version 6` 或 SDK 的 `template: "v1.6.0"` 选用模板 `6`。同一份 OTDA ALL 预映像可重建六种模板的输出。[SM3
+        生成器](reference/sm3_script.py) · [模板指纹](versions/v1.6.0/layout.json) · [测量记录](versions/v1.6.0/measurements.json)'
+      - <a name="v150"></a>
+      - '### v1.5.0'
+      - Forth 公式编译器为 SM2 域上的同一套齐次投影坐标运算重新安排栈操作。点加从 176 字节降到 123 字节，倍点从 89 字节降到 74 字节。生成器在构建锁定脚本时使用固定的编译结果。测试逐字节比对新旧运算输出的有符号坐标，包括无穷远点、相同点、互逆点和负坐标表示。
+      - |-
+        | 实测字节数 | v1.4.0 | v1.5.0 | 变化 |
+        | --- | ---: | ---: | ---: |
+        | 锁定脚本 | 121,847 | 110,747 | −9.1% |
+        | BIP143 ALL，两进两出整笔 | 244,398 | 222,198 | −9.1% |
+        | OTDA ALL，两进两出整笔，启用重建 | 267,692 | 245,354 | −8.3% |
+        | 上述 OTDA ALL 交易的单输入解锁脚本 | 11,938 | 11,869 | −0.6% |
+      - '创建新输出时，用 `--version 5` 或 SDK 的 `template: "v1.5.0"` 选用模板 `5`。同一份 OTDA ALL 预映像可重建五种模板的输出。[点运算公式与复现](reference/README.zh-CN.md#point-kernels)
+        · [模板指纹](versions/v1.5.0/layout.json) · [测量记录](versions/v1.5.0/measurements.json)'
+      - <a name="v140"></a>
+      - '### v1.4.0'
+      - SM3 生成器把扩展消息字和部分轮状态字存为五字节小端值，最高字节为零。位运算直接复用这些字节，算术运算读取时用 `OP_BIN2NUM` 转为 ScriptNum。四字节换序也改用两半分别换序再拼接，缩短读入和摘要输出。两段
+        SM3 程序合计为每个锁定脚本节省 3,769 字节。
+      - |-
+        | 实测字节数 | v1.3.0 | v1.4.0 | 变化 |
+        | --- | ---: | ---: | ---: |
+        | 锁定脚本 | 125,616 | 121,847 | −3.0% |
+        | BIP143 ALL，两进两出整笔 | 251,936 | 244,398 | −3.0% |
+        | OTDA ALL，两进两出整笔，启用重建 | 275,608 | 267,692 | −2.9% |
+        | 上述 OTDA ALL 交易的单输入解锁脚本 | 12,127 | 11,938 | −1.6% |
+      - '创建新输出时，用 `--version 4` 或 SDK 的 `template: "v1.4.0"` 选用模板 `4`。同一份 OTDA ALL 预映像可重建四种模板的输出。[模板指纹](versions/v1.4.0/layout.json)
+        · [测量记录](versions/v1.4.0/measurements.json)'
+      - <a name="v130"></a>
+      - '### v1.3.0'
+      - 点加和倍点对每个坐标执行一次 `OP_MOD`，保留模 SM2 域素数的有符号余数。验签器先拒绝投影坐标 Z 为零的情况，再将 X、Z 转为非负余数，检查签名对应的两个可能域横坐标。每个新输出节省
+        5,949 字节。同一份 OTDA ALL 预映像可重建三种模板的输出。
+      - |-
+        | 实测字节数 | v1.2.0 | v1.3.0 | 变化 |
+        | --- | ---: | ---: | ---: |
+        | 锁定脚本 | 131,565 | 125,616 | −4.5% |
+        | BIP143 ALL，两进两出整笔 | 263,834 | 251,936 | −4.5% |
+        | OTDA ALL，两进两出整笔，启用重建 | 287,524 | 275,608 | −4.1% |
+        | 上述 OTDA ALL 交易的单输入解锁脚本 | 12,136 | 12,127 | −0.1% |
+      - '创建新输出时，用 `--version 3` 或 SDK 的 `template: "v1.3.0"` 选用模板 `3`。[模板指纹](versions/v1.3.0/layout.json)
+        · [测量记录](versions/v1.3.0/measurements.json) · [Forth 锁定脚本](../../src/fourthgraph/stdlib/wallet/p2pkh-sm2.fth)'
+      - <a name="v120"></a>
+      - '### v1.2.0'
+      - 模板 `2` 在 SM3 操作数最后一次使用时直接取走它，并在轮次间复用仍需保留的状态字所在栈位，每个输出节省 13,360 字节。所有模板使用相同的 SM2、ZA、签名覆盖范围和交易绑定规则。
+      - |-
+        | 实测字节数 | v1.1.0 | v1.2.0 | 变化 |
+        | --- | ---: | ---: | ---: |
+        | 锁定脚本 | 144,925 | 131,565 | −9.2% |
+        | BIP143 ALL，两进两出整笔 | 290,554 | 263,834 | −9.2% |
+        | OTDA ALL，两进两出整笔，启用重建 | 316,018 | 287,524 | −9.0% |
+        | 上述 OTDA ALL 交易的单输入解锁脚本 | 13,023 | 12,136 | −6.8% |
+      - 'BSV Node 1.2.3 与项目固定版本的 chain-gang 均使用显式上一输出复放并验证了完整输入。创建新输出时，用 `--version 2` 或 SDK 的 `template:
+        "v1.2.0"` 选用新模板。[模板指纹](versions/v1.2.0/layout.json) · [测量记录](versions/v1.2.0/measurements.json)
+        · [Forth 锁定脚本](../../src/fourthgraph/stdlib/wallet/p2pkh-sm2.fth) · [基准复现](../../docs/benchmark.zh-CN.md)'
+  integration:
+    en:
+      - '### Generate a locking script'
+      - |-
+        Run these commands from the repository root. The owner hash below is an
+        example. Substitute the recipient’s HASH160 for an actual output.
+      - |-
+        ```sh
+        cd projects/p2pkh-sm2/reference
+        python3 generate_lock.py --owner-hash160 000102030405060708090a0b0c0d0e0f10111213
+        python3 generate_lock.py --owner-hash160 000102030405060708090a0b0c0d0e0f10111213 --format raw > scriptPubKey.bin
+        ```
+      - |-
+        The first command reports the template version, byte length, and SHA-256 for
+        the supplied owner. The second writes the exact locking script bytes. Use
+        `--public-key` to supply the recipient’s uncompressed public key instead of
+        its hash. The generator validates the public key before hashing it.
+      - '### Authorize and verify a payment'
+      - |-
+        Use `sign_payment` for a one-input BIP143 ALL payment (`0x41`). Use
+        `sign_input` to choose a signature mode for each input of a prepared
+        transaction. For OTDA, pass the Chronicle activation state for the actual
+        spend. The wallet calls an external signer and verifies the returned signature
+        before building the unlocking script. [Protocol specification](docs/spec.en.md)
+        · [Python reference and node tests](reference/README.md)
+      - |-
+        The wallet adapter accepts a direct SM2 signature from a single signer in a
+        GB/T 35275-2026 `SignedData` envelope. The envelope uses
+        `SignedData.version = 1` and `SignerInfo.version = 2`. The Python and Rust
+        command-line signers use dedicated test keys. [SignedData integration](reference/README.md#signeddata-payment-interop)
+        · [Python test signer](reference/interop/python-signer/README.md)
+        · [Rust test signer](reference/interop/rust-signer/README.md)
+    zh-CN:
+      - '### 生成锁定脚本'
+      - |-
+        在仓库根目录运行下面的命令。示例中的哈希仅供演示，创建实际输出时请换成收款人的
+        公钥 HASH160。
+      - |-
+        ```sh
+        cd projects/p2pkh-sm2/reference
+        python3 generate_lock.py --owner-hash160 000102030405060708090a0b0c0d0e0f10111213
+        python3 generate_lock.py --owner-hash160 000102030405060708090a0b0c0d0e0f10111213 --format raw > scriptPubKey.bin
+        ```
+      - |-
+        第一条命令输出模板编号、脚本字节数和该收款脚本的 SHA-256。第二条命令将锁定脚本的
+        原始字节写入文件。也可以通过 `--public-key` 提供未压缩的收款公钥，生成器会先验证
+        公钥，再计算其哈希。
+      - '### 签署并验证付款'
+      - |-
+        单输入付款可用 `sign_payment`，它使用 BIP143 ALL（`0x41`）。交易已构造好时，
+        可用 `sign_input` 为不同输入分别选择签名模式。签署 OTDA 输入时，请提供实际花费时
+        的 Chronicle 激活状态。钱包调用外部签名器，验证返回的签名后再构造解锁脚本。
+        [协议规范](docs/spec.zh-CN.md) · [Python 参考实现与节点测试](reference/README.zh-CN.md)
+      - |-
+        钱包适配器支持 GB/T 35275-2026 `SignedData` 中由单个签名者直接对消息生成的
+        SM2 签名。封装的外层 `SignedData.version = 1`，内层 `SignerInfo.version = 2`。
+        Python 和 Rust 命令行签名器均使用专用测试密钥。[SignedData 接入指南](reference/README.zh-CN.md#signeddata-付款接入)
+        · [Python 测试签名器](reference/interop/python-signer/README.zh-CN.md)
+        · [Rust 测试签名器](reference/interop/rust-signer/README.zh-CN.md)
+  transactions:
+    en:
+      - BSV Node 1.2.3 and the project's pinned chain-gang validate the complete inputs of these deterministic
+        fixtures. The node replays scripts with supplied prevouts. Funded mempool and mining tests have
+        separate records. Scripts and transactions are measured in bytes. Script sizes follow input and
+        output order. `× n` indicates n equal sizes. Stack peaks refer to input zero, with independent
+        peaks for main-stack items, altstack items, and combined payload. The development evaluator measures
+        stack payload bytes on the successful path.
+      - |-
+        | Signing mode and unlocking encoding | Inputs×outputs | Previous locks | Unlocks | New locks | Total | Main / alt items | Stack payload |
+        | --- | --- | --- | --- | --- | --- | --- | --- |
+        | BIP143 ALL `0x41` | 2×2 | 144,925 × 2 | 291 × 2 | 144,925 × 2 | 290,554 | 122 / 133 | 4,147 |
+        | OTDA ALL `0x61`, v1.1.0 default | 2×2 | 144,925 × 2 | 13,023 × 2 | 144,925 × 2 | 316,018 | 122 / 133 | 580,080 |
+        | OTDA ALL `0x61`, v1.0.0 literal | 2×2 | 144,925 × 2 | 290,109 × 2 | 144,925 × 2 | 870,194 | 122 / 133 | 580,080 |
+    zh-CN:
+      - 下表来自确定性交易夹具，所有完整输入由 BSV Node 1.2.3 和项目固定的 chain-gang 版本验证。节点通过显式提供上一输出执行脚本，默认策略下的入内存池及出块另有复放记录。脚本和交易以字节计。表中按索引列出每个输入或输出的大小，`×
+        n` 表示同样大小重复 n 次。栈数据取第一个输入的成功路径。主栈项数、备用栈项数和两栈载荷分别记录各自达到的峰值，单位为项或字节。栈开销由开发求值器估计，统计栈上数据的字节数。
+      - |-
+        | 签名模式与解锁编码 | 输入×输出 | 上一输出锁定 | 解锁 | 新输出锁定 | 整笔 | 主栈 / 备用栈 | 两栈载荷 |
+        | --- | --- | --- | --- | --- | --- | --- | --- |
+        | BIP143 ALL `0x41` | 2×2 | 144,925 × 2 | 291 × 2 | 144,925 × 2 | 290,554 | 122 / 133 | 4,147 |
+        | OTDA ALL `0x61`，v1.1.0 默认重建 | 2×2 | 144,925 × 2 | 13,023 × 2 | 144,925 × 2 | 316,018 | 122 / 133 | 580,080 |
+        | OTDA ALL `0x61`，v1.0.0 原样编码 | 2×2 | 144,925 × 2 | 290,109 × 2 | 144,925 × 2 | 870,194 | 122 / 133 | 580,080 |
+  lifecycle:
+    en:
+      - Each marginal cell shows the **change in total bytes (output locks / input unlocks / other bytes)**.
+        Other bytes include values, outpoints, sequence numbers, and CompactSize fields. Previous locks
+        identify the coins being spent and belong to their funding transactions. Both lifecycle totals
+        include native P2PKH funding and exit. The second adds one payment between project outputs.
+      - |-
+        | Template and mode | Added-input shape | Added-input bytes | Added-output shape | Added-output bytes | Fund and exit | One turnover |
+        | --- | --- | --- | --- | --- | --- | --- |
+        | `v1.0.0` · `0x41` | 3×2 | 334 (0 / 291 / 43) | 2×3 | 144,938 (144,925 / 0 / 13) | 290,780 | 581,334 |
+        | `v1.0.0` · `0x61` | 3×2 | 290,277 (0 / 290,232 / 45) | 2×3 | 434,814 (144,925 / 289,876 / 13) | 290,794 | 1,160,988 |
+      - '[Unified benchmark and reproduction](../../docs/benchmark.md)'
+    zh-CN:
+      - 每个边际单元格为 **新增整笔字节（输出锁定脚本 / 输入解锁脚本 / 其余序列化字节）**。其余字节包括金额、outpoint、序列号和 CompactSize 等字段。上一输出脚本列用于说明被花费的锁，该脚本长度属于此前创建
+        UTXO 的交易。生命周期从原生 P2PKH 入金开始，以原生 P2PKH 退出，周转列在两者之间增加一次项目内转付。
+      - |-
+        | 模板与模式 | 加输入后 | 加输入成本 | 加输出后 | 加输出成本 | 入金与直接退出 | 含一次周转 |
+        | --- | --- | --- | --- | --- | --- | --- |
+        | `v1.0.0` · `0x41` | 3×2 | 334 (0 / 291 / 43) | 2×3 | 144,938 (144,925 / 0 / 13) | 290,780 | 581,334 |
+        | `v1.0.0` · `0x61` | 3×2 | 290,277 (0 / 290,232 / 45) | 2×3 | 434,814 (144,925 / 289,876 / 13) | 290,794 | 1,160,988 |
+      - '[统一测量入口与复现口径](../../docs/benchmark.zh-CN.md)'

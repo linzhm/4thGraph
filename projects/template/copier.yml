@@ -1,0 +1,30 @@
+_subdirectory: project
+_envops:
+  keep_trailing_newline: true
+
+scaffold:
+  type: bool
+  default: true
+schema_version:
+  type: int
+  validator: "{% if schema_version != 1 %}Expected schema_version 1{% endif %}"
+title:
+  type: yaml
+title_en:
+  type: str
+  default: ""
+title_zh:
+  type: str
+  default: ""
+summary:
+  type: yaml
+entry_points:
+  type: yaml
+sections:
+  type: yaml
+setup:
+  type: yaml
+  default: {}
+readme:
+  type: yaml
+  default: {}

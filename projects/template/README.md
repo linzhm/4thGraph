@@ -4,17 +4,27 @@
 
 ## Create a project
 
-From the repository root, run:
+From the repository root, install Copier and the manifest validator in a documentation environment.
 
 ```sh
-python3 tools/project_readme.py my-project --scaffold --title "My project" --title-zh "我的项目"
+python3 -m venv workspace/docs
+. workspace/docs/bin/activate
+python3 -m pip install -r tools/requirements-docs.txt
+```
+
+Create a new project with the Copier CLI.
+
+```sh
+copier copy --defaults --data-file projects/template/manifest.example.yaml \
+  -d title_en="My project" -d title_zh="我的项目" \
+  projects/template projects/my-project
 ```
 
 The command creates a fresh project directory with the introduction manifest and draft READMEs. It creates the three working directories for implementation, documentation, and versioned evidence.
 
 ```text
 projects/my-project/
-├── manifest.json
+├── manifest.yaml
 ├── README.md
 ├── README.zh-CN.md
 ├── docs/
@@ -24,13 +34,13 @@ projects/my-project/
 
 | Path | Contents |
 | --- | --- |
-| `manifest.json` | Bilingual overview, public entry points, algorithm, reproduction and applicable measurements. The generator owns both READMEs. |
+| `manifest.yaml` | Bilingual overview, public entry points, algorithm, reproduction and applicable measurements. The generator owns both READMEs. |
 | `docs/` | Protocol and developer guides. Use `spec.en.md` and `spec.zh-CN.md` for the protocol. Projects with a wallet integration can add `sdk.en.md` and `sdk.zh-CN.md`. |
 | `reference/` | Project-specific build, reference implementation, and replay entry points. Shared toolchain code belongs under `src/fourthgraph/`. |
 | `versions/` | Catalog and immutable baseline artifacts once a version is selected. |
 | `workspace/` | Local builds, dependencies and logs. Run `bash tools/setup-workspaces.sh` to create it. |
 
-[Project manifest schema](manifest.schema.json) · [Starter manifest](manifest.example.json) · [Schnorr example](../p2pkh-schnorr/manifest.json)
+[Project manifest schema](manifest.schema.json) · [Starter manifest](manifest.example.yaml) · [Schnorr example](../p2pkh-schnorr/manifest.yaml)
 
 ## Record the first version
 
@@ -43,7 +53,7 @@ Regenerate the READMEs after filling the project manifest and selecting the base
 ```sh
 python3 tools/project_readme.py my-project --write
 python3 tools/project_readme.py my-project --check
-PYTHONPATH=src:. python3 -m unittest discover -s tests -p test_layout.py
+PYTHONPATH=src:. python3 -m unittest tests.test_layout tests.test_project_docs
 ```
 
-Use `--init` to add a project manifest to an existing project. [Field guide](../README.md#project-readme-template) · [Repository layout](../../docs/repository-layout.md)
+For an existing project, start with the example `manifest.yaml`. The README command validates the manifest, reads the selected release metadata, and calls Copier. Use `--all --check` to check the README pairs for all projects with a manifest. [Manifest fields](../README.md#project-readme-template) · [Documentation templates and maintenance](../../docs/maintaining-docs.md)

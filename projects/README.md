@@ -42,14 +42,7 @@ Run `bash tools/setup-workspaces.sh` from the repository root to create Git-igno
 
 ## Project README template
 
-The new project scaffold creates the directory, starter manifest, and draft READMEs. The project-level `projects/<name>/manifest.json` is the source for both READMEs. Fill in the introduction and replay evidence, then generate and check the README pair. [Project scaffold](template/README.md)
-
-```sh
-python3 tools/project_readme.py my-project --scaffold --title "My project" --title-zh "我的项目"
-# Edit projects/my-project/manifest.json
-python3 tools/project_readme.py my-project --write
-python3 tools/project_readme.py my-project --check
-```
+Use Copier to create a new project. Each runnable project keeps both README files in sync with its `projects/<name>/manifest.yaml`. [Copier commands and setup](template/README.md)
 
 | Field | Contents |
 | --- | --- |
@@ -59,7 +52,7 @@ python3 tools/project_readme.py my-project --check
 | `sections` | Named sections containing Markdown blocks in both languages. Keep `algorithm` and `reproduction`. Include the other sections that apply. |
 | `setup` | Optional bilingual Markdown blocks before the build and verify commands. |
 
-Use separate Markdown blocks for paragraphs, tables, and fenced code. Resolve relative links from the project directory. The generator reads the current version from `versions/index.json` and takes the build and verify commands from that release's manifest. It links available protocol, SDK, and measurement files. `--check` reports unfinished prompts and any difference from the generated READMEs. Existing projects can continue to maintain their READMEs directly until they adopt a manifest. [JSON Schema](template/manifest.schema.json) · [Starter manifest](template/manifest.example.json) · [Schnorr manifest](p2pkh-schnorr/manifest.json) · [Generated README](p2pkh-schnorr/README.md)
+Use YAML block scalars for Markdown paragraphs, tables, and fenced code. Resolve relative links from the project directory. The generator reads the current version from `versions/index.json` and takes the build and verify commands from that release's manifest. It links available protocol, SDK, and measurement files. To regenerate and check all projects, run `python3 tools/project_readme.py --all --write` and `python3 tools/project_readme.py --all --check`. [JSON Schema](template/manifest.schema.json) · [Starter manifest](template/manifest.example.yaml) · [Schnorr manifest](p2pkh-schnorr/manifest.yaml) · [Generated README](p2pkh-schnorr/README.md)
 
 ## Versioned project data
 
