@@ -1,0 +1,229 @@
+diff --git a/compilers/go/codegen/bn254_groth16.go b/compilers/go/codegen/bn254_groth16.go
+index 1055199..1a3a68f 100644
+--- a/compilers/go/codegen/bn254_groth16.go
++++ b/compilers/go/codegen/bn254_groth16.go
+@@ -7,7 +7,7 @@
+-//   1. Witness-assisted field inversion: prover supplies inverse, script checks a*b mod p == 1
+-//   2. Witness-assisted line gradients: prover supplies lambda, script checks lambda*(x2-x1) == y2-y1
+-//   3. Modulo threshold: defer mod reduction until intermediates exceed configurable byte size
+-//   4. Batched modulo: reduce multiple Fp_n components sharing a single q-fetch
+-//   5. q at stack bottom: store modulus at main stack bottom, fetch with OP_DEPTH OP_1SUB OP_PICK
+-//   6. Precomputed e(alpha,beta): hardcoded Fp12 constant in locking script
+-//   7. Triple Miller loop: 3 pairs processed simultaneously (4th precomputed)
++//  1. Witness-assisted field inversion: prover supplies inverse, script checks a*b mod p == 1
++//  2. Witness-assisted line gradients: prover supplies lambda, script checks lambda*(x2-x1) == y2-y1
++//  3. Modulo threshold: defer mod reduction until intermediates exceed configurable byte size
++//  4. Batched modulo: reduce multiple Fp_n components sharing a single q-fetch
++//  5. q at stack bottom: store modulus at main stack bottom, fetch with OP_DEPTH OP_1SUB OP_PICK
++//  6. Precomputed e(alpha,beta): hardcoded Fp12 constant in locking script
++//  7. Triple Miller loop: 3 pairs processed simultaneously (4th precomputed)
+@@ -76,0 +77,2 @@ type Groth16Config struct {
++	compactDelta    *compactLines
++	compactSubgroup string
+@@ -222,2 +224,3 @@ func swapFp2Pairs(gnark [4]*big.Int) [4]*big.Int {
+-//   Unlock pushes: [a, a_inv]
+-//   Lock script: verifies a * a_inv mod p == 1
++//
++//	Unlock pushes: [a, a_inv]
++//	Lock script: verifies a * a_inv mod p == 1
+@@ -1023,2 +1026,4 @@ func emitWALineEvalAddSparse(t *BN254Tracker, tPrefix, qPrefix, lamPrefix, pxNam
+-//   "_wlam_d{k}_{iteration}" for doubling gradients (pair k, iteration i)
+-//   "_wlam_a{k}_{iteration}" for addition gradients
++//
++//	"_wlam_d{k}_{iteration}" for doubling gradients (pair k, iteration i)
++//	"_wlam_a{k}_{iteration}" for addition gradients
++//
+@@ -1034,0 +1040,8 @@ func emitWAMillerLoop3(t *BN254Tracker) {
++	emitWAMillerLoop(t, nil)
++}
++
++func emitWAMillerLoop(t *BN254Tracker, fixedDelta *compactLines) {
++	pairs := []int{1, 2, 3}
++	if fixedDelta != nil {
++		pairs = pairs[:1]
++	}
+@@ -1046 +1059 @@ func emitWAMillerLoop3(t *BN254Tracker) {
+-	for k := 1; k <= 3; k++ {
++	for _, k := range pairs {
+@@ -1061 +1074 @@ func emitWAMillerLoop3(t *BN254Tracker) {
+-	for k := 1; k <= 3; k++ {
++	for _, k := range pairs {
+@@ -1071 +1084 @@ func emitWAMillerLoop3(t *BN254Tracker) {
+-	iterNum := 0
++	iterNum, addIndex := 0, 0
+@@ -1080 +1093 @@ func emitWAMillerLoop3(t *BN254Tracker) {
+-		for k := 1; k <= 3; k++ {
++		for _, k := range pairs {
+@@ -1093,0 +1107,4 @@ func emitWAMillerLoop3(t *BN254Tracker) {
++		if fixedDelta != nil {
++			emitCompactDelta(t, fixedDelta.double[iterNum])
++		}
++
+@@ -1097 +1114 @@ func emitWAMillerLoop3(t *BN254Tracker) {
+-			for k := 1; k <= 3; k++ {
++			for _, k := range pairs {
+@@ -1113,0 +1131,4 @@ func emitWAMillerLoop3(t *BN254Tracker) {
++			if fixedDelta != nil {
++				emitCompactDelta(t, fixedDelta.add[addIndex])
++				addIndex++
++			}
+@@ -1116 +1137 @@ func emitWAMillerLoop3(t *BN254Tracker) {
+-			for k := 1; k <= 3; k++ {
++			for _, k := range pairs {
+@@ -1132,0 +1154,4 @@ func emitWAMillerLoop3(t *BN254Tracker) {
++			if fixedDelta != nil {
++				emitCompactDelta(t, fixedDelta.add[addIndex])
++				addIndex++
++			}
+@@ -1140 +1165 @@ func emitWAMillerLoop3(t *BN254Tracker) {
+-	for k := 1; k <= 3; k++ {
++	for _, k := range pairs {
+@@ -1150 +1175 @@ func emitWAMillerLoop3(t *BN254Tracker) {
+-	for k := 1; k <= 3; k++ {
++	for _, k := range pairs {
+@@ -1183,0 +1209,6 @@ func emitWAMillerLoop3(t *BN254Tracker) {
++	if fixedDelta != nil {
++		for _, line := range fixedDelta.correction {
++			emitCompactDelta(t, line)
++		}
++	}
++
+@@ -1185 +1216 @@ func emitWAMillerLoop3(t *BN254Tracker) {
+-	for k := 1; k <= 3; k++ {
++	for _, k := range pairs {
+@@ -1765,0 +1797 @@ func EmitGroth16VerifierWitnessAssisted(emit func(StackOp), config Groth16Config
++//
+@@ -1782,0 +1815 @@ func EmitGroth16VerifierWitnessAssisted(emit func(StackOp), config Groth16Config
++//
+@@ -1791,0 +1825,5 @@ func EmitGroth16VerifierWitnessAssistedWithMSM(emit func(StackOp), config Groth1
++	compact := config.compactDelta != nil
++	pairCount := 3
++	if compact {
++		pairCount = 1
++	}
+@@ -1803 +1841 @@ func EmitGroth16VerifierWitnessAssistedWithMSM(emit func(StackOp), config Groth1
+-		for k := 1; k <= 3; k++ {
++		for k := 1; k <= pairCount; k++ {
+@@ -1811 +1849 @@ func EmitGroth16VerifierWitnessAssistedWithMSM(emit func(StackOp), config Groth1
+-			for k := 1; k <= 3; k++ {
++			for k := 1; k <= pairCount; k++ {
+@@ -1827,5 +1865,6 @@ func EmitGroth16VerifierWitnessAssistedWithMSM(emit func(StackOp), config Groth1
+-	// 5 SP1 public-input scalars — between the residue witness and
+-	// prepared_inputs.
+-	for i := 0; i < 5; i++ {
+-		initNames = append(initNames, "_pub_"+string(rune('0'+i)))
+-	}
++	if !compact {
++		// 5 SP1 public-input scalars — between the residue witness and
++		// prepared_inputs.
++		for i := 0; i < 5; i++ {
++			initNames = append(initNames, "_pub_"+string(rune('0'+i)))
++		}
+@@ -1833,3 +1872,3 @@ func EmitGroth16VerifierWitnessAssistedWithMSM(emit func(StackOp), config Groth1
+-	// prepared_inputs (G1, prover-supplied): 2 Fp. The MSM variant binds
+-	// this on-chain below rather than trusting the prover.
+-	initNames = append(initNames, "_pi_x", "_pi_y")
++		// prepared_inputs (G1, prover-supplied): 2 Fp. The MSM variant binds
++		// this on-chain below rather than trusting the prover.
++		initNames = append(initNames, "_pi_x", "_pi_y")
+@@ -1837,3 +1876,6 @@ func EmitGroth16VerifierWitnessAssistedWithMSM(emit func(StackOp), config Groth1
+-	// G2 subgroup-check gradients for proof.B — see the raw-variant
+-	// comment above for the layout.
+-	initNames = appendSubgroupGradientNames(initNames)
++		// G2 subgroup-check gradients for proof.B — see the raw-variant
++		// comment above for the layout.
++	}
++	if !compact || config.compactSubgroup == "affine" {
++		initNames = appendSubgroupGradientNames(initNames)
++	}
+@@ -1861 +1903,3 @@ func EmitGroth16VerifierWitnessAssistedWithMSM(emit func(StackOp), config Groth1
+-	emitWAG1OnCurveCheck(t, "_pi_x", "_pi_y")
++	if !compact {
++		emitWAG1OnCurveCheck(t, "_pi_x", "_pi_y")
++	}
+@@ -1868 +1912,5 @@ func EmitGroth16VerifierWitnessAssistedWithMSM(emit func(StackOp), config Groth1
+-	emitWAG2SubgroupCheck(t, "proof_bx0", "proof_bx1", "proof_by0", "proof_by1")
++	if compact && config.compactSubgroup != "affine" {
++		emitCompactG2Subgroup(t, "proof_bx0", "proof_bx1", "proof_by0", "proof_by1", config.compactSubgroup == "projective-naf")
++	} else {
++		emitWAG2SubgroupCheck(t, "proof_bx0", "proof_bx1", "proof_by0", "proof_by1")
++	}
+@@ -1888,2 +1936,4 @@ func EmitGroth16VerifierWitnessAssistedWithMSM(emit func(StackOp), config Groth1
+-	emitWAGroth16PublicInputRangeCheck(t)
+-	emitWAGroth16MSMBind(t, config)
++	if !compact {
++		emitWAGroth16PublicInputRangeCheck(t)
++		emitWAGroth16MSMBind(t, config)
++	}
+@@ -1906,4 +1956,5 @@ func EmitGroth16VerifierWitnessAssistedWithMSM(emit func(StackOp), config Groth1
+-	t.toTop("_pi_x")
+-	t.rename("p2x")
+-	t.toTop("_pi_y")
+-	t.rename("p2y")
++	if !compact {
++		t.toTop("_pi_x")
++		t.rename("p2x")
++		t.toTop("_pi_y")
++		t.rename("p2y")
+@@ -1911,4 +1962,5 @@ func EmitGroth16VerifierWitnessAssistedWithMSM(emit func(StackOp), config Groth1
+-	t.pushBigInt("q2x0", config.GammaNegG2[0])
+-	t.pushBigInt("q2x1", config.GammaNegG2[1])
+-	t.pushBigInt("q2y0", config.GammaNegG2[2])
+-	t.pushBigInt("q2y1", config.GammaNegG2[3])
++		t.pushBigInt("q2x0", config.GammaNegG2[0])
++		t.pushBigInt("q2x1", config.GammaNegG2[1])
++		t.pushBigInt("q2y0", config.GammaNegG2[2])
++		t.pushBigInt("q2y1", config.GammaNegG2[3])
++	}
+@@ -1921,4 +1973,6 @@ func EmitGroth16VerifierWitnessAssistedWithMSM(emit func(StackOp), config Groth1
+-	t.pushBigInt("q3x0", config.DeltaNegG2[0])
+-	t.pushBigInt("q3x1", config.DeltaNegG2[1])
+-	t.pushBigInt("q3y0", config.DeltaNegG2[2])
+-	t.pushBigInt("q3y1", config.DeltaNegG2[3])
++	if !compact {
++		t.pushBigInt("q3x0", config.DeltaNegG2[0])
++		t.pushBigInt("q3x1", config.DeltaNegG2[1])
++		t.pushBigInt("q3y0", config.DeltaNegG2[2])
++		t.pushBigInt("q3y1", config.DeltaNegG2[3])
++	}
+@@ -1930 +1984 @@ func EmitGroth16VerifierWitnessAssistedWithMSM(emit func(StackOp), config Groth1
+-	emitWAMillerLoop3(t)
++	emitWAMillerLoop(t, config.compactDelta)
+@@ -1935,0 +1990,8 @@ func EmitGroth16VerifierWitnessAssistedWithMSM(emit func(StackOp), config Groth1
++	if compact {
++		for len(t.nm) > 0 {
++			t.drop()
++		}
++		t.e(StackOp{Op: "push", Value: bigIntPush(1)})
++		return
++	}
++
+@@ -1999 +2061 @@ func (c Groth16Config) HasPinnedPublicInputs() bool {
+-func groth16MSMStart(config Groth16Config) (*big.Int, *big.Int) {
++func groth16MSMPoint(config Groth16Config) bn254.G1Affine {
+@@ -2020,0 +2083,5 @@ func groth16MSMStart(config Groth16Config) (*big.Int, *big.Int) {
++	return acc
++}
++
++func groth16MSMStart(config Groth16Config) (*big.Int, *big.Int) {
++	acc := groth16MSMPoint(config)
+diff --git a/compilers/go/compiler/groth16_wa.go b/compilers/go/compiler/groth16_wa.go
+index 0be6f1c..261d353 100644
+--- a/compilers/go/compiler/groth16_wa.go
++++ b/compilers/go/compiler/groth16_wa.go
+@@ -44,0 +45,3 @@ type Groth16WAOpts struct {
++	// CompactStatement folds fully pinned verification data into the lock.
++	CompactStatement bool
++	CompactSubgroup  string
+@@ -340,0 +344,6 @@ func CompileGroth16WA(vkPath string, opts Groth16WAOpts) (*Artifact, error) {
++	if opts.CompactStatement {
++		if err := codegen.ConfigureCompactGroth16(&config, opts.CompactSubgroup); err != nil {
++			return nil, fmt.Errorf("CompileGroth16WA: %w", err)
++		}
++	}
++
+@@ -354 +363,3 @@ func CompileGroth16WA(vkPath string, opts Groth16WAOpts) (*Artifact, error) {
+-	ops = emitGroth16PublicInputPins(ops, opts.PublicInputs, config.PinnedPublicInputs)
++	if !opts.CompactStatement {
++		ops = emitGroth16PublicInputPins(ops, opts.PublicInputs, config.PinnedPublicInputs)
++	}

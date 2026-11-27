@@ -1,6 +1,7 @@
 """Build BSV Script for a fixed BN254 Groth16 verification key and statement."""
 
 import argparse
+from contextlib import contextmanager
 from dataclasses import asdict
 from hashlib import sha256
 import json
@@ -19,6 +20,10 @@ RUNAR_REVISION = "dbcc4269f8e0895c4738cf86948b05b7d62a2010"
 BASE_FIELD = 21888242871839275222246405745257275088696311157297823662689037894645226208583
 PUBLIC_COUNT = 5
 ADAPTER = Path(__file__).resolve().parent / "groth16_bn254_adapter.go"
+RUNAR_EXTENSION = ADAPTER.parent / "runar"
+RUNAR_FILES = ("compilers/go/codegen/bn254_groth16.go", "compilers/go/compiler/groth16_wa.go")
+COMPACT_SUBGROUP = "projective-naf"
+COMPACT_MODULO_THRESHOLD = 64
 
 
 def checked(command, *, cwd=None, env=None, stdin=None):
@@ -28,13 +33,33 @@ def checked(command, *, cwd=None, env=None, stdin=None):
     return result.stdout
 
 
-def build_adapter(repository, output, *, go="go"):
+@contextmanager
+def runar_overlay(repository):
     repository = Path(repository).resolve()
     revision = checked(["git", "rev-parse", "HEAD"], cwd=repository).strip()
     if revision != RUNAR_REVISION or checked(["git", "status", "--porcelain", "-uno"], cwd=repository).strip():
         raise ValueError(f"expected an unmodified Rúnar checkout at {RUNAR_REVISION}")
-    checked([go, "build", "-o", str(Path(output).resolve()), str(ADAPTER)], cwd=repository / "compilers/go",
-            env={**os.environ, "GOWORK": str(repository / "go.work")})
+    # Apply the verifier extension to copies of the two pinned source files.
+    # Go overlays use those copies without editing the caller's checkout.
+    with TemporaryDirectory(prefix="4thgraph-runar-overlay-") as temporary:
+        directory = Path(temporary)
+        files = {}
+        for name in RUNAR_FILES:
+            path = directory / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes((repository / name).read_bytes())
+            files[str(repository / name)] = str(path)
+        checked(["git", "apply", "--unidiff-zero", str(RUNAR_EXTENSION / "compact_groth16.patch")], cwd=directory)
+        for extension in RUNAR_EXTENSION.glob("*.go"):
+            files[str(repository / "compilers/go/codegen" / extension.name)] = str(extension)
+        overlay = directory / "overlay.json"
+        overlay.write_text(json.dumps({"Replace": files}), encoding="utf-8")
+        yield overlay, repository / "compilers/go", {**os.environ, "GOWORK": str(repository / "go.work")}
+
+
+def build_adapter(repository, output, *, go="go"):
+    with runar_overlay(repository) as (overlay, cwd, env):
+        checked([go, "build", "-overlay", str(overlay), "-o", str(Path(output).resolve()), str(ADAPTER)], cwd=cwd, env=env)
 
 
 def canonical(value, modulus):
@@ -100,7 +125,8 @@ class ScriptVerifier:
         self.adapter_key = runar_key(verification_key)
         self.key_digest = sha256(verification_key).hexdigest()
 
-    def emit(self, signals, proof=None, *, fixed_msm=False):
+    def emit(self, signals, proof=None, *, fixed_msm=False, compact_statement=False,
+             compact_subgroup=COMPACT_SUBGROUP, modulo_threshold=COMPACT_MODULO_THRESHOLD):
         key = self.adapter_key
         if fixed_msm:
             key = {**key, "pinnedPublicInputs": dict(enumerate(signals))}
@@ -108,6 +134,8 @@ class ScriptVerifier:
             key_path = Path(temporary) / "vk.json"
             key_path.write_text(json.dumps(key, sort_keys=True), encoding="utf-8")
             request = {"VK": str(key_path), "Public": signals, "Proof": proof}
+            if compact_statement:
+                request.update(CompactStatement=True, CompactSubgroup=compact_subgroup, ModuloThreshold=modulo_threshold)
             return bytes.fromhex(json.loads(checked([self.adapter], stdin=json.dumps(request))))
 
     @staticmethod
@@ -116,8 +144,8 @@ class ScriptVerifier:
             raise ValueError("owner must be a valid compressed secp256k1 public key")
         return authorize(owner)
 
-    def compile_predicate(self, signals, *, fixed_msm=False):
-        template = self.emit(signals, fixed_msm=fixed_msm)
+    def compile_predicate(self, signals, *, fixed_msm=False, compact_statement=False):
+        template = self.emit(signals, fixed_msm=fixed_msm, compact_statement=compact_statement)
         prefix = asm("OP_0 OP_CHECKSIGVERIFY")
         if not template.startswith(prefix):
             raise ValueError("unexpected owner constructor slot in Rúnar artifact")
@@ -142,6 +170,7 @@ class ScriptVerifier:
 
 
 BN254_ENTRY = "verify-bn254-proof"
+COMPACT_WORD = "bn254-compact-fixed-pairing"
 BN254_WORDS = {
     "bn254-owner-guard": Primitive((), ("bn254-authority",), None,
                                    lambda verifier, _signals, owner: (verifier.owner_guard(owner),),
@@ -159,6 +188,10 @@ BN254_WORDS = {
                                                  guard + verifier.compile_predicate(statement, fixed_msm=True),
                                              ),
                                              "Rúnar Groth16 lock with a precomputed public-input MSM", build_only=True),
+    COMPACT_WORD: Primitive(("bn254-authority", "bn254-statement"), ("bn254-verified",), None,
+                            lambda verifier, _signals, _owner, guard, statement: (
+                                guard + verifier.compile_predicate(statement, fixed_msm=True, compact_statement=True),
+                            ), "fixed pairing terms and projective G2 subgroup check", build_only=True),
 }
 BN254_TYPES = TYPES | {kind for word in BN254_WORDS.values() for kind in (*word.takes, *word.gives)}
 
@@ -180,6 +213,8 @@ class ForthVerifier(ScriptVerifier):
             if all(instruction is not stage for stage in BN254_WORDS.values()):
                 raise token.error(f"{token.text!r} cannot build a BN254 verifier lock")
         self.libraries = frontend.library_imports
+        self.compact_statement = any(instruction is BN254_WORDS[COMPACT_WORD]
+                                     for instruction, _ in self.instructions)
 
     def compile(self, signals, owner):
         stack = []
@@ -191,7 +226,16 @@ class ForthVerifier(ScriptVerifier):
     def artifact(self, signals, owner, script):
         document = super().artifact(signals, owner, script)
         document.update(forth_entry=BN254_ENTRY, libraries=tuple(map(asdict, self.libraries)))
+        if self.compact_statement:
+            document.update(witness_layout="compact-fixed-statement", runar_extension_sha256={
+                name: sha256((RUNAR_EXTENSION / name).read_bytes()).hexdigest()
+                for name in ("compact_groth16.go", "compact_groth16.patch")
+            })
+            document.update(subgroup_schedule=COMPACT_SUBGROUP, modulo_threshold=COMPACT_MODULO_THRESHOLD)
         return build_artifact(document, self.source)
+
+    def witness(self, signals, proof):
+        return self.emit(signals, runar_proof(proof), compact_statement=self.compact_statement)
 
 
 def main():

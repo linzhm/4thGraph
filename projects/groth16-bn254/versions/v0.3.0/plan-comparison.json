@@ -1,0 +1,383 @@
+{
+  "fixture_sha256": "d8eee6da5ed5780fb71dc91fa08744d1644ff1db7f53974aafb48bb26c2dd10c",
+  "bsv_node_version": 101020300,
+  "chain_gang": {
+    "version": "0.13.2",
+    "commit": "74676b9c002c452e7f21a9ed9265f4972bef03f6"
+  },
+  "samples_per_case": 5,
+  "plans": {
+    "baseline": {
+      "options": {
+        "compact_statement": false,
+        "compact_subgroup": "",
+        "modulo_threshold": 0
+      },
+      "cases": {
+        "wrap": {
+          "lock_bytes": 821788,
+          "lock_sha256": "ca6ea40e8a0065bd6bfd25d9273c2c05d6bbb399f43e07e3a06dcde0d75abdf6",
+          "witness_bytes": 31056,
+          "witness_sha256": "e4b692aaccc142ea5887ebd4e1da163e1257db4ce3c6d5c31b1a34a1d418b08f",
+          "path_bytes": 852925,
+          "stack": {
+            "main_payload_bytes": 31071,
+            "alt_payload_bytes": 7,
+            "combined_payload_bytes": 31071
+          },
+          "node_rpc_ms": [
+            385.769,
+            382.716,
+            364.246,
+            470.105,
+            390.771
+          ],
+          "chain_gang_ms": [
+            143.778,
+            66.994,
+            75.21,
+            102.706,
+            96.008
+          ],
+          "node_rpc_median_ms": 385.769,
+          "chain_gang_median_ms": 96.008
+        },
+        "other": {
+          "lock_bytes": 821785,
+          "lock_sha256": "ee03597f41d729e1363c8534093056e48b5e2f9497393c3d59b272528150fc6c",
+          "witness_bytes": 31047,
+          "witness_sha256": "54972586d412c384f35be00d480c2215f46c13681763d382c162ee43d5358f70",
+          "path_bytes": 852913,
+          "stack": {
+            "main_payload_bytes": 31063,
+            "alt_payload_bytes": 5,
+            "combined_payload_bytes": 31063
+          },
+          "node_rpc_ms": [
+            582.906,
+            583.501,
+            588.749,
+            484.475,
+            1228.739
+          ],
+          "chain_gang_ms": [
+            93.517,
+            130.311,
+            93.513,
+            131.346,
+            215.252
+          ],
+          "node_rpc_median_ms": 583.501,
+          "chain_gang_median_ms": 130.311
+        }
+      }
+    },
+    "fixed-pairings": {
+      "options": {
+        "compact_statement": true,
+        "compact_subgroup": "affine",
+        "modulo_threshold": 0
+      },
+      "cases": {
+        "wrap": {
+          "lock_bytes": 598775,
+          "lock_sha256": "fd3c8f5895ca74fc16d1e743f5dbfc43c26aa2422c386a92093dbf2effbb5d21",
+          "witness_bytes": 19634,
+          "witness_sha256": "1f1cf0ce62c7d221ab066c56207175b5c8c6a77e480de71e520635de585c12ea",
+          "path_bytes": 618490,
+          "stack": {
+            "main_payload_bytes": 19998,
+            "alt_payload_bytes": 0,
+            "combined_payload_bytes": 19998
+          },
+          "node_rpc_ms": [
+            288.283,
+            358.783,
+            265.856,
+            263.348,
+            337.249
+          ],
+          "chain_gang_ms": [
+            61.232,
+            55.856,
+            55.79,
+            73.259,
+            63.375
+          ],
+          "node_rpc_median_ms": 288.283,
+          "chain_gang_median_ms": 61.232
+        },
+        "other": {
+          "lock_bytes": 598773,
+          "lock_sha256": "b1ec25c03d986e7de120b4584bd3048a850a401c144e2efa4b0b33f6200c201f",
+          "witness_bytes": 19628,
+          "witness_sha256": "b059bb3f714e006b95e2935325ffb446146d08a40e567eee75ac96384da78c13",
+          "path_bytes": 618481,
+          "stack": {
+            "main_payload_bytes": 19992,
+            "alt_payload_bytes": 0,
+            "combined_payload_bytes": 19992
+          },
+          "node_rpc_ms": [
+            254.897,
+            262.787,
+            261.496,
+            267.761,
+            248.908
+          ],
+          "chain_gang_ms": [
+            51.537,
+            53.001,
+            56.781,
+            61.099,
+            72.75
+          ],
+          "node_rpc_median_ms": 261.496,
+          "chain_gang_median_ms": 56.781
+        }
+      }
+    },
+    "projective-binary": {
+      "options": {
+        "compact_statement": true,
+        "compact_subgroup": "projective-binary",
+        "modulo_threshold": 0
+      },
+      "cases": {
+        "wrap": {
+          "lock_bytes": 652046,
+          "lock_sha256": "0daa1427981eaa9ea932579a122a544607aa4881a7c197f27448bba5c8f34369",
+          "witness_bytes": 6765,
+          "witness_sha256": "c1483d42242f4545184abd5b9fffe90569bfebe50c2bd95a324520230b321f47",
+          "path_bytes": 658891,
+          "stack": {
+            "main_payload_bytes": 8863,
+            "alt_payload_bytes": 0,
+            "combined_payload_bytes": 8863
+          },
+          "node_rpc_ms": [
+            273.9,
+            279.829,
+            300.052,
+            291.525,
+            351.852
+          ],
+          "chain_gang_ms": [
+            59.183,
+            56.593,
+            62.314,
+            58.809,
+            83.676
+          ],
+          "node_rpc_median_ms": 291.525,
+          "chain_gang_median_ms": 59.183
+        },
+        "other": {
+          "lock_bytes": 652044,
+          "lock_sha256": "15ffeaeb99eabf8e83aa39b7c41ddc8b3138d4e15075ff993f4d7425a757cb80",
+          "witness_bytes": 6761,
+          "witness_sha256": "24109899b736c96c0c4e057dbadc2920aff3375bd041d36ecc3edad6a5ae39ad",
+          "path_bytes": 658885,
+          "stack": {
+            "main_payload_bytes": 8858,
+            "alt_payload_bytes": 0,
+            "combined_payload_bytes": 8858
+          },
+          "node_rpc_ms": [
+            285.602,
+            285.077,
+            329.261,
+            292.497,
+            289.533
+          ],
+          "chain_gang_ms": [
+            65.42,
+            62.814,
+            83.536,
+            77.483,
+            68.779
+          ],
+          "node_rpc_median_ms": 289.533,
+          "chain_gang_median_ms": 68.779
+        }
+      }
+    },
+    "projective-naf": {
+      "options": {
+        "compact_statement": true,
+        "compact_subgroup": "projective-naf",
+        "modulo_threshold": 0
+      },
+      "cases": {
+        "wrap": {
+          "lock_bytes": 627022,
+          "lock_sha256": "3fd73ef802cb33d8743a0e278eb7b2e15bf992910f06864c5443dc35bbfe5697",
+          "witness_bytes": 6765,
+          "witness_sha256": "c1483d42242f4545184abd5b9fffe90569bfebe50c2bd95a324520230b321f47",
+          "path_bytes": 633868,
+          "stack": {
+            "main_payload_bytes": 8863,
+            "alt_payload_bytes": 0,
+            "combined_payload_bytes": 8863
+          },
+          "node_rpc_ms": [
+            333.47,
+            337.484,
+            692.75,
+            365.699,
+            358.951
+          ],
+          "chain_gang_ms": [
+            70.444,
+            65.158,
+            83.019,
+            70.567,
+            69.368
+          ],
+          "node_rpc_median_ms": 358.951,
+          "chain_gang_median_ms": 70.444
+        },
+        "other": {
+          "lock_bytes": 627020,
+          "lock_sha256": "cae646f3200702591eedec9512d4c2d89cb6a7ffc67177972f374c1586c411ab",
+          "witness_bytes": 6761,
+          "witness_sha256": "24109899b736c96c0c4e057dbadc2920aff3375bd041d36ecc3edad6a5ae39ad",
+          "path_bytes": 633862,
+          "stack": {
+            "main_payload_bytes": 8858,
+            "alt_payload_bytes": 0,
+            "combined_payload_bytes": 8858
+          },
+          "node_rpc_ms": [
+            300.222,
+            286.079,
+            277.378,
+            270.423,
+            323.23
+          ],
+          "chain_gang_ms": [
+            63.736,
+            53.35,
+            56.807,
+            57.355,
+            67.567
+          ],
+          "node_rpc_median_ms": 286.079,
+          "chain_gang_median_ms": 57.355
+        }
+      }
+    },
+    "naf-mod-64": {
+      "options": {
+        "compact_statement": true,
+        "compact_subgroup": "projective-naf",
+        "modulo_threshold": 64
+      },
+      "cases": {
+        "wrap": {
+          "lock_bytes": 539934,
+          "lock_sha256": "bc90d178296c56d7044feb78e9eabbf9d0d66a16cc1c363a7b3c7bfbda08e749",
+          "witness_bytes": 6765,
+          "witness_sha256": "c1483d42242f4545184abd5b9fffe90569bfebe50c2bd95a324520230b321f47",
+          "path_bytes": 546780,
+          "stack": {
+            "main_payload_bytes": 8872,
+            "alt_payload_bytes": 0,
+            "combined_payload_bytes": 8872
+          },
+          "node_rpc_ms": [
+            260.021,
+            261.287,
+            251.973,
+            282.116,
+            326.152
+          ],
+          "chain_gang_ms": [
+            59.929,
+            63.558,
+            52.816,
+            55.92,
+            57.125
+          ],
+          "node_rpc_median_ms": 261.287,
+          "chain_gang_median_ms": 57.125
+        },
+        "other": {
+          "lock_bytes": 539932,
+          "lock_sha256": "b4d66f2621900ee38f5e157f6d07c9b03055666563c0c09380eee4e96836cf2c",
+          "witness_bytes": 6761,
+          "witness_sha256": "24109899b736c96c0c4e057dbadc2920aff3375bd041d36ecc3edad6a5ae39ad",
+          "path_bytes": 546773,
+          "stack": {
+            "main_payload_bytes": 8870,
+            "alt_payload_bytes": 0,
+            "combined_payload_bytes": 8870
+          },
+          "node_rpc_ms": [
+            245.881,
+            246.816,
+            259.954,
+            273.74,
+            335.343
+          ],
+          "chain_gang_ms": [
+            53.116,
+            60.803,
+            61.394,
+            86.49,
+            60.322
+          ],
+          "node_rpc_median_ms": 259.954,
+          "chain_gang_median_ms": 60.803
+        }
+      }
+    },
+    "naf-mod-128": {
+      "options": {
+        "compact_statement": true,
+        "compact_subgroup": "projective-naf",
+        "modulo_threshold": 128
+      },
+      "cases": {
+        "wrap": {
+          "error": "BSV Node rejected a valid fixture"
+        },
+        "other": {
+          "error": "BSV Node rejected a valid fixture"
+        }
+      }
+    },
+    "naf-mod-256": {
+      "options": {
+        "compact_statement": true,
+        "compact_subgroup": "projective-naf",
+        "modulo_threshold": 256
+      },
+      "cases": {
+        "wrap": {
+          "error": "BSV Node rejected a valid fixture"
+        },
+        "other": {
+          "error": "BSV Node rejected a valid fixture"
+        }
+      }
+    },
+    "naf-mod-512": {
+      "options": {
+        "compact_statement": true,
+        "compact_subgroup": "projective-naf",
+        "modulo_threshold": 512
+      },
+      "cases": {
+        "wrap": {
+          "error": "BSV Node rejected a valid fixture"
+        },
+        "other": {
+          "error": "BSV Node rejected a valid fixture"
+        }
+      }
+    }
+  },
+  "compiler_revision": "2a9d079d50933703c2293974d42a8a34892fe4ea",
+  "selected": "naf-mod-64"
+}
