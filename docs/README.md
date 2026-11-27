@@ -97,6 +97,10 @@ For another run, pass `--objective peak-validation` to change the ranking or `--
 
 Try a baseline and two formula plans. Both rounds use the same Bézier fixture and fixed evaluator. The `next` command produces a sample follow-up request that an Agent can inspect and select from.
 
+Axis A uses the same implementation without passes or rules as its baseline. Axis B uses the fixture's reference implementation under the same pass set and rule order. Follow-ups can carry a verified matching baseline forward. When none is available, the baseline delta is `null`. Candidates derived from different parents have separate IDs and can share an artifact hash.
+
+`time_ms` sets a deadline for starting batches after request preparation. An admitted batch finishes compiling and running its vectors. The report records `time_budget` when the deadline is reached, and replay runs the exact admitted candidates.
+
 ```sh
 export PYTHONPATH=src:.
 mkdir -p workspace/tuning

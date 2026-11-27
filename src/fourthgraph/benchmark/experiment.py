@@ -4,7 +4,7 @@ import argparse
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict
 from hashlib import sha256
-from itertools import combinations
+from itertools import chain, combinations
 import json
 from pathlib import Path
 import platform
@@ -75,7 +75,7 @@ def compile_row(raw, fixture, sources, frozen, trace):
     started = perf_counter_ns()
     try:
         spec = plan_spec(raw, fixture)
-        row.update(id=digest([digest(frozen), spec]), applied=spec)
+        row.update(id=digest([digest(frozen), spec, raw.get("parent_id")]), applied=spec)
         builder = ScriptBuilder(sources[spec["implementation"]].decode(), formula_passes=spec["passes"],
                                 experimental_rules=spec["rules"], trace_formulas=trace)
         if [asdict(lib) for lib in builder.library_imports] != frozen["dependencies"]:
@@ -99,13 +99,34 @@ def stable(row):
             "compile": {k:v for k,v in row["compile"].items() if k != "elapsed_ns"}}
 
 
+def report_id(report):
+    request = report["request"]
+    return digest([report["snapshot"], request["axis"], request.get("parent_run"),
+                   report["baseline"], report["baseline_bytes"], [stable(row) for row in report["candidates"]]])
+
+
+def matching_baseline(axis, fixture, eligible, parents, previous):
+    if not eligible:
+        return None
+    plan = dict(eligible[0]["applied"])
+    if axis == "A":
+        plan.update(passes=[], rules=[])
+    else:
+        plan["implementation"] = fixture.name
+    for row in chain(eligible, parents.values()):
+        if row["applied"] == plan:
+            return {"id": row["id"], "applied": plan, "bytes": row["artifact"]["bytes"]}
+    inherited = previous["baseline"] if previous else None
+    return inherited if inherited is not None and inherited["applied"] == plan else None
+
+
 def counted(value, low, high, name):
     if type(value) is not int or not low <= value <= high:
         raise ValueError(f"{name} must be an integer in [{low},{high}]")
     return value
 
 
-def run(request, previous=None):
+def run(request, previous=None, *, replaying=False):
     if not isinstance(request, dict) or set(request) - {"fixture","plans","workers","trace","snapshot","parent_run",
                                                         "axis","max_candidates","time_ms","enumerate","depth","terminal"}:
         raise ValueError("unknown experiment request fields")
@@ -116,8 +137,8 @@ def run(request, previous=None):
         raise ValueError("frozen snapshot mismatch")
     if bool(previous) != bool(request.get("parent_run")):
         raise ValueError("follow-up requires its parent report")
-    if previous and (digest([identity, previous["request"].get("parent_run"), [stable(r) for r in previous["candidates"]]])
-                     != previous["run_id"] or previous["run_id"] != request["parent_run"] or previous["snapshot"] != identity):
+    if previous and (previous["snapshot"] != identity or previous["run_id"] != request["parent_run"]
+                     or previous["run_id"] != report_id(previous)):
         raise ValueError("parent run or snapshot mismatch")
     axis = request.get("axis", "A")
     if axis not in ("A","B"):
@@ -135,14 +156,13 @@ def run(request, previous=None):
                      for r in enumerate_orders(ir, request.get("depth", MAX_DEPTH))]
         else:
             raise ValueError("unknown enumeration mode")
-    if not isinstance(plans, list) or not 1 <= len(plans) <= LIMIT:
-        raise ValueError(f"submit between 1 and {LIMIT} plans")
+    minimum = 0 if replaying else 1
+    if not isinstance(plans, list) or not minimum <= len(plans) <= LIMIT:
+        raise ValueError(f"submit between {minimum} and {LIMIT} plans")
     if not all(isinstance(p, dict) for p in plans):
         raise ValueError("each plan must be an object")
-    if axis == "A" and len({p.get("implementation", fixture.name) for p in plans}) != 1:
+    if axis == "A" and len({p.get("implementation", fixture.name) for p in plans}) > 1:
         raise ValueError("axis A freezes the source")
-    if axis == "B" and len({digest([p.get("passes", []), p.get("rules", [])]) for p in plans}) != 1:
-        raise ValueError("axis B freezes the compiler plan")
     workers = counted(request.get("workers", 1), 1, WORKERS, "workers")
     limit = counted(request.get("max_candidates", LIMIT), 1, LIMIT, "max_candidates")
     timeout = counted(request.get("time_ms", 60_000), 1, 300_000, "time_ms")
@@ -160,24 +180,27 @@ def run(request, previous=None):
             if (axis == "A" and prior["implementation"] != spec["implementation"] or
                 axis == "B" and (prior["passes"], prior["rules"]) != (spec["passes"], spec["rules"])):
                 raise ValueError("parent comparison changes both axes")
-    unique, seen = [], set()
+    unique, seen, compiler_plans = [], set(), set()
     for raw in plans:
         try:
-            key = digest([plan_spec(raw, fixture), raw.get("parent_id")])
+            spec = plan_spec(raw, fixture)
+            key = digest([spec, raw.get("parent_id")])
+            compiler_plans.add((tuple(spec["passes"]), tuple(spec["rules"])))
         except (TypeError, ValueError):
             key = digest(raw)
         if key not in seen:
             unique.append(raw)
             seen.add(key)
+    if axis == "B" and len(compiler_plans) > 1:
+        raise ValueError("axis B freezes the compiler plan")
     duplicates = len(plans) - len(unique)
     plans = unique
     rows, cache = [], {}
-    deadline = monotonic() + timeout/1000
+    deadline = None if replaying else monotonic() + timeout / 1000
     stop = "exhausted" if limit >= len(plans) else "candidate_budget"
     with ThreadPoolExecutor(max_workers=workers) as pool:
         for start in range(0, min(limit,len(plans)), workers):
-            if start and monotonic() > deadline:
-                stop = "time_budget"
+            if deadline is not None and monotonic() >= deadline:
                 break
             group = plans[start:min(start+workers,limit)]
             batch = list(pool.map(lambda p: compile_row(p, fixture, sources, frozen, trace), group))
@@ -189,10 +212,11 @@ def run(request, previous=None):
                         cache[key] = fixture.check(bytes.fromhex(artifact["hex"]))
                     row["test"] = cache[key]
                 rows.append(row)
+    if deadline is not None and monotonic() >= deadline:
+        stop = "time_budget"
     eligible = [r for r in rows if r["test"]["status"] == "passed"]
-    baseline = next((r for r in eligible if r["applied"]["implementation"] == (fixture.name if axis=="B" else plans[0].get("implementation", fixture.name))
-                     and (axis=="B" or not (r["applied"]["passes"] or r["applied"]["rules"]))), None)
-    base_size = baseline["artifact"]["bytes"] if baseline else previous.get("baseline_bytes") if previous else None
+    baseline = matching_baseline(axis, fixture, eligible, parents, previous)
+    base_size = baseline["bytes"] if baseline else None
     for row in eligible:
         size = row["artifact"]["bytes"]
         parent = parents.get(row["requested"].get("parent_id"))
@@ -228,12 +252,12 @@ def run(request, previous=None):
               "workers": 1, "time_ms": 300_000, "snapshot": identity}
     if previous:
         replay["parent_run"] = previous["run_id"]
-    return {"schema": SCHEMA, "snapshot": identity, "frozen": frozen, "request": replay, "candidates": rows,
-            "run_id": digest([identity, request.get("parent_run"), [stable(r) for r in rows]]),
-            "baseline_bytes": base_size, "ranking": [r["id"] for r in order],
-            "ranking_scope":"fixture script bytes, then fewer passes", "winner_including_parents":winner,
-            "observed_frontier": frontier, "frontier_costs":["script_bytes","main_peak_items","alt_peak_items","compile_ns"],
-            "requested": request, "deduplicated_plans": duplicates, "stop": stop}
+    report = {"schema": SCHEMA, "snapshot": identity, "frozen": frozen, "request": replay, "candidates": rows,
+              "baseline": baseline, "baseline_bytes": base_size, "ranking": [r["id"] for r in order],
+              "ranking_scope": "fixture script bytes, then fewer passes", "winner_including_parents": winner,
+              "observed_frontier": frontier, "frontier_costs": ["script_bytes", "main_peak_items", "alt_peak_items", "compile_ns"],
+              "requested": request, "deduplicated_plans": duplicates, "stop": stop}
+    return {**report, "run_id": report_id(report)}
 
 
 def next_request(report):
@@ -266,10 +290,11 @@ def main(argv=None):
             result = next_request(read(args.file))
         else:
             data = read(args.file)
-            result = run(data["request"] if args.cmd=="replay" else data, read(args.parent) if args.parent else None)
-            if args.cmd == "replay" and (data["run_id"] != result["run_id"] or
-                    digest([stable(r) for r in data["candidates"]]) != digest([stable(r) for r in result["candidates"]])):
-                raise ValueError("replay differs from the recorded artifacts or verdicts")
+            replaying = args.cmd == "replay"
+            result = run(data["request"] if replaying else data, read(args.parent) if args.parent else None,
+                         replaying=replaying)
+            if replaying and (data["run_id"] != result["run_id"] or data["run_id"] != report_id(data)):
+                raise ValueError("replay differs from the recorded baseline, artifacts, or verdicts")
         print(json.dumps(result, sort_keys=True))
     except (KeyError, ValueError, TypeError, OSError) as exc:
         print(json.dumps({"schema": SCHEMA, "status":"failed", "diagnostic":str(exc)}))

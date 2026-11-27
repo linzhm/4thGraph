@@ -3,6 +3,7 @@ import subprocess
 import sys
 from itertools import product
 import unittest
+from unittest.mock import patch
 
 from fourthgraph.benchmark.experiment import capabilities, digest, next_request, run
 from fourthgraph.bsv.evaluate import evaluate
@@ -12,6 +13,84 @@ from fourthgraph.compiler.script_builder import ScriptBuilder
 
 
 class FormulaExperiments(unittest.TestCase):
+    def test_cross_axis_baseline_uses_the_same_compiler_plan(self):
+        first = run({"fixture": "bezier", "plans": [{}, {"passes": ["stack"]}]})
+        _, stack = first["candidates"]
+        self.assertEqual(first["baseline_bytes"], 118)
+        request = {"fixture": "bezier", "axis": "B", "parent_run": first["run_id"], "plans": [
+            {"implementation": "bezier-linear", "passes": ["stack"], "parent_id": stack["id"]},
+        ]}
+        second = run(request, first)
+        self.assertEqual(second["baseline"]["id"], stack["id"])
+        self.assertEqual(second["baseline_bytes"], 47)
+        self.assertEqual(second["candidates"][0]["delta"]["baseline_bytes"], -10)
+
+        linear, = second["candidates"]
+        third = run({"fixture": "bezier", "axis": "A", "parent_run": second["run_id"], "plans": [
+            {"implementation": "bezier-linear", "passes": ["stack", "search"], "parent_id": linear["id"]},
+        ]}, second)
+        self.assertIsNone(third["baseline"])
+        self.assertIsNone(third["candidates"][0]["delta"]["baseline_bytes"])
+
+        first["baseline_bytes"] = 1
+        with self.assertRaisesRegex(ValueError, "parent run"):
+            run(request, first)
+
+    def test_matching_baseline_survives_multiple_batches(self):
+        first = run({"fixture": "bezier", "plans": [{}, {"passes": ["stack"]}]})
+        second = run(next_request(first), first)
+        parent, = second["candidates"]
+        request = {"fixture": "bezier", "parent_run": second["run_id"], "plans": [
+            {"passes": ["rewrite", "stack"], "parent_id": parent["id"]},
+        ]}
+        third = run(request, second)
+        self.assertEqual(third["baseline"], first["baseline"])
+        self.assertEqual(third["baseline_bytes"], 118)
+        second["baseline"]["bytes"] = 1
+        with self.assertRaisesRegex(ValueError, "parent run"):
+            run(request, second)
+
+    def test_distinct_parents_keep_distinct_candidate_ids(self):
+        initial = run({"fixture": "bezier", "plans": [{}, {"passes": ["stack"]}]})
+        second = run({"fixture": "bezier", "parent_run": initial["run_id"], "plans": [
+            {"passes": ["stack", "search"], "parent_id": row["id"]} for row in initial["candidates"]
+        ]}, initial)
+        left, right = second["candidates"]
+        self.assertEqual(left["artifact"]["sha256"], right["artifact"]["sha256"])
+        self.assertNotEqual(left["id"], right["id"])
+        self.assertNotEqual(left["delta"]["parent_bytes"], right["delta"]["parent_bytes"])
+        self.assertCountEqual(second["ranking"], (left["id"], right["id"]))
+        self.assertEqual(second["run_id"], run(second["request"], initial)["run_id"])
+
+    def test_deadline_bounds_admission_and_replay_keeps_admitted_candidates(self):
+        request = {"fixture": "square", "time_ms": 1, "plans": [{}, {"passes": ["stack"]}]}
+        cases = (
+            (0, [0, .001, .001]),
+            (1, [0, 0, .001, .001]),
+            (2, [0, 0, 0, .001]),
+        )
+        for admitted, ticks in cases:
+            with self.subTest(admitted=admitted):
+                with patch("fourthgraph.benchmark.experiment.monotonic", side_effect=ticks):
+                    report = run(request)
+                self.assertEqual(report["stop"], "time_budget")
+                self.assertEqual(len(report["candidates"]), admitted)
+                with patch("fourthgraph.benchmark.experiment.monotonic", side_effect=AssertionError):
+                    replay = run(report["request"], replaying=True)
+                self.assertEqual(replay["run_id"], report["run_id"])
+
+    def test_axis_b_uses_canonical_pass_sets_and_ordered_rules(self):
+        request = {"fixture": "bezier", "axis": "B", "plans": [
+            {"passes": ["stack", "share"]},
+            {"implementation": "bezier-linear", "passes": ["share", "stack"]},
+        ]}
+        report = run(request)
+        self.assertEqual([row["applied"]["passes"] for row in report["candidates"]], [["share", "stack"]] * 2)
+        request["plans"][0]["rules"] = ["double-as-add", "common-values"]
+        request["plans"][1]["rules"] = ["common-values", "double-as-add"]
+        with self.assertRaisesRegex(ValueError, "axis B freezes the compiler plan"):
+            run(request)
+
     def test_two_batches_keep_equal_size_parents_and_replay(self):
         first = run({"fixture":"bezier","workers":2,"plans":[{},{"passes":["stack"]},{"passes":["rewrite","share","stack"]}]})
         self.assertEqual([r["artifact"]["bytes"] for r in first["candidates"]],[118,47,47])

@@ -97,6 +97,10 @@ PYTHONPATH=src:. python -m fourthgraph.reporting "$out/search-replay.json" \
 
 以下用同一个 Bézier 夹具和固定评估器比较基线与两个计划，再跑一轮。`next` 输出一个供 Agent 检查和选用的后续请求。
 
+轴 A 的基线是同一实现下未应用 pass 和规则的版本。轴 B 的基线是按相同 pass 集合与规则顺序构建的夹具参考实现。续跑可以沿用已验证且匹配的基线。缺少匹配基线时，基线差值为 `null`。从不同父候选派生的候选有各自的 ID，可以共用产物摘要。
+
+`time_ms` 设置请求准备完毕后启动新批次的截止时间。已启动的批次会完成编译与向量验证。达到截止时间时报告记录 `time_budget`，重放会运行当时已启动的候选。
+
 ```sh
 export PYTHONPATH=src:.
 mkdir -p workspace/tuning
