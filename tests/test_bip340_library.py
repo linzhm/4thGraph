@@ -28,5 +28,19 @@ class Bip340LibraryTests(unittest.TestCase):
         )
         outer = push(b"outer") + asm("OP_TOALTSTACK")
         self.assertEqual(evaluate(outer + b"".join(map(push, fields)) + lock), ([b"\x01"], [b"outer"]))
-        with self.assertRaises(ScriptError):
-            evaluate(push(bytes([1])) + b"".join(map(push, fields[1:])) + lock)
+        cases = {
+            "changed message": (bytes([1]), *fields[1:]),
+            "missing witness": fields[:-1],
+            "extra main-stack item": (b"extra", *fields),
+        }
+        for index, label in enumerate(("key x", "key y", "signature", "nonce y"), start=1):
+            value = fields[index]
+            cases[f"short {label}"] = (*fields[:index], value[:-1], *fields[index + 1:])
+            cases[f"long {label}"] = (*fields[:index], b"\0" + value, *fields[index + 1:])
+        for index in (2, 4):
+            value = fields[index]
+            odd = value[:-1] + bytes([value[-1] ^ 1])
+            cases[f"odd y at slot {index}"] = (*fields[:index], odd, *fields[index + 1:])
+        for label, invalid in cases.items():
+            with self.subTest(label=label), self.assertRaises(ScriptError):
+                evaluate(outer + b"".join(map(push, invalid)) + lock)
