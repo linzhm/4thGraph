@@ -162,6 +162,8 @@ REGTEST_CHRONICLE_HEIGHT=5 PYTHONPATH=src:. bash tools/verify_node.sh --profile 
 | Forth 批量解码 | 23,484 B | 58,822 B |
 | 手工 v0.17.0 | 22,435 B | 54,626 B |
 
+本轮表格和实测文件对应提交 `70d7ec8`。从该提交的检出目录运行下列命令，可复现记录中的脚本字节。引入 #109 的共享栈调度后，数据流构建的付款锁为 23,869 B，重建付款为 60,362 B。批量解码构建的付款锁为 23,482 B，重建付款为 58,814 B。 [实测提交](https://github.com/linzhm/4thGraph/tree/70d7ec80ea4694c7d373f3a2368bb56303907dd1)
+
 最短候选的 18,379 B 窗口循环与手工版逐字节相同。每锁剩余的 1,049 B 包括见证与挑战值处理 392 B、联合点乘准备 549 B、清栈与 nonce 点比较 108 B。每个候选复放 27 个向量与错误见证用例、12 种成对付款模式和两种普通输出退出。选中的候选还复放构造器矩阵的八个场景。[实测](../experiments/high-level/dataflow-measurements.json) · [交易矩阵](../experiments/high-level/dataflow-matrix.json)
 
 ```sh

@@ -158,6 +158,8 @@ The stack plan now builds the variable table directly. The Forth row code uses m
 | Forth batch decoding | 23,484 B | 58,822 B |
 | Handwritten v0.17.0 | 22,435 B | 54,626 B |
 
+The table and measurement file record the dataflow builds at `70d7ec8`. Run the replay commands from that checkout to reproduce those Script bytes. With the shared scheduler from #109, the dataflow build emits a 23,869 B payment lock and a 60,362 B reconstructed payment. The batch build emits a 23,482 B lock and a 58,814 B payment. [Measurement checkout](https://github.com/linzhm/4thGraph/tree/70d7ec80ea4694c7d373f3a2368bb56303907dd1)
+
 The shortest build retains the identical 18,379 B window script. The remaining 1,049 B per lock comprises 392 B of witness and challenge handling, 549 B of joint preparation, and 108 B of cleanup and nonce comparison. Each candidate replays 27 vector and malformed-witness cases, 12 paired payment modes, and both native exits. The selected build replays eight constructor matrix cases. [Measurements](../experiments/high-level/dataflow-measurements.json) · [Transaction matrix](../experiments/high-level/dataflow-matrix.json)
 
 ```sh
