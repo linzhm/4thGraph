@@ -153,6 +153,18 @@ done
 
 每种组合均有 625 个花费通过和 625 个花费拒绝。最短路径用 `bezier-linear` 的四 pass 计划。路径字节相同时，优先选择 pass 和有序规则合计较少的计划。实际编译耗时可从关闭追踪的运行或重放报告中读取 `metrics.compile_ns`。
 
+### 调用点选型
+
+标准库维护曲线内核及其输入范围、坐标表示和边界行为。编译器维护调用点的匹配和绑定方案，并计入转换、守卫与链接成本。用同一份 Forth 调用方和固定内核比较绑定，范围专用的内核也沿用相同的流程，调用点须先有对应的范围证据。
+
+```sh
+printf '%s\n' '{"fixture":"point-add","evaluation":"spend","enumerate":"bindings","workers":2}' |
+  python3 -m fourthgraph.workflow.protocol experiment run - > workspace/tuning/point-add.json
+python3 -m fourthgraph.workflow.protocol experiment replay workspace/tuning/point-add.json
+```
+
+点加夹具在调用点 0 使用构建期验证过的常量，支持完整射影点加和仿射右操作数两条候选路径。调用点 1 从运行时栈接收合法射影点，保留完整射影实现。可用 `"plans":[{"bindings":[{"site":0,"kernel":"secp256k1-add-affine"}]}]` 重放单个显式绑定。报告在 `compile.lowering.call_sites` 给出证据、排除原因、选中内核、转换和链接字节。错曲线、重复绑定或强制使用前提不足的内核均在编译期拒绝。夹具用独立的群运算结果和固定版 chain-gang 验收计算。[夹具源码](../src/fourthgraph/benchmark/fixtures/point-add.fth)
+
 <a name="documentation-index"></a>
 
 ## 文档索引

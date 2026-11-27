@@ -1,4 +1,5 @@
 import json
+from hashlib import sha256
 import subprocess
 import sys
 from importlib.metadata import PackageNotFoundError
@@ -11,6 +12,8 @@ from fourthgraph.benchmark.validation import CONTEXT_PIN, chain_metadata
 from fourthgraph.bsv.evaluate import evaluate
 from fourthgraph.bsv.script import asm, encode_num, number
 from fourthgraph.compiler.formula_experiment import enumerate_orders
+from fourthgraph.compiler.point_add import AFFINE, GENERAL, PointAddBuilder
+from fourthgraph.benchmark.point_add_fixture import PointAddFixture
 from fourthgraph.compiler.script_builder import ScriptBuilder
 
 
@@ -306,6 +309,50 @@ class FormulaExperiments(unittest.TestCase):
                          ("failed", "rejected", "error"))
         self.assertEqual(receipt["diagnostic"], "engine unavailable")
         self.assertEqual(report["ranking"], [])
+
+    def test_point_add_enumerates_only_eligible_call_site_bindings(self):
+        self._require_pinned_chain()
+        self.assertEqual(capabilities()["call_site_fixtures"]["point-add"]["enumerate"], "bindings")
+        report = run({"fixture": "point-add", "evaluation": "spend", "enumerate": "bindings", "workers": 2})
+        base, optimized = report["candidates"]
+        self.assertEqual(base["source_sha256"], optimized["source_sha256"])
+        for row, selected in ((base, GENERAL), (optimized, AFFINE)):
+            fixed, runtime = row["compile"]["lowering"]["call_sites"]
+            self.assertEqual((fixed["kernel"], runtime["kernel"]), (selected, GENERAL))
+            self.assertEqual(fixed["evidence"]["z"], 1)
+            self.assertEqual(runtime["evidence"]["kind"], "runtime-projective")
+            self.assertFalse(runtime["candidates"][1]["eligible"])
+            emitted = bytes.fromhex(row["artifact"]["hex"])
+            for site in (fixed, runtime):
+                offset = site["offset"]
+                self.assertEqual(sha256(emitted[offset:offset+site["bytes"]]).hexdigest(), site["linked_sha256"])
+            spend = row["test"]["spend"]
+            self.assertEqual((spend["status"], spend["accepted"], spend["rejected"]), ("passed", 9, 9))
+        self.assertEqual(optimized["delta"]["baseline_path_bytes"], -12)
+        self.assertEqual(report["ranking"][0], optimized["id"])
+        self.assertEqual(report["run_id"], run(report["request"])["run_id"])
+
+    def test_point_add_rejects_wrong_curve_missing_proof_and_duplicate_bindings(self):
+        request = {"fixture": "point-add", "plans": [
+            {"bindings": [{"site": 0, "kernel": "p256-add"}]},
+            {"bindings": [{"site": 1, "kernel": AFFINE}]},
+            {"bindings": [{"site": 0, "kernel": AFFINE}, {"site": 0, "kernel": GENERAL}]},
+            {"bindings": [{"site": 2, "kernel": GENERAL}]},
+        ]}
+        report = run(request)
+        self.assertEqual(report["ranking"], [])
+        for row, message in zip(report["candidates"],
+                                ("wrong curve", "proven Z=1", "duplicate binding", "unknown call site"), strict=True):
+            self.assertEqual(row["compile"]["status"], "failed")
+            self.assertIn(message, row["compile"]["diagnostic"])
+            self.assertEqual(row["test"]["status"], "not_run")
+        fixture = PointAddFixture()
+        source = fixture.source("point-add").decode()
+        x, y = fixture.generator
+        encoded = f"{x:064x}{y:064x}"
+        invalid = PointAddBuilder(source.replace(encoded, "00" * 64))
+        with self.assertRaisesRegex(ValueError, "outside the secp256k1 curve"):
+            invalid.emit_plan(fixture.entry, [{"site": 0, "kernel": AFFINE}])
 
     def test_invalid_candidates_and_limits(self):
         report=run({"fixture":"square","plans":[{"passes":["search"]},{},{"passes":[]}]})

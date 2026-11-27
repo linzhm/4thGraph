@@ -6,6 +6,7 @@ from importlib.metadata import PackageNotFoundError
 from fourthgraph.bsv.differential import is_chain_gang_script_rejection
 from fourthgraph.bsv.script import asm, number
 from fourthgraph.bsv.transaction import Input, Output, Transaction
+from .point_add_fixture import PointAddFixture
 from .validation import CONTEXT_PIN, chain_metadata
 
 
@@ -30,7 +31,8 @@ def _wrong_bezier(operands):
     return p0 - 1 if p0 == 127 else p0 + 1, p1, p2, t
 
 
-SPEND_FIXTURES = {"square": _wrong_square, "bezier": _wrong_bezier}
+FORMULA_WRONG_INPUTS = {"square": _wrong_square, "bezier": _wrong_bezier}
+SPEND_FIXTURES = (*FORMULA_WRONG_INPUTS, PointAddFixture.name)
 
 
 def spend_profile(fixture):
@@ -59,11 +61,16 @@ def check_spends(fixture, script):
 
     cases = []
     max_bytes = {}
-    wrong_inputs = SPEND_FIXTURES[fixture.name]
+    point_add = isinstance(fixture, PointAddFixture)
+    wrong_inputs = fixture.wrong if point_add else FORMULA_WRONG_INPUTS[fixture.name]
     for operands, expected in fixture.vectors():
         depth = asm("OP_DEPTH") + number(len(operands)) + asm("OP_NUMEQUALVERIFY")
-        checks = b"".join(number(item) + asm("OP_EQUALVERIFY") for item in reversed(expected[1:]))
-        lock = depth + script + checks + number(expected[0]) + asm("OP_EQUAL")
+        if point_add:
+            checks = fixture.result_checks(expected)
+        else:
+            checks = b"".join(number(item) + asm("OP_EQUALVERIFY") for item in reversed(expected[1:]))
+            checks += number(expected[0]) + asm("OP_EQUAL")
+        lock = depth + script + checks
         parent = Transaction((Input(bytes(32), 0),), (Output(10_000, lock),), version=TX_VERSION)
         witness = b"".join(map(number, operands))
         spend = Transaction((Input(parent.txid_wire(), 0, witness),),
