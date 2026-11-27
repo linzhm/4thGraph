@@ -42,7 +42,7 @@ bash tools/verify_node.sh -- python tests/project_transactions.py
 
 ## 项目 README 模板
 
-用 Copier 创建新项目。项目级 `projects/<name>/manifest.yaml` 是中英文 README 的共同来源。[安装与创建命令](template/README.zh-CN.md)
+用 Copier 创建新项目。每个可运行项目都从自己的 `projects/<name>/manifest.yaml` 生成中英文 README。[安装与创建命令](template/README.zh-CN.md)
 
 | 字段 | 内容 |
 | --- | --- |
@@ -52,7 +52,7 @@ bash tools/verify_node.sh -- python tests/project_transactions.py
 | `sections` | 按固定键组织的中英文 Markdown 内容块。保留 `algorithm` 和 `reproduction`，其余按项目需要填写。 |
 | `setup` | 可选的双语准备步骤，放在构建和验证命令之前。 |
 
-段落、表格和代码块可分别用 YAML 块标量填写，相对链接从项目目录解析。生成器从 `versions/index.json` 读取当前版本，从该版本清单取得构建和验证命令，并链接已有的协议、SDK 和实测文件。`--check` 报告未处理的模板提示和 README 与生成结果的差异。现有项目可在采用清单前继续直接维护 README。[JSON Schema](template/manifest.schema.json) · [起始清单](template/manifest.example.yaml) · [Schnorr 清单](p2pkh-schnorr/manifest.yaml) · [生成的 README](p2pkh-schnorr/README.zh-CN.md)
+段落、表格和代码块可分别用 YAML 块标量填写，相对链接从项目目录解析。生成器从 `versions/index.json` 读取当前版本，从该版本清单取得构建和验证命令，并链接已有的协议、SDK 和实测文件。用 `python3 tools/project_readme.py --all --write` 重生成全部 README，再用 `python3 tools/project_readme.py --all --check` 核对。[JSON Schema](template/manifest.schema.json) · [起始清单](template/manifest.example.yaml) · [Schnorr 清单](p2pkh-schnorr/manifest.yaml) · [生成的 README](p2pkh-schnorr/README.zh-CN.md)
 
 ## 版本数据
 

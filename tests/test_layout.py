@@ -79,6 +79,7 @@ class LayoutTests(unittest.TestCase):
     def test_project_version_catalogs(self):
         for project in project_directories(ROOT):
             with self.subTest(project=project.name):
+                self.assertTrue((project / "manifest.yaml").is_file())
                 versions = project / "versions"
                 index = json.loads((versions / "index.json").read_text())
                 self.assertEqual(index["schema_version"], 1)

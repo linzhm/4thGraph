@@ -93,6 +93,17 @@ class ProjectDocsTests(unittest.TestCase):
             checked = run(root, TOOL, "--all", "--check")
             self.assertEqual(checked.returncode, 0, checked.stderr)
 
+            updated = dict(MANIFEST, summary={"en": "Updated overview.", "zh-CN": "更新的介绍。"})
+            manifest.write_text(safe_dump(updated, allow_unicode=True), encoding="utf-8")
+            stale = run(root, TOOL, "--all", "--check")
+            self.assertNotEqual(stale.returncode, 0)
+            for name in ("README.md", "README.zh-CN.md"):
+                self.assertIn(f"projects/example/{name} differs", stale.stderr)
+            self.assertEqual(run(root, TOOL, "--all", "--write").returncode, 0)
+            self.assertEqual(run(root, TOOL, "--all", "--check").returncode, 0)
+            first = english.read_text(encoding="utf-8")
+            self.assertIn("Updated overview.", first)
+
             english.write_text(first + "\nDrift.\n", encoding="utf-8")
             self.assertIn("differs from its manifest", run(root, TOOL, "--all", "--check").stderr)
             manifest.write_text("schema_version: 1\n", encoding="utf-8")
@@ -103,8 +114,6 @@ class ProjectDocsTests(unittest.TestCase):
 
     def test_checked_in_readmes_match_manifest_outputs(self):
         for project in project_directories(ROOT):
-            if not any((project / filename).is_file() for filename in ("manifest.yaml", "manifest.json")):
-                continue
             with self.subTest(project=project.name):
                 checked = run(ROOT, TOOL, project.name, "--check")
                 self.assertEqual(checked.returncode, 0, checked.stderr)

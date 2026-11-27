@@ -1,3 +1,5 @@
+<!-- Generated from manifest.yaml with Copier. -->
+
 # P2PKH-R1-Deferred v0.3.0
 
 [English](README.md) · [4thGraph](../../README.zh-CN.md) · [项目目录](../README.zh-CN.md) · [版本](versions/index.json)
@@ -8,11 +10,52 @@
 
 生成入金短锁，在同一索引安排它承诺的 R1 目标输出，再调用 `activate`。启用后的输出按普通 R1 流程花费。
 
+[协议](docs/spec.zh-CN.md) · [算法与执行](#算法与执行) · [复现方法](#复现方法) · [完整交易与栈测量](#完整交易与栈测量)
+
+| 入口 | 用途 |
+| --- | --- |
+| `activate_input` | 为所选已入金输入及承诺的 R1 目标构造启用见证。 |
+
+## 使用场景与取舍
+
+如果需要批量创建体积较小的入金输出，而且可以在后续出款前集中启用，可以评估 Deferred。每个短锁承诺目标 R1 的所有者、模板和全额金额。任何持有所需数据并能提供手续费的参与方都可构造启用交易。之后花费普通 R1 输出时，仍需所有者签名。
+
+需预算额外一笔交易及手续费来源。每个启用输入与所承诺的 R1 输出同索引时，可以批量启用。确认前，钱包继续跟踪短锁 UTXO。暂时找不到手续费赞助输入时，资金留在短锁里。若用户需要到账即花费，或主要目标是降低总手续费，应和普通 R1 对比从入金到退出的完整成本。[启用成本](#实测交易成本)
+
+## 算法与执行
+
 [协议规范](docs/spec.zh-CN.md) · [安全分析](docs/developer.zh-CN.md#security) · [复现与验证](#开发与复现) · [交易成本](#实测交易成本)
 
 Deferred 将生成完整 R1 锁定脚本的成本推迟到启用阶段。v0.3.0 入金短锁为 1,085 字节，承诺等额的 46,302 字节 P2PKH-R1 v0.2.0 目标输出。已有短锁按原承诺启用。[Deferred 模板](versions/v0.3.0/template.hex) · [R1 目标模板](../p2pkh-r1/versions/v0.2.0/template.hex)
 
-## 4thGraph Forth 对照
+### 启用与后续付款
+
+1. 使用 `funding_output` 或 `funding_output_from_owner_hash` 生成入金输出。接收时核对短锁、金额和两项目标承诺。统一客户端通过 `template` 返回短锁版本，通过 `targetTemplate` 返回承诺的 R1 版本。
+2. 将启用输入和目标输出放在同一索引，再调用 `activate_input`。手续费赞助方需要签自己的输入。BIP143 SINGLE 直接分支的解锁为 160 字节。双检查分支另带所选模式的摘要，解锁为 197 字节。全部 12 种启用签名类型都要求同索引输出存在。
+3. 启用完成后，使用普通 R1 钱包和签名器花费该输出。符合条件的后续付款可以使用 Chronicle OTDA 重建。
+
+启用解锁已经通过 BIP143 SINGLE 携带目标输出的承诺，双检查分支另带一个摘要。完整 R1 目标锁占用启用交易的实际输出。
+
+## 复现方法
+
+在安装了项目依赖的 Python 环境中，从仓库根目录运行版本命令。
+
+```sh
+python -m pip install -r projects/p2pkh-r1-deferred/reference/requirements.txt
+```
+
+```sh
+PYTHONPATH=src:.:projects/p2pkh-r1/reference python projects/p2pkh-r1-deferred/reference/generate_vectors.py
+bash projects/p2pkh-r1-deferred/reference/verify.sh
+```
+
+### 开发与复现
+
+详见[协议规范](docs/spec.zh-CN.md)、[钱包 SDK](docs/sdk.zh-CN.md)、[模板布局](versions/v0.3.0/layout.json)、[启用向量](versions/v0.3.0/activation-single.json)、[十二种模式向量](versions/v0.3.0/sighash-modes.json)和[验收矩阵](reference/acceptance.md)。
+
+## 脚本尺寸
+
+### 4thGraph Forth 对照
 
 高阶 Forth 源码覆盖完整启用检查，包括 BIP143 SINGLE 同索引输出承诺、可选的 BIP143 或 OTDA 摘要、固定密钥签名构造和两处原生签名检查。三种构建使用同一份有栈类型声明的源码，编译器为 `3133da7` 基线上的 4thGraph 0.2.7。[Forth 源码](reference/deferred-activation.fth) · [编译报告](versions/v0.3.0/forth-results.json)
 
@@ -36,31 +79,9 @@ PYTHONPATH=src:. python projects/p2pkh-r1-deferred/reference/compare_forth.py \
   --output-dir projects/p2pkh-r1-deferred/workspace/forth
 ```
 
-## 使用场景与取舍
+## 完整交易与栈测量
 
-如果需要批量创建体积较小的入金输出，而且可以在后续出款前集中启用，可以评估 Deferred。每个短锁承诺目标 R1 的所有者、模板和全额金额。任何持有所需数据并能提供手续费的参与方都可构造启用交易。之后花费普通 R1 输出时，仍需所有者签名。
-
-需预算额外一笔交易及手续费来源。每个启用输入与所承诺的 R1 输出同索引时，可以批量启用。确认前，钱包继续跟踪短锁 UTXO。暂时找不到手续费赞助输入时，资金留在短锁里。若用户需要到账即花费，或主要目标是降低总手续费，应和普通 R1 对比从入金到退出的完整成本。[启用成本](#实测交易成本)
-
-## 启用与后续付款
-
-1. 使用 `funding_output` 或 `funding_output_from_owner_hash` 生成入金输出。接收时核对短锁、金额和两项目标承诺。统一客户端通过 `template` 返回短锁版本，通过 `targetTemplate` 返回承诺的 R1 版本。
-2. 将启用输入和目标输出放在同一索引，再调用 `activate_input`。手续费赞助方需要签自己的输入。BIP143 SINGLE 直接分支的解锁为 160 字节。双检查分支另带所选模式的摘要，解锁为 197 字节。全部 12 种启用签名类型都要求同索引输出存在。
-3. 启用完成后，使用普通 R1 钱包和签名器花费该输出。符合条件的后续付款可以使用 Chronicle OTDA 重建。
-
-启用解锁已经通过 BIP143 SINGLE 携带目标输出的承诺，双检查分支另带一个摘要。完整 R1 目标锁占用启用交易的实际输出。
-
-## 开发与复现
-
-详见[协议规范](docs/spec.zh-CN.md)、[钱包 SDK](docs/sdk.zh-CN.md)、[模板布局](versions/v0.3.0/layout.json)、[启用向量](versions/v0.3.0/activation-single.json)、[十二种模式向量](versions/v0.3.0/sighash-modes.json)和[验收矩阵](reference/acceptance.md)。
-
-```sh
-python -m pip install -r projects/p2pkh-r1-deferred/reference/requirements.txt
-PYTHONPATH=src:. python projects/p2pkh-r1-deferred/reference/generate_vectors.py
-bash projects/p2pkh-r1-deferred/reference/verify.sh
-```
-
-## 实测交易成本
+### 实测交易成本
 
 v0.3.0 基准用两个短锁输入和一个手续费赞助输入，产生两个 R1 v0.2.0 输出。新增一对启用时，同时增加输入与同索引目标。只增输出时，由赞助输入额外支付。表中单位均为序列化字节。
 

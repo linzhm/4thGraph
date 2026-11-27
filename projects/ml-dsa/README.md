@@ -1,4 +1,6 @@
-# Pure ML-DSA-44
+<!-- Generated from manifest.yaml with Copier. -->
+
+# Pure ML-DSA-44 v0.1.0
 
 [简体中文](README.zh-CN.md) · [4thGraph](../../README.md) · [Project index](../README.md) · [Versions](versions/index.json)
 
@@ -8,6 +10,22 @@
 
 Make a lock from the raw ML-DSA-44 public key and sign the payment message in Pure mode with an empty context.
 
+[Protocol](docs/developer.en.md) · [Algorithm and execution](#algorithm-and-execution) · [Reproduce the checks](#reproduce-the-checks) · [Complete transactions and stack measurements](#complete-transactions-and-stack-measurements)
+
+| Entry point | Purpose |
+| --- | --- |
+| `fips204.verify(public_key, message, signature, context=...)` | Verify a byte message and optional context in Python. |
+| `script.verify_message_script(public_key, message_bytes, context=...)` | Compile the Script verifier. The public key, byte length and context are fixed at generation. The message and signature go on the stack. |
+| `script.locking_script(public_key)` | Bind the same verifier to the current input. It verifies the signature over a 32-byte transaction digest with the empty context. |
+
+## Use cases and trade-offs
+
+Evaluate Pure ML-DSA-44 when measuring FIPS 204 signer interoperability or large-script resource limits. A lab can start with the detached conformance vectors and then run the payment wrapper with the same kind of public key and a dedicated payment signer. The wrapper passes a 32-byte payment message to Pure ML-DSA-44 with an empty context. Key and signature validation, transaction binding, and node admission each have their own evidence. [Reproduction steps](#reproduce-the-checks)
+
+The fixed-key payment lock is about 926 kB in the measured fixtures. Evaluate script size, transaction size and validation policy on the target node or miner before choosing this format for a funded workflow. [Funded regtest method](../../docs/benchmark.md#funded-regtest-measurements)
+
+## Algorithm and execution
+
 [Protocol](docs/developer.en.md#protocol) · [Security](docs/developer.en.md#security) · [Verify](#reproduce-the-checks) · [Transaction costs](#complete-transactions-and-stack-measurements)
 
 **Status** · v0.1.0 development baseline.
@@ -16,12 +34,6 @@ The verifier uses the FIPS 204 Pure ML-DSA-44 public-key and signature
 encodings. A public key is 1,312 bytes and a signature is 2,420 bytes.
 The OpenSSL fixture uses a public test seed and deterministic signing.
 [FIPS 204](https://csrc.nist.gov/pubs/fips/204/final)
-
-| Entry point | Purpose |
-|---|---|
-| `fips204.verify(public_key, message, signature, context=...)` | Verify a byte message and optional context in Python. |
-| `script.verify_message_script(public_key, message_bytes, context=...)` | Compile the Script verifier. The public key, byte length and context are fixed at generation. The message and signature go on the stack. |
-| `script.locking_script(public_key)` | Bind the same verifier to the current input. It verifies the signature over a 32-byte transaction digest with the empty context. |
 
 The Script compiler precomputes the matrix and transformed public-key
 polynomials. At execution the script checks the signature encoding, response
@@ -33,13 +45,7 @@ external signature. The caller authenticates the funding transaction and
 approves the transaction intent.
 [Transaction-binding construction](../../src/fourthgraph/bsv/pushtx.py)
 
-## Use cases and trade-offs
-
-Evaluate Pure ML-DSA-44 when measuring FIPS 204 signer interoperability or large-script resource limits. A lab can start with the detached conformance vectors and then run the payment wrapper with the same kind of public key and a dedicated payment signer. The wrapper passes a 32-byte payment message to Pure ML-DSA-44 with an empty context. Key and signature validation, transaction binding, and node admission each have their own evidence. [Reproduction steps](#reproduce-the-checks)
-
-The fixed-key payment lock is about 926 kB in the measured fixtures. Evaluate script size, transaction size and validation policy on the target node or miner before choosing this format for a funded workflow. [Funded regtest method](../../docs/benchmark.md#funded-regtest-measurements)
-
-## Sampling boundary
+### Sampling boundary
 
 Python and Script use the same 221-byte SHAKE256 output budget specified by
 FIPS 204 Appendix C, Table 3. It includes eight sign bytes and up to 213
@@ -49,9 +55,19 @@ Script sampler discards its intermediate stack values before failing.
 
 ## Reproduce the checks
 
+Run the release commands from the repository root with Python 3.12, OpenSSL 3.5 or later, and the pinned Chronicle SDK dependencies.
+
+```sh
+python -m pip install -r tools/requirements-chronicle.txt
+```
+
+```sh
+PYTHONPATH=src:. python -m unittest discover -s projects/ml-dsa/reference -p test_signature_script.py
+PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- python -m unittest discover -s projects/ml-dsa/reference -p test_payment.py
+```
+
 ```sh
 python -m unittest discover -s projects/ml-dsa/reference -p test_mldsa.py -v
-python -m pip install -r tools/requirements-chronicle.txt
 python projects/ml-dsa/reference/check_chain_gang.py -v
 python projects/ml-dsa/reference/test_shake_script.py -v
 python projects/ml-dsa/reference/test_signature_script.py -v

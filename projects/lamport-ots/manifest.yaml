@@ -1,0 +1,141 @@
+$schema: ../template/manifest.schema.json
+schema_version: 1
+title:
+  en: Lamport OTS (SHA-256)
+  zh-CN: Lamport OTS（SHA-256）
+summary:
+  en: Lamport OTS binds an 8,192-byte one-time signature to a BSV transaction input. The v0.1.0 development
+    baseline includes full-key and committed-key payment locks. The Forth experiments reduce the committed-key
+    lock from 7,746 to 7,042 bytes, then to 6,830 bytes with a compact transaction binding. [Protocol](docs/spec.md)
+    · [Forth design and measurements](docs/optimization.md)
+  zh-CN: Lamport OTS 将 8,192 字节的一次性签名绑定到 BSV 当前交易输入。v0.1.0 开发基线包含全公钥和公钥承诺付款锁。Forth 重建先把公钥承诺锁从 7,746 字节降至
+    7,042 字节，再通过压缩交易绑定降至 6,830 字节。[协议规范（英文）](docs/spec.md) · [Forth 设计与测量（英文）](docs/optimization.md)
+entry_points:
+  - name: locking_script
+    description:
+      en: Build the full-key or committed-key payment lock from the selected key representation.
+      zh-CN: 用所选的密钥表示生成全公钥或公钥承诺付款锁。
+  - name: sign_spend
+    description:
+      en: Bind a selected input to the transaction and call an external one-time signer.
+      zh-CN: 将所选输入绑定到交易并调用外部一次性签名器。
+setup:
+  en:
+    - Use the project’s pinned Python environment from the repository root.
+    - |-
+      ```sh
+      python3.12 -m venv projects/lamport-ots/workspace/venv
+      . projects/lamport-ots/workspace/venv/bin/activate
+      python -m pip install -r projects/lamport-ots/reference/requirements.txt
+      ```
+  zh-CN:
+    - 从仓库根目录使用项目固定的 Python 环境。
+    - |-
+      ```sh
+      python3.12 -m venv projects/lamport-ots/workspace/venv
+      . projects/lamport-ots/workspace/venv/bin/activate
+      python -m pip install -r projects/lamport-ots/reference/requirements.txt
+      ```
+sections:
+  algorithm:
+    en:
+      - The opt-in **v0.2.0 candidate** uses a 6,525-byte lock and an 871-byte OTDA reconstruction program
+        pinned in the version catalog. [v0.2.0 manifest](versions/v0.2.0/manifest.json) · [Measurements](versions/v0.2.0/measurements.json)
+      - The full-key lock embeds the ordered Lamport public key. A committed-key lock stores its SHA-256
+        digest and checks the full key supplied at spend time. The transaction binding checks the current
+        input. [Protocol](docs/spec.md)
+    zh-CN:
+      - '**v0.2.0 候选版**可在 SDK 中显式选择，版本目录固定了 6,525 字节的锁模板和 871 字节的 OTDA 重建程序。[v0.2.0 清单](versions/v0.2.0/manifest.json)
+        · [测量数据](versions/v0.2.0/measurements.json)'
+      - 全公钥锁嵌入有序的 Lamport 公钥。公钥承诺锁保存其 SHA-256 摘要，并在花费时检查见证提供的完整公钥。交易绑定校验实际输入。[协议规范（英文）](docs/spec.md)
+  reproduction:
+    en:
+      - '### Run'
+      - From the repository root, use an isolated Python 3.12 environment. The vectors use public test
+        keys.
+      - |-
+        ```sh
+        python -m unittest discover -s projects/lamport-ots/reference -p test_lamport.py -v
+        python -m unittest discover -s projects/lamport-ots/reference -p test_acceptance.py -v
+        python projects/lamport-ots/reference/measure.py --committed-costs
+        ```
+      - Run `bash projects/lamport-ots/reference/verify_apple.sh` on macOS with Apple Container, or `bash
+        projects/lamport-ots/reference/verify.sh` for the Linux BSV Node replay. [Validation receipts](docs/validation.md)
+        · [Original ALL vector](versions/v0.1.0/vector.json) · [Universal sighash vectors](versions/v0.1.0/universal-vectors.json)
+        · [v0.1.0 measurements](versions/v0.1.0/measurements.json)
+      - The funded regtest replay confirmed mempool admission and mining for funding, one turnover and
+        exit for both Forth profiles under BIP143 ALL and Chronicle OTDA ALL. It also replayed the same
+        lifecycle with reconstruction enabled on the compact profile. [Funded results and reproduction](docs/validation.md#funded-regtest)
+    zh-CN:
+      - 在仓库根目录使用独立的 Python 3.12 环境。向量密钥均为公开测试数据。
+      - |-
+        ```sh
+        python -m unittest discover -s projects/lamport-ots/reference -p test_lamport.py -v
+        python -m unittest discover -s projects/lamport-ots/reference -p test_acceptance.py -v
+        python projects/lamport-ots/reference/measure.py --committed-costs
+        ```
+      - macOS 用 Apple Container 运行 `bash projects/lamport-ots/reference/verify_apple.sh`，Linux 运行 `bash
+        projects/lamport-ots/reference/verify.sh` 进行 BSV Node 复放。[验证记录（英文）](docs/validation.md) · [原始
+        ALL 向量](versions/v0.1.0/vector.json) · [通用签名模式向量](versions/v0.1.0/universal-vectors.json) · [v0.1.0
+        测量清单](versions/v0.1.0/measurements.json)
+      - 在 BSV Node 默认 regtest 交易策略下，两种 Forth 模板及启用重建的紧凑模板均完成入金、一次周转和退出。两种 ALL 模式的各阶段均已入池并入块。[逐阶段结果与复现命令（英文）](docs/validation.md#funded-regtest)
+  integration:
+    en:
+      - '### Build a payment'
+      - Use a fresh key per output, including change. Keep the full ordered public key and have the external
+        signer durably consume the key before releasing the first signature. Verify the funding outpoint,
+        amount, script and required confirmations before signing. Retain the original signed transaction
+        for rebroadcast and treat an uncertain signing state as consumed. [Wallet SDK quickstart](docs/sdk.en.md#quickstart)
+        · [Developer guide](docs/developer.en.md) · [Security and recovery](docs/security.md)
+    zh-CN:
+      - '### 构建付款'
+      - 每个新输出使用独立密钥，找零也一样。钱包保存完整有序公钥，外部签名器在释放首次签名前持久记录密钥已消耗。签名前核对入金 outpoint、金额、锁定脚本及所需确认数。重播时使用原已签交易，签名状态无法确认的密钥按已消耗处理。[钱包
+        SDK 快速上手](docs/sdk.zh-CN.md#quickstart) · [开发指南](docs/developer.zh-CN.md) · [安全与恢复（英文）](docs/security.md)
+  transactions:
+    en:
+      - <a name="committed-key-candidate"></a>
+      - <a name="marginal-and-lifecycle-costs"></a>
+      - '### Choose a payment profile'
+      - The sizes below use ordinary BIP143 ALL (`0x41`) and Chronicle OTDA ALL (`0x61`). A 2×2 payment
+        spends two outputs and creates two fresh outputs of the same profile. All sizes are in bytes.
+      - |-
+        | Profile | Output lock | BIP143 ALL unlock per input | BIP143 ALL 2×2 | OTDA ALL 2×2 |
+        | --- | ---: | ---: | ---: | ---: |
+        | `full-key` (default) | 22,780 | 8,357 | 62,392 | 153,436 |
+        | `committed-key` | 7,746 | 16,549 | 48,708 | 79,616 |
+        | `committed-key-forth` (experimental) | 7,042 | 16,549 | 47,300 | 75,392 |
+        | `committed-key-forth-compact` (experimental) | 6,830 | 16,549 | 46,876 | 74,120 |
+        | `committed-key-forth-v0.2.0` (candidate) | 6,525 | 16,549 | 46,266 | 72,290 |
+      - Full-key inputs cost less to spend into ordinary outputs. The committed profiles store SHA-256
+        of the ordered public key and use an additional 8,192 bytes per input to reconstruct it. Shorter
+        output locks also reduce OTDA ALL preimages, which serialize the outputs into each input's signing
+        preimage. [Marginal and lifecycle costs](docs/optimization.md#transaction-and-lifecycle-costs)
+      - For version-2 Chronicle spends, opt-in OTDA reconstruction reduces the compact profile's OTDA
+        ALL 2×2 payment from **74,120 to 48,830 bytes** when both outputs use that profile. [Reconstruction
+        and wallet options](docs/optimization.md#otda-unlocking-reconstruction)
+      - With both outputs using v0.2.0, OTDA reconstruction brings the same payment shape to **48,106
+        bytes**. [v0.2.0 design](docs/optimization.md#version-020-candidate)
+      - The reference supports all twelve BIP143 and OTDA ALL, NONE and SINGLE combinations with optional
+        ANYONECANPAY. BIP143 ALL is the wallet default. The reference requires explicit approval for unpaired
+        SINGLE, which commits to zero outputs. The legacy two-push BIP143 ALL profile remains spendable.
+        The detached digest verifier is for tests only because the same proof can authorize a different
+        transaction. [Wire and Script specification](docs/spec.md) · [Acceptance domain](docs/acceptance.md)
+    zh-CN:
+      - <a name="输入输出取舍"></a>
+      - <a name="输入输出边际与生命周期"></a>
+      - '### 选择付款模板'
+      - 下表采用普通 BIP143 ALL（`0x41`）和 Chronicle OTDA ALL（`0x61`）。两进两出交易花费两个同模板输出，再创建两个同模板的新输出。单位为字节。
+      - |-
+        | 模板 | 输出锁 | 每个 BIP143 ALL 解锁 | BIP143 ALL 两进两出 | OTDA ALL 两进两出 |
+        | --- | ---: | ---: | ---: | ---: |
+        | `full-key`（默认） | 22,780 | 8,357 | 62,392 | 153,436 |
+        | `committed-key` | 7,746 | 16,549 | 48,708 | 79,616 |
+        | `committed-key-forth`（实验） | 7,042 | 16,549 | 47,300 | 75,392 |
+        | `committed-key-forth-compact`（实验） | 6,830 | 16,549 | 46,876 | 74,120 |
+        | `committed-key-forth-v0.2.0`（候选） | 6,525 | 16,549 | 46,266 | 72,290 |
+      - 全公钥格式花费到普通输出时，每个输入的成本较低。承诺格式只在锁中保存有序公钥的 SHA-256，每个输入多携带 8,192 字节以重建公钥。OTDA ALL 还会在每个输入的签名原文中序列化本笔交易的输出，缩短输出锁同时也缩短签名原文。[边际成本与生命周期（英文）](docs/optimization.md#transaction-and-lifecycle-costs)
+      - Chronicle v2 交易可显式启用 OTDA 原文重建。当两个输出均使用紧凑模板时，OTDA ALL 两进两出从 **74,120 降至 48,830 字节**。[重建机制与钱包选项（英文）](docs/optimization.md#otda-unlocking-reconstruction)
+      - 两个输出使用 v0.2.0 并启用重建时，同一交易形状为 **48,106 字节**。[v0.2.0 设计（英文）](docs/optimization.md#version-020-candidate)
+      - 参考实现支持 BIP143 与 Chronicle OTDA 的 ALL、NONE、SINGLE 及 ANYONECANPAY 共十二种组合，默认使用 BIP143 ALL。无配对 SINGLE
+        不承诺任何输出，参考 API 要求调用方显式批准。旧版两项见证的 BIP143 ALL 付款锁仍可花费。分离摘要验证器仅供测试，同一证明可以被复制到另一笔交易。[线格式与脚本规范（英文）](docs/spec.md)
+        · [验收范围（英文）](docs/acceptance.md)

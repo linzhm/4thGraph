@@ -42,7 +42,7 @@ Run `bash tools/setup-workspaces.sh` from the repository root to create Git-igno
 
 ## Project README template
 
-Use Copier to create a new project. Its `projects/<name>/manifest.yaml` is the source for both README files. [Copier commands and setup](template/README.md)
+Use Copier to create a new project. Each runnable project keeps both README files in sync with its `projects/<name>/manifest.yaml`. [Copier commands and setup](template/README.md)
 
 | Field | Contents |
 | --- | --- |
@@ -52,7 +52,7 @@ Use Copier to create a new project. Its `projects/<name>/manifest.yaml` is the s
 | `sections` | Named sections containing Markdown blocks in both languages. Keep `algorithm` and `reproduction`. Include the other sections that apply. |
 | `setup` | Optional bilingual Markdown blocks before the build and verify commands. |
 
-Use YAML block scalars for Markdown paragraphs, tables, and fenced code. Resolve relative links from the project directory. The generator reads the current version from `versions/index.json` and takes the build and verify commands from that release's manifest. It links available protocol, SDK, and measurement files. `--check` reports unfinished prompts and any difference from the generated READMEs. Existing projects can continue to maintain their READMEs directly until they adopt a manifest. [JSON Schema](template/manifest.schema.json) · [Starter manifest](template/manifest.example.yaml) · [Schnorr manifest](p2pkh-schnorr/manifest.yaml) · [Generated README](p2pkh-schnorr/README.md)
+Use YAML block scalars for Markdown paragraphs, tables, and fenced code. Resolve relative links from the project directory. The generator reads the current version from `versions/index.json` and takes the build and verify commands from that release's manifest. It links available protocol, SDK, and measurement files. To regenerate and check all projects, run `python3 tools/project_readme.py --all --write` and `python3 tools/project_readme.py --all --check`. [JSON Schema](template/manifest.schema.json) · [Starter manifest](template/manifest.example.yaml) · [Schnorr manifest](p2pkh-schnorr/manifest.yaml) · [Generated README](p2pkh-schnorr/README.md)
 
 ## Versioned project data
 

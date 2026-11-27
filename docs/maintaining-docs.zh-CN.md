@@ -35,4 +35,6 @@ python3 tools/project_readme.py --all --check
 PYTHONPATH=src:. python3 -m unittest tests.test_layout tests.test_project_docs
 ```
 
-检查覆盖 README 生成差异、本地链接、未填模板提示，以及标准项目说明的语言互链。技术表述和示例输出仍需与链接的实现或复放结果核对。[安装文档工具](../projects/template/README.zh-CN.md)
+这些本地检查覆盖 README 生成差异、缺失的项目清单、本地链接、未填模板提示和标准项目说明的语言互链。技术表述和示例输出仍需与链接的实现或复放结果核对。[安装文档工具](../projects/template/README.zh-CN.md)
+
+推送改动项目 YAML 清单、版本索引或版本清单时，会触发 README 更新工作流。工作流只重生成当前输入有变化的项目，生成文件有改动时提交回当前分支。[README 更新工作流](../.github/workflows/documentation.yml)

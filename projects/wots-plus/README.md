@@ -1,4 +1,6 @@
-# WOTS+ (SHA-256)
+<!-- Generated from manifest.yaml with Copier. -->
+
+# WOTS+ (SHA-256) v0.1.0
 
 [简体中文](README.zh-CN.md) · [4thGraph](../../README.md) · [Project index](../README.md) · [Versions](versions/index.json)
 
@@ -7,6 +9,21 @@
 **[Wallet SDK quickstart](docs/sdk.en.md#quickstart)** · [Unified wallet SDK](../../sdk/README.md#quickstart)
 
 Choose a receive template and connect a durable one-time signer. The cached-step profile supports eligible OTDA reconstruction.
+
+[Protocol](docs/developer.en.md) · [Algorithm and execution](#algorithm-and-execution) · [Reproduce the checks](#reproduce-the-checks) · [Complete transactions and stack measurements](#complete-transactions-and-stack-measurements)
+
+| Entry point | Purpose |
+| --- | --- |
+| `locking_script` | Select a canonical or cached payment lock, or build a detached verifier for tests. |
+| `sign_spend` | Request the one-time signature for a selected transaction input. |
+
+## Use cases and trade-offs
+
+Use WOTS+ to compare SHA-256 one-time signatures when witness size matters. The raw signature is 2,144 bytes, while a Lamport signature here is 8,192 bytes. A fair transaction comparison includes both the payment locks and the unlocking scripts. WOTS+ offers a canonical lock and two cache presets. Use the published measurements to examine how the smaller cached-step lock and eligible OTDA reconstruction affect funding, turnover and exit. [Measured costs](#complete-transactions-and-stack-measurements)
+
+The payment workflow requires a fresh key per UTXO, including change. Reserve that key durably before returning a signature. A wallet investigating repeated turnover should test key reservation and rebroadcast alongside script verification. [Wallet integration](docs/sdk.en.md)
+
+## Algorithm and execution
 
 [Protocol](docs/developer.en.md#protocol) · [Security](docs/developer.en.md#security) · [Verify](#run-the-checks) · [Transaction costs](#complete-transactions-and-stack-measurements)
 
@@ -28,18 +45,24 @@ from `locking_script(key, transaction=False)` accepts a caller-provided digest
 and is only for testing the primitive. The payment lock supports the twelve
 BIP143 and Chronicle OTDA modes, with BIP143 `ALL` (`0x41`) as the wallet default.
 
-## Use cases and trade-offs
+## Reproduce the checks
 
-Use WOTS+ to compare SHA-256 one-time signatures when witness size matters. The raw signature is 2,144 bytes, while a Lamport signature here is 8,192 bytes. A fair transaction comparison includes both the payment locks and the unlocking scripts. WOTS+ offers a canonical lock and two cache presets. Use the published measurements to examine how the smaller cached-step lock and eligible OTDA reconstruction affect funding, turnover and exit. [Measured costs](#complete-transactions-and-stack-measurements)
+Run the release commands from the repository root in a Python virtual environment.
 
-The payment workflow requires a fresh key per UTXO, including change. Reserve that key durably before returning a signature. A wallet investigating repeated turnover should test key reservation and rebroadcast alongside script verification. [Wallet integration](docs/sdk.en.md)
+```sh
+python -m pip install -r projects/wots-plus/reference/requirements.txt
+```
 
-## Run the checks
+```sh
+PYTHONPATH=src:. python projects/wots-plus/reference/generate_reconstruction.py --check
+bash projects/wots-plus/reference/verify.sh
+```
+
+### Run the checks
 
 Run from the repository root in a Python virtual environment.
 
 ```sh
-python -m pip install -r projects/wots-plus/reference/requirements.txt
 python -m unittest discover -s projects/wots-plus/reference -p test_wots.py -v
 (cd projects/wots-plus/reference && python -m unittest -v test_node.ChainGangTests test_acceptance)
 ```
@@ -55,7 +78,7 @@ See the [validation record](docs/validation.md) for completed checks, test
 limits and the script-size comparison with Lamport OTS. The 16 reproducible
 payment vectors are in [vectors.json](versions/v0.1.0/vectors.json).
 
-### Cached-constants candidate
+#### Cached-constants candidate
 
 `locking_script(key, cached_constants=True)` opts in to a 36,283-byte
 payment lock. Each WOTS+ step uses the same SHA-256 inputs as the existing
@@ -83,7 +106,7 @@ path adds a WOTS+ two-input, two-output payment in between.
 Exit costs the same in both formats because the exit outputs are ordinary
 P2PKH and the WOTS+ signature and witness format are identical.
 
-### Step table candidate
+#### Step table candidate
 
 `locking_script(key, cached_constants="steps")` builds a 33,956-byte lock.
 It adds fifteen four-byte step indices to the existing stack cache. The
@@ -99,7 +122,7 @@ Use a fresh key across all formats.
 The [benchmark guide](../../docs/benchmark.md) describes the optional
 durable signer wrapper used for the synthetic keys.
 
-### OTDA output reconstruction
+#### OTDA output reconstruction
 
 Use `compress_otda=True` with `sign_spend` or `sign_payment` only when
 Chronicle functional unlocking is available. Version 2 OTDA ALL and paired
@@ -127,7 +150,7 @@ byte-for-byte witness stack equivalence and the literal fallback.
 From the repository root, check the checked-in artifacts with
 `python projects/wots-plus/reference/generate_reconstruction.py --check`.
 
-### Lean conformance
+#### Lean conformance
 
 Build the [bsv-script-lean evaluator](https://github.com/Calhooon/bsv-script-lean#try-it)
 and run the same synthetic spend fixtures through its complete-input API.
@@ -140,6 +163,10 @@ The runner checks the transaction gate and the selected input's Script verdict
 for the sighash matrix and malformed witnesses. It also checks a BIP143 `ALL`
 spend at Genesis-era heights before Chronicle. This is a separate executable
 specification check alongside BSV Node and chain-gang.
+
+## Script sizes
+
+The complete transaction table lists lock and unlock sizes for the canonical, cached-constant, and cached-step profiles. [Validation record](docs/validation.md)
 
 ## Developer and wallet integration
 

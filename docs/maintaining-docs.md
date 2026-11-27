@@ -35,4 +35,6 @@ python3 tools/project_readme.py --all --check
 PYTHONPATH=src:. python3 -m unittest tests.test_layout tests.test_project_docs
 ```
 
-These checks cover generated README drift, local links, unfinished template prompts, and the language links for the standard project guides. Review technical claims and example output against the linked source or replay. [Install the documentation tools](../projects/template/README.md)
+These local checks cover generated README drift, missing project manifests, local links, unfinished template prompts, and the language links for the standard project guides. Review technical claims and example output against the linked source or replay. [Install the documentation tools](../projects/template/README.md)
+
+The README update workflow triggers on pushes that change a project YAML manifest, version index, or release manifest. It regenerates the affected projects when their current inputs change and pushes a commit containing the refreshed READMEs if any changed. [README update workflow](../.github/workflows/documentation.yml)

@@ -1,4 +1,6 @@
-# WOTS+（SHA-256）
+<!-- Generated from manifest.yaml with Copier. -->
+
+# WOTS+（SHA-256） v0.1.0
 
 [English](README.md) · [4thGraph](../../README.zh-CN.md) · [项目目录](../README.zh-CN.md) · [版本](versions/index.json)
 
@@ -8,9 +10,12 @@
 
 选择收款模板并接入有持久化记录的一次性签名器。缓存步骤模板支持符合条件的 OTDA 重建。
 
-[协议规范](docs/developer.zh-CN.md#protocol) · [安全分析](docs/developer.zh-CN.md#security) · [复现与验证](#开发和钱包接入) · [交易成本](#完整交易与栈测量)
+[协议](docs/developer.zh-CN.md) · [算法与执行](#算法与执行) · [复现方法](#复现方法) · [完整交易与栈测量](#完整交易与栈测量)
 
-WOTS+ 是 v0.1.0 开发基线，按 RFC 8391 的 `WOTSP-SHA2_256` 哈希链验证一次性签名。项目定义 64 字节的 BSV 公钥编码，原始签名为 2,144 字节。付款锁将证明绑定到实际花费的交易输入。 [编码规范](docs/spec.md) · [RFC 8391](https://www.rfc-editor.org/rfc/rfc8391)
+| 入口 | 用途 |
+| --- | --- |
+| `locking_script` | 构造标准或缓存付款锁，也可生成用于测试的独立验签器。 |
+| `sign_spend` | 为所选交易输入请求一次性签名。 |
 
 ## 使用场景与取舍
 
@@ -18,7 +23,13 @@ WOTS+ 是 v0.1.0 开发基线，按 RFC 8391 的 `WOTSP-SHA2_256` 哈希链验�
 
 每个 UTXO 使用新密钥，找零也一样。签名返回前要持久记录密钥已消耗。评估连续周转时，除了脚本验证，还应演练密钥保留和已签交易重播。[钱包接入](docs/sdk.zh-CN.md)
 
-## 模板与签名模式
+## 算法与执行
+
+[协议规范](docs/developer.zh-CN.md#protocol) · [安全分析](docs/developer.zh-CN.md#security) · [复现与验证](#开发和钱包接入) · [交易成本](#完整交易与栈测量)
+
+WOTS+ 是 v0.1.0 开发基线，按 RFC 8391 的 `WOTSP-SHA2_256` 哈希链验证一次性签名。项目定义 64 字节的 BSV 公钥编码，原始签名为 2,144 字节。付款锁将证明绑定到实际花费的交易输入。 [编码规范](docs/spec.md) · [RFC 8391](https://www.rfc-editor.org/rfc/rfc8391)
+
+### 模板与签名模式
 
 | 付款模板 | 锁定脚本 | 说明 |
 |---|---:|---|
@@ -28,17 +39,23 @@ WOTS+ 是 v0.1.0 开发基线，按 RFC 8391 的 `WOTSP-SHA2_256` 哈希链验�
 
 三种锁的普通 BIP143 解锁都为 2,310 字节。启用 Chronicle 并采用版本 2 交易时，可为缓存步骤输出显式启用 `compress_otda=True`。OTDA ALL 重建签名原文里的相关输出，配对 SINGLE 只重建同索引输出。未知输出原样处理，无配对 SINGLE 采用伴随验签。仅验证给定摘要的 `transaction=False` 模板用于算法测试。
 
-## 开发和钱包接入
+## 复现方法
 
-钱包确认 outpoint、锁定格式、金额和所需确认，再安排收款、找零和费用。单输入付款调用 `sign_payment`，已构造交易逐输入调用 `sign_spend`。外部签名器接收 32 字节摘要，返回 2,144 字节原始签名。每个 UTXO 都使用新密钥，必须先持久化消耗记录再返回签名。未广播或确认失败也要保留该记录。 [付款接口](reference/payment.py) · [已签名向量](versions/v0.1.0/vectors.json)
+在仓库根目录的 Python 虚拟环境中运行版本命令。
+
+```sh
+python -m pip install -r projects/wots-plus/reference/requirements.txt
+```
+
+```sh
+PYTHONPATH=src:. python projects/wots-plus/reference/generate_reconstruction.py --check
+bash projects/wots-plus/reference/verify.sh
+```
 
 在仓库根目录的独立 Python 环境运行以下命令。Linux x86-64 节点复放用 `verify.sh`，macOS 可用 `verify_apple.sh`。
 
 ```sh
-python -m pip install -r projects/wots-plus/reference/requirements.txt
 python -m unittest discover -s projects/wots-plus/reference -p test_wots.py -v
-python projects/wots-plus/reference/generate_reconstruction.py --check
-bash projects/wots-plus/reference/verify.sh
 ```
 
 [验证记录](docs/validation.md)包含 1,230 项支付矩阵、67 条签名链的变更测试和已支持的重放环境。栈调度与重建产物见[模板布局](versions/v0.1.0/cached-steps-layout.json)。
@@ -51,9 +68,15 @@ python projects/wots-plus/reference/test_lean.py /path/to/bsv-script-lean/eval/b
 
 该入口单独检查交易激活规则和指定输入的 Script 判定。
 
-## 输入输出取舍
+## 脚本尺寸
+
+### 输入输出取舍
 
 缓存步骤把每个锁从 42,266 降到 33,956 字节，降低入金及新建输出的成本。OTDA ALL 的重建再把同类两进两出从 208,406 降到 79,090 字节。配对 SINGLE 从 140,473 降到 78,921 字节，而重建前后的两栈载荷峰值都是 70,280 字节。新增第三个输入与前两个输出无配对，边际仍是 2,440 字节。
+
+## 开发和钱包接入
+
+钱包确认 outpoint、锁定格式、金额和所需确认，再安排收款、找零和费用。单输入付款调用 `sign_payment`，已构造交易逐输入调用 `sign_spend`。外部签名器接收 32 字节摘要，返回 2,144 字节原始签名。每个 UTXO 都使用新密钥，必须先持久化消耗记录再返回签名。未广播或确认失败也要保留该记录。 [付款接口](reference/payment.py) · [已签名向量](versions/v0.1.0/vectors.json)
 
 ## 完整交易与栈测量
 
