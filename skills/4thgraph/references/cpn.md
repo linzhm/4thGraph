@@ -39,6 +39,8 @@ git show 11c919a:projects/spv-token/fixtures/covenant-backtrace-2x2-regtest.json
 4thgraph cpn design --model workspace/cpn-dev/cctp-model.json --output workspace/cpn-dev/cctp.html
 ```
 
+The fixed-archive 2-to-2 fixture adapter `construct_fixture_spend` accepts this exact archive, its matching logical model, two new payouts and an external signer callback. It constructs a transaction and CPN ports using the archive's verifier funding, ordered token parents and parent-opening proof. This fixture pins the archive digest and cannot reuse that proof for other parent outpoints. Its result describes a proposed transaction. To run the public test fixture against BSV Node `verifyscript` and chain-gang, pass `CCTP_ARCHIVE=workspace/cpn-dev/cctp.json.xz` to `bash tools/verify_node.sh --profile long-script -- python -m unittest tests.test_cctp_transfer_fixture`. The archived parents are supplied as validation context.
+
 With the regtest dependencies below and Node.js installed, run `bash tools/cpn_demo.sh` from the checkout root and open `workspace/cpn-demo/index.html`. The command compiles one Forth source, funds and verifies three paths, and creates a self-contained HTML file. It leaves the source, catalog, original report and replay receipts in the same directory.
 
 Start with the logical graph. A Place describes the state at an interface, and a Transition declares the inputs it consumes and the outputs it produces. Select a transition to inspect its typed computation, Forth word and validation policy. Its external inputs can include witness operands, role signatures and a proof packet. The transaction view maps the same interfaces to the ordered `vin` and `vout` of deployed or spent outputs.

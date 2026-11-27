@@ -39,6 +39,8 @@ git show 11c919a:projects/spv-token/fixtures/covenant-backtrace-2x2-regtest.json
 4thgraph cpn design --model workspace/cpn-dev/cctp-model.json --output workspace/cpn-dev/cctp.html
 ```
 
+固定归档的 2→2 测试适配器 `construct_fixture_spend` 接收该归档、匹配的逻辑模型、两个新输出和外部签名回调，使用归档里的验证器资金、有序 Token 前序和父交易开封证明来构造交易及 CPN 端口。该夹具固定归档摘要，前序 outpoint 改变时不能复用证明。返回值描述待提交的交易。设置 `CCTP_ARCHIVE=workspace/cpn-dev/cctp.json.xz`，运行 `bash tools/verify_node.sh --profile long-script -- python -m unittest tests.test_cctp_transfer_fixture`，可用归档父交易作为上下文，在 BSV Node 的 `verifyscript` 和 chain-gang 上验证公开测试夹具。
+
 装好下文的 regtest 依赖与 Node.js 后，从仓库根目录运行 `bash tools/cpn_demo.sh`，打开 `workspace/cpn-demo/index.html`。这条命令用同一份 Forth 编译、入金并验证三条路径，生成可单独离线打开的 HTML。源码、后端目录、原始报告和复放回执留在同一目录。
 
 先看逻辑图。Place 描述接口上的状态，Transition 声明消费的输入和生产的输出。点选迁移可查看类型化计算、Forth 词和验证策略。外部信息可包含见证操作数、角色签名和证明包。交易图将这些接口映射到部署或花费中的有序 `vin`、`vout`。
