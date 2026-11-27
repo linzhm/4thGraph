@@ -1,6 +1,8 @@
 """Rebuild the frozen OTDA constructors for canonical P2PKH-SM2 locks."""
 import argparse
 from collections import Counter, defaultdict
+from difflib import SequenceMatcher
+from functools import cache, partial
 from hashlib import sha256
 import json
 from pathlib import Path
@@ -11,6 +13,7 @@ from p2pkh_sm2 import MIXED_OTDA_VERSIONS, _canonical
 from sm3_script import SPLIT_ROTATION_WRAP
 from fourthgraph.bsv.evaluate import evaluate
 from fourthgraph.bsv.script import asm, number, push
+from fourthgraph.compiler.script_builder import ScriptBuilder
 
 # (SM3 function, emitted instance, byte offset, width). These ranges
 # parameterize the shared instruction sequences extracted by the SM3 emitter.
@@ -24,6 +27,7 @@ SM3_FRAGMENTS = (
     ("data_round_early", 1, 91, 35),
     ("data_round_early", 1, 27, 58),
 )
+CACHE_COMPILER = ScriptBuilder("REQUIRE stdlib/script-fragments.fth")
 
 
 def function_library(version=TEMPLATE_VERSION):
@@ -57,13 +61,45 @@ def match_length(raw, source, target, lower, upper):
     return lower
 
 
-def copy_span(offset, width, accumulator_size):
-    program = asm("OP_DUP")
+def trim_span(offset, width, source_size):
+    program = b""
     if offset:
         program += number(offset) + asm("OP_SPLIT OP_NIP")
-    if offset + width < accumulator_size:
+    if offset + width < source_size:
         program += number(width) + asm("OP_SPLIT OP_DROP")
     return program
+
+
+def copy_span(offset, width, accumulator_size):
+    return asm("OP_DUP") + trim_span(offset, width, accumulator_size)
+
+
+@cache
+def cache_pick(depth):
+    return CACHE_COMPILER.emit("script-pick-depth", b"", depth)
+
+
+def initialize_shared_cache(library):
+    """Build each entry from literals or a matching span in an earlier entry."""
+    cat = asm("OP_CAT")
+    program = bytearray()
+    for index, target in enumerate(library):
+        shortest = push(target)
+        for source_index, source in enumerate(library[:index]):
+            common = SequenceMatcher(None, target, source, autojunk=False).get_matching_blocks()
+            for start, offset, width in common:
+                if not width:
+                    continue
+                prefix, suffix = target[:start], target[start+width:]
+                depth = index - source_index - 1 + bool(prefix)
+                copy = cache_pick(depth) + trim_span(offset, width, len(source))
+                candidate = push(prefix) + copy + cat if prefix else copy
+                if suffix:
+                    candidate += push(suffix) + cat
+                if len(candidate) < len(shortest):
+                    shortest = candidate
+        program.extend(shortest)
+    return bytes(program)
 
 
 def keep_shorter(options, length, program):
@@ -100,7 +136,7 @@ def earlier_spans(raw, options):
         matches.append(cursor)
 
 
-def encode_suffix(raw, references, library, *, literal_runs=None):
+def encode_suffix(raw, references, library, *, literal_runs=None, shared_cache=False):
     """Serialize one compression plan and count its selected fragments."""
     cat = asm("OP_CAT")
     options = [entry.copy() for entry in references]
@@ -126,7 +162,8 @@ def encode_suffix(raw, references, library, *, literal_runs=None):
                 costs[cursor] = cost
                 choices[cursor] = width, code
 
-    program = bytearray(b"".join(map(push, library)) + asm("OP_0"))
+    initializer = initialize_shared_cache(library) if shared_cache else b"".join(map(push, library))
+    program = bytearray(initializer + asm("OP_0"))
     uses = Counter()
     copy_savings = Counter()
     cursor = 0
@@ -164,48 +201,98 @@ def literal_fragments(literal_runs, library):
                   key=gains.__getitem__, reverse=True)[:4]
 
 
-def compile_suffix(raw, library, *, optimize_library=False, refine_library=False):
-    """Encode literal runs, cached fragments and copies of earlier bytes."""
-    references = [{} for _ in raw]
-    earlier_spans(raw, references)
-    baseline, uses, _ = encode_suffix(raw, references, library)
+def follow_up_cache(encode, library):
+    """Try one bounded batch of substitutions from the selected encoding."""
+    literals = []
+    baseline, _, savings = encode(library, literal_runs=literals)
+    trials = [baseline]
+    for index in range(len(library)):
+        code, _, _ = encode(library[:index] + library[index+1:])
+        trials.append(code)
+    from_literals = literal_fragments(literals, library)
+    from_copies = sorted((fragment for fragment, saving in savings.items()
+                          if fragment not in library and saving > len(push(fragment))),
+                         key=lambda fragment: savings[fragment] - len(push(fragment)), reverse=True)[:4]
+    proposals = [[fragment] for fragment in from_literals[:2] + from_copies[:3]]
+    for additions in (*proposals, from_literals, from_copies):
+        if not additions:
+            continue
+        expanded = [*library, *additions]
+        _, uses, _ = encode(expanded)
+        retained = sorted((fragment for fragment in expanded if uses[fragment] > 1), key=uses.__getitem__)
+        code, _, _ = encode(retained)
+        trials.append(code)
+    return min(trials, key=len)
+
+
+def evaluate_cache_plans(encode, library, *, optimize_library, refine_library, follow_up=False):
+    baseline, uses, _ = encode(library)
     if not optimize_library:
-        return baseline
+        return baseline, baseline
 
     reused = [fragment for fragment in library if uses[fragment] > 1]
-    reduced, _, savings = encode_suffix(raw, references, reused)
+    reduced, _, savings = encode(reused)
     gains = {fragment: saving - len(push(fragment)) for fragment, saving in savings.items()
              if fragment not in reused and saving > len(push(fragment))}
     expanded = reused + sorted(gains, key=gains.get, reverse=True)
-    augmented, uses, _ = encode_suffix(raw, references, expanded)
+    augmented, uses, _ = encode(expanded)
     # Place frequently used entries nearest the top, where picking is cheaper.
     ordered = sorted(expanded, key=uses.__getitem__)
     literal_runs = [] if refine_library else None
-    reordered, _, _ = encode_suffix(raw, references, ordered, literal_runs=literal_runs)
+    reordered, _, _ = encode(ordered, literal_runs=literal_runs)
+    _, starting_cache = min(zip((baseline, reduced, augmented, reordered), (library, reused, expanded, ordered)),
+                            key=lambda pair: len(pair[0]))
     candidates = [baseline, reduced, augmented, reordered]
     if literal_runs:
         proposed = ordered + literal_fragments(literal_runs, ordered)
-        _, uses, _ = encode_suffix(raw, references, proposed)
+        _, uses, _ = encode(proposed)
         retained = sorted((fragment for fragment in proposed if uses[fragment] > 1), key=uses.__getitem__)
-        rescored, _, _ = encode_suffix(raw, references, retained)
+        rescored, _, _ = encode(retained)
         candidates.append(rescored)
         # Removing even a reused entry can lower copy costs for the other entries.
         for index in range(len(retained)):
-            pruned, _, _ = encode_suffix(raw, references, retained[:index] + retained[index+1:])
+            pruned, _, _ = encode(retained[:index] + retained[index+1:])
             candidates.append(pruned)
-    return min(candidates, key=len)
+    best = min(candidates, key=len)
+    return best, min(best, follow_up_cache(encode, starting_cache), key=len) if follow_up else best
 
 
-def generate(version=TEMPLATE_VERSION):
+def suffix_plans(raw, library, *, optimize_library=False, refine_library=False, share_cache=False):
+    references = [{} for _ in raw]
+    earlier_spans(raw, references)
+    encode = partial(encode_suffix, raw, references)
+    literal, _ = evaluate_cache_plans(encode, library, optimize_library=optimize_library, refine_library=refine_library)
+    plans = {"literal-cache": literal}
+    if share_cache:
+        shared, tuned = evaluate_cache_plans(partial(encode, shared_cache=True), library,
+                                            optimize_library=True, refine_library=True, follow_up=True)
+        plans.update({"shared-cache": shared, "shared-cache-follow-up": tuned})
+    return plans
+
+
+def compile_suffix(raw, library, *, optimize_library=False, refine_library=False):
+    return suffix_plans(raw, library, optimize_library=optimize_library,
+                        refine_library=refine_library)["literal-cache"]
+
+
+def generate(version=TEMPLATE_VERSION, *, report=None):
     lock, offset = _canonical(version)
     prefix, suffix = lock[:offset], lock[offset + 20:]
-    program = push(prefix) + compile_suffix(
+    plans = suffix_plans(
         suffix, function_library(version), optimize_library=version != TEMPLATE_VERSION,
         refine_library=version >= CARRIED_FIELD_TEMPLATE_VERSION,
+        share_cache=version >= CARRIED_FIELD_TEMPLATE_VERSION,
     )
-    if evaluate(program) != ([prefix, suffix], []):
-        raise ValueError("OTDA constructor does not reproduce the canonical SM2 template")
-    return program
+    constructors = {name: push(prefix) + program for name, program in plans.items()}
+    for name, program in constructors.items():
+        if evaluate(program) != ([prefix, suffix], []):
+            raise ValueError(f"OTDA constructor {name} does not reproduce the canonical SM2 template")
+    selected = min(constructors, key=lambda name: len(constructors[name]))
+    if report is not None:
+        report.update(template_version=version, lock_sha256=sha256(lock).hexdigest(), selected=selected,
+                      candidates={name: {"bytes": len(program), "sha256": sha256(program).hexdigest()}
+                                  for name, program in constructors.items()})
+    return constructors[selected]
 
 
 def generate_mixed():
@@ -235,6 +322,12 @@ if __name__ == "__main__":
     group = parser.add_mutually_exclusive_group()
     group.add_argument("--version", type=int, choices=TEMPLATE_VERSIONS, default=TEMPLATE_VERSION)
     group.add_argument("--mixed", action="store_true", help="generate the combined template 6 and 7 JSON")
+    parser.add_argument("--report", type=Path, help="write the comparison of single-template constructor plans")
     args = parser.parse_args()
-    encoded = json.dumps(generate_mixed(), indent=2) if args.mixed else generate(args.version).hex()
+    if args.mixed and args.report:
+        parser.error("--report requires a single-template constructor")
+    report = {} if args.report else None
+    encoded = json.dumps(generate_mixed(), indent=2) if args.mixed else generate(args.version, report=report).hex()
     args.output.write_text(encoded + "\n", encoding="ascii")
+    if args.report:
+        args.report.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")

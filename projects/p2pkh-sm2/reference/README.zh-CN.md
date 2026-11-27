@@ -126,7 +126,9 @@ cmp /tmp/sm2-byte-tuning.json projects/p2pkh-sm2/versions/v1.11.0/byte-tuning.js
 
 ## 复现 OTDA 构造器
 
-钱包加载固定构造器，并按布局清单核对字节数和 SHA-256。离线生成器从点运算块开始，从模板中查找可复用片段。模板 `1` 至 `5` 还预先提供 SM3 的具名片段。为模板 `2` 至 `10` 生成构造器时，它评估复制片段的缓存收益，尝试按使用频率排列缓存，并选择序列化后最短的编码。模板 `10` 还尝试缓存首轮编码留下的原样片段，并逐项试验移除缓存能否进一步缩短序列化结果。在仓库根目录生成并比对文件。
+钱包加载固定构造器，并按布局清单核对字节数和 SHA-256。离线生成器从点运算块开始，从模板中查找可复用片段。模板 `1` 至 `5` 还预先提供 SM3 的具名片段。为模板 `2` 至 `10` 生成构造器时，它评估复制片段的缓存收益，并尝试按使用频率排列缓存。模板 `10` 使用标准库的 `script-pick-depth` 从早先的缓存条目切取片段来初始化后续条目，再用一批有限的候选比较逐项删减和新增缓存的收益。每个最终方案先逐字节复原同一锁定脚本，再按序列化长度排序。
+
+另一组探测用 Chronicle 切片指令把构造器缩至 7,340 字节，但 BSV Node 拒绝了测试中标为激活前创建的上一输出。选定的 7,424 字节方案使用 `OP_SPLIT`，通过了不同创建高度的上一输出回放和最新模板交易矩阵。在仓库根目录生成并比对文件。
 
 ```sh
 python projects/p2pkh-sm2/reference/generate_otda_constructor.py /tmp/sm2-otda.hex
@@ -147,8 +149,10 @@ python projects/p2pkh-sm2/reference/generate_otda_constructor.py --version 8 /tm
 cmp /tmp/sm2-otda-v8.hex projects/p2pkh-sm2/versions/v1.9.0/otda-constructor.hex
 python projects/p2pkh-sm2/reference/generate_otda_constructor.py --version 9 /tmp/sm2-otda-v9.hex
 cmp /tmp/sm2-otda-v9.hex projects/p2pkh-sm2/versions/v1.10.0/otda-constructor.hex
-python projects/p2pkh-sm2/reference/generate_otda_constructor.py --version 10 /tmp/sm2-otda-v10.hex
+python projects/p2pkh-sm2/reference/generate_otda_constructor.py --version 10 /tmp/sm2-otda-v10.hex \
+  --report /tmp/sm2-constructor-tuning.json
 cmp /tmp/sm2-otda-v10.hex projects/p2pkh-sm2/versions/v1.11.0/otda-constructor.hex
+cmp /tmp/sm2-constructor-tuning.json projects/p2pkh-sm2/versions/v1.11.0/constructor-tuning.json
 ```
 
 构造器测试逐字节比对预映像、公钥和签名三项栈值，并由 BSV Node 和 chain-gang 验证完整花费。[布局与指纹](../versions/v1.1.0/layout.json) · [钱包接入](../docs/sdk.zh-CN.md)

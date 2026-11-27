@@ -5,11 +5,12 @@ import unittest
 from unittest.mock import patch
 
 from assemble import SCHEDULED_TEMPLATE_VERSION, TEMPLATE_VERSIONS
-from generate_otda_constructor import generate, generate_mixed
+from generate_otda_constructor import generate, generate_mixed, initialize_shared_cache
 from p2pkh_sm2 import MIXED_OTDA_FILE, MIXED_OTDA_VERSIONS, _mixed_otda_program, _otda_pattern
 from p2pkh_sm2 import current_input_unlock, locking_script_from_public_key, sign_input
 from fourthgraph.benchmark.validation import chain_verdict
 from fourthgraph.bsv.evaluate import evaluate
+from fourthgraph.bsv.script import push
 from fourthgraph.bsv.transaction import Input, Output, Transaction
 from sighash import authorization
 from sm2 import USER_ID, encode_public, fixture_sign, mul
@@ -53,6 +54,13 @@ class ConstructorTests(unittest.TestCase):
         program = _mixed_otda_program()
         self.assertEqual(evaluate(program), (parts, []))
         self.assertLess(len(program), sum(len(pattern.program) for pattern in patterns))
+
+    def test_shared_cache_preserves_cached_entries_and_stack_order(self):
+        source = bytes(range(64))
+        entries = (source, b"prefix" + source[9:42] + b"suffix", source[3:60], source)
+        program = initialize_shared_cache(entries)
+        self.assertLess(len(program), sum(len(push(entry)) for entry in entries))
+        self.assertEqual(evaluate(program, [b"caller"]), ([b"caller", *entries], []))
 
     def sign_modes(self, tx, flag, expected, *, funding=None):
         funding = self.funding if funding is None else funding

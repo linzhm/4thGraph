@@ -134,7 +134,9 @@ cmp /tmp/sm2-byte-tuning.json projects/p2pkh-sm2/versions/v1.11.0/byte-tuning.js
 
 ## Reproduce the OTDA constructor
 
-The wallet loads the frozen program and checks its byte length and SHA-256 against the layout manifest. The offline generator starts with point arithmetic blocks and discovers reusable spans in the template. Templates `1` through `5` also seed named SM3 ranges. For templates `2` through `10` it evaluates which copied fragments are worth caching, tries a dictionary ordered by reuse frequency and selects the smallest serialized encoding. Template `10` also tries cache candidates from the remaining literal runs and checks whether removing a single selected entry reduces the serialized size. Rebuild the programs from the repository root and compare them with the checked-in files.
+The wallet loads the frozen program and checks its byte length and SHA-256 against the layout manifest. The offline generator starts with point arithmetic blocks and discovers reusable spans in the template. Templates `1` through `5` also seed named SM3 ranges. For templates `2` through `10` it evaluates which copied fragments are worth caching and tries a dictionary ordered by reuse frequency. Template `10` also compiles cache initialization from slices of earlier entries using the standard library's `script-pick-depth`. A bounded follow-up tries dropping one entry or adding short lists of candidates from literal runs and earlier copies. Each final plan must reconstruct the same canonical lock before ranking by serialized bytes.
+
+Direct Chronicle slicing reduced the constructor to 7,340 bytes in a probe. BSV Node rejected the input whose prevout the test marked as created before Chronicle activation. The selected 7,424-byte plan uses `OP_SPLIT` and passes the mixed-age replay as well as the current-template transaction matrix. Rebuild the programs from the repository root and compare them with the checked-in files.
 
 ```sh
 python projects/p2pkh-sm2/reference/generate_otda_constructor.py /tmp/sm2-otda.hex
@@ -155,8 +157,10 @@ python projects/p2pkh-sm2/reference/generate_otda_constructor.py --version 8 /tm
 cmp /tmp/sm2-otda-v8.hex projects/p2pkh-sm2/versions/v1.9.0/otda-constructor.hex
 python projects/p2pkh-sm2/reference/generate_otda_constructor.py --version 9 /tmp/sm2-otda-v9.hex
 cmp /tmp/sm2-otda-v9.hex projects/p2pkh-sm2/versions/v1.10.0/otda-constructor.hex
-python projects/p2pkh-sm2/reference/generate_otda_constructor.py --version 10 /tmp/sm2-otda-v10.hex
+python projects/p2pkh-sm2/reference/generate_otda_constructor.py --version 10 /tmp/sm2-otda-v10.hex \
+  --report /tmp/sm2-constructor-tuning.json
 cmp /tmp/sm2-otda-v10.hex projects/p2pkh-sm2/versions/v1.11.0/otda-constructor.hex
+cmp /tmp/sm2-constructor-tuning.json projects/p2pkh-sm2/versions/v1.11.0/constructor-tuning.json
 ```
 
 The constructor tests compare exact preimage, public key, and signature stack values, then verify complete spends against BSV Node and chain-gang. [Layout and fingerprint](../versions/v1.1.0/layout.json) · [Wallet integration](../docs/sdk.en.md)
