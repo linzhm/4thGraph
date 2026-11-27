@@ -1,11 +1,13 @@
 import json
 import subprocess
 import sys
+from importlib.metadata import PackageNotFoundError
 from itertools import product
 import unittest
 from unittest.mock import patch
 
 from fourthgraph.benchmark.experiment import capabilities, digest, next_request, run
+from fourthgraph.benchmark.validation import CONTEXT_PIN, chain_metadata
 from fourthgraph.bsv.evaluate import evaluate
 from fourthgraph.bsv.script import encode_num
 from fourthgraph.compiler.formula_experiment import enumerate_orders
@@ -144,6 +146,53 @@ class FormulaExperiments(unittest.TestCase):
                 self.assertIn("formula traces", json.loads(replay.stdout)["diagnostic"])
                 with self.assertRaisesRegex(ValueError, "parent run"):
                     run(follow_up, edited)
+
+    def test_spend_receipts_measure_and_replay_the_same_compiler_plans(self):
+        try:
+            pinned = chain_metadata()["commit"] == CONTEXT_PIN
+        except PackageNotFoundError:
+            pinned = False
+        if not pinned:
+            self.skipTest("requires pinned chain-gang")
+        request = {"fixture": "square", "evaluation": "spend", "workers": 2,
+                   "plans": [{}, {"passes": ["stack"]}]}
+        first = run(request)
+        baseline, optimized = first["candidates"]
+        self.assertEqual(first["frozen"]["spend"]["commit"], CONTEXT_PIN)
+        self.assertEqual(baseline["source_sha256"], optimized["source_sha256"])
+        for row in first["candidates"]:
+            self.assertEqual(row["test"]["status"], "passed")
+            receipt = row["test"]["spend"]
+            self.assertEqual((receipt["accepted"], receipt["rejected"]), (11, 11))
+            sizes = row["metrics"]
+            self.assertEqual(sizes["path_bytes"], sizes["funding_transaction_bytes"] + sizes["transaction_bytes"])
+        self.assertEqual(first["ranking"][0], optimized["id"])
+        self.assertEqual(optimized["delta"]["baseline_path_bytes"], -3)
+        follow = next_request(json.loads(json.dumps(first)))
+        self.assertEqual(follow["evaluation"], "spend")
+        second = run(follow, first)
+        self.assertEqual(second["candidates"][0]["delta"]["parent_path_bytes"], 0)
+        self.assertEqual(second["winner_including_parents"], optimized["id"])
+        self.assertEqual(run(second["request"], first)["run_id"], second["run_id"])
+        with self.assertRaisesRegex(ValueError, "frozen snapshot mismatch"):
+            run({**follow, "evaluation": "formula"}, first)
+
+    def test_spend_mode_requires_pinned_engine_and_a_passing_receipt(self):
+        request = {"fixture": "square", "evaluation": "spend", "plans": [{}]}
+        with patch("fourthgraph.benchmark.spend_fixture.chain_metadata", return_value={"commit": None}):
+            with self.assertRaisesRegex(ValueError, "requires pinned chain-gang"):
+                run(request)
+        with patch("fourthgraph.benchmark.spend_fixture.chain_metadata",
+                   return_value={"version": "test", "commit": CONTEXT_PIN}), patch(
+                       "fourthgraph.benchmark.experiment.check_spends",
+                       return_value={"status": "failed", "diagnostic": "fixture rejection"}):
+            report = run(request)
+        row, = report["candidates"]
+        self.assertEqual(row["compile"]["status"], "passed")
+        self.assertEqual(row["test"]["formula_status"], "passed")
+        self.assertEqual(row["test"]["status"], "failed")
+        self.assertEqual(row["test"]["spend"]["diagnostic"], "fixture rejection")
+        self.assertEqual(report["ranking"], [])
 
     def test_invalid_candidates_and_limits(self):
         report=run({"fixture":"square","plans":[{"passes":["search"]},{},{"passes":[]}]})

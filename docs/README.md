@@ -114,7 +114,19 @@ python3 -m fourthgraph.workflow.protocol experiment replay workspace/tuning/seco
   --parent workspace/tuning/first.json
 ```
 
-Formula reports cover the registered function fixture. Use the existing workflow replay for complete-spend evidence. [Workflow replay](toolchain.md#复放与编译) · [Agent skill](../skills/4thgraph/SKILL.md)
+For the registered `square` spend fixture, set `"evaluation":"spend"` and use the same commands in an environment with [pinned chain-gang](../tools/requirements-chronicle.txt). The runner first checks the formula vectors, then links the candidate into synthetic funding outputs and checks complete spends against those parents offline. Each vector expects one acceptance and one rejection. Formula evaluation remains the default.
+
+```sh
+printf '%s\n' '{"fixture":"square","evaluation":"spend","workers":2,"plans":[{},{"passes":["stack"]}]}' |
+  python3 -m fourthgraph.workflow.protocol experiment run - > workspace/tuning/spend.json
+python3 -m fourthgraph.workflow.protocol experiment next workspace/tuning/spend.json > workspace/tuning/spend-next.json
+python3 -m fourthgraph.workflow.protocol experiment run workspace/tuning/spend-next.json \
+  --parent workspace/tuning/spend.json > workspace/tuning/spend-second.json
+python3 -m fourthgraph.workflow.protocol experiment replay workspace/tuning/spend-second.json \
+  --parent workspace/tuning/spend.json
+```
+
+Spend evaluation ranks passing candidates by the maximum serialized funding-plus-spend bytes across the vectors. The report separates lock, witness, funding, and spend sizes and records the engine pin, Script hashes, and transaction IDs. The reported stack peaks describe the formula evaluation. Complete-spend stack peaks are unmeasured for this fixture. [Workflow replay](toolchain.md#复放与编译) · [Agent skill](../skills/4thgraph/SKILL.md)
 
 <a name="documentation-index"></a>
 

@@ -17,6 +17,7 @@ from fourthgraph.compiler.formula_experiment import MAX_DEPTH, RULES, enumerate_
 from fourthgraph.compiler.script_builder import ScriptBuilder
 from fourthgraph.compiler.script_formula import FORMULA_PASSES, validate_formula_passes
 from .formula_fixture import FIXTURES
+from .spend_fixture import SPEND_FIXTURES, check_spends, spend_profile
 
 SCHEMA = "4thgraph.formula-experiment/1"
 LIMIT = 32
@@ -38,6 +39,7 @@ def pass_sets():
 def capabilities():
     return {"schema": SCHEMA, "compiler": PROJECT_VERSION, "target": TARGET,
             "fixtures": {name: list(fix.implementations) for name, fix in FIXTURES.items()},
+            "evaluations": {"formula": {"default": True}, "spend": {"fixtures": SPEND_FIXTURES}},
             "plan_sets": pass_sets(), "requires": {"search": ["stack"]},
             "ordered_rules": RULES, "max_rule_depth": MAX_DEPTH, "max_candidates": LIMIT, "max_workers": WORKERS,
             "stages": ["formula", "graph", "terminal schedule and emission"], "commands": ["run", "next", "replay"]}
@@ -103,7 +105,7 @@ def stable(row):
 def report_id(report):
     request = report["request"]
     return digest([report["snapshot"], request["axis"], request.get("parent_run"),
-                   report["baseline"], report["baseline_bytes"], [stable(row) for row in report["candidates"]]])
+                   report["baseline"], report["baseline_bytes"], report.get("baseline_path_bytes"), [stable(row) for row in report["candidates"]]])
 
 
 def matching_baseline(axis, fixture, eligible, parents, previous):
@@ -116,7 +118,10 @@ def matching_baseline(axis, fixture, eligible, parents, previous):
         plan["implementation"] = fixture.name
     for row in chain(eligible, parents.values()):
         if row["applied"] == plan:
-            return {"id": row["id"], "applied": plan, "bytes": row["artifact"]["bytes"]}
+            baseline = {"id": row["id"], "applied": plan, "bytes": row["artifact"]["bytes"]}
+            if "spend" in row["test"]:
+                baseline["path_bytes"] = row["test"]["spend"]["max_bytes"]["path_bytes"]
+            return baseline
     inherited = previous["baseline"] if previous else None
     return inherited if inherited is not None and inherited["applied"] == plan else None
 
@@ -129,10 +134,18 @@ def counted(value, low, high, name):
 
 def run(request, previous=None, *, replaying=False):
     if not isinstance(request, dict) or set(request) - {"fixture","plans","workers","trace","snapshot","parent_run",
-                                                        "axis","max_candidates","time_ms","enumerate","depth","terminal"}:
+                                                        "axis","max_candidates","time_ms","enumerate","depth","terminal",
+                                                        "evaluation"}:
         raise ValueError("unknown experiment request fields")
     fixture = FIXTURES[request["fixture"]]
+    evaluation = request.get("evaluation", "formula")
+    if evaluation not in ("formula", "spend"):
+        raise ValueError("choose formula or spend evaluation")
+    spend = evaluation == "spend"
+    profile = spend_profile(fixture) if spend else None
     frozen, sources = freeze(fixture)
+    if spend:
+        frozen["spend"] = profile
     identity = digest(frozen)
     if request.get("snapshot", identity) != identity:
         raise ValueError("frozen snapshot mismatch")
@@ -210,7 +223,13 @@ def run(request, previous=None, *, replaying=False):
                     artifact = row["artifact"]
                     key = identity, artifact["sha256"]
                     if key not in cache:
-                        cache[key] = fixture.check(bytes.fromhex(artifact["hex"]))
+                        script = bytes.fromhex(artifact["hex"])
+                        test = fixture.check(script)
+                        if spend:
+                            receipt = check_spends(fixture, script) if test["status"] == "passed" else {"status": "not_run"}
+                            test = {**test, "formula_status": test["status"], "spend": receipt,
+                                    "status": "passed" if receipt["status"] == "passed" else "failed"}
+                        cache[key] = test
                     row["test"] = cache[key]
                 rows.append(row)
     if deadline is not None and monotonic() >= deadline:
@@ -218,6 +237,11 @@ def run(request, previous=None, *, replaying=False):
     eligible = [r for r in rows if r["test"]["status"] == "passed"]
     baseline = matching_baseline(axis, fixture, eligible, parents, previous)
     base_size = baseline["bytes"] if baseline else None
+
+    def path_bytes(row):
+        return row["test"]["spend"]["max_bytes"]["path_bytes"]
+
+    base_path = baseline.get("path_bytes") if spend and baseline else None
     for row in eligible:
         size = row["artifact"]["bytes"]
         parent = parents.get(row["requested"].get("parent_id"))
@@ -227,6 +251,12 @@ def run(request, previous=None, *, replaying=False):
         row["metrics"] = {"script_bytes": size, "compile_ns": row["compile"]["elapsed_ns"],
                           "main_peak_items": row["test"]["main_peak_items"], "alt_peak_items": row["test"]["alt_peak_items"],
                           "transaction_bytes": {"status":"not_measured"}, "caller_bytes":{"status":"not_measured"}}
+        if spend:
+            row["metrics"].update(row["test"]["spend"]["max_bytes"])
+            row["metrics"]["caller_bytes"] = row["metrics"]["lock_script_bytes"]
+            row["metrics"]["spend_stack_peaks"] = {"status": "not_measured"}
+            row["delta"]["baseline_path_bytes"] = path_bytes(row) - base_path if base_path is not None else None
+            row["delta"]["parent_path_bytes"] = path_bytes(row) - path_bytes(parent) if parent else None
         if parent:
             row["delta"]["parent_main_peak_items"] = row["test"]["main_peak_items"] - parent["test"]["main_peak_items"]
             row["delta"]["parent_alt_peak_items"] = row["test"]["alt_peak_items"] - parent["test"]["alt_peak_items"]
@@ -234,10 +264,18 @@ def run(request, previous=None, *, replaying=False):
         row["next"] = []
         if axis == "A" and "stack" in spec["passes"] and "search" not in spec["passes"]:
             row["next"].append({**spec, "passes": spec["passes"]+["search"], "parent_id":row["id"]})
-    order = sorted(eligible, key=lambda r:(r["artifact"]["bytes"], len(r["applied"]["passes"])+len(r["applied"]["rules"]), r["id"]))
+    primary_cost = "path_bytes" if spend else "script_bytes"
+
+    def rank(row):
+        spec = row["applied"]
+        size = path_bytes(row) if spend else row["artifact"]["bytes"]
+        return size, len(spec["passes"]) + len(spec["rules"]), row["id"]
+
+    order = sorted(eligible, key=rank)
+    frontier_costs = [primary_cost, "main_peak_items", "alt_peak_items", "compile_ns"]
+
     def costs(row):
-        return (row["artifact"]["bytes"], row["test"]["main_peak_items"], row["test"]["alt_peak_items"],
-                row["compile"]["elapsed_ns"])
+        return tuple(row["metrics"][name] for name in frontier_costs)
     frontier = []
     for row in eligible:
         current = costs(row)
@@ -245,29 +283,34 @@ def run(request, previous=None, *, replaying=False):
                    for other in eligible):
             frontier.append(row["id"])
     incumbents = list(parents.values()) + eligible
-    def rank(r):
-        return r["artifact"]["bytes"], len(r["applied"]["rules"])+len(r["applied"]["passes"]), r["id"]
     winner = min(incumbents, key=rank)["id"] if incumbents else None
     # Replays fix the exact admitted sequence, independent of the original wall-clock cutoff.
     replay = {"fixture": fixture.name, "plans": [r["requested"] for r in rows], "axis": axis, "trace": trace,
               "workers": 1, "time_ms": 300_000, "snapshot": identity}
     if previous:
         replay["parent_run"] = previous["run_id"]
+    if spend:
+        replay["evaluation"] = evaluation
     report = {"schema": SCHEMA, "snapshot": identity, "frozen": frozen, "request": replay, "candidates": rows,
               "baseline": baseline, "baseline_bytes": base_size, "ranking": [r["id"] for r in order],
-              "ranking_scope": "fixture script bytes, then fewer passes", "winner_including_parents": winner,
-              "observed_frontier": frontier, "frontier_costs": ["script_bytes", "main_peak_items", "alt_peak_items", "compile_ns"],
+              **({"baseline_path_bytes": base_path} if spend else {}),
+              "ranking_scope": ("maximum fixture funding plus spend bytes, then fewer passes" if spend
+                                else "fixture script bytes, then fewer passes"),
+              "winner_including_parents": winner, "observed_frontier": frontier, "frontier_costs": frontier_costs,
               "requested": request, "deduplicated_plans": duplicates, "stop": stop}
     return {**report, "run_id": report_id(report)}
 
 
 def next_request(report):
+    spend = "spend" in report["frozen"]
+    baseline = "baseline_path_bytes" if spend else "baseline_bytes"
     plans = [p for row in report["candidates"] if row["test"]["status"] == "passed"
-             and row["delta"]["baseline_bytes"] is not None and row["delta"]["baseline_bytes"] < 0 for p in row["next"]]
+             and row["delta"][baseline] is not None and row["delta"][baseline] < 0 for p in row["next"]]
     if not plans:
         return {"stop": "no_improving_expansion"}
     return {"fixture": report["frozen"]["fixture"], "plans": plans[:LIMIT],
-            "snapshot": report["snapshot"], "parent_run": report["run_id"]}
+            "snapshot": report["snapshot"], "parent_run": report["run_id"],
+            **({"evaluation": "spend"} if spend else {})}
 
 
 def read(path):
@@ -297,6 +340,6 @@ def main(argv=None):
             if replaying and (data["run_id"] != result["run_id"] or data["run_id"] != report_id(data)):
                 raise ValueError("replay differs from the recorded baseline, artifacts, verdicts, or formula traces")
         print(json.dumps(result, sort_keys=True))
-    except (KeyError, ValueError, TypeError, OSError) as exc:
+    except (ImportError, KeyError, ValueError, TypeError, OSError) as exc:
         print(json.dumps({"schema": SCHEMA, "status":"failed", "diagnostic":str(exc)}))
         raise SystemExit(2) from exc
