@@ -1,6 +1,6 @@
 <!-- Generated from manifest.yaml with Copier. -->
 
-# P2PKH-SM2 v1.9.0
+# P2PKH-SM2 v1.10.0
 
 [English](README.md) · [4thGraph](../../README.zh-CN.md) · [项目目录](../README.zh-CN.md) · [版本](versions/index.json)
 
@@ -10,7 +10,7 @@
 
 选择原始 SM2 签名器或 SignedData 签名器。符合条件的付款会自动选择更短的 OTDA 解锁编码。
 
-[协议](docs/spec.zh-CN.md) · [算法与执行](#算法与执行) · [复现方法](#复现方法) · [完整交易与栈测量](#完整交易与栈测量) · [实测数据](versions/v1.9.0/measurements.json)
+[协议](docs/spec.zh-CN.md) · [算法与执行](#算法与执行) · [复现方法](#复现方法) · [完整交易与栈测量](#完整交易与栈测量) · [实测数据](versions/v1.10.0/measurements.json)
 
 | 入口 | 用途 |
 | --- | --- |
@@ -25,7 +25,7 @@
 
 ## 算法与执行
 
-[v1.10.0 候选版](#v1100)
+[v1.11.0 候选版](#v1110)
 
 [协议规范](docs/spec.zh-CN.md) · [安全分析](docs/developer.zh-CN.md#security) · [复现与验证](#开发复现与输入输出分析) · [交易成本](#完整交易与栈测量)
 
@@ -36,13 +36,13 @@
 
 ### 项目版本与锁定模板
 
-v1.1.0 为首个公开版本 v1.0.0 的锁定模板 `1` 默认启用 OTDA 重建。v1.2.0 至 v1.7.0 依次对应模板 `2` 至 `7`。v1.9.0 和 v1.10.0 增加模板 `8` 和 `9`。钱包按上一输出的完整字节识别并花费九种模板。
+v1.1.0 为首个公开版本 v1.0.0 的锁定模板 `1` 默认启用 OTDA 重建。v1.2.0 至 v1.7.0 依次对应模板 `2` 至 `7`。v1.9.0 至 v1.11.0 依次增加模板 `8` 至 `10`。钱包按上一输出的完整字节识别并花费十种模板。
 
 | 项目 | 取值 |
 | --- | --- |
 | 收款标识 | 65 字节公钥 `04 \|\| X_BE32 \|\| Y_BE32` 的 HASH160 |
 | SM2 用户标识 | 固定的 ASCII 字符串 `1234567812345678` |
-| 锁定脚本 | 模板 `1` 为 144,925 字节，`2` 为 131,565 字节，`3` 为 125,616 字节，`4` 为 121,847 字节，`5` 为 110,747 字节，`6` 为 100,663 字节，`7` 为 98,362 字节，`8` 为 96,616 字节，`9` 为 95,790 字节 |
+| 锁定脚本 | 模板 `1` 为 144,925 字节，`2` 为 131,565 字节，`3` 为 125,616 字节，`4` 为 121,847 字节，`5` 为 110,747 字节，`6` 为 100,663 字节，`7` 为 98,362 字节，`8` 为 96,616 字节，`9` 为 95,790 字节，`10` 为 94,355 字节 |
 | 解锁脚本 | BIP143 为 291 字节，无配对输出的 OTDA SINGLE 为 294 字节，其他 OTDA 模式的长度随交易变化 |
 | 解锁栈 | 签名预映像、未压缩公钥，以及 64 字节的 `r \|\| s` 签名 |
 | 交易签名模式 | BIP143 和 Chronicle OTDA 均支持 ALL、NONE、SINGLE，每种模式均可选用 ANYONECANPAY |
@@ -54,7 +54,7 @@ v1.1.0 为首个公开版本 v1.0.0 的锁定模板 `1` 默认启用 OTDA 重建
 
 ### 重建 OTDA 输出
 
-构造器是 `scriptSig` 的一部分，模板 `1` 使用 12,703 字节，`2` 使用 11,816 字节，`3` 使用 11,807 字节，`4` 使用 11,618 字节，`5` 使用 11,549 字节，`6` 使用 9,363 字节，`7` 使用 9,447 字节，`8` 使用 7,644 字节，`9` 使用 7,718 字节。模板 `2` 至 `9` 从初始编码实际复制的指令中选出可复用片段，并把高频片段放在靠近栈顶的位置。构造器逐字节重建签名预映像，把收款人的 HASH160 填入各个适用输出。签名回调接收与原样编码一致的消息和 SM2 用户标识。构建子交易时使用最终已签交易的 ID。
+构造器是 `scriptSig` 的一部分，模板 `1` 使用 12,703 字节，`2` 使用 11,816 字节，`3` 使用 11,807 字节，`4` 使用 11,618 字节，`5` 使用 11,549 字节，`6` 使用 9,363 字节，`7` 使用 9,447 字节，`8` 使用 7,644 字节，`9` 使用 7,718 字节，`10` 使用 7,417 字节。模板 `2` 至 `10` 从初始编码实际复制的指令中选出可复用片段，并把高频片段放在靠近栈顶的位置。构造器逐字节重建签名预映像，把收款人的 HASH160 填入各个适用输出。签名回调接收与原样编码一致的消息和 SM2 用户标识。构建子交易时使用最终已签交易的 ID。
 
 Chronicle 激活后，版本 2 的 OTDA ALL 交易可以按原顺序重建匹配的输出。配对 OTDA SINGLE 可以重建同索引输出，并保留预映像中前置的空输出。两种模式均支持 `ANYONECANPAY`。其他模板的输出按原字节写入。BIP143、NONE、无配对 SINGLE、版本 1 及体积未缩小的交易继续使用原样解锁。[SDK 选项](docs/sdk.zh-CN.md) · [构造器与生成方式](reference/README.zh-CN.md#otda-constructor)
 
@@ -79,7 +79,7 @@ python -m pip install -r projects/p2pkh-sm2/reference/requirements.txt
 ```
 
 ```sh
-PYTHONPATH=src:. python projects/p2pkh-sm2/reference/point_kernels.py --window /tmp/sm2-window-kernel.json && python projects/p2pkh-sm2/reference/generate_otda_constructor.py --version 8 /tmp/sm2-otda-v8.hex
+PYTHONPATH=src:. python projects/p2pkh-sm2/reference/point_kernels.py --affine /tmp/sm2-affine-kernel.json && python projects/p2pkh-sm2/reference/generate_otda_constructor.py --version 9 /tmp/sm2-otda-v9.hex
 bash projects/p2pkh-sm2/reference/verify.sh
 ```
 
@@ -99,6 +99,41 @@ bash verify.sh
 
 ## 脚本尺寸
 
+<a name="v1110"></a>
+
+### v1.11.0 候选版
+
+模板 `10` 在标量乘法窗口之间保留域模数和 `3b`，构建公钥表时也复用投影加点内核。提交 `64624db` 上的 4thGraph `0.2.7` 比较了 21 组编译阶段和规则组合，每组核对 16 个固定用例。选定方案使用 `rewrite`、`share`、`stack` 和 `search`。新版字节布局编译器为六个 32 字节字段绑定批量反转内核。PUSHTX 的 DER 编码复用这一内核。OTDA 构造器利用已有缓存的片段初始化后续条目，再比较一批缓存删减和新增方案。各方案均逐字节复原同一锁定脚本。
+
+| 实测字节数 | v1.10.0 | v1.11.0 |
+| --- | ---: | ---: |
+| 锁定脚本 | 95,790 | 94,355 |
+| OTDA 构造器 | 7,718 | 7,417 |
+| BIP143 ALL，两进两出 | 192,284 | 189,414 |
+| OTDA ALL，两进两出 | 207,778 | 204,306 |
+| OTDA ALL，十二进一出 | 197,213 | 191,615 |
+| OTDA ALL，二十四进一出 | 310,421 | 299,219 |
+| OTDA ALL，四十进一出 | 479,733 | 458,819 |
+
+同样的 34 个构造用例中，33 个字节数下降，全部支付给原生 P2PKH 的用例仍为 719 字节。38 例矩阵覆盖十二输入、二十四输入付款以及 ALL 和配对 SINGLE 的重复输入尾部。提交 `a003c4f` 的编译器复用相同的输入尾部，并压缩构造器中的连续重复片段。与上一轮模板 10 相比，四十进一出整笔节省 7,719 字节。相比 v1.10.0，两进两出的 BIP143 ALL 栈载荷峰值增加 29 字节，OTDA ALL 下降 5,740 字节。
+
+用 `--version 10` 或 SDK 的 `template: "v1.11.0"` 选用模板 `10`。[编译优化复现](reference/README.zh-CN.md#window-tuning) · [字节布局复现](reference/README.zh-CN.md#byte-tuning) · [模板指纹](versions/v1.11.0/layout.json) · [测量记录](versions/v1.11.0/measurements.json) · [构造器优化记录](versions/v1.11.0/constructor-tuning.json) · [38 个交易用例](versions/v1.11.0/latest-template-coverage.json)
+
+<a name="p2pkh-sponsorship"></a>
+
+#### P2PKH 交互与零费补费
+
+有资金的 regtest 覆盖了 P2PKH 向模板 `10` 入金、原生 P2PKH 为同模板 SM2 转账补费，以及 SM2 退出到 P2PKH 并给赞助方找零。启动器的默认策略下，BIP143 和 OTDA 两组入金、补费及退出交易均进入内存池并入块。
+
+| 场景 | 有资金的 regtest 实测 |
+| --- | --- |
+| 广播前追加 P2PKH 补费输入 | SM2 预签 BIP143 `0xc1` 或 OTDA `0xe1`，保留原输出和原 SM2 解锁脚本。独立确认的 P2PKH UTXO 支付 150,000 sat，整笔入块。 |
+| 预先纳入赞助方找零 | 同一笔交易把完整的 10,000,000 sat 本金付给模板 `10` 或 P2PKH 输出，赞助方收到 50,000 sat 找零，费用为 150,000 sat。ALL 签名后再追加找零会使 SM2 解锁失效。 |
+| 先广播零费版，再提交补费版 | 零费版进入内存池，连续三个区块未入块。花费相同上一输出的补费版返回 `txn-mempool-conflict`。 |
+| 用子交易补费（CPFP） | 零费父交易包含一个预先签入的 P2PKH 输出。子交易花费该输出及赞助方 UTXO，支付 150,000 sat，父子同块入账。 |
+
+隔离节点的挖矿费率下限为 0.5 sat/B。放宽策略的回放还用 BSV Node 和 chain-gang 验证了完整脚本，并确认普通 ALL 会拒绝签名后追加输入。[默认策略回放](versions/v1.11.0/p2pkh-default.json) · [放宽策略回放](versions/v1.11.0/p2pkh-raised.json) · [复现方式](reference/README.zh-CN.md#p2pkh-sponsorship)
+
 <a name="v1100"></a>
 
 ### v1.10.0 候选版
@@ -113,21 +148,6 @@ bash verify.sh
 | OTDA ALL，两进两出整笔，启用重建 | 209,282 | 207,778 | −0.7% |
 
 用 `--version 9` 或 SDK 的 `template: "v1.10.0"` 选用模板 `9`。[模板指纹](versions/v1.10.0/layout.json) · [测量记录](versions/v1.10.0/measurements.json) · [34 个最新模板用例](versions/v1.10.0/latest-template-coverage.json)
-
-<a name="p2pkh-sponsorship"></a>
-
-#### P2PKH 交互与零费补费
-
-有资金的 regtest 覆盖了 P2PKH 向模板 `9` 入金、原生 P2PKH 为同模板 SM2 转账补费，以及 SM2 退出到 P2PKH 并给赞助方找零。启动器的默认策略下，BIP143 和 OTDA 两组入金、补费及退出交易均进入内存池并入块。
-
-| 场景 | 有资金的 regtest 实测 |
-| --- | --- |
-| 广播前追加 P2PKH 补费输入 | SM2 预签 BIP143 `0xc1` 或 OTDA `0xe1`，保留原输出和原 SM2 解锁脚本。独立确认的 P2PKH UTXO 支付 150,000 sat，整笔入块。 |
-| 预先纳入赞助方找零 | 同一笔交易把完整的 10,000,000 sat 本金付给模板 `9` 或 P2PKH 输出，赞助方收到 50,000 sat 找零，费用为 150,000 sat。ALL 签名后再追加找零会使 SM2 解锁失效。 |
-| 先广播零费版，再提交补费版 | 零费版进入内存池，连续三个区块未入块。花费相同上一输出的补费版返回 `txn-mempool-conflict`。 |
-| 用子交易补费（CPFP） | 零费父交易包含一个预先签入的 P2PKH 输出。子交易花费该输出及赞助方 UTXO，支付 150,000 sat，父子同块入账。 |
-
-隔离节点的挖矿费率下限为 0.5 sat/B。放宽策略的回放还用 BSV Node 和 chain-gang 验证了完整脚本，并确认普通 ALL 会拒绝签名后追加输入。[默认策略回放](versions/v1.10.0/p2pkh-default.json) · [放宽策略回放](versions/v1.10.0/p2pkh-raised.json) · [复现方式](reference/README.zh-CN.md#p2pkh-sponsorship)
 
 <a name="v190"></a>
 

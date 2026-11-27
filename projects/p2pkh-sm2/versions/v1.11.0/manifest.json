@@ -1,0 +1,29 @@
+{
+  "version": "1.11.0",
+  "previous": "1.10.0",
+  "artifacts": [
+    "layout.json",
+    "otda-constructor.hex",
+    "byte-kernels.json",
+    "window-kernels.json"
+  ],
+  "fixtures": [],
+  "evidence": [
+    "window-tuning.json",
+    "byte-tuning.json",
+    "constructor-tuning.json",
+    "measurements.json",
+    "latest-template-coverage.json",
+    "p2pkh-default.json",
+    "p2pkh-raised.json"
+  ],
+  "integration": "docs/sdk.en.md",
+  "build": "export PYTHONPATH=src:. && python projects/p2pkh-sm2/reference/point_kernels.py --carried /tmp/sm2-window-kernels.json && python projects/p2pkh-sm2/reference/byte_fields.py /tmp/sm2-byte-kernels.json && python projects/p2pkh-sm2/reference/generate_otda_constructor.py --version 10 /tmp/sm2-otda-v10.hex",
+  "verify": "bash projects/p2pkh-sm2/reference/verify.sh",
+  "shared_data": [
+    "versions/v1.0.0/sm2-standard.json",
+    "versions/v1.5.0/point-kernels.json",
+    "versions/v1.9.0/window-kernel.json",
+    "versions/v1.10.0/affine-kernel.json"
+  ]
+}

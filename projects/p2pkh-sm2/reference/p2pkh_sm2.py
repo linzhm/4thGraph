@@ -1,15 +1,17 @@
 """Construct, recognize, and authorize canonical P2PKH-SM2 payments."""
-from functools import cache
+from functools import cache, partial
 from hashlib import sha256
 import json
 from pathlib import Path
-from assemble import SIGNED_WINDOW_TEMPLATE_VERSION, SPLIT_ROTATION_TEMPLATE_VERSION
+from assemble import CARRIED_FIELD_TEMPLATE_VERSION, SIGNED_WINDOW_TEMPLATE_VERSION, SPLIT_ROTATION_TEMPLATE_VERSION
 from assemble import TEMPLATE_PROFILES, TEMPLATE_VERSION, assemble
-from sighash import authorization
+from sighash import ORDINARY_CODE, authorization
 from sm2 import USER_ID,hash256,public_key_hash160,verify
 from fourthgraph.bsv.otda_reconstruction import Reconstruction, reconstruct_mixed
 from fourthgraph.bsv.script import push
+from fourthgraph.bsv.transaction import ANYONECANPAY, otda_input_parts
 from fourthgraph.bsv.transaction import Transaction,Input,Output,preimage_all,amount
+from fourthgraph.compiler.preimage import pack_otda_input_prefix
 
 VERSIONS = Path(__file__).resolve().parents[1] / 'versions'
 LOCK_LAYOUTS = {version: VERSIONS / profile / 'layout.json'
@@ -120,8 +122,12 @@ def _preimage_script(tx, index, auth, *, compress_otda, chronicle_active):
     patterns = {version: _otda_pattern(version) for version in LOCK_LAYOUTS
                 if _layout(version)['script_bytes'] in output_sizes}
     candidates = [literal]
-    for pattern in patterns.values():
-        if (program := pattern.build(auth.preimage, outputs)) is not None:
+    for version, pattern in patterns.items():
+        encode_prefix = push
+        if version == CARRIED_FIELD_TEMPLATE_VERSION and not auth.requested_type & ANYONECANPAY and len(tx.inputs) >= 4:
+            parts = otda_input_parts(tx, index, ORDINARY_CODE, auth.requested_type)
+            encode_prefix = partial(pack_otda_input_prefix, input_parts=parts)
+        if (program := pattern.build(auth.preimage, outputs, encode_prefix=encode_prefix)) is not None:
             candidates.append(program)
     if len(patterns) > 1:
         combine = _combine_otda_programs if all(version in patterns for version in MIXED_OTDA_VERSIONS) else None

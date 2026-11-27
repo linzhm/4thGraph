@@ -1,0 +1,167 @@
+{
+  "source_sha256": "99cca01491e927d50b526ca145e782b38b5dda406ee6ca7a61658328dfd80d3c",
+  "candidates": {
+    "sm2-reverse-fields-kernel": [
+      {
+        "call_site": {
+          "site": 0,
+          "source": {
+            "module": null,
+            "line": 4,
+            "column": 7
+          },
+          "operation": "reverse-32-fields",
+          "candidates": [
+            {
+              "kernel": "byte-reverse-fields-split",
+              "eligible": true
+            },
+            {
+              "kernel": "byte-reverse-six-fields",
+              "eligible": true
+            }
+          ],
+          "evidence": {
+            "kind": "build-field-count",
+            "count": 6,
+            "field_bytes": 32,
+            "checked_input_bytes": 192
+          },
+          "guard_bytes": 5,
+          "adapter_bytes": 5,
+          "kernel": "byte-reverse-fields-split",
+          "library": "std/byte-layout",
+          "kernel_bytes": 774,
+          "kernel_sha256": "e5772ddeb401cef6583240dc0900d0a06f6bf5d5b473d74d5d299a54b676db2f",
+          "library_sha256": "ff0ebb80ebafeed4131179261105512cea1de02d8aaae793bc57c88aed089823",
+          "bytes": 779,
+          "linked_sha256": "916b87730f1291789b4587ac490dd2c2acf035ec5cc26e19e1a6ecd62712a480",
+          "offset": 0
+        },
+        "checks": 7
+      },
+      {
+        "call_site": {
+          "site": 0,
+          "source": {
+            "module": null,
+            "line": 4,
+            "column": 7
+          },
+          "operation": "reverse-32-fields",
+          "candidates": [
+            {
+              "kernel": "byte-reverse-fields-split",
+              "eligible": true
+            },
+            {
+              "kernel": "byte-reverse-six-fields",
+              "eligible": true
+            }
+          ],
+          "evidence": {
+            "kind": "build-field-count",
+            "count": 6,
+            "field_bytes": 32,
+            "checked_input_bytes": 192
+          },
+          "guard_bytes": 5,
+          "adapter_bytes": 5,
+          "kernel": "byte-reverse-six-fields",
+          "library": "std/byte-layout",
+          "kernel_bytes": 144,
+          "kernel_sha256": "f26f0b2212f8510ef149a7725b0c2d7785b8f98938d6a3afd7411d0c23d661bf",
+          "library_sha256": "ff0ebb80ebafeed4131179261105512cea1de02d8aaae793bc57c88aed089823",
+          "bytes": 149,
+          "linked_sha256": "f6393f3ca77ed893197a67bc99ce0b73c43bfcb5d53270f32085d2ec884c30c0",
+          "offset": 0
+        },
+        "checks": 7
+      }
+    ],
+    "sm2-zero32-kernel": [
+      {
+        "call_site": {
+          "site": 0,
+          "source": {
+            "module": null,
+            "line": 7,
+            "column": 80
+          },
+          "operation": "byte-constant",
+          "candidates": [
+            {
+              "kernel": "byte-constant-literal",
+              "eligible": true
+            },
+            {
+              "kernel": "byte-constant-repeat",
+              "eligible": true
+            }
+          ],
+          "evidence": {
+            "kind": "build-bytes",
+            "literal_bytes": 32,
+            "literal_sha256": "66687aadf862bd776c8fc18b8e9f8e20089714856ee233b3902a591d0d5f2925",
+            "seed_bytes": 1,
+            "doublings": 5
+          },
+          "guard_bytes": 0,
+          "adapter_bytes": 0,
+          "kernel": "byte-constant-literal",
+          "library": "std/byte-layout",
+          "kernel_bytes": 33,
+          "kernel_sha256": "7e5d2e66fe96f9ce1f4ef968a96608f7c7ac04a911e8f33b938c7822e95d5a36",
+          "library_sha256": "ff0ebb80ebafeed4131179261105512cea1de02d8aaae793bc57c88aed089823",
+          "bytes": 33,
+          "linked_sha256": "7e5d2e66fe96f9ce1f4ef968a96608f7c7ac04a911e8f33b938c7822e95d5a36",
+          "offset": 0
+        },
+        "checks": 1
+      },
+      {
+        "call_site": {
+          "site": 0,
+          "source": {
+            "module": null,
+            "line": 7,
+            "column": 80
+          },
+          "operation": "byte-constant",
+          "candidates": [
+            {
+              "kernel": "byte-constant-literal",
+              "eligible": true
+            },
+            {
+              "kernel": "byte-constant-repeat",
+              "eligible": true
+            }
+          ],
+          "evidence": {
+            "kind": "build-bytes",
+            "literal_bytes": 32,
+            "literal_sha256": "66687aadf862bd776c8fc18b8e9f8e20089714856ee233b3902a591d0d5f2925",
+            "seed_bytes": 1,
+            "doublings": 5
+          },
+          "guard_bytes": 0,
+          "adapter_bytes": 0,
+          "kernel": "byte-constant-repeat",
+          "library": "std/byte-layout",
+          "kernel_bytes": 12,
+          "kernel_sha256": "870fe07ab22144d21d58e8a13262796576888ae80b668d2e9ee4ee802d78da4c",
+          "library_sha256": "ff0ebb80ebafeed4131179261105512cea1de02d8aaae793bc57c88aed089823",
+          "bytes": 12,
+          "linked_sha256": "870fe07ab22144d21d58e8a13262796576888ae80b668d2e9ee4ee802d78da4c",
+          "offset": 0
+        },
+        "checks": 1
+      }
+    ]
+  },
+  "selected_sha256": {
+    "sm2-reverse-fields-kernel": "f6393f3ca77ed893197a67bc99ce0b73c43bfcb5d53270f32085d2ec884c30c0",
+    "sm2-zero32-kernel": "870fe07ab22144d21d58e8a13262796576888ae80b668d2e9ee4ee802d78da4c"
+  }
+}
