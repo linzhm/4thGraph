@@ -404,7 +404,7 @@ class Layout:
         uses = Counter({operand: self.uses[operand] for operand in args})
         for order in orders:
             if group_operands and len(order) > 2:
-                grouped = Layout(self.slots, uses.copy())
+                grouped = Layout(self.slots, uses.copy(), literals=self.literals)
                 staged = 0
                 while staged < len(order):
                     count = grouped.stage_group(order, staged)

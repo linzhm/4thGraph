@@ -48,6 +48,19 @@ class DataflowTests(unittest.TestCase):
         output, alt = evaluate(asm("17 OP_TOALTSTACK") + compact, [b"caller", *map(encode_num, inputs)])
         self.assertEqual((output, alt), ([b"caller", *map(encode_num, returns)], [encode_num(17)]))
 
+    def test_grouped_operands_repush_a_single_byte_literal(self):
+        source = SourceCompiler("""
+            REQUIRE BSV
+            layout: rotate-three ( a:cell b:cell c:cell -- c a b )
+            lock: grouped ( a:cell b:cell ) a b 1 rotate-three - - ;
+        """)
+        stack = [b"caller", encode_num(5), encode_num(11)]
+        for optimization in ("stack", DATAFLOW):
+            with self.subTest(optimization=optimization):
+                code = compile_word(source.words["grouped"], optimization).script
+                result = evaluate(asm("17 OP_TOALTSTACK") + code, stack)
+                self.assertEqual(result, ([b"caller", encode_num(7)], [encode_num(17)]))
+
     def test_grouped_operands_preserve_copies_and_last_uses(self):
         cases = (
             ((0, 1, 2, 3, 4, 5), (0, 1, 2, 3), (4, 5), "OP_2ROT"),
