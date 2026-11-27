@@ -8,7 +8,11 @@ from tempfile import TemporaryDirectory
 from threading import Barrier
 from unittest.mock import patch
 
-from fourthgraph.verification.groth16_bn254 import BASE_FIELD, FIELD, ScriptVerifier, g2, public_signals, runar_key, runar_proof
+from fourthgraph.bsv.script import asm
+from fourthgraph.compiler.source import CompileError
+from fourthgraph.verification.groth16_bn254 import (
+    BASE_FIELD, FIELD, ForthVerifier, ScriptVerifier, g2, public_signals, runar_key, runar_proof,
+)
 
 
 class Groth16EncodingTests(unittest.TestCase):
@@ -32,6 +36,27 @@ class Groth16EncodingTests(unittest.TestCase):
                 calls = [pool.submit(verifier.emit, ("0",) * 5) for verifier in verifiers]
                 self.assertEqual([call.result() for call in calls], [b"\x01", b"\x03"])
             self.assertEqual(list(Path(directory).iterdir()), [])
+
+    def test_bn254_forth_links_the_same_predicate_and_requires_authorization(self):
+        g1 = ["1", "2", "1"]
+        g2_point = [["11", "22"], ["33", "44"], ["1", "0"]]
+        key = json.dumps({"protocol": "groth16", "curve": "bn128", "nPublic": 5, "IC": [g1] * 6,
+                          "vk_alpha_1": g1, "vk_beta_2": g2_point, "vk_gamma_2": g2_point,
+                          "vk_delta_2": g2_point}).encode()
+        source = Path(__file__).resolve().parents[1] / "projects/groth16-bn254/verifier.fth"
+        owner = bytes.fromhex("0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798")
+        signals = ("0",) * 5
+        with TemporaryDirectory() as directory, patch.object(ScriptVerifier, "emit",
+                                                            return_value=asm("OP_0 OP_CHECKSIGVERIFY OP_1")):
+            bytecode = ScriptVerifier("adapter", key, directory).compile(signals, owner)
+            verifier = ForthVerifier("adapter", key, directory, source.read_bytes(), source_path=source)
+            self.assertEqual(verifier.compile(signals, owner), bytecode)
+            artifact = verifier.artifact(signals, owner, bytecode)
+            self.assertEqual(artifact["forth_entry"], "verify-bn254-proof")
+            self.assertEqual([library["name"] for library in artifact["libraries"]], ["forth/statement.fth"])
+            source_without_owner = source.read_bytes().replace(b"    bn254-owner-guard\n", b"")
+            with self.assertRaises(CompileError):
+                ForthVerifier("adapter", key, directory, source_without_owner, source_path=source)
 
     def test_snarkjs_g2_is_real_first_and_only_vk_points_are_negated(self):
         point = [["11", "22"], ["33", "44"], ["1", "0"]]
