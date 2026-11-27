@@ -29,7 +29,11 @@ const signedHex = wallet.signPayment({
 }, ({ payload }) => signer.signBip340(payload));
 ```
 
-签署已组装的交易时，用 `signInput` 传入当前输入索引和已核验的上一输出。使用 Chronicle OTDA 时，根据实际链上下文填写 `chronicleActive`。SINGLE 需要同索引输出。版本 2 交易的 OTDA ALL 或有同索引输出的 SINGLE 会在能缩短解锁脚本时使用预映像构造器。需要原样压栈时设置 `compressOtda: false`，Python 对应 `compress_otda=False`。Python、Rust 和 Go 也提供对应的接口。[统一调用表](../../../sdk/docs/reference.zh-CN.md#calls-and-data)
+## 使用已组装交易与 OTDA
+
+`signPayment` 创建单输入、版本 2 的 BIP143 ALL 付款。已组装交易用 `signInput`，传入实际输入索引和已核验的上一输出。签名前审批输出顺序、金额、输入序列、锁定时间和总手续费。使用 Chronicle OTDA 时，从实际链上下文设置 `chronicleActive`。SINGLE 需要同索引输出。[统一调用表](../../../sdk/docs/reference.zh-CN.md#calls-and-data) · [验签承诺范围](spec.zh-CN.md#unlock-stack-and-sighash)
+
+版本 2 的 OTDA ALL 或有同索引输出的 SINGLE 会在序列化更短时使用构造器。可用 `compressOtda: false`（Python 为 `compress_otda=False`）指定原样压栈。组装完成后，以最终签名交易的 txid 为准，再引用其输出。默认钱包识别版本目录中的模板。调优的 64 窗口构建有独立的构造器复放入口。[版本目录](../versions/index.json) · [构造器对照](high-level-forth.zh-CN.md#otda-constructor)
 
 <a name="integrate-musig2"></a>
 

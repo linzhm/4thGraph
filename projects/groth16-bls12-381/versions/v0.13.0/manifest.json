@@ -1,5 +1,6 @@
 {
   "version": "0.13.0",
+  "witness_layout": "affine-inline",
   "previous": "0.12.0",
   "artifacts": [],
   "fixtures": [],
@@ -16,6 +17,6 @@
     "proof-counter": "0.1.0"
   },
   "integration": "docs/verification.en.md",
-  "build": "PYTHONPATH=src:. python3 projects/groth16-bls12-381/reference/replay_plan.py --release 0.13.0",
-  "verify": "REGTEST_CHRONICLE_HEIGHT=1000 bash tools/verify_node.sh --profile raised -- \\\n  python3 projects/groth16-bls12-381/reference/replay_plan.py --release 0.13.0 --funded"
+  "build": "PYTHONPATH=src:. python3 projects/groth16-bls12-381/reference/replay_plan.py --release v0.13.0-affine-inline",
+  "verify": "REGTEST_CHRONICLE_HEIGHT=1000 bash tools/verify_node.sh --profile raised -- \\\n  python3 projects/groth16-bls12-381/reference/replay_plan.py --release v0.13.0-affine-inline --funded"
 }

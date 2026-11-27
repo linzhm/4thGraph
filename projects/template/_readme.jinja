@@ -18,7 +18,7 @@
 {%- endif -%}
 {%- set document = namespace(blocks=[
     '<!-- Generated from ' ~ readme.get('manifest', 'manifest.yaml') ~ ' with Copier. -->',
-    '# ' ~ readme_title ~ (' v' ~ version if version else ''),
+    '# ' ~ readme_title ~ (' v' ~ readme.get('version_label', version) if version else ''),
     home,
     '## Developer resources' if english else '## 开发入口',
 ]) -%}

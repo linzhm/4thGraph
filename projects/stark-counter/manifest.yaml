@@ -1,0 +1,33 @@
+$schema: ../template/manifest.schema.json
+schema_version: 1
+title:
+  en: STARK counter
+  zh-CN: STARK 计数器
+summary:
+  en: Generate and verify a transparent STARK for a public counter, then compare it with 4thGraph's compiled Script.
+  zh-CN: 为公开计数器生成和验证透明 STARK，并与 4thGraph 编译出的 Script 做差分。
+entry_points:
+  - name: counter-block
+    description:
+      en: Compile a block of 1,023 increments using the proof counter's typed u32 Forth word.
+      zh-CN: 用证明计数器的类型化 u32 Forth 词编译连续 1,023 次递增。
+  - name: fourthgraph-stark-counter
+    description:
+      en: Generate a proof with Winterfell or verify it against an explicitly supplied start and result.
+      zh-CN: 用 Winterfell 生成证明，或按显式提供的起始值和结果验证证明。
+setup:
+  en:
+    - Run from the repository root with Rust 1.87 or later and Python 3.11 or later. Cargo uses the checked-in lockfile.
+  zh-CN:
+    - 在仓库根目录运行，使用 Rust 1.87 或以上及 Python 3.11 或以上。Cargo 使用仓库中的 lockfile。
+sections:
+  algorithm:
+    en:
+      - The proof commits to a 1,024-row AIR trace and uses FRI. Both endpoints are public. The two AIR constraints enforce u32 wraparound, including a wrap on the first or last step. [Verification design](docs/verification.en.md)
+    zh-CN:
+      - 证明承诺 1,024 行 AIR 执行轨迹并使用 FRI。起始值与结果公开。两条 AIR 约束核验 u32 回绕，覆盖第一步或最后一步回绕。 [验证设计](docs/verification.zh-CN.md)
+  reproduction:
+    en:
+      - The replay verifies four proofs against the Forth and Script results and checks 16 rejection cases. The proofs in this release are verified by the host. [Fixture and proof sizes](versions/v0.1.0/measurements.json)
+    zh-CN:
+      - 复放将四份证明与 Forth 和 Script 结果核对，并检查 16 个拒绝用例。本版由宿主验证证明。 [夹具与证明大小](versions/v0.1.0/measurements.json)

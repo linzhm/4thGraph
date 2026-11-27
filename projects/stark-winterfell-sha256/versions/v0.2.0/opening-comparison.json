@@ -1,0 +1,180 @@
+{
+  "comparison": "Only the parent hash block changes, using the v0.1 checked hash word or the v0.2 specialized hash block",
+  "same_witness_and_root": true,
+  "v01_checked_parent_bytes": 19,
+  "v02_specialized_parent_bytes": 5,
+  "synthetic_previous_outputs": true,
+  "paired_samples_per_opening": 201,
+  "results": [
+    {
+      "query_ordinal": 0,
+      "index": 11,
+      "proof_bytes": 34924,
+      "variants": {
+        "v01_composed": {
+          "lock_bytes": 550,
+          "unlock_bytes": 454,
+          "serialized_lock_and_unlock_fields_bytes": 1010,
+          "development_evaluator_stack_payload_peak_bytes": 483,
+          "opcodes_and_pushes_traversed_by_development_evaluator": 469,
+          "both_engines_accept_valid": true,
+          "both_engines_reject": [
+            "wrong_row",
+            "wrong_sibling",
+            "reordered_siblings",
+            "short_path",
+            "extra_path_byte",
+            "wrong_index",
+            "out_of_range_index",
+            "negative_index",
+            "noncanonical_index"
+          ]
+        },
+        "v02_intrinsic": {
+          "lock_bytes": 368,
+          "unlock_bytes": 454,
+          "serialized_lock_and_unlock_fields_bytes": 828,
+          "development_evaluator_stack_payload_peak_bytes": 483,
+          "opcodes_and_pushes_traversed_by_development_evaluator": 313,
+          "both_engines_accept_valid": true,
+          "both_engines_reject": [
+            "wrong_row",
+            "wrong_sibling",
+            "reordered_siblings",
+            "short_path",
+            "extra_path_byte",
+            "wrong_index",
+            "out_of_range_index",
+            "negative_index",
+            "noncanonical_index"
+          ]
+        }
+      },
+      "bsv_node_verifyscript_rpc_us": {
+        "v01_composed": 688.268,
+        "v02_intrinsic": 640.47,
+        "median_paired_saving": 31.244
+      },
+      "chain_gang_parse_and_verify_us": {
+        "v01_composed": 31.726,
+        "v02_intrinsic": 27.609,
+        "median_paired_saving": 4.064
+      }
+    },
+    {
+      "query_ordinal": 17,
+      "index": 2823,
+      "proof_bytes": 35977,
+      "variants": {
+        "v01_composed": {
+          "lock_bytes": 550,
+          "unlock_bytes": 455,
+          "serialized_lock_and_unlock_fields_bytes": 1011,
+          "development_evaluator_stack_payload_peak_bytes": 484,
+          "opcodes_and_pushes_traversed_by_development_evaluator": 469,
+          "both_engines_accept_valid": true,
+          "both_engines_reject": [
+            "wrong_row",
+            "wrong_sibling",
+            "reordered_siblings",
+            "short_path",
+            "extra_path_byte",
+            "wrong_index",
+            "out_of_range_index",
+            "negative_index",
+            "noncanonical_index"
+          ]
+        },
+        "v02_intrinsic": {
+          "lock_bytes": 368,
+          "unlock_bytes": 455,
+          "serialized_lock_and_unlock_fields_bytes": 829,
+          "development_evaluator_stack_payload_peak_bytes": 484,
+          "opcodes_and_pushes_traversed_by_development_evaluator": 313,
+          "both_engines_accept_valid": true,
+          "both_engines_reject": [
+            "wrong_row",
+            "wrong_sibling",
+            "reordered_siblings",
+            "short_path",
+            "extra_path_byte",
+            "wrong_index",
+            "out_of_range_index",
+            "negative_index",
+            "noncanonical_index"
+          ]
+        }
+      },
+      "bsv_node_verifyscript_rpc_us": {
+        "v01_composed": 684.128,
+        "v02_intrinsic": 668.658,
+        "median_paired_saving": 21.766
+      },
+      "chain_gang_parse_and_verify_us": {
+        "v01_composed": 52.21,
+        "v02_intrinsic": 45.177,
+        "median_paired_saving": 6.662
+      }
+    },
+    {
+      "query_ordinal": 38,
+      "index": 7863,
+      "proof_bytes": 36719,
+      "variants": {
+        "v01_composed": {
+          "lock_bytes": 550,
+          "unlock_bytes": 455,
+          "serialized_lock_and_unlock_fields_bytes": 1011,
+          "development_evaluator_stack_payload_peak_bytes": 484,
+          "opcodes_and_pushes_traversed_by_development_evaluator": 469,
+          "both_engines_accept_valid": true,
+          "both_engines_reject": [
+            "wrong_row",
+            "wrong_sibling",
+            "reordered_siblings",
+            "short_path",
+            "extra_path_byte",
+            "wrong_index",
+            "out_of_range_index",
+            "negative_index",
+            "noncanonical_index"
+          ]
+        },
+        "v02_intrinsic": {
+          "lock_bytes": 368,
+          "unlock_bytes": 455,
+          "serialized_lock_and_unlock_fields_bytes": 829,
+          "development_evaluator_stack_payload_peak_bytes": 484,
+          "opcodes_and_pushes_traversed_by_development_evaluator": 313,
+          "both_engines_accept_valid": true,
+          "both_engines_reject": [
+            "wrong_row",
+            "wrong_sibling",
+            "reordered_siblings",
+            "short_path",
+            "extra_path_byte",
+            "wrong_index",
+            "out_of_range_index",
+            "negative_index",
+            "noncanonical_index"
+          ]
+        }
+      },
+      "bsv_node_verifyscript_rpc_us": {
+        "v01_composed": 690.908,
+        "v02_intrinsic": 659.257,
+        "median_paired_saving": 42.356
+      },
+      "chain_gang_parse_and_verify_us": {
+        "v01_composed": 51.1,
+        "v02_intrinsic": 44.47,
+        "median_paired_saving": 6.787
+      }
+    }
+  ],
+  "bsv_node_version": 101020300,
+  "chain_gang": {
+    "version": "0.13.2",
+    "commit": "74676b9c002c452e7f21a9ed9265f4972bef03f6"
+  }
+}

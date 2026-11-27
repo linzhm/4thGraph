@@ -62,10 +62,15 @@
 | `--witness-layout` | 花费者提供的算术数据 | 固定 Γ、Δ 配对线 |
 | --- | --- | --- |
 | `projective`（默认） | 仿射 `VK_x` 声明和 Fp12 配对余数 | 内联 |
+| `projective-cofactor` | `projective` 见证及 A、C 的 G1 余因子原像 | 内联 |
 | `affine-inline` | MSM 窗口斜率、B 的 Miller 斜率和 Fp12 配对余数 | 内联 |
 | `affine-witness` | 与 `affine-inline` 相同，另加预计算线表 | 锁含 SHA-256 承诺，花费提交表的原像 |
 
 两种仿射布局接受动态或混合公开输入。Script 从公开输入推导窗口数位并逐步核验斜率，求出 `VK_x`。零数位、无穷远点和异号点相加的窗口要求零斜率。Miller loop 核验 B 的仿射切线或割线，检查分母非零，并用循环计算出的 `[|u|]B` 验证子群。A、C 的检查及配对余数条件沿用原谓词。验证密钥和各公开输入槽的范围由部署固定。
+
+`projective-cofactor` 在证明包的 Fp12 余数之后、可选 `VK_x` 之前依次编码两个仿射原像点，共 192 B。Script 检查原像在曲线上，计算 `[h_eff]T_A` 和 `[h_eff]T_C`，并要求两个像有限且分别等于 A 和 C。BLS12-381 的 `h_eff = |u| + 1` 将曲线点映射到 G1 素数阶子群，且在该子群上可逆。见证生成器用 `h_eff⁻¹ mod r` 生成原像。该布局使用 `direct-projective` Miller 内核，沿用分段归约以及有界的有符号 MSM 表。[RFC 9380 §7](https://www.rfc-editor.org/rfc/rfc9380.html#section-7) · [RFC 9380 §8.8.1](https://www.rfc-editor.org/rfc/rfc9380.html#section-8.8.1) · [候选版回放](../projects/groth16-bls12-381/docs/verification.zh-CN.md#v0140-布局)
+
+对 Γ、Δ 的固定线，`direct-projective` 用 Fp 中的非零标量把截距的非零虚部缩放为 1，并同比缩放另外两个系数。标量在 Fp6 中，因而在 Fp12*/Fp6* 剩余式判定中消去。固定线虚部为零时沿用原系数。`paired-doubles` 也可用于齐次 G1 余因子倍点，在点加和最终等式前归约坐标。
 
 仿射解锁栈从底到顶依次是可选的固定线表包、斜率包、证明包和公开输入包。算术包用 48 字节小端 Fp 元素，斜率包先列 MSM 窗口，再按 Miller 顺序列 B 的 Fp2 斜率。固定线表每步依次编码 Δ 和 Γ 的截距、斜率，整包在解码前核对承诺。证明包含 A、B、C 和 Fp12 余数。应用层可继续使用最后一项公开输入包做交易绑定。
 

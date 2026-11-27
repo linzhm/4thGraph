@@ -11,6 +11,8 @@
 | [Proof counter](proof-counter/README.md) | Build a public state transition with Script, Circom, or a proof backend |
 | [BLS12-381 Groth16](groth16-bls12-381/README.md) | Compile the modular Forth verifier and replay funded proof spends |
 | [BN254 Groth16](groth16-bn254/README.md) | Build the fixed-statement Forth verifier and replay on Chronicle |
+| [Winterfell BLAKE3 STARK](stark-counter/README.md) | Prove and replay the public counter with the reference hash profile |
+| [Winterfell SHA-256 STARK](stark-winterfell-sha256/README.md) | Build the SHA-256 profile and compare compiled trace openings on BSV |
 
 ## Payments and signing schemes
 

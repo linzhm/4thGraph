@@ -7,13 +7,14 @@ from pathlib import Path
 import unittest
 
 from fourthgraph.verification.bls12381.verifier import (
-    FIELD_BYTES, HOST, Q, R, Curve, Dynamic, ScriptVerifier, bind_public_output, input_sources, public_output,
-    public_packet,
+    FIELD_BYTES, G1_PREIMAGE_BYTES, HOST, PACKET_BYTES, Q, R, Curve, Dynamic, ScriptVerifier, bind_public_output,
+    evaluated_line, input_sources, public_output, public_packet,
 )
 from fourthgraph.verification.bls12381.build import ArithmeticPlan, ForthVerifier, SOURCE, layout_candidates, select_layout
+from fourthgraph.verification.bls12381.projective_cofactor import evaluated_fixed_line
 from fourthgraph.compiler.source import CompileError
 from fourthgraph.workflow.protocol import artifact_digest
-from fourthgraph.replay.bls12381_verifier import SOURCES, fixture
+from fourthgraph.replay.bls12381_verifier import SOURCES, fixture, witness_controls
 from fourthgraph.bsv.chain_gang import validate_at_heights
 from fourthgraph.bsv.script import asm, push
 from fourthgraph.bsv.transaction import blob, preimage_all
@@ -74,6 +75,42 @@ class ForthVerifierTests(unittest.TestCase):
         parent, spend = spend_fixture(continuation, current.witness(other_signals, other_proof))
         with self.assertRaises((RuntimeError, ValueError)):
             check_spend(parent, spend)
+
+    def test_projective_cofactor_binds_both_preimages_and_the_public_inputs(self):
+        original = ForthVerifier(self.key, self.source)
+        verifier = ForthVerifier(self.key, self.source, witness_layout="projective-cofactor")
+        lock = verifier.compile(SOURCES)
+        artifact = verifier.artifact(SOURCES, None, lock)
+        self.assertEqual(artifact["g1_preimage_bytes"], G1_PREIMAGE_BYTES)
+        witnesses = [verifier.witness(signals, proof, sources=SOURCES) for signals, proof in self.cases]
+        packets = [public_packet(SOURCES, signals) for signals, _ in self.cases]
+        for index, ((signals, proof), witness) in enumerate(zip(self.cases, witnesses, strict=True)):
+            old = original.witness(signals, proof, sources=SOURCES)
+            self.assertEqual(len(witness), len(old) + G1_PREIMAGE_BYTES)
+            self.assertEqual(witness[3:3 + PACKET_BYTES], old[3:3 + PACKET_BYTES])
+            parent, spend = spend_fixture(lock, witness)
+            check_spend(parent, spend)
+            start = 3 + PACKET_BYTES
+            preimage = tuple(int.from_bytes(witness[offset:offset + FIELD_BYTES], "little")
+                             for offset in (start, start + FIELD_BYTES))
+            shifted = Curve(HOST).add_host(preimage, (0, 2))
+            encoded = b"".join(coord.to_bytes(FIELD_BYTES, "little") for coord in shifted)
+            check_spend(parent, spend.with_script(0, witness[:start] + encoded + witness[start + len(encoded):]))
+            controls = witness_controls(witnesses, packets, index, artifact["proof_packet_bytes"],
+                                        layout=verifier.witness_layout)
+            controls["legacy_packet"] = old
+            for name, bad in controls.items():
+                with self.subTest(case=index, control=name), self.assertRaises((RuntimeError, ValueError)):
+                    check_spend(parent, spend.with_script(0, bad))
+
+    def test_cofactor_fixed_line_scales_the_entire_line(self):
+        point, slope = (17, 23), (11, 13)
+        for intercept in ((3, 7), (0, 7), (3, 0), (0, 0)):
+            with self.subTest(intercept=intercept):
+                line = (intercept, slope)
+                scale = pow(intercept[1], -1, Q) if intercept[1] else 1
+                expected = tuple(HOST.scale2(part, scale) for part in evaluated_line(HOST, point, line))
+                self.assertEqual(evaluated_fixed_line(HOST, point, line), expected)
 
     def test_reordered_source_changes_lowering(self):
         original = b"bls12-381-check-public-inputs\n    swap bls12-381-check-g1-points"

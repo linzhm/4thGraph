@@ -2,11 +2,15 @@
 
 [English](threshold-comparison.en.md) · [项目首页](../README.zh-CN.md) · [钱包接入](sdk.zh-CN.md#integrate-musig2)
 
-现有 P2PKH-Schnorr 模板可以花费由两方 MuSig2 共同控制的 UTXO。入金时，钱包按约定的顺序用两把独立的压缩公钥计算 BIP327 聚合公钥，再把聚合公钥横坐标的 HASH160 填入固定模板。花费时，两方各自审批当前输入的 32 字节交易签名摘要，先交换公有 nonce，再各自签出部分签名。协调器核验两份部分签名，聚合成标准的 64 字节 BIP340 签名。现有钱包接口接收这条签名并生成坐标见证。链上可见聚合公钥和聚合签名，参与者的公钥列表与人数留在链下。原生 `CHECKMULTISIG` 在锁里直接公开两把公钥。[BIP327](https://github.com/bitcoin/bips/blob/4f9567fd60021cb7dea032250ab241cd68d9ff91/bip-0327.mediawiki) · [两方签名夹具](../reference/musig2_fixture.py)
+## 两方授权
+
+入金前，钱包按约定顺序用两把独立的压缩公钥计算 BIP327 聚合公钥，将其 x-only 编码的 HASH160 写入 Schnorr 锁。每个输入各有签名会话。两方审批相同的 32 字节消息，先交换公开 nonce，再生成部分签名。协调器核验两份部分签名后，向统一 SDK 回调交付标准的 64 字节 BIP340 签名。两把参与者公钥和参与人数由链下钱包策略保存。[BIP327](https://github.com/bitcoin/bips/blob/4f9567fd60021cb7dea032250ab241cd68d9ff91/bip-0327.mediawiki) · [签名夹具](../reference/musig2_fixture.py)
+
+原生 `CHECKMULTISIG` 将两把公钥写进锁，两方可以独立签署同一笔交易。两个方案都要收齐双方的签名材料才能花费。MuSig2 会话中断后，由签名器作废该会话的 nonce，再使用新 nonce 开始新会话。[钱包接入](sdk.zh-CN.md#integrate-musig2)
 
 ## 整笔交易和全生命周期
 
-两套方案均要求两位参与者签名。对照采用同样的输入输出布局、金额和签名模式。2×2 场景创建两个同类型的受保护输出。新增输入以 3×2 减 2×2 测得，新增输出以 2×3 减 2×2 测得。全生命周期从一笔普通 P2PKH 入金交易开始，最后退回两个普通 P2PKH 输出。“一次周转”在两者之间插入一笔 2×2 同类型转账。
+下表固定使用 v0.16.0 的 MuSig2 付款锁，并按相同输入输出布局、金额和 sighash 与原生多签对照。2×2 场景创建两个同类型的受保护输出。新增输入以 3×2 减 2×2 测得，新增输出以 2×3 减 2×2 测得。全生命周期从一笔普通 P2PKH 入金交易开始，最后退回两个普通 P2PKH 输出。“一次周转”在两者之间插入一笔 2×2 同类型转账。
 
 | 方案 | ALL 模式 | 单个锁 | 2×2 解锁见证，每输入 | 2×2 交易 | 新增输入 | 新增输出 | 入金与退出 | 含一次周转 | 首输入栈载荷峰值 |
 | --- | --- | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: |
@@ -19,7 +23,7 @@
 
 在两进两出的夹具中，chain-gang 中位耗时在 BIP143 下为 MuSig2 **6.93 ms**、原生多签 **0.39 ms**，在 OTDA 下分别为 **5.61 ms** 和 **0.39 ms**。BSV Node 本地 RPC 的中位耗时在 BIP143 下分别为 **21.22 ms** 和 **0.70 ms**，在 OTDA 下分别为 **36.34 ms** 和 **0.71 ms**。每组预热一次后测量 15 次，耗时包含输入准备和验证。Node 测量还包含本地 RPC 开销。
 
-表中的 OTDA ALL 使用原样压栈，每份预映像包含所承诺的完整输出字节。[构造器实测](high-level-forth.zh-CN.md#otda-constructor)
+表中的 OTDA ALL 使用 v0.16.0 的原样预映像。调优 Forth 构造器的交易另见实验指南。[构造器实测](high-level-forth.zh-CN.md#otda-constructor)
 
 只有退出、且新输出是普通 P2PKH 时，MuSig2 的两个 OTDA 解锁见证各为 336 字节。原生 `CHECKMULTISIG` 由节点直接从交易构造签名摘要，因此解锁见证只包含 dummy 项和两条签名。
 
@@ -31,13 +35,15 @@ MuSig2 每个输入需要两轮依赖的签名消息。两方各生成 66 字节
 
 验收复放了两条 BIP327 官方签名聚合向量。会话测试覆盖缺 nonce、缺部分签名、中断后作废 nonce、重试、错摘要、参与者错序和旧部分签名。两种链上方案均通过 BSV Node 1.2.3 与 chain-gang 对 **12 种已配对的 BIP143 / OTDA 签名模式 × 两种交易版本**的验证，也验证了锁定时间与输出金额更改的预期效果。两类方案在默认 regtest 策略下的 BIP143 ALL 和 OTDA ALL 入金与退出均进入内存池并出块。统一 SDK 的 Python、TypeScript、Go 和 Rust 验收均复放了 BIP143 ALL 和 OTDA SINGLE 的 MuSig2 聚合签名。[验收入口](../reference/test_musig2.py) · [官方聚合向量](https://github.com/bitcoin/bips/blob/4f9567fd60021cb7dea032250ab241cd68d9ff91/bip-0327/vectors/sig_agg_vectors.json) · [钱包夹具](../reference/sdk_fixture.py)
 
-按[项目验收说明](../README.zh-CN.md#复现验收)安装依赖后，从仓库根目录运行。
+## 复现历史对照
+
+从提交 `7adb2c5` 的检出目录根路径运行以下命令。用项目环境中的 Python，设置 `SCRIPT_LAB_SDK_PYTHON`。[固定的 v0.16.0 源码](https://github.com/linzhm/4thGraph/tree/7adb2c559eb3aa9b7cc6a5f4eb9a0d13421785d3/projects/p2pkh-schnorr) · [安装依赖](../README.zh-CN.md#复现验收)
 
 ```sh
 PYTHONPATH=src:. bash tools/verify_node.sh -- \
-  projects/p2pkh-schnorr/workspace/p2pkh-schnorr/bin/python projects/p2pkh-schnorr/reference/compare_threshold.py \
-  --output /tmp/p2pkh-schnorr-threshold.json
+  "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/reference/compare_threshold.py \
+  --output workspace/p2pkh-schnorr-threshold.json
 PYTHONPATH=src:. bash tools/verify_node.sh --profile default -- \
-  projects/p2pkh-schnorr/workspace/p2pkh-schnorr/bin/python projects/p2pkh-schnorr/reference/compare_threshold.py \
-  --admission --output /tmp/p2pkh-schnorr-threshold-admission.json
+  "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/reference/compare_threshold.py \
+  --admission --output workspace/p2pkh-schnorr-threshold-admission.json
 ```

@@ -1,0 +1,84 @@
+{
+  "schema_version": 1,
+  "openings": [
+    {
+      "current": 19,
+      "next": 1042,
+      "query": 0,
+      "index": 11,
+      "trace_root": "f9594dcb72af85e33869b70c92204ed20266cc8cce5bd08e5fbeccab2144fae3",
+      "proof_sha256": "384fea5257a3ba0b12d1e680ac12679f336863f58e1942fd2de4907565d00116",
+      "lock_bytes": 368,
+      "lock_sha256": "ad73ef90fa38745a9cf0822bae17d0ddefefb82535662353e7ecf27e5657fd81",
+      "path_bytes": 416,
+      "unlock_bytes": 454,
+      "stack_payload_peak_bytes": 483,
+      "rejections": [
+        "wrong_row",
+        "wrong_sibling",
+        "reordered_siblings",
+        "short_path",
+        "extra_path_byte",
+        "wrong_index",
+        "out_of_range_index",
+        "negative_index",
+        "noncanonical_index"
+      ]
+    },
+    {
+      "current": 4294966273,
+      "next": 0,
+      "query": 17,
+      "index": 2823,
+      "trace_root": "5269200bf1c1c97b3b8a55433b5f2e2a7ee43f0eee94c05a657b846655888d6e",
+      "proof_sha256": "6b5ac4af30dfe3c2966dd7072c65797c800dea57353ace0ebe65ce8b268558b2",
+      "lock_bytes": 368,
+      "lock_sha256": "4b9cabe50f409c290e53a8ef0ccf03147c937781103759b1f8cb573de2694536",
+      "path_bytes": 416,
+      "unlock_bytes": 455,
+      "stack_payload_peak_bytes": 484,
+      "rejections": [
+        "wrong_row",
+        "wrong_sibling",
+        "reordered_siblings",
+        "short_path",
+        "extra_path_byte",
+        "wrong_index",
+        "out_of_range_index",
+        "negative_index",
+        "noncanonical_index"
+      ]
+    },
+    {
+      "current": 4294967295,
+      "next": 1022,
+      "query": 38,
+      "index": 7863,
+      "trace_root": "5c40d9781fefad065dd2393f71f615f03208944ccfcc235b371af4c1e503b562",
+      "proof_sha256": "84f2ff580d1b306a1ee2a49b84a4d2850b1e2d418bd2c09f09d05b03ce841a4b",
+      "lock_bytes": 368,
+      "lock_sha256": "28640519fefdb5269cd221de80f3db0735db604b23d4c06ad3baa4409b42da33",
+      "path_bytes": 416,
+      "unlock_bytes": 455,
+      "stack_payload_peak_bytes": 484,
+      "rejections": [
+        "wrong_row",
+        "wrong_sibling",
+        "reordered_siblings",
+        "short_path",
+        "extra_path_byte",
+        "wrong_index",
+        "out_of_range_index",
+        "negative_index",
+        "noncanonical_index"
+      ]
+    }
+  ],
+  "native": {
+    "bsv_node_version": 101020300,
+    "chain_gang": {
+      "version": "0.13.2",
+      "commit": "74676b9c002c452e7f21a9ed9265f4972bef03f6"
+    }
+  }
+}
