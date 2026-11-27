@@ -1,0 +1,5 @@
+{
+  "fixture": "pels-settlement",
+  "paths": ["bip143", "otda"],
+  "previous_amount": 11000
+}

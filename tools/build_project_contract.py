@@ -25,6 +25,11 @@ def build(project, output):
     spec = json.loads((config/"project.json").read_bytes())
     # Only repository-owned build adapters execute, never instructions from a wallet package.
     script, inputs = runpy.run_path(str(config/"build_script.py"))["build"]()
+    policy = inputs.get("settlement_policy")
+    linker_flags = "-s -w -buildid="
+    if policy is not None:
+        spec["paths"] = policy["paths"]
+        linker_flags += " -X main.compiledPolicy=" + json.dumps(policy, sort_keys=True).encode().hex()
     output = Path(output).resolve()
     output.parent.mkdir(parents=True, exist_ok=True)
     with TemporaryDirectory(dir=output.parent) as scratch:
@@ -45,7 +50,7 @@ def build(project, output):
                "GOWORK":"off", "GOPROXY":"off"}
         env.setdefault("GOCACHE", str(ROOT/"workspace/go-cache"))
         go = os.environ.get("GO", "go")
-        subprocess.run([go, "build", "-trimpath", "-buildvcs=false", "-buildmode=c-shared", "-ldflags=-s -w -buildid=",
+        subprocess.run([go, "build", "-trimpath", "-buildvcs=false", "-buildmode=c-shared", "-ldflags=" + linker_flags,
                         "-o", str(module), str(config/"main.go")], cwd=ROOT/"sdk/go", env=env, check=True)
         fixtures = dest/"cases.json"
         shutil.copyfile(config/"cases.json", fixtures)
@@ -67,7 +72,7 @@ def build(project, output):
 
 def main(argv=None):
     cli = argparse.ArgumentParser()
-    cli.add_argument("project", choices=("p2pkh-r1","pels-counter"))
+    cli.add_argument("project", choices=("p2pkh-r1", "pels-counter", "workflow-examples"))
     cli.add_argument("output", type=Path)
     mode = cli.add_mutually_exclusive_group()
     mode.add_argument("--smoke", action="store_true", help="verify this local build with disposable fixture keys")
