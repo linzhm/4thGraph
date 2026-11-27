@@ -22,6 +22,21 @@ class Method(Generic[State]):
     apply: Callable[[State], State]
 
 
+def replay_order(seed, methods, order):
+    """Apply one explicit plan under the same method guards used for search."""
+    if not isinstance(order, (tuple, list)) or len(order) > MAX_ORDER_DEPTH:
+        raise ValueError(f"method plan must be a sequence of at most {MAX_ORDER_DEPTH} methods")
+    state = seed
+    for index, name in enumerate(order, 1):
+        if not isinstance(name, str) or name not in methods:
+            raise ValueError(f"unknown method at step {index}: {name!r}")
+        try:
+            state = methods[name].apply(state)
+        except IneligibleMethod as error:
+            raise IneligibleMethod(f"method {name!r} at step {index}: {error}") from error
+    return state
+
+
 def explore_orders(seed, methods, *, describe, evaluate, max_depth=MAX_ORDER_DEPTH, max_states=DEFAULT_ORDER_STATES):
     """Expand distinct compiler states breadth-first and retain all tried edges.
 

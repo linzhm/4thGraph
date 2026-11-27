@@ -1,16 +1,17 @@
 """Ordered lowering and target-cost selection for the verified R1 Forth entry."""
 
 from dataclasses import dataclass, replace
-from functools import partial
+from functools import cache, partial
 from hashlib import sha256
 
-from compile_r1 import (AUTO_OBJECTIVES, BASELINE_DEPENDENCIES, BASELINE_SOURCE_SHA256, compile_source,
+from compile_r1 import (AUTO_OBJECTIVES, BASELINE_DEPENDENCIES, BASELINE_SOURCE_SHA256, PAYMENT_ENTRY, compile_source,
                         dependencies, payment_window_boundaries)
 from fixed_templates import CompiledTemplate
+from fourthgraph import PROJECT_VERSION
 from fourthgraph.bsv.evaluate import evaluate
 from fourthgraph.bsv.otda_reconstruction import Reconstruction
 from fourthgraph.bsv.transaction import compact
-from fourthgraph.compiler.method_search import IneligibleMethod, Method, explore_orders
+from fourthgraph.compiler.method_search import IneligibleMethod, Method, explore_orders, replay_order
 from msm_compiler import OWNER, R1MSMCompiler
 from msm_lowering import Program, Strategy, clear_window_table, reconstruction, window_program
 
@@ -97,8 +98,8 @@ def apply(method, state, *, backend, scheduled, constructor_for):
         return candidate
     if method != "point-add-stack-search":
         raise ValueError(f"unknown R1 method {method!r}")
-    return replace(state, projective=scheduled["projective"],
-                   affine=scheduled["affine"] if state.affine is not None else None)
+    return replace(state, projective=scheduled(False),
+                   affine=scheduled(True) if state.affine is not None else None)
 
 
 def info(state):
@@ -109,6 +110,7 @@ def info(state):
 
 
 DEFAULT_COMPILER_STATES = 160
+PLAN_SCHEMA = "4thgraph.r1-optimization-plan/1"
 
 
 class UnrecognizedBaseline(ValueError):
@@ -144,8 +146,13 @@ class R1Optimizer:
         self.prefix, self.before = prologue.split(OWNER)
         full, self.double = self.backend.kernels
         formula = self.compiler.formula_ir["r1-add-points"]
-        self.scheduled = {"projective": formula.lower(passes=TERMINAL)[0],
-                          "affine": formula.bind_input(5, 1).lower(passes=TERMINAL)[0]}
+
+        @cache
+        def schedule(affine):
+            kernel = formula.bind_input(5, 1) if affine else formula
+            return kernel.lower(passes=TERMINAL)[0]
+
+        self.schedule = schedule
         self.start = State(self.backend.plan("split-5x4").strategy, full)
         self._programs = {}
         self._constructors = {}
@@ -154,7 +161,7 @@ class R1Optimizer:
     def methods(self, *, pairs=False):
         registry = METHODS if pairs else SEARCH_METHODS
         return {
-            name: Method(region, requires, partial(apply, name, backend=self.backend, scheduled=self.scheduled,
+            name: Method(region, requires, partial(apply, name, backend=self.backend, scheduled=self.schedule,
                                                   constructor_for=self.constructor_for))
             for name, (region, requires) in registry.items()
         }
@@ -205,6 +212,38 @@ def selection_cost(linked, objective):
     return lock_terms + (2 * len(linked.pattern.program) if objective.startswith("otda-") else 0)
 
 
+def plan_snapshot(optimizer):
+    return {"compiler_version": PROJECT_VERSION, "entry": PAYMENT_ENTRY,
+            "source_sha256": BASELINE_SOURCE_SHA256, "window_backend": optimizer.backend.source_identity}
+
+
+def plan_artifacts(linked):
+    return {"lock_template_sha256": digest(linked.lock.script),
+            "otda_program_sha256": digest(linked.pattern.program)}
+
+
+def constructor_report(linked):
+    program = linked.pattern.program
+    return {"program_hex": program.hex(), "bytes": len(program), "sha256": digest(program),
+            "owner_offset": linked.lock.owner_start, "owner_bytes": len(OWNER)}
+
+
+def replay_plan(source, owner, plan, *, source_path):
+    fields = {"schema", "snapshot", "objective", "order", "expected"}
+    if (not isinstance(plan, dict) or plan.keys() != fields
+            or plan["schema"] != PLAN_SCHEMA or plan["objective"] not in AUTO_OBJECTIVES):
+        raise ValueError("invalid R1 optimization plan")
+    if len(owner) != len(OWNER):
+        raise ValueError("expected a 20-byte owner hash")
+    optimizer = R1Optimizer(source, source_path)
+    if plan["snapshot"] != plan_snapshot(optimizer):
+        raise ValueError("R1 optimization plan snapshot differs from the compiler, source, or dependencies")
+    linked = optimizer.link(replay_order(optimizer.start, optimizer.methods(), plan["order"]))
+    if plan["expected"] != plan_artifacts(linked):
+        raise ValueError("R1 optimization plan emitted different lock or reconstruction bytes")
+    return optimizer.compiler, linked.lock.lock(owner), constructor_report(linked)
+
+
 def compile_ordered(source, owner, *, source_path, objective="lock", **budget):
     if objective not in AUTO_OBJECTIVES:
         raise ValueError(f"unknown R1 optimization objective {objective!r}")
@@ -222,7 +261,6 @@ def compile_ordered(source, owner, *, source_path, objective="lock", **budget):
     search = optimizer.search(methods=methods, evaluate=score, **budget)
     winner = min(search["states"], key=lambda row: (row["score_bytes"], row["lock_bytes"], len(row["order"])))
     linked = candidates[winner["id"]]
-    pattern = linked.pattern
     offset = len(optimizer.prefix) + len(OWNER) + len(optimizer.before)
     end = len(linked.lock.script) - len(optimizer.epilogue)
     report = {
@@ -236,8 +274,8 @@ def compile_ordered(source, owner, *, source_path, objective="lock", **budget):
                           "sha256": digest(linked.lock.script[offset:end])},
         "selected": winner["state"]["window"], "selected_order": winner["order"],
         "selected_state": winner["id"], "search": search,
-        "otda_reconstruction": {"program_hex": pattern.program.hex(), "bytes": len(pattern.program),
-                                "sha256": digest(pattern.program), "owner_offset": linked.lock.owner_start,
-                                "owner_bytes": len(owner)},
+        "plan": {"schema": PLAN_SCHEMA, "snapshot": plan_snapshot(optimizer), "objective": objective,
+                 "order": winner["order"], "expected": plan_artifacts(linked)},
+        "otda_reconstruction": constructor_report(linked),
     }
     return optimizer.compiler, linked.lock.lock(owner), report

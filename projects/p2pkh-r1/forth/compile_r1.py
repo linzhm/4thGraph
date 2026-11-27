@@ -236,7 +236,9 @@ def main():
     optimization = parser.add_mutually_exclusive_group()
     optimization.add_argument("--optimize", action="store_true")
     optimization.add_argument("--auto", action="store_true",
-                              help="select and link an audited R1 lowering for the requested byte objective")
+                              help="experimentally search R1 lowerings for the requested byte objective")
+    optimization.add_argument("--replay-plan", type=Path,
+                              help="build an exact R1 plan and check its artifact hashes")
     parser.add_argument("--auto-target", choices=AUTO_OBJECTIVES,
                         help="byte objective for ordered --auto (default: lock)")
     parser.add_argument("--auto-depth", type=int, choices=range(1, MAX_ORDER_DEPTH + 1),
@@ -255,7 +257,17 @@ def main():
     source_path = args.source or ENTRY_SOURCES[args.entry]
     source = source_path.read_bytes()
     try:
-        if args.auto:
+        if args.replay_plan is not None:
+            if args.entry != PAYMENT_ENTRY or args.counter_state is not None:
+                raise ValueError("--replay-plan requires the r1-baseline-lock payment entry")
+            from r1_optimizer import replay_plan
+
+            plan = json.loads(args.replay_plan.read_bytes())
+            if isinstance(plan, dict) and isinstance(plan.get("optimization"), dict):
+                plan = plan["optimization"].get("plan")
+            compiler, lock, constructor = replay_plan(source, args.owner_hash160, plan, source_path=source_path)
+            blocks = {"optimization": {"plan": plan, "replayed": True}, "otda_reconstruction": constructor}
+        elif args.auto:
             if args.entry != PAYMENT_ENTRY or args.counter_state is not None:
                 raise ValueError("--auto requires the r1-baseline-lock payment entry")
             compiler, lock, report = compile_auto(source, args.owner_hash160, source_path=source_path,
@@ -270,7 +282,7 @@ def main():
             lock = emit_lock(compiler, args.entry, args.counter_state)
             blocks = ({"blocks": describe_pels_blocks(compiler, args.owner_hash160, args.counter_state, lock)}
                       if args.entry == PELS_ENTRY else {})
-    except ValueError as error:
+    except (OSError, ValueError) as error:
         parser.error(str(error))
     identity = ({"experiment_version": VERSION, "baseline_version": BASELINE_VERSION, "lock_version": VERSION}
                 if args.entry == "r1-lock" else {"entry": args.entry, "counter_state": args.counter_state,

@@ -44,7 +44,7 @@ PYTHONPATH=src:.:projects/p2pkh-r1/forth:projects/p2pkh-r1/reference \
 ### 同一份 baseline-lock 的自动选型
 
 默认、`--optimize` 和 `--auto` 读取同一份 `r1-baseline.fth` 及其依赖。
-`--auto` 在编译阶段按前提展开有序方法，通过目标字节模型选择实现，输出精确锁和
+项目的 `--auto` 实验按前提展开有序方法，通过目标字节模型选择实现，输出精确锁和
 OTDA 重建程序。编译器保留原入口的准备、结果检查和交易绑定，报告记录有序计划、
 各状态的字节估算、链接区域和停止原因。只有源码与导入摘要匹配已验版本时才允许
 替换窗口区域。普通锁编译可以继续走现有公式路径，OTDA 目标要求能生成相配的
@@ -64,9 +64,23 @@ python -m unittest -v test_r1_baseline.BaselineAutoTests
 
 目标包含默认的 `lock`、`bip143-all`、`otda-all` 和配对的 `otda-single`。
 交易目标按两进两出形状计入四份锁和相应的重建程序，排序分数是候选相关的字节
-估算。实际字节与交易判定由花费夹具独立验收。编译端有序搜索默认最多 8 步和
+估算。实际字节与交易判定由花费夹具独立验收。有序实验默认最多 8 步和
 160 个状态，可用 `--auto-depth` 和 `--auto-states` 改预算。历史的仅窗口对照
 用 `--auto-rounds N`，最多比较 32 个候选。
+
+构建已选方案时，用 `--replay-plan` 指定保存的计划，或直接传入带 `optimization.plan`
+的 `--auto` 报告。重放核对编译器版本、Forth 源码和依赖摘要，逐项执行固定序列，再核对
+锁模板和 OTDA 重建程序摘要。默认的 20 字节零值标记模板参数槽；`--owner-hash160 HEX`
+只替换这个槽。钱包发布仍以版本清单为准。
+
+```sh
+for target in bip143-all otda-all otda-single; do
+  python "$project/forth/compile_r1.py" --entry r1-baseline-lock \
+    --replay-plan "$project/forth/plans/$target.json" > "/tmp/r1-fixed-$target.json"
+done
+```
+
+[BIP143 ALL](plans/bip143-all.json) · [OTDA ALL](plans/otda-all.json) · [OTDA SINGLE](plans/otda-single.json)
 
 花费测试使用固定版 chain-gang，覆盖 BIP143 ALL、OTDA ALL、配对和无配对的
 OTDA SINGLE。正例使用测试签名和实际夹具父输出。改动花费的锁定时间后，测试必须观察到

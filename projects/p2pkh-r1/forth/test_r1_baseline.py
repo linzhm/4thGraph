@@ -3,6 +3,7 @@
 from dataclasses import replace
 from hashlib import sha256
 from importlib.metadata import PackageNotFoundError
+import json
 import os
 import sys
 from pathlib import Path
@@ -14,6 +15,7 @@ from ecdsa import NIST256p, ellipticcurve
 from compile_r1 import (COUNTER_ENTRY, ENTRY_SOURCES, MAX_AUTO_CANDIDATES, MAX_AUTO_ROUNDS, PAYMENT_ENTRY,
                         baseline_plans, compile_auto, compile_source, emit_lock, select_baseline_plan)
 from curve_compiler import B3, FIELD
+from r1_optimizer import replay_plan
 from signature import SpendAuthorization, authorization, current_input_unlock
 from test_payment import fixture_signature, signer
 
@@ -161,15 +163,18 @@ class BaselineAutoTests(unittest.TestCase):
         cases = {
             "bip143-all": (41_165, 5591, ["affine-g", "compact-g", "ifdup"]),
             "otda-all": (42_382, 3042, ["joint-window", "pack-prefix-repeat", "pack-adjacent-kernels"]),
+            "otda-single": (42_382, 3042, ["joint-window", "pack-prefix-repeat", "pack-adjacent-kernels"]),
         }
         blocked = {"tx_engine": None, "r1_method_matrix": None, "replay_r1": None}
         with patch.dict(sys.modules, blocked):
             for target, (lock_bytes, program_bytes, order) in cases.items():
                 with self.subTest(target=target):
-                    _, script, report = compile_auto(self.source, self.owner, objective=target, max_states=64)
+                    _, script, report = compile_auto(self.source, self.owner, objective=target)
                     self.assertEqual(len(script), lock_bytes)
                     self.assertEqual(report["objective"], target)
                     self.assertEqual(report["selected_order"], order)
+                    self.assertEqual(report["search"]["stop"], "exhausted")
+                    self.assertEqual(len(report["search"]["states"]), 152)
                     constructor = report["otda_reconstruction"]
                     self.assertEqual(constructor["bytes"], program_bytes)
                     code = bytes.fromhex(constructor["program_hex"])
@@ -178,6 +183,57 @@ class BaselineAutoTests(unittest.TestCase):
                     end = start + constructor["owner_bytes"]
                     self.assertEqual(script[start:end], self.owner)
                     self.assertEqual(evaluate(code), ([script[:start], script[end:]], []))
+                    plan_path = self.source_path.with_name("plans") / f"{target}.json"
+                    plan = json.loads(plan_path.read_bytes())
+                    self.assertEqual(report["plan"], plan)
+                    with patch("r1_optimizer.explore_orders", side_effect=AssertionError("replay searched")):
+                        _, fixed, fixed_constructor = replay_plan(self.source, self.owner, plan,
+                                                                   source_path=self.source_path)
+                    self.assertEqual((fixed, fixed_constructor), (script, constructor))
+
+    def test_fixed_plan_rejects_changed_snapshot_guard_and_artifacts(self):
+        plan_path = self.source_path.with_name("plans") / "bip143-all.json"
+        plan = json.loads(plan_path.read_bytes())
+        cases = (
+            ({**plan, "snapshot": {**plan["snapshot"], "compiler_version": "unknown"}}, "snapshot differs"),
+            ({**plan, "order": ["compact-g", "affine-g"]}, "method 'compact-g' at step 1"),
+            ({**plan, "expected": {}}, "emitted different lock or reconstruction"),
+        )
+        for candidate, message in cases:
+            with self.subTest(message=message), self.assertRaisesRegex(ValueError, message):
+                replay_plan(self.source, self.owner, candidate, source_path=self.source_path)
+
+    def test_fixed_plans_reproduce_two_input_spends(self):
+        try:
+            engine = chain_metadata()
+        except PackageNotFoundError:
+            self.skipTest("requires pinned chain-gang")
+        if engine["commit"] != CONTEXT_PIN:
+            self.skipTest("requires pinned chain-gang")
+        from fixed_templates import CompiledTemplate
+        from r1_method_matrix import replay
+
+        cases = {
+            "bip143-all": (165_575, 129, 119, 4_653),
+            "otda-all": (176_577, 65, 131, 169_934),
+            "otda-single": (176_506, 65, 131, 85_166),
+        }
+        receipts = {}
+        for target, expected in cases.items():
+            with self.subTest(target=target):
+                path = self.source_path.with_name("plans") / f"{target}.json"
+                plan = json.loads(path.read_bytes())
+                _, script, constructor = replay_plan(self.source, bytes(20), plan, source_path=self.source_path)
+                lock = CompiledTemplate(script, constructor["owner_offset"])
+                program = bytes.fromhex(constructor["program_hex"])
+                key = (lock, program)
+                if key not in receipts:
+                    receipts[key] = replay(lock, lock.reconstruction(program))
+                measured = receipts[key][target]
+                self.assertEqual(tuple(measured[field] for field in (
+                    "total_bytes", "max_main_items", "max_alt_items", "max_stack_payload_bytes",
+                )), expected)
+                self.assertTrue(measured["accepted"])
 
     def test_complete_spends_check_transaction_binding(self):
         try:

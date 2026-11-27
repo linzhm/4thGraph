@@ -34,9 +34,9 @@ For independent acceptance, use a neutral point-addition caller and reuse the st
 
 Optimize methods with interacting regions through bounded ordered pairs. A method declares its scope and prerequisites and applies to the current state. A 5×5 experiment applies the row method before the column method and records the reverse order as a separate cell. Use another frozen seed to compare methods with a shared prerequisite. Keep plan identity even when both paths emit the same artifact, and reuse verification when the exact linked bytes and fixture agree. Rank the verified spend by target. [R1 matrix example](optimization-paths.md#r1-ordered-method-exploration)
 
-The compiler can also continue beyond pairs. It expands legal methods from each state until there is no new state or a budget is reached. Deduplicate expansion using the complete state that determines future applicability, such as bindings, representation and proven facts. A report keeps converging edges and can replay the search under the same budget.
+An explicit experiment can continue beyond pairs. It expands legal methods from each state until there is no new state or a budget is reached. Deduplicate expansion using the complete state that determines future applicability, such as bindings, representation and proven facts. A report keeps converging edges and can replay the experiment under the same budget.
 
-The R1 compiler and experiment runner use the same ordered lowering. The compiler ranks linked artifacts with a declared byte model and emits the selected lock and OTDA constructor. The experiment runner independently replays the emitted bytes and records complete spend results.
+The shared `4thgraph SOURCE --entry WORD` command compiles with the pinned compiler and explicit options such as `--optimize safe`. The experiment layer can propose ordered plans. A fixed plan records the compiler version, source and imports, exact method order, and expected artifact hashes. Replay applies only that sequence under the same prerequisites. R1's project directory owns its curve-window choices, transaction byte objectives, plans, and fixtures. Its project entry point combines these with the shared compiler and ordered plan executor. [R1 fixed plans](../projects/p2pkh-r1/forth/README.md#同一份-baseline-lock-的自动选型)
 
 ## Build and spend boundary
 
