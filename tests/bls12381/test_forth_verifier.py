@@ -203,7 +203,8 @@ class ForthVerifierTests(unittest.TestCase):
     def test_affine_compact_checks_trace_lines_and_residue(self):
         verifier = ForthVerifier(self.key, self.source, witness_layout="affine-witness",
                                  plan=ArithmeticPlan(msm="signed-radix4", msm_table="deferred-doubling-slopes",
-                                                     miller_reductions="per-round"))
+                                                     miller_reductions="split-chord-residue",
+                                                     miller_kernel="direct-normalized"))
         signals, proof = self.cases[0]
         lock = verifier.compile(SOURCES)
         artifact = verifier.artifact(SOURCES, None, lock)
