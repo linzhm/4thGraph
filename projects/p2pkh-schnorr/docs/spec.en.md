@@ -2,9 +2,9 @@
 
 [简体中文](spec.zh-CN.md) · [Project overview](../README.md)
 
-The owner field is HASH160 of the 32-byte BIP340 x-only public key. The rest of the file is fixed. Fill the owner slot identified in the manifest when creating a receive output. When recognizing an output, compare its length and all fixed bytes before taking the owner hash. [Frozen template](../versions/v0.15.0/template.hex) · [Layout](../versions/v0.15.0/layout.json)
+The owner field is HASH160 of the 32-byte BIP340 x-only public key. The rest of the file is fixed. Fill the owner slot identified in the manifest when creating a receive output. When recognizing an output, compare its length and all fixed bytes before taking the owner hash. [Frozen template](../versions/v0.16.0/template.hex) · [Layout](../versions/v0.16.0/layout.json)
 
-Versions 0.6.0 through 0.15.0 use the same `scriptCode` fragments for the current-input binding and the same witness encoding. A wallet can spend outputs from different versions in one transaction. [Version catalog](../versions/index.json)
+Versions 0.6.0 through 0.16.0 use the same `scriptCode` fragments for the current-input binding and the same witness encoding. A wallet can spend outputs from different versions in one transaction. [Version catalog](../versions/index.json)
 
 The wallet builds the BSV sighash preimage for the current input. The external signer receives SHA256d of that preimage as the 32-byte BIP340 message and returns the standard signature bytes. The lock verifies the signature and binds the same message to the current input with PUSHTX. BIP143 ALL is the wallet default. A wallet must supply trusted Chronicle activation context for OTDA and a same-index output for SINGLE. [Forth contract](../reference/schnorr.fth)
 
@@ -43,7 +43,9 @@ In each pair of doublings, the first doubling reduces `Y'` and `Z'` immediately.
 
 Let `k = n − e` and `B = 2^128`. The lock splits `s` into `s0 + B*s1` and uses the fixed base `H = B*G`. The secp256k1 endomorphism `φ(x,y) = (βx,y)` satisfies `φ(P) = λP`. The lock splits `k` into signed components with `k ≡ k1 + λ*k2 (mod n)`. The magnitudes of all four components fit in 128 bits. [Window code](../../../src/fourthgraph/stdlib/bip340.fth) · [secp256k1 lattice basis](https://github.com/bitcoin-core/secp256k1/blob/v0.6.0/src/scalar_impl.h#L78-L135)
 
-The lattice basis obeys `ai + bi*λ ≡ 0 (mod n)` and has determinant `n`. The lock computes `c1 = round(k*b2/n)` and `c2 = round(-k*b1/n)` with exact integer division. Subtracting the two basis multiples from `(k, 0)` gives the signed pair `(k1, k2)`. Each coordinate error is bounded by half the sum of the absolute basis components in that coordinate. The lock also checks both magnitudes against `B`. When `e = 0`, the split of `k = n` gives zero in both components. [Scalar split](../../../src/fourthgraph/stdlib/secp256k1.fth)
+Write `A = a1 = b2` and `D = −b1`. The two basis vectors are `(A, −D)` and `(A+D, A)`, with `A² + AD + D² = n` and `ai + bi*λ ≡ 0 mod n`. The lock reuses the order from challenge reduction to compute `c1 = floor((kA + floor(n/2))/n)` and `c2 = floor((kD + floor(n/2))/n)`. It returns `k1 = k − A(c1+c2) − Dc2` and `k2 = Dc1 − Ac2`. [Scalar split](../../../src/fourthgraph/stdlib/secp256k1.fth)
+
+The rounding errors `ε1 = kA/n − c1` and `ε2 = kD/n − c2` each have magnitude at most one half. The determinant identity gives `k1 = Aε1 + (A+D)ε2` and `k2 = −Dε1 + Aε2`. Their magnitudes are at most `(2A+D)/2` and `(A+D)/2`, both below `2^128`. This bound covers the entire input interval `0 ≤ k ≤ n`. At `k = n` both components are zero. [Rounding tests](../../../tests/test_secp256k1_library.py)
 
 The verifier computes the scaled image of `s0*G + s1*H + k1*P + k2*φ(P)` in 64 two-bit windows. The fixed affine table contains scaled images of `G,H` combinations. The projective table uses scaled `P,φ(P)` with the respective signs applied. Each row of the variable table is constructed by repeatedly adding the scaled affine point P. Each window selects one entry from each table with `4*highDigit + lowDigit`. After the first window, the accumulator doubles twice before each selection. The initial accumulator is infinity. Index zero skips addition. Variable table construction and fixed point accumulation use complete addition specialized to a right-hand point with `Z = 1`. [Mixed addition](../../../src/fourthgraph/stdlib/secp256k1.fth)
 

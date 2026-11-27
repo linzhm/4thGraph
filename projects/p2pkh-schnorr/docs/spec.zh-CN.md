@@ -2,9 +2,9 @@
 
 [English](spec.en.md) · [项目首页](../README.zh-CN.md)
 
-所有者字段是 32 字节 BIP340 x-only 公钥的 HASH160。其余脚本字节固定。创建收款输出时按布局清单填入所有者字段。识别输出时先比对脚本长度和全部固定字节，再读取所有者哈希。[固定模板](../versions/v0.15.0/template.hex) · [布局清单](../versions/v0.15.0/layout.json)
+所有者字段是 32 字节 BIP340 x-only 公钥的 HASH160。其余脚本字节固定。创建收款输出时按布局清单填入所有者字段。识别输出时先比对脚本长度和全部固定字节，再读取所有者哈希。[固定模板](../versions/v0.16.0/template.hex) · [布局清单](../versions/v0.16.0/layout.json)
 
-v0.6.0 至 v0.15.0 的当前输入绑定使用相同的 `scriptCode` 片段和解锁见证编码，钱包可以在同一笔交易中花费不同版本的输出。[版本目录](../versions/index.json)
+v0.6.0 至 v0.16.0 的当前输入绑定使用相同的 `scriptCode` 片段和解锁见证编码，钱包可以在同一笔交易中花费不同版本的输出。[版本目录](../versions/index.json)
 
 钱包按所选 sighash 为当前输入构造 BSV 签名预映像。外部签名器收到其 SHA256d 作为 32 字节 BIP340 消息，返回标准签名字节。锁验证 Schnorr 签名，并通过 PUSHTX 将同一消息绑定到当前输入。钱包默认用 BIP143 ALL。使用 OTDA 时应从可信链视图取得 Chronicle 激活状态，使用 SINGLE 时要提供同索引输出。[Forth 合约](../reference/schnorr.fth)
 
@@ -43,7 +43,9 @@ v0.6.0 至 v0.15.0 的当前输入绑定使用相同的 `scriptCode` 片段和�
 
 令 `k = n − e`、`B = 2^128`。锁将 `s` 拆成 `s0 + B*s1`，使用固定基点 `H = B*G`。secp256k1 自同态 `φ(x,y) = (βx,y)` 满足 `φ(P) = λP`。锁将 `k` 分解成有符号的 `k1` 和 `k2`，满足 `k ≡ k1 + λ*k2 (mod n)`。四个标量分量的绝对值均可用 128 位表示。[窗口实现](../../../src/fourthgraph/stdlib/bip340.fth) · [secp256k1 格基](https://github.com/bitcoin-core/secp256k1/blob/v0.6.0/src/scalar_impl.h#L78-L135)
 
-格基满足 `ai + bi*λ ≡ 0 (mod n)`，行列式为 `n`。锁用精确整数除法计算 `c1 = round(k*b2/n)` 和 `c2 = round(-k*b1/n)`，再从 `(k, 0)` 减去两项格基倍数，得到有符号的 `(k1, k2)`。每个分量的误差上界为对应两项格基坐标绝对值之和的一半，锁也检查两个分量的绝对值小于 `B`。当 `e = 0` 时，`k = n` 的两个分量均为零。[标量分解](../../../src/fourthgraph/stdlib/secp256k1.fth)
+令 `A = a1 = b2`、`D = −b1`。格基为 `(A, −D)` 和 `(A+D, A)`，满足 `A² + AD + D² = n` 和 `ai + bi*λ ≡ 0 mod n`。锁复用挑战取模所用的群阶，计算 `c1 = floor((kA + floor(n/2))/n)` 和 `c2 = floor((kD + floor(n/2))/n)`。结果为 `k1 = k − A(c1+c2) − Dc2` 和 `k2 = Dc1 − Ac2`。[标量分解](../../../src/fourthgraph/stdlib/secp256k1.fth)
+
+舍入误差 `ε1 = kA/n − c1` 和 `ε2 = kD/n − c2` 的绝对值均不超过二分之一。由行列式恒等式可得 `k1 = Aε1 + (A+D)ε2` 和 `k2 = −Dε1 + Aε2`，绝对值的上界分别为 `(2A+D)/2` 和 `(A+D)/2`，均小于 `2^128`。该上界覆盖 `0 ≤ k ≤ n` 的整个区间。`k = n` 时两个分量均为零。[舍入测试](../../../tests/test_secp256k1_library.py)
 
 验签器用 64 个两位窗口计算 `s0*G + s1*H + k1*P + k2*φ(P)` 的缩放像。固定仿射表存放 `G,H` 组合的缩放像。变量表用缩放后的 `P,φ(P)`，按分量符号选点后生成。构建变量表时，每行依次加上缩放后的仿射点 P。每窗对两张表分别按 `4*高位数字 + 低位数字` 查表累加。从第二窗开始，查表前先对累加点倍点两次。初始累加点为无穷远点。索引为零时跳过该次点加。构建变量表和累加固定点时都使用右侧 `Z = 1` 的专用完备点加。[仿射点加](../../../src/fourthgraph/stdlib/secp256k1.fth)
 

@@ -36,23 +36,19 @@ REQUIRE stdlib/script-fragments.fth
 : secp256k1-lattice-a2 ( script -- script ) bytes-hex 0114ca50f7a8e2f3f657c1108d9d44cfd8 bsv-num-be ;
 : secp256k1-lattice-minus-b1 ( script -- script ) bytes-hex e4437ed6010e88286f547fa90abfe4c3 bsv-num-be ;
 
-: secp256k1-lambda-split ( script -- script )
-    ( Input k is in 0..n. Return signed k1 and k2 with k1+lambda*k2 = k mod n. )
-    ( The lattice has b2=a1. Positive division rounds with an added floor of n/2. )
-    secp256k1-order op-dup op-2 op-div
-    2 script-pick-depth secp256k1-lattice-a1 op-mul op-over op-add
-    2 script-pick-depth op-div ( k n halfN c1 )
-    3 script-pick-depth secp256k1-lattice-minus-b1 op-mul 2 script-pick-depth op-add
-    3 script-pick-depth op-div ( k n halfN c1 c2 )
-
-    4 script-pick-depth 2 script-pick-depth secp256k1-lattice-a1 op-mul op-sub
-    op-over secp256k1-lattice-a2 op-mul op-sub ( k1 = k-c1*a1-c2*a2 )
-    2 script-pick-depth secp256k1-lattice-minus-b1 op-mul
-    2 script-pick-depth secp256k1-lattice-a1 op-mul op-sub ( k2 = -c1*b1-c2*b2 )
-    op-toaltstack op-toaltstack
-    2 script-drop-pairs op-drop
-    2 script-restore-items
+: secp256k1-lambda-split-with-order ( script -- script )
+    ( Input: k in 0..n, followed by the secp256k1 group order n. )
+    ( A = a1 = b2, B = -b1, a2 = A+B. Keep A and B for rounding and reconstruction. )
+    op-2 op-over op-swap op-div secp256k1-lattice-a1 secp256k1-lattice-minus-b1
+    op-over 5 script-pick-depth op-mul 3 script-pick-depth op-add 4 script-pick-depth op-div
+    op-over 6 script-pick-depth op-mul op-4 op-roll op-add op-4 op-roll op-div
+    ( k A B c1 c2. Subtract A times their sum and B*c2 from k. Then compute B*c1 - A*c2. )
+    op-2dup op-add 4 script-pick-depth op-mul op-5 op-roll op-swap op-sub
+    op-over 4 script-pick-depth op-mul op-sub
+    op-2swap op-mul op-2swap op-mul op-sub
 ;
+
+: secp256k1-lambda-split ( script -- script ) secp256k1-order secp256k1-lambda-split-with-order ;
 
 : secp256k1-add-with-field ( script cell -- script )
     ( Complete homogeneous addition. Preserve the stack below the two points. )

@@ -1,4 +1,4 @@
-"""Verify the scaled secp256k1 kernels against an affine group-law reference."""
+"""Verify the shared secp256k1 kernels against independent arithmetic references."""
 
 import os
 from random import Random
@@ -14,6 +14,8 @@ from fourthgraph.compiler.script_builder import ScriptBuilder
 
 FIELD = (1 << 256) - (1 << 32) - 977
 ORDER = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141
+LATTICE_A = 0x3086D221A7D46BCDE86C90E49284EB15
+LATTICE_B = 0xE4437ED6010E88286F547FA90ABFE4C3
 GENERATOR = (
     0x79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798,
     0x483ADA7726A3C4655DA4FBFC0E1108A8FD17B448A68554199C47D08FFB10D4B8,
@@ -45,6 +47,18 @@ def generator_multiple(scalar):
             point = affine_add(point, bit)
         bit = affine_add(bit, bit)
     return point
+
+
+def split_scalar(scalar):
+    half = ORDER // 2
+    first = (scalar * LATTICE_A + half) // ORDER
+    second = (scalar * LATTICE_B + half) // ORDER
+    return (scalar - LATTICE_A * first - (LATTICE_A + LATTICE_B) * second,
+            LATTICE_B * first - LATTICE_A * second)
+
+
+def rounding_transition(coefficient, quotient):
+    return (quotient * ORDER - ORDER // 2 + coefficient - 1) // coefficient
 
 
 class Secp256k1LibraryTests(unittest.TestCase):
@@ -129,10 +143,69 @@ class Secp256k1LibraryTests(unittest.TestCase):
                     self.check_kernel(single + single, prefix, coordinates, four)
                     self.check_kernel(pair, prefix, coordinates, four)
 
+    def test_glv_split_rounding_and_magnitude_bounds(self):
+        self.assertEqual(LATTICE_A ** 2 + LATTICE_A * LATTICE_B + LATTICE_B ** 2, ORDER)
+        self.assertLess(2 * LATTICE_A + LATTICE_B, 1 << 129)
+        rng = Random(160)
+        scalars = {0, 1, ORDER // 2, ORDER - 1, ORDER, *(rng.randrange(ORDER) for _ in range(128))}
+        for coefficient in (LATTICE_A, LATTICE_B):
+            for quotient in (1, 2, coefficient // 2, coefficient - 1, coefficient):
+                boundary = rounding_transition(coefficient, quotient)
+                scalars.update(range(boundary - 1, boundary + 2))
+        for word, extra in (("secp256k1-lambda-split", ()),
+                            ("secp256k1-lambda-split-with-order", (ORDER,))):
+            code = self.app.emit(word, b"")
+            for scalar in sorted(scalars):
+                with self.subTest(word=word, scalar=scalar):
+                    expected = split_scalar(scalar)
+                    self.assertTrue(all(abs(component) < 1 << 128 for component in expected))
+                    stack = [encode_num(value) for value in (-19, scalar, *extra)]
+                    result, alt = evaluate(SAVE_ALT + code, stack)
+                    self.assertEqual((list(map(decode_num, result)), alt), ([-19, *expected], [ALT_MARKER]))
+
+    def check_script_in_both_engines(self, label, node, code, inputs, expected):
+        activation = int(os.environ["SCRIPT_LAB_CHRONICLE_HEIGHT"])
+        contexts = (
+            (1, activation - 1, activation - 1),
+            (2, activation - 1, activation + 1),
+            (2, activation, activation + 1),
+        )
+        witness = b"".join(number(value) for value in inputs)
+        cleanup = asm("OP_FROMALTSTACK") + push(ALT_MARKER) + asm("OP_EQUALVERIFY OP_1")
+        for version, funding_height, spend_height in contexts:
+            context = dict(spend_height=spend_height, activation_height=activation,
+                           utxo_heights=(funding_height,))
+            for valid in (True, False):
+                with self.subTest(case=label, version=version, funding_height=funding_height, valid=valid):
+                    values = [*expected[:-1], expected[-1] + int(not valid)]
+                    assertions = b"".join(number(value) + asm("OP_EQUALVERIFY") for value in reversed(values))
+                    lock = SAVE_ALT + code + assertions + cleanup
+                    parent = Transaction((Input(bytes([42]) * 32, 0),), (Output(1000, lock),))
+                    spend = Transaction((Input(parent.txid_wire(), 0, script=witness),),
+                                        (Output(900, asm("OP_1")),), version=version)
+                    self.assertEqual(node.verdicts(spend, (parent,), **context), [valid])
+                    if valid:
+                        validate_at_heights(spend, (parent,), **context)
+                    else:
+                        with self.assertRaises((ValueError, RuntimeError)):
+                            validate_at_heights(spend, (parent,), **context)
+
+    @unittest.skipUnless(os.environ.get("REGTEST_URL"), "requires tools/verify_node.sh")
+    def test_glv_split_in_both_engines(self):
+        node = Node(os.environ["REGTEST_URL"], os.environ["REGTEST_COOKIE"])
+        a = rounding_transition(LATTICE_A, 1)
+        b = rounding_transition(LATTICE_B, 1)
+        for word, extra in (("secp256k1-lambda-split", ()),
+                            ("secp256k1-lambda-split-with-order", (ORDER,))):
+            code = self.app.emit(word, b"")
+            for scalar in (0, ORDER, ORDER - 1, ORDER // 2, a - 1, a, b - 1, b):
+                self.check_script_in_both_engines(
+                    (word, scalar), node, code, (-19, scalar, *extra), (-19, *split_scalar(scalar)),
+                )
+
     @unittest.skipUnless(os.environ.get("REGTEST_URL"), "requires tools/verify_node.sh")
     def test_scaled_library_scripts_in_both_engines(self):
         node = Node(os.environ["REGTEST_URL"], os.environ["REGTEST_COOKIE"])
-        activation = int(os.environ["SCRIPT_LAB_CHRONICLE_HEIGHT"])
         left, right = self.points[:2]
         point = self.project(left, -17)
         infinity = self.project(None, -17)
@@ -147,35 +220,11 @@ class Secp256k1LibraryTests(unittest.TestCase):
             ("secp256k1-scaled-double-pair-with-field", point, affine_add(double, double)),
             ("secp256k1-scaled-double-pair-with-field", infinity, None),
         )
-        contexts = (
-            (1, activation - 1, activation - 1),
-            (2, activation - 1, activation + 1),
-            (2, activation, activation + 1),
-        )
-        cleanup = asm("OP_FROMALTSTACK") + push(ALT_MARKER) + asm("OP_EQUALVERIFY OP_1")
         for word, coordinates, expected in cases:
             for placement, prefix in ((0, (FIELD, -19)), (1, (-19, FIELD))):
                 code = self.app.emit(word, b"", placement)
                 output = self.check_kernel(code, prefix, coordinates, expected)
-                for version, funding_height, spend_height in contexts:
-                    context = dict(spend_height=spend_height, activation_height=activation,
-                                   utxo_heights=(funding_height,))
-                    for valid in (True, False):
-                        with self.subTest(word=word, placement=placement, version=version,
-                                          funding_height=funding_height, valid=valid):
-                            values = list(map(decode_num, output))
-                            if not valid:
-                                values[-1] += 1
-                            assertions = b"".join(number(value) + asm("OP_EQUALVERIFY")
-                                                  for value in reversed(values))
-                            lock = SAVE_ALT + code + assertions + cleanup
-                            parent = Transaction((Input(bytes([42]) * 32, 0),), (Output(1000, lock),))
-                            witness = b"".join(number(value) for value in (*prefix, *coordinates))
-                            spend = Transaction((Input(parent.txid_wire(), 0, script=witness),),
-                                                (Output(900, asm("OP_1")),), version=version)
-                            self.assertEqual(node.verdicts(spend, (parent,), **context), [valid])
-                            if valid:
-                                validate_at_heights(spend, (parent,), **context)
-                            else:
-                                with self.assertRaises((ValueError, RuntimeError)):
-                                    validate_at_heights(spend, (parent,), **context)
+                self.check_script_in_both_engines(
+                    (word, placement, coordinates), node, code, (*prefix, *coordinates),
+                    tuple(map(decode_num, output)),
+                )

@@ -162,6 +162,10 @@ LIBRARIES = {
                         failure="The caller places the field prime at the bottom of the main stack."),
         script_fragment("secp256k1-lambda-split", (Parameter("k", "script-int", "Scalar in [0, n]"),),
                         failure="The caller supplies a scalar in range. Leaves the two signed components."),
+        script_fragment("secp256k1-lambda-split-with-order", (
+            Parameter("k", "script-int", "Scalar in [0, n]"),
+            Parameter("n", "script-int", "The secp256k1 group order"),
+        ), failure="The caller supplies a scalar in range and the fixed group order. Leaves the two signed components."),
         script_fragment("secp256k1-add", (
             Parameter("left", "projective-point", "Three homogeneous ScriptNum coordinates"),
             Parameter("right", "projective-point", "Three homogeneous ScriptNum coordinates"),

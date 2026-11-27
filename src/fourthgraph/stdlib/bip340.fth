@@ -73,9 +73,9 @@ REQUIRE stdlib/secp256k1.fth
     5 script-pick-depth op-dup op-dup op-mul op-mul op-7 op-add op-sub
     secp256k1-reduce op-0 op-numequalverify
 
-    ( Check s < n and use the same n for k = n - hash mod n. )
+    ( Check s < n, compute k = n - hash mod n, and pass n to the scalar split. )
     32 bsv-num op-split op-swap script-le-unsigned secp256k1-order op-2dup op-lessthan op-verify
-    op-rot script-le-unsigned op-over op-mod op-sub
+    op-rot script-le-unsigned op-over op-mod op-over op-toaltstack op-sub
     op-2rot op-2swap ( field r ry px py s k )
 ;
 
@@ -147,20 +147,18 @@ REQUIRE stdlib/secp256k1.fth
     bytes-hex ab90aa570a2cf6d7845ec0ca06cc6bd9b9c687e0c37ab3091840a43560b247b3 bsv-num-be
 ;
 
-: bip340-check-half ( script -- script )
-    op-abs op-dup bip340-half-radix op-lessthan op-verify
-;
-
 : bip340-variable-bases ( script -- script )
-    ( px py s k -> signed P and Q. Save magnitudes k2 and k1, then s and beta, on the altstack. )
-    secp256k1-lambda-split ( px py s k1 k2 )
+    ( px py s k, with n atop the altstack -> signed P and Q. )
+    ( Save magnitudes k2 and k1, then s and beta, on the altstack. )
+    op-fromaltstack secp256k1-lambda-split-with-order ( px py s k1 k2 )
     3 script-pick-depth 2 script-pick-depth op-0 op-lessthan op-if op-negate op-endif
     5 script-pick-depth op-swap op-1 ( signed P )
     ( Retain beta between P and Q until the scalar magnitudes have been saved. )
     7 script-pick-depth secp256k1-beta op-tuck op-mul secp256k1-reduce
     8 script-pick-depth 6 script-pick-depth op-0 op-lessthan op-if op-negate op-endif
     op-1 ( signed Q )
-    8 script-pick-depth bip340-check-half 8 script-pick-depth bip340-check-half
+    ( The lattice bounds both magnitudes below 2^128 for k in 0..n. )
+    8 script-pick-depth op-abs 8 script-pick-depth op-abs
     op-toaltstack op-toaltstack 9 script-pick-depth op-toaltstack
     op-3 op-roll op-toaltstack
     bsv-empty op-toaltstack 6 bsv-repeat-code bsv-cat-code
@@ -250,7 +248,8 @@ REQUIRE stdlib/secp256k1.fth
 ;
 
 : bip340-joint-window-table ( script -- script )
-    ( field r ry px py s k -> r ry TV1..TV15 TF15..TF1 field X Y Z. Save depth pairs on the altstack. )
+    ( Consume n from the altstack. Save depth pairs there after constructing the tables. )
+    ( field r ry px py s k -> r ry TV1..TV15 TF15..TF1 field X Y Z. )
     op-toaltstack op-toaltstack secp256k1-scale-affine-pair op-fromaltstack op-fromaltstack
     bip340-variable-bases bip340-variable-window-table bip340-fixed-window-table
     op-fromaltstack bip340-half-radix op-2dup op-div op-toaltstack op-mod

@@ -253,7 +253,7 @@ class SchnorrTests(unittest.TestCase):
         self.assertEqual(raw, reference[:offset] + owner + reference[offset + 20:])
         self.assertEqual(compiled_template(owner), (raw, offset))
         self.assertEqual(recognize_template(raw), (TEMPLATE_VERSION, owner))
-        self.assertLess(len(raw), len(lock_for_owner(bytes(20), version="v0.14.0")))
+        self.assertLess(len(raw), len(lock_for_owner(bytes(20), version="v0.15.0")))
 
     def test_mixed_template_spend(self):
         public = self.public_keys[0]
@@ -269,6 +269,7 @@ class SchnorrTests(unittest.TestCase):
             "v0.12.0": "0c867581a116fd86be8aaa6f3c700742d265df4473e77ba9f2344c13122841e2",
             "v0.13.0": "0c09881b86ddfa644701e4f2bd6bdeee5930095fcdfdaf07e2ce38be2f960f27",
             "v0.14.0": "c70c3b816478caa5fa6086a770484e629d1df75c1477d8436875ea78c1f09f76",
+            "v0.15.0": "abf968180a0f6a84422bfe02d9e4b5533b2cdf7a1df9a59bf5afae6343965c26",
         }
         for version, checksum in versions.items():
             raw = lock_for_public_key(public, version=version)
@@ -424,7 +425,8 @@ class SchnorrTests(unittest.TestCase):
     def test_joint_window_table_and_selectors(self):
         contract = _contract()
         split = contract.emit("secp256k1-lambda-split", b"")
-        table = contract.emit("bip340-joint-window-table", b"")
+        order = number(ORDER) + asm("OP_TOALTSTACK")
+        table = contract.emit("bip340-joint-window-table", order)
         step = contract.emit("bip340-joint-window-step", b"")
         depths = contract.emit("bip340-window-depths", b"")
         (scale_bytes,), alt = evaluate(contract.emit("secp256k1-scale-root", b""))
@@ -505,7 +507,8 @@ class SchnorrTests(unittest.TestCase):
         self.assertEqual(signs, set(product((False, True), repeat=2)))
 
     def test_joint_multiplication_scalar_edges(self):
-        multiply = _contract().emit("bip340-joint-multiply", b"")
+        order = number(ORDER) + asm("OP_TOALTSTACK")
+        multiply = _contract().emit("bip340-joint-multiply", order)
         px, py = affine_generator_multiple(1)
         cases = ((0, ORDER), (0, ORDER - 1), (1, ORDER), (1, ORDER - 1),
                  (HALF_RADIX - 1, 1), (HALF_RADIX, ORDER - HALF_RADIX),

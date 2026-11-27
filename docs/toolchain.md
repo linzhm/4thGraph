@@ -141,6 +141,8 @@ lock = builder.emit("bip340-verify", b"")
 
 标准库的 `secp256k1-scale-affine-pair` 将两个仿射点映射到 `3b = 1` 的同构曲线。缩放坐标使用 `secp256k1-scaled-add-with-field`、`secp256k1-scaled-add-affine-with-field`、`secp256k1-scaled-double-with-field` 和 `secp256k1-scaled-double-pair-with-field`。构建参数 0 表示域素数在主栈底，1 表示域素数紧邻待运算坐标下方。采用位置 1 时，缩放曲线的两种点加分别为 85 和 78 字节，连续两次倍点为 101 字节。BIP340 验签词用自同态分解公开挑战标量，在 64 个两位窗口中联合累加四个 128 位标量。[曲线运算](../src/fourthgraph/stdlib/secp256k1.fth) · [验签实现](../src/fourthgraph/stdlib/bip340.fth)
 
+`secp256k1-lambda-split` 使用两个格基常数进行舍入和重构。调用者栈上已有群阶时，可用 `secp256k1-lambda-split-with-order`，按 `k n` 的顺序提供输入。这两个词分别编译为 112 和 78 字节。[分解与上界](../projects/p2pkh-schnorr/docs/spec.zh-CN.md#联合标量乘法)
+
 独立的 P2PKH-Schnorr 示例把所有者承诺和交易绑定组合进付款锁，并通过统一钱包 SDK 构造和识别输出。[付款示例](../projects/p2pkh-schnorr/README.zh-CN.md) · [统一钱包 SDK](../sdk/README.zh-CN.md)
 
 ## 交易与验证
