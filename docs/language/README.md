@@ -6,7 +6,7 @@
 | --- | --- |
 | [语言规范](specification.md) | Forth 语义、类型、栈效果、宿主词、BSV 扩展及编译目标 |
 | [中文语法](syntax.md) · [English syntax](syntax.en.md) | 词定义、`REQUIRE`、公开入口、范围、验证关系和交易声明 |
-| [标准库手册](stdlib.md) | 模块、公开词的栈签名、构建产物及验证路径 |
+| [标准库手册](stdlib.zh-CN.md) | 模块、公开词的栈签名、构建产物及验证路径 |
 | [编译与复放](../toolchain.md) | 优化、构建报告、交易计划及复放 |
 | [Gforth 工作流](../../projects/workflow-examples/gforth/README.md) | 使用 Forth 定义词创建阶段、解析资源和生成 Script |
 

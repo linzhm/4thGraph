@@ -1,34 +1,60 @@
-# 4thGraph 标准库
+# 4thGraph standard library
 
-用 Forth 2012 的 `REQUIRE filename` 加载源码。标准库清单中的 `std/…` 名称用于接口目录和构建报告。
+[简体中文](stdlib.zh-CN.md)
 
-| 模块 | 公开接口 | 现有项目 |
+Load source with Forth 2012 `REQUIRE filename`. The interface catalog and build reports identify registered modules as `std/…`.
+
+## Module paths
+
+| Purpose | `REQUIRE` paths |
+| --- | --- |
+| Language basics and Script fragments | `BSV`, `stdlib/u32.fth`, `stdlib/script-fragments.fth` |
+| Native payments | `stdlib/p2pk.fth`, `stdlib/p2pkh.fth`, `stdlib/native-p2pk.fth`, `stdlib/native-p2pkh.fth` |
+| Curve arithmetic and signature verification | `stdlib/p256.fth`, `stdlib/secp256k1.fth`, `stdlib/bip340.fth` |
+| Wallet lock construction | `stdlib/wallet/` contains `r1.fth`, `p2pkh-r1-deferred.fth`, `p2pkh-sm2.fth`, `lamport-ots.fth`, `wots-plus.fth`, and `ml-dsa.fth` |
+| Verification backends | `stdlib/verify.fth`, `stdlib/groth16-bls12-381.fth` |
+
+For ordinary file paths, `REQUIRE` searches relative to the source file containing that directive, then checks the bundled library. In-memory source with no source path starts from the current working directory. `REQUIRE BSV` is a case-insensitive built-in alias. A bundled import of `stdlib/u32.fth` appears in the report as `std/u32` with an interface digest. When a project file with the same path is found first, the report records the project path and its source digest. [Import syntax](syntax.en.md) · [Catalog and path resolution](../../src/fourthgraph/stdlib/__init__.py)
+
+### Transaction preimage construction
+
+| Stage | Existing entry points and responsibilities |
+| --- | --- |
+| Off-chain construction | `preimage_forkid` and `preimage_otda` serialize the transaction preimage for the selected sighash mode. The caller supplies the current input index and the correct `scriptCode`. BIP143 also requires the previous output amount. [Serialization](../../src/fourthgraph/bsv/transaction.py) |
+| On-chain reconstruction | PELS and Workflow reconstruct preimages from known transaction structure, linked `scriptCode`, and outputs constructed by the contract. The sighash mode and contract constraints determine which fields can be omitted. [Reconstruction](../../src/fourthgraph/workflow/forkid_lowering.py) |
+| Authorization and spend binding | The wallet interface prepares ordinary and companion authorization paths. The lock uses native signature verification to bind the authorization to the actual spend. Unpaired OTDA SINGLE uses a special digest and has no serializable transaction preimage. [Authorization](../../src/fourthgraph/bsv/spend_authorization.py) · [Spend binding](../../src/fourthgraph/bsv/pushtx.py) |
+
+A shared Forth entry point could start with single-input BIP143 ALL transactions whose complete, ordered outputs can be constructed. Compare the reconstructed bytes with the existing off-chain serializer, then check that changing the outputs or locktime causes a stale witness to be rejected. An OTDA ALL extension needs to account for whether the contract depends on the previous output amount. Projects can explicitly opt into a new entry point.
+
+## Public interfaces
+
+| Module | Public interface | Example |
 | --- | --- | --- |
-| `std/bsv` | `REQUIRE BSV` 加载 `verify ( cell -- )` 和受支持的原生 `OP_*` 词 | [P2PKH 示例](../../projects/p2pk-p2pkh-baseline/forth/p2pkh.fth) |
-| `std/u32` | `u32-inc ( u32 -- u32 )`，按 32 位回绕 | [PELS Counter](../../projects/pels-counter/pels-counter.fth) |
-| `std/p2pk` | `p2pk-lock ( bytes -- bytes )`，接收 33 字节压缩公钥并返回锁脚本 | [库源码](../../src/fourthgraph/stdlib/p2pk.fth) · [P2PK 示例](../../projects/p2pk-p2pkh-baseline/forth/p2pk.fth) |
-| `std/p2pkh` | `p2pkh-lock ( bytes -- bytes )`，接收 20 字节公钥哈希并返回锁脚本 | [库源码](../../src/fourthgraph/stdlib/p2pkh.fth) · [P2PKH 示例](../../projects/p2pk-p2pkh-baseline/forth/p2pkh.fth) |
-| `std/native-p2pk`、`std/native-p2pkh` | 绑定接收者后编译原生付款锁 | [付款构建命令](../../projects/p2pk-p2pkh-baseline/forth/README.md) |
-| `std/p256` | `p256-add`、`p256-double`，项目式坐标，保留栈底的 `p b3` | [P-256 内核](../../src/fourthgraph/stdlib/p256.fth) |
-| `std/script-fragments` | 构造栈搬运、32 字节反序和无符号大端整数解码片段 | [库源码](../../src/fourthgraph/stdlib/script-fragments.fth) |
-| `std/secp256k1` | 齐次射影点加、仿射混合点加、倍点、缩放坐标运算和标量分解 | [曲线内核](../../src/fourthgraph/stdlib/secp256k1.fth) |
-| `std/bip340` | `bip340-verify ( script -- script )`，构造 BIP340 验签片段 | [付款示例](../../projects/p2pkh-schnorr/README.zh-CN.md) |
-| `std/groth16-bls12-381` | `groth16-bls12-381-verify ( -- groth16-verified )`，由 BLS12-381 verifier 后端编译 | [Groth16 Forth 源码](../../src/fourthgraph/stdlib/groth16-bls12-381.fth) |
-| `std/verify` | `relation: TRANSITION ROUTE ;`，声明一个可用多种后端验证的关系 | [状态验证示例](../../projects/proof-counter/verify-state.fth) |
+| `std/bsv` | `REQUIRE BSV` loads `verify ( cell -- )` and supported native `OP_*` words | [P2PKH](../../projects/p2pk-p2pkh-baseline/forth/p2pkh.fth) |
+| `std/u32` | `u32-inc ( u32 -- u32 )`, wrapping at 32 bits | [PELS Counter](../../projects/pels-counter/pels-counter.fth) |
+| `std/p2pk` | `p2pk-lock ( bytes -- bytes )` takes a 33-byte compressed public key and returns a lock script | [Source](../../src/fourthgraph/stdlib/p2pk.fth) · [P2PK](../../projects/p2pk-p2pkh-baseline/forth/p2pk.fth) |
+| `std/p2pkh` | `p2pkh-lock ( bytes -- bytes )` takes a 20-byte public-key hash and returns a lock script | [Source](../../src/fourthgraph/stdlib/p2pkh.fth) · [P2PKH](../../projects/p2pk-p2pkh-baseline/forth/p2pkh.fth) |
+| `std/native-p2pk`, `std/native-p2pkh` | Compile native payment locks with a bound recipient | [Payment build commands](../../projects/p2pk-p2pkh-baseline/forth/README.md) |
+| `std/p256` | `p256-add` and `p256-double` use projective coordinates and preserve `p b3` at the bottom of the stack | [P-256 kernels](../../src/fourthgraph/stdlib/p256.fth) |
+| `std/script-fragments` | Build fragments for stack movement, 32-byte reversal, and unsigned big-endian decoding | [Source](../../src/fourthgraph/stdlib/script-fragments.fth) |
+| `std/secp256k1` | Homogeneous projective addition, mixed affine addition, doubling, and their scaled-coordinate kernels. `secp256k1-lambda-split` splits a scalar. `secp256k1-lambda-split-with-order` takes `k n` when the group order is already on the stack. | [Curve kernels](../../src/fourthgraph/stdlib/secp256k1.fth) |
+| `std/bip340` | `bip340-verify ( script -- script )` builds a BIP340 verification fragment | [Payment example](../../projects/p2pkh-schnorr/README.md) |
+| `std/groth16-bls12-381` | `groth16-bls12-381-verify ( -- groth16-verified )` compiles through the BLS12-381 verifier backend | [Forth source](../../src/fourthgraph/stdlib/groth16-bls12-381.fth) |
+| `std/verify` | `relation: TRANSITION ROUTE ;` declares a relation available to multiple verification backends | [State verification](../../projects/proof-counter/verify-state.fth) |
 
-支付构造词在返回脚本前检查字段宽度，P2PK 为 33 字节，P2PKH 为 20 字节。钱包接口对压缩公钥另做 secp256k1 点检查，Script 花费仍通过原生 `CHECKSIG` 验证签名。
+Payment construction words check input widths. P2PK takes 33 bytes and P2PKH takes 20 bytes. The wallet interface also checks that a compressed public key represents a secp256k1 point. The spending Script verifies the signature with native `CHECKSIG`.
 
-文件在调用方的词典中加载。同一文件只加载一次，循环依赖会在构建时报错。标准库清单定义公开接口，诊断和改写记录能指向文件内行列。构建记录实际加载文件的 SHA-256 摘要，以及已登记库的接口摘要。`--capabilities` 列出公开栈签名、参数、失败语义和后端。 [语法书](syntax.md)
+Files load into the caller's dictionary. Each file loads once per build, and a dependency cycle raises a build error. Builds record the SHA-256 digest of each loaded file and the interface digest of each registered module. Diagnostics and rewrite records can identify source lines and columns. `--capabilities` lists public stack signatures, parameters, failure behavior, and backends. [Syntax reference](syntax.en.md)
 
-## 库、入口和产物
+## Libraries, entry points, and artifacts
 
-Forth 的库和应用使用同一种词定义。加载文件会解释顶层内容，执行某个词时才运行该词的主体。Forth 2012 的 `REQUIRE` 调用 `REQUIRED` 以避免重复加载。Gforth 的 `string.fs` 用 `require` 声明依赖，把相关字符串操作和各自的栈效果放在一起。4thGraph 在构建时执行 `REQUIRE`。文件名相对当前源码解析，也可以从打包的标准库中加载。 [Forth 2012 REQUIRED](https://forth-standard.org/standard/file/REQUIRED) · [Gforth 文件加载](https://gforth.org/manual/Forth-source-files.html) · [Gforth string.fs](https://github.com/forthy42/gforth/blob/master/string.fs#L21)
+Forth libraries and applications use the same word definitions. Loading interprets top-level content, while a word's body runs when the word is invoked. Forth 2012 `REQUIRE` calls `REQUIRED` to avoid loading a file more than once. Gforth's `string.fs` uses `require` to declare dependencies and documents stack effects alongside string operations. 4thGraph runs `REQUIRE` at build time. [Forth 2012 REQUIRED](https://forth-standard.org/standard/file/REQUIRED) · [Gforth file loading](https://gforth.org/manual/Forth-source-files.html) · [Gforth string.fs](https://github.com/forthy42/gforth/blob/master/string.fs#L21)
 
-- **按调用边界拆模块。** P2PK 的调用者提供压缩公钥，P2PKH 的调用者提供公钥哈希。两种锁可以独立构建，所以各有模块。共享坐标约定与域运算的 `p256-add` 和 `p256-double` 属于同一模块。按相关功能组织模块，也便于把内部辅助词留在模块中。 [Rust 模块组织](https://doc.rust-lang.org/book/ch07-02-defining-modules-to-control-scope-and-privacy.html)
-- **显式列出公开词。** 在 `stdlib.py` 登记每个导出词的栈签名、输入契约和失败行为。辅助词随文件加载。库的调用方依赖清单规定的公开接口，便于对单个词做差分和提取。 [Scheme R7RS 库声明](https://standards.scheme.org/r7rs-html5/index.html#5.6.1)
-- **原生付款入口。** P2PK 和 P2PKH 的示例加载打包的 `lock:` 定义。构建时绑定接收者，花费时由 Script 执行同一份 Forth 中的验证。 [构建和复放](../../projects/p2pk-p2pkh-baseline/forth/README.md)
+- **Group words by caller requirements.** P2PK takes a compressed key and P2PKH takes a key hash, so callers can build the two locks independently. The P-256 addition and doubling words share field arithmetic and coordinate conventions. Related helper words can stay together in the same module. [Rust module organization](https://doc.rust-lang.org/book/ch07-02-defining-modules-to-control-scope-and-privacy.html)
+- **List public words explicitly.** Register each export's stack signature, input contract, and failure behavior in the catalog. Helper words load with the file. Callers can use the documented exports to compare or extract individual words. [Scheme R7RS library declarations](https://standards.scheme.org/r7rs-html5/index.html#5.6.1)
+- **Bind recipients at native payment entry points.** The P2PK and P2PKH examples load bundled `lock:` definitions. The build binds the recipient, and the spending Script executes the verification defined in the same Forth source. [Build and replay](../../projects/p2pk-p2pkh-baseline/forth/README.md)
 
-以下例子把两个项目的库词编译进同一个 Script。回绕后的计数和生成的 P2PKH 锁都保留在数据栈上。 [完整 Forth 源码](../../projects/workflow-examples/library-composition.fth)
+The following example composes words from two modules. It leaves the wrapping counter and the generated P2PKH lock on the data stack. [Complete Forth source](../../projects/workflow-examples/library-composition.fth)
 
 ```forth
 REQUIRE BSV
@@ -43,27 +69,29 @@ PYTHONPATH=src:. python -m fourthgraph.workflow.protocol "projects/workflow-exam
   --entry advance-and-pay --optimize stack
 ```
 
-## 验证路径
+<a id="验证路径"></a>
 
-`relation:` 声明公开的 `current → next → route` 关系。每种候选检查相同的部署状态、真实输入、结算或复核输出，以及记录新状态的回执。电路后端共享 `next, route, current, bindLo, bindHi` 的公开信号顺序。证明路径从经认证的 BIP143 ALL 原像取得 SHA-256d，核对证明中的两个绑定字段。
+## Verification paths
 
-| 路径 | 资格条件 |
+`relation:` declares a public `current → next → route` relation. Each candidate checks the same deployed state, actual input, settlement or review output, and receipt for the next state. Circuit backends use the public signal order `next, route, current, bindLo, bindHi`. A proof-based path derives SHA-256d from the authenticated BIP143 ALL preimage and checks the two binding fields in the proof.
+
+| Path | Eligibility |
 | --- | --- |
-| 直接 Script | 两个词都可以下沉到 Script，且调用方允许直接验证 |
-| 透明 R1CS | 电路能由同一份 Forth 编译，启用固定版本的 Circom/snarkjs，且策略允许透明赋值 |
-| BLS12-381 Groth16 | 外部 `.zkey` 和 Phase 2 `.ptau` 通过 snarkjs 对生成的 BLS12-381 R1CS 的验证 |
+| Direct Script | Both words can lower to Script, and policy allows direct verification |
+| Transparent R1CS | The same Forth compiles to a circuit, pinned Circom and snarkjs are available, and policy permits a transparent assignment |
+| BLS12-381 Groth16 | snarkjs verifies the external `.zkey` and Phase 2 `.ptau` against the generated BLS12-381 R1CS |
 
-通过资格检查后，默认按部署锁加一次花费见证的序列化字段字节上界排序。也可用 `--objective lock-bytes` 只比较部署锁。BLS12-381 对三种见证布局分别报价。报告列出选择、排除原因、库摘要、R1CS 与验证密钥摘要。复放另外记录完整部署、花费字节及两引擎的判定。
+The planner ranks eligible candidates by the upper bound on serialized deployment lock and one spend witness by default. `--objective lock-bytes` ranks by deployment lock size. BLS12-381 prices three witness layouts separately. The report records the choice, exclusions, library digests, R1CS, and verification-key digest. Replay also records complete deployment and spend bytes and both engines' verdicts.
 
-`compilations` 给出直接验证锁的 Script 字节和生成的 Circom 源码，构建状态与候选资格分别记录。`--max-expanded-ops` 在进入两个后端前限制展开规模，按调用图累计重复调用及分支。`--max-lock-bytes` 在排序前排除超长的候选锁，包括证明验证锁。验证路径共用 `--spend-fee`，以相同输出金额复放。
+`compilations` reports the direct verification lock bytes and the generated Circom source, with build status and candidate eligibility recorded separately. `--max-expanded-ops` limits expansion before either backend and counts repeated calls and branches in the call graph. `--max-lock-bytes` excludes oversized locks, including proof verification locks, before ranking. All paths use the same `--spend-fee` so replay compares equal output amounts.
 
-安装版提供 `4thgraph-circuit` 和 `4thgraph-verify`。它们可在仓库外读取打包的标准库。使用 `relation:` 时，规划器生成与同一份已解析 Forth 对应的 R1CS。独立的 `proof_contract.py --verification-key` 入口用于由部署方核对的外部 R1CS。 [安装和依赖](../install.md)
+Installed `4thgraph-circuit` and `4thgraph-verify` commands can read bundled library files outside the repository. Given a `relation:`, the planner builds R1CS from the same parsed Forth. The separate `python -m fourthgraph.verification.proof_contract --verification-key` entry point accepts external R1CS that the deployer has checked. [Installation and dependencies](../install.md)
 
-当前 `relation:` 支持有界的公开状态转换。跨任意长度历史的溯源需要另外定义经过认证的前序状态或历史证明接口。只有能约束同一条历史关系和实际花费的后端，才可接替超预算的直接 Script。
+`relation:` currently supports bounded public state transitions. Tracing an arbitrary history requires an authenticated predecessor state or a history proof interface. A proof backend can replace over-budget direct Script when it enforces the same history relation and binds it to the actual spend.
 
-`--policy allow-direct` 让所有合格路径参与排序。调用方需要外部证明时，用 `require-proof`。应用要求 Groth16 时，用 `require-groth16`。BN254 固定声明适配器有不同的授权和花费绑定接口，本例的报告会列出其排除原因。
+`--policy allow-direct` ranks all eligible paths. Use `require-proof` for external proofs or `require-groth16` for Groth16 specifically. The BN254 fixed-statement adapter has a different authorization and spend-binding interface, and the example report explains its exclusion.
 
-从仓库根目录复放。用已有复放报告里的测试公钥生成 `keys.json`。Groth16 选项接收与这份电路对应且由部署方认可的外部设置。本地测试设置仅用于 regtest。
+Run replay from the repository root. Generate the keys file using the test public keys from an existing replay report. The Groth16 option accepts an external setup for this circuit that the deployer has approved. Use the local test setup only on regtest.
 
 ```sh
 source="projects/proof-counter/verify-state.fth"
@@ -75,6 +103,6 @@ PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
   --target both --r1cs --replay --output "workspace/v0.2.5-relation-auto.json"
 ```
 
-对同一命令加上 `--groth16 "$zkey" "$ptau"` 可让 BLS12-381 也参加选择。当前样例的默认策略选择直接 Script，使用 `--policy require-proof` 会选 R1CS。要求 Groth16 时，按总字段字节选择 `affine-inline`，按锁字节选择 `affine-witness`。
+Add `--groth16 "$zkey" "$ptau"` to include BLS12-381 in the selection. The example defaults to direct Script, while `--policy require-proof` selects R1CS. With Groth16 required, the total field size objective selects `affine-inline`, while the lock size objective selects `affine-witness`.
 
-用 `--policy require-groth16 --max-lock-bytes 400000` 保留整路字节目标并施加锁预算。`affine-inline` 的锁超出该预算，编译器会改选 `affine-witness`。
+`--policy require-groth16 --max-lock-bytes 400000` retains the total field size objective and imposes a lock size budget. The `affine-inline` lock exceeds that budget, so the compiler selects `affine-witness`.

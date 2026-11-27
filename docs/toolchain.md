@@ -4,7 +4,7 @@ A Forth compiler for BSV Script and multi-transaction workflows.
 
 当前构建版本为 **v0.2.7**。编译与复放产物可写入 `workspace/build/`。运行 `bash tools/setup-workspaces.sh` 初始化。
 
-用 `REQUIRE stdlib/<file>.fth` 加载 4thGraph 标准库。计数器、原生支付、P-256 内核、BIP340 和 BLS12-381 Groth16 已提供库入口。同一份 Forth 源码可以组合库词，也可以通过 `relation:` 让编译器在符合条件的 Script 与证明路径间选择。 [语法书](language/syntax.md) · [标准库与验证路径](language/stdlib.md)
+用 `REQUIRE stdlib/<file>.fth` 加载 4thGraph 标准库。计数器、原生支付、P-256 内核、BIP340 和 BLS12-381 Groth16 已提供库入口。同一份 Forth 源码可以组合库词，也可以通过 `relation:` 让编译器在符合条件的 Script 与证明路径间选择。 [语法书](language/syntax.md) · [标准库与验证路径](language/stdlib.zh-CN.md)
 
 同一份 Forth 源码可以生成融合版和拆分版。示例计算 `a = 2x`、`b = y + 1`，两支结果和汇合的和都按 `u32` 表示。回绕后的和小于 20 时走复核，其余走结算。两种后继各锁给一个配置的公钥。编译器以 Forth 2012 Core 为语义基线，`+` 使用 64 位 cell，`u32+` 固定按 32 位回绕。 [示例源码](../projects/workflow-examples/example.fth) · [语言与 BSV 扩展规范](language/specification.md)
 
