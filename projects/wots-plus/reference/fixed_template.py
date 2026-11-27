@@ -73,11 +73,23 @@ def _encode_with_run(raw, suffix, fragment, count):
     return program
 
 
+def _encode_hash_steps(chain, gate, hash_suffix, tail):
+    start, gates, steps = chain.removesuffix(tail).partition(gate * (W - 2))
+    if not gates:
+        raise ValueError("compact chain is missing its countdown")
+    # The opcode before each variable depth can be shared with the previous
+    # step's suffix. Add a final copy to complete the pattern, then trim it.
+    prefix = asm("OP_2OVER")
+    return (push(start) + _repeat_bytes(gate, W - 2, trim=True) + asm("OP_CAT")
+            + _encode_repeated(steps + prefix, hash_suffix + prefix)
+            + asm("OP_SIZE OP_1SUB OP_SPLIT OP_DROP OP_CAT") + push(tail) + asm("OP_CAT"))
+
+
 def _compact_fragment_programs(first, chain, last, *, profile):
     from fourthgraph.bsv.pushtx import REVERSE32_ON_STACK
     from script import (
-        FIRST_ADDRESS_NORMALIZED_PROFILES, MESSAGE_BYTE_SUFFIX, MESSAGE_WIDE_SPLIT, MESSAGE_WIDE_SPLITS,
-        NIBBLE_SUFFIXES, _compact_builder,
+        DELTA_TABLE_OFFSET, FIRST_ADDRESS_NORMALIZED_PROFILES, MESSAGE_BYTE_SUFFIX, MESSAGE_WIDE_SPLIT,
+        MESSAGE_WIDE_SPLITS, NIBBLE_SUFFIXES, STEP_TABLE_SPLIT, _compact_builder,
     )
 
     builder = _compact_builder()
@@ -88,9 +100,16 @@ def _compact_fragment_programs(first, chain, last, *, profile):
                 + _repeat_bytes(asm("OP_SWAP OP_CAT"), N - 1, trim=trim) + asm("OP_CAT"))
     if profile == "compact-v9":
         first_program = _encode_with_run(first, digit_suffix, MESSAGE_WIDE_SPLIT, MESSAGE_WIDE_SPLITS)
+    elif profile == "compact-v11":
+        count = W - 2 - DELTA_TABLE_OFFSET
+        first_program = _encode_with_run(first, digit_suffix, STEP_TABLE_SPLIT, count)
     else:
         first_program = _encode_repeated(first, digit_suffix)
-    if trim:
+    if profile == "compact-v11":
+        gate = builder.emit("compact-countdown-gate", b"")
+        tail = builder.emit("compact-v8-chain-end", b"")
+        chain_program = _encode_hash_steps(chain, gate, hash_suffix, tail)
+    elif trim:
         gate = builder.emit("compact-countdown-gate", b"")
         chain_program = _encode_with_run(chain, hash_suffix, gate, W - 2)
     else:
@@ -101,7 +120,7 @@ def _compact_fragment_programs(first, chain, last, *, profile):
 @cache
 def compact_pattern(profile="compact"):
     from script import (
-        BUFFERED_PROFILES, FIRST_ADDRESS_NORMALIZED_PROFILES, MESSAGE_PAIR_DECODE,
+        BUFFERED_PROFILES, FIRST_ADDRESS_NORMALIZED_PROFILES, LAZY_MESSAGE_PROFILES, MESSAGE_PAIR_DECODE,
         _compact_chain, _first_address_offset, _message_chains, _message_pair_decode_offset, _payment_script,
     )
 
@@ -121,7 +140,7 @@ def compact_pattern(profile="compact"):
         first_program, chain_program, last_program = map(push, (first, chain, last))
     program = first_program + push(lead) + chain_program + asm("OP_DUP")
     copies = 2 * N
-    if profile == "compact-v10":
+    if profile in LAZY_MESSAGE_PROFILES:
         # Insert the byte splitter into the high-nibble chain only.
         program += asm("OP_DUP") + number(_message_pair_decode_offset()) + asm("OP_SPLIT")
         program += push(MESSAGE_PAIR_DECODE) + asm("OP_SWAP OP_CAT OP_CAT OP_SWAP OP_CAT")

@@ -17,6 +17,7 @@ def cases():
         (10, "compact-v8", "compact-v8", 21540, 0x63),
         (11, "compact-v9", "compact-v9", 21332, 0x63),
         (12, "compact-v10", "compact-v10", 21320, 0x63),
+        (13, "compact-v11", "compact-v11", 21272, 0x63),
     ):
         secret, public = bytes([seed]) * 32, bytes([seed + 9]) * 32
         yield dict(public_key=public_key(secret, public), signer=lambda digest: sign_digest(secret, public, digest),

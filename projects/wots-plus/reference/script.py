@@ -15,9 +15,10 @@ COMPANION_CODE = asm('OP_NOP OP_IF OP_CHECKSIGVERIFY OP_ELSE OP_CODESEPARATOR') 
 
 COMPACT_PROFILES = (
     'compact', 'compact-v2', 'compact-v3', 'compact-v4', 'compact-v5', 'compact-v6', 'compact-v7', 'compact-v8',
-    'compact-v9', 'compact-v10',
+    'compact-v9', 'compact-v10', 'compact-v11',
 )
-MAIN_BUFFER_PROFILES = ('compact-v8', 'compact-v9', 'compact-v10')
+LAZY_MESSAGE_PROFILES = ('compact-v10', 'compact-v11')
+MAIN_BUFFER_PROFILES = ('compact-v8', 'compact-v9', *LAZY_MESSAGE_PROFILES)
 BUFFERED_PROFILES = ('compact-v6', 'compact-v7', *MAIN_BUFFER_PROFILES)
 CACHE_PROFILES = (False, True, 'steps', *COMPACT_PROFILES)
 MESSAGE_BYTE_SUFFIX = asm('OP_SPLIT 0x00 OP_CAT OP_BIN2NUM OP_DUP OP_16 OP_MOD OP_DUP OP_TOALTSTACK'
@@ -40,9 +41,11 @@ NIBBLE_SUFFIXES = {
     'compact-v8': MESSAGE_PAIRED_NIBBLE_SUFFIX,
     'compact-v9': MESSAGE_RAW_NIBBLES,
 }
-FIRST_ADDRESS_NORMALIZED_PROFILES = (*NIBBLE_SUFFIXES, 'compact-v10')
+FIRST_ADDRESS_NORMALIZED_PROFILES = (*NIBBLE_SUFFIXES, *LAZY_MESSAGE_PROFILES)
 # Twelve table entries above the delta keep its update at an OP_16 pick.
 DELTA_TABLE_OFFSET = 3
+STEP_SUFFIX_BYTES = 8
+STEP_TABLE_SPLIT = number(STEP_SUFFIX_BYTES) + asm('OP_SPLIT')
 
 
 def _message_digits(*, step_counts=False, byte_suffix=MESSAGE_BYTE_SUFFIX):
@@ -89,7 +92,7 @@ def _packed_message_digits():
 
 
 def _buffered_message_digits(profile):
-    if profile == 'compact-v10':
+    if profile in LAZY_MESSAGE_PROFILES:
         return _packed_digest_checksum(fold_by_division=True) + asm('OP_TOALTSTACK')
     if profile == 'compact-v9':
         return _packed_message_digits()
@@ -139,37 +142,39 @@ def _compact_chain(profile='compact'):
 
     builder = _compact_builder()
     # Open gates from step 14 to 0. The hashes run in order as the gates close.
-    start = 'compact-v6-chain-start' if profile == 'compact-v7' else f'{profile}-chain-start'
+    frame = 'compact-v8' if profile == 'compact-v11' else profile
+    start = 'compact-v6-chain-start' if frame == 'compact-v7' else f'{frame}-chain-start'
     code = builder.emit(start, b'')
-    hash_step = f'{profile}-hash-step'
+    hash_step = f'{frame}-hash-step'
     if profile != 'compact':
         # The counter starts at 15 minus the signed digit. The first false
         # gate consumes zero, and the innermost gate consumes the final flag.
         code += builder.emit('compact-countdown-gate', b'') * (W - 2) + asm('OP_IF')
         table_depth = 9
         local_hash_depths = {'compact-v4': 12, 'compact-v5': 10, 'compact-v6': 7, 'compact-v7': 7, 'compact-v8': 6}
-        if profile in local_hash_depths:
+        if frame in local_hash_depths:
             hash_step = 'compact-local-hash-step'
-            table_depth = local_hash_depths[profile]
+            table_depth = local_hash_depths[frame]
     else:
         for limit in reversed(range(2, W)):
             code = builder.emit('compact-if-digit-below', code, limit)
         code += asm('OP_OVER OP_NOTIF')
         table_depth = 11
     for step in range(W - 1):
-        # The highest step is the nearest table entry.
-        depth = table_depth + W - 2 - step
-        if profile == 'compact-v8' and step < DELTA_TABLE_OFFSET:
+        # The packed table pushes the highest step first, reversing the stack order.
+        position = W - 2 - step if profile == 'compact-v11' else step
+        depth = table_depth + W - 2 - position
+        if frame == 'compact-v8' and position < DELTA_TABLE_OFFSET:
             depth += 1
         code = builder.emit(hash_step, code, depth)
         code += asm('OP_ENDIF')
-    return builder.emit(f'{profile}-chain-end', code)
+    return builder.emit(f'{frame}-chain-end', code)
 
 
 def _first_address_offset(chain, profile):
     suffix = 'compact-v8-chain-tail' if profile in MAIN_BUFFER_PROFILES else 'compact-address-increment'
     offset = len(chain) - len(_compact_builder().emit(suffix, b''))
-    if profile == 'compact-v10':
+    if profile in LAZY_MESSAGE_PROFILES:
         offset += len(MESSAGE_PAIR_DECODE)
     return offset
 
@@ -181,7 +186,7 @@ def _message_pair_decode_offset():
 def _message_chains(chain, profile):
     unit = chain
     count = 2 * N
-    if profile == 'compact-v10':
+    if profile in LAZY_MESSAGE_PROFILES:
         offset = _message_pair_decode_offset()
         unit = chain[:offset] + MESSAGE_PAIR_DECODE + chain[offset:] + chain
         count = N
@@ -222,6 +227,17 @@ def _padded_one(zero_bytes):
     return _zero_bytes(zero_bytes) + asm('OP_1 OP_CAT')
 
 
+def _packed_step_suffixes(address_delta):
+    # For q = 2**64, floor(2**24 * q**15 / (q - 1)**2) packs 14 down to 1
+    # at byte three of successive little-endian lanes. The fractional tail
+    # is smaller than one, and NUM2BIN appends the zero lane for step zero.
+    size = (W - 1) * STEP_SUFFIX_BYTES
+    code = _padded_one(size + 3) + _padded_one(STEP_SUFFIX_BYTES)
+    code += asm('OP_1SUB OP_DUP OP_MUL OP_DIV') + number(size) + asm('OP_NUM2BIN')
+    code += STEP_TABLE_SPLIT * DELTA_TABLE_OFFSET + address_delta + asm('OP_SWAP')
+    return code + STEP_TABLE_SPLIT * (W - 2 - DELTA_TABLE_OFFSET)
+
+
 def _compact_constants(public_seed, *, synthesize, carry_prefixes=False):
     # The chain appends its one-byte index to the first 23 address bytes.
     prf_base = push((3).to_bytes(N, 'big') + public_seed + bytes(23))
@@ -248,9 +264,12 @@ def _buffered_verifier(public_seed, commitment, *, profile):
     # As a little-endian Script number, the increment has a one at the chain
     # index position. That byte remains below 128 through the last increment.
     delta = _padded_one(len(prf_base) - 1)
-    prefix += _step_suffixes(synthesize=True, address_delta=delta if main_buffer else b'')
-    if not main_buffer:
-        prefix += delta
+    if profile == 'compact-v11':
+        prefix += _packed_step_suffixes(delta)
+    else:
+        prefix += _step_suffixes(synthesize=True, address_delta=delta if main_buffer else b'')
+        if not main_buffer:
+            prefix += delta
     prefix += _zero_bytes(N)
     if compact:
         prefix += (_zero_bytes(N - 1) + asm('OP_3 OP_CAT') + push(public_seed)
@@ -262,7 +281,7 @@ def _buffered_verifier(public_seed, commitment, *, profile):
     if main_buffer:
         prefix += number(W + 4) + asm('OP_ROLL')
     checksum = _checksum_digits(W + 4, step_counts=True)
-    if profile == 'compact-v10':
+    if profile in LAZY_MESSAGE_PROFILES:
         # The paired chains have consumed the digest. Drop its empty tail.
         checksum = asm('OP_FROMALTSTACK OP_DROP') + checksum
     elif not main_buffer:

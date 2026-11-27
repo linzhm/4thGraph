@@ -9,8 +9,9 @@ import unittest
 from fixtures import fixture_seeds, funding_transaction, mode_fixture, vector_document
 from payment import sign_payment
 from script import (
-    BUFFERED_PROFILES, CACHE_PROFILES, COMPACT_PROFILES, COMPANION_CODE, NIBBLE_SUFFIXES, ORDINARY_CODE,
-    _buffered_message_digits, _message_digits, locking_script,
+    BUFFERED_PROFILES, CACHE_PROFILES, COMPACT_PROFILES, COMPANION_CODE, FIRST_ADDRESS_NORMALIZED_PROFILES,
+    LAZY_MESSAGE_PROFILES, ORDINARY_CODE, _buffered_message_digits, _message_digits, _packed_step_suffixes,
+    locking_script,
 )
 from fourthgraph.bsv.evaluate import ScriptError, evaluate
 from fourthgraph.bsv.pushtx import N as CURVE_ORDER, R as BINDING_R, authorization_checks, binding_der, check_binding
@@ -77,7 +78,7 @@ class WotsTests(unittest.TestCase):
 
     def test_bitwise_digest_decoder_matches_for_every_byte(self):
         reference = _message_digits(step_counts=True)
-        for profile in (*NIBBLE_SUFFIXES, "compact-v10"):
+        for profile in FIRST_ADDRESS_NORMALIZED_PROFILES:
             bitwise = _buffered_message_digits(profile)
             for value in range(256):
                 with self.subTest(profile=profile, value=value):
@@ -86,10 +87,16 @@ class WotsTests(unittest.TestCase):
                         expected_main, expected_counts = evaluate(reference, stack)
                         main, alt = evaluate(bitwise, stack)
                         self.assertEqual(main, expected_main)
-                        if profile == "compact-v10":
+                        if profile in LAZY_MESSAGE_PROFILES:
                             self.assertEqual(alt, [bytes(byte ^ 255 for byte in digest)])
                         else:
                             self.assertEqual(list(map(decode_num, alt)), list(map(decode_num, expected_counts)))
+
+    def test_packed_step_suffixes_match_the_prf_address_layout(self):
+        delta = bytes(87) + b"\x01"
+        expected = [step.to_bytes(4, "big") + bytes(4) for step in reversed(range(15))]
+        expected.insert(3, delta)
+        self.assertEqual(evaluate(_packed_step_suffixes(push(delta))), (expected, []))
 
     def test_compact_authorization_for_every_flag_byte(self):
         _, _, spend = mode_fixture(0x41)
