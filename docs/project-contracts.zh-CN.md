@@ -54,7 +54,16 @@ ABI 标识为 `4thgraph.project-contract/1`。请求与回应用 UTF-8 JSON，�
 
 功能 Profile 选择本地理解的项目，模板版本固定具体的 Script、布局与 WASM。单次签署候选用精确交易字节绑定。模板字节升级要保留旧包以花费旧 UTXO。多步流程逐笔引用已构造并验证的父输出。PELS 归属标准库模板族。此处的 `pels-counter` 实例选用单输入、单后继、固定费用及保留代码的 `advance` 路径，计数按模 2³² 递增。R1 包支持 v0.6.0 的 `ordinary-all` 路径，MESA 签名槽对签后逆元的支持仍待单独评审。
 
-当前项目包宿主验证 BIP143 ALL（`0x41`）。扩展到多模式时，模板清单需要按路径绑定 sighash、有效 `scriptCode`、见证布局、已认证字段和适用链规则。一次 `prepare_spend` 使用一种已编入的模式，宿主按该路径重算原像并核对覆盖后再授权。
+R1 与计数示例包使用 BIP143 ALL（`0x41`）。中性结算项目包使用同一把锁验收 BIP143 ALL 和 Chronicle OTDA ALL（`0x61`）。清单按路径绑定有效 `scriptCode`、见证布局、已认证字段和适用链规则。宿主按请求的获准路径重算原像。结算夹具使用编译器的交易绑定见证，R1 则验收宿主签名。独立验证会拒绝错父交易、错路径、变更覆盖和激活前 OTDA。
+
+```sh
+export PYTHONPATH=src:.
+python3 tools/build_project_contract.py workflow-examples workspace/settlement --verify
+approval="$(sha256sum workspace/settlement/manifest.json | cut -d' ' -f1)"
+python3 tools/verify_project_contract.py workspace/settlement/manifest.json \
+  --approved-sha256 "$approval" --replay workspace/settlement/receipt.json \
+  --output workspace/settlement/replay.json
+```
 
 ### 夹具可以追加错误输入
 

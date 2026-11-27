@@ -21,9 +21,57 @@ from fourthgraph.bsv.script import asm
 from fourthgraph.bsv.transaction import Input, Output, Transaction, preimage_forkid, preimage_otda
 from fourthgraph.workflow.workflow_contract import WorkflowContracts, compile_workflow
 from fourthgraph.replay.typed_workflow import SOURCE
+from fourthgraph.replay.prefix_workflow import replay as replay_prefix
 
 
 class WorkflowTests(unittest.TestCase):
+    def test_three_stage_prefix_respects_independence_and_actual_previous_outputs(self):
+        path = SOURCE.parents[1] / "workflow-examples" / "serial-graph.fth"
+        report = replay_prefix(path)
+        serial, fused = (report["layouts"][kind] for kind in ("serial", "fused-prefix"))
+        self.assertEqual((len(serial["transactions"]), len(fused["transactions"])), (4, 3))
+        self.assertEqual(fused["transactions"][1]["executes"], ("increment", "scale"))
+        self.assertEqual(fused["transactions"][2]["parent"], fused["transactions"][1]["txid"])
+        self.assertLess(fused["whole_path_bytes"], serial["whole_path_bytes"])
+        self.assertEqual(set(fused["rejected"]), {"wrong_state", "wrong_authorization", "wrong_parent_opening", "foreign_parent"})
+        text = path.read_text()
+        keys = TestKeys().public
+        checks = (("", {"operator", "alice"}, "fused-prefix", None),
+                  ("", {"operator"}, "serial", "unavailable_authorizer"),
+                  ("independent-submit: scale ;", {"operator", "alice"}, "serial", "independent_submit"),
+                  ("independent-submit: decide ;", {"operator", "alice"}, "fused-prefix", None))
+        for directive, available, expected, blocker in checks:
+            raw = (text + "\n" + directive).encode()
+            program = SourceCompiler(raw.decode(), source_path=path).workflow()
+            options = dict(source_bytes=raw, available_authorizers=available, target="bip143-v1")
+            self.assertEqual(compile_workflow(program, keys, 19, **options)[1]["selected"], "serial")
+            _, explanation = compile_workflow(program, keys, 19, search=True, **options)
+            self.assertEqual(explanation["selected"], expected)
+            if blocker:
+                self.assertEqual(explanation["candidates"]["fused-prefix"]["exclusions"][0]["code"], blocker)
+
+    def test_prefix_replay_rejects_wrong_signature_when_stages_share_an_authorizer(self):
+        path = SOURCE.parents[1] / "workflow-examples" / "serial-graph.fth"
+        source = path.read_text().replace("scaled alice", "scaled operator").replace("route bob", "route operator")
+        with TemporaryDirectory() as scratch:
+            shared = Path(scratch) / path.name
+            shared.write_text(source)
+            report = replay_prefix(shared)
+        self.assertIn("wrong_authorization", report["layouts"]["fused-prefix"]["rejected"])
+
+    def test_prefix_replay_propagates_engine_errors_during_negative_checks(self):
+        path = SOURCE.parents[1] / "workflow-examples" / "serial-graph.fth"
+
+        def validate(*args, **kwargs):
+            try:
+                validate_at_heights(*args, **kwargs)
+            except ValueError as error:
+                raise RuntimeError("engine unavailable") from error
+
+        with patch("fourthgraph.replay.prefix_workflow.validate_at_heights", side_effect=validate):
+            with self.assertRaisesRegex(RuntimeError, "engine unavailable"):
+                replay_prefix(path)
+
     def test_auto_target_ranks_legal_families_after_layout_checks(self):
         source = SOURCE.read_bytes()
         program = SourceCompiler(source.decode(), source_path=SOURCE).workflow()

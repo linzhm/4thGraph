@@ -55,7 +55,22 @@ Forth 通过公共词表达要完成的操作。编译器在解析词和输入�
 
 需求项具备代码、构建命令和实测验收记录后再标记完成。编译器用中性的夹具独立评审，支付项目和 WASM 发布走各自的评审和验收。
 
-## 评审中的改动
+## 整体验收与评审状态
+
+基础依赖 #86–#90 已进入主线。以下各评审项独立验收，合入后从同一提交重建并复跑。先落地调优评估入口，再把调用点选型改以主线为基线。
+
+| 验收项 | 评审与证据 |
+| --- | --- |
+| Forth 基线与构建身份 | 本页基线与 wheel 复跑回执记录提交、产物摘要和能力清单。 |
+| 模块调用选型 | 同源点加夹具验证常量绑定、守卫路径和不兼容排除。[#93](https://github.com/linzhm/4thGraph/pull/93) |
+| PELS 编译目标 | 非计数静态锁覆盖单模式、双模式和自动选型。动态状态标签夹具用实际前序重放两步。[#87](https://github.com/linzhm/4thGraph/pull/87) · [#95](https://github.com/linzhm/4thGraph/pull/95) |
+| 交易计划 | 同源三阶段工作流比较串行和前缀融合，验证父子关系、授权和终态。[#92](https://github.com/linzhm/4thGraph/pull/92) |
+| Agent 探索与追踪 | 固定向量验证源码及 pass 对照、完整花费、栈计划及重放。[#94](https://github.com/linzhm/4thGraph/pull/94) |
+| 钱包与示例 | 双模式中性结算包复跑两条路径，现有 R1 走宿主签名集成回归。[#91](https://github.com/linzhm/4thGraph/pull/91) · [#89](https://github.com/linzhm/4thGraph/pull/89) |
+
+在含上述实现的干净检出上运行 `bash tools/verify_architecture_acceptance.sh workspace/architecture-acceptance`。命令使用已有 Python 与 Go 环境、Node.js WASI 运行器和固定版 chain-gang。可通过 `PYTHON`、`WHEEL_PYTHON` 和 `GO` 指定解释器。由 `PYTHONPATH` 提供额外安装位置时，已安装的 wheel 仍优先加载。脚本在仓库外复跑并生成 `acceptance.json`，记录证据文件摘要和安装包摘要。[组合复跑脚本](../tools/verify_architecture_acceptance.sh)
+
+### 基线评审
 
 - 类型化 PELS 编译目标、字面量循环展开与字节追踪。独立结算夹具验收同一份锁的两条路径。[编译器 PR #87](https://github.com/linzhm/4thGraph/pull/87)
 - Agent 有界选候选、固定评估和公式报告重放。首页流程图与 skill 说明同一个循环。[调优 PR #88](https://github.com/linzhm/4thGraph/pull/88)
