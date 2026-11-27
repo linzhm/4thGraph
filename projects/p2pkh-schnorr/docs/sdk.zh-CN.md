@@ -29,7 +29,7 @@ const signedHex = wallet.signPayment({
 }, ({ payload }) => signer.signBip340(payload));
 ```
 
-签署已组装的交易时，用 `signInput` 传入当前输入索引和已核验的上一输出。使用 Chronicle OTDA 时，根据实际链上下文填写 `chronicleActive`。SINGLE 需要同索引输出。Python、Rust 和 Go 也提供对应的接口。[统一调用表](../../../sdk/docs/reference.zh-CN.md#calls-and-data)
+签署已组装的交易时，用 `signInput` 传入当前输入索引和已核验的上一输出。使用 Chronicle OTDA 时，根据实际链上下文填写 `chronicleActive`。SINGLE 需要同索引输出。版本 2 交易的 OTDA ALL 或有同索引输出的 SINGLE 会在能缩短解锁脚本时使用预映像构造器。需要原样压栈时设置 `compressOtda: false`，Python 对应 `compress_otda=False`。Python、Rust 和 Go 也提供对应的接口。[统一调用表](../../../sdk/docs/reference.zh-CN.md#calls-and-data)
 
 <a name="integrate-musig2"></a>
 

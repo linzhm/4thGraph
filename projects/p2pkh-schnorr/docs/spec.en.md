@@ -4,7 +4,7 @@
 
 The owner field is HASH160 of the 32-byte BIP340 x-only public key. The rest of the file is fixed. Fill the owner slot identified in the manifest when creating a receive output. When recognizing an output, compare its length and all fixed bytes before taking the owner hash. [Frozen template](../versions/v0.17.0/template.hex) · [Layout](../versions/v0.17.0/layout.json)
 
-Versions 0.6.0 through 0.17.0 use the same `scriptCode` fragments for the current-input binding and the same witness encoding. A wallet can spend outputs from different versions in one transaction. [Version catalog](../versions/index.json)
+Versions 0.6.0 through 0.17.0 use the same `scriptCode` fragments for the current-input binding and the same stack layout after unlocking. A wallet can spend outputs from different versions in one transaction. [Version catalog](../versions/index.json)
 
 The wallet builds the BSV sighash preimage for the current input. The external signer receives SHA256d of that preimage as the 32-byte BIP340 message and returns the standard signature bytes. The lock verifies the signature and binds the same message to the current input with PUSHTX. BIP143 ALL is the wallet default. A wallet must supply trusted Chronicle activation context for OTDA and a same-index output for SINGLE. [Forth contract](../reference/schnorr.fth)
 
@@ -13,6 +13,8 @@ The wallet builds the BSV sighash preimage for the current input. The external s
 | Signing preimage | The chosen BSV sighash preimage with the template's scriptCode |
 | Packed witness | Public x (32 bytes), even public y (32 bytes), BIP340 signature (64 bytes), even nonce y (32 bytes) |
 | Mode selector | Script number 0 for the ordinary payment path |
+
+In a Chronicle-active version-2 transaction, the wallet can replace the literal preimage push with a shorter Script program for OTDA ALL or a paired OTDA SINGLE. The constructor expands the exact fixed parts of recognized Schnorr outputs and inserts each output's own amount and owner hash at its signed position. The program leaves the same complete preimage as the literal push, including the signed order, script lengths, locktime, and sighash. Unrecognized outputs retain their literal bytes. [Shared OTDA constructor](../../../src/fourthgraph/bsv/otda_reconstruction.py) · [Verified sizes](high-level-forth.en.md#otda-constructor)
 
 The wallet derives both extra ordinates from public data after signing. They are unsigned, big-endian field elements. Script checks the field bounds, even parity, and public-point equation. The checker calculates the tagged challenge over r, public x, and the message. It evaluates sG − eP, rejects infinity, and compares both projective coordinates with the finite even nonce point using field congruences. This verifies the nonce coordinates without executing a square root or field inversion inside Script. [BIP340 verification](https://github.com/bitcoin/bips/blob/master/bip-0340.mediawiki) · [Complete addition formulas](https://eprint.iacr.org/2015/1060)
 
