@@ -101,12 +101,14 @@ class FormulaExperiments(unittest.TestCase):
         self._require_pinned_chain()
         report = run({"fixture": "modular-dot", "enumerate": "orders", "evaluation": "spend"})
         node = Node(os.environ["REGTEST_URL"], os.environ["REGTEST_COOKIE"])
+        expected_rejection = "Script evaluated without error but finished with a false/empty top stack element"
         for row in report["candidates"]:
             self.assertEqual(row["test"]["status"], "passed")
             script = bytes.fromhex(row["artifact"]["hex"])
             for case, parent, spend, rejected in linked_spends(FIXTURES["modular-dot"], script):
                 self.assertEqual(node.verdicts(spend, (parent,), **CONTEXT), [True], case)
-                self.assertEqual(node.verdicts(rejected, (parent,), **CONTEXT), [False], case)
+                self.assertEqual(node.verdicts(rejected, (parent,), **CONTEXT,
+                                               expected_rejection=expected_rejection), [False], case)
 
     def test_large_matrix_keeps_the_smallest_linked_plan(self):
         self._require_pinned_chain()
