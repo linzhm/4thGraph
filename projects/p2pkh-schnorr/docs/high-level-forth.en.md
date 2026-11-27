@@ -220,7 +220,7 @@ REGTEST_CHRONICLE_HEIGHT=5 PYTHONPATH=src:. bash tools/verify_node.sh --profile 
 
 ## Source tuning for the 64-window verifier
 
-The tuned Forth carries the same field prime through the four coordinate bounds, the public curve equation, and the paired coordinate map. The script checks the original encodings and both ordinate parities before mapping, then checks the two modular residuals and rejects `Z = 0`. The compiler uses the same `dataflow` profile and secp256k1 joint word as the paired build. [Tuned Forth](../experiments/high-level/window-verifier-tuned.fth)
+The tuned Forth carries the same field prime through the four coordinate bounds, the public curve equation, and the paired coordinate map. The script checks the original encodings and both ordinate parities before mapping, then checks the two modular residuals and rejects `Z = 0`. At `f4b29f9`, the compiler uses the same `dataflow` profile and secp256k1 joint word as the paired build. [Tuned Forth](../experiments/high-level/window-verifier-tuned.fth)
 
 | Build | Before the windows | After the windows | Payment lock | 2×2 OTDA ALL with reconstruction |
 | --- | ---: | ---: | ---: | ---: |
@@ -237,4 +237,25 @@ PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
 REGTEST_CHRONICLE_HEIGHT=5 PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
   "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/experiments/high-level/window_compare.py \
   --joint-lowerings --forth-tuning --matrix-only --output workspace/schnorr-high-level/forth-tuning-matrix.json
+```
+
+## Sharing the endomorphism at two row starts
+
+The variable table maps `2P` and `3P` to `2Q` and `3Q` before extending their rows. The Forth word compares the signed ordinates of `P` and `Q` once. A single formula then maps both inputs as `(X, Y, Z) → (βX mod p, ±Y, Z)` with the same field prime, sign, and β. The linker passes the two points to that compiled word. Both the scaled and original-model stack tables use it. [Forth composition](../../../src/fourthgraph/compiler/secp256k1-joint-stack.fth) · [Row map formula](../../../src/fourthgraph/stdlib/secp256k1-window.fth)
+
+| Build | Joint preparation | Payment lock | 2×2 OTDA ALL with reconstruction |
+| --- | ---: | ---: | ---: |
+| Separate row maps at `f4b29f9` | 3,107 B | 22,992 B | 56,854 B |
+| Shared row map | 3,055 B | 22,940 B | 56,646 B |
+| Handwritten v0.17.0 | 2,763 B | 22,435 B | 54,626 B |
+
+The shared map saves 52 B, all in joint preparation. The 18,379 B window sequence is byte-identical across the three builds. Compared with the handwritten lock, the remaining 505 B consists of 207 B before the joint word, 292 B in joint preparation, and 6 B after the windows. Both engines replayed the standalone and payment cases and the eight constructor scenarios. [Measurements](../experiments/high-level/table-tuning-measurements.json) · [Transaction matrix](../experiments/high-level/table-tuning-matrix.json)
+
+```sh
+PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
+  "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/experiments/high-level/window_compare.py \
+  --joint-lowerings --forth-tuning --output workspace/schnorr-high-level/table-tuning-measurements.json
+REGTEST_CHRONICLE_HEIGHT=5 PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
+  "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/experiments/high-level/window_compare.py \
+  --joint-lowerings --forth-tuning --matrix-only --output workspace/schnorr-high-level/table-tuning-matrix.json
 ```

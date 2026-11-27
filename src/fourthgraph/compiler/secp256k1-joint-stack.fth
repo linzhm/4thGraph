@@ -21,16 +21,11 @@ layout: restore-signs ( s:script-int k1:script-int k2:script-int
     joint-variable pack-signed-bases
 ;
 
-( Map 2P and 3P into 2Q and 3Q. The endomorphism preserves y and an affine
-  secp256k1 point has nonzero y, so comparing the ordinates recovers the relative sign. )
-layout: expose-map ( p:script-int py:script-int qy:script-int x:script-int y:script-int z:script-int --
-                     z x p y py qy )
-layout: expose-map-x ( z:script-int x:script-int p:script-int y:script-int -- y z x p )
-
-: map-row-start ( script-int script-int script-int script-int script-int script-int --
-                  script-int script-int script-int )
-    expose-map int= IF ELSE int-negate THEN
-    expose-map-x swap glv-beta int* swap int-rem rot rot
+( Input order: p, 2P, 3P, Py, Qy. The endomorphism leaves the nonzero affine
+  ordinate unchanged, so comparing Py and Qy gives one sign for both rows. )
+: map-row-pair ( script-int script-int script-int script-int script-int script-int script-int script-int script-int --
+                 script-int script-int script-int script-int script-int script-int )
+    int= IF 1 ELSE -1 THEN cell>int glv-beta map-row-coordinates
 ;
 
 ( A row consumes its affine P and projective jQ, and appends four projective entries. )

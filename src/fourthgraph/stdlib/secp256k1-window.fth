@@ -1,6 +1,21 @@
 REQUIRE BSV
 REQUIRE stdlib/script-fragments.fth
 
+range: secp-window-coordinate script-int $-ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
+                                         $10000000000000000000000000000000000000000000000000000000000000000 ;
+range: secp-window-field script-int 2 $10000000000000000000000000000000000000000000000000000000000000000 ;
+range: secp-window-sign script-int -1 2 ;
+
+( Apply the same signed endomorphism to the projective row starts. )
+formula: secp-window-map-row-coordinates ( secp-window-field secp-window-coordinate secp-window-coordinate
+    secp-window-coordinate secp-window-coordinate secp-window-coordinate secp-window-coordinate
+    secp-window-sign secp-window-coordinate -- secp-window-coordinate secp-window-coordinate secp-window-coordinate
+    secp-window-coordinate secp-window-coordinate secp-window-coordinate )
+    {: p x2 y2 z2 x3 y3 z3 sign beta :}
+    x2 beta int* p int-rem y2 sign int* z2
+    x3 beta int* p int-rem y3 sign int* z3
+;
+
 ( Pack four secp256k1 GLV lanes and read the associated table depths. )
 : secp-window-uint128le ( script -- script )
     ( The magnitude is below 2^128. Drop the separate positive sign byte. )
