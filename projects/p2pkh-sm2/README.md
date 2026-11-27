@@ -52,7 +52,7 @@ Version 1.1.0 enables OTDA reconstruction by default for locking template `1` fr
 The current source includes the [layout manifest](versions/v1.0.0/layout.json),
 [standard SM2 vector](versions/v1.0.0/sm2-standard.json),
 [complete payment vector](versions/v1.0.0/spend-all.json), and
-[16 signing preimages](versions/v1.0.0/sighash-modes.json). [v1.0.0 release](https://github.com/linzhm/bsv-script-lab/releases/tag/p2pkh-sm2-v1.0.0)
+[16 signing preimages](versions/v1.0.0/sighash-modes.json). [v1.0.0 source](https://github.com/linzhm/4thGraph/tree/p2pkh-sm2-v1.0.0/projects/p2pkh-sm2)
 
 <a name="otda-constructor"></a>
 
