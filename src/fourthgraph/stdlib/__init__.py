@@ -211,6 +211,22 @@ LIBRARIES = {
     ), WALLET_BACKEND),
     "std/groth16-bls12-381": Library(ROOT / library_resource("std/groth16-bls12-381"), (GROTH16_VERIFY,), "groth16-bls12-381"),
     "std/verify": Library(ROOT / "stdlib/verify.fth", declarations=("relation:",)),
+    "std/wallet/pels-binding": Library(ROOT / library_resource("std/wallet/pels-binding"), backend=WALLET_BACKEND),
+    "std/wallet/pels-successor": Library(ROOT / library_resource("std/wallet/pels-successor"), (
+        script_fragment("pels-assert-successor", (
+            Parameter("state", "bytes", "Five-byte state supplied by the executing lock"),
+            Parameter("preimage", "bytes", "Full BIP143 ALL preimage"),
+        ), takes=("script", "script"),
+            failure="Rejects invalid input count or successor commitment. The caller must authenticate the same preimage."),
+    ), WALLET_BACKEND),
+    "std/wallet/pels-verify": Library(ROOT / library_resource("std/wallet/pels-verify"), (
+        script_fragment("pels-verify", (
+            Parameter("tail", "bytes", "BIP143 locktime and sighash"),
+            Parameter("head", "bytes", "BIP143 fields before the output commitment"),
+            Parameter("state", "bytes", "Five-byte state supplied by the executing lock"),
+        ), takes=("script", "script"),
+            failure="Rejects invalid context, successor or binding. Leaves the authenticated digest."),
+    ), WALLET_BACKEND),
     "std/wallet/r1": wallet_library("r1", ("r1-lock",), accumulator="script", parameters=(
         ("owner-hash", "20-byte P-256 public-key hash"), ("optimize", "Select the R1 doubling rewrite"),
     )),

@@ -71,6 +71,8 @@ PYTHONPATH=src:. python -m fourthgraph.workflow.protocol "projects/workflow-exam
 
 ## Reusing PELS preimage reconstruction
 
+`REQUIRE stdlib/wallet/pels-verify.fth` provides the dynamic single-successor BIP143 ALL member. Its build arguments are a Script prefix and a state/amount rule. The rule consumes the current state and previous amount at spend time, and leaves a five-byte successor state and an eight-byte little-endian amount. The library binds the ordered output and the executing code to the actual spend and leaves its authenticated digest. Use `stdlib/wallet/pels-successor.fth` for the full-preimage assertion when the application authenticates that same message. [Standalone state-label fixture](../../tests/test_pels_successor_library.py) · [R1 composition example](../../projects/p2pkh-r1/forth/r1-pels-lock.fth)
+
 Keep witness compression in the transaction compiler. The contract defines and constructs the complete ordered output vector. The reconstructor assembles the preimage for the selected sighash mode, and the authentication fragment binds that preimage to the actual spend with native `OP_CHECKSIG`. The Counter's single-successor construction and Workflow's ordered multi-output construction use this boundary. [Counter build and replay](../../projects/pels-counter/README.md) · [Reconstruction implementation](../../src/fourthgraph/workflow/forkid_lowering.py)
 
 | Single-input path | Reconstructed fields | Requirements |
