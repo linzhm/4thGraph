@@ -83,7 +83,11 @@ def script_operations(script):
 def without_codeseparators(script):
     """Remove CODESEPARATOR opcodes outside pushed data for OTDA scriptCode."""
     separator = asm('OP_CODESEPARATOR')
-    return b''.join(operation for operation in script_operations(script) if operation != separator)
+    clean = bytearray()
+    for operation in script_operations(script):
+        if operation != separator:
+            clean.extend(operation)
+    return bytes(clean)
 
 
 def is_compressed_public_key(encoded):
