@@ -470,7 +470,8 @@ def proof_stack(inputs):
 class VerifierStages:
     """Build the typed stages of one BLS12-381 Script predicate."""
 
-    def __init__(self, key, sources, *, chronicle=False, optimize=False, extra_inputs=None, fp2_rules=FP2_RULES):
+    def __init__(self, key, sources, *, chronicle=False, optimize=False, extra_inputs=None, fp2_rules=FP2_RULES,
+                 fp2_selection="uniform"):
         self.key, self.sources = key, sources
         self.slots = dynamic_slots(sources)
         self.optimize = optimize
@@ -478,7 +479,8 @@ class VerifierStages:
         if extra_inputs is None:
             extra_inputs = 2 if self.slots else 0  # Projective VK_x claim.
         self.field = ScriptField(self.proof_elements + len(self.slots) + extra_inputs,
-                                 chronicle=chronicle, assert_checks=optimize, fp2_rules=fp2_rules)
+                                 chronicle=chronicle, assert_checks=optimize, fp2_rules=fp2_rules,
+                                 fp2_selection=fp2_selection)
         self.tower = Tower(self.field, sparse=optimize, defer_reductions=optimize,
                            mul2_kernel=self.field.multiply2 if optimize else None)
         self.setup = b""
@@ -502,9 +504,14 @@ class VerifierStages:
         return fixed, delta, ((gx, self.field.sub(0, gy)), gamma_lines, finite)
 
     def check_g1_points(self, proof):
-        a, _, c, _ = proof
-        check_g1(self.tower, a)
-        check_g1(self.tower, c)
+        return self.check_g1_c(self.check_g1_a(proof))
+
+    def check_g1_a(self, proof):
+        check_g1(self.tower, proof[0])
+        return proof
+
+    def check_g1_c(self, proof):
+        check_g1(self.tower, proof[2])
         return proof
 
     @staticmethod

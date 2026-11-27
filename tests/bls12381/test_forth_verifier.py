@@ -104,6 +104,14 @@ class ForthVerifierTests(unittest.TestCase):
         with self.assertRaisesRegex(CompileError, "requires an explicit BLS12-381 residue product"):
             ForthVerifier(self.key, self.source, plan=ArithmeticPlan(residue_association="right"))
 
+    def test_split_g1_checks_require_a_and_c(self):
+        source = HIGH_LEVEL.read_bytes().replace(b"swap bls12-381-check-g1-points",
+                                                b"swap bls12-381-check-g1-a bls12-381-check-g1-c")
+        for word in (b"bls12-381-check-g1-a", b"bls12-381-check-g1-c"):
+            with self.subTest(word=word), self.assertRaises(CompileError):
+                ForthVerifier(self.key, source.replace(word, b""), entry="verify-proof")
+        ForthVerifier(self.key, source, entry="verify-proof")
+
     def test_reports_unsupported_words(self):
         invalid = self.source.replace(b"swap bls12", b"1 drop swap bls12")
         with self.assertRaisesRegex(CompileError, r"line 8, column 5: '1' cannot compile"):

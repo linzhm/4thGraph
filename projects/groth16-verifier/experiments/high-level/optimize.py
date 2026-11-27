@@ -13,7 +13,7 @@ from fourthgraph.replay.bls12381_verifier import FIXTURE, SOURCES, fixture, witn
 from fourthgraph.verification.bls12381.build import (
     RESIDUE_ASSOCIATIONS, SCRIPT_ERAS, ArithmeticPlan, ForthVerifier,
 )
-from fourthgraph.verification.bls12381.field import fp2_kernel
+from fourthgraph.verification.bls12381.field import FP2_RULES, fp2_kernel
 from fourthgraph.verification.bls12381.verifier import public_packet
 
 
@@ -44,7 +44,8 @@ def verify_vectors(lock, witnesses, controls):
 
 
 def measure(compiler, witnesses, packets):
-    lock = compiler.compile(SOURCES)
+    diagnostics = {}
+    lock = compiler.lower(compiler.sources(SOURCES), compact=True, diagnostics=diagnostics)
     artifact = compiler.artifact(SOURCES, None, lock)
     controls = tuple(control for index in range(len(witnesses))
                      for control in witness_controls(witnesses, packets, index, artifact["proof_packet_bytes"],
@@ -55,6 +56,7 @@ def measure(compiler, witnesses, packets):
         "script_sha256": artifact["script_sha256"],
         "artifact_sha256": artifact["artifact_sha256"],
         "local_verdicts": verify_vectors(lock, witnesses, controls),
+        **diagnostics,
     }
     if compiler.plan is not None:
         result["plan"] = artifact["arithmetic_plan"]
@@ -68,17 +70,22 @@ def write_json(path, value):
 def main():
     cli = argparse.ArgumentParser(description=__doc__)
     cli.add_argument("--era", choices=SCRIPT_ERAS, help="restrict the search to one Script era")
+    cli.add_argument("--source", type=Path, default=SOURCE, help="Forth source revision to compile")
+    cli.add_argument("--residue-association", choices=RESIDUE_ASSOCIATIONS,
+                     help="hold the residue multiplication order fixed while comparing Fp2 lowerings")
     cli.add_argument("--output", type=Path, default=PROJECT / "workspace/build/high-level")
     args = cli.parse_args()
     args.output.mkdir(parents=True, exist_ok=True)
 
     key, cases = fixture()
-    source = SOURCE.read_bytes()
+    source = args.source.read_bytes()
     reference_path = PROJECT / "verifier.fth"
     reference_source = reference_path.read_bytes()
     formula, kernel_digest = fp2_kernel(())
-    plans = tuple(ArithmeticPlan(rules, association) for rules, association
-                  in product(enumerate_orders(formula), RESIDUE_ASSOCIATIONS))
+    associations = (args.residue_association,) if args.residue_association else RESIDUE_ASSOCIATIONS
+    plans = [ArithmeticPlan(rules, association) for rules, association
+             in product(enumerate_orders(formula), associations)]
+    plans.extend(ArithmeticPlan(FP2_RULES, association, "callsite") for association in associations)
     packets = [public_packet(SOURCES, signals) for signals, _ in cases]
     report = {
         "objective": "path-bytes",
@@ -95,7 +102,7 @@ def main():
         reference_row, _ = measure(reference, witnesses, packets)
         candidates = []
         for plan in plans:
-            result, artifact = measure(verifier(key, source, SOURCE, era, plan), witnesses, packets)
+            result, artifact = measure(verifier(key, source, args.source, era, plan), witnesses, packets)
             candidates.append((result, artifact))
             print(era, plan, result["lock_bytes"], flush=True)
         winner, lock = min(candidates, key=lambda row: row[0]["path_bytes"])

@@ -1,13 +1,15 @@
 """BLS12-381 arithmetic shared by the host and the Script code generator."""
 
+from collections import Counter
 from contextlib import contextmanager
 from functools import cache
 from hashlib import sha256
 from importlib.resources import files
 
 from fourthgraph.bsv.script import asm
+from fourthgraph.compiler.formula_experiment import enumerate_orders
 from fourthgraph.compiler.script_builder import ScriptBuilder
-from fourthgraph.compiler.stack_schedule import Graph
+from fourthgraph.compiler.stack_schedule import Graph, ResidueBlock
 
 U = 0xd201000000010000  # Absolute value of the negative BLS12-381 seed.
 R = U**4 - U**2 + 1
@@ -23,6 +25,12 @@ def fp2_kernel(rules=FP2_RULES):
     source = files("fourthgraph.stdlib").joinpath("bls12-381-fp2.fth").read_bytes()
     builder = ScriptBuilder(source.decode("utf-8"), formula_passes=("stack",), experimental_rules=rules)
     return builder.formula_ir[FP2_ENTRY], sha256(source).hexdigest()
+
+
+@cache
+def fp2_alternatives(preferred):
+    source, _ = fp2_kernel(())
+    return tuple(dict.fromkeys((preferred, *enumerate_orders(source))))
 
 
 class HostField:
@@ -51,12 +59,14 @@ def opcode(name):
 class ScriptField:
     """Signed residues are sufficient at arithmetic boundaries inside Script."""
 
-    def __init__(self, inputs, *, chronicle=False, assert_checks=False, fp2_rules=FP2_RULES):
+    def __init__(self, inputs, *, chronicle=False, assert_checks=False, fp2_rules=FP2_RULES, fp2_selection="uniform"):
         self.graph = Graph(inputs)
         self.valid = 1
         self.checks = set() if assert_checks else None
         self.chronicle = chronicle
         self.fp2_rules = fp2_rules
+        self.fp2_selection = fp2_selection
+        self.fp2_choices = Counter()
 
     def value(self, a):
         return self.graph.integer(a) if type(a) is int else a
@@ -99,10 +109,29 @@ class ScriptField:
             return self.op("OP_2MUL", a)
         return self.op("OP_MUL", a, b)
 
-    def multiply2(self, *limbs):
-        formula, _ = fp2_kernel(self.fp2_rules)
+    def _inline_fp2(self, rules, limbs):
+        formula, _ = fp2_kernel(rules)
         operations = {"int+": self.add, "int-": self.sub, "int*": self.mul}
         return formula.inline(limbs, lambda name, *args: operations[name](*args))
+
+    def multiply2(self, *limbs):
+        if self.fp2_selection == "uniform":
+            return self._inline_fp2(self.fp2_rules, limbs)
+        active = self.graph
+
+        def inline(rules, graph):
+            self.graph = graph
+            try:
+                return self._inline_fp2(rules, limbs)
+            finally:
+                self.graph = active
+
+        # The Fp2 formulas contain only polynomial operations, so a trial
+        # graph can use the same definitions as the active residue block.
+        graph = active.graph if isinstance(active, ResidueBlock) else active
+        rules, results = graph.select_expansion(fp2_alternatives(self.fp2_rules), inline)
+        self.fp2_choices[rules] += 1
+        return results
 
     def half_digit(self, digit):
         # MSM digits are nonnegative and occupy at most two bits.

@@ -136,10 +136,11 @@ def checked_b_line(curve, point, other, slope, *, doubling):
 
 
 class AffineStages(VerifierStages):
-    def __init__(self, key, sources, *, lines_in_witness, chronicle=False, optimize=False, fp2_rules=FP2_RULES):
+    def __init__(self, key, sources, *, lines_in_witness, chronicle=False, optimize=False, fp2_rules=FP2_RULES,
+                 fp2_selection="uniform"):
         self.witness_items = 2 if lines_in_witness else 1
         super().__init__(key, sources, chronicle=chronicle, optimize=optimize, extra_inputs=self.witness_items,
-                         fp2_rules=fp2_rules)
+                         fp2_rules=fp2_rules, fp2_selection=fp2_selection)
         if not self.slots:
             raise ValueError("an affine witness layout requires at least one spend-time public input")
         self.lines_in_witness = lines_in_witness

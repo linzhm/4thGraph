@@ -1,6 +1,6 @@
 """Schedule a straight-line graph of total operations on the Script stack."""
 
-from collections import Counter
+from collections import ChainMap, Counter
 from dataclasses import dataclass
 from heapq import nsmallest
 
@@ -54,6 +54,7 @@ class Graph:
 
     def __init__(self, input_count, *, share=True):
         self.inputs = tuple(Value(i) for i in range(input_count))
+        self._first_slot = input_count
         self.definitions = {}
         self.common = {}
         self.packet_reads = {}
@@ -67,7 +68,7 @@ class Graph:
         key = kind, node
         if self.share and key in self.common:
             return self.common[key]
-        value = Value(len(self.inputs) + len(self.definitions))
+        value = Value(self._first_slot + len(self.definitions))
         self.definitions[value] = node
         self.common[key] = value
         return value
@@ -97,6 +98,39 @@ class Graph:
     def residue_block(self, modulus):
         """Lower a bounded polynomial that exposes outputs only modulo a positive integer."""
         return ResidueBlock(self, modulus)
+
+    def select_expansion(self, alternatives, lower):
+        """Append the cheapest equivalent straight-line expansion at this call site.
+
+        Each alternative must obey the caller's semantic and range checks.
+        Builders may define values on their trial graph and return Values or
+        integer constants. Existing shared nodes act as inputs to the local
+        stack estimate, which does not predict the complete program size.
+        """
+        candidates = []
+        for alternative in alternatives:
+            trial = Graph(0, share=self.share)
+            trial._first_slot = self._first_slot + len(self.definitions)
+            trial.common = ChainMap({}, self.common)
+            outputs = tuple(lower(alternative, trial))
+            candidates.append((trial._expansion_size(outputs), alternative, trial, outputs))
+        _, selected, trial, outputs = min(candidates, key=lambda candidate: candidate[0])
+        self.definitions.update(trial.definitions)
+        self.common.update(trial.common.maps[0])
+        self.packet_reads.update(trial.packet_reads)
+        return selected, outputs
+
+    def _expansion_size(self, outputs):
+        constants = sum(len(number(value)) for value in outputs if type(value) is int)
+        returns = tuple(value for value in outputs if type(value) is not int)
+        needed = set(returns)
+        steps = []
+        for value, node in reversed(self.definitions.items()):
+            if value in needed:
+                needed.update(node.args)
+                steps.append((node.script, node.args, (value,)))
+        inputs = sorted(needed.difference(self.definitions), key=lambda value: value.slot)
+        return constants + len(emit_steps(inputs, list(reversed(steps)), returns, compact=True))
 
     def live_definitions(self, returns):
         needed = set(returns)
