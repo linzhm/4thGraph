@@ -108,7 +108,20 @@ def keep_shorter(options, length, program):
         options[length] = program
 
 
-def earlier_spans(raw, options):
+def packed_repeat(width, copies, limit):
+    """Repeat the top item exactly, with a bounded doubling-and-trim candidate."""
+    bits = bin(copies)[3:]
+    double = asm("OP_DUP OP_CAT")
+    append = asm("OP_OVER OP_CAT")
+    code = asm("OP_DUP") + b"".join(double + (append if bit == "1" else b"") for bit in bits) + asm("OP_NIP")
+    doublings = (copies - 1).bit_length()
+    if width * (1 << doublings) <= limit:
+        sliced = double * doublings + number(width * copies) + asm("OP_SPLIT OP_DROP")
+        return min(sliced, code, key=len)
+    return code
+
+
+def earlier_spans(raw, options, *, pack_runs=False):
     seed_width = 11
     earlier = defaultdict(list)
     cat = asm("OP_CAT")
@@ -133,6 +146,8 @@ def earlier_spans(raw, options):
             while repeat <= count:
                 keep_shorter(options[cursor], repeat * gap, source + double * (repeat.bit_length() - 1) + cat)
                 repeat *= 2
+            if pack_runs and count > 2 and count & (count - 1):
+                keep_shorter(options[cursor], count * gap, source + packed_repeat(gap, count, len(raw)) + cat)
         matches.append(cursor)
 
 
@@ -259,7 +274,7 @@ def evaluate_cache_plans(encode, library, *, optimize_library, refine_library, f
 
 def suffix_plans(raw, library, *, optimize_library=False, refine_library=False, share_cache=False):
     references = [{} for _ in raw]
-    earlier_spans(raw, references)
+    earlier_spans(raw, references, pack_runs=share_cache)
     encode = partial(encode_suffix, raw, references)
     literal, _ = evaluate_cache_plans(encode, library, optimize_library=optimize_library, refine_library=refine_library)
     plans = {"literal-cache": literal}

@@ -23,12 +23,12 @@
         0
       ],
       "shared_constructor_inputs": [],
-      "auto_bytes": 102081,
+      "auto_bytes": 102074,
       "literal_bytes": 188983,
-      "auto_txid": "a9758ded6454e3ca36d95c7c690bc06910fc17e79e93cbe0d031ab8acd2dc7ab",
+      "auto_txid": "64aa557ac3fc54ec3eb08659929d6dbb28d3605c13e74b2d6dba7b93f6d8f7ab",
       "literal_txid": "90b6aa7e431bca63803d6bd96e87316722c050f91bcf92994860f8d3e134c585",
       "auto_unlock_bytes": [
-        7660
+        7653
       ],
       "literal_unlock_bytes": [
         94560
@@ -53,12 +53,12 @@
         0
       ],
       "shared_constructor_inputs": [],
-      "auto_bytes": 102081,
+      "auto_bytes": 102074,
       "literal_bytes": 188983,
-      "auto_txid": "ac14c84ec7e3216045983facbeb249c830f0aa1416fd28b1e8c717411ff45654",
+      "auto_txid": "5d5ee76434c496bec7c9516f452bab67a759011370257c941c3527905e30a2b1",
       "literal_txid": "5b321f64ea74619f3a7ccf1379554eb0e38ed83284ed569a0c23968800d4c4ad",
       "auto_unlock_bytes": [
-        7660
+        7653
       ],
       "literal_unlock_bytes": [
         94560
@@ -83,12 +83,12 @@
         0
       ],
       "shared_constructor_inputs": [],
-      "auto_bytes": 196491,
+      "auto_bytes": 196484,
       "literal_bytes": 377719,
-      "auto_txid": "4f287bc7ea3c428f6b2b4073e7c4a3786ec3e23eff1a4cc94189d77216b8b589",
+      "auto_txid": "0222faf976efbbafe0ddfdcfe7f47d4a40f4f09e58a47af4eac7c182f76ec69b",
       "literal_txid": "9879a14ca27aa6d013c87e8ac6f629144d7f841d05ff3424d9be16524edfeaf1",
       "auto_unlock_bytes": [
-        7702
+        7695
       ],
       "literal_unlock_bytes": [
         188928
@@ -113,12 +113,12 @@
         0
       ],
       "shared_constructor_inputs": [],
-      "auto_bytes": 196491,
+      "auto_bytes": 196484,
       "literal_bytes": 377719,
-      "auto_txid": "c0528a0dcdcbeec8173c80aca0526ac90b4a363206e0552a8db796228952aa66",
+      "auto_txid": "ac87c24388c48bfada9b73b716bf2468f337d2d229d3afdb18a34b184c7eb7eb",
       "literal_txid": "12bbb9f8ae8582cc8a4587711399c5bfd31085b2c010cb40b8eaa4f3cd3428ab",
       "auto_unlock_bytes": [
-        7702
+        7695
       ],
       "literal_unlock_bytes": [
         188928
@@ -145,13 +145,13 @@
         1
       ],
       "shared_constructor_inputs": [],
-      "auto_bytes": 109868,
+      "auto_bytes": 109854,
       "literal_bytes": 283670,
-      "auto_txid": "0d31f6b7f99a6e0d832aaa3b7aff82f8866569a47ac5e2c1b0f421373189e0cb",
+      "auto_txid": "3539ee25d90bb029d27e069800c96c1f84997d33bdbef900b36aae081bd7cbf6",
       "literal_txid": "38c1b2e870a4881b4d8015361780c8de067396f330ef2ad0fdbda369b95c8f83",
       "auto_unlock_bytes": [
-        7702,
-        7702
+        7695,
+        7695
       ],
       "literal_unlock_bytes": [
         94601,
@@ -179,13 +179,13 @@
         1
       ],
       "shared_constructor_inputs": [],
-      "auto_bytes": 109784,
+      "auto_bytes": 109770,
       "literal_bytes": 283588,
-      "auto_txid": "37e1bdf29402ceabe38e608404218bfb8c4090fddf359592784c89404cf49da6",
+      "auto_txid": "b8c563bd028e6b97ca9aa3a126cbf93d303868955c49b5a74e6c14f24b272c93",
       "literal_txid": "9c5d0f505ec68d7483ea36be79ac5ca7793964eff824509dbab315018e2259b3",
       "auto_unlock_bytes": [
-        7660,
-        7660
+        7653,
+        7653
       ],
       "literal_unlock_bytes": [
         94560,
@@ -213,13 +213,13 @@
         1
       ],
       "shared_constructor_inputs": [],
-      "auto_bytes": 204320,
+      "auto_bytes": 204306,
       "literal_bytes": 566774,
-      "auto_txid": "a3ba64f8ebd6f99e2bad0af6073f1e97000f5f854184f592dacaa1ed8baec8c2",
+      "auto_txid": "a769aa3ecabfc309c9955a0703e23eaf52d6a1092032111f9b099bfa01c2607d",
       "literal_txid": "66fd81e1fedf15011f89b8d95a180fbaa3e5f0003f60cb9d06b36d990accccbc",
       "auto_unlock_bytes": [
-        7744,
-        7744
+        7737,
+        7737
       ],
       "literal_unlock_bytes": [
         188969,
@@ -247,13 +247,13 @@
         1
       ],
       "shared_constructor_inputs": [],
-      "auto_bytes": 204236,
+      "auto_bytes": 204222,
       "literal_bytes": 566692,
-      "auto_txid": "913bc1622d4a4fcc91ec02e56401ee2f3bd01ee2b0c2f903a936801cbd452983",
+      "auto_txid": "aef842ebbfee0c45d8c78e1fb4cf9a650f8e339fefe5932971c648c0f01a84de",
       "literal_txid": "bd6437186d786afeed8ed05898a046d757d188fa116c0ba3a3f2708cbe6dc265",
       "auto_unlock_bytes": [
-        7702,
-        7702
+        7695,
+        7695
       ],
       "literal_unlock_bytes": [
         188928,
@@ -283,14 +283,14 @@
         2
       ],
       "shared_constructor_inputs": [],
-      "auto_bytes": 212230,
+      "auto_bytes": 212209,
       "literal_bytes": 755911,
-      "auto_txid": "bef31014d8826797a98c2be0bb1c656d58956c02e3eb1b8a0e52546149994ae8",
+      "auto_txid": "91b859919c7f82873194b37131b369db15f3742df5445e5d6fe60dc9c9f8be96",
       "literal_txid": "ff81c959f0d53b4e28bd06eb2489c12d478d3cb2d0e6e5772e1bc164591a4564",
       "auto_unlock_bytes": [
-        7785,
-        7785,
-        7785
+        7778,
+        7778,
+        7778
       ],
       "literal_unlock_bytes": [
         189010,
@@ -321,14 +321,14 @@
         2
       ],
       "shared_constructor_inputs": [],
-      "auto_bytes": 211981,
+      "auto_bytes": 211960,
       "literal_bytes": 755665,
-      "auto_txid": "83b4f293a6afbab114220e5e75f9192e73f25d2e1c45a8e8b0f3668feb9900d8",
+      "auto_txid": "9e7f62c3243d7bae73638c3efa19bed429f2cb856a6bd88737c05ef4225cf8a5",
       "literal_txid": "e02c5eb67ef419cc8ccf829645bd7f422d54bbc3cb327df76968d50f0a124f28",
       "auto_unlock_bytes": [
-        7702,
-        7702,
-        7702
+        7695,
+        7695,
+        7695
       ],
       "literal_unlock_bytes": [
         188928,
@@ -357,13 +357,13 @@
         1
       ],
       "shared_constructor_inputs": [],
-      "auto_bytes": 298772,
+      "auto_bytes": 298758,
       "literal_bytes": 849878,
-      "auto_txid": "01e4d840675a794d2e43216d874e766a4b84ad19109dad62c66a3786e4689de7",
+      "auto_txid": "be02a9c181a36cf7f81fa3d571e09b4df3b5682903e407a7388daf0c325e1e6e",
       "literal_txid": "e397ca105acd318165eb78aab89d1ed29192391b7fb1f1f36903f2d19e45f944",
       "auto_unlock_bytes": [
-        7786,
-        7786
+        7779,
+        7779
       ],
       "literal_unlock_bytes": [
         283337,
@@ -391,13 +391,13 @@
         1
       ],
       "shared_constructor_inputs": [],
-      "auto_bytes": 298688,
+      "auto_bytes": 298674,
       "literal_bytes": 849796,
-      "auto_txid": "4ecb0b8508623e44b132b023f0a4ad1b159697dfbc2e8f478b64fcbafdb0b8de",
+      "auto_txid": "be342144abbcb5662bc92c10c770d59d209a52ae94741a7497e5345beab31be4",
       "literal_txid": "aa2e5bc08a50ef8bd8b1a97bb54017108e0c72fa205cddb3b82a876c10519a53",
       "auto_unlock_bytes": [
-        7744,
-        7744
+        7737,
+        7737
       ],
       "literal_unlock_bytes": [
         283296,
@@ -429,15 +429,15 @@
         3
       ],
       "shared_constructor_inputs": [],
-      "auto_bytes": 409294,
+      "auto_bytes": 409266,
       "literal_bytes": 1888810,
-      "auto_txid": "01006fc17951b168d759e88db6ca3e6ba3b9e6a1008a379ddbf1e5442ca0b63d",
+      "auto_txid": "4242aa0f34ea19dee20ff58230ab72d27d6fbb98494b620a0bf623bf90b4f975",
       "literal_txid": "2315fe7efb68fca7b0d32f5921b32a9fbc72d4382e81dde19ba510747a1a0e82",
       "auto_unlock_bytes": [
-        7910,
-        7910,
-        7910,
-        7910
+        7903,
+        7903,
+        7903,
+        7903
       ],
       "literal_unlock_bytes": [
         377787,
@@ -471,15 +471,15 @@
         3
       ],
       "shared_constructor_inputs": [],
-      "auto_bytes": 408798,
+      "auto_bytes": 408770,
       "literal_bytes": 1888318,
-      "auto_txid": "8b236d01f4000dfa9ce11e855b133265ea709c35ae6cf4d1cd27850640d20a49",
+      "auto_txid": "697286a4df20ef6e74f0fbb59474178ba0fe1f3bcbc70ac616a443c88d584099",
       "literal_txid": "bc813572d6232f0e8ee5301c108c10ebb65ebdf77c368580ac35cafbc9d4d926",
       "auto_unlock_bytes": [
-        7786,
-        7786,
-        7786,
-        7786
+        7779,
+        7779,
+        7779,
+        7779
       ],
       "literal_unlock_bytes": [
         377664,
@@ -517,17 +517,17 @@
         5
       ],
       "shared_constructor_inputs": [],
-      "auto_bytes": 236452,
+      "auto_bytes": 236410,
       "literal_bytes": 1323814,
-      "auto_txid": "61ba80d0b3ee64cad4e035ef594825d7121abfbc1bdc53e0a18588e9ffb259e1",
+      "auto_txid": "5e99956f1c1125290c60e573c2bc4611b3cda2c59ecf24e4e122f416f286e7c2",
       "literal_txid": "eb70a4d8ae94ba88e13c431bc1deddd5a5901ddfc435e7c5fc6725b2d4960d97",
       "auto_unlock_bytes": [
-        7908,
-        7908,
-        7908,
-        7908,
-        7908,
-        7908
+        7901,
+        7901,
+        7901,
+        7901,
+        7901,
+        7901
       ],
       "literal_unlock_bytes": [
         189133,
@@ -567,17 +567,17 @@
         5
       ],
       "shared_constructor_inputs": [],
-      "auto_bytes": 235216,
+      "auto_bytes": 235174,
       "literal_bytes": 1322584,
-      "auto_txid": "45d613c608bd3730550967f4295d97293c7a173437c5c4ab3139b9e2ec57d574",
+      "auto_txid": "ba7f714f7b3d569074b074989fbba018ed04c53d22044089f85d98bf182f3701",
       "literal_txid": "a395c006675d391cf68a2b87263cdbe9ef25779ef200f984635169c0c992cbcb",
       "auto_unlock_bytes": [
-        7702,
-        7702,
-        7702,
-        7702,
-        7702,
-        7702
+        7695,
+        7695,
+        7695,
+        7695,
+        7695,
+        7695
       ],
       "literal_unlock_bytes": [
         188928,
@@ -607,12 +607,12 @@
         0
       ],
       "shared_constructor_inputs": [],
-      "auto_bytes": 762951,
+      "auto_bytes": 762944,
       "literal_bytes": 1510135,
-      "auto_txid": "bf49427da9ab8acd661c7b8159d93d5aee156d3d6bb03d409456d78ad1fcd753",
+      "auto_txid": "8d631e1c2a5091f009b5fc52184216dcd18fbfa2764815d714633525be376ffb",
       "literal_txid": "6b17bd00b5ccd17531a6a76417a6d4ff146f2e58be7a43d3d379d8a368f9e67b",
       "auto_unlock_bytes": [
-        7954
+        7947
       ],
       "literal_unlock_bytes": [
         755136
@@ -637,12 +637,12 @@
         0
       ],
       "shared_constructor_inputs": [],
-      "auto_bytes": 762951,
+      "auto_bytes": 762944,
       "literal_bytes": 1510135,
-      "auto_txid": "7661467449b76979dd5210369d368dc249dba47e2403dae5ce2b5f26450136c7",
+      "auto_txid": "9036423280eb5438abf860747679661375307aa995d9707841ab5e6e0677920f",
       "literal_txid": "8599d478628e97df2e245f234605fef80c1a645b4b4ba22f745383133b4d87a5",
       "auto_unlock_bytes": [
-        7954
+        7947
       ],
       "literal_unlock_bytes": [
         755136
@@ -793,13 +793,13 @@
         1
       ],
       "shared_constructor_inputs": [],
-      "auto_bytes": 204203,
+      "auto_bytes": 204189,
       "literal_bytes": 378006,
-      "auto_txid": "28f5d55be38271bea6d86e82a1252f474951bf024a961d161c224d0c08066d4a",
+      "auto_txid": "d7222e31498040796f4a709c853ee3316763f011736ec19a01c5761de0043fb6",
       "literal_txid": "2a482aa08aa415c42712bab28ea94f2353eded88906edff4651c11aba4324310",
       "auto_unlock_bytes": [
-        7702,
-        7669
+        7695,
+        7662
       ],
       "literal_unlock_bytes": [
         94601,
@@ -826,12 +826,12 @@
         0
       ],
       "shared_constructor_inputs": [],
-      "auto_bytes": 102460,
+      "auto_bytes": 102453,
       "literal_bytes": 189361,
-      "auto_txid": "1ac1f43b9b2d83ef6a57d9dbfa7334e1878781b6ae7f6ff6d9499a9235caf83e",
+      "auto_txid": "48ee8aa8100d8bd790935d07a45689311a263da9e494debf32f3c3814b6e08fc",
       "literal_txid": "3052ad49042d7fbcf96266bb36d093065311debe6cc27e988377b9418883e3db",
       "auto_unlock_bytes": [
-        7702,
+        7695,
         294
       ],
       "literal_unlock_bytes": [
@@ -862,14 +862,14 @@
         2
       ],
       "shared_constructor_inputs": [],
-      "auto_bytes": 299417,
+      "auto_bytes": 299398,
       "literal_bytes": 661872,
-      "auto_txid": "dc02a9ed8227073364bb6bc9c7ceb73b67edde33d38c203f1736d9e499b70a5d",
+      "auto_txid": "f191e4efca95bd386a1df398cd509c56f90adfda2e5b05a02177db2111629c10",
       "literal_txid": "d34285c26e70d6811af303d0520dd4ec98e74bd9db1273143b219d86a83f83d6",
       "auto_unlock_bytes": [
         291,
-        7744,
-        7802,
+        7737,
+        7790,
         294
       ],
       "literal_unlock_bytes": [
@@ -902,14 +902,14 @@
         2
       ],
       "shared_constructor_inputs": [],
-      "auto_bytes": 212147,
+      "auto_bytes": 212126,
       "literal_bytes": 755829,
-      "auto_txid": "b1386e5b5fb743f5547e82230129efb92f7813cff771bf7bcae3ef9ec88fe463",
+      "auto_txid": "54522c25af7a66b286097f97ec5973c658def303973959294bdd3896429fbb64",
       "literal_txid": "133602734f69f273978c1372f20a0e4a6dec9121a5916136c9e2ac8eff786c28",
       "auto_unlock_bytes": [
-        7785,
-        7702,
-        7785
+        7778,
+        7695,
+        7778
       ],
       "literal_unlock_bytes": [
         189010,
@@ -941,14 +941,14 @@
         2
       ],
       "shared_constructor_inputs": [],
-      "auto_bytes": 204573,
+      "auto_bytes": 204559,
       "literal_bytes": 567024,
-      "auto_txid": "38f51109313a850167006dade5290dbf900621500f0a5691636416d9b049d756",
+      "auto_txid": "7c8582b0bedd720035f0601f27c4e40df05adb697748bb90a2fe2ca823b4bd9e",
       "literal_txid": "32accedc320e0e9710d0a7e955b710076fac5a18c070dc43936705908f76a0ce",
       "auto_unlock_bytes": [
-        7821,
+        7814,
         107,
-        7738
+        7731
       ],
       "literal_unlock_bytes": [
         189044,
@@ -1034,12 +1034,12 @@
         0
       ],
       "shared_constructor_inputs": [],
-      "auto_bytes": 290825,
+      "auto_bytes": 290818,
       "literal_bytes": 377719,
-      "auto_txid": "825dfd3ee2245fd263f499099c7939a818140f24d693f1fb46fcf2cf98d0d549",
+      "auto_txid": "9478cac89f50b9ac1f3232031d94fb95c0d477a7f01b3874f514b911c6ba2aef",
       "literal_txid": "fdce7871e1c8364347874e87ad921a139372f230fd6472f4fcf83fe26e53d72a",
       "auto_unlock_bytes": [
-        102034
+        102027
       ],
       "literal_unlock_bytes": [
         188928
@@ -1157,12 +1157,12 @@
         0
       ],
       "shared_constructor_inputs": [],
-      "auto_bytes": 119725,
+      "auto_bytes": 119718,
       "literal_bytes": 206123,
-      "auto_txid": "6c86ce1724d07873acbf5e7f2f4246b9ce9d48a526ce635d24db945c10ec393b",
+      "auto_txid": "749a1f58c485bdfd0b0ad037c8e6427333df95847fa11c01248ff2e8fd845fb6",
       "literal_txid": "1f17765128cbcefb681624867caa2b0ad09fddf768970fc84c077a9b11240e91",
       "auto_unlock_bytes": [
-        16734
+        16727
       ],
       "literal_unlock_bytes": [
         103130
@@ -1209,23 +1209,23 @@
         11
       ],
       "shared_constructor_inputs": [],
-      "auto_bytes": 192250,
+      "auto_bytes": 192166,
       "literal_bytes": 1235050,
-      "auto_txid": "51ffe6aef15efa54531ac957c8f813357c867d7abc87cf2060d4419ab93b547f",
+      "auto_txid": "8c9f5b264aa7e173a67c5e617152667ddc40eb5645ea03b6e9a6eadf7b409b9c",
       "literal_txid": "29f13861504630c1e9cb9c6180e47454be58c3c34192f3f0aceb26bde4fe41a6",
       "auto_unlock_bytes": [
-        8113,
-        8113,
-        8113,
-        8113,
-        8113,
-        8113,
-        8113,
-        8113,
-        8113,
-        8113,
-        8113,
-        8113
+        8106,
+        8106,
+        8106,
+        8106,
+        8106,
+        8106,
+        8106,
+        8106,
+        8106,
+        8106,
+        8106,
+        8106
       ],
       "literal_unlock_bytes": [
         95011,
@@ -1307,35 +1307,35 @@
         23
       ],
       "shared_constructor_inputs": [],
-      "auto_bytes": 301930,
+      "auto_bytes": 301762,
       "literal_bytes": 2387530,
-      "auto_txid": "219c1d83a72488704b6ace51883fb59918227b9ceb9e3ab6e0f28a6a6514902f",
+      "auto_txid": "7d01b63c6eb683670777e6e1e525d2219f515e9d4390f7c98d35e8812de8d71f",
       "literal_txid": "d9c52472f8ec18e7ad3ebee5cbb3f9773f646824cc05ea262493103ef1049387",
       "auto_unlock_bytes": [
-        8605,
-        8605,
-        8605,
-        8605,
-        8605,
-        8605,
-        8605,
-        8605,
-        8605,
-        8605,
-        8605,
-        8605,
-        8605,
-        8605,
-        8605,
-        8605,
-        8605,
-        8605,
-        8605,
-        8605,
-        8605,
-        8605,
-        8605,
-        8605
+        8598,
+        8598,
+        8598,
+        8598,
+        8598,
+        8598,
+        8598,
+        8598,
+        8598,
+        8598,
+        8598,
+        8598,
+        8598,
+        8598,
+        8598,
+        8598,
+        8598,
+        8598,
+        8598,
+        8598,
+        8598,
+        8598,
+        8598,
+        8598
       ],
       "literal_unlock_bytes": [
         95503,
@@ -1362,6 +1362,123 @@
         95503,
         95503,
         95503
+      ]
+    },
+    {
+      "case": "otda-all-common-input-tails",
+      "shape": [
+        8,
+        2
+      ],
+      "transaction_version": 2,
+      "chronicle_spend": true,
+      "sighashes": [
+        "41",
+        "61",
+        "61",
+        "61",
+        "61",
+        "61",
+        "61",
+        "61"
+      ],
+      "native_inputs": [
+        0
+      ],
+      "native_output_count": 0,
+      "non_matching_output": null,
+      "same_funding_transaction": false,
+      "reconstructed_inputs": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "shared_constructor_inputs": [],
+      "auto_bytes": 244901,
+      "literal_bytes": 1513714,
+      "auto_txid": "171d49667fe78b6894cc655105b954e211e0c2172cc929d5176bf93ddb8d4de8",
+      "literal_txid": "a44da7058e467339549d55a2d8655473ebe8c7a25da64bd808caec57c020b3e6",
+      "auto_unlock_bytes": [
+        107,
+        7958,
+        7958,
+        7958,
+        7958,
+        7958,
+        7958,
+        7958
+      ],
+      "literal_unlock_bytes": [
+        107,
+        189215,
+        189215,
+        189215,
+        189215,
+        189215,
+        189215,
+        189215
+      ]
+    },
+    {
+      "case": "otda-single-common-input-tails",
+      "shape": [
+        8,
+        8
+      ],
+      "transaction_version": 2,
+      "chronicle_spend": true,
+      "sighashes": [
+        "63",
+        "63",
+        "63",
+        "63",
+        "63",
+        "63",
+        "63",
+        "63"
+      ],
+      "native_inputs": [],
+      "native_output_count": 0,
+      "non_matching_output": null,
+      "same_funding_transaction": false,
+      "reconstructed_inputs": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "shared_constructor_inputs": [],
+      "auto_bytes": 818880,
+      "literal_bytes": 1514342,
+      "auto_txid": "74b62fdb04a2a42f8d7c1ef5ba1c0e8ef81d3cfcbc98393d68096c66431694b7",
+      "literal_txid": "a3225fafb4841feed024ff5789136d96def5459db08b4f22a3357b39501240bc",
+      "auto_unlock_bytes": [
+        7917,
+        7925,
+        7934,
+        7943,
+        7952,
+        7961,
+        7970,
+        7980
+      ],
+      "literal_unlock_bytes": [
+        94847,
+        94856,
+        94865,
+        94874,
+        94883,
+        94892,
+        94901,
+        94910
       ]
     }
   ],

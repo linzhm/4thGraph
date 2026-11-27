@@ -36,6 +36,7 @@ class Case:
     chronicle_active: bool = True
     compress_otda: bool | None = None
     same_parent: bool = False
+    common_sequence: bool = False
 
 
 def construction_cases(template_version):
@@ -65,6 +66,9 @@ def construction_cases(template_version):
     if template_version >= CARRIED_FIELD_TEMPLATE_VERSION:
         for inputs in (12, 24):
             yield Case(f"all-{inputs}x1", (0x61,) * inputs, 1, tuple(range(inputs)))
+        yield Case("otda-all-common-input-tails", (0x41,) + (0x61,) * 7, 2, tuple(range(1, 8)),
+                   native_inputs=(0,), common_sequence=True)
+        yield Case("otda-single-common-input-tails", (0x63,) * 8, 8, tuple(range(8)))
 
 
 def fixture(case, template_version):
@@ -83,7 +87,7 @@ def fixture(case, template_version):
         parents = tuple(Transaction((Input(seed(f"{case.name}/{index}"), 0),), (output,))
                         for index, output in enumerate(funding))
         vouts = (0,) * len(locks)
-    inputs = tuple(Input(parent.txid_wire(), vout, sequence=10 + index)
+    inputs = tuple(Input(parent.txid_wire(), vout, sequence=0xffffffff if case.common_sequence else 10 + index)
                    for index, (parent, vout) in enumerate(zip(parents, vouts, strict=True)))
     outputs = []
     amounts = allocations(len(inputs) * INPUT_VALUE - FEE, case.output_count)
@@ -153,6 +157,10 @@ class LatestTemplateMatrixTests(unittest.TestCase):
                         self.assertEqual(self.node.verdicts(signed, parents, spend_height=spend_height,
                                                             utxo_heights=(utxo_height,) * len(parents)),
                                          [True] * len(parents))
+                        if case.common_sequence:
+                            mixed_heights = (utxo_height, 1) + (utxo_height,) * (len(parents) - 2)
+                            self.assertEqual(self.node.verdicts(signed, parents, utxo_heights=mixed_heights),
+                                             [True] * len(parents))
                     self.results.append({
                         'case': case.name,
                         'shape': [len(tx.inputs), len(tx.outputs)],

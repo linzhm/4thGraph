@@ -4,16 +4,16 @@
   "selected": "shared-cache-follow-up",
   "candidates": {
     "literal-cache": {
-      "bytes": 7754,
-      "sha256": "9b9ac22aa0c83c309b9b81ad333b19baeb2d8d2ba63fd48bb90e1a08fd93f180"
+      "bytes": 7747,
+      "sha256": "3068ff380b0472ca26adfaacd8c62975133e93d88ba6a618ec7fdee7ddbfaa35"
     },
     "shared-cache": {
-      "bytes": 7592,
-      "sha256": "64b056f310492d45c9f5b6d2ee6bcd345910ff9363c71d3738ab4f6221adb4c0"
+      "bytes": 7585,
+      "sha256": "acefdfa29df66a4cfc78556a2eb85a24cb1bd7ad1851e4e457f238dcabfc28da"
     },
     "shared-cache-follow-up": {
-      "bytes": 7424,
-      "sha256": "a6b265c07f487c9cea3ba3cfddc1bdba16729a7f56dd344d9813c4aee2793453"
+      "bytes": 7417,
+      "sha256": "6d174b32a30fcb72182c2248d71413a702ba71a2cb521d361fee49d97af2f16e"
     }
   }
 }

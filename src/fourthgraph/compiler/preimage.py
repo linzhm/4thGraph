@@ -1,4 +1,5 @@
 """Choose the Script encoding of a complete, already authorized preimage."""
+from collections import Counter
 from dataclasses import dataclass, replace
 from functools import lru_cache
 from hashlib import sha256
@@ -15,6 +16,44 @@ class PreimagePlan:
     selected: str
     program: bytes
     candidates: tuple[dict, ...]
+
+
+def pack_otda_input_prefix(prefix, input_parts):
+    """Build the exact prefix, sharing a repeated trailer after the 32-byte txids."""
+    start = 4 + len(compact(len(input_parts)))
+    joined = b"".join(input_parts)
+    end = start + len(joined)
+    if prefix[start:end] != joined:
+        raise ValueError("OTDA input records differ from the signing preimage")
+
+    best = push(prefix)
+    cat = asm("OP_CAT")
+    copy = asm("OP_OVER OP_CAT")
+    # The selected trailer occupies one slot below the prefix accumulator.
+    for trailer, uses in Counter(part[32:] for part in input_parts).most_common(4):
+        if uses < 3:
+            break
+        code = bytearray(push(trailer))
+        pending = bytearray(prefix[:start])
+        started = False
+        for part in input_parts:
+            if part[32:] != trailer:
+                pending.extend(part)
+                continue
+            pending.extend(part[:32])
+            code.extend(push(bytes(pending)))
+            if started:
+                code.extend(cat)
+            code.extend(copy)
+            pending.clear()
+            started = True
+        pending.extend(prefix[end:])
+        if pending:
+            code.extend(push(bytes(pending)) + cat)
+        code.extend(asm("OP_NIP"))
+        if len(code) < len(best):
+            best = bytes(code)
+    return best
 
 
 def _copy_span(depth, start, width, total):

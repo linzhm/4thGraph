@@ -65,6 +65,8 @@ OTDA，包括混用签名模式的输入、全 SM2 的两进两出付款、由�
 
 ## 复现点运算字节码
 
+逐字节比对时，使用含编译器提交 `64624db` 的固定 SM2 源码快照。后续版本的栈调度器可能为同一公式生成不同字节。验收套件用有符号坐标向量分别检查当前编译结果和固定内核，并按布局指纹核验完整锁定脚本。[固定源码快照](https://github.com/linzhm/4thGraph/tree/1462b96d8ba2bf9edf365857d8785f342a91b227)
+
 模板 `5` 用 Forth 优化编译器编译齐次坐标点运算公式，沿用模板 `3` 和 `4` 的有符号余数与无穷远点处理。在仓库根目录生成并比对已固定的字节码。
 
 ```sh
@@ -94,7 +96,7 @@ cmp /tmp/sm2-affine-kernel.json projects/p2pkh-sm2/versions/v1.10.0/affine-kerne
 
 模板 `10` 把 `3b` 和域模数保留在标量乘法的累加点下方。锁定脚本在进入窗口或构建公钥表的投影加点前自行放入这两个常量。每次运算返回带符号余数，继续满足下次调用的坐标范围。固定生成元表提供右操作数的仿射坐标。五次倍点在进入公式前检查无穷远点。
 
-固定比较使用提交 `64624db` 上的 4thGraph `0.2.7`，评估显式终端编译阶段和有限条有序规则。每个候选都与模板 `9` 的运算结果逐字节比对，共 16 个用例，涵盖无穷远点、倍点、逆点、负投影比例和带符号余数的边界。`rewrite`、`share`、`stack`、`search` 组合的窗口代码最短。加入 `common-values` 后持平，其余试验规则组合更长。报告记录了选定内核与栈调度的哈希。
+固定比较使用提交 `64624db` 上的 4thGraph `0.2.7`，评估显式终端编译阶段和有限条有序规则。每个候选都与模板 `9` 的运算结果逐字节比对，共 16 个用例，涵盖无穷远点、倍点、逆点、负投影比例和带符号余数的边界。`rewrite`、`share`、`stack`、`search` 组合的窗口代码最短。加入 `common-values` 后持平，其余试验规则组合更长。在固定快照执行以下命令可以复现选定内核与栈调度的哈希。[固定源码快照](https://github.com/linzhm/4thGraph/tree/1462b96d8ba2bf9edf365857d8785f342a91b227)
 
 ```sh
 export PYTHONPATH=src:.
@@ -126,9 +128,9 @@ cmp /tmp/sm2-byte-tuning.json projects/p2pkh-sm2/versions/v1.11.0/byte-tuning.js
 
 ## 复现 OTDA 构造器
 
-钱包加载固定构造器，并按布局清单核对字节数和 SHA-256。离线生成器从点运算块开始，从模板中查找可复用片段。模板 `1` 至 `5` 还预先提供 SM3 的具名片段。为模板 `2` 至 `10` 生成构造器时，它评估复制片段的缓存收益，并尝试按使用频率排列缓存。模板 `10` 使用标准库的 `script-pick-depth` 从早先的缓存条目切取片段来初始化后续条目，再用一批有限的候选比较逐项删减和新增缓存的收益。每个最终方案先逐字节复原同一锁定脚本，再按序列化长度排序。
+钱包加载固定构造器，并按布局清单核对字节数和 SHA-256。离线生成器从点运算块开始，从模板中查找可复用片段。模板 `1` 至 `5` 还预先提供 SM3 的具名片段。为模板 `2` 至 `10` 生成构造器时，它评估复制片段的缓存收益，并尝试按使用频率排列缓存。模板 `10` 使用标准库的 `script-pick-depth` 从已有缓存复制片段来初始化后续条目，再比较一批缓存删减和新增方案。重复片段会比较逐次加倍、在主栈保留重复单元，以及加倍后裁剪。裁剪方案的临时数据需放得进待重建的后缀尺寸。各方案先逐字节复原同一锁定脚本，再按序列化长度排序。
 
-另一组探测用 Chronicle 切片指令把构造器缩至 7,340 字节，但 BSV Node 拒绝了测试中标为激活前创建的上一输出。选定的 7,424 字节方案使用 `OP_SPLIT`，通过了不同创建高度的上一输出回放和最新模板交易矩阵。在仓库根目录生成并比对文件。
+上一轮探测用 Chronicle 切片指令把构造器缩至 7,340 字节，但 BSV Node 拒绝了测试中标为激活前创建的上一输出。选定的 7,417 字节方案使用 `OP_SPLIT`，通过了不同创建高度的上一输出回放和最新模板交易矩阵。在仓库根目录生成并比对文件。
 
 ```sh
 python projects/p2pkh-sm2/reference/generate_otda_constructor.py /tmp/sm2-otda.hex
@@ -157,6 +159,8 @@ cmp /tmp/sm2-constructor-tuning.json projects/p2pkh-sm2/versions/v1.11.0/constru
 
 构造器测试逐字节比对预映像、公钥和签名三项栈值，并由 BSV Node 和 chain-gang 验证完整花费。[布局与指纹](../versions/v1.1.0/layout.json) · [钱包接入](../docs/sdk.zh-CN.md)
 
+模板 `10` 的重建交易签入至少四个输入时，编译器也会比较输入前缀的两种编码。缓存方案在每个输入的 32 字节交易 ID 后追加相同的字节串，复用 OTDA 序列化器提供的实际签名输入。计入压栈、复制和清理指令后，钱包选择较短的编码。最新矩阵覆盖混入原生 P2PKH 输入、不同序列号和配对 SINGLE。[输入前缀编译器](../../../src/fourthgraph/compiler/preimage.py) · [尺寸对比](../versions/v1.11.0/measurements.json)
+
 <a name="mixed-otda-constructor"></a>
 
 ## 复现共享 OTDA 构造器
@@ -182,13 +186,13 @@ bash tools/verify_node.sh -- python projects/p2pkh-sm2/reference/test_otda_matri
 cmp /tmp/sm2-latest-template-coverage.json projects/p2pkh-sm2/versions/v1.11.0/latest-template-coverage.json
 ```
 
-将命令改用 `--template 9`、`--template 8` 或 `--template 7` 可复现以前的报告。每次运行中，SM2 上一输出和可识别的 SM2 收款输出均使用同一种模板。模板 `10` 新增十二进一出和二十四进一出的 OTDA ALL 用例。[模板 9 覆盖报告](../versions/v1.10.0/latest-template-coverage.json) · [模板 8 覆盖报告](../versions/v1.9.0/latest-template-coverage.json) · [模板 7 覆盖报告](../versions/v1.8.0/latest-template-coverage.json)
+将命令改用 `--template 9`、`--template 8` 或 `--template 7` 可复现以前的报告。每次运行中，SM2 上一输出和可识别的 SM2 收款输出均使用同一种模板。模板 `10` 的 38 例矩阵包括十二进一出和二十四进一出的 OTDA ALL，也覆盖 ALL 和 SINGLE 的重复输入尾部。[模板 9 覆盖报告](../versions/v1.10.0/latest-template-coverage.json) · [模板 8 覆盖报告](../versions/v1.9.0/latest-template-coverage.json) · [模板 7 覆盖报告](../versions/v1.8.0/latest-template-coverage.json)
 
 尺寸对比还复放四十进一出的 OTDA ALL。每笔交易的输入和输出使用同一个 SM2 模板，两个版本都用报告中指定的编译器提交构建。
 
 ```sh
 bash tools/verify_node.sh -- python projects/p2pkh-sm2/reference/measure_template_sizes.py \
-  --compiler-commit 64624dbdac83bdcc03fed150b93472cc7b1d080c --report /tmp/sm2-template-sizes.json
+  --compiler-commit a003c4f2e20b3ad53a46c378568531dd4b6c5856 --report /tmp/sm2-template-sizes.json
 cmp /tmp/sm2-template-sizes.json projects/p2pkh-sm2/versions/v1.11.0/measurements.json
 ```
 

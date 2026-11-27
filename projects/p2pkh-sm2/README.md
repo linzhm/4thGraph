@@ -58,7 +58,7 @@ The current source includes the [layout manifest](versions/v1.0.0/layout.json),
 
 ### Reconstruct OTDA outputs
 
-The constructor is part of `scriptSig`. It uses 12,703 bytes for template `1`, 11,816 for `2`, 11,807 for `3`, 11,618 for `4`, 11,549 for `5`, 9,363 for `6`, 9,447 for `7`, 7,644 for `8`, 7,718 for `9`, and 7,424 for `10`. Templates `2` through `10` select reusable fragments from the initial encoding and place frequently used fragments near the top of the stack. The constructor reconstructs the exact signing preimage and fills each eligible output's HASH160 slot. The signing callback receives the same message and SM2 user ID as the literal encoding. Use the final signed transaction ID to build a child.
+The constructor is part of `scriptSig`. It uses 12,703 bytes for template `1`, 11,816 for `2`, 11,807 for `3`, 11,618 for `4`, 11,549 for `5`, 9,363 for `6`, 9,447 for `7`, 7,644 for `8`, 7,718 for `9`, and 7,417 for `10`. Templates `2` through `10` select reusable fragments from the initial encoding and place frequently used fragments near the top of the stack. The constructor reconstructs the exact signing preimage and fills each eligible output's HASH160 slot. The signing callback receives the same message and SM2 user ID as the literal encoding. Use the final signed transaction ID to build a child.
 
 After Chronicle activation, version-2 OTDA ALL can reconstruct matching outputs in their original order. Paired OTDA SINGLE can reconstruct the same-index output and preserve the preceding null outputs in the preimage. Both support `ANYONECANPAY`. Other output templates keep their literal bytes. BIP143, NONE, unpaired SINGLE, version 1 and non-smaller encodings continue with the literal unlocking script. [SDK options](docs/sdk.en.md) · [Constructor and generator](reference/README.md#otda-constructor)
 
@@ -121,16 +121,16 @@ Template `10` carries the field prime and `3b` across the scalar windows and reu
 | Measured bytes | v1.10.0 | v1.11.0 |
 | --- | ---: | ---: |
 | Locking script | 95,790 | 94,355 |
-| OTDA constructor | 7,718 | 7,424 |
+| OTDA constructor | 7,718 | 7,417 |
 | BIP143 ALL, 2 inputs and 2 outputs | 192,284 | 189,414 |
-| OTDA ALL, 2 inputs and 2 outputs | 207,778 | 204,320 |
-| OTDA ALL, 12 inputs and 1 output | 197,213 | 192,250 |
-| OTDA ALL, 24 inputs and 1 output | 310,421 | 301,930 |
-| OTDA ALL, 40 inputs and 1 output | 479,733 | 466,538 |
+| OTDA ALL, 2 inputs and 2 outputs | 207,778 | 204,306 |
+| OTDA ALL, 12 inputs and 1 output | 197,213 | 191,615 |
+| OTDA ALL, 24 inputs and 1 output | 310,421 | 299,219 |
+| OTDA ALL, 40 inputs and 1 output | 479,733 | 458,819 |
 
-In the 34 shared construction cases, 33 shrink and the native-only destination case stays at 719 bytes. The 36-case matrix adds 12-input and 24-input payments. The 7,424-byte constructor saves 330 bytes per reconstructed input compared with the initial template 10 candidate. In the 2×2 case, against v1.10.0, peak stack payload rises by 29 bytes for BIP143 ALL and falls by 5,740 bytes for OTDA ALL.
+In the 34 shared construction cases, 33 shrink and the native-only destination case stays at 719 bytes. The 38-case matrix includes 12-input and 24-input payments and repeated input tails under ALL and paired SINGLE. Against the previous template 10 build, the compiler at `a003c4f` saves 7,719 bytes in the 40-input case by sharing identical input trailers and packing repeated constructor fragments. In the 2×2 case, against v1.10.0, peak stack payload rises by 29 bytes for BIP143 ALL and falls by 5,740 bytes for OTDA ALL.
 
-Select template `10` with `--version 10` or SDK `template: "v1.11.0"`. [Compiler tuning](reference/README.md#window-tuning) · [Byte bindings](reference/README.md#byte-tuning) · [Template fingerprint](versions/v1.11.0/layout.json) · [Measurements](versions/v1.11.0/measurements.json) · [Constructor tuning](versions/v1.11.0/constructor-tuning.json) · [36 transaction cases](versions/v1.11.0/latest-template-coverage.json)
+Select template `10` with `--version 10` or SDK `template: "v1.11.0"`. [Compiler tuning](reference/README.md#window-tuning) · [Byte bindings](reference/README.md#byte-tuning) · [Template fingerprint](versions/v1.11.0/layout.json) · [Measurements](versions/v1.11.0/measurements.json) · [Constructor tuning](versions/v1.11.0/constructor-tuning.json) · [38 transaction cases](versions/v1.11.0/latest-template-coverage.json)
 
 <a name="p2pkh-sponsorship"></a>
 

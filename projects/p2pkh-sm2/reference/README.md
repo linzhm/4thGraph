@@ -73,6 +73,8 @@ isolate the effect of the activation flags.
 
 ## Reproduce the point kernels
 
+Run the byte-for-byte point-kernel comparisons in the pinned SM2 source snapshot with compiler revision `64624db`. The later stack scheduler can emit different code for the same formulas. The acceptance suite checks both the current compiler output and the frozen kernels against the signed-coordinate vectors, and checks the complete locks against their layout fingerprints. [Pinned source snapshot](https://github.com/linzhm/4thGraph/tree/1462b96d8ba2bf9edf365857d8785f342a91b227)
+
 Template `5` compiles the homogeneous point formulas with the optimizing Forth compiler. The compiled kernels preserve the signed residues and infinity handling of templates `3` and `4`. Rebuild the frozen kernels from the repository root.
 
 ```sh
@@ -102,7 +104,7 @@ cmp /tmp/sm2-affine-kernel.json projects/p2pkh-sm2/versions/v1.10.0/affine-kerne
 
 Template `10` carries `3b` and the field prime below the scalar accumulator. The lock inserts its own constants before the window and before the projective add used to build the public-key table. Each arithmetic kernel returns signed residues, so its coordinate bounds hold at the next call. Fixed generator pairs supply the affine right operand. The five-doubling group checks infinity before entering the finite formula.
 
-The fixed comparison uses 4thGraph `0.2.7` at `64624db`, with explicit terminal passes and bounded ordered rules. It accepts a candidate after exact comparison against the template `9` kernels on 16 cases covering infinity, equal and inverse points, negative projective scale, and signed residue endpoints. The selected `rewrite`, `share`, `stack`, `search` plan minimizes emitted window kernel bytes. Adding `common-values` ties, and the other tested rule orders are larger. The report pins the selected kernel digests and stack schedule digests.
+The fixed comparison uses 4thGraph `0.2.7` at `64624db`, with explicit terminal passes and bounded ordered rules. It accepts a candidate after exact comparison against the template `9` kernels on 16 cases covering infinity, equal and inverse points, negative projective scale, and signed residue endpoints. The selected `rewrite`, `share`, `stack`, `search` plan minimizes emitted window kernel bytes. Adding `common-values` ties, and the other tested rule orders are larger. Run the comparison commands in the pinned source snapshot to reproduce the recorded kernel and stack schedule digests. [Pinned source snapshot](https://github.com/linzhm/4thGraph/tree/1462b96d8ba2bf9edf365857d8785f342a91b227)
 
 ```sh
 export PYTHONPATH=src:.
@@ -134,9 +136,9 @@ cmp /tmp/sm2-byte-tuning.json projects/p2pkh-sm2/versions/v1.11.0/byte-tuning.js
 
 ## Reproduce the OTDA constructor
 
-The wallet loads the frozen program and checks its byte length and SHA-256 against the layout manifest. The offline generator starts with point arithmetic blocks and discovers reusable spans in the template. Templates `1` through `5` also seed named SM3 ranges. For templates `2` through `10` it evaluates which copied fragments are worth caching and tries a dictionary ordered by reuse frequency. Template `10` also compiles cache initialization from slices of earlier entries using the standard library's `script-pick-depth`. A bounded follow-up tries dropping one entry or adding short lists of candidates from literal runs and earlier copies. Each final plan must reconstruct the same canonical lock before ranking by serialized bytes.
+The wallet loads the frozen program and checks its byte length and SHA-256 against the layout manifest. The offline generator starts with point arithmetic blocks and discovers reusable spans in the template. Templates `1` through `5` also seed named SM3 ranges. For templates `2` through `10` it evaluates which copied fragments are worth caching and tries a dictionary ordered by reuse frequency. Template `10` also compiles cache initialization from slices of earlier entries using the standard library's `script-pick-depth`. A bounded follow-up tries dropping one entry or adding short lists of candidates from literal runs and earlier copies. The search compares ordinary doubling, main-stack repetition, and doubling followed by trimming when the temporary fits inside the suffix size. Each final plan must reconstruct the same canonical lock before ranking by serialized bytes.
 
-Direct Chronicle slicing reduced the constructor to 7,340 bytes in a probe. BSV Node rejected the input whose prevout the test marked as created before Chronicle activation. The selected 7,424-byte plan uses `OP_SPLIT` and passes the mixed-age replay as well as the current-template transaction matrix. Rebuild the programs from the repository root and compare them with the checked-in files.
+Direct Chronicle slicing reduced the constructor to 7,340 bytes in an earlier probe. BSV Node rejected the input whose prevout the test marked as created before Chronicle activation. The selected 7,417-byte plan uses `OP_SPLIT` and passes the mixed-age replay as well as the current-template transaction matrix. Rebuild the programs from the repository root and compare them with the checked-in files.
 
 ```sh
 python projects/p2pkh-sm2/reference/generate_otda_constructor.py /tmp/sm2-otda.hex
@@ -165,6 +167,8 @@ cmp /tmp/sm2-constructor-tuning.json projects/p2pkh-sm2/versions/v1.11.0/constru
 
 The constructor tests compare exact preimage, public key, and signature stack values, then verify complete spends against BSV Node and chain-gang. [Layout and fingerprint](../versions/v1.1.0/layout.json) · [Wallet integration](../docs/sdk.en.md)
 
+For a reconstructed template `10` payment with four or more committed inputs, the compiler also compares literal input bytes with a prefix program that caches one repeated byte string after each input's 32-byte transaction ID. It uses the same committed inputs as the OTDA serializer. The retained plan has to be smaller after counting its pushes, copies, and cleanup. The latest matrix exercises repeated tails with a native P2PKH input, different input sequences, and paired SINGLE. [Prefix compiler](../../../src/fourthgraph/compiler/preimage.py) · [Size comparison](../versions/v1.11.0/measurements.json)
+
 <a name="mixed-otda-constructor"></a>
 
 ## Reproduce the shared OTDA constructor
@@ -190,13 +194,13 @@ bash tools/verify_node.sh -- python projects/p2pkh-sm2/reference/test_otda_matri
 cmp /tmp/sm2-latest-template-coverage.json projects/p2pkh-sm2/versions/v1.11.0/latest-template-coverage.json
 ```
 
-Run the same command with `--template 9`, `--template 8`, or `--template 7` to reproduce the earlier reports. Each run uses one SM2 template for all SM2 prevouts and all recognized SM2 destinations. The template `10` matrix adds OTDA ALL with 12 or 24 inputs and one output. [Template 9 coverage](../versions/v1.10.0/latest-template-coverage.json) · [Template 8 coverage](../versions/v1.9.0/latest-template-coverage.json) · [Template 7 coverage](../versions/v1.8.0/latest-template-coverage.json)
+Run the same command with `--template 9`, `--template 8`, or `--template 7` to reproduce the earlier reports. Each run uses one SM2 template for all SM2 prevouts and all recognized SM2 destinations. The 38-case template `10` matrix includes OTDA ALL with 12 or 24 inputs and covers repeated input tails in ALL and SINGLE. [Template 9 coverage](../versions/v1.10.0/latest-template-coverage.json) · [Template 8 coverage](../versions/v1.9.0/latest-template-coverage.json) · [Template 7 coverage](../versions/v1.8.0/latest-template-coverage.json)
 
 The size comparison also replays 40-input OTDA ALL. Each template pays outputs of its own version. The compiler revision identifies the compiler used for both builds.
 
 ```sh
 bash tools/verify_node.sh -- python projects/p2pkh-sm2/reference/measure_template_sizes.py \
-  --compiler-commit 64624dbdac83bdcc03fed150b93472cc7b1d080c --report /tmp/sm2-template-sizes.json
+  --compiler-commit a003c4f2e20b3ad53a46c378568531dd4b6c5856 --report /tmp/sm2-template-sizes.json
 cmp /tmp/sm2-template-sizes.json projects/p2pkh-sm2/versions/v1.11.0/measurements.json
 ```
 
