@@ -204,6 +204,23 @@ class BaselineAutoTests(unittest.TestCase):
             with self.subTest(message=message), self.assertRaisesRegex(ValueError, message):
                 replay_plan(self.source, self.owner, candidate, source_path=self.source_path)
 
+    def test_release_plan_shares_fragments_without_changing_lock_bytes(self):
+        original = json.loads((self.source_path.with_name("plans") / "otda-all.json").read_text())
+        directory = self.source_path.parent.parent / "versions" / "v0.8.0"
+        plan = json.loads((directory / "plan.json").read_text())
+        _, original_lock, original_constructor = replay_plan(
+            self.source, bytes(20), original, source_path=self.source_path,
+        )
+        with patch("r1_optimizer.explore_orders", side_effect=AssertionError("release replay searched method orders")):
+            _, lock, constructor = replay_plan(self.source, bytes(20), plan, source_path=self.source_path)
+        program = bytes.fromhex(constructor["program_hex"])
+        offset = constructor["owner_offset"]
+        self.assertEqual(lock, original_lock)
+        self.assertEqual(lock, bytes.fromhex((directory / "template.hex").read_text()))
+        self.assertEqual(program, bytes.fromhex((directory / "otda-reconstruct.hex").read_text()))
+        self.assertLess(constructor["bytes"], original_constructor["bytes"])
+        self.assertEqual(evaluate(program), ([lock[:offset], lock[offset + 20:]], []))
+
     def test_fixed_plans_reproduce_two_input_spends(self):
         try:
             engine = chain_metadata()

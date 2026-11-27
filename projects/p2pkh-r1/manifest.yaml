@@ -57,21 +57,21 @@ sections:
       - <a name="version-history"></a>
       - <a name="forth-experiment"></a>
       - '### Measured results'
-      - '#### v0.5.0 → v0.6.0'
-      - '**v0.6.0** freezes `split-5x4-affine-g` as the latest compiler template. It saves **357 B per
-        lock** and **714 B per BIP143 ALL payment**. The OTDA reconstruction program grows by 148 B, and
-        each measured OTDA payment shrinks by **418 B**. Payments use two inputs and two outputs. [Frozen
-        artifacts and hashes](versions/v0.6.0/layout.json) · [Build and replay](forth/README.md)'
+      - '#### v0.7.0 → v0.8.0'
+      - '**v0.8.0** saves **148 B per lock**, **296 B per BIP143 ALL payment**, and **1,020 B
+        per OTDA payment** in each of the two measured OTDA modes. Payment sizes count the two-input,
+        two-output spend. [Version manifest](versions/v0.8.0/manifest.json) · [Build and replay](forth/README.md)'
       - |-
         | Version | Compiler construction | Lock | BIP143 ALL payment | OTDA ALL payment | OTDA SINGLE payment |
         | --- | --- | ---: | ---: | ---: | ---: |
-        | v0.5.0 | `split-5x4` | 41,721 B | 84,212 B | 95,282 B | 95,211 B |
-        | **v0.6.0** | `split-5x4-affine-g` | **41,364 B** | **83,498 B** | **94,864 B** | **94,793 B** |
-      - Both versions compile the same Forth call to `P256.mul2(u,G,v,Q)` with 5-bit and 4-bit windows
-        for `G` and `Q`. In v0.6.0, the compiler proves `Z=1` for nonzero entries in the fixed-generator
-        table, specializes 51 additions, and guards the zero index. Both versions passed funded BSV Node
-        and independent chain-gang replay for the three payment modes above and the R1 acceptance matrix.
-        [High-level source](forth/msm.fth) · [Version measurements](versions/v0.6.0/comparison.json) ·
+        | v0.7.0 | Affine fixed table with a shorter zero guard | 41,262 B | 83,294 B | 94,632 B | 94,561 B |
+        | **v0.8.0** | Compact fixed table and shared OTDA fragments | **41,114 B** | **82,998 B** | **93,612 B** | **93,541 B** |
+      - The compiler stores only X and Y in the fixed-generator table, using its proof that nonzero entries
+        have `Z=1`. The OTDA constructor reuses repeated byte strings and reconstructs the same lock byte
+        for byte. The iteration reuses the existing Forth source. Funded BSV Node and independent chain-gang
+        replay passed for all three modes. The selected template also passed the R1 acceptance matrix.
+        [Forth entry](forth/r1-baseline.fth) · [Optimization plan](versions/v0.8.0/plan.json) ·
+        [Version comparison](versions/v0.8.0/comparison.json) ·
         [Acceptance matrix](reference/acceptance.md)
       - |-
         <details>
@@ -86,6 +86,8 @@ sections:
         | v0.2.0 | Forth v0.3.0 | Generate the full lock from Forth and shorten 263 point doublings | 45,776 B | 92,322 B | 100,192 B |
         | Forth v0.3.0 | Forth v0.4.0 | Express point arithmetic as bounded formulas and let the compiler rewrite and schedule them | 42,536 B | 85,842 B | 93,664 B |
         | Forth v0.4.0 | v0.5.0 (`split-5x4`) | Compile the double-scalar multiplication with a 5-bit fixed table and a 4-bit public-key table to reduce loop additions | 41,721 B | 84,212 B | 95,282 B |
+        | v0.5.0 | v0.6.0 | Prove `Z=1` for nonzero fixed-generator entries and specialize 51 point additions | 41,364 B | 83,498 B | 94,864 B |
+        | v0.6.0 | v0.7.0 | Shorten the zero-digit guard at each fixed-generator lookup | 41,262 B | 83,294 B | 94,632 B |
 
         The main sequence selects templates by lock and BIP143 payment size. The window iteration also selected `joint-2` for OTDA, where it still gives a 91,692 B two-input, two-output payment. [Window replay results](versions/v0.6.0/comparison.json)
 
@@ -103,17 +105,17 @@ sections:
       - <a name="version-history"></a>
       - <a name="forth-探索版"></a>
       - '### 实测结果'
-      - '#### v0.5.0 → v0.6.0'
-      - '**v0.6.0** 将 `split-5x4-affine-g` 固定为最新的编译器模板。每个完整锁缩短 **357 B**，BIP143 ALL 付款缩短 **714 B**。OTDA
-        重建程序增加 148 B，两种 OTDA 付款各缩短 **418 B**。付款均为两进两出。 [冻结产物与哈希](versions/v0.6.0/layout.json) · [构建与复放](forth/README.md)'
+      - '#### v0.7.0 → v0.8.0'
+      - '**v0.8.0** 每个完整锁缩短 **148 B**，BIP143 ALL 付款缩短 **296 B**，两种 OTDA 付款各缩短 **1,020 B**。付款字节数按两进两出的花费交易计。
+        [版本清单](versions/v0.8.0/manifest.json) · [构建与复放](forth/README.md)'
       - |-
         | 版本 | 编译器构造 | 完整锁 | BIP143 ALL 付款 | OTDA ALL 付款 | OTDA SINGLE 付款 |
         | --- | --- | ---: | ---: | ---: | ---: |
-        | v0.5.0 | `split-5x4` | 41,721 B | 84,212 B | 95,282 B | 95,211 B |
-        | **v0.6.0** | `split-5x4-affine-g` | **41,364 B** | **83,498 B** | **94,864 B** | **94,793 B** |
-      - 两个版本编译同一份调用 `P256.mul2(u,G,v,Q)` 的 Forth，分别给 `G`、`Q` 使用 5 位和 4 位窗口。v0.6.0 的编译器证明固定生成元表的非零项满足 `Z=1`，据此特化
-        51 处点加，并单独处理零下标。两个版本在上述三种付款模式中都通过了 BSV Node 和独立 chain-gang 的带资金复放，也通过了 R1 验收矩阵。 [高阶源码](forth/msm.fth)
-        · [版本实测数据](versions/v0.6.0/comparison.json) · [验收矩阵](reference/acceptance.md)
+        | v0.7.0 | 仿射固定表与更短的零下标分支 | 41,262 B | 83,294 B | 94,632 B | 94,561 B |
+        | **v0.8.0** | 双坐标固定表与 OTDA 片段共享 | **41,114 B** | **82,998 B** | **93,612 B** | **93,541 B** |
+      - 本轮复用现有 Forth 源码。编译器利用固定生成元表非零项的 `Z=1` 证明，只存 X 和 Y。OTDA 重建程序复用重复字节片段，逐字节还原同一把锁。
+        三种付款均通过 BSV Node 和独立 chain-gang 的带资金复放，选定模板也通过了 R1 验收矩阵。 [Forth 入口](forth/r1-baseline.fth)
+        · [优化计划](versions/v0.8.0/plan.json) · [版本对照](versions/v0.8.0/comparison.json) · [验收矩阵](reference/acceptance.md)
       - |-
         <details>
         <summary>展开此前的版本迭代</summary>
@@ -127,6 +129,8 @@ sections:
         | v0.2.0 | Forth v0.3.0 | 从 Forth 生成整锁，缩短 263 处倍点 | 45,776 B | 92,322 B | 100,192 B |
         | Forth v0.3.0 | Forth v0.4.0 | 用带范围的公式表达点运算，编译器做等价改写与栈调度 | 42,536 B | 85,842 B | 93,664 B |
         | Forth v0.4.0 | v0.5.0（`split-5x4`） | 把双标量乘法留给编译器，用 5 位固定表和 4 位公钥表减少循环点加 | 41,721 B | 84,212 B | 95,282 B |
+        | v0.5.0 | v0.6.0 | 证明固定生成元表非零项满足 `Z=1`，特化 51 处点加 | 41,364 B | 83,498 B | 94,864 B |
+        | v0.6.0 | v0.7.0 | 缩短每次固定生成元查表的零下标分支 | 41,262 B | 83,294 B | 94,632 B |
 
         主线以锁和 BIP143 付款字节数选版。以 OTDA 付款为首要目标时，沿用窗口迭代选出的 `joint-2`，两进两出 OTDA ALL 为 91,692 B。 [窗口复放数据](versions/v0.6.0/comparison.json)
 
