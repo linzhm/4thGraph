@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>4thGraph CPN Workbench</title>
+  <style>/* STYLE */</style>
+</head>
+<body>
+  <header class="brand"><span class="mark">4G</span><strong>4thGraph</strong><span id="brand-title">CPN Workbench</span>
+    <div class="languages" aria-label="Language"><button data-lang="en">English</button><button data-lang="zh">中文</button></div>
+  </header>
+  <main>
+    <div class="intro"><div><h1 id="heading">Compare CPN paths</h1><p id="context"></p></div><dl id="stats"></dl></div>
+    <div class="workspace">
+      <aside class="rail" aria-labelledby="rail-title">
+        <h2 id="rail-title">Candidates</h2>
+        <input type="search" id="search" autocomplete="off" aria-label="Find a path" placeholder="Find a path…">
+        <div id="filters" class="segments" role="group" aria-label="Filter candidates"></div>
+        <ul id="candidates"></ul>
+      </aside>
+      <section class="diagram" aria-labelledby="diagram-title">
+        <header class="diagram-header"><h2 id="diagram-title">CPN graph</h2><div id="views" class="segments" role="group" aria-label="Graph view"></div></header>
+        <div id="canvas" tabindex="0"></div>
+        <footer class="legend"><span class="place-swatch"></span><span>Place</span><span class="transition-swatch"></span><span>Transition</span><span id="port-hint"></span></footer>
+      </section>
+      <aside id="inspector" class="inspector" aria-live="polite"></aside>
+    </div>
+  </main>
+  <script id="workbench-data" type="application/json"><!-- DATA --></script>
+  <script>/* SCRIPT */</script>
+</body>
+</html>

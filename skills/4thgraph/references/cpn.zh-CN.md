@@ -4,6 +4,16 @@
 
 比较候选时保持 Forth 关系、公开状态、私有操作数、签名角色和交易需求一致。要求阶段在同一笔交易完成时使用 `atomic:`，要求能够单独提交时使用 `independent-submit:`。只有允许公开整个赋值时，才为 R1CS 阶段写 `assignment-disclosure: STAGE allow ;`。`require-zk` 和私有见证都会排除直接 Script 与透明 R1CS。
 
+## 使用交互工作台
+
+装好下文的 regtest 依赖与 Node.js 后，从仓库根目录运行 `bash tools/cpn_demo.sh`，打开 `workspace/cpn-demo/index.html`。这条命令用同一份 Forth 编译、入金并验证三条路径，生成可单独离线打开的 HTML。源码、后端目录、原始报告和复放回执留在同一目录。
+
+先看逻辑图。Place 描述接口上的状态，Transition 声明消费的输入和生产的输出。点选迁移可查看类型化计算、Forth 词和验证策略。外部信息可包含见证操作数、角色签名和证明包。交易图将这些接口映射到部署或花费中的有序 `vin`、`vout`。
+
+选择 `path/handoff~stack` 追踪两笔交易之间的 `next: u32`。在逻辑图点选 `next`，可查看它由后继 UTXO 承载。在交易图点选对应的状态输出，可看到金额、解出的状态、工作流根、产出槽位和消费输入。实际 outpoint 来自复放回执。融合布局可以在当前输入栈中交接同一个值。零金额公开回执是携带序列化数据的不可花费输出。
+
+对现有构建运行 `4thgraph cpn workbench REPORT --receipt RECEIPT --output index.html`。重复传入 `--receipt` 可关联多个实测候选。传入 `--source SOURCE` 可显示经摘要核对的 Forth 定义。从详情下载固定计划、规划报告和已有回执。接收方可用固定版本的 chain-gang 执行 `4thgraph cpn verify receipt.json --report report.json` 离线复核。需要重建时，再一同保留 Forth 源码、目录与设置文件。
+
 ## 从干净检出开始跑纯 Script
 
 在仓库根目录运行，使用 Python 3.11 或更新版本的虚拟环境。第一条命令安装生成测试公钥、入金复放和离线复验所需的依赖。使用由同一份检出构建的 CLI。 [安装 CLI](../../../docs/install.zh-CN.md)

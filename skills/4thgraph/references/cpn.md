@@ -4,6 +4,16 @@
 
 Keep the Forth relations, public state, private operands, signing roles and transaction requirements fixed when comparing candidates. Use `atomic:` when stages must share a transaction, and `independent-submit:` when they must remain separately submittable. Give an R1CS stage `assignment-disclosure: STAGE allow ;` only when its full assignment may be public. `require-zk` and private witnesses exclude direct Script and transparent R1CS.
 
+## Explore the workbench
+
+With the regtest dependencies below and Node.js installed, run `bash tools/cpn_demo.sh` from the checkout root and open `workspace/cpn-demo/index.html`. The command compiles one Forth source, funds and verifies three paths, and creates a self-contained HTML file. It leaves the source, catalog, original report and replay receipts in the same directory.
+
+Start with the logical graph. A Place describes the state at an interface, and a Transition declares the inputs it consumes and the outputs it produces. Select a transition to inspect its typed computation, Forth word and validation policy. Its external inputs can include witness operands, role signatures and a proof packet. The transaction view maps the same interfaces to the ordered `vin` and `vout` of deployed or spent outputs.
+
+Select `path/handoff~stack` to trace `next: u32` across two transactions. In the logical graph select `next` to see the continuation UTXO as its carrier. In the transaction graph select the corresponding state output to see its amount, decoded state, workflow root, producing slot and consuming input. The receipt records the actual outpoint. A fused spend can carry the same value on its own input stack. The zero-value public receipt is an unspendable output with serialized data.
+
+Use `4thgraph cpn workbench REPORT --receipt RECEIPT --output index.html` for an existing build. Repeat `--receipt` to associate different measured candidates. Add `--source SOURCE` to display the Forth definition from the matching source and imports. Download the plan, planning report and available receipt from the inspector. With pinned chain-gang installed, the recipient can run `4thgraph cpn verify receipt.json --report report.json` offline. Keep the Forth source, catalog and setup together when the recipient also needs to rebuild.
+
 ## Direct Script from a clean checkout
 
 Run from the checkout root with Python 3.11 or later in a virtual environment. The first command installs the dependencies for test keys, funded replay and offline verification. Use an installed CLI built from this checkout. [CLI installation](../../../docs/install.md)

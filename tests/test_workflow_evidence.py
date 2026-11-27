@@ -2,14 +2,19 @@
 
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from hashlib import sha256
 import json
+import re
 import unittest
 
+from fourthgraph.bsv.transaction import Output
 from fourthgraph.compiler.source import CompileError, SourceCompiler
 from fourthgraph.replay.workflow import TestKeys
 from fourthgraph.verification.circuit_backend import emit_stage_circuit
 from fourthgraph.verification.lineage import lineage_statement
+from fourthgraph.workflow.cpn_workbench import carried_state, export_workbench
 from fourthgraph.workflow.proof_planner import compile_evidence_plans, evidence_path, rebuild_candidate
+from fourthgraph.workflow.workflow_contract import state_fields
 
 SOURCE = Path(__file__).resolve().parents[1] / "projects/proof-counter/workflow.fth"
 
@@ -91,6 +96,33 @@ recursive: lineage tx-edge ;
         self.assertEqual(report["recursive_statements"], [statement])
         self.assertIn("recursive_backend_unavailable", [row["code"] for row in
                       report["candidates"]["fused/script"]["exclusions"]])
+
+    def test_workbench_embeds_original_report_and_canonical_plan_as_data(self):
+        _, (_, artifact) = self.compile("")
+        report, output = self.directory / "report.json", self.directory / "workbench.html"
+        report.write_text(json.dumps(artifact))
+        title = "</script><tag>"
+        export_workbench(report, [], output=output, title=title)
+        html = output.read_text()
+        self.assertNotIn(title, html)
+        (embedded,) = re.findall(r'<script id="workbench-data" type="application/json">(.*?)</script>', html)
+        payload = json.loads(embedded)
+        self.assertEqual(payload["title"], title)
+        self.assertEqual(payload["report"], json.loads(report.read_bytes()))
+        plan = payload["packages"][payload["selected"]]["plan"]
+        self.assertEqual(sha256(plan.encode()).hexdigest(), artifact["plan_sha256"])
+        with self.assertRaisesRegex(ValueError, "unknown candidate"):
+            export_workbench(report, [], output=output, title=title, selected="unreported")
+
+    def test_workbench_decodes_only_the_declared_state_carrier(self):
+        root = bytes(range(32))
+        state = state_fields(root, 20)
+        build = {"state_output": {"satoshis": 100, "script_suffix_hex": "51"},
+                 "receipt": {"satoshis": 0, "script_prefix_hex": "006a"}}
+        expected = {"state_u32": 20, "root_txid": root[::-1].hex()}
+        self.assertEqual(carried_state(Output(100, state + b"\x51"), "state", "advance", build), expected)
+        self.assertEqual(carried_state(Output(0, b"\x00\x6a" + state), "receipt", "decide", build), expected)
+        self.assertEqual(carried_state(Output(100, state + b"\x52"), "state", "advance", build), {})
 
     def test_composition_checks_statement_flow_and_refuses_unlinked_paths(self):
         path = {

@@ -4,8 +4,8 @@ from fourthgraph.benchmark.validation import CONTEXT_PIN, chain_metadata
 from fourthgraph.bsv.chain_gang import validate_at_heights
 from fourthgraph.bsv.transaction import Transaction
 from fourthgraph.reporting import control_passed, positive_passed, transaction_from_record
-from fourthgraph.workflow.cpn import apply, check_effect, from_build
-from fourthgraph.workflow.protocol import artifact_digest
+from fourthgraph.workflow.cpn import apply, check_effect
+from fourthgraph.workflow.proof_planner import planned_build
 
 
 def verify_replay(receipt, *, original=None, selected=None):
@@ -15,28 +15,7 @@ def verify_replay(receipt, *, original=None, selected=None):
     if chain["commit"] != CONTEXT_PIN or receipt["chain_gang"]["commit"] != CONTEXT_PIN:
         raise ValueError("receipt verification requires the pinned height-aware chain-gang")
     build = receipt["build"]
-    if build["artifact_sha256"] != artifact_digest(build):
-        raise ValueError("invalid build digest")
-    plan = from_build(build)
-    if plan.digest != build["plan_sha256"]:
-        raise ValueError("invalid plan digest")
-    report = build["schedule_explanation"]
-    identity = report["selected"]
-    if selected is not None and selected != identity:
-        raise ValueError(f"receipt is for {identity!r}, expected {selected!r}")
-    candidate = report["candidates"][identity]
-    base_digest = artifact_digest({key: value for key, value in build.items() if key != "schedule_explanation"})
-    if (not candidate["eligible"] or candidate["artifact_sha256"] != base_digest
-            or candidate["plan_sha256"] != plan.digest):
-        raise ValueError("the build does not match its selected candidate")
-    if original is not None:
-        original = original.get("schedule_explanation", original)
-        reference = original["candidates"].get(identity)
-        if (not reference or not reference["eligible"]
-                or any(report[key] != original[key] for key in ("source_sha256", "imports", "request"))
-                or any(candidate.get(key) != reference.get(key)
-                       for key in ("artifact_sha256", "plan_sha256", "stage_roles"))):
-            raise ValueError("receipt does not match the original candidate report")
+    identity, plan = planned_build(build, original=original, selected=selected)
 
     names = [template["name"] for template in build["templates"]]
     if [row["step"] for row in receipt["spends"]] != names or not names:

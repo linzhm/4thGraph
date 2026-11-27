@@ -16,6 +16,13 @@ def main(argv):
     verify.add_argument("receipt", type=Path)
     verify.add_argument("--report", type=Path, help="compare against the original planning or tuning report")
     verify.add_argument("--candidate", help="require this exact candidate identity")
+    workbench = commands.add_parser("workbench", help="export an interactive, offline CPN graph")
+    workbench.add_argument("report", type=Path)
+    workbench.add_argument("--receipt", type=Path, action="append", default=[])
+    workbench.add_argument("--candidate", help="initial candidate to inspect")
+    workbench.add_argument("--title", default="Staged workflow")
+    workbench.add_argument("--source", type=Path, help="embed definitions from the matching Forth source")
+    workbench.add_argument("--output", type=Path, required=True)
     if argv[:1] in (["plan"], ["tune"]):
         from fourthgraph.workflow.protocol import main as compiler_main
 
@@ -30,6 +37,13 @@ def main(argv):
             from fourthgraph.replay.workflow import TestKeys
 
             report = {role: key.hex() for role, key in TestKeys().public.items()}
+        elif args.command == "workbench":
+            from fourthgraph.workflow.cpn_workbench import export_workbench
+
+            export_workbench(args.report, args.receipt, output=args.output, title=args.title, selected=args.candidate,
+                             source=args.source)
+            print(args.output)
+            return
         else:
             from fourthgraph.replay.cpn_receipt import verify_replay
 

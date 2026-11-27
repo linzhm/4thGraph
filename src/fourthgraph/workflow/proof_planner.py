@@ -10,13 +10,41 @@ from fourthgraph.compiler.lowering import OPTIMIZATIONS
 from fourthgraph.compiler.source import CompileError, WORKFLOW_CHOICES, workflow_blockers
 from fourthgraph.verification.lineage import lineage_statement
 from fourthgraph.verification.stage_proof import GROTH16, TRANSPARENT, StageProof
-from fourthgraph.workflow.cpn import canonical
+from fourthgraph.workflow.cpn import canonical, from_build
 from fourthgraph.workflow.protocol import (
-    OBJECTIVES, build_artifact, candidate_rank, candidate_sighash_families, normalize_sighash_family, normalize_target,
+    OBJECTIVES, artifact_digest, build_artifact, candidate_rank, candidate_sighash_families, normalize_sighash_family,
+    normalize_target,
 )
 from fourthgraph.workflow.workflow_contract import WorkflowContracts, sighash_blocker, state_fields
 
 STAGE_BACKENDS = ("script", TRANSPARENT, GROTH16)
+PINNED_CANDIDATE_FIELDS = ("artifact_sha256", "plan_sha256", "stage_roles")
+
+
+def planned_build(build, *, original=None, selected=None):
+    """Check a compiled artifact against its candidate and an optional original report."""
+    if build["artifact_sha256"] != artifact_digest(build):
+        raise ValueError("invalid build digest")
+    plan = from_build(build)
+    if plan.digest != build["plan_sha256"]:
+        raise ValueError("invalid plan digest")
+    report = build["schedule_explanation"]
+    identity = report["selected"]
+    if selected is not None and selected != identity:
+        raise ValueError(f"receipt is for {identity!r}, expected {selected!r}")
+    candidate = report["candidates"][identity]
+    base_digest = artifact_digest({key: value for key, value in build.items() if key != "schedule_explanation"})
+    if (not candidate["eligible"] or candidate["artifact_sha256"] != base_digest
+            or candidate["plan_sha256"] != plan.digest):
+        raise ValueError("the build does not match its selected candidate")
+    if original is not None:
+        original = original.get("schedule_explanation", original)
+        reference = original["candidates"].get(identity)
+        if (not reference or not reference["eligible"]
+                or any(report[key] != original[key] for key in ("source_sha256", "imports", "request"))
+                or any(candidate.get(key) != reference.get(key) for key in PINNED_CANDIDATE_FIELDS)):
+            raise ValueError("receipt does not match the original candidate report")
+    return identity, plan
 
 
 def catalog_from_file(file):
@@ -313,6 +341,6 @@ def rebuild_candidate(frontend, report, name, directory, catalog):
     contract, artifact = compile_evidence_plans(frontend, keys, current, directory,
                                                 catalog=catalog, selected=name, **request)
     rebuilt = artifact["schedule_explanation"]["candidates"][name]
-    if any(rebuilt.get(key) != entry.get(key) for key in ("artifact_sha256", "plan_sha256", "stage_roles")):
+    if any(rebuilt.get(key) != entry.get(key) for key in PINNED_CANDIDATE_FIELDS):
         raise CompileError("candidate artifacts changed")
     return contract, artifact

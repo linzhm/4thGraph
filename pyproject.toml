@@ -23,6 +23,6 @@ version = {attr = "fourthgraph.PROJECT_VERSION"}
 [tool.setuptools.package-data]
 "fourthgraph.compiler" = ["*.fth"]
 "fourthgraph.stdlib" = ["*.fth", "wallet/*.fth"]
-"fourthgraph.workflow" = ["*.fs", "*.fth", "*.mjs"]
+"fourthgraph.workflow" = ["*.fs", "*.fth", "*.mjs", "workbench/*.css", "workbench/*.html", "workbench/*.js"]
 "fourthgraph.verification" = ["*.go", "runar/*.go", "runar/*.patch", "runar/LICENSE"]
 "fourthgraph.benchmark" = ["formulas/*.fth", "fixtures/*.fth"]

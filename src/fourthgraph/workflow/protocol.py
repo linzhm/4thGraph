@@ -1086,7 +1086,7 @@ def main(argv=None, *, cpn_action=None):
                           **capabilities(), "libraries": library_capabilities(),
                           "optimizations": OPTIMIZATIONS, "join_witnesses": JOIN_WITNESSES,
                           "topologies": ("parallel", "gated-parallel", "workflow"), "workflow_modes": WORKFLOW_CHOICES,
-                          "cpn": {"commands": ("plan", "tune", "test-keys", "replay", "verify"),
+                          "cpn": {"commands": ("plan", "tune", "test-keys", "replay", "verify", "workbench"),
                                   "stage_backends": STAGE_BACKENDS,
                                   "nested_proofs": "planning-only", "recursive_lineage": "statement-only"},
                           "workflow_sighash_families": {**{name: f"{flag:02x}" for name, flag in SIGHASH_FAMILIES.items()},
