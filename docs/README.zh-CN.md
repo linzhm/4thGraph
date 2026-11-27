@@ -85,6 +85,33 @@ PYTHONPATH=src:. python -m fourthgraph.reporting "$out/search-replay.json" \
 
 下一轮可以用 `--objective peak-validation` 换排序目标，或者用 `--available-authorizers operator` 模拟首步只有 Operator 能签名。为每轮保留不同的复放文件和报告目录，再对照排除理由、正向轨迹和拒绝用例。后续脚手架的重点是让更多项目从自己的阶段声明和测试夹具生成这一套产物。[带门示例源码](../projects/workflow-examples/gated.fth)
 
+<a name="agent-tuning-loop"></a>
+
+## Agent 开发与调优循环
+
+1. **从高层 Forth 开始。** 写清输出、状态转换、授权和必须拒绝的情况。保存基线 Script，固定编译器、依赖、目标与验收夹具。
+2. **并列列出可复跑的选择。** 源码路径固定编译计划，比较不同 Forth 实现。编译路径固定源码，比较可用 pass 集合和有限次序。交易路径固定业务与签名覆盖，比较合法的交易切割和见证布局。用 `4thgraph experiment capabilities` 查公式夹具和规则，用 `--search --explain` 看交易计划候选。
+3. **Agent 选择本轮候选与预算。** 将选择提交给编译器。公式执行器按工作线程预算并行编译，再用固定向量验证产物。每个变体保留独立产物或报告。
+4. **用固定评估结果决定下一轮。** 先查编译及测试判定，再比较 Script 字节、栈峰值、编译耗时与候选摘要。整路比较要从真实前序组装花费，独立验收后再量序列化交易字节。缺测的指标在报告中标出。
+5. **冻结选定方案并复跑。** 保存源码和依赖身份、目标、实际计划、链接后 Script 和片段摘要、验证回执。Agent 可以读机器报告继续选下一批，留下的请求与产物足以独立重放。
+
+以下用同一个 Bézier 夹具和固定评估器比较基线与两个计划，再跑一轮。`next` 输出一个供 Agent 检查和选用的后续请求。
+
+```sh
+export PYTHONPATH=src:.
+mkdir -p workspace/tuning
+python3 -m fourthgraph.workflow.protocol experiment capabilities
+printf '%s\n' '{"fixture":"bezier","workers":2,"plans":[{},{"passes":["stack"]},{"passes":["rewrite","share","stack"]}]}' |
+  python3 -m fourthgraph.workflow.protocol experiment run - > workspace/tuning/first.json
+python3 -m fourthgraph.workflow.protocol experiment next workspace/tuning/first.json > workspace/tuning/next.json
+python3 -m fourthgraph.workflow.protocol experiment run workspace/tuning/next.json \
+  --parent workspace/tuning/first.json > workspace/tuning/second.json
+python3 -m fourthgraph.workflow.protocol experiment replay workspace/tuning/second.json \
+  --parent workspace/tuning/first.json
+```
+
+公式报告覆盖已登记的函数夹具。完整交易验收使用现有工作流复放。[工作流复放](toolchain.md#复放与编译) · [Agent skill](../skills/4thgraph/SKILL.md)
+
 <a name="documentation-index"></a>
 
 ## 文档索引
@@ -92,6 +119,7 @@ PYTHONPATH=src:. python -m fourthgraph.reporting "$out/search-replay.json" \
 | 目标 | 文档 |
 | --- | --- |
 | 构建第一个合约 | [用 Agent 开始](../README.zh-CN.md#start-with-agent) · [安装 CLI 和 skill](install.md) · [可运行项目](../projects/README.zh-CN.md) |
+| 选择、验证和复跑优化候选 | [Agent 开发与调优循环](#agent-tuning-loop) |
 | 用 Forth 写 BSV 合约 | [SDL 规范、语法书和标准库](language/README.md) |
 | 编译并复放交易工作流 | [工具链手册](toolchain.md) · [Regtest 环境](infrastructure.md) · [Chronicle 回归测试](chronicle-regression.md) |
 | 生成或验证证明 | [证明计数器](../projects/proof-counter/README.zh-CN.md) · [BLS12-381 Groth16](groth16-bls12-381.md) |

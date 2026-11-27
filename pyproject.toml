@@ -24,3 +24,4 @@ version = {attr = "fourthgraph.PROJECT_VERSION"}
 "fourthgraph.stdlib" = ["*.fth", "wallet/*.fth"]
 "fourthgraph.workflow" = ["*.fs", "*.fth"]
 "fourthgraph.verification" = ["*.go"]
+"fourthgraph.benchmark" = ["formulas/*.fth"]
