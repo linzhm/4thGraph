@@ -2,6 +2,7 @@ from dataclasses import replace
 from hashlib import sha256
 from importlib.metadata import PackageNotFoundError
 import json
+import os
 from pathlib import Path
 import shutil
 import subprocess
@@ -33,6 +34,32 @@ def integration_available():
 
 
 class ProjectReceiptTests(unittest.TestCase):
+    @unittest.skipUnless(integration_available(), "requires pinned chain-gang and Node WASI runtime")
+    def test_cli_defaults_to_chain_gang_and_honors_node_opt_in(self):
+        manifest, approval, _ = read_bundle(R1)
+        env = os.environ.copy()
+        env.pop("REGTEST_URL", None)
+        env.pop("REGTEST_COOKIE", None)
+        with TemporaryDirectory() as temp:
+            receipt = Path(temp) / "receipt.json"
+            replay = Path(temp) / "replay.json"
+            command = [sys.executable, str(ROOT / "tools/verify_project_contract.py"),
+                       str(manifest), "--approved-sha256", approval]
+            for args, output in (([], receipt), (["--replay", str(receipt)], replay)):
+                result = subprocess.run(command + args + ["--output", str(output)], env=env,
+                                        capture_output=True, text=True)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                report = json.loads(output.read_bytes())
+                self.assertEqual((report["status"], report["verification_level"]), ("passed", "chain-only"))
+                self.assertIsNone(report["node_version"])
+            self.assertEqual(report["steps"][0]["engines"], {"chain_gang": True, "bsv_node": "not_run"})
+            result = subprocess.run(command + ["--with-bsv-node", "--replay", str(receipt), "--output", str(replay)],
+                                    env=env, capture_output=True, text=True)
+            self.assertEqual(result.returncode, 1)
+            failure = json.loads(replay.read_bytes())
+            self.assertEqual(failure["requested_verification_level"], "dual-engine")
+            self.assertIn("REGTEST_URL", failure["diagnostic"]["detail"])
+
     def assert_rejected(self, status, manifest, approval, receipt, **kwargs):
         with self.assertRaises(verifier.VerificationFailure) as error:
             verifier.replay_receipt(manifest, approval, receipt, **kwargs)

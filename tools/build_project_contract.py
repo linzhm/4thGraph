@@ -71,15 +71,17 @@ def main(argv=None):
     cli.add_argument("output", type=Path)
     mode = cli.add_mutually_exclusive_group()
     mode.add_argument("--smoke", action="store_true", help="verify this local build with disposable fixture keys")
-    mode.add_argument("--verify", action="store_true", help="verify the fixed fixture on both pinned engines")
+    mode.add_argument("--verify", action="store_true", help="verify the fixed fixture with pinned chain-gang")
+    cli.add_argument("--with-bsv-node", action="store_true", help="also verify on the configured local BSV Node")
     args = cli.parse_args(argv)
+    if args.with_bsv_node and not (args.smoke or args.verify):
+        cli.error("--with-bsv-node requires --verify or --smoke")
     result = build(args.project, args.output)
     if args.smoke or args.verify:
-        from verify_project_contract import RECEIPT_SCHEMA, VerificationFailure, diagnostic_value, verify_bundle
-        from fourthgraph.benchmark.validation import Node
+        from verify_project_contract import RECEIPT_SCHEMA, VerificationFailure, diagnostic_value, optional_bsv_node, verify_bundle
 
         try:
-            node = Node(os.environ["REGTEST_URL"], os.environ["REGTEST_COOKIE"]) if args.verify else None
+            node = optional_bsv_node(args.with_bsv_node)
             receipt = verify_bundle(args.output/"manifest.json", result["sha256"], node, ephemeral=args.smoke)
         except VerificationFailure as exc:
             print(json.dumps(exc.report, sort_keys=True), file=sys.stderr)

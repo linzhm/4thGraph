@@ -51,6 +51,14 @@ def pinned_chain():
     return engine
 
 
+def optional_bsv_node(enabled):
+    if not enabled:
+        return None
+    if not os.environ.get("REGTEST_URL") or not os.environ.get("REGTEST_COOKIE"):
+        raise ValueError("--with-bsv-node requires REGTEST_URL and REGTEST_COOKIE for a local regtest node")
+    return Node(os.environ["REGTEST_URL"], os.environ["REGTEST_COOKIE"])
+
+
 def fixture_spec(manifest, host):
     package = host.package
     raw = (Path(manifest).resolve().parent / package["fixtures"]["file"]).read_bytes()
@@ -245,6 +253,7 @@ def verify_bundle(manifest, approval, node=None, *, ephemeral=False, include_io=
             "verification_sources":{str(f.relative_to(ROOT)):sha256(f.read_bytes()).hexdigest() for f in
                                     (Path(__file__).resolve(), ROOT/"src/fourthgraph/workflow/project_contract.py",
                                      ROOT/"src/fourthgraph/workflow/contract_runtime.mjs", ROOT/"src/fourthgraph/benchmark/validation.py")},
+            "verification_level":"dual-engine" if node is not None else "chain-only",
             "node_version":node.version if node else None, "chain_gang":engine,"flags":NODE_FLAGS,"utxo_height":UTXO_HEIGHT,
             "spend_height":SPEND_HEIGHT,"activation_height":ACTIVATION_HEIGHT,"cases":rows,"steps":steps,"status":"passed"}
 
@@ -382,9 +391,11 @@ def main(argv=None):
     cli.add_argument("--approved-sha256", required=True)
     cli.add_argument("--output", type=Path, required=True)
     cli.add_argument("--include-io", action="store_true")
-    cli.add_argument("--smoke", action="store_true", help="chain-gang only; fresh in-memory P-256 key for the R1 fixture")
+    cli.add_argument("--smoke", action="store_true", help="use a fresh in-memory P-256 key for the R1 fixture")
     cli.add_argument("--replay", metavar="RECEIPT", type=Path, help="validate signed spends without generating keys or calling a signer")
-    cli.add_argument("--chain-only", action="store_true", help="in replay, run chain-gang without local BSV Node")
+    engines = cli.add_mutually_exclusive_group()
+    engines.add_argument("--with-bsv-node", action="store_true", help="also verify on the configured local BSV Node")
+    engines.add_argument("--chain-only", action="store_true", help="explicitly select the default chain-gang-only replay")
     cli.add_argument("--public-key", metavar="HEX", help="in R1 replay, require this locally selected public key")
     args = cli.parse_args(argv)
     if args.replay is None and (args.chain_only or args.public_key is not None):
@@ -396,7 +407,7 @@ def main(argv=None):
 
     schema = REPLAY_SCHEMA if args.replay is not None else RECEIPT_SCHEMA
     try:
-        node = None if args.smoke or args.chain_only else Node(os.environ["REGTEST_URL"], os.environ["REGTEST_COOKIE"])
+        node = optional_bsv_node(args.with_bsv_node)
         if args.replay is None:
             report = verify_bundle(args.manifest, args.approved_sha256, node, ephemeral=args.smoke, include_io=args.include_io)
         else:
@@ -408,8 +419,10 @@ def main(argv=None):
     except (ValueError, OSError, KeyError, TypeError, RuntimeError, ImportError) as exc:
         report = VerificationFailure(schema, getattr(exc, "status", type(exc).__name__), diagnostic_value(str(exc))).report
 
-    if args.replay is not None:
-        report.setdefault("verification_level", "chain-only" if args.chain_only else "dual-engine")
+    if report["status"] == "failed":
+        report["requested_verification_level"] = "dual-engine" if args.with_bsv_node else "chain-only"
+        if args.replay is not None:
+            report["verification_level"] = report["requested_verification_level"]
     args.output.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n")
     if report["status"] == "failed":
         print(json.dumps(report, sort_keys=True), file=sys.stderr)
