@@ -253,7 +253,7 @@ REGTEST_CHRONICLE_HEIGHT=5 PYTHONPATH=src:. bash tools/verify_node.sh --profile 
 
 ## 两个建表行首共用自同态
 
-变基表将 `2P`、`3P` 映射为 `2Q`、`3Q` 后再展开对应的行。Forth 词只比较一次 `P` 和 `Q` 的带符号纵坐标，再用一条公式执行两次 `(X, Y, Z) → (βX mod p, ±Y, Z)`，共用域模数、相对符号和 β。链接器将两点传给编译出的词。原曲线和缩放模型的栈表都使用这段实现。[Forth 组合](../../../src/fourthgraph/compiler/secp256k1-joint-stack.fth) · [行首映射公式](../../../src/fourthgraph/stdlib/secp256k1-window.fth)
+在 `7d53334` 上，变基表将 `2P`、`3P` 映射为 `2Q`、`3Q` 后再展开对应的行。Forth 词只比较一次 `P` 和 `Q` 的带符号纵坐标，再用一条公式执行两次 `(X, Y, Z) → (βX mod p, ±Y, Z)`，共用域模数、相对符号和 β。原曲线和缩放模型的栈表都使用这段实现。[两行映射的 Forth 源码](https://github.com/linzhm/4thGraph/blob/7d5333405102e2950dfeb9c172187a25acc4618a/src/fourthgraph/stdlib/secp256k1-window.fth)
 
 | 构建 | 联合点乘准备 | 付款锁 | 两进两出 OTDA ALL，使用构造器 |
 | --- | ---: | ---: | ---: |
@@ -270,4 +270,27 @@ PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
 REGTEST_CHRONICLE_HEIGHT=5 PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
   "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/experiments/high-level/window_compare.py \
   --joint-lowerings --forth-tuning --matrix-only --output workspace/schnorr-high-level/table-tuning-matrix.json
+```
+
+<a name="sharing-beta-across-all-variable-table-row-starts"></a>
+
+## 变基表的三个行首共用 β
+
+准备阶段计算带符号的纵坐标并打包窗口索引。`Q.x = βP.x mod p` 延后到建表，由同一个 Forth 公式构造 `Q`、`2Q` 和 `3Q`。三个横坐标共用域模数和 β。第一个纵坐标沿用已准备的带符号 `Q.y`，另两个用相对符号调整纵坐标，射影分母原样传出。[Forth 组合](../../../src/fourthgraph/compiler/secp256k1-joint-stack.fth) · [行首映射公式](../../../src/fourthgraph/stdlib/secp256k1-window.fth)
+
+| 构建 | 联合点乘准备 | 付款锁 | 两进两出 OTDA ALL，使用构造器 |
+| --- | ---: | ---: | ---: |
+| `7d53334` 的 `2Q`、`3Q` 共用映射 | 3,055 B | 22,940 B | 56,646 B |
+| `Q`、`2Q`、`3Q` 共用映射 | 3,017 B | 22,902 B | 56,494 B |
+| 手工 v0.17.0 | 2,763 B | 22,435 B | 54,626 B |
+
+两份自动版使用同一 `dataflow` 配置及交易夹具，18,379 B 的窗口主体逐字节相同。每锁剩余 467 B，联合点乘调用前占 207 B，联合点乘准备占 254 B，窗口后占 6 B。BSV Node 和 chain-gang 复放了独立验签、付款和八种构造器场景。[实测](../experiments/high-level/window-beta-measurements.json) · [交易矩阵](../experiments/high-level/window-beta-matrix.json)
+
+```sh
+PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
+  "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/experiments/high-level/window_compare.py \
+  --joint-lowerings --forth-tuning --output workspace/schnorr-high-level/window-beta-measurements.json
+REGTEST_CHRONICLE_HEIGHT=5 PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
+  "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/experiments/high-level/window_compare.py \
+  --joint-lowerings --forth-tuning --matrix-only --output workspace/schnorr-high-level/window-beta-matrix.json
 ```

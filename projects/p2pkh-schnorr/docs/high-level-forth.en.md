@@ -241,7 +241,7 @@ REGTEST_CHRONICLE_HEIGHT=5 PYTHONPATH=src:. bash tools/verify_node.sh --profile 
 
 ## Sharing the endomorphism at two row starts
 
-The variable table maps `2P` and `3P` to `2Q` and `3Q` before extending their rows. The Forth word compares the signed ordinates of `P` and `Q` once. A single formula then maps both inputs as `(X, Y, Z) → (βX mod p, ±Y, Z)` with the same field prime, sign, and β. The linker passes the two points to that compiled word. Both the scaled and original-model stack tables use it. [Forth composition](../../../src/fourthgraph/compiler/secp256k1-joint-stack.fth) · [Row map formula](../../../src/fourthgraph/stdlib/secp256k1-window.fth)
+At `7d53334`, the variable table maps `2P` and `3P` to `2Q` and `3Q` before extending their rows. The Forth word compares the signed ordinates of `P` and `Q` once. A single formula then maps both inputs as `(X, Y, Z) → (βX mod p, ±Y, Z)` with the same field prime, sign, and β. Both the scaled and original-model stack tables use it. [Forth source for the two row maps](https://github.com/linzhm/4thGraph/blob/7d5333405102e2950dfeb9c172187a25acc4618a/src/fourthgraph/stdlib/secp256k1-window.fth)
 
 | Build | Joint preparation | Payment lock | 2×2 OTDA ALL with reconstruction |
 | --- | ---: | ---: | ---: |
@@ -258,4 +258,25 @@ PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
 REGTEST_CHRONICLE_HEIGHT=5 PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
   "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/experiments/high-level/window_compare.py \
   --joint-lowerings --forth-tuning --matrix-only --output workspace/schnorr-high-level/table-tuning-matrix.json
+```
+
+## Sharing β across all variable-table row starts
+
+Preparation computes the signed ordinates and the window digits. It defers `Q.x = βP.x mod p` until table construction, where one Forth formula produces `Q`, `2Q`, and `3Q`. The three abscissas use the same field prime and β. The first ordinate comes from the prepared signed `Q.y`; the other two use the relative sign, and their projective denominators pass through the formula. [Forth composition](../../../src/fourthgraph/compiler/secp256k1-joint-stack.fth) · [Row map formula](../../../src/fourthgraph/stdlib/secp256k1-window.fth)
+
+| Build | Joint preparation | Payment lock | 2×2 OTDA ALL with reconstruction |
+| --- | ---: | ---: | ---: |
+| Shared map for `2Q` and `3Q` at `7d53334` | 3,055 B | 22,940 B | 56,646 B |
+| Shared map for `Q`, `2Q`, and `3Q` | 3,017 B | 22,902 B | 56,494 B |
+| Handwritten v0.17.0 | 2,763 B | 22,435 B | 54,626 B |
+
+The comparison uses the same `dataflow` settings and transaction fixtures. The 18,379 B window sequence is byte-identical. The 467 B gap to the handwritten lock comprises 207 B before the joint word, 254 B in joint preparation, and 6 B after the windows. BSV Node and chain-gang replayed the standalone and payment cases and the eight constructor scenarios. [Measurements](../experiments/high-level/window-beta-measurements.json) · [Transaction matrix](../experiments/high-level/window-beta-matrix.json)
+
+```sh
+PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
+  "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/experiments/high-level/window_compare.py \
+  --joint-lowerings --forth-tuning --output workspace/schnorr-high-level/window-beta-measurements.json
+REGTEST_CHRONICLE_HEIGHT=5 PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
+  "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/experiments/high-level/window_compare.py \
+  --joint-lowerings --forth-tuning --matrix-only --output workspace/schnorr-high-level/window-beta-matrix.json
 ```

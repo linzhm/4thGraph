@@ -220,7 +220,7 @@ def _optimized_joint_words(vocabulary, optimization, *, scaled):
         "double-pair": numeric_fragment(library.emit(prefix + "double-pair-with-field", b"", 1), 4, 4),
         "double-point": numeric_fragment(library.emit(prefix + "double-with-field", b"", 1), 4, 4),
         "add-fixed-affine": numeric_fragment(library.emit(prefix + "add-affine-with-field", b"", 1), 6, 4),
-        "map-row-coordinates": numeric_fragment(library.emit("secp-window-map-row-coordinates", b""), 9, 6),
+        "map-row-coordinates": numeric_fragment(library.emit("secp-window-map-row-coordinates", b""), 11, 9),
     }
     points = fixed_table(SECP256K1, split_bits=128)
     scale_public = restore = b""
@@ -242,8 +242,8 @@ def _optimized_joint_words(vocabulary, optimization, *, scaled):
 
 def _variable_stack_table(frontend, words, optimization):
     """Schedule the three nonzero rows around the shared P, 2P and 3P."""
-    p, px, py, qx, qy = inputs = (0, 1, 2, 3, 4)
-    map_pair = compile_word(frontend.words["map-row-pair"], optimization).script
+    p, px, py, qy = inputs = (0, 1, 2, 3)
+    map_rows = compile_word(frontend.words["map-row-starts"], optimization).script
     row = compile_word(frontend.words["stack-table-row"], optimization).script
 
     def schedule(preserve_field):
@@ -258,13 +258,13 @@ def _variable_stack_table(frontend, words, optimization):
             return outputs
 
         one, = emit(number(1), (), 1)
-        P, Q = (px, py, one), (qx, qy, one)
+        P = (px, py, one)
         retained = (p,) if preserve_field else ()
         drop = b"" if preserve_field else asm("3 OP_ROLL OP_DROP")
         P2 = emit(words["double-point"].code + drop, (p, *P), 3, retained)
         P3 = emit(words["add-fixed-affine"].code + drop, (p, *P2, px, py), 3, retained)
-        mapped = emit(map_pair, (p, *P2, *P3, py, qy), 6)
-        Q2, Q3 = mapped[:3], mapped[3:]
+        starts = emit(map_rows, (p, px, *P2, *P3, qy, py), 9)
+        Q, Q2, Q3 = starts[:3], starts[3:6], starts[6:]
         rows = [emit(row, (p, px, py, *point), 12) for point in (Q, Q2, Q3)]
         returns = (p, *P, *P2, *P3, *(slot for values in rows for slot in values))
         return emit_steps(inputs, steps, returns, compact=True, trim_suffix=optimization == DATAFLOW,
