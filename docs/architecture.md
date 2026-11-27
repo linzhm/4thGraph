@@ -17,6 +17,8 @@ Start with the highest-level Forth and freeze its semantics, target, dependencie
 
 The typed AST and dependency graph record how a result arises. Record a separate hash for the source snapshot, normalized constraints, build plan, exact linked Script, and emitted fragments. A byte hash identifies an artifact. Its source and build records explain which changes produced it and permit replay. Keep multiple plans traceable even when they emit identical bytes.
 
+Workload-specific acceptance covers wide integer arithmetic, repeated hashing, and curve calls. [Optimization paths and replay](optimization-paths.md)
+
 ### Select implementations at call sites
 
 Forth names the operation through a public word. After resolving the word and its input facts, the compiler binds each call site to a registered implementation, then optimizes its graph, schedules its stack, and links it. Two calls to the same word can bind different implementations. Evaluate specialized kernels for known constants, ranges, or coordinate representations, shared representations across adjacent calls, and alternatives for unrolling, table lookup, or reusing intermediates in repeated calls. The first slice selects a specialized kernel at an individual call site.

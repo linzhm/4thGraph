@@ -155,6 +155,13 @@ LIBRARIES = {
         p256_export("p256-add", ("p", "b3", "x1", "y1", "z1", "x2", "y2", "z2")),
         p256_export("p256-double", ("p", "b3", "x", "y", "z")),
     )),
+    "std/hash-chain": Library(ROOT / "stdlib/hash-chain.fth", tuple(
+        script_fragment(name, (Parameter("data", "bytes", "Initial byte string"),), takes=("script", "cell"),
+                        build_parameters=(Parameter("count", "cell", count),),
+                        failure="The build count must be in 0..256. The runtime stack must contain one byte string.")
+        for name, count in (("sha256-chain-single", "Number of SHA-256 rounds"),
+                            ("sha256-chain-pairs", "Number of consecutive SHA-256 pairs"))
+    )),
     "std/script-fragments": Library(ROOT / "stdlib/script-fragments.fth", (
         script_fragment("script-pick-depth", takes=("script", "cell"),
                         failure="The spend stack must contain the selected depth."),
