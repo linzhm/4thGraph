@@ -69,6 +69,19 @@ PYTHONPATH=src:. python -m fourthgraph.workflow.protocol "projects/workflow-exam
   --entry advance-and-pay --optimize stack
 ```
 
+## 复用 PELS 原像重建
+
+将见证压缩放在交易编译层。合约定义并构造完整、有序的输出向量，重建器按签名模式拼回原像，认证片段再用原生 `OP_CHECKSIG` 将原像绑定到实际花费。Counter 的单后继构造和 Workflow 的有序多输出构造都遵循这个边界。[Counter 构建与复放](../../projects/pels-counter/README.zh-CN.md) · [重建实现](../../src/fourthgraph/workflow/forkid_lowering.py)
+
+| 单输入路径 | 可重建字段 | 适用条件 |
+| --- | --- | --- |
+| BIP143 ALL | `hashPrevouts`、`hashSequence`、`hashOutputs` 和签名类型。链接固定 `scriptCode` 时，打包上下文为 56 B。 | 合约能构造全部输出。上一输出金额留在打包上下文，并由原像认证。 |
+| OTDA ALL | 输入记录、输出计数、有序输出序列和签名类型。链接固定 `scriptCode` 时，打包上下文为 48 B。 | 合约能构造全部输出，且约束不依赖原像未承诺的上一输出金额。 |
+
+Workflow 的双模式锁用打包上下文的长度选择签名模式，并将对应签名类型交给认证片段。两条分支消费同一份有序输出序列。若合约需要验证上一输出金额，构建时只选用 BIP143 路径。
+
+打包上下文字节只衡量一部分见证；评估收益时还应计入应用见证和新增重建代码。Counter 的自引用路径可以携带 `scriptCode`，并在链接验证两个位置的片段相同后省去其中一份。多输入、开放输出以及其他 SIGHASH 模式需要各自证明可重建字段，已有调用方按原有模板继续构建。[重建回归](../../tests/test_workflow.py) · [Counter 见证回归](../../tests/test_counter_optimization.py)
+
 ## 验证路径
 
 `relation:` 声明公开的 `current → next → route` 关系。每种候选检查相同的部署状态、真实输入、结算或复核输出，以及记录新状态的回执。电路后端共享 `next, route, current, bindLo, bindHi` 的公开信号顺序。证明路径从经认证的 BIP143 ALL 原像取得 SHA-256d，核对证明中的两个绑定字段。

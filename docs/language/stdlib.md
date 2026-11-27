@@ -69,6 +69,19 @@ PYTHONPATH=src:. python -m fourthgraph.workflow.protocol "projects/workflow-exam
   --entry advance-and-pay --optimize stack
 ```
 
+## Reusing PELS preimage reconstruction
+
+Keep witness compression in the transaction compiler. The contract defines and constructs the complete ordered output vector. The reconstructor assembles the preimage for the selected sighash mode, and the authentication fragment binds that preimage to the actual spend with native `OP_CHECKSIG`. The Counter's single-successor construction and Workflow's ordered multi-output construction use this boundary. [Counter build and replay](../../projects/pels-counter/README.md) · [Reconstruction implementation](../../src/fourthgraph/workflow/forkid_lowering.py)
+
+| Single-input path | Reconstructed fields | Requirements |
+| --- | --- | --- |
+| BIP143 ALL | `hashPrevouts`, `hashSequence`, `hashOutputs`, and sighash type. The packed context is 56 B when a fixed `scriptCode` is linked. | The contract can construct all outputs. The previous output amount stays in the packed context and is authenticated by the preimage. |
+| OTDA ALL | Input record, output count, ordered outputs, and sighash type. The packed context is 48 B when a fixed `scriptCode` is linked. | The contract can construct all outputs and its constraints can be checked without the previous output amount, which OTDA does not commit to. |
+
+The dual-mode Workflow lock selects the mode by the packed context length and passes the corresponding sighash type to the authentication fragment. Both branches consume the same ordered outputs. A contract that must verify the previous output amount selects the BIP143 path at build time.
+
+The packed context accounts for part of the witness. Include the application witness and the added reconstruction code when comparing sizes. The Counter's self-referencing path can carry `scriptCode` and omit one copy once the linker checks that the two fragments match. Multi-input transactions, open outputs, and other sighash modes need separate proofs of which fields can be reconstructed. Existing callers continue to build from their current templates. [Reconstruction regression](../../tests/test_workflow.py) · [Counter witness regression](../../tests/test_counter_optimization.py)
+
 <a id="验证路径"></a>
 
 ## Verification paths
