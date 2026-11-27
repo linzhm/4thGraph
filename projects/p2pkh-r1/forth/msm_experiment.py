@@ -32,7 +32,7 @@ def objective(row, field, metric):
 
 def estimated_cost(compiler, plan, program, lock, pattern):
     costs = compiler.local_cost(plan, program)
-    size = len(compiler.prepare) + costs["window_bytes"] + len(compiler.finish(program.table_points))
+    size = len(compiler.prepare) + costs["window_bytes"] + len(compiler.finish(program.table_slots))
     if size != len(lock.script):
         raise ValueError("counted window cost does not match the compiled lock")
     otda = len(pattern.program)
@@ -40,7 +40,7 @@ def estimated_cost(compiler, plan, program, lock, pattern):
     # reconstructed OTDA bytes dominate the two OTDA fixture modes.
     counts = plan.counts()
     digits = counts["g_lookups"] + counts["q_lookups"] + counts["joint_lookups"]
-    bip143_peak = 99 * plan.table_points + 2 * digits + 400
+    bip143_peak = 33 * plan.table_slots + 2 * digits + 400
     return {
         **costs, "lock_bytes": size, "otda_program_bytes": otda, "payment_bytes": payment_estimates(size, otda),
         "payment_peak_stack_payload_bytes": {
@@ -365,8 +365,20 @@ def dump(value, output=None):
 
 
 def main():
+    from fourthgraph.compiler.method_search import DEFAULT_ORDER_STATES, MAX_ORDER_DEPTH, MAX_ORDER_STATES
+
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
+    for name, help_text in (("method-matrix", "compile and verify the ordered R1 method pairs"),
+                            ("method-search", "expand eligible R1 method sequences and verify their costs")):
+        command = sub.add_parser(name, help=help_text)
+        command.add_argument("--output", type=Path)
+        command.add_argument("--replay", type=Path, help="require exact agreement with a previous report")
+        if name == "method-search":
+            command.add_argument("--max-depth", type=int, choices=range(1, MAX_ORDER_DEPTH + 1),
+                                 metavar=f"1..{MAX_ORDER_DEPTH}")
+            command.add_argument("--max-states", type=int, choices=range(1, MAX_ORDER_STATES + 1),
+                                 metavar=f"1..{MAX_ORDER_STATES}")
     for name in ("scan", "local", "build", "compare"):
         command = sub.add_parser(name)
         command.add_argument("--source", type=Path,
@@ -392,6 +404,33 @@ def main():
             command.add_argument("--markdown", type=Path)
             command.add_argument("--reference", type=Path, help="previous R1 comparison report (schema version 2)")
     args = parser.parse_args()
+    if args.command in ("method-matrix", "method-search"):
+        from r1_method_matrix import SCHEMA, SEARCH_SCHEMA, run_experiment
+
+        search = args.command == "method-search"
+        try:
+            previous = json.loads(args.replay.read_text()) if args.replay else None
+            schema = SEARCH_SCHEMA if search else SCHEMA
+            if args.replay and (not isinstance(previous, dict) or previous.get("schema") != schema):
+                raise ValueError(f"expected an R1 {args.command} report")
+            budget = None
+            if search:
+                requested = {"max_depth": args.max_depth, "max_states": args.max_states}
+                if previous is None:
+                    budget = {"max_depth": args.max_depth or MAX_ORDER_DEPTH,
+                              "max_states": args.max_states or DEFAULT_ORDER_STATES}
+                else:
+                    budget = previous["search"]["budget"]
+                    if set(budget) != set(requested) or any(
+                            value is not None and value != budget[key] for key, value in requested.items()):
+                        raise ValueError("method search replay requires the recorded budget")
+            report = run_experiment(search_budget=budget)
+            if args.replay and previous != json.loads(json.dumps(report)):
+                raise ValueError(f"{args.command} replay differs from the recorded evidence")
+        except (KeyError, OSError, TypeError, ValueError) as error:
+            parser.error(str(error))
+        dump(report, args.output)
+        return 0 if report["status"] == "passed" else 1
     source_requested = args.source is not None
     if not source_requested:
         args.source = SOURCE

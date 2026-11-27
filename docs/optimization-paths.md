@@ -17,6 +17,38 @@ The matrix comparison fixes the input domain and the four result slots. `stack` 
 
 The hash fixture returns both its intermediate and final digest. The compiler selects the paired kernel only for a build-time region of at least two rounds. It records the round count, bundled kernel digest, linked byte range, and the cost of a trailing odd round. The single-round checkpoint and any kernel for a different operation are rejected as paired bindings. [Matrix sources](../src/fourthgraph/benchmark/formulas/matrix-mul.fth) · [Hash caller](../src/fourthgraph/benchmark/fixtures/hash-chain.fth) · [Hash kernels](../src/fourthgraph/stdlib/hash-chain.fth)
 
+## R1 same-source automatic selection
+
+Freeze `r1-baseline-lock` and its imports, then measure the current compiler before selecting a window plan. The original window-only entry `--auto --auto-rounds 1` ranks six linked Scripts by lock size. It can replace the verified P-256 multiplication region only when the input and dependency digests match. It preserves the original result check and transaction binding. Other input snapshots use the existing formula plans.
+
+| Compile mode | Lock bytes | BIP143 funding + spend bytes | Main / alternate stack peak items |
+| --- | ---: | ---: | ---: |
+| Baseline | 415,058 | 415,511 | 71 / 39 |
+| Existing `--optimize` | 139,333 | 139,786 | 24 / 39 |
+| `--auto`, selected `split-5x4-affine-g-ifdup` | 41,264 | 41,715 | 161 / 119 |
+
+The transaction metric is for one synthetic input spending into one output. The development evaluator observes the stack peaks. Pinned chain-gang and BSV Node regtest verify all six candidates under BIP143 ALL, OTDA ALL and both paired and unpaired OTDA SINGLE. Each rejects the stale witness at the transaction binding check after a locktime change. [Build and replay](../projects/p2pkh-r1/forth/README.md)
+
+With `--auto-rounds 6`, the search compiled 32 distinct candidates in five rounds and stopped at the candidate budget. The same spend checks cover all 32 candidates. Adjusting the window widths and guard choices left the winning Script at 41,264 B. The JSON records which candidates entered each round and the best lock through that round.
+
+## R1 ordered method exploration
+
+The initial matrix and search figures below use the original compiler snapshot. [Original build and plans](https://github.com/linzhm/4thGraph/tree/9b13dfbbd50487ca868831788f653e2b75f9cd5a)
+
+Each matrix cell applies the row method followed by the column method. Both matrices use the same Forth and two-input, two-output fixture. The first starts with separate generic tables. The second starts with a proven affine G kernel so that compact storage and its zero-digit guard can be compared in each order. The five methods select a joint window, specialize fixed G calls, compact the G table, shorten the zero guard, and run explicit stack search on the point-add kernels visible at that step.
+
+Applying affine specialization before stack search emits a 41,927 B lock. Applying stack search first leaves the new affine kernel on its default lowering and emits 41,366 B. Compact storage and the guard commute from the affine seed and emit the same 41,165 B lock. This compact plan leads on the BIP143 ALL path at 165,575 B. The joint window leads on the OTDA ALL path at 176,617 B, compared with 176,807 B for the compact plan.
+
+The run records all 50 ordered pairs. The 25 eligible cells link to nine distinct lock and reconstruction artifacts, each verified against actual fixture prevouts by pinned chain-gang. The report ranks targets separately and can be reproduced with `method-matrix --replay`. [Build and replay](../projects/p2pkh-r1/forth/README.md)
+
+The `method-search` command starts from the generic split state and expands every applicable method, including independent G-window widening. The measured run on six registered methods exhausted the reachable graph after 19 compiler states and 114 attempted transitions. The longest discovered prefix had five methods. BIP143 ALL selected affine G, compact G and the shortened guard in sequence, while both OTDA modes selected the single joint-window step. `--replay` uses the original budget.
+
+The next method-search revision adds an OTDA packing choice for repeated fragments. For `joint-2`, the constructor can build 128 copies of a window by doubling and remove the final copy. It tries the alternative only when it uses fewer bytes and its temporary fits within the suffix being reconstructed. The 42,382 B lock is byte-identical. The constructor falls from 3,062 B to 3,043 B. With two signed inputs, the complete fixture path falls from 176,617 B to 176,579 B under OTDA ALL and from 176,546 B to 176,508 B under paired OTDA SINGLE. The BIP143 paths and the observed stack peaks are unchanged.
+
+The expanded search also compares a narrower separate Q window, repeats constructed on the main stack, and one dictionary lookup for consecutive copies of an identical kernel. The two packing choices are admitted only when the emitted constructor is smaller on the current state. All retained candidates are ranked using complete verified transactions. The report distinguishes reaching the state budget from exhausting the graph. The ten-method run reached the 64-state budget and independently verified 61 distinct artifacts. Narrowing Q made the generic split's OTDA ALL path 8,229 B larger even though its constructor shrank. Main-stack repetition reduced the compact affine candidate's OTDA path by 16 B. Adjacent references reduced the winning joint-window OTDA path by another 2 B, to 176,577 B under ALL and 176,506 B under paired SINGLE. The best BIP143 ALL path was 165,575 B.
+
+With the compiler at `c02df4a`, all three payment searches exhausted their 152 states within the 160-state budget. Each chose a 41,114 B lock. The OTDA goals also chose main-stack repetition and adjacent kernel packing. `--replay-plan` checks the compiler source digest, applies the saved sequence and verifies both artifact hashes. Chain-gang 0.13.2 measured 165,371 B for BIP143 ALL, 176,547 B for OTDA ALL, and 176,476 B for paired OTDA SINGLE across funding and spending. [Plans and commands](../projects/p2pkh-r1/forth/README.md)
+
 ## Ordered formula rules
 
 Use these rules on closed formulas whose caller establishes canonical ScriptNum encodings and the declared input intervals.
