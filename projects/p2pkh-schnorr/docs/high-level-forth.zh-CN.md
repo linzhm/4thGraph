@@ -189,6 +189,8 @@ REGTEST_CHRONICLE_HEIGHT=5 PYTHONPATH=src:. bash tools/verify_node.sh --profile 
 | 栈与坐标模型边界优化 | 23,190 B | 57,646 B |
 | 手工 v0.17.0 | 22,435 B | 54,626 B |
 
+表格和实测文件对应提交 `e1ee42b`。从该提交的检出目录运行下列命令，可逐字节复现实测脚本。与 `main` 的 `c02df4a` 合并后，选中构建的付款锁为 23,188 B，两进两出的重建交易为 57,638 B。 [实测提交](https://github.com/linzhm/4thGraph/tree/e1ee42b455225934d580d172e562540286c42c56)
+
 18,379 B 的窗口循环与冻结手工版逐字节相同。每锁剩余 755 B，分布在联合点乘准备 441 B、见证和挑战值处理 250 B、清栈和 nonce 点比较 64 B。验签器复放 BIP340 向量、错误见证、12 种成对付款模式和两种普通输出退出。选中候选也通过构造器矩阵的八个场景。[实测](../experiments/high-level/boundary-measurements.json) · [交易矩阵](../experiments/high-level/boundary-matrix.json)
 
 ```sh
