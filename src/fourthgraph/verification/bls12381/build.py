@@ -7,8 +7,8 @@ import json
 from pathlib import Path
 
 from fourthgraph.verification.bls12381.affine_witness import (
-    AffineStages, LAYOUTS, MILLER_REDUCTIONS, MSM_STRATEGIES, MSM_TABLES, affine_witness, line_packet, msm_windows,
-    slope_packet_bytes,
+    AffineStages, LAYOUTS, MILLER_KERNELS, MILLER_REDUCTIONS, MSM_STRATEGIES, MSM_TABLES, affine_witness,
+    line_packet, msm_windows, slope_packet_bytes,
 )
 from fourthgraph.verification.bls12381.field import FP2_ENTRY, FP2_RULES, fp2_alternatives, fp2_kernel
 from fourthgraph.verification.bls12381.verifier import (
@@ -43,6 +43,7 @@ class ArithmeticPlan:
     msm: str = MSM_STRATEGIES[0]
     msm_table: str = MSM_TABLES[0]
     miller_reductions: str = MILLER_REDUCTIONS[0]
+    miller_kernel: str = MILLER_KERNELS[0]
 
     def __post_init__(self):
         object.__setattr__(self, "fp2_rules", validate_rules(self.fp2_rules))
@@ -58,6 +59,12 @@ class ArithmeticPlan:
             raise ValueError("doubling-slope tables require signed radix-4 MSM")
         if self.miller_reductions not in MILLER_REDUCTIONS:
             raise ValueError(f"Miller reductions must be one of {', '.join(MILLER_REDUCTIONS)}")
+        if self.miller_kernel not in MILLER_KERNELS:
+            raise ValueError(f"Miller kernel must be one of {', '.join(MILLER_KERNELS)}")
+
+    @property
+    def uses_affine_miller(self):
+        return self.miller_reductions != MILLER_REDUCTIONS[0] or self.miller_kernel != MILLER_KERNELS[0]
 
     def document(self):
         document = asdict(self)
@@ -69,13 +76,15 @@ class ArithmeticPlan:
             del document["msm_table"]
         if self.miller_reductions == MILLER_REDUCTIONS[0]:
             del document["miller_reductions"]
+        if self.miller_kernel == MILLER_KERNELS[0]:
+            del document["miller_kernel"]
         return document
 
     @classmethod
     def read(cls, path):
         plan = json.loads(path.read_bytes())
         required = {"fp2_rules", "residue_association"}
-        optional = {"fp2_selection", "msm", "msm_table", "miller_reductions"}
+        optional = {"fp2_selection", "msm", "msm_table", "miller_reductions", "miller_kernel"}
         if not isinstance(plan, dict) or not required <= plan.keys() <= required | optional:
             raise ValueError("arithmetic plan requires fp2_rules and residue_association")
         return cls(**plan)
@@ -166,8 +175,8 @@ class ForthVerifier(ScriptVerifier):
             raise ValueError(f"unknown witness layout {witness_layout!r}")
         if plan is not None and plan.msm == "signed-radix4" and witness_layout == "projective":
             raise ValueError("signed radix-4 MSM requires an affine witness layout")
-        if plan is not None and plan.miller_reductions != MILLER_REDUCTIONS[0] and witness_layout == "projective":
-            raise ValueError("grouped Miller reductions require an affine witness layout")
+        if plan is not None and plan.uses_affine_miller and witness_layout == "projective":
+            raise ValueError("the Miller plan requires an affine witness layout")
         if script_era not in SCRIPT_ERAS:
             raise ValueError(f"unknown Script era {script_era!r}")
         self.witness_layout = witness_layout
@@ -214,7 +223,8 @@ class ForthVerifier(ScriptVerifier):
         else:
             stages = AffineStages(self.key, sources, lines_in_witness=self.witness_layout == "affine-witness",
                                   msm=self.msm, msm_table=plan.msm_table,
-                                  miller_reductions=plan.miller_reductions, **options)
+                                  miller_reductions=plan.miller_reductions, miller_kernel=plan.miller_kernel,
+                                  **options)
         stack = []
         for instruction, _ in self.instructions:
             if isinstance(instruction, Shuffle):
@@ -286,15 +296,14 @@ def layout_candidates(verification_key, source, sources=None, owner=None, *, com
                       entry=None, source_path=None, plan=None):
     """Build the applicable layouts under the same proof and deployment policy."""
     signed_msm = plan is not None and plan.msm == "signed-radix4"
-    grouped_miller = plan is not None and plan.miller_reductions != MILLER_REDUCTIONS[0]
-    affine = signed_msm or grouped_miller
+    affine = signed_msm or (plan is not None and plan.uses_affine_miller)
     primary = ForthVerifier(verification_key, source, entry=entry, source_path=source_path, script_era=script_era,
                             witness_layout="affine-inline" if affine else "projective", plan=plan)
     sources = primary.sources(sources)
     if dynamic_slots(sources):
         layouts = LAYOUTS[1:] if affine else LAYOUTS
     elif affine:
-        feature = "signed radix-4 MSM" if signed_msm else "grouped Miller reductions"
+        feature = "signed radix-4 MSM" if signed_msm else "the Miller plan"
         raise ValueError(f"{feature} requires at least one spend-time public input")
     else:
         layouts = (primary.witness_layout,)

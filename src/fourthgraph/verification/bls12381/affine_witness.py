@@ -17,7 +17,8 @@ from fourthgraph.compiler.curve_windows import SignedRadix4Window, double_from_a
 LAYOUTS = ("projective", "affine-inline", "affine-witness")
 MSM_STRATEGIES = ("unsigned-radix4", "signed-radix4")
 MSM_TABLES = ("points", "doubling-slopes", "deferred-doubling-slopes")
-MILLER_REDUCTIONS = ("per-operation", "per-step", "per-round")
+MILLER_REDUCTIONS = ("per-operation", "per-step", "per-round", "split-chord", "split-chord-residue")
+MILLER_KERNELS = ("cross-products", "direct-normalized")
 IDENTITY = (0, 0)
 PAIRING_STEPS = len(SEED_BITS) + SEED_BITS.count("1")
 
@@ -161,7 +162,7 @@ def add_msm_window(f, acc, point, digit, slope, *, bounded=False, defer_reductio
     return tuple(map(f.reduce, selected)) if defer_reductions else selected
 
 
-def checked_b_line(curve, point, other, slope, *, doubling):
+def line_slope_residual(curve, point, other, slope, *, doubling):
     x, y = point
     ax, ay = other
     if doubling:
@@ -170,13 +171,41 @@ def checked_b_line(curve, point, other, slope, *, doubling):
     else:
         denominator = curve.sub(ax, x)
         numerator = curve.sub(ay, y)
+    return denominator, curve.sub(curve.mul(slope, denominator), numerator)
+
+
+def checked_b_line(curve, point, other, slope, *, doubling):
+    x, y = point
+    ax, _ = other
     f = curve.tower.fp
-    mismatch = curve.sub(curve.mul(slope, denominator), numerator)
+    denominator, mismatch = line_slope_residual(curve, point, other, slope, doubling=doubling)
     f.all((f.op("OP_BOOLOR", *(f.nonzero(limb) for limb in denominator)),
            *(f.equal(limb, 0) for limb in mismatch)))
     nx = curve.reduce(curve.sub(curve.sub(curve.square(slope), x), ax))
     ny = curve.sub(curve.mul(slope, curve.sub(x, nx)), y)
     return (nx, ny), (curve.sub(curve.mul(slope, x), y), slope)
+
+
+def checked_normalized_b_line(curve, point, other, slope, *, doubling):
+    x, y = point
+    ax, _ = other
+    f = curve.tower.fp
+    with f.residue_block():
+        denominator, mismatch = line_slope_residual(curve, point, other, slope, doubling=doubling)
+    # The initial proof coordinates and each subsequent point are reduced.
+    # Since 2 is invertible, a tangent denominator vanishes exactly when y does.
+    nonzero = (tuple(f.op("OP_0NOTEQUAL", limb) for limb in y) if doubling
+               else tuple(map(f.nonzero, denominator)))
+    f.all((f.op("OP_BOOLOR", *nonzero), *(f.equal(limb, 0) for limb in mismatch)))
+    with f.residue_block():
+        nx = curve.sub(curve.sub(curve.square(slope), x), ax)
+        intercept = curve.sub(curve.mul(slope, x), y)
+    nx = curve.reduce(nx)
+    # Reuse the line intercept for y' = (slope*x - y) - slope*x'.
+    with f.residue_block():
+        ny = curve.sub(intercept, curve.mul(slope, nx))
+    intercept = curve.reduce(intercept)
+    return (nx, curve.reduce(ny)), (intercept, slope)
 
 
 def double_msm_point(field, point, trusted_point, *, defer_reductions):
@@ -197,7 +226,7 @@ def double_msm_point(field, point, trusted_point, *, defer_reductions):
 class AffineStages(VerifierStages):
     def __init__(self, key, sources, *, lines_in_witness, chronicle=False, optimize=False, fp2_rules=FP2_RULES,
                  fp2_selection="uniform", msm=MSM_STRATEGIES[0], msm_table=MSM_TABLES[0],
-                 miller_reductions=MILLER_REDUCTIONS[0]):
+                 miller_reductions=MILLER_REDUCTIONS[0], miller_kernel=MILLER_KERNELS[0]):
         self.witness_items = 2 if lines_in_witness else 1
         super().__init__(key, sources, chronicle=chronicle, optimize=optimize, extra_inputs=self.witness_items,
                          fp2_rules=fp2_rules, fp2_selection=fp2_selection)
@@ -207,6 +236,8 @@ class AffineStages(VerifierStages):
         self.msm = msm
         self.msm_table = msm_table
         self.miller_reductions = miller_reductions
+        self.direct_miller = miller_kernel == "direct-normalized"
+        self.tower.direct_lines = self.direct_miller
         self.windows = tuple(msm_windows(key, sources, strategy=msm))
         inputs = self.field.graph.inputs
         self.trace = PackedFields(self.field, inputs[self.witness_items - 1])
@@ -295,8 +326,10 @@ class AffineStages(VerifierStages):
         prepared = iter(vk_lines(self.key))
         step = 0
         acc, current = z, b
-        per_round = self.miller_reductions == "per-round"
+        split_chord = self.miller_reductions in ("split-chord", "split-chord-residue")
+        per_round = self.miller_reductions == "per-round" or split_chord
         per_step = self.miller_reductions == "per-step"
+        check_line = checked_normalized_b_line if self.direct_miller else checked_b_line
         for bit in bits:
             if not per_round:
                 acc = tower.square12(acc)
@@ -304,7 +337,7 @@ class AffineStages(VerifierStages):
             for doubling in ((True, False) if bit == "1" else (True,)):
                 offset = len(self.windows) + step * 2
                 slope = self.trace.read(offset), self.trace.read(offset + 1)
-                current, line = checked_b_line(curve, current, current if doubling else b, slope, doubling=doubling)
+                current, line = check_line(curve, current, current if doubling else b, slope, doubling=doubling)
                 delta, gamma = next(prepared)
                 zero_intercept = gamma[0] == curve.zero
                 if self.lines_in_witness:
@@ -328,7 +361,13 @@ class AffineStages(VerifierStages):
                     acc = tower.mul_line(acc, evaluated_line(tower, minus_c, delta))
                     acc = tower.mul_line(acc, gamma_line)
                 step += 1
-            if per_round:
+            if split_chord and bit == "1":
+                acc = tower.miller_round(acc, round_lines[:3], None)
+                if self.miller_reductions == "split-chord-residue":
+                    acc = tower.mul12(tower.mul_lines(acc, round_lines[3:]), z)
+                else:
+                    acc = tower.mul_lines(acc, round_lines[3:], z)
+            elif per_round:
                 acc = tower.miller_round(acc, round_lines, z if bit == "1" else None)
             elif bit == "1":
                 acc = tower.mul12(acc, z)

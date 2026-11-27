@@ -182,11 +182,12 @@ class ScriptField:
 class Tower:
     """Fp2 = Fp[i], i² = -1, Fp6 = Fp2[v], v³ = 1+i, Fp12 = Fp6[w], w² = v."""
 
-    def __init__(self, field, *, sparse=False, defer_reductions=False, mul2_kernel=None):
+    def __init__(self, field, *, sparse=False, defer_reductions=False, mul2_kernel=None, direct_lines=False):
         self.fp = field
         self.sparse = sparse
         self.defer_reductions = defer_reductions
         self.mul2_kernel = mul2_kernel
+        self.direct_lines = direct_lines
 
     def add2(self, a, b):
         return self.fp.add(a[0], b[0]), self.fp.add(a[1], b[1])
@@ -238,6 +239,12 @@ class Tower:
             # involving a2 each have one product after reducing v³ = 1+i.
             a0, a1, a2 = a
             b0, b1, _ = b
+            if self.direct_lines:
+                return (
+                    self.add2(self.mul2(a0, b0), self.xi(self.mul2(a2, b1))),
+                    self.add2(self.mul2(a0, b1), self.mul2(a1, b0)),
+                    self.add2(self.mul2(a1, b1), self.mul2(a2, b0)),
+                )
             t0, t1 = self.mul2(a0, b0), self.mul2(a1, b1)
             cross = self.mul2(self.add2(a0, a1), self.add2(b0, b1))
             return (
@@ -287,18 +294,28 @@ class Tower:
     def _mul_line(self, a, line):
         c0, c2, c3 = line
         even, odd = a
-        t0 = self.mul6(even, (c0, c2, ZERO2))
-        t1 = self.mul_v(tuple(self.mul2(coefficient, c3) for coefficient in odd))
+        base = c0, c2, ZERO2
+        if self.direct_lines:
+            # The odd line part is c3*v. Recombine the two powers of w
+            # explicitly to shorten the lifetime of the sparse products.
+            even_product = self.add6(self.mul6(even, base), self.mul_v(self._mul_line_odd(odd, c3)))
+            odd_product = self.add6(self.mul6(odd, base), self._mul_line_odd(even, c3))
+            return even_product, odd_product
+        t0 = self.mul6(even, base)
+        t1 = self._mul_line_odd(odd, c3)
         cross = self.mul6(self.add6(even, odd), (c0, self.add2(c2, c3), ZERO2))
         return self.add6(t0, self.mul_v(t1)), self.sub6(self.sub6(cross, t0), t1)
 
-    def mul_lines(self, acc, lines):
-        return self._fp12(self._mul_lines, acc, lines)
+    def _mul_line_odd(self, value, coefficient):
+        return self.mul_v(tuple(self.mul2(pair, coefficient) for pair in value))
 
-    def _mul_lines(self, acc, lines):
+    def mul_lines(self, acc, lines, extra_factor=None):
+        return self._fp12(self._mul_lines, acc, lines, extra_factor)
+
+    def _mul_lines(self, acc, lines, extra_factor):
         for line in lines:
             acc = self._mul_line(acc, line)
-        return acc
+        return acc if extra_factor is None else self._mul12(acc, extra_factor)
 
     def miller_round(self, acc, lines, extra_factor):
         """Square, apply three tangent lines, and include optional chord lines and residue."""
@@ -309,8 +326,7 @@ class Tower:
         # six evaluated lines (limbs below Q²) and one reduced residue.
         # Even allowing a factor of 2¹⁶ for the coefficient sums in each
         # operation, one round fits within 6,000 bits per unreduced limb.
-        acc = self._mul_lines(self._square12(acc), lines)
-        return acc if extra_factor is None else self._mul12(acc, extra_factor)
+        return self._mul_lines(self._square12(acc), lines, extra_factor)
 
     def frobenius12(self, a):
         return tuple(

@@ -54,41 +54,47 @@ class BLS12381Tests(unittest.TestCase):
         def flatten(value):
             return tuple(chain.from_iterable(chain.from_iterable(value)))
 
-        field = ScriptField(18, assert_checks=True)
-        tower = Tower(field, sparse=True, defer_reductions=True, mul2_kernel=field.multiply2)
-        inputs = field.graph.inputs
-        element = fp12(inputs)
-        squared = tower.square12(element)
-        line = pairs(inputs[12:])
-        lined = tower.mul_line(squared, line)
-        product = tower.mul12(lined, element)
-        step = tower.mul_lines(squared, (line,) * 3)
-        round_without_chord = tower.miller_round(element, (line,) * 3, None)
-        round_with_chord = tower.miller_round(element, (line,) * 6, element)
-        self.assertEqual(field.reduce(product[0][0][0]), product[0][0][0])
-        outputs = tuple(chain.from_iterable(map(flatten, (squared, lined, product, step,
-                                                         round_without_chord, round_with_chord))))
-        script = field.graph.emit(outputs, compact=True)
+        def expected_outputs(value, line):
+            squared = HOST.square12(value)
+            lined = HOST.mul_line(squared, line)
+            product = HOST.mul12(lined, value)
+            step = squared
+            for _ in range(3):
+                step = HOST.mul_line(step, line)
+            round_with_chord = step
+            for _ in range(3):
+                round_with_chord = HOST.mul_line(round_with_chord, line)
+            round_with_chord = HOST.mul12(round_with_chord, value)
+            return tuple(chain.from_iterable(map(flatten, (squared, lined, product, step, step, round_with_chord))))
 
         limbs = (Q - 1, -Q + 1, 0, -7, 1, -1, -Q + 1, 2, Q - 2, 0, 3, -4)
-        line_limbs = (Q - 1, -Q + 1, -(Q - 1)**2, (Q - 1)**2, Q - 1, 0)
-        value = fp12(limbs)
-        squared = HOST.square12(value)
-        line = pairs(line_limbs)
-        lined = HOST.mul_line(squared, line)
-        product = HOST.mul12(lined, value)
-        after_lines = squared
-        for count in range(6):
-            after_lines = HOST.mul_line(after_lines, line)
-            if count == 2:
-                step = after_lines
-        round_with_chord = HOST.mul12(after_lines, value)
-        expected = tuple(chain.from_iterable(map(flatten, (squared, lined, product, step, step, round_with_chord))))
-        stack, alt = evaluate(script, list(map(encode_num, limbs + line_limbs)))
-        signed = tuple(map(decode_num, stack))
-        self.assertEqual(alt, [])
-        self.assertTrue(all(abs(limb) < Q for limb in signed))
-        self.assertEqual(tuple(limb % Q for limb in signed), expected)
+        for direct in (False, True):
+            field = ScriptField(18, assert_checks=True)
+            tower = Tower(field, sparse=True, defer_reductions=True, mul2_kernel=field.multiply2,
+                          direct_lines=direct)
+            inputs = field.graph.inputs
+            element = fp12(inputs)
+            squared = tower.square12(element)
+            line = pairs(inputs[12:])
+            lined = tower.mul_line(squared, line)
+            product = tower.mul12(lined, element)
+            step = tower.mul_lines(squared, (line,) * 3)
+            round_without_chord = tower.miller_round(element, (line,) * 3, None)
+            round_with_chord = tower.miller_round(element, (line,) * 6, element)
+            self.assertEqual(field.reduce(product[0][0][0]), product[0][0][0])
+            outputs = tuple(chain.from_iterable(map(flatten, (squared, lined, product, step,
+                                                             round_without_chord, round_with_chord))))
+            script = field.graph.emit(outputs, compact=True)
+
+            for odd_imag in (0, -Q + 2):
+                with self.subTest(direct=direct, odd_imag=odd_imag):
+                    line_limbs = (Q - 1, -Q + 1, -(Q - 1)**2, (Q - 1)**2, Q - 1, odd_imag)
+                    expected = expected_outputs(fp12(limbs), pairs(line_limbs))
+                    stack, alt = evaluate(script, list(map(encode_num, limbs + line_limbs)))
+                    signed = tuple(map(decode_num, stack))
+                    self.assertEqual(alt, [])
+                    self.assertTrue(all(abs(limb) < Q for limb in signed))
+                    self.assertEqual(tuple(limb % Q for limb in signed), expected)
 
     def test_nchain_and_residue_exponent_kernels(self):
         # Symbolically track the signed-seed nChain hard exponent straight-line program.
