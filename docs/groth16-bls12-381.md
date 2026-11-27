@@ -71,6 +71,8 @@
 
 仿射算术计划可选 `msm: signed-radix4`。完整窗口用 `-1、0、1、2` 四个数位，只存基点和二倍点，负数位由基点取负。编译器与见证生成器按同一份有界进位计划生成数位和对应斜率。每个额外窗口增加 48 B 见证，需按所选计划重新生成斜率包。[MSM 实测](../projects/groth16-verifier/versions/v0.8.0/measurements.json)
 
+有符号计划还可选 `msm_table: doubling-slopes`。锁为每个公开输入编码起始基点和由验证密钥预计算的切线斜率，Script 逐个窗口恢复二倍点和下一窗口的四倍点。两个表表示共用有符号数位及花费见证。高层 Forth 的 `bls12-381-check-g1-c-then-a` 按 C、A 的顺序执行两项 G1 检查。[点表与 Forth 实测](../projects/groth16-verifier/versions/v0.9.0/measurements.json)
+
 ## 构建和复放
 
 在仓库根目录执行，依赖见 [4thGraph 安装命令](toolchain.md#复放与编译)。示例从版本库自带的测试夹具导出一份验证密钥、证明和公开输入。

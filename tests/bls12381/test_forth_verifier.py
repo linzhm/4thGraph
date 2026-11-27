@@ -105,8 +105,9 @@ class ForthVerifierTests(unittest.TestCase):
             ForthVerifier(self.key, self.source, plan=ArithmeticPlan(residue_association="right"))
 
     def test_split_g1_checks_require_a_and_c(self):
-        source = HIGH_LEVEL.read_bytes().replace(b"swap bls12-381-check-g1-points",
-                                                b"swap bls12-381-check-g1-a bls12-381-check-g1-c")
+        source = HIGH_LEVEL.read_bytes().replace(b"bls12-381-check-g1-c-then-a", b"bls12-381-check-g1-points")
+        source = source.replace(b"swap bls12-381-check-g1-points",
+                                b"swap bls12-381-check-g1-a bls12-381-check-g1-c")
         for word in (b"bls12-381-check-g1-a", b"bls12-381-check-g1-c"):
             with self.subTest(word=word), self.assertRaises(CompileError):
                 ForthVerifier(self.key, source.replace(word, b""), entry="verify-proof")
@@ -139,10 +140,12 @@ class ForthVerifierTests(unittest.TestCase):
         unsigned = ForthVerifier(json.dumps(key), self.source, witness_layout="affine-witness")
         signed = ForthVerifier(json.dumps(key), self.source, witness_layout="affine-witness",
                                plan=ArithmeticPlan(msm="signed-radix4"))
-        for verifier in (unsigned, signed):
+        derived = ForthVerifier(json.dumps(key), self.source, witness_layout="affine-witness",
+                                plan=ArithmeticPlan(msm="signed-radix4", msm_table="doubling-slopes"))
+        for verifier in (unsigned, signed, derived):
             lock = verifier.compile(sources)
             for s, t in ((0, 0), (1, 0), (0, 1), (0, 3), (R - 1, 2)):
-                with self.subTest(msm=verifier.msm, signals=(s, t)):
+                with self.subTest(plan=verifier.plan, signals=(s, t)):
                     # VK_x=[1-s+t]P, and A=[3-s+t]P makes the test pairing exact.
                     proof = json.dumps({**metadata, "pi_a": g1_json(curve.mul_host(p, (3 - s + t) % R)),
                                         "pi_b": g2_json(q), "pi_c": g1_json(p)})
@@ -158,6 +161,8 @@ class ForthVerifierTests(unittest.TestCase):
                         old_witness = unsigned.witness((s, t), proof, sources=sources)
                         with self.assertRaises((RuntimeError, ValueError)):
                             check_spend(parent, spend.with_script(0, old_witness))
+                    if verifier is derived and t == 3:
+                        self.assertEqual(witness, signed.witness((s, t), proof, sources=sources))
 
     def test_affine_layout_shares_public_packet_with_successor_check(self):
         verifier = ForthVerifier(self.key, self.source, witness_layout="affine-inline")

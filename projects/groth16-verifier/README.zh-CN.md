@@ -1,6 +1,6 @@
 <!-- Generated from manifest.yaml with Copier. -->
 
-# BLS12-381 Groth16 验证器 v0.8.0
+# BLS12-381 Groth16 验证器 v0.9.0
 
 [English](README.md) · [4thGraph](../../README.zh-CN.md) · [项目目录](../README.zh-CN.md) · [版本](versions/index.json)
 
@@ -8,7 +8,7 @@
 
 在 Forth 中调用 4thGraph 的 Groth16 标准库，构建验证锁与见证，并在 BSV regtest 复放花费。
 
-[算法与执行](#算法与执行) · [复现方法](#复现方法) · [实测数据](versions/v0.8.0/measurements.json)
+[算法与执行](#算法与执行) · [复现方法](#复现方法) · [实测数据](versions/v0.9.0/measurements.json)
 
 | 入口 | 用途 |
 | --- | --- |
@@ -29,6 +29,8 @@
 
 搜索按序列化锁和对应见证的总长度比较有符号与无符号的公开输入 MSM。[MSM 实测](versions/v0.8.0/measurements.json)
 
+有符号 MSM 实验比较直接存点和斜率重建，并重新编译改动后的 Forth 源码。[点表与源码实测](versions/v0.9.0/measurements.json)
+
 ## 复现方法
 
 使用 Python 3.11 或更新版本，从仓库根目录运行。构建只用 Python 标准库。入金回放使用固定的 chain-gang 绑定和隔离的 Linux BSV Node 1.2.3。
@@ -39,7 +41,7 @@ python3 -m pip install ecdsa -r tools/requirements-chronicle.txt
 
 ```sh
 PYTHONPATH=src:. python3 projects/groth16-verifier/experiments/high-level/optimize.py \
-  --residue-association accumulator-frobenius-first
+  --residue-association accumulator-frobenius-first --msm signed-radix4
 REGTEST_CHRONICLE_HEIGHT=1000 bash tools/verify_node.sh --profile raised -- \
   python3 -m fourthgraph.replay.bls12381_verifier \
   --source projects/groth16-verifier/experiments/high-level/verifier.fth \

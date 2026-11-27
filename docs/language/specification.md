@@ -195,6 +195,8 @@ PY
 
 `compiler.curve_windows.signed_radix4` 接收已证明的非负标量上界。每个完整窗口把标量拆成 `4*q+d`，其中 `q=floor((n+1)/4)` 且 `d` 在 `[-1,2]` 内。编译器按商的上界继续规划窗口，必要时保留末尾进位。宿主端与 Script 后端可用同一窗口计划生成数位。[Groth16 MSM 对照](../../projects/groth16-verifier/versions/v0.8.0/measurements.json)
 
+固定基点的生成器可用 `double_from_affine_slope` 从受信的预计算切线斜率重建仿射二倍点。它以调用方提供的域运算发出坐标乘法、减法和约减。连续的 radix-4 窗口可用两次重建得到当前的二倍点和下一窗口的四倍点。[点表表示对照](../../projects/groth16-verifier/versions/v0.9.0/measurements.json)
+
 ## 电路入口
 
 `circuit_backend.py` 根据阶段依赖选取一个 `u32 -- u32` 转换词和一个 `u32 -- route` 路由词。仅有词定义的文件须通过 `--entries TRANSITION ROUTE` 指定入口。带工作流声明的文件以声明为准。本入口编译计算和路由，交易签名与独立提交仍由交易规划器处理。

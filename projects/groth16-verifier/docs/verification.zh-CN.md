@@ -38,11 +38,13 @@ v0.7.0 固定剩余式的乘法顺序，对同一份 Forth 文件做两轮改动
 
 v0.8.0 在这份 Forth 上比较无符号和有符号 radix-4 MSM，并为每种方案生成对应的见证。负数位复用正倍点，末尾进位可能增加斜率窗口。搜索按序列化锁与见证的合计字节数排名。复现之前的无符号对照时可加 `--msm unsigned-radix4`。有符号计划适用于两种仿射布局。[v0.8.0 MSM 实测](../versions/v0.8.0/measurements.json)
 
+v0.9.0 固定有符号 radix-4，比较直接存点与从验证密钥的倍点切线恢复点这两种表表示。两种表示共用同一份见证。源码试验在高层 Forth 中把 C 的检查提前到 A 之前，再编译两份源码并记录完整锁和见证的大小。复现 v0.8.0 点表对照时可加 `--msm-table points`。[v0.9.0 点表与源码实测](../versions/v0.9.0/measurements.json)
+
 从仓库根目录运行搜索，再回放选出的 Genesis 计划。
 
 ```sh
 PYTHONPATH=src:. python3 projects/groth16-verifier/experiments/high-level/optimize.py \
-  --residue-association accumulator-frobenius-first
+  --residue-association accumulator-frobenius-first --msm signed-radix4
 out=projects/groth16-verifier/workspace/build/high-level
 REGTEST_CHRONICLE_HEIGHT=1000 bash tools/verify_node.sh --profile raised -- \
   python3 -m fourthgraph.replay.bls12381_verifier \

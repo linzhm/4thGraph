@@ -38,11 +38,13 @@ The v0.7.0 experiment holds the residue multiplication order fixed and edits the
 
 The v0.8.0 search compares unsigned and signed radix-4 MSM on that Forth source, generating a matching witness for each strategy. The signed digits reuse positive multiples for negative digits and can require extra slope windows for carries. Search ranks the serialized lock and witness together. Use `--msm unsigned-radix4` to reproduce the earlier unsigned comparison. The signed plan applies to both affine layouts. [v0.8.0 MSM measurements](../versions/v0.8.0/measurements.json)
 
+The v0.9.0 experiment holds signed radix-4 fixed and compares explicit points with a table that reconstructs points from verification-key doubling slopes. Both encodings share the same witness. The source trial changes the high-level Forth to check C before A. It recompiles both sources and records the full lock and witness size for each. Use `--msm-table points` to pin explicit points for the v0.8.0 comparison. [v0.9.0 table and source measurements](../versions/v0.9.0/measurements.json)
+
 Run the search and replay its selected Genesis plan from the repository root.
 
 ```sh
 PYTHONPATH=src:. python3 projects/groth16-verifier/experiments/high-level/optimize.py \
-  --residue-association accumulator-frobenius-first
+  --residue-association accumulator-frobenius-first --msm signed-radix4
 out=projects/groth16-verifier/workspace/build/high-level
 REGTEST_CHRONICLE_HEIGHT=1000 bash tools/verify_node.sh --profile raised -- \
   python3 -m fourthgraph.replay.bls12381_verifier \
