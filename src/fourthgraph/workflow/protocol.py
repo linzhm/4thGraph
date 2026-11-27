@@ -1086,7 +1086,7 @@ def main(argv=None, *, cpn_action=None):
                           **capabilities(), "libraries": library_capabilities(),
                           "optimizations": OPTIMIZATIONS, "join_witnesses": JOIN_WITNESSES,
                           "topologies": ("parallel", "gated-parallel", "workflow"), "workflow_modes": WORKFLOW_CHOICES,
-                          "cpn": {"commands": ("plan", "tune", "tune-model", "test-keys", "replay", "verify", "workbench",
+                          "cpn": {"commands": ("plan", "tune", "tune-model", "verify-model", "test-keys", "replay", "verify", "workbench",
                                                 "check-model", "lower-model", "design", "inspect-cctp",
                                                 "fixture-workbench", "fixture-declaration", "verify-fixture",
                                                 "inspect-evidence"),

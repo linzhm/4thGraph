@@ -20,6 +20,11 @@ def main(argv):
                        help="maximum token count per place in explored markings")
     inventory = commands.add_parser("inspect-evidence", help="inspect declared state, assertion and proof requirements")
     inventory.add_argument("model", type=Path)
+    verify_model = commands.add_parser("verify-model", help="check a tuned workflow against its logical model")
+    verify_model.add_argument("model", type=Path)
+    verify_model.add_argument("--source", type=Path, required=True)
+    verify_model.add_argument("--workflow", type=Path, required=True)
+    verify_model.add_argument("--report", type=Path)
     lower = commands.add_parser("lower-model", help="lower a supported logical CPN to a staged Forth workflow")
     lower.add_argument("model", type=Path)
     lower.add_argument("--source", type=Path, required=True, help="Forth definitions used by the graph")
@@ -101,6 +106,10 @@ def main(argv):
             if report["diagnostics"]:
                 print(json.dumps(report, indent=2, sort_keys=True))
                 raise SystemExit(1)
+        elif args.command == "verify-model":
+            from fourthgraph.workflow.tune_model import verify_model
+
+            report = verify_model(args.model, args.source, args.workflow, args.report)
         elif args.command == "inspect-cctp":
             from fourthgraph.workflow.cctp_archive import flow_report, inspect_archive, logical_model, read_archive
 

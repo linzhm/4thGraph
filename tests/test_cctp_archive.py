@@ -40,6 +40,22 @@ def fixture():
 
 
 class ArchiveGraphTests(unittest.TestCase):
+    @staticmethod
+    def rewrite_second_payment(archive, parent, vout, output_slot, quantity):
+        record = archive["summary"]["transactions"]["bob-to-carol"]
+        tx = Transaction.parse(bytes.fromhex(archive["transactions"][record["txid"]]))
+        token_input = replace(tx.inputs[2], txid=bytes.fromhex(parent)[::-1], vout=vout)
+        output = tx.outputs[output_slot]
+        pos = len(TOKEN_PREFIX)
+        script = output.script[:pos] + quantity.to_bytes(8, "little") + output.script[pos + 8:]
+        outputs = list(tx.outputs)
+        outputs[output_slot] = replace(output, script=script)
+        changed = replace(tx, inputs=(*tx.inputs[:2], token_input), outputs=tuple(outputs))
+        record.update(txid=changed.txid(), bytes=len(changed.serialize()))
+        archive["transactions"][changed.txid()] = changed.serialize().hex()
+        archive["summary"]["payments"]["bob-to-carol"]["direct_token_parents"] = [
+            f"{item.txid[::-1].hex()}:{item.vout}" for item in changed.inputs[1:]]
+
     def test_graph_preserves_intermediate_token_and_distinguishes_satoshis(self):
         archive = fixture()
         graph = inspect_archive(archive)
@@ -97,6 +113,29 @@ class ArchiveGraphTests(unittest.TestCase):
                        "owner_compressed": first["outputs"][0]["owner_compressed"]}, report["handoffs"])
         self.assertEqual(report["validation"]["transaction_signatures"], "not checked")
         self.assertEqual(report["validation"]["script_execution"], "not checked")
+
+    def test_archive_rejects_token_outpoint_consumed_by_two_transfers(self):
+        archive = fixture()
+        # The first transfer already consumed this 300-unit mint.  Keep the
+        # second transfer balanced and update its txid and reported parents so
+        # only the cross-transaction double spend distinguishes the archive.
+        parent = archive["summary"]["transactions"]["alice-mint-1"]["txid"]
+        self.rewrite_second_payment(archive, parent, 0, 0, 500)
+        for inspect in (inspect_archive, flow_report):
+            with self.subTest(inspector=inspect.__name__), self.assertRaisesRegex(ValueError, "already consumed"):
+                inspect(archive)
+
+    def test_archive_allows_distinct_outputs_of_the_same_parent(self):
+        archive = fixture()
+        parent = archive["summary"]["transactions"]["alice-to-bob"]["txid"]
+        # Both inputs now come from the first transfer, but the vouts differ:
+        # 275 + 225 = 350 + 150.  Bob's mint remains unspent in this subgraph.
+        self.rewrite_second_payment(archive, parent, 1, 1, 150)
+        graph = inspect_archive(archive)
+        self.assertEqual(graph["transitions"][-1]["inputs"][1:], [parent + ":0", parent + ":1"])
+        self.assertEqual(graph["validation"]["unique_input_consumption"],
+                         "checked within selected archive only")
+        self.assertEqual(flow_report(archive)["invariants"]["remaining_token_quantity"], 650)
 
     def test_bounded_flow_rejects_inflation_after_transaction_rehash(self):
         archive = fixture()

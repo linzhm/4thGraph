@@ -45,6 +45,14 @@ const en = [
   "The compiler checks whether these requirements can be satisfied.",
   "Edit the malformed requirement in Advanced metadata JSON.", "No other transitions",
   "A transition cannot be atomic with itself", "Unknown transition",
+  "Compile and inspect", "Close build guide", "Local build steps",
+  "Save node edits and download the current model as cpn-draft.json into your working directory.",
+  "Replace the example filenames and current value. words.fth must define the referenced Forth words and its imports; keys.json must contain the required public-key roles. Forth code recorded in node metadata remains draft data.",
+  "workflow.fth must be a new file in the same directory as words.fth. The compiler currently accepts supported two- or three-stage linear models; other models return diagnostics.",
+  "Run these steps in a terminal. Continue only when the preceding step succeeds. The browser does not compile or verify this model.",
+  "Check the model", "Explore candidates", "Verify model and workflow", "Open the report",
+  "Copy", "Copied", "Copy failed. Select the command and copy it manually.",
+  "verify-model checks lowering provenance. Proofs, transaction execution, and chain state require separate verification.",
 ];
 const zh = [
   "比较 CPN 路径", "候选", "可构建", "已淘汰", "已复放", "全部", "搜索路径…", "CPN 图",
@@ -89,6 +97,14 @@ const zh = [
   "编译器会检查这些要求能否同时满足。",
   "请在高级元信息 JSON 中修正格式错误的要求。", "没有其他迁移",
   "迁移不能与自身声明原子执行", "未知迁移",
+  "编译与查看", "收起构建指南", "本机构建步骤",
+  "先保存节点修改，将当前模型下载为 cpn-draft.json 并放入工作目录。",
+  "将示例文件名和初始值换成实际值。words.fth 需定义所引用的 Forth 词及其导入，keys.json 需包含所需角色的公钥。节点元信息中的 Forth 代码仍是草稿数据。",
+  "workflow.fth 必须是与 words.fth 同目录的新文件。编译器目前接受受支持的两阶段或三阶段线性模型，其他模型会返回诊断。",
+  "在终端依次运行下列步骤，上一步成功后再继续。浏览器不会编译或验证此模型。",
+  "检查模型", "探索候选", "核对模型与工作流", "打开报告",
+  "复制", "已复制", "复制失败，请选中命令后手动复制。",
+  "verify-model 核对降级来源。证明、交易执行及链状态需要分别验证。",
 ];
 let lang = "en";
 let filter = "all";
@@ -101,6 +117,7 @@ let draft = model.fixture_mode ? {schema_version: 1, places: [], transitions: []
 let fixtureCopied = false;
 let draftError = "";
 let replayIndex = -1;
+let buildGuideOpen = false;
 const $ = id => document.getElementById(id);
 const label = index => (lang === "en" ? en : zh)[index];
 
@@ -847,6 +864,53 @@ function draftButton(text, action) {
   return button;
 }
 
+async function copyCommand(command, status) {
+  try {
+    if (!navigator.clipboard?.writeText) throw new Error("Clipboard unavailable");
+    await navigator.clipboard.writeText(command);
+    status.textContent = label(193);
+    return;
+  } catch (_) {
+    // Local file previews can lack the asynchronous clipboard API.
+  }
+  const input = element("textarea");
+  input.value = command;
+  input.style.position = "fixed";
+  input.style.left = "-10000px";
+  document.body.append(input);
+  input.select();
+  let copied = false;
+  try { copied = document.execCommand("copy"); } catch (_) { /* Manual selection remains available. */ }
+  input.remove();
+  status.textContent = label(copied ? 193 : 194);
+}
+
+function draftBuildGuide() {
+  const section = element("section", undefined, "build-guide");
+  section.append(element("h3", label(183)));
+  for (const index of [184, 185, 186, 187, 195]) section.append(element("p", label(index)));
+  const steps = [
+    [188, "4thgraph cpn check-model cpn-draft.json"],
+    [189, "4thgraph cpn tune-model cpn-draft.json --source words.fth --output workflow.fth --keys keys.json --current 19 --target both > report.json"],
+    [190, "4thgraph cpn verify-model cpn-draft.json --source words.fth --workflow workflow.fth --report report.json"],
+    [191, "4thgraph cpn workbench report.json --source workflow.fth --output workbench.html"],
+  ];
+  const list = element("ol");
+  for (const [name, command] of steps) {
+    const item = element("li");
+    const status = element("span", "", "copy-status");
+    status.setAttribute("role", "status");
+    const copy = draftButton(label(192), () => copyCommand(command, status));
+    copy.setAttribute("aria-label", label(192) + " · " + label(name));
+    const heading = element("div", undefined, "build-step");
+    heading.append(element("strong", label(name)), copy, status);
+    item.append(heading, element("pre", command, "build-command"));
+    list.append(item);
+  }
+  section.append(list);
+  return section;
+}
+
 function setDraftNode(kind) {
   const name = uniqueDraftName(kind);
   if (kind === "place") draft.places.push({name, type: "u32", initial: 0, capacity: null, metadata: {}});
@@ -899,7 +963,12 @@ function draftTools() {
     render();
   });
   tools.append(input, draftButton(label(64), () => input.click()),
-    download(label(65), "cpn-draft.json", draft));
+    download(label(65), "cpn-draft.json", draft),
+    draftButton(label(buildGuideOpen ? 182 : 181), () => {
+      buildGuideOpen = !buildGuideOpen;
+      draftTools();
+    }));
+  if (buildGuideOpen) tools.append(draftBuildGuide());
 }
 
 function draftInspector(panel) {

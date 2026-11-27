@@ -16,6 +16,10 @@
 
 可以用 `4thgraph cpn tune-model MODEL --source WORDS.fth --output WORKFLOW.fth --keys KEYS.json --current 19 > report.json` 一步完成降级和探索。它接受 `cpn tune` 的搜索预算和后端目录，不会覆盖已有工作流；生成的 Forth 注释包含原始模型的 SHA-256，并受到编译器源码摘要保护。请保存模型、生成的工作流、导入和报告；重新运行降级可核对它们的关系。没有合格候选时仍会输出淘汰报告，并以非零状态退出。
 
+运行 `4thgraph cpn verify-model MODEL --source WORDS.fth --workflow WORKFLOW.fth --report report.json`，可重新降级模型，逐字节比较包含模型摘要的工作流，并核对报告的源码和导入摘要；对已选择的构建，还会检查内部计划和构建摘要。它不会重新探索候选、验证证明、执行交易或检查链状态；复验回执应使用 `cpn verify`。
+
+末段迁移可增加第二个 `u32` 输入，来自初始可用、容量为 1 的 Place，其元数据须显式声明 `"carrier": "external-witness"` 和 `"visibility": "public"` 或 `"private"`。第一个输入是状态，第二个是外部见证。见证由链下提供，并非已认证的 UTXO。当前只支持一个此类见证，且不能同时声明见证元数据；私有见证需要兼容的零知识后端，直接 Script 和透明赋值不符合要求。参见[公开和私有外部见证示例](../../../projects/proof-counter/cpn-external-witness.zh-CN.md)。
+
 迁移可声明 `"atomic_with": ["other-transition"]`，要求两阶段在同一笔交易执行；也可声明 `"independent_submit": true`，要求该阶段能够独立提交。降级器将要求转换为工作流声明，规划器淘汰不符合要求的布局。要求冲突时可能没有合格候选。这些声明适用于当前支持的线性子集，并不代表已支持任意 CPN 拓扑的编译。
 
 可以在独立目录中运行[线性模型](../../../projects/proof-counter/cpn-linear.json)和 [Forth 导入](../../../projects/proof-counter/cpn-words.fth)：
@@ -34,7 +38,7 @@ cp projects/proof-counter/{cpn-linear.json,cpn-words.fth,counter.fth} workspace/
 
 迁移也可声明一条结构化范围约束，例如 `{"kind":"range","operand":"delta","range":"private-delta"}`。Forth 源码须声明对应的 `u32` 范围，该操作数须位于入口栈顶，计算词须以匹配的 `check-range` 开始。编译器核对所选 Script 和适用电路包含该检查。其他约束需要各自的降级实现。
 
-已有 CCTP 归档提供了另一组历史输入。在包含提交 `11c919a` 的检出中运行下列命令，再把生成的模型导入编辑器。检查器核对序列化交易标识、槽位、Token 模板和所记录数量。逻辑模型的初始标记描述归档子图的边界。Script 执行、发行授权、区块包含和当前 UTXO 状态需要各自的证据。
+已有 CCTP 归档提供了另一组历史输入。在包含提交 `11c919a` 的检出中运行下列命令，再把生成的模型导入编辑器。检查器核对序列化交易标识、槽位、Token 模板、所记录数量，以及每个 outpoint 在所选归档交易中是否只消费一次。同一交易的不同输出槽位是不同的 outpoint；检查无法发现所选子图之外的花费。逻辑模型的初始标记描述归档子图的边界。Script 执行、发行授权、区块包含和当前 UTXO 状态需要各自的证据。
 
 ```sh
 mkdir -p workspace/cpn-dev

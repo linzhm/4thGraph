@@ -83,6 +83,16 @@ def inspect_archive(archive, *, archive_sha256=None, policy=None):
                 "verifier_funding_txid": funding.txid()}
 
     places, transitions, edges = {}, [], []
+    consumed = set()
+
+    def check_consumption(tx, name):
+        # This is the selected archive subgraph only: it detects conflicting
+        # archived spends, but says nothing about spends outside the archive.
+        for txin in tx.inputs:
+            point = txin.outpoint()
+            if point in consumed:
+                raise ValueError(f"{name}: input outpoint is already consumed in this archive")
+            consumed.add(point)
 
     def outpoint(txid, vout):
         return f"{txid}:{vout}"
@@ -103,6 +113,7 @@ def inspect_archive(archive, *, archive_sha256=None, policy=None):
         mint = transactions[MINTS[slot]]
         if len(mint.inputs) != 1 or len(mint.outputs) != 1 or mint.inputs[0].outpoint() != root.txid_wire() + slot.to_bytes(4, "little"):
             raise ValueError(f"{MINTS[slot]}: missing declared issuance anchor slot")
+        check_consumption(mint, MINTS[slot])
         root_id, token_id = place(root, slot, "issuance-anchor"), place(mint, 0, "token")
         if places[token_id]["token"]["quantity"] != amount:
             raise ValueError(f"{MINTS[slot]}: quantity differs from declared issuance allowance")
@@ -129,6 +140,7 @@ def inspect_archive(archive, *, archive_sha256=None, policy=None):
             inputs.append(place(parent, txin.vout, "verifier-funding" if vin == 0 else "token"))
         if len(set(inputs)) != len(inputs):
             raise ValueError(f"{name}: duplicate input outpoint")
+        check_consumption(tx, name)
         recorded_parents = archive["summary"]["payments"][name]["direct_token_parents"]
         if inputs[1:] != recorded_parents:
             raise ValueError(f"{name}: token inputs differ from the payment summary")
@@ -149,6 +161,7 @@ def inspect_archive(archive, *, archive_sha256=None, policy=None):
                    "verifier_funding": funding.txid(), "verifier_lock_sha256": policy["verifier_lock_sha256"],
                    "verifying_key_sha256": policy["verifying_key_sha256"]},
         "validation": {"transaction_hashes_and_slots": "checked", "token_template": "marker and common bytes matched",
+                       "unique_input_consumption": "checked within selected archive only",
                        "transaction_signatures": "not checked", "script_execution": "not checked",
                        "block_inclusion": "not checked", "unspent_status": "not checked",
                        "issuance_authorization": "policy asserted by archive or caller"},

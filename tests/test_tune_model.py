@@ -53,6 +53,43 @@ class TuneModelTests(unittest.TestCase):
         self.assertNotEqual(changed.returncode, 0)
         self.assertIn("source digest changed", changed.stderr)
 
+    def test_verify_model_detects_changed_graph_workflow_import_and_report(self):
+        run = self.explore()
+        self.assertEqual(run.returncode, 0, run.stderr)
+        report_file = self.directory / "report.json"
+        report_file.write_text(run.stdout)
+        model = self.directory / "cpn-linear.json"
+        source = self.directory / "cpn-words.fth"
+
+        def verify():
+            return self.run_command("verify-model", str(model), "--source", str(source),
+                                    "--workflow", str(self.output), "--report", str(report_file))
+
+        checked = verify()
+        self.assertEqual(checked.returncode, 0, checked.stderr)
+        result = json.loads(checked.stdout)
+        self.assertTrue(result["report_checked"])
+        self.assertEqual(result["scope"], "logical-model-lowering-provenance")
+        self.assertIn("proof verification", result["not_checked"])
+
+        original = model.read_text()
+        model.write_text(original + "\n")
+        self.assertNotEqual(verify().returncode, 0)
+        model.write_text(original)
+        original = self.output.read_text()
+        self.output.write_text(original + "\\ changed\n")
+        self.assertNotEqual(verify().returncode, 0)
+        self.output.write_text(original)
+        imported = self.directory / "counter.fth"
+        original = imported.read_text()
+        imported.write_text(original + "\n\\ changed import\n")
+        self.assertNotEqual(verify().returncode, 0)
+        imported.write_text(original)
+        report = json.loads(run.stdout)
+        report["schedule_explanation"]["source_sha256"] = "00" * 32
+        report_file.write_text(json.dumps(report))
+        self.assertNotEqual(verify().returncode, 0)
+
     def test_existing_output_is_not_overwritten_and_bad_models_fail(self):
         self.output.write_text("user data\n")
         run = self.explore()

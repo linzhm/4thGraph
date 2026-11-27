@@ -1,4 +1,4 @@
-"""Lower the executable linear subset of a typed logical CPN to a workflow."""
+"""Lower linear CPN state chains and a terminal external witness to a workflow."""
 
 import re
 
@@ -15,18 +15,21 @@ def _identifier(value, path):
     return value
 
 
-def _metadata(metadata, path, *, place):
-    supported = {"visibility"} if place else {
+def _metadata(metadata, path, *, place, external_witness=False):
+    supported = ({"carrier", "visibility"} if external_witness else {"visibility"}) if place else {
         "authorization", "constraints", "evidence", "witnesses", "atomic_with", "independent_submit"
     }
     for key, value in metadata.items():
         if key not in supported and value not in (None, [], {}):
             raise CPNError("unsupported_requirement", path + "." + key,
                            "this requirement has no executable lowering")
-        if key == "visibility" and value != "public":
+        if key == "visibility" and not external_witness and value != "public":
             raise CPNError("unsupported_requirement", path + ".visibility",
                            "this lowering requires public state")
     if place:
+        if external_witness and (metadata.get("carrier") != "external-witness"
+                                 or metadata.get("visibility") not in ("public", "private")):
+            raise CPNError("unsupported_witness", path, "external witness needs an explicit public or private visibility")
         return None
     authorization = metadata.get("authorization")
     if not isinstance(authorization, list) or len(authorization) != 1 or not isinstance(authorization[0], str):
@@ -62,9 +65,14 @@ def _transaction_requirements(transitions, positions):
     return result + "".join(f"independent-submit: {name} ;\n" for name in independent)
 
 
-def _evidence(transition, path, *, terminal):
+def _evidence(transition, path, *, terminal, port_witness=None):
     metadata = transition.metadata
     witnesses = metadata.get("witnesses", [])
+    if port_witness is not None:
+        if witnesses:
+            raise CPNError("unsupported_witness", path + ".witnesses",
+                           "use either an external witness input or witness metadata, not both")
+        witnesses = [port_witness]
     if witnesses and not terminal:
         raise CPNError("unsupported_witness", path + ".witnesses",
                        "only the terminal transition supports witness operands")
@@ -138,7 +146,7 @@ def _constraints(transition, stage, frontend, path):
 def lower_linear(document, source, *, source_path=None):
     """Return a validated workflow frontend and its generated Forth source.
 
-    All graph constraints must fit the supported linear public-state layout.
+    The state chain is public; one terminal input may carry an external witness.
     The caller must retain the generated source and imports with the build.
     """
     net = parse_net(document)
@@ -147,12 +155,18 @@ def lower_linear(document, source, *, source_path=None):
         raise CPNError("unsupported_graph", "$.transitions", "at least two transitions are required")
     if any(place.capacity != 1 or place.initial > 1 for place in net.places):
         raise CPNError("unsupported_marking", "$.places", "every place requires an explicit capacity of one")
-    roots = [place for place in net.places if place.initial]
+    external = {place.name: place for place in net.places
+                if place.metadata.get("carrier") == "external-witness"}
+    roots = [place for place in net.places if place.initial and place.name not in external]
     if len(roots) != 1:
         raise CPNError("unsupported_marking", "$.places", "exactly one initial state token is required")
     for i, place in enumerate(net.places):
         _identifier(place.name, f"$.places[{i}].name")
-        _metadata(place.metadata, f"$.places[{i}].metadata", place=True)
+        is_external = place.name in external
+        _metadata(place.metadata, f"$.places[{i}].metadata", place=True, external_witness=is_external)
+        if is_external and (place.type != "u32" or place.initial != 1):
+            raise CPNError("unsupported_witness", f"$.places[{i}]",
+                           "an external witness must be an initially available u32")
         if place.type not in ("u32", "route"):
             raise CPNError("unsupported_type", f"$.places[{i}].type", "expected u32 or route")
     if len({place.name.casefold() for place in net.places}) != len(net.places):
@@ -160,18 +174,30 @@ def lower_linear(document, source, *, source_path=None):
     if len({item.name.casefold() for item in net.transitions}) != len(net.transitions):
         raise CPNError("duplicate_identifier", "$.transitions", "transition names must be unique ignoring case")
 
-    following, producers, roles, positions = {}, {}, {}, {}
+    following, producers, roles, positions, external_consumers = {}, {}, {}, {}, {}
     for i, transition in enumerate(net.transitions):
         path = f"$.transitions[{i}]"
         _identifier(transition.name, path + ".name")
         _identifier(transition.word, path + ".word")
         roles[transition.name] = _metadata(transition.metadata, path + ".metadata", place=False)
         positions[transition.name] = path
-        if len(transition.inputs) != 1 or len(transition.outputs) != 1:
-            raise CPNError("unsupported_ports", path, "this lowering requires one input and one output port")
+        if not 1 <= len(transition.inputs) <= 2 or len(transition.outputs) != 1:
+            raise CPNError("unsupported_ports", path, "this lowering requires one input and one output port, optionally with one external witness input")
         incoming, outgoing = transition.inputs[0], transition.outputs[0]
-        if incoming.count != 1 or outgoing.count != 1:
+        if incoming.place in external or outgoing.place in external:
+            raise CPNError("unsupported_witness", path, "external witnesses cannot carry the workflow state")
+        if any(arc.count != 1 for arc in (*transition.inputs, outgoing)):
             raise CPNError("unsupported_multiplicity", path, "this lowering requires one token on each port")
+        if len(transition.inputs) == 2:
+            witness = transition.inputs[1]
+            if witness.place not in external:
+                raise CPNError("unsupported_witness", path + ".inputs[1]", "second input must be an external witness")
+            _identifier(witness.name, path + ".inputs[1].name")
+            if witness.name.casefold() == incoming.name.casefold():
+                raise CPNError("duplicate_identifier", path + ".inputs[1].name", "input names must be distinct ignoring case")
+            if witness.place in external_consumers:
+                raise CPNError("unsupported_witness", path + ".inputs[1]", "external witness cannot be reused")
+            external_consumers[witness.place] = transition.name
         if incoming.place in following or outgoing.place in producers:
             raise CPNError("unsupported_branch", path, "this lowering requires a single producer and consumer per place")
         following[incoming.place] = transition
@@ -190,8 +216,12 @@ def lower_linear(document, source, *, source_path=None):
         ordered.append(transition)
         visited.add(destination)
         cursor = destination
-    if len(ordered) != len(net.transitions) or len(visited) != len(places):
+    if len(ordered) != len(net.transitions) or len(visited) + len(external) != len(places):
         raise CPNError("unsupported_graph", "$.transitions", "all places and transitions must form one connected chain")
+    if set(external_consumers) != set(external):
+        raise CPNError("unsupported_witness", "$.places", "each external witness must be consumed exactly once")
+    if any(consumer != ordered[-1].name for consumer in external_consumers.values()):
+        raise CPNError("unsupported_witness", "$.transitions", "only the terminal transition supports external witness inputs")
     for transition in ordered[:-1]:
         if places[transition.outputs[0].place].type != "u32":
             raise CPNError("unsupported_type", "$.places", "intermediate places must have u32 type")
@@ -210,8 +240,14 @@ def lower_linear(document, source, *, source_path=None):
             f"stage: {item.name} {item.word} {item.inputs[0].place} {item.outputs[0].place} {roles[item.name]} ;\n"
             for item in ordered
         )
-        generated += "".join(_evidence(item, positions[item.name] + ".metadata", terminal=item is ordered[-1])
-                             for item in ordered)
+        for item in ordered:
+            port_witness = None
+            if len(item.inputs) == 2:
+                port = item.inputs[1]
+                port_witness = {"name": port.name, "type": port.type,
+                                "visibility": external[port.place].metadata["visibility"]}
+            generated += _evidence(item, positions[item.name] + ".metadata", terminal=item is ordered[-1],
+                                   port_witness=port_witness)
         generated += _transaction_requirements(ordered, positions)
         lowered = SourceCompiler(generated, source_path=source_path)
         workflow = lowered.workflow()

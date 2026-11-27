@@ -63,6 +63,13 @@ main { padding: 22px 20px 34px; max-width: 1780px; margin: auto; }
 .draft-tools[hidden] { display: none; }
 .draft-tools button, .draft-form button { padding: 5px 9px; border: 1px solid var(--teal); border-radius: 6px; background: white; color: var(--teal); }
 .draft-note { flex-basis: 100%; color: #705018; font-size: 12px; }
+.build-guide { flex: 1 0 100%; min-width: 0; border: 1px solid var(--line); border-radius: 7px; padding: 12px; }
+.build-guide p { color: var(--muted); margin: 6px 0; font-size: 13px; }
+.build-guide ol { margin: 10px 0 0; padding-left: 22px; }
+.build-guide li { margin: 12px 0; }
+.build-step { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.build-command { margin: 5px 0; padding: 8px; background: #f4f7f8; border-radius: 4px; font: 12px/1.5 ui-monospace, monospace; white-space: pre-wrap; overflow-wrap: anywhere; user-select: text; }
+.copy-status { font-size: 12px; color: var(--muted); }
 .draft-form { display: grid; gap: 8px; margin: 12px 0; }
 .draft-form label { display: grid; gap: 3px; color: var(--muted); font-size: 13px; }
 .draft-form input, .draft-form select, .draft-form textarea { width: 100%; min-width: 0; padding: 7px; border: 1px solid var(--line); border-radius: 5px; color: var(--ink); background: white; }

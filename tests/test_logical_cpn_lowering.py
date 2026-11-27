@@ -46,7 +46,66 @@ def document():
     }
 
 
+def external_witness_document(visibility):
+    graph = document()
+    graph["places"].append({"name": "delta-value", "type": "u32", "initial": 1, "capacity": 1,
+                            "metadata": {"carrier": "external-witness", "visibility": visibility}})
+    terminal = graph["transitions"][-1]
+    terminal["word"] = "decide-with-delta"
+    terminal["inputs"].append({"name": "delta", "place": "delta-value", "type": "u32"})
+    terminal["metadata"]["constraints"] = [{"kind": "range", "operand": "delta", "range": "private-delta"}]
+    terminal["metadata"]["evidence"] = ([{"policy": "require-zk"}] if visibility == "private" else
+                                      [{"policy": "require-proof", "assignment_disclosure": "allow"}])
+    return graph
+
+
 class LogicalCPNLoweringTests(unittest.TestCase):
+    def test_external_witness_port_lowers_to_identical_proof_abi(self):
+        for visibility in ("public", "private"):
+            graph = external_witness_document(visibility)
+            port_frontend, port_source = lower_linear(graph, PRIVATE_SOURCE, source_path=SOURCE_PATH)
+            reference = deepcopy(graph)
+            reference["places"].pop()
+            reference["transitions"][-1]["inputs"].pop()
+            reference["transitions"][-1]["metadata"]["witnesses"] = [
+                {"name": "delta", "type": "u32", "visibility": visibility}]
+            reference_frontend, reference_source = lower_linear(reference, PRIVATE_SOURCE, source_path=SOURCE_PATH)
+            with self.subTest(visibility=visibility):
+                self.assertEqual(port_source, reference_source)
+                port_stage = port_frontend.workflow().stages[-1]
+                self.assertEqual(port_stage.private, visibility == "private")
+                self.assertEqual(emit_stage_circuit(port_stage),
+                                 emit_stage_circuit(reference_frontend.workflow().stages[-1]))
+                self.assertEqual([name.name for name, _ in port_stage.witnesses], ["delta"])
+
+    def test_external_witness_rejects_unbound_or_ambiguous_graphs(self):
+        changes = (
+            lambda doc: doc["places"][-1]["metadata"].update(carrier="utxo"),
+            lambda doc: doc["places"][-1]["metadata"].pop("visibility"),
+            lambda doc: doc["places"][-1].update(initial=0),
+            lambda doc: doc["places"][-1].update(capacity=2),
+            lambda doc: doc["transitions"][-1]["inputs"].pop(),
+            lambda doc: doc["transitions"][-1]["inputs"].reverse(),
+            lambda doc: doc["transitions"][-1]["inputs"][-1].update(count=2),
+            lambda doc: doc["transitions"][-1]["inputs"][-1].update(name="STATE"),
+            lambda doc: doc["transitions"][-1]["metadata"].update(witnesses=[
+                {"name": "delta", "type": "u32", "visibility": "private"}]),
+        )
+        for change in changes:
+            doc = external_witness_document("private")
+            change(doc)
+            with self.subTest(doc=doc), self.assertRaises(CPNError):
+                lower_linear(doc, PRIVATE_SOURCE, source_path=SOURCE_PATH)
+        doc = external_witness_document("private")
+        extra = doc["transitions"][-1]["inputs"].pop()
+        doc["transitions"][0]["inputs"].append(extra)
+        with self.assertRaisesRegex(CPNError, "only the terminal transition"):
+            lower_linear(doc, PRIVATE_SOURCE, source_path=SOURCE_PATH)
+        doc = external_witness_document("private")
+        doc["transitions"][0]["inputs"].append(deepcopy(doc["transitions"][-1]["inputs"][-1]))
+        with self.assertRaisesRegex(CPNError, "cannot be reused"):
+            lower_linear(doc, PRIVATE_SOURCE, source_path=SOURCE_PATH)
+
     def plan(self, document):
         frontend, generated = lower_linear(document, SOURCE, source_path=SOURCE_PATH)
         with TemporaryDirectory() as directory:
