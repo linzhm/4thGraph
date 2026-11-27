@@ -22,32 +22,40 @@ class Groth16EncodingTests(unittest.TestCase):
     def test_complete_forth_emits_formulas_schedules_and_the_compact_lock(self):
         project = Path(__file__).resolve().parents[1] / "projects/groth16-bn254"
         fixture = json.loads((project / "versions/v0.1.0/fixture.json").read_bytes())
-        source = project / "forth/verifier.fth"
         signals = tuple(fixture["wrap"]["public"])
         owner = bytes.fromhex(fixture["owner_public_key"])
         key = json.dumps(fixture["verification_key"]).encode()
-        calls = []
+        lock = asm("OP_0 OP_CHECKSIGVERIFY 5 OP_ROLL 5 OP_ROLL OP_DROP OP_DROP OP_1")
 
-        def adapter(_command, *, stdin):
-            request = json.loads(stdin)
-            calls.append(request)
-            lock = asm("OP_0 OP_CHECKSIGVERIFY 5 OP_ROLL 5 OP_ROLL OP_1")
-            return json.dumps((asm("OP_1") if request["Proof"] else lock).hex())
+        for name, optimization, assembly in (
+            ("verifier.fth", "paired-moves", "OP_2ROT OP_DROP OP_DROP OP_1"),
+            ("compact-stack-verifier.fth", "compact-moves", "OP_2ROT OP_2DROP OP_1"),
+        ):
+            with self.subTest(source=name):
+                source = project / "forth" / name
+                calls = []
 
-        with TemporaryDirectory() as directory, patch("fourthgraph.verification.groth16_bn254.checked", side_effect=adapter):
-            verifier = ForthVerifier("adapter", key, directory, source.read_bytes(), source_path=source)
-            script = verifier.compile(signals, owner)
-            self.assertEqual(script, verifier.owner_guard(owner) + asm("OP_2ROT OP_1"))
-            verifier.witness(signals, json.dumps(fixture["wrap"]["proof"]))
-            bad_source = source.read_bytes().replace(b"    require-g2-subgroup\n", b"")
-            with self.assertRaises(CompileError):
-                ForthVerifier("adapter", key, directory, bad_source, source_path=source)
-        lock_request, witness_request = calls
-        plan = lock_request["ForthPlan"]
-        self.assertTrue(witness_request["CompactStatement"])
-        self.assertNotIn("ForthPlan", witness_request)
-        self.assertEqual((len(plan["Subgroup"]), len(plan["Miller"])), (127, 65))
-        self.assertEqual((len(plan["Double"]["Steps"]), len(plan["MixedAdd"]["Steps"])), (15, 18))
+                def adapter(_command, *, stdin):
+                    request = json.loads(stdin)
+                    calls.append(request)
+                    return json.dumps((asm("OP_1") if request["Proof"] else lock).hex())
+
+                with (TemporaryDirectory() as directory,
+                      patch("fourthgraph.verification.groth16_bn254.checked", side_effect=adapter)):
+                    verifier = ForthVerifier("adapter", key, directory, source.read_bytes(), source_path=source)
+                    script = verifier.compile(signals, owner)
+                    self.assertEqual(script, verifier.owner_guard(owner) + asm(assembly))
+                    self.assertEqual(verifier.artifact(signals, owner, script)["stack_optimization"], optimization)
+                    verifier.witness(signals, json.dumps(fixture["wrap"]["proof"]))
+                    bad_source = source.read_bytes().replace(b"    require-g2-subgroup\n", b"")
+                    with self.assertRaises(CompileError):
+                        ForthVerifier("adapter", key, directory, bad_source, source_path=source)
+                lock_request, witness_request = calls
+                plan = lock_request["ForthPlan"]
+                self.assertTrue(witness_request["CompactStatement"])
+                self.assertNotIn("ForthPlan", witness_request)
+                self.assertEqual((len(plan["Subgroup"]), len(plan["Miller"])), (127, 65))
+                self.assertEqual((len(plan["Double"]["Steps"]), len(plan["MixedAdd"]["Steps"])), (15, 18))
 
     def test_fixed_msm_forth_pins_the_deployment_inputs_only_in_the_lock(self):
         project = Path(__file__).resolve().parents[1] / "projects/groth16-bn254"
