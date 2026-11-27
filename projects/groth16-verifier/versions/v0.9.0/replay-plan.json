@@ -1,0 +1,57 @@
+{
+  "version": "0.9.0",
+  "source_revision": "f20d155c238951e9cff62845b08692398e962e1c",
+  "source": "experiments/high-level/verifier.fth",
+  "source_sha256": "42bea985390c956c4d61beeb877e43a3c6c572ab73e51d9472adae1a17d6f025",
+  "input_sources_sha256": "6df6df04c0072841cc6caafecc301adc8a5a70a630dafc0aa11e0f1643c50f53",
+  "fixture_sha256": "51f6524a32d8ec5d4eac1c97398dc97c1d0594caae0284b8faa36a02574c5cc6",
+  "verification_key_sha256": "b2a207af971ac1b35fb7dac203e029e22871970816297fdbc303dbf7d77045d1",
+  "entry": "verify-proof",
+  "witness_layout": "affine-inline",
+  "stack_schedule": "compact",
+  "transaction_version": 2,
+  "witnesses": {
+    "wrap": {
+      "bytes": 9378,
+      "sha256": "dd56640a5b84fa2192c05a0726841e427b83a24170348e51ae875cecc3640a97"
+    },
+    "other": {
+      "bytes": 9378,
+      "sha256": "4a2827dc39dbfc88079a66b617f5d3d4b379758aaead61e3ab254e4ba2d9661f"
+    }
+  },
+  "script_eras": {
+    "genesis": {
+      "chronicle_activation_height": 1000,
+      "lock_bytes": 253510,
+      "path_bytes": 262896,
+      "script_sha256": "df15ba696fc0f5a13c003e11c88e5c8528c21b589982c2a6a5c2d53dad768b5c",
+      "artifact_sha256": "959dd0718e870ba437470cb3874ed451f06778ef09f819b81a4af1f6e29df3d7",
+      "arithmetic_plan": {
+        "fp2_rules": [
+          "expand-cross-products"
+        ],
+        "residue_association": "accumulator-frobenius-first",
+        "fp2_selection": "callsite",
+        "msm": "signed-radix4",
+        "msm_table": "doubling-slopes"
+      }
+    },
+    "chronicle": {
+      "chronicle_activation_height": 2,
+      "lock_bytes": 252605,
+      "path_bytes": 261991,
+      "script_sha256": "271a95770bbc83433b820cf3bb94f16ecc92082ac1f56251c0a0f0398bf5e3a2",
+      "artifact_sha256": "627da93d5afc2621033bbcb943eb3479a197f64f919b97ce8e1e4db67836555f",
+      "arithmetic_plan": {
+        "fp2_rules": [
+          "expand-cross-products"
+        ],
+        "residue_association": "accumulator-frobenius-first",
+        "fp2_selection": "callsite",
+        "msm": "signed-radix4",
+        "msm_table": "doubling-slopes"
+      }
+    }
+  }
+}
