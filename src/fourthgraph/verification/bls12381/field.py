@@ -324,7 +324,7 @@ class Tower:
 
     def _miller_round(self, acc, lines, extra_factor):
         # A round multiplies the square of a reduced accumulator by at most
-        # six evaluated lines (limbs below Q²) and one reduced residue.
+        # six evaluated lines (limbs at most a small multiple of Q²) and one reduced residue.
         # Even allowing a factor of 2¹⁶ for the coefficient sums in each
         # operation, one round fits within 6,000 bits per unreduced limb.
         return self._mul_lines(self._square12(acc), lines, extra_factor)

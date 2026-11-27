@@ -1,0 +1,65 @@
+{
+  "schema_version": 1,
+  "scope": "SHA-256 primitives with synthetic previous outputs",
+  "engines": [
+    "development evaluator",
+    "BSV Node",
+    "chain-gang"
+  ],
+  "vectors": [
+    {
+      "name": "bytes",
+      "script_bytes": 5,
+      "script_sha256": "ec1f93d083ac38819e89bf12710d61a1cc26bbd8cc3b189532523c30190a5e75",
+      "rejections": [
+        "changed_first_byte"
+      ]
+    },
+    {
+      "name": "trace-row",
+      "script_bytes": 10,
+      "script_sha256": "3b3eb830c2c21b4f397f745cc5239935218b6d0f4c1619b489e6554a67dc2fb9",
+      "rejections": [
+        "changed_first_byte",
+        "short_first_item"
+      ]
+    },
+    {
+      "name": "merkle-parent",
+      "script_bytes": 19,
+      "script_sha256": "d7926e4c6653de8ffa85d8ce13cf5f7b26829837e523e7795a93b8dd86c1f889",
+      "rejections": [
+        "changed_first_byte",
+        "short_first_item",
+        "short_second_item",
+        "reversed_children"
+      ]
+    },
+    {
+      "name": "digest-list",
+      "script_bytes": 4,
+      "script_sha256": "7d9d49bd6cbbe7fbddb2825ad6760faa9be35963c98ab396249058f04b5ce1c5",
+      "rejections": [
+        "changed_first_byte"
+      ]
+    },
+    {
+      "name": "seed-counter",
+      "script_bytes": 18,
+      "script_sha256": "0b2523a5657a6ac1f49607d473a471d8f3e2545cdd15e6f3b44632cad27a9885",
+      "rejections": [
+        "changed_first_byte",
+        "short_first_item",
+        "short_second_item",
+        "reversed_counter_bytes"
+      ]
+    }
+  ],
+  "native": {
+    "bsv_node_version": 101020300,
+    "chain_gang": {
+      "version": "0.13.2",
+      "commit": "74676b9c002c452e7f21a9ed9265f4972bef03f6"
+    }
+  }
+}

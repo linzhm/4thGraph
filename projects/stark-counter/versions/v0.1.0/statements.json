@@ -1,0 +1,6 @@
+[
+  {"name": "ordinary", "current": 19, "next": 1042},
+  {"name": "ends-at-max", "current": 4294966272, "next": 4294967295},
+  {"name": "wraps-at-end", "current": 4294966273, "next": 0},
+  {"name": "wraps-at-start", "current": 4294967295, "next": 1022}
+]

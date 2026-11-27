@@ -14,7 +14,8 @@ from .verifier import (
 from fourthgraph.bsv.script import asm, number, push
 from fourthgraph.compiler.curve_windows import SignedRadix4Window, double_from_affine_slope, signed_radix4
 
-LAYOUTS = ("projective", "affine-inline", "affine-witness")
+AFFINE_LAYOUTS = ("affine-inline", "affine-witness")
+LAYOUTS = ("projective", *AFFINE_LAYOUTS, "projective-cofactor")
 MSM_STRATEGIES = ("unsigned-radix4", "signed-radix4")
 MSM_TABLES = ("points", "doubling-slopes", "deferred-doubling-slopes")
 MILLER_REDUCTIONS = ("per-operation", "per-step", "per-round", "split-chord", "split-chord-residue")
@@ -223,6 +224,42 @@ def double_msm_point(field, point, trusted_point, *, defer_reductions):
     return double_from_affine_slope(field, point, slope)
 
 
+def signed_msm_points(f, slots, public, windows, *, table):
+    scalars = {index: value for (index, _), value in zip(slots, public, strict=True)}
+    derive = table != "points"
+    defer_reductions = table == "deferred-doubling-slopes"
+    bases = {}
+
+    def divmod_script(value, radix):
+        return f.op("OP_DIV", value, radix), f.op("OP_MOD", value, radix)
+
+    for window in windows:
+        index, points, step = window.index, window.points, window.signed
+        shifted = defer_reductions and step.carry
+        digit, scalars[index] = step.split(scalars[index], add=f.add, sub=f.sub, divide=divmod_script,
+                                          shifted=shifted)
+        point = points[0]
+        if derive:
+            point = bases.get(index)
+            if point is None:
+                point = tuple(map(f.value, points[0]))
+        if len(points) == 2:
+            twice = f.op("OP_NUMEQUAL", digit, 3 if shifted else 2)
+            doubled = (double_msm_point(f, point, points[0], defer_reductions=defer_reductions)
+                       if derive else points[1])
+            px, py = (f.select(twice, high, low) for low, high in zip(point, doubled, strict=True))
+            if derive and step.carry:
+                # The next radix-4 window's base is four times this base.
+                bases[index] = double_msm_point(f, doubled, points[1], defer_reductions=defer_reductions)
+            if shifted:
+                py = f.op("OP_IF OP_NEGATE OP_ENDIF", py, f.op("OP_NOT", digit))
+            elif step.carry:
+                negative = f.op("OP_LESSTHAN", digit, 0)
+                py = f.select(negative, f.sub(0, py), py)
+            point = px, py
+        yield digit, point, shifted
+
+
 class AffineStages(VerifierStages):
     def __init__(self, key, sources, *, lines_in_witness, chronicle=False, optimize=False, fp2_rules=FP2_RULES,
                  fp2_selection="uniform", msm=MSM_STRATEGIES[0], msm_table=MSM_TABLES[0],
@@ -281,39 +318,10 @@ class AffineStages(VerifierStages):
 
     def check_signed_msm(self, public):
         f = self.field
-        scalars = {index: value for (index, _), value in zip(self.slots, public, strict=True)}
         acc = fold_msm(self.key, self.sources) or IDENTITY
-        derive = self.msm_table != "points"
         defer_reductions = self.msm_table == "deferred-doubling-slopes"
-        bases = {}
-
-        def divmod_script(value, radix):
-            return f.op("OP_DIV", value, radix), f.op("OP_MOD", value, radix)
-
-        for offset, window in enumerate(self.windows):
-            index, points, step = window.index, window.points, window.signed
-            shifted = defer_reductions and step.carry
-            digit, scalars[index] = step.split(scalars[index], add=f.add, sub=f.sub, divide=divmod_script,
-                                              shifted=shifted)
-            point = points[0]
-            if derive:
-                point = bases.get(index)
-                if point is None:
-                    point = tuple(map(f.value, points[0]))
-            if len(points) == 2:
-                twice = f.op("OP_NUMEQUAL", digit, 3 if shifted else 2)
-                doubled = (double_msm_point(f, point, points[0], defer_reductions=defer_reductions)
-                           if derive else points[1])
-                px, py = (f.select(twice, high, low) for low, high in zip(point, doubled, strict=True))
-                if derive and step.carry:
-                    # The next radix-4 window's base is four times this base.
-                    bases[index] = double_msm_point(f, doubled, points[1], defer_reductions=defer_reductions)
-                if shifted:
-                    py = f.op("OP_IF OP_NEGATE OP_ENDIF", py, f.op("OP_NOT", digit))
-                elif step.carry:
-                    negative = f.op("OP_LESSTHAN", digit, 0)
-                    py = f.select(negative, f.sub(0, py), py)
-                point = px, py
+        points = signed_msm_points(f, self.slots, public, self.windows, table=self.msm_table)
+        for offset, (digit, point, shifted) in enumerate(points):
             acc = add_msm_window(f, acc, point, digit, self.trace.read(offset), bounded=True,
                                  defer_reductions=defer_reductions, shifted=shifted)
         return Curve(self.tower).negate(acc), f.op("OP_0NOTEQUAL", acc[1])

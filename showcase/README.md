@@ -12,6 +12,7 @@
 | **Pure ML-DSA-44** | The v0.11.0 fixture measures 251,704 B per payment lock. [Compiler and transaction measurements](../projects/ml-dsa/versions/v0.11.0/measurements.json) |
 | **BLS12-381 Groth16** | [Modular Forth and funded replay](../projects/groth16-bls12-381/README.md) · [Fixed-statement comparison](../projects/proof-counter/reference/fixed-statement/README.md) · [Recorded benchmark](../projects/proof-counter/versions/v0.1.0/measurements.json) |
 | **BN254 Groth16** | [Fixed-statement Forth and Chronicle replay](../projects/groth16-bn254/README.md) |
+| **Winterfell SHA-256 STARK** | The v0.2.0 Forth Merkle word reduces the depth-13 trace-opening lock from 550 B to 368 B against a controlled baseline. [Reproduce](../projects/stark-winterfell-sha256/docs/verification.en.md#opening-lock-comparison) · [Versioned measurements](../projects/stark-winterfell-sha256/versions/v0.2.0/opening-comparison.json) |
 | **Lamport OTS** | The v0.2.0 candidate measures 6,525 B per lock and 48,106 B per two-input, two-output OTDA ALL payment with reconstruction. The fixed-weight research candidate measures 41,920 B on that payment and uses an 11,264 B proof. [Fixed-weight design and costs](../projects/lamport-ots/docs/optimization.md#fixed-weight-candidate) · [Lamport results](../projects/lamport-ots/README.md) · [Versioned measurements](../projects/lamport-ots/versions/v0.2.0/measurements.json) |
 
 The [wallet benchmark](../docs/benchmark.md) specifies transaction shapes, measurement and engine pins for cross-project comparisons.
