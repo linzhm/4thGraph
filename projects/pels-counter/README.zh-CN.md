@@ -4,6 +4,8 @@
 
 **[构建完整锁](#build)** · [Regtest 入金和复放](#spend-and-verify-on-regtest) · [调整手续费规则](#declare-a-fee-constraint)
 
+这是 PELS 标准库模板族的一个计数示例。递增规则、状态宽度和费用策略由本项目选择。[模板族与实例边界](../../docs/optimizer-integration-review.zh-CN.md)
+
 4thGraph 把 `advance` 编译到完整合约锁。每次花费只允许一个后继输出，后继的 `u32` 计数加一，并沿用同一段合约代码。[入门版](pels-counter.fth)固定每笔花费的手续费为 1,000 聪。[核心版](pels-counter-core.fth)由花费见证提供后继金额，锁再把金额绑定到实际输出。
 
 <a name="build"></a>

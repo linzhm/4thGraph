@@ -91,6 +91,8 @@ PYTHONPATH=src:. python -m fourthgraph.reporting "$out/search-replay.json" \
 
 [项目合约接口与开发计划](project-contracts.zh-CN.md) 说明怎样用临时密钥构造锁、检验 WASM 的输入输出，以及让 agent 运行可复放的公式实验。
 
+[PELS 标准库模板族与编译器优化接入评审](optimizer-integration-review.zh-CN.md) 列出已有优化、Forth 公开词和实例的边界，以及实际整锁与交易路径的对照结果。
+
 | 目标 | 文档 |
 | --- | --- |
 | 构建第一个合约 | [用 Agent 开始](../README.zh-CN.md#start-with-agent) · [安装 CLI 和 skill](install.md) · [可运行项目](../projects/README.zh-CN.md) |

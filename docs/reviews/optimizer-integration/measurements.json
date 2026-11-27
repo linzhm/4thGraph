@@ -1,0 +1,483 @@
+{
+  "scope": "Offline review on isolated regtest, explicit prevouts, no broadcast, mempool admission or confirmation. Script stack profiles use a development evaluator with native CHECKSIG modeled true. All byte counts are serialized bytes.",
+  "branch_revision": "96eff5009b94519d425d508bbc1cedc65dde7543",
+  "main_revision": "5fef0b71bb93507fb1d0206d7d72e3d692a74847",
+  "branch_r1_ordinary_all": {
+    "inputs": {
+      "source_sha256": "08df84282d5624ff8a010a9a24631a974322d75c72b3634ff6c6306c2d6451d5",
+      "dependencies": {
+        "r1.fth": "c79cf9ba9a20d9a9c01274ae6676e2ae51b0de2de365266ebe3467c706ba13e3",
+        "std/bsv": "92f4510c9d3e8e0371d9b41d08f9f7e639324c9795e6d0a1c3f9779e9179b404"
+      }
+    },
+    "plan_scope": "fixed split-4, change only add/double formula lowering",
+    "receipt_scope": "one ordinary-all signed spend to OP_1; synthetic funding included for path size",
+    "node_version": 101020300,
+    "chain_gang": {
+      "version": "0.13.2",
+      "commit": "74676b9c002c452e7f21a9ed9265f4972bef03f6"
+    },
+    "rows": [
+      {
+        "plan": [],
+        "add_bytes": 392,
+        "double_bytes": 222,
+        "script_bytes": 116364,
+        "script_sha256": "86163417ec7b591262a07ec6970a2e2e82b60b7c0368088434a5da532090bb23",
+        "reconstruction_bytes": 4359,
+        "compile_link_ns": 1710242698,
+        "funding_bytes": 116428,
+        "spend_bytes": 389,
+        "unlock_bytes": 326,
+        "path_bytes": 116817,
+        "stack": {
+          "source": "development evaluator; native CHECKSIG modeled as true",
+          "main_items": 160,
+          "alt_items": 131,
+          "combined_payload_bytes": 6688
+        },
+        "template": "review/split-4/empty",
+        "manifest_sha256": "f248dff6949999277d8388674dd357700c048b31f5c28cf5f7e4daeb27557194",
+        "module_sha256": "2ccef5ffa88b4b6cb70b726db37e034f3352649377c0b8d9f8e15591cf7da01e",
+        "cases": 14,
+        "fixture_sha256": "4eb57f665a8deed07bffa0179c19482808c13ab9212d0f466711bc5db553add8",
+        "replay": "dual-engine",
+        "engines": {
+          "chain_gang": true,
+          "bsv_node": true
+        }
+      },
+      {
+        "plan": [
+          "stack"
+        ],
+        "add_bytes": 156,
+        "double_bytes": 80,
+        "script_bytes": 47962,
+        "script_sha256": "8398f037dca9c1f8634829a09496292568a2c3e4babee461358ee61290785efb",
+        "reconstruction_bytes": 3980,
+        "compile_link_ns": 23875742,
+        "funding_bytes": 48024,
+        "spend_bytes": 389,
+        "unlock_bytes": 326,
+        "path_bytes": 48413,
+        "stack": {
+          "source": "development evaluator; native CHECKSIG modeled as true",
+          "main_items": 111,
+          "alt_items": 131,
+          "combined_payload_bytes": 3469
+        },
+        "template": "review/split-4/stack",
+        "manifest_sha256": "e1cb677c8b331e2c23809cab375f2d610702b65c7014df25427aee6c0acf7886",
+        "module_sha256": "7c8098a2f6e61f3d17aad38b772f2d6b020c57842c16c5ed12ec87838ac9dd1f",
+        "cases": 14,
+        "fixture_sha256": "4eb57f665a8deed07bffa0179c19482808c13ab9212d0f466711bc5db553add8",
+        "replay": "dual-engine",
+        "engines": {
+          "chain_gang": true,
+          "bsv_node": true
+        }
+      },
+      {
+        "plan": [
+          "rewrite",
+          "share",
+          "stack"
+        ],
+        "add_bytes": 142,
+        "double_bytes": 79,
+        "script_bytes": 45827,
+        "script_sha256": "35b3614e5c146ed96d1ddfb0e346114ef9257e7b2153089b997af5e3dcaf063d",
+        "reconstruction_bytes": 3965,
+        "compile_link_ns": 16204972,
+        "funding_bytes": 45889,
+        "spend_bytes": 389,
+        "unlock_bytes": 326,
+        "path_bytes": 46278,
+        "stack": {
+          "source": "development evaluator; native CHECKSIG modeled as true",
+          "main_items": 111,
+          "alt_items": 131,
+          "combined_payload_bytes": 3472
+        },
+        "template": "review/split-4/rewrite-share-stack",
+        "manifest_sha256": "63c1350044b40077e750a30d76ca6bf52e956a43fe2b0f5d7b7968f8c13a3218",
+        "module_sha256": "3febdd51d3b74ce2dae2a85f13f49496a1d78ba2a0e9a45f87fb9afa5d899655",
+        "cases": 14,
+        "fixture_sha256": "4eb57f665a8deed07bffa0179c19482808c13ab9212d0f466711bc5db553add8",
+        "replay": "dual-engine",
+        "engines": {
+          "chain_gang": true,
+          "bsv_node": true
+        }
+      },
+      {
+        "plan": [
+          "rewrite",
+          "share",
+          "stack",
+          "search"
+        ],
+        "add_bytes": 123,
+        "double_bytes": 74,
+        "script_bytes": 41986,
+        "script_sha256": "10f1708ea2c38c34f4d6779c8584485a514835b885dd3e2169d6b7aa9afdd399",
+        "reconstruction_bytes": 3940,
+        "compile_link_ns": 791635332,
+        "funding_bytes": 42048,
+        "spend_bytes": 389,
+        "unlock_bytes": 326,
+        "path_bytes": 42437,
+        "stack": {
+          "source": "development evaluator; native CHECKSIG modeled as true",
+          "main_items": 113,
+          "alt_items": 131,
+          "combined_payload_bytes": 3636
+        },
+        "template": "review/split-4/rewrite-share-stack-search",
+        "manifest_sha256": "5b404de7025599373f0ab26ec5295ffd4833a84ea45f06b1c121158459a9c6bb",
+        "module_sha256": "3efe3c604e6b67ec2aacd70b4a2720f4f7da2dd0204f55460f9410b49be3bd79",
+        "cases": 14,
+        "fixture_sha256": "4eb57f665a8deed07bffa0179c19482808c13ab9212d0f466711bc5db553add8",
+        "replay": "dual-engine",
+        "engines": {
+          "chain_gang": true,
+          "bsv_node": true
+        }
+      }
+    ]
+  },
+  "branch_pels_counter_instance": {
+    "notice": "Only positive offline fixture transactions. The compact candidate has no approved WASM bundle.",
+    "source": {
+      "sha256": "d17ee96774e4f700d2d80c520b8606020cd2e350e7695952e13c0af475779492",
+      "dependencies": [
+        {
+          "name": "std/bsv",
+          "sha256": "92f4510c9d3e8e0371d9b41d08f9f7e639324c9795e6d0a1c3f9779e9179b404",
+          "interface_sha256": "8f13bbd5b91b3741175765fe94333e7ecdcae74ef43f7e5e15e83a5dae3a166d"
+        },
+        {
+          "name": "std/u32",
+          "sha256": "d1a493031110afbf5e2799ec8148f7a6020bd553afbe6e9b3fc8899ea836e93c",
+          "interface_sha256": "235e20b899dfa23a22d4cff4b73f64b3e00b43d9b634c7221f38f5abbeb07167"
+        }
+      ]
+    },
+    "advance": {
+      "baseline": {
+        "hex": "8b05000000000197",
+        "reported_rewrites": []
+      },
+      "safe": {
+        "hex": "8b05000000000197",
+        "reported_rewrites": [
+          "add-one-instruction"
+        ]
+      },
+      "stack": {
+        "hex": "8b05000000000197",
+        "reported_rewrites": [
+          "add-one-instruction"
+        ]
+      }
+    },
+    "engine": {
+      "version": "0.13.2",
+      "commit": "74676b9c002c452e7f21a9ed9265f4972bef03f6"
+    },
+    "node_version": 101020300,
+    "variants": [
+      {
+        "target_plan": "baseline",
+        "witness": "full-preimage",
+        "frozen_manifest_matches": true,
+        "frozen_wasm_recognize": "Match",
+        "script": {
+          "bytes": 705,
+          "sha256": "8b757966d492adfadb003bd7e5d0766fa44261d5034da10fed85befd31367917",
+          "script_code_sha256": "0ea9886c6fc34ac7915e48bef78b6869de20c6bae27c3185c78aef35a444a488",
+          "anchors": [
+            {
+              "offset": 6,
+              "op": "OP_CODESEPARATOR",
+              "bytes": 1
+            },
+            {
+              "offset": 704,
+              "op": "OP_CHECKSIG",
+              "bytes": 1
+            }
+          ]
+        },
+        "synthetic_funding_transaction_bytes": 767,
+        "path_root_lock_field_and_first_spend_bytes": 2337,
+        "funding_and_both_spends_bytes": 4025,
+        "steps": [
+          {
+            "step": 0,
+            "state": 1,
+            "txid": "29774ee9233ebc70aeda6ead49b4529e915eef4fb52f0517143a55516e479459",
+            "prevout": "66944eccb8a9244390b96445b52d65cfebf90fa64ba2b366be57502d71c2abe100000000",
+            "amount": 99000,
+            "tx_bytes": 1629,
+            "unlock_bytes": 860,
+            "engines": {
+              "chain_gang": true,
+              "bsv_node": true
+            },
+            "wasm_wallet_spend": true,
+            "stack": {
+              "source": "development evaluator; native CHECKSIG modeled as true",
+              "main_items": 5,
+              "alt_items": 32,
+              "combined_payload_bytes": 2609
+            }
+          },
+          {
+            "step": 1,
+            "state": 2,
+            "txid": "6f93cbc6356c284a66f1fa2a10509f10dde2c1a57c684ccdce6e0e2478ad3624",
+            "prevout": "5994476e51553a1417052fb54fef5e919e52b449ad6edaae70bc3e23e94e772900000000",
+            "amount": 98000,
+            "tx_bytes": 1629,
+            "unlock_bytes": 860,
+            "engines": {
+              "chain_gang": true,
+              "bsv_node": true
+            },
+            "wasm_wallet_spend": true,
+            "stack": {
+              "source": "development evaluator; native CHECKSIG modeled as true",
+              "main_items": 5,
+              "alt_items": 32,
+              "combined_payload_bytes": 2609
+            }
+          }
+        ]
+      },
+      {
+        "target_plan": "compact",
+        "witness": "full-preimage",
+        "frozen_manifest_matches": false,
+        "frozen_wasm_recognize": "NoMatch",
+        "script": {
+          "bytes": 547,
+          "sha256": "804d9eb559ba4aab63311cf6261d056abc8c3ca376d440ddae458ff6917c10b8",
+          "script_code_sha256": "2133a52dfc815df42f4b94216d39ec784b6aafdc36394477ac5c436f941491f8",
+          "anchors": [
+            {
+              "offset": 6,
+              "op": "OP_CODESEPARATOR",
+              "bytes": 1
+            },
+            {
+              "offset": 546,
+              "op": "OP_CHECKSIG",
+              "bytes": 1
+            }
+          ]
+        },
+        "synthetic_funding_transaction_bytes": 609,
+        "path_root_lock_field_and_first_spend_bytes": 1863,
+        "funding_and_both_spends_bytes": 3235,
+        "steps": [
+          {
+            "step": 0,
+            "state": 1,
+            "txid": "ec2dc2656fd9b364e61d75d4f0e2db7557a1997b06da4e425035b9708598cd4c",
+            "prevout": "bbd0c1b1d5a3e49dcbdaa38462f137a799b9bf81df50dd71ab8e363aa3ba78d700000000",
+            "amount": 99000,
+            "tx_bytes": 1313,
+            "unlock_bytes": 702,
+            "engines": {
+              "chain_gang": true,
+              "bsv_node": true
+            },
+            "wasm_wallet_spend": "not_run",
+            "stack": {
+              "source": "development evaluator; native CHECKSIG modeled as true",
+              "main_items": 32,
+              "alt_items": 2,
+              "combined_payload_bytes": 2135
+            }
+          },
+          {
+            "step": 1,
+            "state": 2,
+            "txid": "3a009025a280b292eb08fbcbbd0afadce4007d6c033876a4569bce6d5983d87b",
+            "prevout": "4ccd988570b93550424eda067b99a15775dbe2f0d4751de664b3d96f65c22dec00000000",
+            "amount": 98000,
+            "tx_bytes": 1313,
+            "unlock_bytes": 702,
+            "engines": {
+              "chain_gang": true,
+              "bsv_node": true
+            },
+            "wasm_wallet_spend": "not_run",
+            "stack": {
+              "source": "development evaluator; native CHECKSIG modeled as true",
+              "main_items": 32,
+              "alt_items": 2,
+              "combined_payload_bytes": 2135
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "main_83_existing_forth_fixtures": [
+    {
+      "case": "PELS standalone existing +2, 500 sat",
+      "engines": {
+        "chain_gang": true,
+        "bsv_node": true
+      },
+      "lock": 623,
+      "parent": 685,
+      "tx": 1434,
+      "unlock": 747,
+      "txid": "6cc908fa4920acee4550f9ac04dea53dd73b93595c4c703d07e987af1eb1a9d9",
+      "amount": 9500
+    },
+    {
+      "case": "R1 + PELS lock",
+      "bytes": 9905009,
+      "sha256": "52cc763ad6b347fcf6fc6e2d69da2ba5134c2985c7954350515d5b0800e6fbeb",
+      "segments": [
+        {
+          "word": "r1-pels-state",
+          "offset": 0,
+          "bytes": 7,
+          "sha256": "e4bcb981ead4d9be62a1d8cfa4f28e53b474c96b7732802ac3c300ee7cb1d05d"
+        },
+        {
+          "word": "pels-verify",
+          "offset": 7,
+          "bytes": 624,
+          "sha256": "ea43a1b52573eb22564f7b80105dbcd6ae6457388a0c95c84e22068bf97d9457"
+        },
+        {
+          "word": "r1-verify-owner",
+          "offset": 631,
+          "bytes": 9904378,
+          "sha256": "a05dc550c78048e031e7bd93763f0953f093e466d71300f2d382e74b2ad4cc4c"
+        }
+      ],
+      "chain": {
+        "version": "0.13.2",
+        "commit": "74676b9c002c452e7f21a9ed9265f4972bef03f6"
+      },
+      "node": 101020300
+    },
+    {
+      "case": "R1 + PELS existing positive chain",
+      "state": 1,
+      "engines": {
+        "chain_gang": true,
+        "bsv_node": true
+      },
+      "lock": 9905009,
+      "parent": 9905073,
+      "tx": 19810345,
+      "unlock": 9905268,
+      "txid": "43119e2db1a2688017a88a9322d763004ec0668dfbe73fb40b9110df235a5f1a",
+      "amount": 9000
+    },
+    {
+      "case": "R1 + PELS existing positive chain",
+      "state": 2,
+      "engines": {
+        "chain_gang": true,
+        "bsv_node": true
+      },
+      "lock": 9905009,
+      "parent": 19810345,
+      "tx": 19810345,
+      "unlock": 9905268,
+      "txid": "93a6c258b48119f53e03e00716a8ff8d63d33faab74a1705bfd5365da76b6137",
+      "amount": 8000
+    }
+  ],
+  "review_status_label_fixture_against_main_83": {
+    "chain": {
+      "version": "0.13.2",
+      "commit": "74676b9c002c452e7f21a9ed9265f4972bef03f6"
+    },
+    "source_sha256": "e5ad656ce739669f3307ab36343d730351c70a41f9342e33315aebffe37dc2f0",
+    "initial_lock_bytes": 645,
+    "initial_lock_sha256": "f2e8d422e2e6a27542590114a3ca46f564a62b1c872f778bd5f4030cca6e8e57",
+    "steps": [
+      {
+        "from": "0300000000",
+        "to": "0900000000",
+        "txid": "f736603db7100c4b8b95fa79f45f639b792a8c01df3f3c9a195dbd0b269a5539",
+        "bytes": 1478,
+        "chain_gang": true,
+        "bsv_node": "not_run"
+      },
+      {
+        "from": "0900000000",
+        "to": "0300000000",
+        "txid": "e9f2a5ccafac295dd2a9ec20c7dfd630c1ef1e2f0f1fbb4fadd7dccb55b9b48f",
+        "bytes": 1478,
+        "chain_gang": true,
+        "bsv_node": "not_run"
+      }
+    ]
+  },
+  "independent_project_package_default": {
+    "fixture_cases_passed": 14,
+    "verification_sources": {
+      "src/fourthgraph/benchmark/validation.py": "bc2a1dfbf1a08a92cf639f24d1596f6591a2f35473843b1eb702780ceeb2fc9e",
+      "src/fourthgraph/workflow/contract_runtime.mjs": "be241f1bfac15259eb50d8bf3a5dea6d41340d1a93109369f6327ed778316c60",
+      "src/fourthgraph/workflow/project_contract.py": "8b479c3468f34a1225d1f36ef2e0c9782f34d42c2bcb1f6fadf7c58169414e45",
+      "tools/verify_project_contract.py": "4044687c15ea584a388584489b08f32b333965b226a88885b773e307e13c07df"
+    },
+    "replay": {
+      "activation_height": 2,
+      "chain_gang": {
+        "commit": "74676b9c002c452e7f21a9ed9265f4972bef03f6",
+        "version": "0.13.2"
+      },
+      "fixture_sha256": "4eb57f665a8deed07bffa0179c19482808c13ab9212d0f466711bc5db553add8",
+      "flags": 3997710,
+      "local_public_key_checked": false,
+      "manifest_sha256": "2dddac4e7a9eb6b2f08a16357c2db78461b6fc0e37b429c8fff29c4b64ef3d97",
+      "module_sha256": "310e0c0e12c794d11316d9c3120c133ec337f8e21f1084f209c10772eb1e88de",
+      "node_version": null,
+      "path": "ordinary-all",
+      "profile": "p2pkh-r1",
+      "public_key": "048e533b6fa0bf7b4625bb30667c01fb607ef9f8b8a80fef5b300628703187b2a373eb1dbde03318366d069f83a6f5900053c73633cb041b21c55e1a86c1f400b4",
+      "receipt_payload_sha256": "df0e821a9e800deeca4f085dc83c6bdf8c357d32acdc1890914129b075fbabae",
+      "receipt_schema": "4thgraph.project-receipt/1",
+      "schema": "4thgraph.project-replay/1",
+      "scope": "fixture_transactions",
+      "spend_height": 4,
+      "status": "passed",
+      "steps": [
+        {
+          "candidate_sha256": "30fe88bfc1e72bce0913c698e98419bf9c09d60ec89534c41d6aa2cb6bc5147b",
+          "coverage": 65,
+          "engines": {
+            "bsv_node": "not_run",
+            "chain_gang": true
+          },
+          "input_index": 0,
+          "next_amount": 99000,
+          "previous_amount": 100000,
+          "prevout": "33c51524038b5e980b84169b3c7b24045efb847db537b71fe96779ee19553bae00000000",
+          "step": 0,
+          "tx_bytes": 389,
+          "txid": "cd38256b99c1748cdda532d68b855aa215d566e25cb66c60992ee9aaba92d402",
+          "unlock_bytes": 326
+        }
+      ],
+      "template": "0.6.0",
+      "template_sha256": "d4dc90255e60d8dff51e1f8464391304d4b0946457445e62f558c66e84edb27a",
+      "utxo_height": 3,
+      "verification_level": "chain-only"
+    },
+    "revision": "daaa519d7c76c9457af91c4718a4d2832f4419c7"
+  }
+}

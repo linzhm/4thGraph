@@ -19,26 +19,34 @@ Forth 源码、依赖、计划 → ScriptBuilder → Formula / Step → Graph �
 
 以 R1 的普通 ForkID ALL 路径为例。命令从 Forth 重建模板并对照冻结的 v0.6.0 字节，独立编译 WASM，在内存生成本轮 P-256 密钥，将所选公钥的 HASH160 填入模板并构造合成父交易。宿主核对候选后签名，比较 WASM 与既有参考实现生成的见证字节，再把组装好的交易与实际父交易交给 chain-gang。临时私钥只在签名进程内使用。回执保存公钥、父交易、签后交易以及各用例结果。需要逐项比对材料时，验证器的 `--include-io` 会保存入口的实际输入、期望与返回值。
 
-在仓库根目录使用项目现有 Python、Node 和 Go 环境。重建预编译模块需要支持 WASI reactor 的 Go，提交产物使用 Go 1.25.14。宿主使用 Node 的 WASI preview1。完整验证依赖仓库固定的 chain-gang 与 BSV Node 1.2.3。[验证依赖](../tools/requirements-chronicle.txt)
+在仓库根目录使用项目现有 Python、Node.js 和 Go 环境。重建预编译模块需要支持 WASI reactor 的 Go，提交产物使用 Go 1.25.14。Node.js 的 WASI preview1 运行项目模块。独立合约包的验收引擎默认为固定版 chain-gang，BSV Node 1.2.3 为显式可选复核。[验证依赖](../tools/requirements-chronicle.txt)
 
 ```sh
 export PYTHONPATH=src:.
 python tools/build_project_contract.py p2pkh-r1 workspace/holder --smoke
 ```
 
-`workspace/holder/smoke.json` 记录临时密钥这一轮的结果。冷构建相同工具、源码与参数得到相同 Script、模块与 manifest。临时密钥每轮不同，因此公钥、实例化的锁和交易也会不同。可重复的正式回归使用独立的固定公开测试密钥，并在两个引擎上验证。下面这两条命令仅使用隔离 regtest 的本地验证接口。
+`workspace/holder/smoke.json` 记录临时密钥这一轮的结果。冷构建相同工具、源码与参数得到相同 Script、模块与 manifest。临时密钥每轮不同，因此公钥、实例化的锁和交易也会不同。可重复的回归使用固定公开测试密钥或该路径约定的无签名见证。下面两条命令重建包，实跑固定夹具，将签后交易与实际父交易交给 chain-gang 并生成 `receipt.json`。
 
 ```sh
-bash tools/verify_node.sh --profile raised -- python tools/build_project_contract.py p2pkh-r1 workspace/holder --verify
-bash tools/verify_node.sh --profile raised -- python tools/build_project_contract.py pels-counter workspace/counter --verify
+python tools/build_project_contract.py p2pkh-r1 workspace/holder --verify
+python tools/build_project_contract.py pels-counter workspace/counter --verify
 ```
 
-临时私钥销毁后，下面的命令用保存的公开材料重放签后交易。示例的批准值来自仓库中这版 R1 包的项目清单。调用者还可用 `--public-key HEX` 指定预期的本地公开身份。去掉 `--chain-only` 并在隔离 regtest 验证器中运行，就会同时得到两个引擎的回执。
+下面的命令用保存的公开材料重放签后交易。也可对 `smoke.json` 做相同重放。批准值来自仓库中这版 R1 包的清单。可用 `--public-key HEX` 指定本地选定的公开身份。默认实跑及重放的级别均为 `chain-only`，引擎判定中的 `bsv_node` 记录为 `not_run`。
 
 ```sh
 python tools/verify_project_contract.py workspace/holder/manifest.json \
   --approved-sha256 2dddac4e7a9eb6b2f08a16357c2db78461b6fc0e37b429c8fff29c4b64ef3d97 \
-  --replay workspace/holder/smoke.json --chain-only --output workspace/holder-replay.json
+  --replay workspace/holder/receipt.json --output workspace/holder-replay.json
+```
+
+显式选择双引擎时，向上面的验证或重放命令追加 `--with-bsv-node`，并设置隔离 regtest 的 `REGTEST_URL` 和 `REGTEST_COOKIE`。例如下列调用主动启动本地 BSV Node 作一次复核。显式选用后，连接、版本或判定失败都会报告错误。独立合约包的回执覆盖夹具中的 Script 花费，交易入池、入块和正式 MESA 验收须分别取证。
+
+```sh
+bash tools/verify_node.sh --profile raised -- python tools/verify_project_contract.py \
+  workspace/holder/manifest.json --approved-sha256 2dddac4e7a9eb6b2f08a16357c2db78461b6fc0e37b429c8fff29c4b64ef3d97 \
+  --replay workspace/holder/receipt.json --with-bsv-node --output workspace/holder-node-replay.json
 ```
 
 ### 标准逻辑接口
@@ -53,7 +61,7 @@ ABI 标识为 `4thgraph.project-contract/1`。请求与回应用 UTF-8 JSON，�
 
 宿主从本地认可的 manifest 摘要起步，检查模块与模板的精确摘要、参数槽和签名锚点。钱包程序从真实父交易取输出，按输入的 outpoint 对齐。宿主独立序列化候选、计算签名覆盖，签名回调可以查看完整父交易、候选、序号、路径与摘要。宿主只替换获准输入的见证，最后由独立验证器复核。收到未知模板时，`NoMatch` 表示这个钱包缺少匹配的项目包，链上有效性由交易验证决定。[宿主](../src/fourthgraph/workflow/project_contract.py)
 
-功能 Profile 选择本地理解的项目，模板版本固定具体的 Script、布局与 WASM。单次签署候选用精确交易字节绑定。模板字节升级要保留旧包以花费旧 UTXO。多步流程逐笔引用已构造并验证的父输出。PELS 这一包支持单输入、单后继、固定费用与保留代码的 `advance` 路径。R1 包支持 v0.6.0 的 `ordinary-all` 路径；MESA 的签名槽是否能容纳签后才确定的逆元仍待单独评审。
+功能 Profile 选择本地理解的项目，模板版本固定具体的 Script、布局与 WASM。单次签署候选用精确交易字节绑定。模板字节升级要保留旧包以花费旧 UTXO。多步流程逐笔引用已构造并验证的父输出。PELS 归属标准库模板族。此处的 `pels-counter` 实例选用单输入、单后继、固定费用及保留代码的 `advance` 路径。R1 包支持 v0.6.0 的 `ordinary-all` 路径，MESA 签名槽对签后逆元的支持仍待单独评审。[模板族及优化接入评审](optimizer-integration-review.zh-CN.md)
 
 ### 夹具可以追加错误输入
 
@@ -65,7 +73,7 @@ ABI 标识为 `4thgraph.project-contract/1`。请求与回应用 UTF-8 JSON，�
  "expect":{"status":"NotOwned","signer_calls":0}}
 ```
 
-返回错误时还检查响应不含待签材料和解锁脚本。既有用例覆盖三入口的正常返回、缺少前序、输入类型错误、未知模板或路径、错误公钥、缺签、已覆盖输出变化和错误后继。PELS 分别运行两个状态阶段，第二步使用第一步实际组装的交易作为父交易。新增同类用例只需扩充表并重建本地包，新 manifest 显式绑定更新后的夹具摘要。[R1 用例](../projects/p2pkh-r1/contract/cases.json) · [PELS 用例](../projects/pels-counter/contract/cases.json)
+返回错误时还检查响应不含待签材料和解锁脚本。既有用例覆盖三入口的正常返回、缺少前序、输入类型错误、未知模板或路径、错误公钥、缺签、已覆盖输出变化和错误后继。`pels-counter` 分别运行两个状态阶段，第二步使用第一步实际组装的交易作为父交易。新增同类用例只需扩充表并重建本地包，新 manifest 显式绑定更新后的夹具摘要。[R1 用例](../projects/p2pkh-r1/contract/cases.json) · [计数实例用例](../projects/pels-counter/contract/cases.json)
 
 ### 公式优化与 agent 的两轮实验
 
@@ -89,7 +97,7 @@ echo '{"fixture":"bezier","workers":2,"plans":[{},{"passes":["stack"]},{"passes"
 | `square`，冻结源码 | 基线 → 栈调度 → 加搜索 | 6 → 3 → 3 B，同分保留较简单父计划 | 每项 11 组向量 |
 | Bézier，冻结 `stack` 计划 | 多项式展开式 → 两级线性插值 | 47 → 37 B，主栈峰值 9 → 8 | 两个独立源码身份，同一组 625 个 oracle；尚未验证调用方净收益 |
 | R1 构造夹具 | 41,364 B 的 v0.6.0 模板，花到单个 `OP_1` 输出 | 见证 326 B，签后交易 389 B | 固定夹具双引擎；这里量的是消费交易 |
-| PELS 构造夹具 | 705 B 的状态锁，0 → 1 → 2 | 每步见证 860 B，签后交易 1,629 B | 两笔消费均由双引擎核对实际父输出 |
+| `pels-counter` 实例夹具 | 705 B 的状态锁，0 → 1 → 2 | 每步见证 860 B，签后交易 1,629 B | 两笔消费均有双引擎历史回执 |
 
 本机对 Bézier 做了 5 轮串行测量，编译时间从开始处理单项计划计到发射 Script，排除向量执行。三项 `rewrite/share/stack` 的中位数是 2.34 ms，加入 `search` 后为 177.72 ms。这里用额外编译时间和一个主栈槽换取了 1 B。这是本次环境的测量值。
 
@@ -104,7 +112,7 @@ B 轴固定编译计划与夹具，比较登记过的不同算法源码。等价
 | 1. 原生实验入口 | `src/fourthgraph/benchmark` 和现有 CLI | Bézier 和 square 两轮、机器报告驱动、冻结重放 |
 | 2. 公式语义和终端排布 | `src/fourthgraph/compiler` | 累积来源、区间前提、依赖及源码顺序最后使用点；显式有序计划与 #82 集合分开测试 |
 | 3. 钱包构建包 | 共享 ABI、项目自己的 WASM 源码、版本目录与 manifest | 从模块任意文件名加载；保留单独可读的 Script、反汇编、参数与签名锚点 |
-| 4. 两个项目的实际花费 | 各自的 `contract/cases.json` 与回执 | R1 临时密钥冒烟、固定密钥双引擎；PELS 真实前序两步 |
+| 4. 两个项目的实际花费 | 各自的 `contract/cases.json` 与回执 | R1 临时与固定测试密钥、`pels-counter` 实际前序两步。默认 chain-gang，显式可再用 BSV Node 核验 |
 | 5. 算法与顺序对照 | 显式 A/B 请求、依赖约束和有限规则集合 | 同范围相同成本口径比较；只有测过完整调用方才能作采用决定 |
 | 6. 后续评审 | 有代表性的实际调用方与完整交易夹具 | 净收益稳定后再评审重算或新规则；付费模型、发行默认变动、跨脚本全局优化均需独立决定 |
 

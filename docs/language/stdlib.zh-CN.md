@@ -28,6 +28,8 @@
 
 ## 公开接口
 
+PELS 在架构上归属标准库模板族，成员声明可验证的交易与后继约束，应用提供状态和金额规则。项目 `pels-counter` 演示其中一种用法。主线已有可独立加载的项目内 PELS 词；公开模块名和成员接口仍在评审，下面的表只列已登记模块。[模板族及公开接口评审](../optimizer-integration-review.zh-CN.md)
+
 | 模块 | 公开接口 | 现有项目 |
 | --- | --- | --- |
 | `std/bsv` | `REQUIRE BSV` 加载 `verify ( cell -- )` 和受支持的原生 `OP_*` 词 | [P2PKH 示例](../../projects/p2pk-p2pkh-baseline/forth/p2pkh.fth) |
