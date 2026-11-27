@@ -3,7 +3,7 @@
   "snapshot": {
     "compiler_version": "0.2.7",
     "entry": "r1-baseline-lock",
-    "compiler_sha256": "5f1e2aa40069c48367b30f23a9af473f72e0b1c71ef3dfc5826fc99fd2c63b17",
+    "compiler_sha256": "ec191317a2bbca365129b308e44d8a8f4a95906ae5ae8425367d8ffd02ce2c4e",
     "source_sha256": "877f30ef15d05758d30aefc0d2666dc338d118d802492e795cb0400b44f3a3c6",
     "window_backend": {
       "source_sha256": "08df84282d5624ff8a010a9a24631a974322d75c72b3634ff6c6306c2d6451d5",
