@@ -4,7 +4,7 @@
 
 ## 开发入口
 
-**[钱包 SDK 快速上手](docs/sdk.zh-CN.md#quickstart)** · [v1.7.0 候选版](#v170) · [统一钱包 SDK](../../sdk/README.zh-CN.md#quickstart)
+**[钱包 SDK 快速上手](docs/sdk.zh-CN.md#quickstart)** · [v1.8.0 候选版](#v180) · [统一钱包 SDK](../../sdk/README.zh-CN.md#quickstart)
 
 选择原始 SM2 签名器或 SignedData 签名器。符合条件的付款会自动选择更短的 OTDA 解锁编码。
 
@@ -37,9 +37,23 @@ v1.1.0 为首个公开版本 v1.0.0 的锁定模板 `1` 默认启用 OTDA 重建
 当前源码包含[模板布局](versions/v1.0.0/layout.json)、[SM2 标准向量](versions/v1.0.0/sm2-standard.json)、
 [完整付款向量](versions/v1.0.0/spend-all.json)和 [16 个签名预映像](versions/v1.0.0/sighash-modes.json)。[v1.0.0 发布页](https://github.com/linzhm/bsv-script-lab/releases/tag/p2pkh-sm2-v1.0.0)
 
+<a name="v180"></a>
+
+## v1.8.0 候选版
+
+当一笔 OTDA ALL 付款同时包含模板 `6` 和 `7` 的输出时，钱包可以共用一份构造器。构造器只写入一次公共前缀，并复用字节片段重建两个后缀。加上 ANYONECANPAY 时也适用。本版沿用现有锁定模板，钱包会在共享编码最短时自动选用。
+
+| 实测字节数 | v1.7.0 | v1.8.0 | 变化 |
+| --- | ---: | ---: | ---: |
+| 两种模板的构造器 | 18,810 | 9,681 | −48.5% |
+| OTDA ALL，两进两出混合模板整笔 | 237,409 | 219,151 | −7.7% |
+| 上述 OTDA ALL 交易的单输入解锁脚本 | 19,131 | 10,002 | −47.7% |
+
+对比使用相同的输入、输出顺序和签名预映像。[构造器](versions/v1.8.0/mixed-otda-constructor.json) · [复现方式](reference/README.zh-CN.md#mixed-otda-constructor) · [测量记录](versions/v1.8.0/measurements.json)
+
 <a name="v170"></a>
 
-## v1.7.0 候选版
+## v1.7.0
 
 验签用有符号的 32 进制数位计算 `sG + tQ`。两张点表分别保存绝对值 0 至 16 对应的点，数位为负时对 Y 取反。展开的窗口从 64 组降到 52 组，标量乘法字节码从 40,158 降到 37,854 字节。
 

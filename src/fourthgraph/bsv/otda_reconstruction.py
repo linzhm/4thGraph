@@ -30,8 +30,13 @@ class Reconstruction:
         return _build(preimage, slots, (self,))
 
 
-def reconstruct_mixed(preimage, outputs, patterns):
-    """Emit each used dictionary once and serialize all outputs in signed order."""
+def reconstruct_mixed(preimage, outputs, patterns, *, combine_programs=None):
+    """Serialize outputs in signed order with the dictionaries actually used.
+
+    A combined program must leave the same dictionary parts, in the same
+    order, as running each selected constructor. Return None to use those
+    constructors individually.
+    """
     slots = []
     used = set()
     for output in outputs:
@@ -47,14 +52,16 @@ def reconstruct_mixed(preimage, outputs, patterns):
         return None
     order = sorted(used)
     remap = {index: position for position, index in enumerate(order)}
+    selected = tuple(patterns[index] for index in order)
     return _build(
         preimage,
         [(output, fields, remap.get(index)) for output, fields, index in slots],
-        tuple(patterns[index] for index in order),
+        selected,
+        constructor=combine_programs(selected) if combine_programs is not None else None,
     )
 
 
-def _build(preimage, slots, patterns):
+def _build(preimage, slots, patterns, *, constructor=None):
     encoded = b"".join(output.serialize() for output, _, _ in slots)
     if not preimage.endswith(encoded, 0, len(preimage) - 8):
         raise ValueError("OTDA outputs differ from the signing preimage")
@@ -67,9 +74,9 @@ def _build(preimage, slots, patterns):
         base_depth.append(next_depth)
         next_depth -= len(pattern.fixed_parts)
 
-    program = bytearray()
-    for pattern in patterns:
-        program.extend(pattern.program)
+    program = bytearray(
+        b"".join(pattern.program for pattern in patterns) if constructor is None else constructor
+    )
     program.extend(push(preimage[:-len(encoded) - 8]))
     for output, fields, index in slots:
         raw = output.serialize()

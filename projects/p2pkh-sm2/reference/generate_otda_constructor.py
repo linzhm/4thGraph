@@ -1,11 +1,13 @@
-"""Rebuild the frozen OTDA constructor for a canonical P2PKH-SM2 lock."""
+"""Rebuild the frozen OTDA constructors for canonical P2PKH-SM2 locks."""
 import argparse
 from collections import Counter, defaultdict
+from hashlib import sha256
+import json
 from pathlib import Path
 
 from assemble import TEMPLATE_VERSION, TEMPLATE_VERSIONS, forth_compiler, sm3_blocks
 from assemble import SPLIT_ROTATION_TEMPLATE_VERSION
-from p2pkh_sm2 import _canonical
+from p2pkh_sm2 import MIXED_OTDA_VERSIONS, _canonical
 from fourthgraph.bsv.evaluate import evaluate
 from fourthgraph.bsv.script import asm, number, push
 
@@ -177,9 +179,33 @@ def generate(version=TEMPLATE_VERSION):
     return program
 
 
+def generate_mixed():
+    fixed_parts = []
+    for version in MIXED_OTDA_VERSIONS:
+        lock, offset = _canonical(version)
+        fixed_parts.extend((lock[:offset], lock[offset + 20:]))
+    prefix_a, suffix_a, prefix_b, suffix_b = fixed_parts
+    prefixes = push(prefix_a) + (asm("OP_DUP") if prefix_a == prefix_b else push(prefix_b))
+    suffixes = compile_suffix(suffix_a + suffix_b, function_library(MIXED_OTDA_VERSIONS[-1]),
+                              optimize_library=True)
+    # Leave each prefix next to its suffix, in canonical template order.
+    program = prefixes + suffixes + number(len(suffix_a)) + asm("OP_SPLIT OP_ROT OP_SWAP")
+    if evaluate(program) != (fixed_parts, []):
+        raise ValueError("mixed OTDA constructor does not reproduce both SM2 templates")
+    return {
+        "templates": list(MIXED_OTDA_VERSIONS),
+        "bytes": len(program),
+        "sha256": sha256(program).hexdigest(),
+        "program_hex": program.hex(),
+    }
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("output", type=Path, help="destination for the hexadecimal constructor")
-    parser.add_argument("--version", type=int, choices=TEMPLATE_VERSIONS, default=TEMPLATE_VERSION)
+    parser.add_argument("output", type=Path, help="destination for the constructor")
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument("--version", type=int, choices=TEMPLATE_VERSIONS, default=TEMPLATE_VERSION)
+    group.add_argument("--mixed", action="store_true", help="generate the combined template 6 and 7 JSON")
     args = parser.parse_args()
-    args.output.write_text(generate(args.version).hex() + "\n", encoding="ascii")
+    encoded = json.dumps(generate_mixed(), indent=2) if args.mixed else generate(args.version).hex()
+    args.output.write_text(encoded + "\n", encoding="ascii")

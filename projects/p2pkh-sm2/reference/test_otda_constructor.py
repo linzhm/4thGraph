@@ -1,11 +1,13 @@
 """Constructor byte equivalence and complete spending through both engines."""
 from dataclasses import replace
+import json
 import unittest
 from unittest.mock import patch
 
 from assemble import SCHEDULED_TEMPLATE_VERSION, TEMPLATE_VERSIONS
-from generate_otda_constructor import generate
-from p2pkh_sm2 import _otda_pattern, current_input_unlock, locking_script_from_public_key, sign_input
+from generate_otda_constructor import generate, generate_mixed
+from p2pkh_sm2 import MIXED_OTDA_FILE, MIXED_OTDA_VERSIONS, _mixed_otda_program, _otda_pattern
+from p2pkh_sm2 import current_input_unlock, locking_script_from_public_key, sign_input
 from fourthgraph.benchmark.validation import chain_verdict
 from fourthgraph.bsv.evaluate import evaluate
 from fourthgraph.bsv.transaction import Input, Output, Transaction
@@ -43,6 +45,14 @@ class ConstructorTests(unittest.TestCase):
                     self.assertIsNone(pattern.match(lock[:-1]))
                     self.assertIsNone(pattern.match(lock[:-1] + b'\x51'))
         self.assertLess(len(_otda_pattern(SCHEDULED_TEMPLATE_VERSION).program), len(_otda_pattern().program))
+
+    def test_mixed_program_reproduces_both_dictionaries(self):
+        self.assertEqual(generate_mixed(), json.loads(MIXED_OTDA_FILE.read_text(encoding="utf-8")))
+        patterns = [_otda_pattern(version) for version in MIXED_OTDA_VERSIONS]
+        parts = [part for pattern in patterns for part in pattern.fixed_parts]
+        program = _mixed_otda_program()
+        self.assertEqual(evaluate(program), (parts, []))
+        self.assertLess(len(program), sum(len(pattern.program) for pattern in patterns))
 
     def sign_modes(self, tx, flag, expected, *, funding=None):
         funding = self.funding if funding is None else funding
@@ -130,6 +140,34 @@ class ConstructorTests(unittest.TestCase):
         oversized = replace(pattern, program=pattern.program + bytes(len(tx.serialize())))
         with patch('p2pkh_sm2._otda_pattern', return_value=oversized):
             self.sign_modes(tx, 0x61, (False, False))
+
+    def mixed_template_fixture(self):
+        funding = tuple(
+            replace(parent, outputs=(Output(10_000, locking_script_from_public_key(key, version=version)),))
+            for parent, key, version in zip(self.funding, self.keys, MIXED_OTDA_VERSIONS, strict=True)
+        )
+        inputs = tuple(Input(parent.txid_wire(), 0) for parent in funding)
+        outputs = tuple(
+            Output(9_950, locking_script_from_public_key(key, version=version))
+            for key, version in zip(self.keys, reversed(MIXED_OTDA_VERSIONS), strict=True)
+        )
+        return Transaction(inputs, outputs), funding
+
+    def test_mixed_templates_use_shorter_shared_constructor(self):
+        tx, funding = self.mixed_template_fixture()
+        saved = sum(len(_otda_pattern(version).program) for version in MIXED_OTDA_VERSIONS)
+        saved -= len(_mixed_otda_program())
+        for flag in (0x61, 0xe1, 0x63):
+            with self.subTest(flag=hex(flag)):
+                shared = self.sign_modes(tx, flag, (True, True), funding=funding)
+                with patch("p2pkh_sm2._combine_otda_programs", return_value=None):
+                    separate = self.sign_modes(tx, flag, (True, True), funding=funding)
+                if flag == 0x63:
+                    self.assertEqual(shared, separate)
+                expected = saved if flag in (0x61, 0xe1) else 0
+                for index, (before, after) in enumerate(zip(separate.inputs, shared.inputs, strict=True)):
+                    self.assertEqual(len(before.script) - len(after.script), expected)
+                    check_node(shared, funding, index, old_output=True)
 
     def test_all_lock_versions_reconstruct_in_one_preimage(self):
         versions = TEMPLATE_VERSIONS[-2:]

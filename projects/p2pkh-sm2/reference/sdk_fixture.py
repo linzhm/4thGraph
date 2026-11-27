@@ -1,7 +1,8 @@
 from assemble import COMPILED_POINT_TEMPLATE_VERSION, PACKED_SM3_TEMPLATE_VERSION, SCHEDULED_TEMPLATE_VERSION
 from assemble import SIGNED_RESIDUE_TEMPLATE_VERSION, SIGNED_WINDOW_TEMPLATE_VERSION
 from assemble import SPLIT_ROTATION_TEMPLATE_VERSION, TEMPLATE_PROFILES
-from p2pkh_sm2 import locking_script_from_public_key
+from fourthgraph.bsv.transaction import Output
+from p2pkh_sm2 import MIXED_OTDA_VERSIONS, locking_script_from_public_key
 from sm2 import USER_ID, encode_public, fixture_sign, mul
 
 
@@ -52,3 +53,10 @@ def cases():
         yield dict(public_key=encode_public(mul(3)), signer=signed_data_provider, profile=profile,
                    bytes=size, sighash=0x61, destination=destination, reconstructed=True,
                    signer_identifier=ISSUER_AND_SERIAL)
+
+    mixed_outputs = tuple(
+        Output(4_950, locking_script_from_public_key(encode_public(mul(9)), version=version))
+        for version in reversed(MIXED_OTDA_VERSIONS)
+    )
+    yield dict(public_key=encode_public(mul(2)), signer=raw_signer(2), profile="v1.7.0",
+               bytes=98362, sighash=0x61, outputs=mixed_outputs, reconstructed=True)

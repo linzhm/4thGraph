@@ -107,6 +107,19 @@ cmp /tmp/sm2-otda-v7.hex projects/p2pkh-sm2/versions/v1.7.0/otda-constructor.hex
 
 The constructor tests compare exact preimage, public key, and signature stack values, then verify complete spends against BSV Node and chain-gang. [Layout and fingerprint](../versions/v1.1.0/layout.json) · [Wallet integration](../docs/sdk.en.md)
 
+<a name="mixed-otda-constructor"></a>
+
+## Reproduce the shared OTDA constructor
+
+The generator compresses the concatenated suffixes with the existing byte-span encoder. It then splits the result and returns the prefix and suffix for each template in ascending template order. The wallet uses those parts to serialize outputs in transaction order. Rebuild the JSON and compare the exact bytes from the repository root.
+
+```sh
+python projects/p2pkh-sm2/reference/generate_otda_constructor.py --mixed /tmp/sm2-otda-mixed.json
+cmp /tmp/sm2-otda-mixed.json projects/p2pkh-sm2/versions/v1.8.0/mixed-otda-constructor.json
+```
+
+The mixed payment test compares the shared, separate and literal encodings. Both engines verify the complete inputs, and BSV Node also verifies the shared encoding against prevouts created before Chronicle activation. [Tests](test_otda_constructor.py) · [Measurements](../versions/v1.8.0/measurements.json)
+
 ## SignedData payment interop
 
 [GB/T 35275-2026](https://openstd.samr.gov.cn/bzgk/std/newGbInfo?hcno=28A18B702BDC318803E598F5E502E2CC)

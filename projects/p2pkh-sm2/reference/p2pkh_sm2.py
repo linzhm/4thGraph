@@ -3,6 +3,7 @@ from functools import cache
 from hashlib import sha256
 import json
 from pathlib import Path
+from assemble import SIGNED_WINDOW_TEMPLATE_VERSION, SPLIT_ROTATION_TEMPLATE_VERSION
 from assemble import TEMPLATE_PROFILES, TEMPLATE_VERSION, assemble
 from sighash import authorization
 from sm2 import USER_ID,hash256,public_key_hash160,verify
@@ -16,6 +17,8 @@ LOCK_LAYOUTS = {version: VERSIONS / profile / 'layout.json'
 CONSTRUCTOR_LAYOUTS = LOCK_LAYOUTS | {
     TEMPLATE_VERSION: VERSIONS / 'v1.1.0/layout.json',
 }
+MIXED_OTDA_VERSIONS = (SPLIT_ROTATION_TEMPLATE_VERSION, SIGNED_WINDOW_TEMPLATE_VERSION)
+MIXED_OTDA_FILE = VERSIONS / 'v1.8.0/mixed-otda-constructor.json'
 RECONSTRUCT_ALL = frozenset((0x61, 0xe1))
 RECONSTRUCT_SINGLE = frozenset((0x63, 0xe3))
 
@@ -79,6 +82,26 @@ def _otda_pattern(version=TEMPLATE_VERSION):
     return Reconstruction(program, (template[:start], template[start+20:]), (20,))
 
 
+@cache
+def _mixed_otda_program():
+    record = json.loads(MIXED_OTDA_FILE.read_text(encoding='utf-8'))
+    program = bytes.fromhex(record['program_hex'])
+    if (tuple(record['templates']) != MIXED_OTDA_VERSIONS or len(program) != record['bytes']
+            or sha256(program).hexdigest() != record['sha256']):
+        raise ValueError('mixed SM2 OTDA constructor differs from its manifest')
+    return program
+
+
+def _combine_otda_programs(patterns):
+    pair = tuple(_otda_pattern(version) for version in MIXED_OTDA_VERSIONS)
+    for index in range(len(patterns) - 1):
+        if patterns[index:index + 2] == pair:
+            programs = [pattern.program for pattern in patterns]
+            programs[index:index + 2] = [_mixed_otda_program()]
+            return b''.join(programs)
+    return None
+
+
 def _preimage_script(tx, index, auth, *, compress_otda, chronicle_active):
     if compress_otda is not None and type(compress_otda) is not bool:
         raise ValueError('compress_otda must be a boolean')
@@ -94,14 +117,17 @@ def _preimage_script(tx, index, auth, *, compress_otda, chronicle_active):
     else:
         return literal
     output_sizes = {len(output.script) for output in outputs}
-    patterns = tuple(_otda_pattern(version) for version in LOCK_LAYOUTS
-                     if _layout(version)['script_bytes'] in output_sizes)
+    patterns = {version: _otda_pattern(version) for version in LOCK_LAYOUTS
+                if _layout(version)['script_bytes'] in output_sizes}
     candidates = [literal]
-    for pattern in patterns:
+    for pattern in patterns.values():
         if (program := pattern.build(auth.preimage, outputs)) is not None:
             candidates.append(program)
-    if len(patterns) > 1 and (program := reconstruct_mixed(auth.preimage, outputs, patterns)) is not None:
-        candidates.append(program)
+    if len(patterns) > 1:
+        combine = _combine_otda_programs if all(version in patterns for version in MIXED_OTDA_VERSIONS) else None
+        program = reconstruct_mixed(auth.preimage, outputs, tuple(patterns.values()), combine_programs=combine)
+        if program is not None:
+            candidates.append(program)
     return min(candidates, key=len)
 
 

@@ -99,6 +99,19 @@ cmp /tmp/sm2-otda-v7.hex projects/p2pkh-sm2/versions/v1.7.0/otda-constructor.hex
 
 构造器测试逐字节比对预映像、公钥和签名三项栈值，并由 BSV Node 和 chain-gang 验证完整花费。[布局与指纹](../versions/v1.1.0/layout.json) · [钱包接入](../docs/sdk.zh-CN.md)
 
+<a name="mixed-otda-constructor"></a>
+
+## 复现共享 OTDA 构造器
+
+生成器用现有片段编码器压缩拼接后的两个后缀，再把重建结果拆开，按模板编号依次输出两组前缀和后缀。钱包用这些片段按交易顺序序列化输出。在仓库根目录生成并逐字节比对 JSON。
+
+```sh
+python projects/p2pkh-sm2/reference/generate_otda_constructor.py --mixed /tmp/sm2-otda-mixed.json
+cmp /tmp/sm2-otda-mixed.json projects/p2pkh-sm2/versions/v1.8.0/mixed-otda-constructor.json
+```
+
+混合付款测试对照共享构造器、独立构造器和原样编码，并让两个引擎验证完整输入。BSV Node 还会用 Chronicle 激活前创建的上一输出验证共享编码。[测试](test_otda_constructor.py) · [测量记录](../versions/v1.8.0/measurements.json)
+
 ## SignedData 付款接入
 
 外部签名器可以按 GB/T 35275-2026 返回 DER 编码的 `SignedData`。封装携带签名值、

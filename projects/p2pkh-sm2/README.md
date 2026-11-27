@@ -4,7 +4,7 @@
 
 ## Developer resources
 
-**[Wallet SDK quickstart](docs/sdk.en.md#quickstart)** · [v1.7.0 candidate](#v170) · [Unified wallet SDK](../../sdk/README.md#quickstart)
+**[Wallet SDK quickstart](docs/sdk.en.md#quickstart)** · [v1.8.0 candidate](#v180) · [Unified wallet SDK](../../sdk/README.md#quickstart)
 
 Choose a raw SM2 or SignedData signer. The wallet automatically selects a shorter OTDA unlocking script for eligible payments.
 
@@ -41,9 +41,23 @@ The current source includes the [layout manifest](versions/v1.0.0/layout.json),
 [complete payment vector](versions/v1.0.0/spend-all.json), and
 [16 signing preimages](versions/v1.0.0/sighash-modes.json). [v1.0.0 release](https://github.com/linzhm/bsv-script-lab/releases/tag/p2pkh-sm2-v1.0.0)
 
+<a name="v180"></a>
+
+## v1.8.0 candidate
+
+The wallet uses a shared OTDA constructor when an ALL payment includes outputs of both templates `6` and `7`. It emits the common prefix once, then rebuilds both suffixes from shared byte spans. The same constructor applies with ANYONECANPAY. This release uses the existing locking templates and selects the shared encoding automatically when it is the shortest candidate.
+
+| Measured bytes | v1.7.0 | v1.8.0 | Change |
+| --- | ---: | ---: | ---: |
+| Constructor for both templates | 18,810 | 9,681 | −48.5% |
+| OTDA ALL, 2×2 transaction with mixed outputs | 237,409 | 219,151 | −7.7% |
+| OTDA ALL, unlocking script per input in that transaction | 19,131 | 10,002 | −47.7% |
+
+The comparison uses the same inputs, output order and signing preimages. [Constructor](versions/v1.8.0/mixed-otda-constructor.json) · [Reproduction](reference/README.md#mixed-otda-constructor) · [Recorded measurements](versions/v1.8.0/measurements.json)
+
 <a name="v170"></a>
 
-## v1.7.0 candidate
+## v1.7.0
 
 The verifier computes `sG + tQ` with signed radix-32 digits. Each table holds magnitudes 0 through 16, with Y negated for negative digits. This reduces the unrolled window count from 64 to 52 and the scalar multiplication block from 40,158 to 37,854 bytes.
 
