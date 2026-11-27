@@ -432,7 +432,7 @@
       "src/fourthgraph/benchmark/validation.py": "bc2a1dfbf1a08a92cf639f24d1596f6591a2f35473843b1eb702780ceeb2fc9e",
       "src/fourthgraph/workflow/contract_runtime.mjs": "be241f1bfac15259eb50d8bf3a5dea6d41340d1a93109369f6327ed778316c60",
       "src/fourthgraph/workflow/project_contract.py": "8b479c3468f34a1225d1f36ef2e0c9782f34d42c2bcb1f6fadf7c58169414e45",
-      "tools/verify_project_contract.py": "4044687c15ea584a388584489b08f32b333965b226a88885b773e307e13c07df"
+      "tools/verify_project_contract.py": "22ae68943c2c8ee69976a5b8e7eb9d8db1a12fbf3f1ba69634921f879748f9b1"
     },
     "replay": {
       "activation_height": 2,
@@ -449,7 +449,7 @@
       "path": "ordinary-all",
       "profile": "p2pkh-r1",
       "public_key": "048e533b6fa0bf7b4625bb30667c01fb607ef9f8b8a80fef5b300628703187b2a373eb1dbde03318366d069f83a6f5900053c73633cb041b21c55e1a86c1f400b4",
-      "receipt_payload_sha256": "df0e821a9e800deeca4f085dc83c6bdf8c357d32acdc1890914129b075fbabae",
+      "receipt_payload_sha256": "66c28f33c9406720b9a3a5311803871d5ef4835285e4d5bb53f1a74a55da95df",
       "receipt_schema": "4thgraph.project-receipt/1",
       "schema": "4thgraph.project-replay/1",
       "scope": "fixture_transactions",
@@ -479,5 +479,95 @@
       "verification_level": "chain-only"
     },
     "revision": "daaa519d7c76c9457af91c4718a4d2832f4419c7"
+  },
+  "hand_scheduled_status_rule_pels_kernel": {
+    "plans": [
+      [],
+      [
+        "rewrite"
+      ],
+      [
+        "share"
+      ],
+      [
+        "stack"
+      ],
+      [
+        "rewrite",
+        "share"
+      ],
+      [
+        "rewrite",
+        "stack"
+      ],
+      [
+        "share",
+        "stack"
+      ],
+      [
+        "stack",
+        "search"
+      ],
+      [
+        "rewrite",
+        "share",
+        "stack"
+      ],
+      [
+        "rewrite",
+        "stack",
+        "search"
+      ],
+      [
+        "share",
+        "stack",
+        "search"
+      ],
+      [
+        "rewrite",
+        "share",
+        "stack",
+        "search"
+      ]
+    ],
+    "section_bytes": 636,
+    "section_sha256": "a0d5980f8f5eab0c152ee44e4f5435849832f98f663281942e1061ae66c3a601",
+    "rule_sha256": "2ff4515a7c7920945badaf400ebeeb503559dd33ff6096733adb9fe1cd76f00b",
+    "forth_source_sha256": "e5ad656ce739669f3307ab36343d730351c70a41f9342e33315aebffe37dc2f0",
+    "scope": "pels-verify with the same status-rule, compiler at main revision, excluding state prefix and final OP_DROP OP_1"
+  },
+  "review_output_and_preimage_contract": {
+    "chain": {
+      "version": "0.13.2",
+      "commit": "74676b9c002c452e7f21a9ed9265f4972bef03f6"
+    },
+    "script_bytes": 629,
+    "script_sha256": "1e48789f413ac72d8181309bdd3a25e21e868f98bbffcd541eb6a68fcfd5367c",
+    "cases": [
+      {
+        "locktime": 42,
+        "output_sats": 10000,
+        "expected": true,
+        "chain_gang": true,
+        "bsv_node": "not_run",
+        "txid": "72488c186adc980db2a447ecdc61c8215bf45b4d136b760af3f3680d33ab1a86"
+      },
+      {
+        "locktime": 43,
+        "output_sats": 10000,
+        "expected": false,
+        "chain_gang": false,
+        "bsv_node": "not_run",
+        "txid": "742e85d817f35558ed9fabadda8fc1b7e5fba2462fa063cd14d3e72f4bc1a59f"
+      },
+      {
+        "locktime": 42,
+        "output_sats": 9999,
+        "expected": false,
+        "chain_gang": false,
+        "bsv_node": "not_run",
+        "txid": "484dcbec408a2e84c235ff1528a33f9015c189ac0235dccfd4f6130f952741fb"
+      }
+    ]
   }
 }

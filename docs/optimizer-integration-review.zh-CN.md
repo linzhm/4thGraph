@@ -1,10 +1,49 @@
 # PELS 标准库模板族与编译器优化接入评审
 
-**建议按三个边界接入。** 标准库负责 PELS 模板族及各成员承诺的交易约束，项目选择成员并提供业务规则，编译器在这些语义冻结后优化到精确 Script。钱包使用与该模板版本及花费路径配对的项目 WASM。计数递增只是一个项目夹具。
+**PELS 是标准库模板族。** 建议把 `pels-verify` 作为可完全手写汇编的基础构件。Forth 应用通过固定的库路径和公开词约定本交易的预期输出、断言经过认证的 preimage 字段。编译器可优化应用传入的业务规则，链接器按约定插入规则并核对基础构件的字节与签名锚点。钱包使用与该模板版本及路径配对的项目 WASM。计数递增只是一个项目夹具。
 
-本次对照两个版本。主线 `5fef0b7` 已合入 #82 的公式开关和 #83 的 PELS 组件。本地实现分支的评审基线为 `96eff50`，含项目包及实验入口，与主线的共同祖先是 `db63d62`。下文标注了分别在哪个版本验证过，两个版本的组合仍待集成。[主线 #82](https://github.com/linzhm/4thGraph/pull/82) · [主线 #83](https://github.com/linzhm/4thGraph/pull/83) · [本次测量及引擎判定](reviews/optimizer-integration/measurements.json)
+本次实测冻结两个版本。主线快照 `5fef0b7` 已合入 #82 的公式开关和 #83 的 PELS 组件。本地实现分支的评审基线为 `96eff50`，含项目包及实验入口，与主线的共同祖先是 `db63d62`。下文标注了分别在哪个版本验证过，两个版本的组合仍待集成。[主线 #82](https://github.com/linzhm/4thGraph/pull/82) · [主线 #83](https://github.com/linzhm/4thGraph/pull/83) · [本次测量及引擎判定](reviews/optimizer-integration/measurements.json)
+
+交付前复核远端 `main` 为 `70e6536`。新增 #84 将项目 README 改为由 manifest 生成，实测涉及的 PELS 汇编词、编译器和标准库源码与上述快照相同。后续接到该主线时，计数实例的项目简介应写入 `projects/pels-counter/manifest.yaml` 并重新生成 README。[主线 #84](https://github.com/linzhm/4thGraph/pull/84)
 
 ## PELS 的 Forth 接口评审
+
+### 应用怎样引用并约束当前交易
+
+提议固定以下写法。文件名标明本成员使用 BIP143 ALL、单输入和唯一输出。源码沿用现有的 `REQUIRE 文件名` 和 Forth 调词语法。以下片段已经在临时库目录内编译和执行，公开安装路径和两个新词仍待标准库登记。[完整 Forth 示例](reviews/optimizer-integration/output-preimage.fth)
+
+```forth
+REQUIRE stdlib/pels/bip143-all-1in-1out.fth
+
+: expected-output0 ( script -- script )
+    ( Keep the five-byte state and serialize the previous amount. )
+    op-8 op-num2bin
+;
+
+: require-output-and-time ( script -- script )
+    bsv-empty expected-output0 pels-verify-preimage
+    bytes-hex 2a000000 pels-assert-locktime
+;
+```
+
+| 引用 | 构建期 | 花费时承诺 |
+|---|---|---|
+| `expected-output0` | 应用提供一个生成规则片段的词，名字由作者选择。 | 此例输入为当前五字节状态和前序金额，返回后继状态字节与八字节小端金额。标准库用它们和当前执行代码构造**唯一有序输出**，核对整笔交易的 `hashOutputs`。 |
+| `pels-verify` | 已有底层词接收前缀与规则两段 Script。 | 输入 `tail head state`，返回与当前输入绑定的摘要。只需要授权摘要的调用者可直接使用它。 |
+| `pels-verify-preimage` | 本次试验的同成员入口，参数同上。 | 保留重建的完整原像，用其 HASH256 交给同一原生签名绑定，成功才留下该原像供后续断言。见证送来的 head/tail 单独使用时没有这一保证。 |
+| `pels-assert-locktime` | 接收前缀与恰好四字节的期望值，按 wire 小端编码，例中为 42。 | 输入为上一步留下的已认证原像，相等时原样保留，失配时验证失败。调用方需要摘要时可继续 `op-hash256`。检查更多字段时，只开放该成员实际承诺的字段。 |
+
+这里的“控制”是花费的接受条件。宿主构造候选，Script 验证其输出和 preimage。该成员不能表达任意数量的输出；另一种输出向量需有自己的完整序列化、签名覆盖和公开入口。`script` 类型本身无法证明一段任意栈数据已经过认证，因此公开组合和测试都从 `pels-verify-preimage` 返回的同一值继续。[试验库的手写指令及栈效果](reviews/optimizer-integration/stdlib/pels/bip143-all-1in-1out.fth)
+
+以关闭全部公式 pass 的方式构建该示例，完整锁 **629 B**。固定 chain-gang 实跑三笔独立夹具，各自根据自己的交易重算见证。保留 10,000 sat 且 `nLockTime=42` 通过，仅将锁定时间改为 43 或仅将输出降为 9,999 sat 均被拒绝。这验证的是 Script 自己的两项接受条件。[执行器](reviews/optimizer-integration/verify_output_preimage.py) · [实测回执](reviews/optimizer-integration/measurements.json)
+
+### 手写汇编与编译器的接口
+
+手写汇编负责精确编码、交易绑定和栈排列，可以由小汇编器直接发射，也可以像 #83 一样用 Forth 的 `op-*` 构造词逐条生成。标准库交付版本、固定片段或摘要、规则插入点、栈契约和签名锚点。链接后另记完整 Script 的摘要。业务规则是显式插入的可变片段，其长度可以移动后段偏移，故签名锚点按最终布局核对。库内手调实现独立建候选版本，沿用相同语义夹具逐字节和逐交易比较。编译器计划止于该边界，禁止越过规则插入点或对链接后的已认可基础件再做 peephole。
+
+主线实现可直接验证这一边界。对同一份标签规则使用 #82 的全部 12 组合法计划，`pels-verify` 含该规则的段始终为 **636 B，SHA-256 完全相同**。这是现有手工排列的证据，最短长度仍须单独测量。[段摘要与计划](reviews/optimizer-integration/measurements.json)
+
+### 主线已经具备的组合
 
 主线上已经有一段可以直接读懂的组合。项目先交给 PELS 一段状态和金额规则，再把已认证的交易摘要交给 R1 所有者验证。调用者不用手排原像、签名或中间栈槽。[主线组合源码](https://github.com/linzhm/4thGraph/blob/5fef0b71bb93507fb1d0206d7d72e3d692a74847/projects/p2pkh-r1/forth/r1-pels-lock.fth)
 
@@ -36,6 +75,8 @@ snapshot=$(mktemp -d)
 git archive 5fef0b71bb93507fb1d0206d7d72e3d692a74847 | tar -x -C "$snapshot"
 PYTHONPATH="$snapshot/src${PYTHONPATH:+:$PYTHONPATH}" python docs/reviews/optimizer-integration/verify_status_labels.py \
   "$snapshot/projects/p2pkh-r1/forth"
+PYTHONPATH="$snapshot/src${PYTHONPATH:+:$PYTHONPATH}" python docs/reviews/optimizer-integration/verify_output_preimage.py \
+  "$snapshot/projects/p2pkh-r1/forth"
 ```
 
 ## 已积累哪些优化
@@ -55,7 +96,8 @@ PYTHONPATH="$snapshot/src${PYTHONPATH:+:$PYTHONPATH}" python docs/reviews/optimi
 
 ```text
 族成员及契约 + 项目业务规则 + 源码和依赖 + 固定计划
-    → 命名公式／语义节点 → 合法改写 → 图及栈调度 → 独立 Script、指令、参数和签名锚点
+    → 业务公式／语义节点 → 合法改写 → 图及栈调度 → 业务片段
+    → 与手写 PELS 成员按约定链接 → 独立 Script、指令、参数和签名锚点
     → 项目构建器配对准确的 WASM、manifest 和夹具
     → 实际父输出 → recognize → prepare_spend → 宿主审核及授权 → assemble_unlock
     → 已签交易 + 实际父交易 → 固定 chain-gang → 候选对比、公开回执及重放
@@ -97,7 +139,7 @@ PYTHONPATH="$snapshot/src${PYTHONPATH:+:$PYTHONPATH}" python docs/reviews/optimi
 
 | 独立评审单元 | 改动和可验收结果 |
 |---|---|
-| 1 · PELS 标准库成员 | 对齐已合入的 #83 和主线库目录，从现有 Forth 词提取最小公开接口。保留原计数实例逐字节回归；将本次非计数标签实例和已有可替换规则纳入回归，并检查调用者双栈。确定原像认证责任、回绕策略及版本命名。 |
+| 1 · PELS 标准库成员 | 对齐 #83 和主线库目录，评审上面的确切路径和三个公开词。登记可手写汇编的构件、规则插入点和锚点。保留原实例逐字节回归；将非计数标签、独立的输出及原像断言纳入回归，并检查调用者双栈。确定原像认证责任、回绕策略及版本命名。 |
 | 2 · 从计划到模板 | 先接固定窗口的普通 R1 路径。现有公式计划 → 整锁链接 → 参数和锚点 → 项目包。字节相同可复用已核对的模板身份，构建记录仍各自保存实际计划。字节有变就构建对应识别材料并验证旧包仍能花旧输出。 |
 | 3 · 代表性调用路径 | 把上述两类候选交给同一个“编译、实跑、比较”入口。以固定夹具核对预期与实际见证、父子交易、验证状态和差额；agent 凭上一轮 JSON 产生下一批。可选双引擎逐项记录；自动采用须另行决定。 |
 | 4 · R1 授权与 PELS 组合 | 用主线 #83 的 Python 参考和精确成员契约验独立授权，再验实际两步后继。先解决 8 MiB 限额；无配套 WASM 只能报告 Script 层通过。评审通过后才讨论更广交易形状。 |
