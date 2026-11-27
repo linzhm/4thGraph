@@ -12,9 +12,10 @@ from fourthgraph.bsv.evaluate import ScriptError, evaluate
 from fourthgraph.bsv.script import asm, decode_num, encode_num, push
 from fourthgraph.bsv.transaction import Input, Output, Transaction
 from fourthgraph.compiler.curve_lowering import compile_fixed_generator, compile_joint_generator_point
-from fourthgraph.compiler.curve_windows import CURVES, P256, SECP256K1, SM2, fixed_table, scalar_plans
+from fourthgraph.compiler.curve_windows import CURVES, GLV_REFERENCE, JOINT_STRATEGIES, P256, SECP256K1, SM2, fixed_table, scalar_plans
 from fourthgraph.compiler.lowering import compile_word
 from fourthgraph.compiler.source import CompileError, SourceCompiler
+from fourthgraph.stdlib.weierstrass import CoordinateScale
 
 
 def affine(coords, field):
@@ -57,7 +58,36 @@ class CurveWindowsTests(unittest.TestCase):
         cls.fixed = {curve.name: {mode: compile_fixed_generator(curve, mode)
                                   for mode in ("binary", "fixed-window-2", "fixed-window-4")}
                      for curve in CURVES.values()}
-        cls.joint = compile_joint_generator_point(SECP256K1)
+        cls.joint = {name: compile_joint_generator_point(SECP256K1, name) for name in JOINT_STRATEGIES}
+
+    def test_coordinate_scale_library_for_registered_curves(self):
+        source = SourceCompiler("REQUIRE stdlib/weierstrass.fth")
+        bundles = [compile_word(source.words["weierstrass-scale"], mode).script
+                   for mode in ("baseline", "safe", "stack")]
+        for curve in CURVES.values():
+            scale = CoordinateScale(curve.field, 2)
+            a, b = scale.coefficients(curve.a, curve.b)
+            x, y = scale.affine(curve.generator)
+            self.assertEqual((y*y - x*x*x - a*x - b) % curve.field, 0)
+            self.assertEqual(scale.affine((x, y), inverse=True), curve.generator)
+            self.assertIsNone(scale.affine(None))
+            for script in bundles:
+                for z in (0, -7, 1):
+                    # A nonzero signed homogeneous representative and projective infinity.
+                    values = (0, 1, 0) if z == 0 else (*(coordinate * z % curve.field for coordinate in curve.generator), z)
+                    prefix = [b"outer", encode_num(curve.field)]
+                    saved = asm("17 OP_TOALTSTACK")
+                    forward = [*prefix, *map(encode_num, (*values, *scale.factors()))]
+                    result, alt = evaluate(saved + script, forward)
+                    self.assertEqual((result[:2], alt), (prefix, [encode_num(17)]))
+                    self.assertEqual(affine(result[2:], curve.field), None if not z else (x, y))
+                    original, _ = evaluate(script, result + list(map(encode_num, scale.factors(inverse=True))))
+                    self.assertEqual(affine(original[2:], curve.field), None if not z else curve.generator)
+        a, b = SECP256K1.normalized_a0().coefficients(SECP256K1.a, SECP256K1.b)
+        self.assertEqual((a, 3 * b % SECP256K1.field), (0, 1))
+        self.assertEqual((P256.field - 1) % 6, 0)
+        self.assertNotEqual(pow(3 * P256.b, (P256.field - 1) // 6, P256.field), 1)
+        self.assertIsNone(P256.normalized_a0())
 
     @unittest.skipUnless(which("openssl"), "requires OpenSSL for independent point multiplication")
     def test_curve_registry_and_fixed_tables(self):
@@ -95,30 +125,41 @@ class CurveWindowsTests(unittest.TestCase):
     @unittest.skipUnless(which("openssl"), "requires OpenSSL for independent point multiplication")
     def test_joint_glv_edges_and_input_guards(self):
         curve = SECP256K1
-        for point_n, s, k in ((1, 0, 0), (1, 1, 0), (1, 0, curve.order),
-                              (curve.order - 1, 3, 3), (5, (1 << 128) + 3, curve.order - 1),
-                              (17, curve.order - 1, (1 << 253) + 77)):
-            with self.subTest(point_n=point_n, s=s, k=k):
-                public = generator_multiple(curve, point_n)
-                stack, alt = evaluate(self.joint.script, list(map(encode_num, (*public, s, k))))
-                self.assertEqual((decode_num(stack[0]), alt), (curve.field, []))
-                self.assertEqual(affine(stack[1:], curve.field), generator_multiple(curve, s + k * point_n))
         x, y = generator_multiple(curve, 1)
-        for values in ((0, 0, 1, 1), (curve.field, y, 1, 1), (x, y, 1, curve.order + 1)):
-            with self.assertRaises(ScriptError):
-                evaluate(self.joint.script, list(map(encode_num, values)))
+        vectors = ((1, 0, 0), (1, 1, 0), (1, 0, curve.order), (curve.order - 1, 3, 3),
+                   (5, (1 << 128) + 3, curve.order - 1), (17, curve.order - 1, (1 << 253) + 77),
+                   (5, 123, curve.order // 2), (31, (1 << 127) - 1, curve.order // 7))
+        for mode, build in self.joint.items():
+            for point_n, s, k in vectors:
+                with self.subTest(mode=mode, point_n=point_n, s=s, k=k):
+                    public = generator_multiple(curve, point_n)
+                    stack, alt = evaluate(asm("17 OP_TOALTSTACK") + build.script,
+                                          [b"outer", *map(encode_num, (*public, s, k))])
+                    self.assertEqual((stack[0], decode_num(stack[1]), alt), (b"outer", curve.field, [encode_num(17)]))
+                    self.assertEqual(affine(stack[2:], curve.field), generator_multiple(curve, s + k * point_n))
+            for values in ((0, 0, 1, 1), (curve.field, y, 1, 1), (x, y, 1, curve.order + 1)):
+                with self.assertRaises(ScriptError):
+                    evaluate(build.script, list(map(encode_num, values)))
 
     def test_cli_advertises_and_builds_registered_curves(self):
         command = (sys.executable, "-m", "fourthgraph.workflow.protocol")
         result = json.loads(subprocess.check_output((*command, "--capabilities")))
         capabilities = result["curve_multiply"]["curves"]
         self.assertEqual(set(capabilities), set(CURVES))
-        self.assertEqual(capabilities["secp256k1"]["joint"], ["glv-joint-window-2"])
+        self.assertEqual(capabilities["secp256k1"]["joint"], list(JOINT_STRATEGIES))
         self.assertEqual(capabilities["p256"]["joint"], [])
         self.assertEqual(capabilities["sm2"]["joint"], [])
         program = json.loads(subprocess.check_output((*command, "curve-multiply", "--curve", "p256",
                                                       "--strategy", "fixed-window-4")))
         self.assertEqual(program["script_hex"], self.fixed["p256"]["fixed-window-4"].script.hex())
+        for optimization in ("baseline", "safe", "stack"):
+            options = {name: compile_joint_generator_point(SECP256K1, name, optimization=optimization)
+                       for name in JOINT_STRATEGIES}
+            program = json.loads(subprocess.check_output((*command, "curve-multiply", "--curve", "secp256k1",
+                                                          "--operation", "joint", "--optimize", optimization)))
+            winner = min(options, key=lambda name: len(options[name].script))
+            self.assertEqual(program["selected"], winner)
+            self.assertEqual(program["script_hex"], options[winner].script.hex())
         rejected = subprocess.run((*command, "curve-multiply", "--curve", "sm2", "--operation", "joint"),
                                   capture_output=True)
         self.assertEqual(rejected.returncode, 2)
@@ -128,13 +169,16 @@ class CurveWindowsTests(unittest.TestCase):
         frontend = SourceCompiler("""
             curve-multiply: mul-p256 p256 generator auto ;
             curve-multiply: mul-joint secp256k1 joint glv-joint-window-2 ;
+            curve-multiply: mul-auto secp256k1 joint auto ;
             : check-p256-scalar ( script-int -- cell )
                 mul-p256 2drop drop 1
             ;
         """)
         expected_script = self.fixed["p256"]["fixed-window-4"].script
         self.assertEqual(compile_word(frontend.words["mul-p256"], "stack").script, expected_script)
-        self.assertEqual(compile_word(frontend.words["mul-joint"], "stack").script, self.joint.script)
+        self.assertEqual(compile_word(frontend.words["mul-joint"], "stack").script, self.joint[GLV_REFERENCE].script)
+        chosen = min(self.joint.values(), key=lambda build: len(build.script))
+        self.assertEqual(compile_word(frontend.words["mul-auto"], "stack").script, chosen.script)
         for optimization in ("baseline", "safe", "stack"):
             code = compile_word(frontend.words["check-p256-scalar"], optimization).script
             self.assertEqual(evaluate(code, [b""])[0], [encode_num(1)])
@@ -161,7 +205,8 @@ class CurveWindowsTests(unittest.TestCase):
                 for n in (0, 19, curve.order - 1)]
         curve = SECP256K1
         point = generator_multiple(curve, 7)
-        jobs.append((self.joint.script, (*point, 23, curve.order - 4), curve, generator_multiple(curve, -5)))
+        jobs.extend((build.script, (*point, s, k), curve, generator_multiple(curve, s + 7*k))
+                    for build in self.joint.values() for s, k in ((23, curve.order - 4), (7, curve.order - 1), (0, 0)))
         for script, values, curve, target in jobs:
             with self.subTest(curve=curve.name, script_bytes=len(script), values=values):
                 witness = b"".join(push(encode_num(value)) for value in values)
@@ -179,6 +224,7 @@ class CurveWindowsTests(unittest.TestCase):
             script = self.fixed[registered.name]["fixed-window-4"].script
             for bad in (encode_num(-1), encode_num(registered.order), b"\x01\x00"):
                 check_verdict(script + asm("OP_2DROP OP_DROP OP_1"), push(bad), False)
-        for bad in ((0, 0, 1, 1), (*point, 1, curve.order + 1)):
-            witness = b"".join(push(encode_num(value)) for value in bad)
-            check_verdict(self.joint.script + asm("OP_2DROP OP_2DROP OP_1"), witness, False)
+        for build in self.joint.values():
+            for bad in ((0, 0, 1, 1), (*point, 1, curve.order + 1)):
+                witness = b"".join(push(encode_num(value)) for value in bad)
+                check_verdict(build.script + asm("OP_2DROP OP_2DROP OP_1"), witness, False)

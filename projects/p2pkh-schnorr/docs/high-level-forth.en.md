@@ -108,3 +108,38 @@ REGTEST_CHRONICLE_HEIGHT=5 PYTHONPATH=src:. bash tools/verify_node.sh --profile 
   "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/experiments/high-level/window_compare.py \
   --matrix-only --output workspace/schnorr-high-level/window-matrix.json
 ```
+
+## Joint lowering candidates
+
+The compiler reuses the same BIP340 wrapper and 64-window GLV decomposition for all four automatic candidates. The packed plan computes window indices up front and uses paired doubling and mixed addition. The stack plans use those techniques with affine fixed entries and direct `OP_PICK` lookups. The scaled stack plan also selects the registered `a=0, 3*b=1` point kernels. The compiler maps the input point and returns coordinates on the original curve. [Curve model selection](../../../docs/optimization-paths.md#coordinate-model-selection)
+
+| Lowering | Payment lock | 2×2 OTDA ALL using the template constructor |
+| --- | ---: | ---: |
+| `glv-joint-window-2` | 43,999 B | 107,404 B |
+| `glv-joint-packed-2` | 33,357 B | 84,302 B |
+| `glv-joint-stack-2` | 27,983 B | 74,090 B |
+| `glv-joint-scaled-2` | 26,639 B | 71,442 B |
+| Handwritten v0.17.0 | 22,435 B | 54,626 B |
+
+The scaled plan and v0.17.0 emit the same 18,379 bytes for the first window and the 63 regular windows. The remaining payment lock difference is outside the loop.
+
+| Region | v0.17.0 | Scaled plan | Difference |
+| --- | ---: | ---: | ---: |
+| Witness checks and challenge | 409 B | 1,593 B | +1,184 B |
+| Joint multiplication preparation | 2,763 B | 5,486 B | +2,723 B |
+| 64 windows | 18,379 B | 18,379 B | 0 B |
+| Cleanup and nonce comparison | 74 B | 371 B | +297 B |
+| Owner and preimage binding | 810 B | 810 B | 0 B |
+
+Variable table construction and unpacking account for 2,531 B of the gap. The generated plan builds a packed projective table, then unpacks it onto the stack. The handwritten plan constructs the stack entries directly and uses the endomorphism for the `2Q` and `3Q` row starts. The generated BIP340 wrapper also repeats coordinate decoding and signature splitting. Each 2×2 OTDA transaction has two locks and two template constructors that are each 4,204 B larger, for a total of 16,816 B.
+
+The replay checks the pinned vectors, malformed witnesses, 12 paired payment modes, two native exits and changed locktime for each candidate. The selected scaled plan also runs all eight automatic cases from the constructor matrix. [Measurements](../experiments/high-level/joint-lowerings.json) · [Transaction matrix](../experiments/high-level/joint-lowerings-matrix.json)
+
+```sh
+PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
+  "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/experiments/high-level/window_compare.py \
+  --joint-lowerings --output workspace/schnorr-high-level/joint-lowerings.json
+REGTEST_CHRONICLE_HEIGHT=5 PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
+  "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/experiments/high-level/window_compare.py \
+  --joint-lowerings --matrix-only --output workspace/schnorr-high-level/joint-lowerings-matrix.json
+```

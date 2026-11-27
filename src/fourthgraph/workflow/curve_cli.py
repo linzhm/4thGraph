@@ -3,7 +3,7 @@ import argparse
 import json
 
 from fourthgraph.compiler.curve_lowering import compile_curve_multiply
-from fourthgraph.compiler.curve_windows import CURVES
+from fourthgraph.compiler.curve_windows import CURVES, JOINT_STRATEGIES
 
 
 def main(argv=None):
@@ -11,7 +11,7 @@ def main(argv=None):
     parser.add_argument("--curve", choices=CURVES, required=True)
     parser.add_argument("--operation", choices=("generator", "joint"), default="generator")
     parser.add_argument("--strategy", default="auto",
-                        choices=("auto", "binary", "fixed-window-2", "fixed-window-4", "glv-joint-window-2"))
+                        choices=("auto", "binary", "fixed-window-2", "fixed-window-4", *JOINT_STRATEGIES))
     parser.add_argument("--optimize", choices=("baseline", "safe", "stack"), default="stack")
     args = parser.parse_args(argv)
     curve = CURVES[args.curve]

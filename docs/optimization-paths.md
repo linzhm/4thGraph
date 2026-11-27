@@ -79,11 +79,13 @@ For a checked scalar in `[0,n)` and the registered generator, the compiler can s
 
 A separate secp256k1 operation accepts a checked affine public point and two scalars, and returns `p X Y Z` for the generator plus public-point combination. It uses the GLV endomorphism and a two-bit window over four 128-bit components. The operation checks input ranges and curve membership. P-256 and SM2 use the registered fixed-base plans.
 
+For the joint operation, `auto` compares the original 64-window code, a packed byte table with precomputed indices, direct stack lookup, and stack lookup on a scaled curve. The optimized plans use paired doubling and mixed addition for the affine fixed table. The CLI report includes the coordinate model, table layout, bytes, and Script hash. An explicit strategy pins the lowering for reproduction.
+
 In a Forth source file, a `curve-multiply:` declaration binds the selected Script to a typed word. `auto` uses the same size comparison as the CLI. The declared word runs its input checks when called.
 
 ```forth
 curve-multiply: mul-p256-generator p256 generator auto ;
-curve-multiply: mul-secp256k1-joint secp256k1 joint glv-joint-window-2 ;
+curve-multiply: mul-secp256k1-joint secp256k1 joint auto ;
 ```
 
 The replay uses OpenSSL as the independent point reference and the project verification environment for BSV Node and chain-gang.
@@ -96,3 +98,9 @@ PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
 ```
 
 [Source and measured BIP340 comparison](../projects/p2pkh-schnorr/docs/high-level-forth.en.md#64-window-lowering)
+
+### Coordinate model selection
+
+`REQUIRE stdlib/weierstrass.fth` exposes `weierstrass-scale ( p X Y Z u2 u3 -- p X' Y' Z )`. It applies the homogeneous map `(u²X, u³Y, Z)` to short Weierstrass points. The matching coefficients are `a' = a·u⁴` and `b' = b·u⁶` modulo `p`. The compiler verifies the registered secp256k1 scale before selecting the `a=0, 3*b=1` kernels, pre-scales the fixed table, maps the input point, and restores the original model at the output. [Shared Forth word](../src/fourthgraph/stdlib/weierstrass.fth)
+
+P-256 uses the shared point-model interface and the original `a=-3` kernels. The sixth-power test gives `(3b)^((p-1)/6) ≠ 1 mod p`, so the `3*b=1` model is unavailable for P-256. A scale that preserves `a=-3` in this field also preserves `b`.

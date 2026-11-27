@@ -108,3 +108,40 @@ REGTEST_CHRONICLE_HEIGHT=5 PYTHONPATH=src:. bash tools/verify_node.sh --profile 
   "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/experiments/high-level/window_compare.py \
   --matrix-only --output workspace/schnorr-high-level/window-matrix.json
 ```
+
+<a name="joint-lowering-candidates"></a>
+
+## 联合点乘候选
+
+四个自动候选使用同一个 BIP340 封装和同一套 64 窗口 GLV 分解。字节表候选提前计算窗口索引，并采用合并倍点和混合点加。栈版使用相同的技术，固定表存仿射点，查表直接使用 `OP_PICK`。缩放栈版进一步使用登记的 `a=0, 3*b=1` 点运算内核。编译器转换输入点坐标，输出恢复为原曲线坐标。[曲线模型选择](../../../docs/optimization-paths.zh-CN.md#坐标模型选择)
+
+| 候选 | 付款锁 | 两进两出 OTDA ALL，使用模板构造器 |
+| --- | ---: | ---: |
+| `glv-joint-window-2` | 43,999 B | 107,404 B |
+| `glv-joint-packed-2` | 33,357 B | 84,302 B |
+| `glv-joint-stack-2` | 27,983 B | 74,090 B |
+| `glv-joint-scaled-2` | 26,639 B | 71,442 B |
+| 手工 v0.17.0 | 22,435 B | 54,626 B |
+
+缩放候选和 v0.17.0 的首窗和后续 63 窗共 18,379 B，逐字节相同。剩余的付款锁差距来自循环外。
+
+| 区段 | v0.17.0 | 缩放候选 | 差值 |
+| --- | ---: | ---: | ---: |
+| 见证检查和挑战值 | 409 B | 1,593 B | +1,184 B |
+| 联合点乘准备 | 2,763 B | 5,486 B | +2,723 B |
+| 64 个窗口 | 18,379 B | 18,379 B | 0 B |
+| 清理和 nonce 点比较 | 74 B | 371 B | +297 B |
+| 所有者和原像绑定 | 810 B | 810 B | 0 B |
+
+变基表构建和解包占其中 2,531 B。编译器候选先建齐次坐标字节表，再把点解包到栈上。手工版直接建立栈条目，并用自同态得到 `2Q` 和 `3Q` 两个行首。高阶 BIP340 封装还会重复解码坐标和拆分签名。两进两出 OTDA 交易里，两份锁和两份构造器各多 4,204 B，整笔交易多 16,816 B。
+
+每个候选均复放固定验签向量、错误见证、12 种成对付款模式、两种普通输出退出及锁定时间篡改。选中的缩放候选也复放构造器矩阵的八个自动场景。[实测](../experiments/high-level/joint-lowerings.json) · [交易矩阵](../experiments/high-level/joint-lowerings-matrix.json)
+
+```sh
+PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
+  "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/experiments/high-level/window_compare.py \
+  --joint-lowerings --output workspace/schnorr-high-level/joint-lowerings.json
+REGTEST_CHRONICLE_HEIGHT=5 PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
+  "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/experiments/high-level/window_compare.py \
+  --joint-lowerings --matrix-only --output workspace/schnorr-high-level/joint-lowerings-matrix.json
+```
