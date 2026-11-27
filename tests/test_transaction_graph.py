@@ -83,8 +83,10 @@ class TransactionGraphTests(unittest.TestCase):
         source = SERIAL.read_bytes()
         workflow = SourceCompiler(source.decode()).workflow()
         keys = TestKeys()
-        artifact, report = compile_workflow(workflow, keys.public, 9, source_bytes=source, target="both", search=True)
+        artifact, report = compile_workflow(workflow, keys.public, 9, source_bytes=source, target="both",
+                                            mode="serial", search=True)
         self.assertEqual(report["selected"], "serial")
+        self.assertTrue(report["candidates"]["fused-prefix"]["eligible"])
         self.assertEqual(report["candidates"]["atomic"]["exclusions"][0]["code"], "unsupported_stage_count")
         self.assertEqual([item["producer"] for item in artifact["dependencies"]], ["increment", "scale"])
         contract = WorkflowContracts(workflow, keys.public, 9, target="both")
