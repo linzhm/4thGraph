@@ -12,13 +12,11 @@ REQUIRE stdlib/bip340.fth
     schnorr-tag op-if op-checksigverify op-else op-codeseparator schnorr-ordinary-code
 ;
 
-: another-type ( script cell -- script ) swap op-over swap cell>byte bsv-push op-equal op-boolor ;
 : check-sighash ( script -- script )
-    op-1 op-split bytes-hex 000000 bsv-push op-equalverify op-dup
-    bytes-hex 41 bsv-push op-equal $42 another-type $43 another-type
-    $61 another-type $62 another-type $63 another-type
-    $c1 another-type $c2 another-type $c3 another-type
-    $e1 another-type $e2 another-type $e3 another-type op-verify
+    ( Require ForkID, allow Chronicle and ANYONECANPAY, and select ALL, NONE or SINGLE. )
+    op-1 op-split bytes-hex 000000 bsv-push op-equalverify
+    op-dup bytes-hex 5c bsv-push op-and bytes-hex 40 bsv-push op-equalverify
+    op-dup op-3 op-and op-verify
 ;
 
 : check-forkid-shape ( script script -- script )

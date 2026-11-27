@@ -17,7 +17,7 @@ def write_stub(directory, name, body):
 
 
 class VerifyNodeTests(unittest.TestCase):
-    def run_launcher(self, directory, *, rpc_port=None, chronicle_height=None, test_exit=0):
+    def run_launcher(self, directory, *, rpc_port=None, chronicle_height=None, test_exit=0, profile=None):
         temporary = directory / 'node-temp'
         temporary.mkdir()
         env = dict(os.environ, PATH=f"{directory}:{os.environ['PATH']}", LC_ALL='C',
@@ -29,7 +29,8 @@ class VerifyNodeTests(unittest.TestCase):
             env['REGTEST_RPC_PORT'] = rpc_port
         if chronicle_height is not None:
             env['REGTEST_CHRONICLE_HEIGHT'] = chronicle_height
-        result = subprocess.run(['bash', str(LAUNCHER), 'test_fixture'], env=env, cwd=directory,
+        options = ['--profile', profile] if profile else []
+        result = subprocess.run(['bash', str(LAUNCHER), *options, 'test_fixture'], env=env, cwd=directory,
                                 capture_output=True, timeout=10)
         self.assertEqual(list(temporary.iterdir()), [])
         return result
@@ -65,8 +66,9 @@ class VerifyNodeTests(unittest.TestCase):
                 self.assertFalse((directory / 'downloaded').exists())
 
     def test_selected_configuration_reaches_node_and_tests(self):
-        cases = ((None, 18443, None, 2, 0), ('18461', 18461, '01000', 1000, 0), ('01861', 1861, None, 2, 7))
-        for override, port, chronicle_height, expected_height, test_exit in cases:
+        cases = ((None, 18443, None, 2, 0, None), ('18461', 18461, '01000', 1000, 0, None),
+                 ('01861', 1861, None, 2, 7, None), (None, 18443, None, 2, 0, 'long-script'))
+        for override, port, chronicle_height, expected_height, test_exit, profile in cases:
             with self.subTest(override=override, test_exit=test_exit), TemporaryDirectory() as tmp:
                 directory = Path(tmp)
                 write_stub(directory, 'curl', 'printf %s "test archive bytes" > "${!#}"\n')
@@ -94,11 +96,17 @@ printf '%s\n' "$@" > "$VERIFY_NODE_TEST_TRACE/test-args"
 exit "$VERIFY_NODE_TEST_EXIT"
 ''')
                 result = self.run_launcher(directory, rpc_port=override,
-                                           chronicle_height=chronicle_height, test_exit=test_exit)
+                                           chronicle_height=chronicle_height, test_exit=test_exit, profile=profile)
                 self.assertEqual(result.returncode, test_exit, result.stderr)
-                self.assertIn(f'-rpcport={port}', (directory / 'node-args').read_text().splitlines())
-                self.assertIn(f'-chronicleactivationheight={expected_height}',
-                              (directory / 'node-args').read_text().splitlines())
+                node_args = (directory / 'node-args').read_text().splitlines()
+                self.assertIn(f'-rpcport={port}', node_args)
+                self.assertIn(f'-chronicleactivationheight={expected_height}', node_args)
+                if profile == 'long-script':
+                    self.assertIn('-maxstdtxvalidationduration=15000', node_args)
+                    self.assertIn('-maxnonstdtxvalidationduration=30000', node_args)
+                    self.assertIn('-maxtxnvalidatorasynctasksrunduration=40000', node_args)
+                else:
+                    self.assertIn('-maxstdtxvalidationduration=1000', node_args)
                 cli_args = (directory / 'cli-args').read_text().splitlines()
                 self.assertIn('-rpcconnect=127.0.0.1', cli_args)
                 self.assertIn(f'-rpcport={port}', cli_args)

@@ -29,7 +29,9 @@ def generate(project, node):
         if "bytes" in case:
             assert len(lock) == case["bytes"]
         funding = Transaction((Input(bytes([17 + len(vectors)]) * 32, 0),), (Output(10_000, lock),))
-        outputs = (Output(9_900, case.get("destination", b"\x51")),)
+        outputs = case.get("outputs")
+        if outputs is None:
+            outputs = (Output(9_900, case.get("destination", b"\x51")),)
         tx = Transaction((Input(funding.txid_wire(), 0),), outputs)
         sighash = case.get("sighash", 0x41)
         active = bool(sighash & 0x20)

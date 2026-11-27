@@ -1,0 +1,1178 @@
+{
+  "sm2_locking_template": "v1.10.0",
+  "bsv_node_version": "1.2.3",
+  "chain_gang_commit": "8b60b71a12a69fdcb465d3e627dbf6f43d6ed081",
+  "validation": "Peerless regtest script replay with supplied prevouts",
+  "positive_cases": [
+    {
+      "case": "all-1x1",
+      "shape": [
+        1,
+        1
+      ],
+      "transaction_version": 2,
+      "chronicle_spend": true,
+      "sighashes": [
+        "61"
+      ],
+      "native_inputs": [],
+      "native_output_count": 0,
+      "non_matching_output": null,
+      "same_funding_transaction": false,
+      "reconstructed_inputs": [
+        0
+      ],
+      "shared_constructor_inputs": [],
+      "auto_bytes": 103810,
+      "literal_bytes": 191853,
+      "auto_txid": "58d141a7d1f8dff58222110396d896fb903aafdecf9d059b325cba104be98851",
+      "literal_txid": "bf02586226234f57aea24f2c1912b2ecb8b1be96de27815e8b22d1afaf6c9018",
+      "auto_unlock_bytes": [
+        7954
+      ],
+      "literal_unlock_bytes": [
+        95995
+      ]
+    },
+    {
+      "case": "acp-all-1x1",
+      "shape": [
+        1,
+        1
+      ],
+      "transaction_version": 2,
+      "chronicle_spend": true,
+      "sighashes": [
+        "e1"
+      ],
+      "native_inputs": [],
+      "native_output_count": 0,
+      "non_matching_output": null,
+      "same_funding_transaction": false,
+      "reconstructed_inputs": [
+        0
+      ],
+      "shared_constructor_inputs": [],
+      "auto_bytes": 103810,
+      "literal_bytes": 191853,
+      "auto_txid": "f8d251c73e213ebd96b49e73000d791fa3556c2dc9d057b09b9c80d07665b066",
+      "literal_txid": "acc96cad625caffd77686bd102309d8a30f24214f35894f7af522c190e8fc20e",
+      "auto_unlock_bytes": [
+        7954
+      ],
+      "literal_unlock_bytes": [
+        95995
+      ]
+    },
+    {
+      "case": "all-1x2",
+      "shape": [
+        1,
+        2
+      ],
+      "transaction_version": 2,
+      "chronicle_spend": true,
+      "sighashes": [
+        "61"
+      ],
+      "native_inputs": [],
+      "native_output_count": 0,
+      "non_matching_output": null,
+      "same_funding_transaction": false,
+      "reconstructed_inputs": [
+        0
+      ],
+      "shared_constructor_inputs": [],
+      "auto_bytes": 199655,
+      "literal_bytes": 383459,
+      "auto_txid": "ed51204c3c495530cdf86b439c2dc89d06ebd6e4592ecd5756c69c6c53e630ba",
+      "literal_txid": "ff6d1b4a94295553fc831bd584ce0c9aa65ed4ae1a253894ebfd932547f51e18",
+      "auto_unlock_bytes": [
+        7996
+      ],
+      "literal_unlock_bytes": [
+        191798
+      ]
+    },
+    {
+      "case": "acp-all-1x2",
+      "shape": [
+        1,
+        2
+      ],
+      "transaction_version": 2,
+      "chronicle_spend": true,
+      "sighashes": [
+        "e1"
+      ],
+      "native_inputs": [],
+      "native_output_count": 0,
+      "non_matching_output": null,
+      "same_funding_transaction": false,
+      "reconstructed_inputs": [
+        0
+      ],
+      "shared_constructor_inputs": [],
+      "auto_bytes": 199655,
+      "literal_bytes": 383459,
+      "auto_txid": "e28ca049f660c313599fa6f58532a5ccf0ac9bff9be2b36b87f2158f4bf5bd15",
+      "literal_txid": "b6bc3c5636f09b23ee7d442b2eae1ebdfb9a5304baa6282bab75fcdac3d7283e",
+      "auto_unlock_bytes": [
+        7996
+      ],
+      "literal_unlock_bytes": [
+        191798
+      ]
+    },
+    {
+      "case": "all-2x1",
+      "shape": [
+        2,
+        1
+      ],
+      "transaction_version": 2,
+      "chronicle_spend": true,
+      "sighashes": [
+        "61",
+        "61"
+      ],
+      "native_inputs": [],
+      "native_output_count": 0,
+      "non_matching_output": null,
+      "same_funding_transaction": false,
+      "reconstructed_inputs": [
+        0,
+        1
+      ],
+      "shared_constructor_inputs": [],
+      "auto_bytes": 111891,
+      "literal_bytes": 287975,
+      "auto_txid": "7ba98ee72f2e0ccde5fa725c47579eb9afff97f9ca2be7bdc143f3d709a34560",
+      "literal_txid": "da1ac40becf74e79121536586b24c216bb092c7b8018e5c0acfac0ab23a2948f",
+      "auto_unlock_bytes": [
+        7996,
+        7996
+      ],
+      "literal_unlock_bytes": [
+        96036,
+        96036
+      ]
+    },
+    {
+      "case": "acp-all-2x1",
+      "shape": [
+        2,
+        1
+      ],
+      "transaction_version": 2,
+      "chronicle_spend": true,
+      "sighashes": [
+        "e1",
+        "e1"
+      ],
+      "native_inputs": [],
+      "native_output_count": 0,
+      "non_matching_output": null,
+      "same_funding_transaction": false,
+      "reconstructed_inputs": [
+        0,
+        1
+      ],
+      "shared_constructor_inputs": [],
+      "auto_bytes": 111807,
+      "literal_bytes": 287893,
+      "auto_txid": "4288b2390941257bd7936b8d5fe1a82884f7560fd7e47c722464ecec1c0c6305",
+      "literal_txid": "d5bc4dee27299a82cd245323a6b2ba452f20848c366d2cf7ac748a7f3db0c541",
+      "auto_unlock_bytes": [
+        7954,
+        7954
+      ],
+      "literal_unlock_bytes": [
+        95995,
+        95995
+      ]
+    },
+    {
+      "case": "all-2x2",
+      "shape": [
+        2,
+        2
+      ],
+      "transaction_version": 2,
+      "chronicle_spend": true,
+      "sighashes": [
+        "61",
+        "61"
+      ],
+      "native_inputs": [],
+      "native_output_count": 0,
+      "non_matching_output": null,
+      "same_funding_transaction": false,
+      "reconstructed_inputs": [
+        0,
+        1
+      ],
+      "shared_constructor_inputs": [],
+      "auto_bytes": 207778,
+      "literal_bytes": 575384,
+      "auto_txid": "358c251812033eae8cd46f1d45bd2b1c5e45785d1a2151ba4ee199bfbc7319e9",
+      "literal_txid": "f29a0845856acb70ee75917b1767fc70d9c96fdc33c65c84dbf1b88536d67a93",
+      "auto_unlock_bytes": [
+        8038,
+        8038
+      ],
+      "literal_unlock_bytes": [
+        191839,
+        191839
+      ]
+    },
+    {
+      "case": "acp-all-2x2",
+      "shape": [
+        2,
+        2
+      ],
+      "transaction_version": 2,
+      "chronicle_spend": true,
+      "sighashes": [
+        "e1",
+        "e1"
+      ],
+      "native_inputs": [],
+      "native_output_count": 0,
+      "non_matching_output": null,
+      "same_funding_transaction": false,
+      "reconstructed_inputs": [
+        0,
+        1
+      ],
+      "shared_constructor_inputs": [],
+      "auto_bytes": 207694,
+      "literal_bytes": 575302,
+      "auto_txid": "b2057ffb23809ea075a8405959dfd54daad794248bc8707c2f3c713d973495c8",
+      "literal_txid": "8a0895a78991fc7115a31332b2be077c687b61b1be1db6210c94a38aad875a32",
+      "auto_unlock_bytes": [
+        7996,
+        7996
+      ],
+      "literal_unlock_bytes": [
+        191798,
+        191798
+      ]
+    },
+    {
+      "case": "all-3x2",
+      "shape": [
+        3,
+        2
+      ],
+      "transaction_version": 2,
+      "chronicle_spend": true,
+      "sighashes": [
+        "61",
+        "61",
+        "61"
+      ],
+      "native_inputs": [],
+      "native_output_count": 0,
+      "non_matching_output": null,
+      "same_funding_transaction": false,
+      "reconstructed_inputs": [
+        0,
+        1,
+        2
+      ],
+      "shared_constructor_inputs": [],
+      "auto_bytes": 215982,
+      "literal_bytes": 767391,
+      "auto_txid": "c14425bdd2df6307ca0bca862bf4377595e8fefa5f228631ab61e5d27fb17937",
+      "literal_txid": "4fc81801b1012c41f9fec5370e473e421e11f504b6a77cb60beb759062623a61",
+      "auto_unlock_bytes": [
+        8079,
+        8079,
+        8079
+      ],
+      "literal_unlock_bytes": [
+        191880,
+        191880,
+        191880
+      ]
+    },
+    {
+      "case": "acp-all-3x2",
+      "shape": [
+        3,
+        2
+      ],
+      "transaction_version": 2,
+      "chronicle_spend": true,
+      "sighashes": [
+        "e1",
+        "e1",
+        "e1"
+      ],
+      "native_inputs": [],
+      "native_output_count": 0,
+      "non_matching_output": null,
+      "same_funding_transaction": false,
+      "reconstructed_inputs": [
+        0,
+        1,
+        2
+      ],
+      "shared_constructor_inputs": [],
+      "auto_bytes": 215733,
+      "literal_bytes": 767145,
+      "auto_txid": "80528c01cfc07789cd716d70d6f12f286710132f1cbe4da12fae1d98d60839b1",
+      "literal_txid": "30dcf0f6ad619d35e692223fad036ef7b4ab0d37e12ff1d176b6bcb9bc0572b4",
+      "auto_unlock_bytes": [
+        7996,
+        7996,
+        7996
+      ],
+      "literal_unlock_bytes": [
+        191798,
+        191798,
+        191798
+      ]
+    },
+    {
+      "case": "all-2x3",
+      "shape": [
+        2,
+        3
+      ],
+      "transaction_version": 2,
+      "chronicle_spend": true,
+      "sighashes": [
+        "61",
+        "61"
+      ],
+      "native_inputs": [],
+      "native_output_count": 0,
+      "non_matching_output": null,
+      "same_funding_transaction": false,
+      "reconstructed_inputs": [
+        0,
+        1
+      ],
+      "shared_constructor_inputs": [],
+      "auto_bytes": 303665,
+      "literal_bytes": 862793,
+      "auto_txid": "1731de6125801515542d99bae1608c374eebeda75bf00b568576298595b1774b",
+      "literal_txid": "91c2b354d8b0f994bded8739fa81ad37ae674660301f4e066f6f3f7cebfde8ca",
+      "auto_unlock_bytes": [
+        8080,
+        8080
+      ],
+      "literal_unlock_bytes": [
+        287642,
+        287642
+      ]
+    },
+    {
+      "case": "acp-all-2x3",
+      "shape": [
+        2,
+        3
+      ],
+      "transaction_version": 2,
+      "chronicle_spend": true,
+      "sighashes": [
+        "e1",
+        "e1"
+      ],
+      "native_inputs": [],
+      "native_output_count": 0,
+      "non_matching_output": null,
+      "same_funding_transaction": false,
+      "reconstructed_inputs": [
+        0,
+        1
+      ],
+      "shared_constructor_inputs": [],
+      "auto_bytes": 303581,
+      "literal_bytes": 862711,
+      "auto_txid": "e7b75be2ab1327f8befe7338d4f10efa1bcbeda7087e9e3670237c0f9ef1d33d",
+      "literal_txid": "9ad3d775ed117f1dbca5ee6356073944da6c69c97868cc20c4ae98aa1069c4c5",
+      "auto_unlock_bytes": [
+        8038,
+        8038
+      ],
+      "literal_unlock_bytes": [
+        287601,
+        287601
+      ]
+    },
+    {
+      "case": "all-4x4",
+      "shape": [
+        4,
+        4
+      ],
+      "transaction_version": 2,
+      "chronicle_spend": true,
+      "sighashes": [
+        "61",
+        "61",
+        "61",
+        "61"
+      ],
+      "native_inputs": [],
+      "native_output_count": 0,
+      "non_matching_output": null,
+      "same_funding_transaction": false,
+      "reconstructed_inputs": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "shared_constructor_inputs": [],
+      "auto_bytes": 416210,
+      "literal_bytes": 1917510,
+      "auto_txid": "f7e18cbc42c98606523a76e944945d198a30ed511a8b3bf9faa7f64bbac39d58",
+      "literal_txid": "b373272c801563cd73df205e9b8a5be5cf6d39f1d1895935d2f159ed4110cad7",
+      "auto_unlock_bytes": [
+        8204,
+        8204,
+        8204,
+        8204
+      ],
+      "literal_unlock_bytes": [
+        383527,
+        383527,
+        383527,
+        383527
+      ]
+    },
+    {
+      "case": "acp-all-4x4",
+      "shape": [
+        4,
+        4
+      ],
+      "transaction_version": 2,
+      "chronicle_spend": true,
+      "sighashes": [
+        "e1",
+        "e1",
+        "e1",
+        "e1"
+      ],
+      "native_inputs": [],
+      "native_output_count": 0,
+      "non_matching_output": null,
+      "same_funding_transaction": false,
+      "reconstructed_inputs": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "shared_constructor_inputs": [],
+      "auto_bytes": 415714,
+      "literal_bytes": 1917018,
+      "auto_txid": "bb5aa7b542e24851d44ce4c654836180655a53b97960be791e4f272d973941cd",
+      "literal_txid": "ba86eab29b8a203b0f4066bb00787884b20965fa14278b31c270c9b5a76992b9",
+      "auto_unlock_bytes": [
+        8080,
+        8080,
+        8080,
+        8080
+      ],
+      "literal_unlock_bytes": [
+        383404,
+        383404,
+        383404,
+        383404
+      ]
+    },
+    {
+      "case": "all-6x2",
+      "shape": [
+        6,
+        2
+      ],
+      "transaction_version": 2,
+      "chronicle_spend": true,
+      "sighashes": [
+        "61",
+        "61",
+        "61",
+        "61",
+        "61",
+        "61"
+      ],
+      "native_inputs": [],
+      "native_output_count": 0,
+      "non_matching_output": null,
+      "same_funding_transaction": false,
+      "reconstructed_inputs": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "shared_constructor_inputs": [],
+      "auto_bytes": 241086,
+      "literal_bytes": 1343904,
+      "auto_txid": "ed647ec6c64adaa6619400735038b1c2c98a5fd83d2d5c2af6c3dc031dabe3e8",
+      "literal_txid": "ecb5dfb958be510c62f08db5abe89df205a93d7b20dc744cd7b0883ad8a2ed45",
+      "auto_unlock_bytes": [
+        8202,
+        8202,
+        8202,
+        8202,
+        8202,
+        8202
+      ],
+      "literal_unlock_bytes": [
+        192003,
+        192003,
+        192003,
+        192003,
+        192003,
+        192003
+      ]
+    },
+    {
+      "case": "acp-all-6x2",
+      "shape": [
+        6,
+        2
+      ],
+      "transaction_version": 2,
+      "chronicle_spend": true,
+      "sighashes": [
+        "e1",
+        "e1",
+        "e1",
+        "e1",
+        "e1",
+        "e1"
+      ],
+      "native_inputs": [],
+      "native_output_count": 0,
+      "non_matching_output": null,
+      "same_funding_transaction": false,
+      "reconstructed_inputs": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "shared_constructor_inputs": [],
+      "auto_bytes": 239850,
+      "literal_bytes": 1342674,
+      "auto_txid": "609a9488ce8850ce0a0112af5f81ca530ec6bf6fad54a66106a804a09df0279b",
+      "literal_txid": "58b801be2f5444b64abdfac9f9122aed2d71757c91d377f7227f1ef58b3ce3af",
+      "auto_unlock_bytes": [
+        7996,
+        7996,
+        7996,
+        7996,
+        7996,
+        7996
+      ],
+      "literal_unlock_bytes": [
+        191798,
+        191798,
+        191798,
+        191798,
+        191798,
+        191798
+      ]
+    },
+    {
+      "case": "all-1x8",
+      "shape": [
+        1,
+        8
+      ],
+      "transaction_version": 2,
+      "chronicle_spend": true,
+      "sighashes": [
+        "61"
+      ],
+      "native_inputs": [],
+      "native_output_count": 0,
+      "non_matching_output": null,
+      "same_funding_transaction": false,
+      "reconstructed_inputs": [
+        0
+      ],
+      "shared_constructor_inputs": [],
+      "auto_bytes": 774725,
+      "literal_bytes": 1533095,
+      "auto_txid": "f5ddf42d1a1d2f09d0b225828a4b3d568adab7b04841c09795bbda8f5f146b22",
+      "literal_txid": "a15ccf02ae45b499c843952363c08dddf47a878a3a42a20476ce9b9730cb0717",
+      "auto_unlock_bytes": [
+        8248
+      ],
+      "literal_unlock_bytes": [
+        766616
+      ]
+    },
+    {
+      "case": "acp-all-1x8",
+      "shape": [
+        1,
+        8
+      ],
+      "transaction_version": 2,
+      "chronicle_spend": true,
+      "sighashes": [
+        "e1"
+      ],
+      "native_inputs": [],
+      "native_output_count": 0,
+      "non_matching_output": null,
+      "same_funding_transaction": false,
+      "reconstructed_inputs": [
+        0
+      ],
+      "shared_constructor_inputs": [],
+      "auto_bytes": 774725,
+      "literal_bytes": 1533095,
+      "auto_txid": "4394223d9a6017655ed4d62fd89cace7cb2ccad48ec0b4ab8f1bebeef700bd51",
+      "literal_txid": "96f195322a4432b8bcd35f6748d07d3d6377a86565c5208cbb2549b8710c6202",
+      "auto_unlock_bytes": [
+        8248
+      ],
+      "literal_unlock_bytes": [
+        766616
+      ]
+    },
+    {
+      "case": "bip143-all",
+      "shape": [
+        2,
+        2
+      ],
+      "transaction_version": 2,
+      "chronicle_spend": true,
+      "sighashes": [
+        "41",
+        "c1"
+      ],
+      "native_inputs": [],
+      "native_output_count": 0,
+      "non_matching_output": null,
+      "same_funding_transaction": false,
+      "reconstructed_inputs": [],
+      "shared_constructor_inputs": [],
+      "auto_bytes": 192284,
+      "literal_bytes": 192284,
+      "auto_txid": "047485af1959f88f0f8f4574f53e7793e75fa8ba6fc9a081ac80d610a1979c67",
+      "literal_txid": "047485af1959f88f0f8f4574f53e7793e75fa8ba6fc9a081ac80d610a1979c67",
+      "auto_unlock_bytes": [
+        291,
+        291
+      ],
+      "literal_unlock_bytes": [
+        291,
+        291
+      ]
+    },
+    {
+      "case": "bip143-none",
+      "shape": [
+        2,
+        2
+      ],
+      "transaction_version": 2,
+      "chronicle_spend": true,
+      "sighashes": [
+        "42",
+        "c2"
+      ],
+      "native_inputs": [],
+      "native_output_count": 0,
+      "non_matching_output": null,
+      "same_funding_transaction": false,
+      "reconstructed_inputs": [],
+      "shared_constructor_inputs": [],
+      "auto_bytes": 192284,
+      "literal_bytes": 192284,
+      "auto_txid": "74f1b7b3514dcf125612f6787940de226e3e5095d2f0e313d3512e4983df3d09",
+      "literal_txid": "74f1b7b3514dcf125612f6787940de226e3e5095d2f0e313d3512e4983df3d09",
+      "auto_unlock_bytes": [
+        291,
+        291
+      ],
+      "literal_unlock_bytes": [
+        291,
+        291
+      ]
+    },
+    {
+      "case": "bip143-single",
+      "shape": [
+        2,
+        2
+      ],
+      "transaction_version": 2,
+      "chronicle_spend": true,
+      "sighashes": [
+        "43",
+        "c3"
+      ],
+      "native_inputs": [],
+      "native_output_count": 0,
+      "non_matching_output": null,
+      "same_funding_transaction": false,
+      "reconstructed_inputs": [],
+      "shared_constructor_inputs": [],
+      "auto_bytes": 192284,
+      "literal_bytes": 192284,
+      "auto_txid": "74025f6062d8a6c7385a179759bca3353fe26c646d0b73210b1b91d2ccea4414",
+      "literal_txid": "74025f6062d8a6c7385a179759bca3353fe26c646d0b73210b1b91d2ccea4414",
+      "auto_unlock_bytes": [
+        291,
+        291
+      ],
+      "literal_unlock_bytes": [
+        291,
+        291
+      ]
+    },
+    {
+      "case": "otda-none",
+      "shape": [
+        2,
+        2
+      ],
+      "transaction_version": 2,
+      "chronicle_spend": true,
+      "sighashes": [
+        "62",
+        "e2"
+      ],
+      "native_inputs": [],
+      "native_output_count": 0,
+      "non_matching_output": null,
+      "same_funding_transaction": false,
+      "reconstructed_inputs": [],
+      "shared_constructor_inputs": [],
+      "auto_bytes": 192116,
+      "literal_bytes": 192116,
+      "auto_txid": "36459306a8bcece416424d3fd51876dc7cc5a9407c1326484ed72e58b726bfab",
+      "literal_txid": "36459306a8bcece416424d3fd51876dc7cc5a9407c1326484ed72e58b726bfab",
+      "auto_unlock_bytes": [
+        230,
+        188
+      ],
+      "literal_unlock_bytes": [
+        230,
+        188
+      ]
+    },
+    {
+      "case": "otda-single",
+      "shape": [
+        2,
+        2
+      ],
+      "transaction_version": 2,
+      "chronicle_spend": true,
+      "sighashes": [
+        "63",
+        "e3"
+      ],
+      "native_inputs": [],
+      "native_output_count": 0,
+      "non_matching_output": null,
+      "same_funding_transaction": false,
+      "reconstructed_inputs": [
+        0,
+        1
+      ],
+      "shared_constructor_inputs": [],
+      "auto_bytes": 207661,
+      "literal_bytes": 383746,
+      "auto_txid": "2305804498212f5bb63cdee46f509a91007778daa03417b09ed1e6e3075a82b1",
+      "literal_txid": "af854cebf1b9675b8b88f0153756c9b838acd4a3522d753020784c32752f107d",
+      "auto_unlock_bytes": [
+        7996,
+        7963
+      ],
+      "literal_unlock_bytes": [
+        96036,
+        96004
+      ]
+    },
+    {
+      "case": "otda-unpaired-single",
+      "shape": [
+        2,
+        1
+      ],
+      "transaction_version": 2,
+      "chronicle_spend": true,
+      "sighashes": [
+        "63",
+        "e3"
+      ],
+      "native_inputs": [],
+      "native_output_count": 0,
+      "non_matching_output": null,
+      "same_funding_transaction": false,
+      "reconstructed_inputs": [
+        0
+      ],
+      "shared_constructor_inputs": [],
+      "auto_bytes": 104189,
+      "literal_bytes": 192231,
+      "auto_txid": "684b3d2f1e3209290d4abf89dc749a92afe28470633400d9ba0cb2e2a5f36621",
+      "literal_txid": "458780c587b7851002fc1c1bd3274f2ff3b8c1a01ed2fb3df251c25f28c43773",
+      "auto_unlock_bytes": [
+        7996,
+        294
+      ],
+      "literal_unlock_bytes": [
+        96036,
+        294
+      ]
+    },
+    {
+      "case": "mixed-sighashes",
+      "shape": [
+        4,
+        3
+      ],
+      "transaction_version": 2,
+      "chronicle_spend": true,
+      "sighashes": [
+        "41",
+        "e1",
+        "63",
+        "e3"
+      ],
+      "native_inputs": [],
+      "native_output_count": 0,
+      "non_matching_output": null,
+      "same_funding_transaction": false,
+      "reconstructed_inputs": [
+        1,
+        2
+      ],
+      "shared_constructor_inputs": [],
+      "auto_bytes": 304310,
+      "literal_bytes": 671917,
+      "auto_txid": "6e068213bf791c5f6e981803efe2650a064fcd75ef3c4dd77f1fb899823c830e",
+      "literal_txid": "d717f9a803a23b3fcca9e306f1fc7bf9d7d2828cad4a3e60464f6f0aa3ab296e",
+      "auto_unlock_bytes": [
+        291,
+        8038,
+        8096,
+        294
+      ],
+      "literal_unlock_bytes": [
+        291,
+        287601,
+        96136,
+        294
+      ]
+    },
+    {
+      "case": "shared-funding-transaction",
+      "shape": [
+        3,
+        2
+      ],
+      "transaction_version": 2,
+      "chronicle_spend": true,
+      "sighashes": [
+        "61",
+        "e1",
+        "61"
+      ],
+      "native_inputs": [],
+      "native_output_count": 0,
+      "non_matching_output": null,
+      "same_funding_transaction": true,
+      "reconstructed_inputs": [
+        0,
+        1,
+        2
+      ],
+      "shared_constructor_inputs": [],
+      "auto_bytes": 215899,
+      "literal_bytes": 767309,
+      "auto_txid": "046f53d67125a5bc85e593dd945e3c30356d3dee2f199c3880fbc5e032e5cd80",
+      "literal_txid": "46bea06383ceeecfa588b5cd1e530304dab1e3bd69101c715312b5243764ff70",
+      "auto_unlock_bytes": [
+        8079,
+        7996,
+        8079
+      ],
+      "literal_unlock_bytes": [
+        191880,
+        191798,
+        191880
+      ]
+    },
+    {
+      "case": "native-fee-input-and-output",
+      "shape": [
+        3,
+        3
+      ],
+      "transaction_version": 2,
+      "chronicle_spend": true,
+      "sighashes": [
+        "61",
+        "41",
+        "e1"
+      ],
+      "native_inputs": [
+        1
+      ],
+      "native_output_count": 1,
+      "non_matching_output": null,
+      "same_funding_transaction": false,
+      "reconstructed_inputs": [
+        0,
+        2
+      ],
+      "shared_constructor_inputs": [],
+      "auto_bytes": 208031,
+      "literal_bytes": 575634,
+      "auto_txid": "57208e5570ef839100724a1372f096a102f848c2e203b537407c25d37a2a8d22",
+      "literal_txid": "9d9db9edb7d1d159b4ef26770e3ce051491a42fb0baae9e06daa78040050be12",
+      "auto_unlock_bytes": [
+        8115,
+        107,
+        8032
+      ],
+      "literal_unlock_bytes": [
+        191914,
+        107,
+        191832
+      ]
+    },
+    {
+      "case": "native-only-destinations",
+      "shape": [
+        2,
+        2
+      ],
+      "transaction_version": 2,
+      "chronicle_spend": true,
+      "sighashes": [
+        "61",
+        "e1"
+      ],
+      "native_inputs": [],
+      "native_output_count": 2,
+      "non_matching_output": null,
+      "same_funding_transaction": false,
+      "reconstructed_inputs": [],
+      "shared_constructor_inputs": [],
+      "auto_bytes": 719,
+      "literal_bytes": 719,
+      "auto_txid": "f169512fdbad1c29814b5dc0f525efd83c8c38c062d78b470cc442189016e11f",
+      "literal_txid": "f169512fdbad1c29814b5dc0f525efd83c8c38c062d78b470cc442189016e11f",
+      "auto_unlock_bytes": [
+        298,
+        257
+      ],
+      "literal_unlock_bytes": [
+        298,
+        257
+      ]
+    },
+    {
+      "case": "same-length-non-template",
+      "shape": [
+        1,
+        1
+      ],
+      "transaction_version": 2,
+      "chronicle_spend": true,
+      "sighashes": [
+        "61"
+      ],
+      "native_inputs": [],
+      "native_output_count": 0,
+      "non_matching_output": 0,
+      "same_funding_transaction": false,
+      "reconstructed_inputs": [],
+      "shared_constructor_inputs": [],
+      "auto_bytes": 191853,
+      "literal_bytes": 191853,
+      "auto_txid": "e63c05331d8e0780a8da9b5df2e0941ecd2598b78e88ca6e4aeab6f9b4251997",
+      "literal_txid": "e63c05331d8e0780a8da9b5df2e0941ecd2598b78e88ca6e4aeab6f9b4251997",
+      "auto_unlock_bytes": [
+        95995
+      ],
+      "literal_unlock_bytes": [
+        95995
+      ]
+    },
+    {
+      "case": "same-length-output-beside-template",
+      "shape": [
+        1,
+        2
+      ],
+      "transaction_version": 2,
+      "chronicle_spend": true,
+      "sighashes": [
+        "e1"
+      ],
+      "native_inputs": [],
+      "native_output_count": 0,
+      "non_matching_output": 0,
+      "same_funding_transaction": false,
+      "reconstructed_inputs": [
+        0
+      ],
+      "shared_constructor_inputs": [],
+      "auto_bytes": 295424,
+      "literal_bytes": 383459,
+      "auto_txid": "1cdcbd5b5accec2049b6b58fa2e91d0ab12bb7fe800d5415bf5caf122e642cf7",
+      "literal_txid": "80e065aa60af7ec31b8caafef1c3fa4153cc5acd3a6b54f38aa7f7fd50680d5c",
+      "auto_unlock_bytes": [
+        103763
+      ],
+      "literal_unlock_bytes": [
+        191798
+      ]
+    },
+    {
+      "case": "explicit-literal",
+      "shape": [
+        2,
+        2
+      ],
+      "transaction_version": 2,
+      "chronicle_spend": true,
+      "sighashes": [
+        "61",
+        "e1"
+      ],
+      "native_inputs": [],
+      "native_output_count": 0,
+      "non_matching_output": null,
+      "same_funding_transaction": false,
+      "reconstructed_inputs": [],
+      "shared_constructor_inputs": [],
+      "auto_bytes": 575343,
+      "literal_bytes": 575343,
+      "auto_txid": "851bd0e59fd824ac2ef4608ff655cd586196c7d74e8aa33abc02af8fa50ca869",
+      "literal_txid": "851bd0e59fd824ac2ef4608ff655cd586196c7d74e8aa33abc02af8fa50ca869",
+      "auto_unlock_bytes": [
+        191839,
+        191798
+      ],
+      "literal_unlock_bytes": [
+        191839,
+        191798
+      ]
+    },
+    {
+      "case": "transaction-version-one",
+      "shape": [
+        2,
+        2
+      ],
+      "transaction_version": 1,
+      "chronicle_spend": true,
+      "sighashes": [
+        "61",
+        "e1"
+      ],
+      "native_inputs": [],
+      "native_output_count": 0,
+      "non_matching_output": null,
+      "same_funding_transaction": false,
+      "reconstructed_inputs": [],
+      "shared_constructor_inputs": [],
+      "auto_bytes": 575343,
+      "literal_bytes": 575343,
+      "auto_txid": "7b49fd18571037882d509f620382ae15e43b48f7fff3ad816c4782fe57364222",
+      "literal_txid": "7b49fd18571037882d509f620382ae15e43b48f7fff3ad816c4782fe57364222",
+      "auto_unlock_bytes": [
+        191839,
+        191798
+      ],
+      "literal_unlock_bytes": [
+        191839,
+        191798
+      ]
+    },
+    {
+      "case": "pre-chronicle-bip143",
+      "shape": [
+        2,
+        2
+      ],
+      "transaction_version": 1,
+      "chronicle_spend": false,
+      "sighashes": [
+        "41",
+        "c1"
+      ],
+      "native_inputs": [],
+      "native_output_count": 0,
+      "non_matching_output": null,
+      "same_funding_transaction": false,
+      "reconstructed_inputs": [],
+      "shared_constructor_inputs": [],
+      "auto_bytes": 192284,
+      "literal_bytes": 192284,
+      "auto_txid": "f2c53f8fe625f6b97b8479c28da26b41ea306673c8fb582a9c17cd3ed27e0864",
+      "literal_txid": "f2c53f8fe625f6b97b8479c28da26b41ea306673c8fb582a9c17cd3ed27e0864",
+      "auto_unlock_bytes": [
+        291,
+        291
+      ],
+      "literal_unlock_bytes": [
+        291,
+        291
+      ]
+    },
+    {
+      "case": "compactsize-output-count",
+      "shape": [
+        1,
+        253
+      ],
+      "transaction_version": 2,
+      "chronicle_spend": true,
+      "sighashes": [
+        "61"
+      ],
+      "native_inputs": [],
+      "native_output_count": 252,
+      "non_matching_output": null,
+      "same_funding_transaction": false,
+      "reconstructed_inputs": [
+        0
+      ],
+      "shared_constructor_inputs": [],
+      "auto_bytes": 121454,
+      "literal_bytes": 208993,
+      "auto_txid": "6dd9bbd7c68cd637d13a31c8f7e2c8484442a59d37c376583f5e9f034b2f4c0f",
+      "literal_txid": "17009d0f2768cffc9449956d89e7ac11be575680109baa7bf7a8fd0a42582b04",
+      "auto_unlock_bytes": [
+        17028
+      ],
+      "literal_unlock_bytes": [
+        104565
+      ]
+    }
+  ],
+  "controls_passed": [
+    "pre-activation signing rejected",
+    "pre-activation OTDA witness rejected by node",
+    "post-activation mixed-age prevouts accepted by node",
+    "two engines reject altered output amount, output order and locktime"
+  ]
+}

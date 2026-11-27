@@ -1,0 +1,15 @@
+# Project verification and reproduction
+
+[简体中文](verification.zh-CN.md) · [Project overview](../README.md)
+
+## Environment and inputs
+
+<!-- docs-template: List the engine versions, required tools, fixture versions and working directory. -->
+
+## Build and replay
+
+<!-- docs-template: Give executable commands, expected decisions and output locations. Include a rejection case when it is part of the supported behavior. -->
+
+## Measurements and evidence
+
+<!-- docs-template: Identify the version and fixture behind the measurements, the units and scope, and link the recorded results. -->

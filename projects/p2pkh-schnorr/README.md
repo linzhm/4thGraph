@@ -1,61 +1,127 @@
-# P2PKH-Schnorr v0.7.0
+<!-- Generated from manifest.yaml with Copier. -->
+
+# P2PKH-Schnorr v0.16.0
 
 [简体中文](README.zh-CN.md) · [4thGraph](../../README.md) · [Project index](../README.md) · [Versions](versions/index.json)
 
-**Experimental payment template.** Pay to a BIP340 x-only public-key hash on BSV. A wallet fills one 20-byte owner field in a fixed locking script. Its external signer returns a standard 64-byte BIP340 signature.
+## Developer resources
 
-Two parties can use BIP327 MuSig2 to spend through the same signer interface. The existing lock accepts the aggregate x-only key and resulting BIP340 signature. The reference fixtures cover an interrupted signing session and compare the same all-participants policy against native `CHECKMULTISIG`. [MuSig2 and native 2-of-2](docs/threshold-comparison.en.md)
+**[Wallet SDK quickstart](docs/sdk.en.md#quickstart)** · [Unified wallet SDK](../../sdk/README.md#quickstart)
 
-**[Wallet SDK quickstart](docs/sdk.en.md#quickstart)** · [Payment protocol](docs/spec.en.md) · [Validate](#validate-the-baseline) · [Transaction costs](#measured-sizes) · [BIP340](https://github.com/bitcoin/bips/blob/master/bip-0340.mediawiki)
+Create a BSV payment lock from the HASH160 of a BIP340 x-only public key. The key is 32 bytes, the owner hash is 20 bytes, and the external signer returns a 64-byte BIP340 signature. This is an experimental payment template. [BIP340](https://github.com/bitcoin/bips/blob/master/bip-0340.mediawiki)
 
-## Build from Forth
+[Protocol](docs/spec.en.md) · [Algorithm and execution](#algorithm-and-execution) · [Reproduce the checks](#reproduce-the-checks) · [Complete transactions and stack measurements](#complete-transactions-and-stack-measurements) · [Measurements data](versions/v0.16.0/measurements.json)
 
-The payment example imports the 4thGraph standard-library verifier with `REQUIRE stdlib/bip340.fth`. Its `schnorr-lock` word combines the library verifier with the owner check and the current-input binding. Its `schnorr-unlock` word builds the unlocking script for each spend. [Payment example source](reference/schnorr.fth) · [4thGraph BIP340 library](../../src/fourthgraph/stdlib/bip340.fth)
+| Entry point | Purpose |
+| --- | --- |
+| `bip340-verify ( script -- script )` | Build a detached verifier. At execution it accepts a byte message, public key x and y, a BIP340 signature, and the nonce point's y coordinate. |
+| `schnorr-lock ( script bytes -- script )` | Build a payment lock from a 20-byte owner hash. The lock checks ownership, verifies the BIP340 signature, and binds the signed digest to the current input. |
+| `schnorr-unlock` | Build the input script from the signed preimage, mode selector, signature, and public coordinate witnesses. |
 
-From the repository root, run `PYTHONPATH=src:. python projects/p2pkh-schnorr/reference/generate_template.py --check` to verify the current lock and layout. Use `--write` to regenerate them. The wallet creates v0.7.0 outputs by default and can recognize and spend original v0.6.0 outputs. [v0.6.0 layout](versions/v0.6.0/layout.json)
+## Use cases and trade-offs
 
-The wallet uses libsecp256k1 to verify the external signature, then supplies the approved preimage and public witness to `schnorr-unlock` to construct the unlocking script. [Wallet SDK](docs/sdk.en.md#quickstart)
+The detached verifier covers BIP340 signer interoperability with empty and variable-length messages. The payment wrapper uses the same algorithm with the 32-byte SHA256d of the current input's signing preimage as the message. The BIP340 equation, the current-input binding, and funded node admission have separate checks. [Payment protocol](docs/spec.en.md) · [Reproduction](#reproduce-the-checks)
 
-The verifier uses 64 two-bit windows over four 128-bit components. It splits the signature scalar into two limbs and applies the secp256k1 endomorphism to the challenge scalar. v0.7.0 uses mixed addition to build part of the variable-base table, shortens the table lookups, and defers one X-coordinate reduction across each pair of doublings. The detached verifier shrinks from 29,415 to 28,677 bytes. [Scalar decomposition and window construction](docs/spec.en.md#joint-scalar-multiplication)
+Two parties can use BIP327 MuSig2. The lock commits to the aggregate x-only key and verifies the final BIP340 signature through the same wallet interface. The fixtures cover signing-session interruptions and compare the same all-participants policy with native `CHECKMULTISIG`. [MuSig2 and native 2-of-2](docs/threshold-comparison.en.md)
 
-## Validate the baseline
+Each Schnorr output carries a 22,515-byte lock. Under OTDA ALL, every input witness also carries the serialized outputs, so the cost of adding an output grows with the number of inputs. The measured one-input exit to ordinary P2PKH is 416 bytes under BIP143 ALL and 348 bytes under OTDA ALL for both v0.15.0 and v0.16.0. The lock reduction saves bytes in the transaction that creates the Schnorr UTXO. [Recorded measurements](versions/v0.16.0/measurements.json)
 
-From the repository root, create a Python 3.12 project environment. The tests use public fixture keys and run against the pinned chain-gang build. The BSV Node replay runs on an isolated regtest.
+## Algorithm and execution
+
+1. Parse the BIP340 signature as `r || s`. The wallet derives the even y coordinates of the public key point `P` and nonce point `R` from public data. Script checks the ranges, parity, and the public point's curve equation.
+2. Compute the BIP340 tagged challenge from the original `r`, public key x, and message, then reduce it modulo the group order `n` to obtain `e`.
+3. Compute `sG − eP`, reject the point at infinity, and compare both projective coordinates with the even nonce point `R`. The coordinate witnesses let Script use field congruences for this comparison without a square root or inversion.
+
+[BIP340 verification](https://github.com/bitcoin/bips/blob/master/bip-0340.mediawiki) · [Witness and challenge checks](docs/spec.en.md) · [Forth payment example](reference/schnorr.fth) · [BIP340 standard-library source](../../src/fourthgraph/stdlib/bip340.fth)
+
+### secp256k1 arithmetic
+
+v0.15.0 introduced a coordinate map that sends `(X:Y:Z)` to `(u²X:u³Y:Z)` with `21u⁶ = 1 mod p`. It preserves the group law and maps `y² = x³ + 7` to `y² = x³ + 1/3`. The scaled curve uses simpler complete addition formulas. The paired doubling kernel reduces the X coordinate once after both doublings. The challenge still uses the original BIP340 coordinates. [Coordinate scaling and doubling](docs/spec.en.md#coordinate-scaling)
+
+For joint multiplication, the verifier splits `s` at bit 128 and applies the secp256k1 endomorphism `φ(P) = λP` to split `k = n − e` into `k1 + λk2 ≡ k mod n`. The bounds give `|k1|, |k2| < 2¹²⁸`. The verifier accumulates the four components in 64 two-bit windows. v0.16.0 reuses two GLV lattice constants during rounding and reconstruction, and passes the group order from challenge reduction to the split. [Joint multiplication and bound](docs/spec.en.md#joint-scalar-multiplication) · [Reusable kernels](../../src/fourthgraph/stdlib/secp256k1.fth)
+
+The same kernels apply to Script paths that explicitly multiply secp256k1 points by runtime scalars. The current PELS Counter uses fixed public parameters `d = k = 1` for transaction binding. With the candidate preimage digest `H` and the fixed generator coordinate `r`, Script computes `s = (H + r) mod n`, applies low-S normalization, encodes DER, and delegates ECDSA verification to native `OP_CHECKSIG`. All three PELS Counter builds produced byte-identical locks across v0.15.0 and v0.16.0. [PELS Counter](../pels-counter/README.md) · [Fixed-key binding](../../src/fourthgraph/bsv/pushtx.py)
+
+## Reproduce the checks
+
+<a name="validate-the-baseline"></a>
+
+Run from the repository root with Python 3.12. The SDK replay also uses Node.js 22, Go, and Rust/Cargo. The suites use public fixture keys and replay against pinned chain-gang and an isolated BSV Node regtest.
 
 ```sh
 bash tools/setup-workspaces.sh
 python3.12 -m venv projects/p2pkh-schnorr/workspace/p2pkh-schnorr
 projects/p2pkh-schnorr/workspace/p2pkh-schnorr/bin/python -m pip install -r projects/p2pkh-schnorr/reference/requirements.txt
-export SCRIPT_LAB_SDK_PYTHON="$PWD/projects/p2pkh-schnorr/workspace/p2pkh-schnorr/bin/python"
-PYTHONPATH=src:. "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/reference/generate_template.py --check
-PYTHONPATH="$PWD/src:$PWD:$PWD/projects/p2pkh-schnorr/reference" \
-  bash tools/verify_node.sh -- "$SCRIPT_LAB_SDK_PYTHON" -m unittest -v test_schnorr test_musig2
+. projects/p2pkh-schnorr/workspace/p2pkh-schnorr/bin/activate
+export SCRIPT_LAB_SDK_PYTHON="$VIRTUAL_ENV/bin/python"
+```
+
+```sh
+PYTHONPATH=src:. python projects/p2pkh-schnorr/reference/generate_template.py --check
+PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- python -m unittest discover -s projects/p2pkh-schnorr/reference
+```
+
+```sh
+PYTHONPATH="$PWD/tests" REGTEST_CHRONICLE_HEIGHT=5 \
+  bash tools/verify_node.sh -- "$SCRIPT_LAB_SDK_PYTHON" -m unittest -v test_secp256k1_library
 bash tools/verify_node.sh -- bash sdk/verify_wallet.sh p2pkh-schnorr
 ```
 
-The acceptance suite checks all 19 official BIP340 verification vectors, including empty and variable-length messages, through libsecp256k1 and both Script engines. It also regenerates the eight official signing vectors with test keys and auxiliary randomness. The payment matrix covers all 12 paired BIP143 and Chronicle OTDA modes for transaction versions 1 and 2. It rejects locktime changes and checks the expected output commitments for ALL, NONE, and SINGLE. Separate cases cover malformed coordinates, key ownership, fee balance, inactive Chronicle, and both lookup tables, scalar decomposition, and results at infinity.
+The acceptance suite checks all 19 official BIP340 verification vectors through libsecp256k1 and both Script engines, and regenerates eight signing vectors with public test data. Payment cases cover all 12 paired BIP143 and Chronicle OTDA sighash modes in transaction versions 1 and 2. They cover stale locktime, ALL/NONE/SINGLE output commitments, malformed coordinates, ownership, fee balance, and Chronicle activation. The verifier tests exercise both lookup tables and infinity. The curve tests compare scaled point operations and GLV rounding with independent references and replay correct and incorrect results in both engines. [Payment tests](reference/test_schnorr.py) · [Curve tests](../../tests/test_secp256k1_library.py)
 
-## Measured sizes
+## Script sizes
 
-Each v0.7.0 output lock is **29,660 bytes**, saving 738 bytes over v0.6.0. Its owner field starts at byte offset **238**. These two-input, two-output fixtures create two Schnorr outputs. The unlocking scripts include the signing preimage, BIP340 signature, and coordinate witnesses.
+| Component | v0.15.0 | v0.16.0 |
+| --- | ---: | ---: |
+| GLV split with embedded group order | 182 B | 112 B |
+| GLV split with the group order supplied on the stack | — | 78 B |
+| Detached BIP340 verifier | 21,848 B | 21,705 B |
+| Complete payment lock | 22,658 B | 22,515 B |
 
-| Mode | Each output lock | Each input unlock | Complete transaction | Extra input | Extra output | Fund and exit | One turnover | Peak stack payload |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| BIP143 ALL | 29,660 | 329 | 60,096 | 372 | 29,671 | 60,322 | 120,418 | 3,321 |
-| Chronicle OTDA ALL | 29,660 | 59,611 | 178,660 | 59,777 | 89,021 | 60,335 | 238,996 | 119,054 |
+The v0.16.0 owner field starts at byte offset 189. Across 56 alternating detached verification runs per version, chain-gang medians were 2.547 and 2.505 ms. Local BSV Node RPC medians were 9.567 and 9.584 ms. The sCrypt report compares the earlier v0.6.0 baseline with the legacy verifier and a separate BIP340 implementation using the same witness layout. [Layout and fingerprint](versions/v0.16.0/layout.json) · [Recorded measurements](versions/v0.16.0/measurements.json) · [sCrypt comparison](docs/scrypt-comparison.en.md)
 
-All sizes are in bytes. Stack payload is the approximate combined main and alternate stack payload for the first input from the development evaluator. BSV Node 1.2.3 and chain-gang verify each complete input with supplied prevouts. OTDA ALL includes the literal signed outputs in each preimage. [Layout and fingerprint](versions/v0.7.0/layout.json) · [Replayed measurements](versions/v0.7.0/measurements.json) · [Benchmark method](../../docs/benchmark.md)
+## Developer and wallet integration
+
+1. Create a receive lock with `createLock` using the x-only key or its HASH160. Before spending, recognize the authenticated funding output, check the outpoint and amount, and approve the destinations and fee. The SDK defaults to v0.16.0 and recognizes and spends all releases from v0.6.0 to v0.16.0.
+2. Use `signPayment` for a single-input payment or `signInput` for a prepared transaction. The signer callback takes the supplied 32 bytes as the BIP340 message and returns the standard 64-byte signature. The SDK verifies it with libsecp256k1 and derives the two public y coordinates.
+3. The SDK calls the Forth `schnorr-unlock` word with the approved preimage and public witness. Every spend pushes the complete literal preimage. The lock uses PUSHTX and native `OP_CHECKSIG` to bind the digest to the actual input after validating the BIP340 signature.
+
+[SDK quickstart](docs/sdk.en.md#quickstart) · [Payment protocol](docs/spec.en.md) · [Current-input binding](../../src/fourthgraph/bsv/pushtx.py)
+
+### Build from Forth
+
+Load `REQUIRE stdlib/bip340.fth` to reuse the detached verifier. The payment example composes it with the ownership and input-binding checks. Run the template check above to confirm the frozen lock and its layout. Use `--write` to regenerate them. [Forth source](reference/schnorr.fth) · [Version catalog](versions/index.json)
+
+## Complete transactions and stack measurements
+
+<a name="measured-sizes"></a>
+
+The v0.16.0 fixtures spend two Schnorr outputs and create two Schnorr outputs. BSV Node 1.2.3 and pinned chain-gang verify complete inputs with explicit prevouts. The development evaluator measures stack peaks for input zero. The main and alternate item peaks and combined payload peak are recorded independently. Transaction and payload sizes are in bytes. [Recorded measurements](versions/v0.16.0/measurements.json) · [Benchmark method](../../docs/benchmark.md)
+
+| Mode | Inputs × outputs | Previous locks | Unlocks | New locks | Total | Main / alt items | Stack payload |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| BIP143 ALL (`0x41`) | 2 × 2 | 22,515 × 2 | 329 × 2 | 22,515 × 2 | 45,806 | 90 / 13 | 3,403 |
+| Chronicle OTDA ALL (`0x61`) | 2 × 2 | 22,515 × 2 | 45,321 × 2 | 22,515 × 2 | 135,790 | 90 / 13 | 90,474 |
 
 ```sh
 PYTHONPATH=src:. bash tools/verify_node.sh -- "$SCRIPT_LAB_SDK_PYTHON" -m fourthgraph.benchmark.run \
   --project p2pkh-schnorr --venvs-dir projects/p2pkh-schnorr/workspace --output projects/p2pkh-schnorr/workspace/build/benchmark
 ```
 
-Under BSV Node 1.2.3's default regtest policy, funding and exit transactions entered the mempool and were mined in both BIP143 ALL and OTDA ALL runs.
+Under BSV Node 1.2.3's default regtest policy, funding, turnover, and exit entered the mempool and were mined in both modes.
 
 ```sh
 PYTHONPATH=src:. bash tools/verify_node.sh --profile default -- "$SCRIPT_LAB_SDK_PYTHON" -m fourthgraph.benchmark.admission \
-  p2pkh-schnorr --output projects/p2pkh-schnorr/workspace/build/admission.json
+  p2pkh-schnorr --template v0.16.0 --turnover --output projects/p2pkh-schnorr/workspace/build/admission.json
 ```
 
-The [sCrypt comparison](docs/scrypt-comparison.en.md) includes the 2021 article's linked verifier and a sCrypt BIP340 implementation with a common witness layout. The [native 2-of-2 comparison](docs/threshold-comparison.en.md) measures the full transaction lifecycle and the amount of signing data produced off-chain.
+## Marginal and lifecycle costs
+
+Each added-input or added-output cell gives the change from 2 × 2 in **total bytes (new output locks / input unlocks / other serialization)**. Previous locks are counted in the transaction that funds the UTXO. Both lifecycle totals include native P2PKH funding and exit. One turnover adds a payment between Schnorr outputs.
+
+| Mode | Added-input shape | Added-input bytes | Added-output shape | Added-output bytes | Fund and exit | One turnover |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| BIP143 ALL (`0x41`) | 3 × 2 | 372 (0 / 329 / 43) | 2 × 3 | 22,526 (22,515 / 0 / 11) | 46,032 | 91,838 |
+| Chronicle OTDA ALL (`0x61`) | 3 × 2 | 45,487 (0 / 45,444 / 43) | 2 × 3 | 67,586 (22,515 / 45,056 / 15) | 46,046 | 181,835 |
+
+[Unified benchmark and reproduction](../../docs/benchmark.md) · [Native 2-of-2 lifecycle comparison](docs/threshold-comparison.en.md)

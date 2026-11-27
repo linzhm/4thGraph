@@ -1,4 +1,6 @@
-# 原生 P2PK 与 P2PKH 基准
+<!-- Generated from manifest.yaml with Copier. -->
+
+# 原生 P2PK 与 P2PKH 基准 v0.1.0
 
 [English](README.md) · [4thGraph](../../README.zh-CN.md) · [项目目录](../README.zh-CN.md) · [版本](versions/index.json)
 
@@ -8,17 +10,36 @@
 
 生成 P2PK 或 P2PKH 收款脚本，再用自己的 secp256k1 签名器完成付款。
 
+[协议](docs/developer.zh-CN.md) · [算法与执行](#算法与执行) · [复现方法](#复现方法) · [完整交易与栈测量](#完整交易与栈测量)
+
+| 入口 | 用途 |
+| --- | --- |
+| `p2pk-lock` | 用 33 字节压缩 secp256k1 公钥构造锁。 |
+| `p2pkh-lock` | 用收款方的 20 字节公钥哈希构造锁。 |
+
+## 使用场景与取舍
+
+接入交易构造器、secp256k1 签名设备或迁移钱包时，可以从这里建立基准。先用公开向量核对序列化，再换成自己的签名器。后续接入其他方案时，沿用同一套收款和付款流程比较差异。
+
+付款请求只提供公钥哈希时，可选择 P2PKH，花费时再提交完整公钥和签名。付款方已取得收款公钥时，可用 P2PK 做对照。在 BIP143 ALL 下，P2PK 每个输出多 10 字节，每个花费输入约少 34 字节。批量出款和多输入归集时，应按输入与输出的实际数量比较。[交易成本](#完整交易与栈测量)
+
+### 输入输出取舍
+
+在 BIP143 ALL 夹具中，P2PKH 每个输出锁比 P2PK 少 10 字节，每个解锁约多 34 字节，因为花费者需要携带公钥。两进两出样本分别为 374 和 326 字节，DER 签名编码长度可随样本变化。数据可用于核对钱包的锁定和解锁格式，完整交易的基准判定使用 BSV Node 和 chain-gang。
+
+## 算法与执行
+
 [协议规范](docs/developer.zh-CN.md#protocol) · [Forth 源码与编译结果](#forth-源码与编译结果) · [安全分析](docs/developer.zh-CN.md#security) · [复现与验证](#复现与验收) · [交易成本](#完整交易与栈测量)
 
 原生 P2PKH 是 4thGraph 的第一个钱包接入示例，也是对照其他签名方案的交易成本基准。P2PK 使用同一个 secp256k1 签名器，把公钥放在输出锁中，供对照输入和输出的成本。两种模板都有可复放的公开向量。
 
 [从 Forth 构建脚本](forth/README.md) · [复现基准](../../docs/benchmark.zh-CN.md)
 
-## Forth 源码与编译结果
+### Forth 源码与编译结果
 
 Forth 构造词检查收款字段的长度，再拼接锁定脚本字节。两个示例都使用仓库公开夹具中的公钥。
 
-### P2PK
+#### P2PK
 
 构造词接收 33 字节压缩 secp256k1 公钥。解锁输入提供 `<signature>`。[示例入口](forth/p2pk.fth) · [标准库](../../src/fourthgraph/stdlib/p2pk.fth)
 
@@ -40,7 +61,7 @@ Forth 构造词检查收款字段的长度，再拼接锁定脚本字节。两�
 210279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798ac
 ```
 
-### P2PKH
+#### P2PKH
 
 构造词接收 20 字节公钥 HASH160。解锁输入提供 `<signature> <public key>`。[示例入口](forth/p2pkh.fth) · [标准库](../../src/fourthgraph/stdlib/p2pkh.fth)
 
@@ -62,7 +83,7 @@ OP_DUP OP_HASH160 0x751e76e8199196d454941c45d1b3a323f1433bd6 OP_EQUALVERIFY OP_C
 76a914751e76e8199196d454941c45d1b3a323f1433bd688ac
 ```
 
-### 优化与复现
+#### 优化与复现
 
 在 4thGraph 0.2.7 中，每个构造词在 `baseline`、`safe` 和 `stack` 模式下都生成相同的字节码。传入夹具数据求值后，得到上面的 35 字节 P2PK 和 25 字节 P2PKH 锁定脚本，与现有的 `lock_hex` 逐字节一致。钱包在链下执行 Forth 构造词，把得到的字节用作交易输出的锁定脚本。[基准夹具](versions/v0.1.0/baseline.json)
 
@@ -79,13 +100,20 @@ for entry in p2pk p2pkh; do
 done
 ```
 
-## 使用场景与取舍
+## 复现方法
 
-接入交易构造器、secp256k1 签名设备或迁移钱包时，可以从这里建立基准。先用公开向量核对序列化，再换成自己的签名器。后续接入其他方案时，沿用同一套收款和付款流程比较差异。
+从仓库根目录使用项目固定的依赖运行版本命令。
 
-付款请求只提供公钥哈希时，可选择 P2PKH，花费时再提交完整公钥和签名。付款方已取得收款公钥时，可用 P2PK 做对照。在 BIP143 ALL 下，P2PK 每个输出多 10 字节，每个花费输入约少 34 字节。批量出款和多输入归集时，应按输入与输出的实际数量比较。[交易成本](#完整交易与栈测量)
+```sh
+python -m pip install -r projects/p2pk-p2pkh-baseline/reference/requirements.txt
+```
 
-## 复现与验收
+```sh
+PYTHONPATH=src:. python projects/p2pk-p2pkh-baseline/reference/script_lab.py
+PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- python -m unittest discover -s projects/p2pk-p2pkh-baseline/reference -p test_acceptance.py
+```
+
+### 复现与验收
 
 从 `projects/p2pk-p2pkh-baseline/reference/` 中使用 Python 3.12、Rust 工具链和 [uv](https://docs.astral.sh/uv/)。
 
@@ -97,9 +125,9 @@ uv run --no-project --with-requirements requirements.txt python script_lab.py
 
 离线示例使用版本 1 的交易和 BIP143 ALL。独立[验收矩阵](reference/acceptance.md)列出 2,880 种完整输入组合、80 个无配对 SINGLE 变更用例和 192 个 Chronicle 激活边界用例。统一测量使用独立的版本 2 交易样本。
 
-## 输入输出取舍
+## 开发和钱包接入
 
-在 BIP143 ALL 夹具中，P2PKH 每个输出锁比 P2PK 少 10 字节，每个解锁约多 34 字节，因为花费者需要携带公钥。两进两出样本分别为 374 和 326 字节，DER 签名编码长度可随样本变化。数据可用于核对钱包的锁定和解锁格式，完整交易的基准判定使用 BSV Node 和 chain-gang。
+从钱包接入指南取得收款锁构造、签名请求和见证组装示例。链上验收结果见仓库的完整输入矩阵。[钱包 SDK](docs/sdk.zh-CN.md#quickstart) · [付款验收](reference/acceptance.md)
 
 ## 完整交易与栈测量
 

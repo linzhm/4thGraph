@@ -1,0 +1,64 @@
+{%- set english = language == 'en' -%}
+{%- set headings = {
+    'use_cases': 'Use cases and trade-offs' if english else '使用场景与取舍',
+    'algorithm': 'Algorithm and execution' if english else '算法与执行',
+    'reproduction': 'Reproduce the checks' if english else '复现方法',
+    'script_sizes': 'Script sizes' if english else '脚本尺寸',
+    'integration': 'Developer and wallet integration' if english else '开发和钱包接入',
+    'transactions': 'Complete transactions and stack measurements' if english else '完整交易与栈测量',
+    'lifecycle': 'Marginal and lifecycle costs' if english else '输入输出边际与生命周期',
+} -%}
+{%- set readme_title = (title_en if english else title_zh) or title[language] -%}
+{%- set version = readme.get('version', '') -%}
+{%- set links = readme.get(language, {}) -%}
+{%- set home = '[简体中文](README.zh-CN.md) · [4thGraph](../../README.md) · [Project index](../README.md)' if english
+    else '[English](README.md) · [4thGraph](../../README.zh-CN.md) · [项目目录](../README.zh-CN.md)' -%}
+{%- if version -%}
+  {%- set home = home ~ (' · [Versions]' if english else ' · [版本]') ~ '(versions/index.json)' -%}
+{%- endif -%}
+{%- set document = namespace(blocks=[
+    '<!-- Generated from ' ~ readme.get('manifest', 'manifest.yaml') ~ ' with Copier. -->',
+    '# ' ~ readme_title ~ (' v' ~ version if version else ''),
+    home,
+    '## Developer resources' if english else '## 开发入口',
+]) -%}
+{%- if links.get('sdk') -%}
+  {%- set sdk = ('**[Wallet SDK quickstart]' if english else '**[钱包 SDK 快速上手]') ~ '(' ~ links.sdk ~ ')**' -%}
+  {%- if links.get('unified_sdk') -%}
+    {%- set sdk = sdk ~ (' · [Unified wallet SDK]' if english else ' · [统一钱包 SDK]') ~ '(' ~ links.unified_sdk ~ ')' -%}
+  {%- endif -%}
+  {%- set document.blocks = document.blocks + [sdk] -%}
+{%- endif -%}
+{%- set document.blocks = document.blocks + [summary[language]] -%}
+{%- set nav = namespace(items=[]) -%}
+{%- if links.get('protocol') -%}
+  {%- set nav.items = [('[Protocol]' if english else '[协议]') ~ '(' ~ links.protocol ~ ')'] -%}
+{%- endif -%}
+{%- for key in ['algorithm', 'reproduction', 'transactions'] if key in sections -%}
+  {%- set heading = headings[key] -%}
+  {%- set nav.items = nav.items + ['[' ~ heading ~ '](#' ~ (heading | lower | replace(' ', '-')) ~ ')'] -%}
+{%- endfor -%}
+{%- if readme.get('measurements') -%}
+  {%- set nav.items = nav.items + [('[Measurements data]' if english else '[实测数据]') ~ '(' ~ readme.measurements ~ ')'] -%}
+{%- endif -%}
+{%- set document.blocks = document.blocks + [nav.items | join(' · ')] -%}
+{%- if entry_points -%}
+  {%- set table = namespace(rows=['| Entry point | Purpose |' if english else '| 入口 | 用途 |', '| --- | --- |']) -%}
+  {%- for entry in entry_points -%}
+    {%- set name = entry.name | replace('|', '\\|') -%}
+    {%- set description = entry.description[language] | replace('|', '\\|') -%}
+    {%- set table.rows = table.rows + ['| `' ~ name ~ '` | ' ~ description ~ ' |'] -%}
+  {%- endfor -%}
+  {%- set document.blocks = document.blocks + [table.rows | join('\n')] -%}
+{%- endif -%}
+{%- for key, heading in headings.items() if key in sections -%}
+  {%- set document.blocks = document.blocks + ['## ' ~ heading] -%}
+  {%- if key == 'reproduction' -%}
+    {%- set document.blocks = document.blocks + setup.get(language, []) -%}
+    {%- if readme.get('commands') -%}
+      {%- set document.blocks = document.blocks + ['```sh\n' ~ (readme.commands | join('\n')) ~ '\n```'] -%}
+    {%- endif -%}
+  {%- endif -%}
+  {%- set document.blocks = document.blocks + sections[key][language] -%}
+{%- endfor -%}
+{{ document.blocks | join('\n\n') }}

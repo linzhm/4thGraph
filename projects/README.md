@@ -23,9 +23,36 @@
 | [WOTS+](wots-plus/README.md) | Compare Winternitz witness and lock layouts | [One-time signer](wots-plus/docs/sdk.en.md#quickstart) |
 | [Pure ML-DSA-44](ml-dsa/README.md) | Replay a Pure ML-DSA-44 spend | [FIPS 204 signer](ml-dsa/docs/sdk.en.md#quickstart) |
 
+## Transaction tests
+
+The [transaction runner](../tests/project_transactions.py) builds and validates complete transactions for every project in the index. Payment examples cover funding, turnover, and exit. Deferred R1 also covers activation with a sponsor input. The PELS counter advances twice, the serial workflow runs in both BIP143 ALL and OTDA ALL, and the proof counter spends through its direct Script backend.
+
+From the repository root, use a Python environment with chain-gang, `ecdsa`, `coincurve` and `cryptography`. The ML-DSA fixture signer requires OpenSSL 3.5 or later. Pass a project directory name to run just that project.
+
+```sh
+PYTHONPATH=src:. python tests/project_transactions.py
+bash tools/verify_node.sh -- python tests/project_transactions.py
+```
+
+The first command uses chain-gang. The second also checks each input with BSV Node using explicit previous outputs. Each successful transaction has a corresponding rejection test that changes locktime while retaining the original witness. The counter tests also construct incorrect successor or terminal outputs and rebuild the witness. The runner prints each transaction ID and serialized size. For funded replay, additional modes and proof backends, see the individual project guides.
+
 ## Project workspaces
 
 Run `bash tools/setup-workspaces.sh` from the repository root to create Git-ignored build, cache, and log directories in each project’s `workspace/`. The project homepage leads to its protocol and integration guide. Reference code, build entry points and test runners live with the project. [Install 4thGraph](../docs/install.md) · [Shared wallet SDK](../sdk/README.md) · [Showcase](../showcase/README.md)
+
+## Project README template
+
+Use Copier to create a new project. Each runnable project keeps both README files in sync with its `projects/<name>/manifest.yaml`. [Copier commands and setup](template/README.md)
+
+| Field | Contents |
+| --- | --- |
+| `schema_version` | Format version, currently `1`. |
+| `title`, `summary` | One line each in `en` and `zh-CN`. |
+| `entry_points` | Shared interface names with bilingual descriptions. |
+| `sections` | Named sections containing Markdown blocks in both languages. Keep `algorithm` and `reproduction`. Include the other sections that apply. |
+| `setup` | Optional bilingual Markdown blocks before the build and verify commands. |
+
+Use YAML block scalars for Markdown paragraphs, tables, and fenced code. Resolve relative links from the project directory. The generator reads the current version from `versions/index.json` and takes the build and verify commands from that release's manifest. It links available protocol, SDK, and measurement files. To regenerate and check all projects, run `python3 tools/project_readme.py --all --write` and `python3 tools/project_readme.py --all --check`. [JSON Schema](template/manifest.schema.json) · [Starter manifest](template/manifest.example.yaml) · [Schnorr manifest](p2pkh-schnorr/manifest.yaml) · [Generated README](p2pkh-schnorr/README.md)
 
 ## Versioned project data
 

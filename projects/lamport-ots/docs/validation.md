@@ -40,10 +40,38 @@ The Script RPC replay used the project's dedicated verification launcher and
 its validation time budget. The funded runs below used default transaction
 policy on a separate node instance for each replay.
 
+### OTDA reconstruction replay
+
+Replayed from `889ff6e` after #72 merged. Nineteen existing Script fragments
+and locks matched that baseline byte for byte. The 928-byte reconstruction
+program produces the fixed parts of the 6,830-byte compact lock. The
+reconstructed witness ran through the 408-row authorization domain. The
+engines checked all six edits that downgrade a reconstructed transaction to
+version 1 against the explicit push-only rejection. Literal and reconstructed
+stacks matched for eligible sighashes and mixed outputs. The ineligible cases
+kept the literal encoding. BSV Node and chain-gang verified all 80 benchmark
+transactions, including 16 with reconstruction enabled. Five wallet vectors,
+including the reconstructed OTDA witness, replayed in Python, TypeScript, Go
+and Rust. [Reconstruction and costs](optimization.md#otda-unlocking-reconstruction)
+
+### v0.2.0 candidate replay
+
+The Forth build reproduced the 6,525-byte lock and 871-byte reconstruction
+program. The test compared all 256 low type bytes in each selector branch
+against the previous guard, including independent rejection checks for the
+three high bytes. Both engines agreed on 408 v0.2.0 authorization decisions
+each with literal and reconstruction-enabled witnesses, and rejected the
+512 proof-block mutations. The BSV Node suite also passed 96 activation cases
+for v0.2.0. The benchmark reproduced the 80 previous transaction IDs and
+verified 32 more transactions for v0.2.0. Seven wallet vectors replayed in
+Python, TypeScript, Go and Rust. [Versioned evidence](../versions/v0.2.0/measurements.json)
+
 ### Funded regtest
 
 Both Forth profiles ran their full lifecycle on fresh, peerless BSV Node 1.2.3
 with default transaction policy and the repository's regtest consensus settings.
+Both the compact experimental profile and the v0.2.0 candidate also ran with
+reconstruction enabled.
 After 101 bootstrap blocks, the native wallet funded two Lamport outputs. The
 turnover spent both into two fresh Forth-profile outputs, then the exit spent
 both into native P2PKH. The native wallet signed funding in both runs. The
@@ -51,7 +79,7 @@ listed mode applied to both Lamport inputs in the turnover and the exit. Each
 of those transactions paid a 250,000 sat fixture fee.
 
 Each transaction was observed in `getrawmempool` after `sendrawtransaction`,
-then found by txid in a generated block. All 12 transactions in the table
+then found by txid in a generated block. All 24 transactions in the table
 passed both checks.
 
 | Profile | Lamport spend mode | Funding bytes / height | Turnover bytes / height | Exit bytes / height |
@@ -60,6 +88,10 @@ passed both checks.
 | `committed-key-forth` | Chronicle OTDA ALL (`0x61`) | 14,297 / 105 | 75,392 / 106 | 33,276 / 107 |
 | `committed-key-forth-compact` | BIP143 ALL (`0x41`) | 13,839 / 102 | 46,876 / 103 | 33,262 / 104 |
 | `committed-key-forth-compact` | Chronicle OTDA ALL (`0x61`) | 13,873 / 105 | 74,120 / 106 | 33,276 / 107 |
+| Compact, reconstruction enabled | BIP143 ALL (`0x41`) | 13,840 / 102 | 46,876 / 103 | 33,262 / 104 |
+| Compact, reconstruction enabled | Chronicle OTDA ALL (`0x61`) | 13,874 / 105 | 48,830 / 106 | 33,276 / 107 |
+| v0.2.0, reconstruction enabled | BIP143 ALL (`0x41`) | 13,229 / 102 | 46,266 / 103 | 33,262 / 104 |
+| v0.2.0, reconstruction enabled | Chronicle OTDA ALL (`0x61`) | 13,263 / 105 | 48,106 / 106 | 33,276 / 107 |
 
 The funded sizes include wallet change and native signatures, so funding sizes
 can vary between runs. The default direct-exit replay also passed all 12
@@ -70,7 +102,8 @@ Reproduce the funded check on Linux from the repository root with the same
 Python environment.
 
 ```sh
-for lamport_profile in committed-key-forth committed-key-forth-compact; do
+for lamport_profile in committed-key-forth committed-key-forth-compact \
+  committed-key-forth-compact-reconstructed committed-key-forth-v0.2.0-reconstructed; do
   bash tools/verify_node.sh --profile default -- \
     projects/lamport-ots/workspace/venv/bin/python -m fourthgraph.benchmark.admission lamport-ots \
     --template "$lamport_profile" --turnover \

@@ -1,16 +1,44 @@
-# PELS 计数器
+<!-- Generated from manifest.yaml with Copier. -->
 
-[English](README.md) · [项目目录](../README.zh-CN.md) · [版本](versions/index.json)
+# PELS 计数器 v0.1.0
 
-**[构建完整锁](#build)** · [Regtest 入金和复放](#spend-and-verify-on-regtest) · [调整手续费规则](#declare-a-fee-constraint)
+[English](README.md) · [4thGraph](../../README.zh-CN.md) · [项目目录](../README.zh-CN.md) · [版本](versions/index.json)
+
+## 开发入口
 
 这是 PELS 标准库模板族的一个计数示例。递增规则、状态宽度和费用策略由本项目选择。[模板族与实例边界](../../docs/optimizer-integration-review.zh-CN.md)
 
 4thGraph 把 `advance` 编译到完整合约锁。每次花费只允许一个后继输出，后继的 `u32` 计数加一，并沿用同一段合约代码。[入门版](pels-counter.fth)固定每笔花费的手续费为 1,000 聪。[核心版](pels-counter-core.fth)由花费见证提供后继金额，锁再把金额绑定到实际输出。
 
+[算法与执行](#算法与执行) · [复现方法](#复现方法)
+
+| 入口 | 用途 |
+| --- | --- |
+| `pels_counter.py build` | 编译计数状态转换并生成初始锁。 |
+| `pels_counter.py replay` | 在隔离 regtest 上入金并复放计数更新。 |
+
+## 算法与执行
+
+**[构建完整锁](#build)** · [Regtest 入金和复放](#spend-and-verify-on-regtest) · [调整手续费规则](#declare-a-fee-constraint)
+
+JSON 的 `script_hex` 是计数为 0 的完整锁，`satoshis` 是初始输出金额。Forth 递增词编译为 8 字节，完整锁还要核对实际后继输出。`optimization` 记录了状态转换、编译改写及候选见证的字节成本。
+
+## 复现方法
+
+从仓库根目录运行版本命令。构建锁需要 Python 3.11 或更新版本，入金复放还需固定的 Chronicle 绑定。[Regtest 环境](../../docs/infrastructure.md)
+
+```sh
+python -m pip install ecdsa -r tools/requirements-chronicle.txt
+```
+
+```sh
+PYTHONPATH=src:. python projects/pels-counter/pels_counter.py build
+PYTHONPATH=src:. bash tools/verify_node.sh --profile default -- python projects/pels-counter/pels_counter.py replay --output /tmp/pels-replay.json
+```
+
 <a name="build"></a>
 
-## 构建完整锁
+### 构建完整锁
 
 从仓库根目录运行，构建只需要 Python 3.11 或更新版本的标准库。
 
@@ -20,11 +48,9 @@ counter=projects/pels-counter/pels_counter.py
 python3 "$counter" build
 ```
 
-JSON 的 `script_hex` 是计数为 0 的完整锁，`satoshis` 是初始输出金额。Forth 递增词编译为 8 字节，完整锁还要核对实际后继输出。`optimization` 记录了状态转换、编译改写及候选见证的字节成本。
-
 <a name="spend-and-verify-on-regtest"></a>
 
-## Regtest 入金和复放
+### Regtest 入金和复放
 
 在 Linux x86-64 上准备 curl、Rust/Cargo 和 C 编译工具链。启动脚本会下载并校验 BSV Node。[Regtest 环境](../../docs/infrastructure.md)
 
@@ -48,9 +74,11 @@ bash tools/verify_node.sh --profile default -- python "$counter" replay --output
 PYTHONPATH=src:. python3 "$counter" spend --parent "$(jq -r '.deployment.raw' "$report")"
 ```
 
+## 开发和钱包接入
+
 <a name="declare-a-fee-constraint"></a>
 
-## 调整手续费规则
+### 调整手续费规则
 
 在源码写入 `pels-fee: 1000 2000 ;` 可指定闭区间。上下界相同时，编译器直接取该值。上下界不同时，花费者提供手续费，锁验证手续费和扣除之后的后继金额，并承诺整个后继输出。沿用上面的环境，运行有界手续费示例。
 

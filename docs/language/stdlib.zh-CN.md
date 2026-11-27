@@ -40,7 +40,7 @@ PELS 在架构上归属标准库模板族，应用提供输出和字段约束，
 | `std/native-p2pk`、`std/native-p2pkh` | 绑定接收者后编译原生付款锁 | [付款构建命令](../../projects/p2pk-p2pkh-baseline/forth/README.md) |
 | `std/p256` | `p256-add`、`p256-double`，项目式坐标，保留栈底的 `p b3` | [P-256 内核](../../src/fourthgraph/stdlib/p256.fth) |
 | `std/script-fragments` | 构造栈搬运、32 字节反序和无符号大端整数解码片段 | [库源码](../../src/fourthgraph/stdlib/script-fragments.fth) |
-| `std/secp256k1` | 齐次射影点加、仿射混合点加、倍点和标量分解 | [曲线内核](../../src/fourthgraph/stdlib/secp256k1.fth) |
+| `std/secp256k1` | 齐次射影点加、仿射混合点加、倍点及对应的缩放坐标内核。`secp256k1-lambda-split` 分解标量。群阶已在栈上时，`secp256k1-lambda-split-with-order` 接收 `k n`。 | [曲线内核](../../src/fourthgraph/stdlib/secp256k1.fth) |
 | `std/bip340` | `bip340-verify ( script -- script )`，构造 BIP340 验签片段 | [付款示例](../../projects/p2pkh-schnorr/README.zh-CN.md) |
 | `std/groth16-bls12-381` | `groth16-bls12-381-verify ( -- groth16-verified )`，由 BLS12-381 verifier 后端编译 | [Groth16 Forth 源码](../../src/fourthgraph/stdlib/groth16-bls12-381.fth) |
 | `std/verify` | `relation: TRANSITION ROUTE ;`，声明一个可用多种后端验证的关系 | [状态验证示例](../../projects/proof-counter/verify-state.fth) |
@@ -71,6 +71,19 @@ PYTHONPATH=src:. python -m fourthgraph.workflow.protocol --capabilities
 PYTHONPATH=src:. python -m fourthgraph.workflow.protocol "projects/workflow-examples/library-composition.fth" \
   --entry advance-and-pay --optimize stack
 ```
+
+## 复用 PELS 原像重建
+
+将见证压缩放在交易编译层。合约定义并构造完整、有序的输出向量，重建器按签名模式拼回原像，认证片段再用原生 `OP_CHECKSIG` 将原像绑定到实际花费。Counter 的单后继构造和 Workflow 的有序多输出构造都遵循这个边界。[Counter 构建与复放](../../projects/pels-counter/README.zh-CN.md) · [重建实现](../../src/fourthgraph/workflow/forkid_lowering.py)
+
+| 单输入路径 | 可重建字段 | 适用条件 |
+| --- | --- | --- |
+| BIP143 ALL | `hashPrevouts`、`hashSequence`、`hashOutputs` 和签名类型。链接固定 `scriptCode` 时，打包上下文为 56 B。 | 合约能构造全部输出。上一输出金额留在打包上下文，并由原像认证。 |
+| OTDA ALL | 输入记录、输出计数、有序输出序列和签名类型。链接固定 `scriptCode` 时，打包上下文为 48 B。 | 合约能构造全部输出，且约束不依赖原像未承诺的上一输出金额。 |
+
+Workflow 的双模式锁用打包上下文的长度选择签名模式，并将对应签名类型交给认证片段。两条分支消费同一份有序输出序列。若合约需要验证上一输出金额，构建时只选用 BIP143 路径。
+
+打包上下文字节只衡量一部分见证；评估收益时还应计入应用见证和新增重建代码。Counter 的自引用路径可以携带 `scriptCode`，并在链接验证两个位置的片段相同后省去其中一份。多输入、开放输出以及其他 SIGHASH 模式需要各自证明可重建字段，已有调用方按原有模板继续构建。[重建回归](../../tests/test_workflow.py) · [Counter 见证回归](../../tests/test_counter_optimization.py)
 
 ## 验证路径
 

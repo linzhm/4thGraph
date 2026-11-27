@@ -7,15 +7,16 @@ from io import StringIO
 import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
 from fourthgraph.compiler.source import WORKFLOW_MODES, CompileError, ParentOutput, SourceCompiler
-from fourthgraph.workflow.forkid_lowering import LINKED_CONTEXT_BYTES, OTDA_ALL, LinkedContext
+from fourthgraph.workflow.forkid_lowering import LINKED_CONTEXT_BYTES, OTDA_ALL, DualLinkedContext, LinkedContext
 from fourthgraph.workflow.protocol import BINDING_CODE, FLAG, artifact_digest, invalidated, main
 from fourthgraph.replay.workflow import TestKeys
 from fourthgraph.bsv.chain_gang import validate_at_heights
-from fourthgraph.bsv.evaluate import evaluate as evaluate_script
+from fourthgraph.bsv.evaluate import ScriptError, evaluate as evaluate_script
 from fourthgraph.bsv.script import asm
 from fourthgraph.bsv.transaction import Input, Output, Transaction, preimage_forkid, preimage_otda
 from fourthgraph.workflow.workflow_contract import WorkflowContracts, compile_workflow
@@ -40,6 +41,52 @@ class WorkflowTests(unittest.TestCase):
                                      mode="atomic", sighash_family="auto")
         self.assertEqual(atomic["sighash_selection"]["selected"], "bip143")
         self.assertFalse(atomic["sighash_selection"]["candidates"]["otda"]["eligible"])
+
+    def test_dual_linked_context_selects_mode_and_rejects_other_lengths(self):
+        script_code = b"\x51"
+        labels = ("terminal", "receipt")
+        template = SimpleNamespace(inputs=("state",), outputs=labels)
+        bip143 = LinkedContext.for_template(template, FLAG, script_code, labels)
+        otda = LinkedContext.for_template(template, OTDA_ALL, script_code, labels,
+                                          requires_previous_amount=False)
+        dual = DualLinkedContext(bip143, otda)
+        script = (asm("OP_SWAP") + dual.check_size() + asm("OP_TOALTSTACK")
+                  + dual.bind_outputs() + asm("OP_FROMALTSTACK OP_FROMALTSTACK"))
+        outputs = (Output(1000, script_code), Output(0, b"\x00\x6a"))
+        serialized = b"".join(output.serialize() for output in outputs)
+        tx = Transaction((Input(bytes(range(32)), 257, sequence=0xFFFFFFFE),),
+                         outputs, version=2, locktime=87)
+        for flag, expected in ((FLAG, preimage_forkid(tx, 0, 1001, script_code, FLAG)),
+                               (OTDA_ALL, preimage_otda(tx, 0, script_code, OTDA_ALL))):
+            with self.subTest(flag=hex(flag)):
+                packed = dual.pack(expected)
+                self.assertEqual(evaluate_script(script, [b"sentinel", packed, serialized]),
+                                 ([b"sentinel", expected, bytes([flag])], []))
+                for malformed in (packed[:-1], packed + b"\x00"):
+                    with self.assertRaises(ScriptError):
+                        evaluate_script(script, [b"sentinel", malformed, serialized])
+
+    def test_linked_context_preserves_output_vector_serialization(self):
+        script_code = b"\x51"
+        for flag, packed_size in ((FLAG, LINKED_CONTEXT_BYTES), (OTDA_ALL, LINKED_CONTEXT_BYTES - 8)):
+            for output_count in (1, 2, 16, 17, 252, 253):
+                labels = tuple(range(output_count))
+                template = SimpleNamespace(inputs=("state",), outputs=labels)
+                context = LinkedContext.for_template(template, flag, script_code, labels,
+                                                     requires_previous_amount=False)
+                script = asm("OP_SWAP OP_TOALTSTACK") + context.bind_outputs() + asm("OP_FROMALTSTACK")
+                outputs = tuple(Output(index, script_code) for index in labels)
+                serialized = b"".join(output.serialize() for output in outputs)
+                for version, sequence, locktime in ((1, 0xFFFFFFFE, 87), (2, 0xFFFFFFFF, 0)):
+                    with self.subTest(flag=hex(flag), output_count=output_count, version=version):
+                        tx = Transaction((Input(bytes(range(32)), 257, sequence=sequence),),
+                                         outputs, version=version, locktime=locktime)
+                        expected = (preimage_forkid(tx, 0, 1001, script_code, flag) if flag == FLAG
+                                    else preimage_otda(tx, 0, script_code, flag))
+                        packed = context.pack(expected)
+                        self.assertEqual(len(packed), packed_size)
+                        self.assertEqual(evaluate_script(script, [b"sentinel", packed, serialized]),
+                                         ([b"sentinel", expected], []))
 
     def test_cli_aliases_emit_identical_canonical_artifacts(self):
         keys = TestKeys().public

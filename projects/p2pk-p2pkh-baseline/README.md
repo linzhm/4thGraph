@@ -1,4 +1,6 @@
-# Native P2PK and P2PKH baseline
+<!-- Generated from manifest.yaml with Copier. -->
+
+# Native P2PK and P2PKH baseline v0.1.0
 
 [简体中文](README.zh-CN.md) · [4thGraph](../../README.md) · [Project index](../README.md) · [Versions](versions/index.json)
 
@@ -8,17 +10,32 @@
 
 Receive to P2PK or P2PKH, then sign a payment with your secp256k1 signer.
 
+[Protocol](docs/developer.en.md) · [Algorithm and execution](#algorithm-and-execution) · [Reproduce the checks](#reproduce-the-checks) · [Complete transactions and stack measurements](#complete-transactions-and-stack-measurements)
+
+| Entry point | Purpose |
+| --- | --- |
+| `p2pk-lock` | Build a lock from a 33-byte compressed secp256k1 public key. |
+| `p2pkh-lock` | Build a lock from the recipient’s 20-byte public-key hash. |
+
+## Use cases and trade-offs
+
+Start here when bringing up a transaction builder, a secp256k1 signing device, or a wallet migration. Check serialization with the public vector first. Then connect your own signer and use the same workflow to compare another signature scheme.
+
+P2PKH is the usual choice when a payment request provides a public-key hash. The spending wallet reveals the full public key with the signature. P2PK is useful as a control when the payer already has the recipient's public key. For BIP143 ALL, P2PK moves 10 bytes into each receive output and saves about 34 bytes per spending input. Compare both sides if your wallet batches funding or consolidates many inputs. [Transaction costs](#complete-transactions-and-stack-measurements)
+
+## Algorithm and execution
+
 [Protocol](docs/developer.en.md#protocol) · [Forth and compiled Script](#forth-source-and-compiled-script) · [Security](docs/developer.en.md#security) · [Verify](#run) · [Transaction costs](#complete-transactions-and-stack-measurements)
 
 Native P2PKH is the first wallet integration example and the transaction-cost baseline for 4thGraph. P2PK uses the same secp256k1 signer and provides a control for placing the public key in the output lock. Both templates have public fixtures that you can replay as you integrate another project.
 
 [Build locks from Forth](forth/README.md) · [Reproduce the benchmark](../../docs/benchmark.md)
 
-## Forth source and compiled Script
+### Forth source and compiled Script
 
 The Forth constructors check the recipient field width and assemble the locking scripts. Both examples use the public fixture key.
 
-### P2PK
+#### P2PK
 
 The constructor takes a 33-byte compressed secp256k1 public key. The spending input supplies `<signature>`. [Example entry](forth/p2pk.fth) · [Standard library](../../src/fourthgraph/stdlib/p2pk.fth)
 
@@ -40,7 +57,7 @@ The 35-byte lock pushes the public key and executes `OP_CHECKSIG`.
 210279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798ac
 ```
 
-### P2PKH
+#### P2PKH
 
 The constructor takes a 20-byte HASH160 of the public key. The spending input supplies `<signature> <public key>`. [Example entry](forth/p2pkh.fth) · [Standard library](../../src/fourthgraph/stdlib/p2pkh.fth)
 
@@ -62,7 +79,7 @@ OP_DUP OP_HASH160 0x751e76e8199196d454941c45d1b3a323f1433bd6 OP_EQUALVERIFY OP_C
 76a914751e76e8199196d454941c45d1b3a323f1433bd688ac
 ```
 
-### Optimization and reproduction
+#### Optimization and reproduction
 
 In 4thGraph 0.2.7, `baseline`, `safe`, and `stack` emit identical bytecode for each constructor. Evaluating that bytecode with the fixture inputs produces the 35-byte P2PK and 25-byte P2PKH locks above, byte for byte against the existing `lock_hex` values. The wallet build evaluates the Forth constructors off-chain and uses the resulting bytes as the transaction output scripts. [Baseline fixtures](versions/v0.1.0/baseline.json)
 
@@ -79,29 +96,7 @@ for entry in p2pk p2pkh; do
 done
 ```
 
-## Use cases and trade-offs
-
-Start here when bringing up a transaction builder, a secp256k1 signing device, or a wallet migration. Check serialization with the public vector first. Then connect your own signer and use the same workflow to compare another signature scheme.
-
-P2PKH is the usual choice when a payment request provides a public-key hash. The spending wallet reveals the full public key with the signature. P2PK is useful as a control when the payer already has the recipient's public key. For BIP143 ALL, P2PK moves 10 bytes into each receive output and saves about 34 bytes per spending input. Compare both sides if your wallet batches funding or consolidates many inputs. [Transaction costs](#complete-transactions-and-stack-measurements)
-
-## Run
-
-From `projects/p2pk-p2pkh-baseline/reference/`, with Python 3.12, a Rust
-toolchain and uv. [uv documentation](https://docs.astral.sh/uv/)
-
-```sh
-uv run --no-project --with-requirements requirements.txt python script_lab.py
-```
-
-The first run may download and build the pinned dependency. The script itself
-has no network operations. After provisioning, add `--offline` after `uv run`.
-It exits nonzero on a script encoding or validation mismatch and otherwise
-emits raw parent/spend transactions, ASM, script hex and per-case outcomes.
-`../versions/v0.1.0/baseline.json` is the checked-in output. To check reproducibility,
-pipe the same command into `cmp - ../versions/v0.1.0/baseline.json`.
-
-## Fixture contract
+### Fixture contract
 
 | Template | Unlocking script | Expected verification |
 | --- | --- | --- |
@@ -124,7 +119,36 @@ To reproduce the original upstream control in its own environment, run
 `uv run --no-project --with 'tx-engine==0.13.1' python script_lab.py`.
 It reproduces the same checked-in baseline vector. [Upstream package](https://pypi.org/project/tx-engine/0.13.1/)
 
-## Node cross-check
+## Reproduce the checks
+
+Run the release commands from the repository root with the pinned project dependencies.
+
+```sh
+python -m pip install -r projects/p2pk-p2pkh-baseline/reference/requirements.txt
+```
+
+```sh
+PYTHONPATH=src:. python projects/p2pk-p2pkh-baseline/reference/script_lab.py
+PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- python -m unittest discover -s projects/p2pk-p2pkh-baseline/reference -p test_acceptance.py
+```
+
+### Run
+
+From `projects/p2pk-p2pkh-baseline/reference/`, with Python 3.12, a Rust
+toolchain and uv. [uv documentation](https://docs.astral.sh/uv/)
+
+```sh
+uv run --no-project --with-requirements requirements.txt python script_lab.py
+```
+
+The first run may download and build the pinned dependency. The script itself
+has no network operations. After provisioning, add `--offline` after `uv run`.
+It exits nonzero on a script encoding or validation mismatch and otherwise
+emits raw parent/spend transactions, ASM, script hex and per-case outcomes.
+`../versions/v0.1.0/baseline.json` is the checked-in output. To check reproducibility,
+pipe the same command into `cmp - ../versions/v0.1.0/baseline.json`.
+
+### Node cross-check
 
 The five checked-in fixtures were also passed to BSV Node 1.2.3
 `verifyscript` in isolated Apple Container regtest. The RPC used each raw
