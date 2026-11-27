@@ -7,6 +7,7 @@ from hashlib import sha256
 import json
 from pathlib import Path
 
+from fourthgraph.compiler.method_search import MAX_ORDER_DEPTH, MAX_ORDER_STATES
 from fourthgraph.compiler.script_builder import ScriptBuilder, build_word
 
 VERSION = "0.4.0"
@@ -27,6 +28,7 @@ WINDOW_PLANS = ("split-4", "joint-2", "split-5x4-affine-g", "split-5x4-affine-g-
 MAX_AUTO_ROUNDS = 6
 MAX_AUTO_CANDIDATES = 32
 AUTO_BATCH = 8
+AUTO_OBJECTIVES = ("lock", "bip143-all", "otda-all", "otda-single")
 ENTRY_SOURCES = {
     "r1-lock": SOURCE,
     PAYMENT_ENTRY: SOURCE.with_name("r1-baseline.fth"),
@@ -175,11 +177,31 @@ def select_baseline_plan(candidates):
     return min(candidates, key=lambda name: len(candidates[name]))
 
 
-def compile_auto(source, owner, *, source_path=ENTRY_SOURCES[PAYMENT_ENTRY], rounds=1):
-    raw, optimized, candidates, region = baseline_plans(source, owner, source_path=source_path, rounds=rounds)
+def compile_auto(source, owner, *, source_path=ENTRY_SOURCES[PAYMENT_ENTRY], rounds=None, objective="lock",
+                 max_depth=None, max_states=None):
+    if objective not in AUTO_OBJECTIVES:
+        raise ValueError(f"unknown R1 optimization objective {objective!r}")
+    if rounds is None:
+        if sha256(source).hexdigest() == BASELINE_SOURCE_SHA256:
+            from r1_optimizer import DEFAULT_COMPILER_STATES, UnrecognizedBaseline, compile_ordered
+
+            try:
+                return compile_ordered(source, owner, source_path=source_path, objective=objective,
+                                       max_depth=MAX_ORDER_DEPTH if max_depth is None else max_depth,
+                                       max_states=DEFAULT_COMPILER_STATES if max_states is None else max_states)
+            except UnrecognizedBaseline:
+                pass
+        if objective.startswith("otda-"):
+            raise ValueError("OTDA selection requires the verified R1 baseline and imports")
+    elif objective != "lock" or max_depth is not None or max_states is not None:
+        raise ValueError("explicit window rounds cannot be combined with ordered search options")
+
+    raw, optimized, candidates, region = baseline_plans(source, owner, source_path=source_path,
+                                                        rounds=1 if rounds is None else rounds)
     selected = select_baseline_plan(candidates)
     report = {
-        "objective": "lock_script_bytes", "region": "r1-baseline-mul2", "window_region": region,
+        "objective": "lock_script_bytes", "requested_objective": objective,
+        "region": "r1-baseline-mul2", "window_region": region,
         "selected": selected, "candidates": {
             name: {"lock_bytes": len(code), "lock_sha256": sha256(code).hexdigest()}
             for name, code in candidates.items()
@@ -214,13 +236,22 @@ def main():
     optimization = parser.add_mutually_exclusive_group()
     optimization.add_argument("--optimize", action="store_true")
     optimization.add_argument("--auto", action="store_true",
-                              help="select an audited R1 baseline lowering by emitted lock size")
+                              help="select and link an audited R1 lowering for the requested byte objective")
+    parser.add_argument("--auto-target", choices=AUTO_OBJECTIVES,
+                        help="byte objective for ordered --auto (default: lock)")
+    parser.add_argument("--auto-depth", type=int, choices=range(1, MAX_ORDER_DEPTH + 1),
+                        metavar=f"1..{MAX_ORDER_DEPTH}", help="ordered search depth")
+    parser.add_argument("--auto-states", type=int, choices=range(1, MAX_ORDER_STATES + 1),
+                        metavar=f"1..{MAX_ORDER_STATES}", help="ordered search state budget")
     parser.add_argument("--auto-rounds", type=int, choices=range(1, MAX_AUTO_ROUNDS + 1),
-                        help="window search rounds when using --auto (default: 1)")
+                        help="use the window-only search with this many rounds")
     parser.add_argument("--version", action="version", version=VERSION)
     args = parser.parse_args()
-    if args.auto_rounds is not None and not args.auto:
-        parser.error("--auto-rounds requires --auto")
+    ordered = (args.auto_target, args.auto_depth, args.auto_states)
+    if not args.auto and (args.auto_rounds is not None or any(value is not None for value in ordered)):
+        parser.error("search options require --auto")
+    if args.auto_rounds is not None and any(value is not None for value in ordered):
+        parser.error("--auto-rounds cannot be combined with ordered search options")
     source_path = args.source or ENTRY_SOURCES[args.entry]
     source = source_path.read_bytes()
     try:
@@ -228,8 +259,12 @@ def main():
             if args.entry != PAYMENT_ENTRY or args.counter_state is not None:
                 raise ValueError("--auto requires the r1-baseline-lock payment entry")
             compiler, lock, report = compile_auto(source, args.owner_hash160, source_path=source_path,
-                                                  rounds=args.auto_rounds or 1)
+                                                  rounds=args.auto_rounds, objective=args.auto_target or "lock",
+                                                  max_depth=args.auto_depth, max_states=args.auto_states)
+            constructor = report.pop("otda_reconstruction", None)
             blocks = {"optimization": report}
+            if constructor is not None:
+                blocks["otda_reconstruction"] = constructor
         else:
             compiler = compile_source(source, args.owner_hash160, optimize=args.optimize, source_path=source_path)
             lock = emit_lock(compiler, args.entry, args.counter_state)

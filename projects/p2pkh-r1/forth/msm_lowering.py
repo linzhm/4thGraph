@@ -8,10 +8,11 @@ import re
 
 from ecdsa import NIST256p, ellipticcurve
 
-from curve_compiler import B3, FIELD
 from fourthgraph.bsv.evaluate import evaluate
 from fourthgraph.bsv.script import OPS, asm, decode_num, encode_num, number, push
 
+FIELD = NIST256p.curve.p()
+B3 = 3 * NIST256p.curve.b() % FIELD
 GENERATOR = NIST256p.generator
 ORDER = NIST256p.order
 INFINITY = asm("0 1 0")

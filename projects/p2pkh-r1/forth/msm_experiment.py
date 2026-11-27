@@ -365,7 +365,7 @@ def dump(value, output=None):
 
 
 def main():
-    from fourthgraph.benchmark.method_matrix import MAX_ORDER_DEPTH, MAX_ORDER_STATES
+    from fourthgraph.compiler.method_search import DEFAULT_ORDER_STATES, MAX_ORDER_DEPTH, MAX_ORDER_STATES
 
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
@@ -418,7 +418,7 @@ def main():
                 requested = {"max_depth": args.max_depth, "max_states": args.max_states}
                 if previous is None:
                     budget = {"max_depth": args.max_depth or MAX_ORDER_DEPTH,
-                              "max_states": args.max_states or MAX_ORDER_STATES}
+                              "max_states": args.max_states or DEFAULT_ORDER_STATES}
                 else:
                     budget = previous["search"]["budget"]
                     if set(budget) != set(requested) or any(

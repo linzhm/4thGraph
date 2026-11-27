@@ -44,10 +44,11 @@ PYTHONPATH=src:.:projects/p2pkh-r1/forth:projects/p2pkh-r1/reference \
 ### 同一份 baseline-lock 的自动选型
 
 默认、`--optimize` 和 `--auto` 读取同一份 `r1-baseline.fth` 及其依赖。
-`--auto` 比较原样构建、已有公式优化和四种窗口方案，按链接后的锁字节数选型。
-只有源文件与导入摘要匹配已验证的版本时才尝试窗口实现。编译器保留原入口
-的准备、结果检查和交易绑定，并在结果检查前清理窗口表。JSON 记录选中的
-计划、所有候选的锁摘要以及替换片段在最终 Script 中的范围。
+`--auto` 在编译阶段按前提展开有序方法，通过目标字节模型选择实现，输出精确锁和
+OTDA 重建程序。编译器保留原入口的准备、结果检查和交易绑定，报告记录有序计划、
+各状态的字节估算、链接区域和停止原因。只有源码与导入摘要匹配已验版本时才允许
+替换窗口区域。普通锁编译可以继续走现有公式路径，OTDA 目标要求能生成相配的
+重建程序。
 [实测与边界（中）](../../../docs/optimization-paths.zh-CN.md#r1-同源自动选型) ·
 [Measurements and scope (EN)](../../../docs/optimization-paths.md#r1-same-source-automatic-selection)
 
@@ -56,14 +57,16 @@ project=projects/p2pkh-r1
 export PYTHONPATH="src:.:$project/reference:$project/forth"
 python "$project/forth/compile_r1.py" --entry r1-baseline-lock > /tmp/r1-baseline.json
 python "$project/forth/compile_r1.py" --entry r1-baseline-lock --optimize > /tmp/r1-formula.json
-python "$project/forth/compile_r1.py" --entry r1-baseline-lock --auto > /tmp/r1-auto.json
+python "$project/forth/compile_r1.py" --entry r1-baseline-lock --auto --auto-target bip143-all > /tmp/r1-auto-bip143.json
+python "$project/forth/compile_r1.py" --entry r1-baseline-lock --auto --auto-target otda-all > /tmp/r1-auto-otda.json
 python -m unittest -v test_r1_baseline.BaselineAutoTests
 ```
 
-需要多轮搜索时加 `--auto-rounds 6`。默认一轮。从第二轮起，编译器优先
-扩展当前较小锁的窗口宽度和守卫选择，每轮最多编译 8 个新计划，总上限为
-32 个候选。候选用计划名去重。`optimization.window_region.search` 记录每轮
-的候选、累计最优和停止原因。请求的轮数是上限，达到候选上限时可提前结束。
+目标包含默认的 `lock`、`bip143-all`、`otda-all` 和配对的 `otda-single`。
+交易目标按两进两出形状计入四份锁和相应的重建程序，排序分数是候选相关的字节
+估算。实际字节与交易判定由花费夹具独立验收。编译端有序搜索默认最多 8 步和
+160 个状态，可用 `--auto-depth` 和 `--auto-states` 改预算。历史的仅窗口对照
+用 `--auto-rounds N`，最多比较 32 个候选。
 
 花费测试使用固定版 chain-gang，覆盖 BIP143 ALL、OTDA ALL、配对和无配对的
 OTDA SINGLE。正例使用测试签名和实际夹具父输出。改动花费的锁定时间后，测试必须观察到

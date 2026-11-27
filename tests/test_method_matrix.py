@@ -1,6 +1,7 @@
 import unittest
 
-from fourthgraph.benchmark.method_matrix import IneligibleMethod, Method, explore_orders, explore_pairs
+from fourthgraph.benchmark.method_matrix import explore_pairs
+from fourthgraph.compiler.method_search import IneligibleMethod, Method, explore_orders
 
 
 class MethodMatrixTests(unittest.TestCase):

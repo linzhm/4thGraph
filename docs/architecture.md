@@ -36,6 +36,8 @@ Optimize methods with interacting regions through bounded ordered pairs. A metho
 
 The compiler can also continue beyond pairs. It expands legal methods from each state until there is no new state or a budget is reached. Deduplicate expansion using the complete state that determines future applicability, such as bindings, representation and proven facts. A report keeps converging edges and can replay the search under the same budget.
 
+The R1 compiler and experiment runner use the same ordered lowering. The compiler ranks linked artifacts with a declared byte model and emits the selected lock and OTDA constructor. The experiment runner independently replays the emitted bytes and records complete spend results.
+
 ## Build and spend boundary
 
 - **Standalone compilation.** `4thgraph SOURCE --entry WORD` emits the Script bytes, stack signature, and build metadata such as source and artifact hashes.

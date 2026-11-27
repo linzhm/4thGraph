@@ -4,8 +4,10 @@ from dataclasses import replace
 from hashlib import sha256
 from importlib.metadata import PackageNotFoundError
 import os
+import sys
 from pathlib import Path
 import unittest
+from unittest.mock import patch
 
 from ecdsa import NIST256p, ellipticcurve
 
@@ -145,12 +147,37 @@ class BaselineAutoTests(unittest.TestCase):
             self.assertEqual((row["best"], row["best_lock_bytes"]), (best, len(seen[best])))
 
     def test_distinct_source_uses_the_existing_formula_path(self):
-        _, script, report = compile_auto(self.source + b"\n( local revision )\n", self.owner, rounds=4)
+        revised = self.source + b"\n( local revision )\n"
+        _, script, report = compile_auto(revised, self.owner)
         self.assertEqual(report["window_region"]["status"], "ineligible")
         self.assertEqual(report["window_region"]["search"]["stop"], "ineligible")
         self.assertEqual(list(report["candidates"]), ["baseline", "formula"])
         self.assertEqual(report["selected"], "formula")
         self.assertEqual(script, self.candidates["formula"])
+        with self.assertRaisesRegex(ValueError, "OTDA selection requires the verified R1 baseline"):
+            compile_auto(revised, self.owner, objective="otda-all")
+
+    def test_ordered_auto_reports_target_and_emits_the_selected_constructor(self):
+        cases = {
+            "bip143-all": (41_165, 5591, ["affine-g", "compact-g", "ifdup"]),
+            "otda-all": (42_382, 3042, ["joint-window", "pack-prefix-repeat", "pack-adjacent-kernels"]),
+        }
+        blocked = {"tx_engine": None, "r1_method_matrix": None, "replay_r1": None}
+        with patch.dict(sys.modules, blocked):
+            for target, (lock_bytes, program_bytes, order) in cases.items():
+                with self.subTest(target=target):
+                    _, script, report = compile_auto(self.source, self.owner, objective=target, max_states=64)
+                    self.assertEqual(len(script), lock_bytes)
+                    self.assertEqual(report["objective"], target)
+                    self.assertEqual(report["selected_order"], order)
+                    constructor = report["otda_reconstruction"]
+                    self.assertEqual(constructor["bytes"], program_bytes)
+                    code = bytes.fromhex(constructor["program_hex"])
+                    self.assertEqual(sha256(code).hexdigest(), constructor["sha256"])
+                    start = constructor["owner_offset"]
+                    end = start + constructor["owner_bytes"]
+                    self.assertEqual(script[start:end], self.owner)
+                    self.assertEqual(evaluate(code), ([script[:start], script[end:]], []))
 
     def test_complete_spends_check_transaction_binding(self):
         try:
