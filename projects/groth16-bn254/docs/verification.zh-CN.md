@@ -36,6 +36,8 @@ REGTEST_CHRONICLE_HEIGHT=2 bash tools/verify_node.sh --profile long-script -- \
   --output projects/groth16-bn254/workspace/build/plan-comparison.json
 ```
 
+基线和选定的 64 B 方案均通过两份夹具后，命令才会写入报告。其他候选方案的脚本拒绝会写入报告，编译或 RPC 错误会中止命令。
+
 ## BN254 体积对照
 
 | 实现和用例 | 公开输入数 | 锁定脚本 | 解锁脚本 | 序列化脚本路径 |

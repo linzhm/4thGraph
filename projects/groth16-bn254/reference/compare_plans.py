@@ -11,6 +11,7 @@ from time import perf_counter_ns
 
 from fourthgraph.benchmark.validation import CONTEXT_PIN, Node, chain_metadata
 from fourthgraph.bsv.chain_gang import validate_at_heights
+from fourthgraph.bsv.differential import is_chain_gang_script_rejection
 from fourthgraph.bsv.script import asm
 from fourthgraph.bsv.transaction import Input, Output, Transaction, blob
 from fourthgraph.replay.groth16_bn254 import sign_spend
@@ -19,16 +20,21 @@ from fourthgraph.verification.groth16_bn254 import ScriptVerifier, build_adapter
 
 PROJECT = Path(__file__).resolve().parents[1]
 FIXTURE = PROJECT / "versions/v0.1.0/fixture.json"
+SELECTED_PLAN = "naf-mod-64"
 PLANS = (
     ("baseline", False, "", 0),
     ("fixed-pairings", True, "affine", 0),
     ("projective-binary", True, "projective-binary", 0),
     ("projective-naf", True, "projective-naf", 0),
-    ("naf-mod-64", True, "projective-naf", 64),
+    (SELECTED_PLAN, True, "projective-naf", 64),
     ("naf-mod-128", True, "projective-naf", 128),
     ("naf-mod-256", True, "projective-naf", 256),
     ("naf-mod-512", True, "projective-naf", 512),
 )
+
+
+class CandidateRejected(ValueError):
+    """An engine rejected the compiled witness for a valid fixture."""
 
 
 def compile_case(verifier, keys, case, options):
@@ -49,11 +55,16 @@ def time_engines(node, tx, parent, samples):
     rpc_ms, chain_ms = [], []
     for i in range(samples + 1):
         start = perf_counter_ns()
-        if node.verdicts(tx, (parent,), timeout_us=15000, **context) != [True]:
-            raise ValueError("BSV Node rejected a valid fixture")
+        if node.verdicts(tx, (parent,), timeout_us=15000, **context) == [False]:
+            raise CandidateRejected("BSV Node rejected a valid fixture")
         rpc = (perf_counter_ns() - start) / 1e6
         start = perf_counter_ns()
-        validate_at_heights(tx, (parent,), **context)
+        try:
+            validate_at_heights(tx, (parent,), **context)
+        except ValueError as error:
+            if not is_chain_gang_script_rejection(error):
+                raise
+            raise CandidateRejected(f"chain-gang rejected a valid fixture: {error}") from error
         chain = (perf_counter_ns() - start) / 1e6
         if i:
             rpc_ms.append(round(rpc, 3))
@@ -104,14 +115,16 @@ def main():
                 try:
                     lock, witness = compile_case(verifier, keys, fixture[label], options)
                     results[label] = measure(node, keys, lock, witness, args.samples)
-                except (RuntimeError, ValueError) as error:
+                except CandidateRejected as error:
+                    if name in {"baseline", SELECTED_PLAN}:
+                        raise RuntimeError(f"{name} failed for {label}: {error}") from error
                     results[label] = {"error": str(error)}
             variants[name] = dict(options=options, cases=results)
             print(name, {case: row.get("error", (row.get("lock_bytes"), row.get("witness_bytes"),
                                                 row.get("node_rpc_median_ms"), row.get("chain_gang_median_ms")))
                          for case, row in results.items()}, flush=True)
     evidence = dict(fixture_sha256=sha256(fixture_bytes).hexdigest(), bsv_node_version=node.version,
-                    chain_gang=engine, samples_per_case=args.samples, plans=variants)
+                    chain_gang=engine, samples_per_case=args.samples, plans=variants, selected=SELECTED_PLAN)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(evidence, indent=2) + "\n", encoding="utf-8")
 

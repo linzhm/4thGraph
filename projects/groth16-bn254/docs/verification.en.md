@@ -36,6 +36,8 @@ REGTEST_CHRONICLE_HEIGHT=2 bash tools/verify_node.sh --profile long-script -- \
   --output projects/groth16-bn254/workspace/build/plan-comparison.json
 ```
 
+The command writes the report after both fixtures pass with the baseline and the selected 64 B plan. It records script rejections for other candidates and exits on compiler or RPC errors.
+
 ## BN254 size comparison
 
 | Implementation and case | Public inputs | Locking script | Unlocking script | Serialized script path |
