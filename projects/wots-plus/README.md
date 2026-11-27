@@ -154,19 +154,28 @@ address increment into the step suffix table shortens one lookup per chain.
 The repeated chain body is 301 bytes. The digest decoder uses `OP_2DUP` to
 save each nibble pair for the chain countdowns.
 
+`locking_script(key, cached_constants="compact-v9")` builds a 21,332-byte
+lock. It computes the checksum in parallel by folding complemented digest
+nibbles into 16-bit lanes and reducing the packed sum modulo 65,535.
+The countdown accepts raw nibble flags. For the last 15 digest bytes, the decoder
+splits at the remaining digest length minus one. These identical splits
+let the OTDA program reconstruct the whole run by doubling and trimming.
+
 In the two-input, two-output BIP143 ALL fixture, the development evaluator
 measured a peak of 32 main stack items for `compact-v6` through `compact-v8`.
 The alternate stack peak fell from 68 to 67 items in `compact-v8`.
+`compact-v9` peaked at 32 main and 67 alternate stack items, with combined
+stack payload rising from 2,916 to 2,922 bytes.
 
-| Measured bytes | `cached-steps` | `compact` | `compact-v2` | `compact-v3` | `compact-v4` | `compact-v5` | `compact-v6` | `compact-v7` | `compact-v8` |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| Payment lock | 33,956 | 29,217 | 27,070 | 25,965 | 23,296 | 22,494 | 21,982 | 21,774 | 21,540 |
-| OTDA reconstruction program | 3,097 | 2,395 | 2,358 | 1,979 | 1,884 | 1,126 | 1,076 | 957 | 952 |
-| 2×2 BIP143 ALL payment | 72,650 | 63,172 | 58,878 | 56,668 | 51,330 | 49,726 | 48,702 | 48,286 | 47,818 |
-| 2×2 OTDA ALL, reconstructed | 79,090 | 68,208 | 63,840 | 60,872 | 55,344 | 52,224 | 51,100 | 50,446 | 49,968 |
-| 2×2 paired OTDA SINGLE, reconstructed | 78,921 | 68,039 | 63,671 | 60,703 | 55,175 | 52,055 | 50,931 | 50,277 | 49,799 |
+| Measured bytes | `cached-steps` | `compact` | `compact-v2` | `compact-v3` | `compact-v4` | `compact-v5` | `compact-v6` | `compact-v7` | `compact-v8` | `compact-v9` |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Payment lock | 33,956 | 29,217 | 27,070 | 25,965 | 23,296 | 22,494 | 21,982 | 21,774 | 21,540 | 21,332 |
+| OTDA reconstruction program | 3,097 | 2,395 | 2,358 | 1,979 | 1,884 | 1,126 | 1,076 | 957 | 952 | 910 |
+| 2×2 BIP143 ALL payment | 72,650 | 63,172 | 58,878 | 56,668 | 51,330 | 49,726 | 48,702 | 48,286 | 47,818 | 47,402 |
+| 2×2 OTDA ALL, reconstructed | 79,090 | 68,208 | 63,840 | 60,872 | 55,344 | 52,224 | 51,100 | 50,446 | 49,968 | 49,468 |
+| 2×2 paired OTDA SINGLE, reconstructed | 78,921 | 68,039 | 63,671 | 60,703 | 55,175 | 52,055 | 50,931 | 50,277 | 49,799 | 49,299 |
 
-The wallet SDK selects the smaller lock with `template: "compact-v8"`. [SDK quickstart](docs/sdk.en.md#quickstart)
+The wallet SDK selects the smaller lock with `template: "compact-v9"`. [SDK quickstart](docs/sdk.en.md#quickstart)
 
 ### OTDA output reconstruction
 
@@ -174,7 +183,7 @@ Use `compress_otda=True` with `sign_spend` or `sign_payment` only when
 Chronicle functional unlocking is available. Version 2 OTDA ALL and paired
 OTDA SINGLE use the [prebuilt cached-steps program](versions/v0.1.0/cached-steps-layout.json)
 or a compact program generated from the chain body. An ALL transaction may
-use all nine dictionaries. SINGLE covers only its same-index output.
+use all ten dictionaries. SINGLE covers only its same-index output.
 Earlier null outputs stay in the signed prefix, and unpaired SINGLE
 uses the existing companion authorization. Mixed transactions copy
 unrecognized outputs literally. The wallet chooses the shorter encoding,
@@ -203,7 +212,7 @@ Build the [bsv-script-lean evaluator](https://github.com/Calhooon/bsv-script-lea
 and run the same synthetic spend fixtures through its complete-input API.
 
 ```sh
-python projects/wots-plus/reference/test_lean.py --compact-v8 /path/to/bsv-script-lean/eval/bsvs
+python projects/wots-plus/reference/test_lean.py --compact-v9 /path/to/bsv-script-lean/eval/bsvs
 ```
 
 The runner checks the transaction gate and the selected input's Script verdict

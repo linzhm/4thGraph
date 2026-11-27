@@ -63,9 +63,21 @@ def _repeat_bytes(fragment, count, *, trim=False):
     return min(program, rounded, key=len)
 
 
+def _encode_with_run(raw, suffix, fragment, count):
+    program = _encode_repeated(raw, suffix)
+    before, run, after = raw.partition(fragment * count)
+    if run:
+        packed = (push(before) + _repeat_bytes(fragment, count, trim=True) + asm("OP_CAT")
+                  + _encode_repeated(after, suffix) + asm("OP_CAT"))
+        return min(program, packed, key=len)
+    return program
+
+
 def _compact_fragment_programs(first, chain, last, *, profile):
     from fourthgraph.bsv.pushtx import REVERSE32_ON_STACK
-    from script import MESSAGE_BYTE_SUFFIX, NIBBLE_SUFFIXES, _compact_builder
+    from script import (
+        MESSAGE_BYTE_SUFFIX, MESSAGE_WIDE_SPLIT, MESSAGE_WIDE_SPLITS, NIBBLE_SUFFIXES, _compact_builder,
+    )
 
     builder = _compact_builder()
     trim = profile in NIBBLE_SUFFIXES
@@ -73,16 +85,16 @@ def _compact_fragment_programs(first, chain, last, *, profile):
     hash_suffix = builder.emit("compact-local-hash-pair", b"") + asm("OP_ENDIF")
     reversal = (_repeat_bytes(asm("OP_1 OP_SPLIT"), N - 1, trim=trim)
                 + _repeat_bytes(asm("OP_SWAP OP_CAT"), N - 1, trim=trim) + asm("OP_CAT"))
-    chain_program = _encode_repeated(chain, hash_suffix)
+    if profile == "compact-v9":
+        first_program = _encode_with_run(first, digit_suffix, MESSAGE_WIDE_SPLIT, MESSAGE_WIDE_SPLITS)
+    else:
+        first_program = _encode_repeated(first, digit_suffix)
     if trim:
         gate = builder.emit("compact-countdown-gate", b"")
-        before, gates, after = chain.partition(gate * (W - 2))
-        if gates:
-            packed = (push(before) + _repeat_bytes(gate, W - 2, trim=True) + asm("OP_CAT")
-                      + _encode_repeated(after, hash_suffix) + asm("OP_CAT"))
-            chain_program = min(chain_program, packed, key=len)
-    return (_encode_repeated(first, digit_suffix), chain_program,
-            _encode_repeated(last, REVERSE32_ON_STACK, reversal))
+        chain_program = _encode_with_run(chain, hash_suffix, gate, W - 2)
+    else:
+        chain_program = _encode_repeated(chain, hash_suffix)
+    return first_program, chain_program, _encode_repeated(last, REVERSE32_ON_STACK, reversal)
 
 
 @cache

@@ -10,11 +10,11 @@ from fixtures import fixture_seeds, funding_transaction, mode_fixture, vector_do
 from payment import sign_payment
 from script import (
     BUFFERED_PROFILES, CACHE_PROFILES, COMPACT_PROFILES, COMPANION_CODE, NIBBLE_SUFFIXES, ORDINARY_CODE,
-    _message_digits, locking_script,
+    _buffered_message_digits, _message_digits, locking_script,
 )
 from fourthgraph.bsv.evaluate import ScriptError, evaluate
 from fourthgraph.bsv.pushtx import N as CURVE_ORDER, R as BINDING_R, authorization_checks, binding_der, check_binding
-from fourthgraph.bsv.script import asm, number, push
+from fourthgraph.bsv.script import asm, decode_num, number, push
 from fourthgraph.bsv.transaction import SIGHASH_TYPES, Output
 from wots import (
     CHAINS,
@@ -77,12 +77,16 @@ class WotsTests(unittest.TestCase):
 
     def test_bitwise_digest_decoder_matches_for_every_byte(self):
         reference = _message_digits(step_counts=True)
-        for profile, suffix in NIBBLE_SUFFIXES.items():
-            bitwise = _message_digits(step_counts=True, byte_suffix=suffix)
+        for profile in NIBBLE_SUFFIXES:
+            bitwise = _buffered_message_digits(profile)
             for value in range(256):
                 with self.subTest(profile=profile, value=value):
-                    stack = [b"fixture signature", bytes([value]) * N]
-                    self.assertEqual(evaluate(bitwise, stack), evaluate(reference, stack))
+                    for digest in (bytes([value]) * N, bytes(value ^ index for index in range(N))):
+                        stack = [b"fixture signature", digest]
+                        expected_main, expected_counts = evaluate(reference, stack)
+                        main, counts = evaluate(bitwise, stack)
+                        self.assertEqual(main, expected_main)
+                        self.assertEqual(list(map(decode_num, counts)), list(map(decode_num, expected_counts)))
 
     def test_compact_authorization_for_every_flag_byte(self):
         _, _, spend = mode_fixture(0x41)

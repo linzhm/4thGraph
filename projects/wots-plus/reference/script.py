@@ -15,8 +15,10 @@ COMPANION_CODE = asm('OP_NOP OP_IF OP_CHECKSIGVERIFY OP_ELSE OP_CODESEPARATOR') 
 
 COMPACT_PROFILES = (
     'compact', 'compact-v2', 'compact-v3', 'compact-v4', 'compact-v5', 'compact-v6', 'compact-v7', 'compact-v8',
+    'compact-v9',
 )
-BUFFERED_PROFILES = ('compact-v6', 'compact-v7', 'compact-v8')
+MAIN_BUFFER_PROFILES = ('compact-v8', 'compact-v9')
+BUFFERED_PROFILES = ('compact-v6', 'compact-v7', *MAIN_BUFFER_PROFILES)
 CACHE_PROFILES = (False, True, 'steps', *COMPACT_PROFILES)
 MESSAGE_BYTE_SUFFIX = asm('OP_SPLIT 0x00 OP_CAT OP_BIN2NUM OP_DUP OP_16 OP_MOD OP_DUP OP_TOALTSTACK'
                           ' OP_SWAP OP_16 OP_DIV OP_DUP OP_TOALTSTACK OP_ADD OP_ROT OP_ADD')
@@ -25,7 +27,16 @@ MESSAGE_NIBBLE_SUFFIX = asm('OP_SPLIT OP_DUP OP_15 OP_AND OP_BIN2NUM OP_DUP OP_T
 MESSAGE_PAIRED_NIBBLE_SUFFIX = asm('OP_SPLIT OP_DUP OP_4 OP_RSHIFT OP_BIN2NUM'
                                   ' OP_SWAP OP_15 OP_AND OP_BIN2NUM OP_2DUP OP_TOALTSTACK OP_TOALTSTACK'
                                   ' OP_ADD OP_ROT OP_ADD')
-NIBBLE_SUFFIXES = {'compact-v7': MESSAGE_NIBBLE_SUFFIX, 'compact-v8': MESSAGE_PAIRED_NIBBLE_SUFFIX}
+# Zero stays a one-byte false flag, which the countdown consumes before any arithmetic.
+MESSAGE_RAW_NIBBLES = asm('OP_DUP OP_15 OP_AND OP_TOALTSTACK OP_4 OP_RSHIFT OP_TOALTSTACK')
+# For indexes over 16, a length-based split costs the same as a literal and repeats exactly.
+MESSAGE_WIDE_SPLIT = asm('OP_SIZE OP_1SUB OP_SPLIT') + MESSAGE_RAW_NIBBLES
+MESSAGE_WIDE_SPLITS = N - 17
+NIBBLE_SUFFIXES = {
+    'compact-v7': MESSAGE_NIBBLE_SUFFIX,
+    'compact-v8': MESSAGE_PAIRED_NIBBLE_SUFFIX,
+    'compact-v9': MESSAGE_RAW_NIBBLES,
+}
 # Twelve table entries above the delta keep its update at an OP_16 pick.
 DELTA_TABLE_OFFSET = 3
 
@@ -42,6 +53,31 @@ def _message_digits(*, step_counts=False, byte_suffix=MESSAGE_BYTE_SUFFIX):
     if not step_counts:
         code += number(2 * N * (W - 1)) + asm('OP_SWAP OP_SUB')
     return bytes(code)
+
+
+def _packed_message_digits():
+    # Sum complemented nibbles without carries into neighboring bytes.
+    # Preserve the digest below the working copy for the countdown flags.
+    double = asm('OP_DUP OP_CAT')
+    nibble_mask = asm('OP_15') + double * 5
+    even_mask = push(b'\xff\x00') + double * 4
+    code = asm('OP_INVERT OP_DUP') + nibble_mask
+    code += asm('OP_2DUP OP_AND OP_BIN2NUM OP_ROT OP_4 OP_RSHIFT OP_ROT OP_AND OP_BIN2NUM OP_ADD')
+    code += number(N) + asm('OP_NUM2BIN') + even_mask
+    # Pair adjacent byte sums into 16-bit lanes. The total is at most 960,
+    # and each power of 2**16 is congruent to one modulo 0xffff.
+    code += asm('OP_2DUP OP_AND OP_BIN2NUM OP_ROT OP_8 OP_LSHIFT OP_ROT OP_AND OP_BIN2NUM OP_ADD')
+    code += number(0xffff) + asm('OP_MOD OP_SWAP')
+    code += MESSAGE_WIDE_SPLIT * MESSAGE_WIDE_SPLITS
+    for index in reversed(range(1, N - MESSAGE_WIDE_SPLITS)):
+        code += number(index) + asm('OP_SPLIT') + MESSAGE_RAW_NIBBLES
+    return code + MESSAGE_RAW_NIBBLES
+
+
+def _buffered_message_digits(profile):
+    if profile == 'compact-v9':
+        return _packed_message_digits()
+    return _message_digits(step_counts=True, byte_suffix=NIBBLE_SUFFIXES.get(profile, MESSAGE_BYTE_SUFFIX))
 
 
 def _chain(index, *, cached_constants):
@@ -82,6 +118,9 @@ def _compact_builder():
 
 @cache
 def _compact_chain(profile='compact'):
+    if profile == 'compact-v9':
+        return _compact_chain('compact-v8')
+
     builder = _compact_builder()
     # Open gates from step 14 to 0. The hashes run in order as the gates close.
     start = 'compact-v6-chain-start' if profile == 'compact-v7' else f'{profile}-chain-start'
@@ -112,7 +151,7 @@ def _compact_chain(profile='compact'):
 
 
 def _first_address_offset(chain, profile):
-    suffix = 'compact-v8-chain-tail' if profile == 'compact-v8' else 'compact-address-increment'
+    suffix = 'compact-v8-chain-tail' if profile in MAIN_BUFFER_PROFILES else 'compact-address-increment'
     return len(chain) - len(_compact_builder().emit(suffix, b''))
 
 
@@ -171,10 +210,9 @@ def _compact_constants(public_seed, *, synthesize, carry_prefixes=False):
 
 def _buffered_verifier(public_seed, commitment, *, profile):
     # The buffer starts as the signature and ends as the endpoints in chain order.
-    main_buffer = profile == 'compact-v8'
+    main_buffer = profile in MAIN_BUFFER_PROFILES
     compact = profile in NIBBLE_SUFFIXES
-    suffix = NIBBLE_SUFFIXES.get(profile, MESSAGE_BYTE_SUFFIX)
-    prefix = _message_digits(step_counts=True, byte_suffix=suffix)
+    prefix = _buffered_message_digits(profile)
     if not main_buffer:
         prefix += asm('OP_SWAP OP_TOALTSTACK')
     prf_base = (3).to_bytes(N, 'big') + public_seed + bytes(24)
