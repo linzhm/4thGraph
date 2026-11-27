@@ -12,7 +12,7 @@ from fourthgraph.compiler.source import CompileError, SourceCompiler
 from fourthgraph.replay.workflow import TestKeys
 from fourthgraph.verification.circuit_backend import emit_stage_circuit
 from fourthgraph.verification.lineage import lineage_statement
-from fourthgraph.workflow.cpn_workbench import carried_state, export_workbench
+from fourthgraph.workflow.cpn_workbench import carried_state, export_designer, export_workbench
 from fourthgraph.workflow.proof_planner import compile_evidence_plans, evidence_path, rebuild_candidate
 from fourthgraph.workflow.workflow_contract import state_fields
 
@@ -123,6 +123,15 @@ recursive: lineage tx-edge ;
         self.assertEqual(carried_state(Output(100, state + b"\x51"), "state", "advance", build), expected)
         self.assertEqual(carried_state(Output(0, b"\x00\x6a" + state), "receipt", "decide", build), expected)
         self.assertEqual(carried_state(Output(100, state + b"\x52"), "state", "advance", build), {})
+
+    def test_standalone_designer_embeds_no_fake_report(self):
+        output = self.directory / "draft.html"
+        export_designer(output=output, title="CPN draft")
+        (data,) = re.findall(r'<script id="workbench-data" type="application/json">(.*?)</script>', output.read_text())
+        model = json.loads(data)
+        self.assertTrue(model["editor_start"])
+        self.assertEqual(model["candidates"], [])
+        self.assertIsNone(model["report"])
 
     def test_composition_checks_statement_flow_and_refuses_unlinked_paths(self):
         path = {

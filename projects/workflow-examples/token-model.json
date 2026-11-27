@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "places": [
+    {
+      "name": "holding-a",
+      "type": "token-state",
+      "initial": 1,
+      "capacity": 1,
+      "metadata": {
+        "visibility": "public",
+        "carrier": "continuation-utxo",
+        "fields": ["issuance-outpoint", "rule-id", "owner", "quantity"]
+      }
+    },
+    {
+      "name": "holding-b",
+      "type": "token-state",
+      "initial": 1,
+      "capacity": 1,
+      "metadata": {
+        "visibility": "public",
+        "carrier": "continuation-utxo",
+        "fields": ["issuance-outpoint", "rule-id", "owner", "quantity"]
+      }
+    }
+  ],
+  "transitions": [
+    {
+      "name": "transfer-2-to-2",
+      "word": "conserve-2x2",
+      "inputs": [
+        {"name": "input-a", "place": "holding-a", "type": "token-state"},
+        {"name": "input-b", "place": "holding-b", "type": "token-state"}
+      ],
+      "outputs": [
+        {"name": "output-a", "place": "holding-a", "type": "token-state"},
+        {"name": "output-b", "place": "holding-b", "type": "token-state"}
+      ],
+      "metadata": {
+        "constraints": [
+          "Conserve token quantity across the two inputs and outputs.",
+          "Preserve the approved issuance outpoint and rule identity.",
+          "Bind the actual ordered input outpoints and output scripts."
+        ],
+        "authorization": ["Owner of input-a", "Owner of input-b"],
+        "witnesses": ["Authenticated parent data", "Transaction preimages", "Owner signatures"],
+        "evidence": ["PELS transaction assertion", "Optional proof backend when linked"]
+      }
+    }
+  ]
+}

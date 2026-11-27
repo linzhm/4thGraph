@@ -247,10 +247,12 @@ def emit_stage_circuit(stage):
     builder.add(f"{output} <== {result.expr};")
     public = ["state", "bindLo", "bindHi",
               *(name for name, (_, private) in zip(names[1:], stage.witnesses, strict=True) if not private)]
+    inputs = (("state", "bindLo", "bindHi", *names[1:]) if len(public) > 3
+              else (*names, "bindLo", "bindHi"))
     template = "RouteStage" if output == "route" else "AdvanceStage"
     return "\n".join([
         BIT_DECOMPOSITION, f"template {template}() {{", f"    signal output {output};",
-        *(f"    signal input {name};" for name in (*names, "bindLo", "bindHi")),
+        *(f"    signal input {name};" for name in inputs),
         *builder.lines, "}",
         f"component main {{public [{', '.join(public)}]}} = {template}();", "",
     ]).encode(), (output, *public)

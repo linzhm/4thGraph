@@ -1,0 +1,2 @@
+REQUIRE BSV
+REQUIRE counter.fth

@@ -12,14 +12,15 @@
   background: #f3f6f7;
 }
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 body { margin: 0; }
 h1, h2, h3, p { margin: 0; }
 h1 { font-size: clamp(28px, 4vw, 42px); letter-spacing: -.04em; line-height: 1.08; }
 h2 { font-size: 21px; letter-spacing: -.035em; }
 h3 { font-size: 15px; }
-button, input { font: inherit; }
+button, input, select, textarea { font: inherit; }
 button { color: inherit; cursor: pointer; }
-button:focus-visible, input:focus-visible, a:focus-visible, [tabindex]:focus-visible {
+button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, a:focus-visible, [tabindex]:focus-visible {
   outline: 3px solid #009e91; outline-offset: 2px;
 }
 .mono, code { font-family: ui-monospace, "IBM Plex Mono", monospace; }
@@ -58,6 +59,19 @@ main { padding: 22px 20px 34px; max-width: 1780px; margin: auto; }
 .badge.available::before { background: #00a16d; }
 .diagram { display: flex; flex-direction: column; }
 .diagram-header { padding: 13px 16px; display: flex; flex-wrap: wrap; gap: 7px; align-items: center; justify-content: space-between; }
+.draft-tools { display: flex; flex-wrap: wrap; gap: 7px; align-items: center; padding: 8px 16px 12px; }
+.draft-tools[hidden] { display: none; }
+.draft-tools button, .draft-form button { padding: 5px 9px; border: 1px solid var(--teal); border-radius: 6px; background: white; color: var(--teal); }
+.draft-note { flex-basis: 100%; color: #705018; font-size: 12px; }
+.draft-form { display: grid; gap: 8px; margin: 12px 0; }
+.draft-form label { display: grid; gap: 3px; color: var(--muted); font-size: 13px; }
+.draft-form input, .draft-form select, .draft-form textarea { width: 100%; min-width: 0; padding: 7px; border: 1px solid var(--line); border-radius: 5px; color: var(--ink); background: white; }
+.draft-form textarea { resize: vertical; font: 12px/1.45 ui-monospace, monospace; }
+.draft-form button { justify-self: start; }
+.draft-error { color: #a12a23; font-size: 13px; overflow-wrap: anywhere; }
+.draft-edges { margin: 0; padding: 0; list-style: none; }
+.draft-edges li { display: flex; align-items: start; justify-content: space-between; gap: 8px; padding: 6px 0; border-bottom: 1px solid #edf1f4; overflow-wrap: anywhere; }
+.draft-edges button { flex: 0 0 auto; border: 0; color: #a12a23; background: transparent; }
 #canvas { display: grid; align-items: center; flex: 1; min-height: min(57vh, 570px); overflow: auto; border-block: 1px solid var(--line); background: radial-gradient(#c9d6e1 1px, transparent 1px) var(--canvas); background-size: 20px 20px; }
 #canvas svg { display: block; width: 100%; min-width: 590px; height: auto; max-height: 560px; }
 svg .wire { stroke: #395169; stroke-width: 1.6; fill: none; }

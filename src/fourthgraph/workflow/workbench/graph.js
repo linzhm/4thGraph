@@ -13,6 +13,13 @@ const en = [
   "Continuation UTXO", "Ordered receipt in the same transaction", "Current input stack",
   "Published receipt", "Funding transaction", "Authenticated spend preimage", "Role signatures", "Proof packet",
   "Deployment argument", "Witness operand", "Spendable output", "Unspendable output", "Public signals", "Entire R1CS assignment is public",
+  "Draft", "Draft model · not compiled or deployed", "Add Place", "Add Transition", "Import JSON", "Export JSON",
+  "Name", "Token type", "Initial tokens", "Capacity", "Forth word", "Save node", "Delete node",
+  "Add connection", "Port name", "Place", "Count", "Connect", "Delete", "Node metadata (JSON object)",
+  "Import failed", "Name must be unique and nonempty.", "Select a node to edit.", "Inputs or outputs must reference a Place.",
+  "Metadata is descriptive and has not been checked.", "Initial marking", "Select a Place", "New draft",
+  "Incomplete models can be saved. Run the CPN checker before use.",
+  "Design a CPN", "Model nodes", "No matching nodes.",
 ];
 const zh = [
   "比较 CPN 路径", "候选", "可构建", "已淘汰", "已复放", "全部", "搜索路径…", "CPN 图",
@@ -25,12 +32,21 @@ const zh = [
   "可花费的后继 UTXO", "同笔交易的有序回执", "当前输入的栈",
   "公开回执", "入金交易", "已认证的花费原像", "角色签名", "证明包",
   "部署参数", "见证操作数", "可花费输出", "不可花费输出", "公开信号", "公开完整 R1CS 赋值",
+  "草稿", "模型草稿 · 尚未编译或部署", "添加 Place", "添加 Transition", "导入 JSON", "导出 JSON",
+  "名称", "令牌类型", "初始令牌数", "容量", "Forth 词", "保存节点", "删除节点",
+  "添加连接", "端口名称", "Place", "数量", "连接", "删除", "节点元信息（JSON 对象）",
+  "导入失败", "名称必须非空且不重复。", "选择节点以编辑。", "输入或输出需要关联 Place。",
+  "元信息仅用于描述，尚未验证。", "初始标记", "选择 Place", "新建草稿",
+  "未完成的模型也可以保存，使用前请运行 CPN 检查器。",
+  "设计 CPN", "模型节点", "没有符合条件的节点。",
 ];
 let lang = "en";
 let filter = "all";
-let view = "logical";
-let selected = model.selected ?? model.candidates[0].id;
+let view = model.editor_start ? "draft" : "logical";
+let selected = model.selected ?? model.candidates[0]?.id ?? null;
 let activeNode = null;
+let draft = {schema_version: 1, places: [], transitions: []};
+let draftError = "";
 const $ = id => document.getElementById(id);
 const label = index => (lang === "en" ? en : zh)[index];
 
@@ -66,6 +82,21 @@ function graphModel() {
     source.ports.push({direction: 24, name: output, peer: target.title, peerId: target.id, peerPort: input, facts});
     target.ports.push({direction: 23, name: input, peer: source.title, peerId: source.id, peerPort: output, facts});
     edges.push({source, output, target, input});
+  }
+  if (view === "draft") {
+    for (const place of draft.places) node("draft:place:" + place.name, place.name, "place", place.type);
+    for (const transition of draft.transitions) {
+      node("draft:transition:" + transition.name, transition.name, "transition", transition.word || "Transition");
+      for (const port of transition.inputs) {
+        link("draft:place:" + port.place, transition.name + " · " + port.name,
+          "draft:transition:" + transition.name, port.name, [[37, port.type]]);
+      }
+      for (const port of transition.outputs) {
+        link("draft:transition:" + transition.name, port.name, "draft:place:" + port.place,
+          transition.name + " · " + port.name, [[37, port.type]]);
+      }
+    }
+    return {nodes, edges};
   }
   const candidate = byId.get(selected);
   const graph = candidate.graph;
@@ -186,7 +217,21 @@ function layout({nodes, edges}) {
       if (pending.get(target.id) === 0) queue.push(target);
     }
   }
-  if (queue.length !== nodes.size) return null;
+  if (queue.length !== nodes.size) {
+    // CPN cycles are logical recurrence. Arrange all nodes on a ring so each
+    // edge remains inspectable without pretending the graph is acyclic.
+    const ordered = [...nodes.values()];
+    const width = Math.max(700, ordered.length * 100);
+    const height = Math.max(440, ordered.length * 46);
+    ordered.forEach((node, index) => {
+      const angle = 2 * Math.PI * index / ordered.length - Math.PI / 2;
+      node.height = Math.max(node.kind === "place" ? 58 : 73,
+        26 + 17 * Math.max(node.inputs.length, node.outputs.length));
+      node.x = width / 2 + (width / 2 - 110) * Math.cos(angle) - 68;
+      node.y = height / 2 + (height / 2 - 65) * Math.sin(angle) - node.height / 2;
+    });
+    return {width, height, nodes: ordered, edges};
+  }
   const layers = new Map();
   for (const node of queue) {
     if (!layers.has(node.layer)) layers.set(node.layer, []);
@@ -211,7 +256,7 @@ function renderGraph(focus = false) {
   const graph = graphModel();
   const geometry = layout(graph);
   if (!geometry || !graph.nodes.size) {
-    canvas.replaceChildren(element("p", label(19), "empty"));
+    canvas.replaceChildren(element("p", label(view === "draft" ? 82 : 19), "empty"));
     return;
   }
   const {width, height, nodes, edges} = geometry;
@@ -304,7 +349,246 @@ function description(title, rows) {
   return block;
 }
 
+function draftItem() {
+  if (!activeNode?.startsWith("draft:")) return null;
+  const [, kind, ...parts] = activeNode.split(":");
+  return draft[kind === "place" ? "places" : "transitions"].find(item => item.name === parts.join(":")) ?? null;
+}
+
+function uniqueDraftName(kind) {
+  const collection = kind === "place" ? draft.places : draft.transitions;
+  let index = 1;
+  while (collection.some(item => item.name === kind + index)) index++;
+  return kind + index;
+}
+
+function checkDraft(document) {
+  if (!document || document.schema_version !== 1 || !Array.isArray(document.places) || !Array.isArray(document.transitions)) {
+    throw new Error("Expected schema_version 1 with places and transitions arrays.");
+  }
+  if (Object.keys(document).some(key => !["schema_version", "places", "transitions"].includes(key))) {
+    throw new Error("Unknown model field.");
+  }
+  const isObject = value => value && typeof value === "object" && !Array.isArray(value);
+  const name = value => typeof value === "string" && value.trim().length > 0;
+  const integer = value => Number.isSafeInteger(value) && value >= 0;
+  const noExtra = (object, keys) => Object.keys(object).every(key => keys.includes(key));
+  const places = new Map();
+  for (const place of document.places) {
+    if (!isObject(place) || !noExtra(place, ["name", "type", "initial", "capacity", "metadata"]) ||
+        !name(place.name) || !name(place.type) || places.has(place.name) ||
+        (place.initial !== undefined && !integer(place.initial)) ||
+        (place.capacity != null && !integer(place.capacity)) ||
+        (place.metadata !== undefined && !isObject(place.metadata))) throw new Error("Invalid Place.");
+    places.set(place.name, place);
+  }
+  const names = new Set();
+  for (const transition of document.transitions) {
+    if (!isObject(transition) || !noExtra(transition, ["name", "word", "inputs", "outputs", "metadata"]) ||
+        !name(transition.name) || names.has(transition.name) ||
+        (transition.word != null && !name(transition.word)) ||
+        !Array.isArray(transition.inputs) || !Array.isArray(transition.outputs) ||
+        (transition.metadata !== undefined && !isObject(transition.metadata))) throw new Error("Invalid Transition.");
+    names.add(transition.name);
+    for (const ports of [transition.inputs, transition.outputs]) {
+      const usedNames = new Set(), usedPlaces = new Set();
+      for (const port of ports) {
+        if (!isObject(port) || !noExtra(port, ["name", "place", "type", "count"]) || !name(port.name) ||
+            !places.has(port.place) || port.type !== places.get(port.place).type ||
+            usedNames.has(port.name) || usedPlaces.has(port.place) ||
+            (port.count !== undefined && (!integer(port.count) || port.count === 0))) throw new Error("Invalid connection.");
+        usedNames.add(port.name);
+        usedPlaces.add(port.place);
+      }
+    }
+  }
+  return document;
+}
+
+function field(form, name, value, type = "text") {
+  const wrap = element("label", name);
+  const input = element("input");
+  input.type = type;
+  input.value = value ?? "";
+  if (type === "number") { input.min = "0"; input.step = "1"; }
+  wrap.append(input);
+  form.append(wrap);
+  return input;
+}
+
+function draftButton(text, action) {
+  const button = element("button", text);
+  button.type = "button";
+  button.addEventListener("click", action);
+  return button;
+}
+
+function setDraftNode(kind) {
+  const name = uniqueDraftName(kind);
+  if (kind === "place") draft.places.push({name, type: "u32", initial: 0, capacity: null, metadata: {}});
+  else draft.transitions.push({name, word: null, inputs: [], outputs: [], metadata: {}});
+  activeNode = "draft:" + kind + ":" + name;
+  draftError = "";
+  render();
+}
+
+function draftTools() {
+  const tools = $("draft-tools");
+  tools.hidden = view !== "draft";
+  tools.replaceChildren();
+  if (tools.hidden) return;
+  const note = element("span", label(61) + " · " + label(88), "draft-note");
+  tools.append(note, draftButton(label(62), () => setDraftNode("place")),
+    draftButton(label(63), () => setDraftNode("transition")));
+  const input = element("input");
+  input.type = "file";
+  input.accept = "application/json,.json";
+  input.hidden = true;
+  input.addEventListener("change", async () => {
+    if (!input.files.length) return;
+    try {
+      if (input.files[0].size > 5_000_000) throw new Error("File exceeds 5 MB.");
+      draft = checkDraft(JSON.parse(await input.files[0].text()));
+      draftError = "";
+      activeNode = null;
+    } catch (error) {
+      draftError = label(80) + ": " + error.message;
+    }
+    render();
+  });
+  tools.append(input, draftButton(label(64), () => input.click()),
+    download(label(65), "cpn-draft.json", draft));
+}
+
+function draftInspector(panel) {
+  panel.replaceChildren(element("h2", label(60)), element("p", label(61), "draft-note"));
+  if (draftError) panel.append(element("p", draftError, "draft-error"));
+  const item = draftItem();
+  if (!item) {
+    panel.append(element("p", label(82), "hint"));
+    return;
+  }
+  const isPlace = draft.places.includes(item);
+  const form = element("form", undefined, "draft-form");
+  const name = field(form, label(66), item.name);
+  name.required = true;
+  const tokenType = isPlace ? field(form, label(67), item.type) : null;
+  if (tokenType) tokenType.required = true;
+  const initial = isPlace ? field(form, label(68), item.initial ?? 0, "number") : null;
+  const capacity = isPlace ? field(form, label(69), item.capacity, "number") : null;
+  const word = !isPlace ? field(form, label(70), item.word) : null;
+  const metadataLabel = element("label", label(79));
+  const metadata = element("textarea");
+  metadata.rows = 5;
+  metadata.value = JSON.stringify(item.metadata ?? {}, null, 2);
+  metadataLabel.append(metadata);
+  form.append(metadataLabel, element("small", label(84), "hint"));
+  const submit = element("button", label(71));
+  submit.type = "submit";
+  form.append(submit);
+  form.addEventListener("submit", event => {
+    event.preventDefault();
+    try {
+      const value = JSON.parse(metadata.value);
+      if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error(label(79));
+      const nextName = name.value.trim();
+      const collection = isPlace ? draft.places : draft.transitions;
+      if (!nextName || collection.some(other => other !== item && other.name === nextName)) throw new Error(label(81));
+      if (isPlace) {
+        const nextType = tokenType.value.trim();
+        const nextInitial = Number(initial.value), nextCapacity = capacity.value === "" ? null : Number(capacity.value);
+        if (!nextType || !Number.isSafeInteger(nextInitial) || nextInitial < 0 ||
+            (nextCapacity !== null && (!Number.isSafeInteger(nextCapacity) || nextCapacity < nextInitial))) {
+          throw new Error(label(67));
+        }
+        for (const transition of draft.transitions) for (const port of [...transition.inputs, ...transition.outputs]) {
+          if (port.place === item.name) { port.place = nextName; port.type = nextType; }
+        }
+        item.type = nextType;
+        item.initial = nextInitial;
+        item.capacity = nextCapacity;
+      } else item.word = word.value.trim() || null;
+      item.metadata = value;
+      item.name = nextName;
+      activeNode = "draft:" + (isPlace ? "place:" : "transition:") + nextName;
+      draftError = "";
+      render();
+    } catch (error) {
+      draftError = error.message;
+      draftInspector(panel);
+    }
+  });
+  panel.append(form);
+  panel.append(draftButton(label(72), () => {
+    if (isPlace) {
+      draft.places = draft.places.filter(place => place !== item);
+      for (const transition of draft.transitions) {
+        transition.inputs = transition.inputs.filter(port => port.place !== item.name);
+        transition.outputs = transition.outputs.filter(port => port.place !== item.name);
+      }
+    } else draft.transitions = draft.transitions.filter(transition => transition !== item);
+    activeNode = null;
+    draftError = "";
+    render();
+  }));
+  if (!isPlace) {
+    for (const [key, heading] of [["inputs", 23], ["outputs", 24]]) {
+      const section = element("section", undefined, "details");
+      section.append(element("h3", label(heading)));
+      const list = element("ul", undefined, "draft-edges");
+      for (const port of item[key]) {
+        const row = element("li");
+        row.append(element("span", port.name + " → " + port.place + " · " + port.type + " × " + (port.count ?? 1)),
+          draftButton(label(78), () => {
+            item[key] = item[key].filter(other => other !== port);
+            render();
+          }));
+        list.append(row);
+      }
+      section.append(list);
+      const connect = element("form", undefined, "draft-form");
+      const port = field(connect, label(74), "");
+      port.required = true;
+      const placeLabel = element("label", label(75));
+      const place = element("select");
+      place.setAttribute("aria-label", label(75));
+      const placeholder = element("option", label(86));
+      placeholder.value = "";
+      place.append(placeholder);
+      for (const entry of draft.places) {
+        const option = element("option", entry.name + " · " + entry.type);
+        option.value = entry.name;
+        place.append(option);
+      }
+      placeLabel.append(place);
+      connect.append(placeLabel);
+      const count = field(connect, label(76), "1", "number");
+      count.min = "1";
+      const button = element("button", label(73) + " · " + label(heading));
+      button.type = "submit";
+      connect.append(button);
+      connect.addEventListener("submit", event => {
+        event.preventDefault();
+        const destination = draft.places.find(entry => entry.name === place.value);
+        const portName = port.value.trim(), quantity = Number(count.value);
+        if (!destination || !portName || !Number.isSafeInteger(quantity) || quantity < 1 ||
+            item[key].some(entry => entry.name === portName || entry.place === destination.name)) {
+          draftError = label(83);
+          draftInspector(panel);
+          return;
+        }
+        item[key].push({name: portName, place: destination.name, type: destination.type, count: quantity});
+        draftError = "";
+        render();
+      });
+      section.append(connect);
+      panel.append(section);
+    }
+  }
+}
+
 function renderInspector() {
+  if (view === "draft") { draftInspector($("inspector")); return; }
   const row = byId.get(selected), pkg = model.packages[selected] ?? {};
   const panel = $("inspector");
   panel.replaceChildren(element("h2", label(10)), element("p", selected, "path mono"));
@@ -372,6 +656,30 @@ function renderInspector() {
 
 function renderCandidates() {
   const query = $("search").value.trim().toLowerCase();
+  if (view === "draft") {
+    const list = $("candidates");
+    list.replaceChildren();
+    const items = [
+      ...draft.places.map(item => ({kind: "place", item})),
+      ...draft.transitions.map(item => ({kind: "transition", item})),
+    ].filter(({item}) => item.name.toLowerCase().includes(query));
+    if (!items.length) list.append(element("li", label(91), "empty"));
+    for (const {kind, item} of items) {
+      const li = element("li"), button = element("button", undefined, "candidate");
+      const identity = "draft:" + kind + ":" + item.name;
+      button.setAttribute("aria-pressed", identity === activeNode);
+      button.append(element("strong", item.name), element("small", kind === "place" ? "Place · " + item.type : "Transition"));
+      button.addEventListener("click", () => {
+        activeNode = identity;
+        renderCandidates();
+        renderGraph();
+        renderInspector();
+      });
+      li.append(button);
+      list.append(li);
+    }
+    return;
+  }
   const results = model.candidates.filter(row => row.id.toLowerCase().includes(query) &&
     (filter === "all" || (filter === "eligible") === row.eligible));
   const priority = row => row.id === model.selected ? 2 : model.packages[row.id]?.receipt ? 1 : 0;
@@ -420,9 +728,15 @@ function render() {
   for (const [id, value] of [["heading", 0], ["rail-title", 1], ["diagram-title", 7], ["port-hint", 22]]) {
     $(id).textContent = label(value);
   }
+  if (view === "draft") {
+    $("heading").textContent = label(89);
+    $("rail-title").textContent = label(90);
+  }
+  $("stats").hidden = view === "draft";
+  $("filters").hidden = view === "draft";
   const contexts = {bip143: "BIP143 ALL", otda: "Chronicle OTDA ALL", both: "BIP143 / OTDA ALL"};
-  $("context").textContent = model.title + " · " + (contexts[model.sighash] ?? model.sighash) + " · " +
-    label(28) + " " + model.current;
+  $("context").textContent = model.editor_start ? label(61) :
+    model.title + " · " + (contexts[model.sighash] ?? model.sighash) + " · " + label(28) + " " + model.current;
   $("search").placeholder = label(6);
   $("search").setAttribute("aria-label", label(6));
   $("stats").replaceChildren(...[
@@ -434,7 +748,9 @@ function render() {
     return stat;
   }));
   segments("filters", [["all", 5], ["eligible", 2], ["excluded", 3]], filter, key => { filter = key; render(); });
-  segments("views", [["logical", 8], ["physical", 9]], view, key => { activeNode = null; view = key; render(); });
+  const choices = model.editor_start ? [["draft", 60]] : [["logical", 8], ["physical", 9], ["draft", 60]];
+  segments("views", choices, view, key => { activeNode = null; view = key; render(); });
+  draftTools();
   for (const button of document.querySelectorAll("[data-lang]")) button.setAttribute("aria-pressed", button.dataset.lang === lang);
   renderCandidates();
   renderGraph();

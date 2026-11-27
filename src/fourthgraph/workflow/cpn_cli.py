@@ -12,6 +12,19 @@ def main(argv):
     commands.add_parser("tune", help="compare compiler lowering profiles across the same candidate plans")
     commands.add_parser("replay", help="fund, validate and mine a fixed candidate on loopback regtest")
     commands.add_parser("test-keys", help="print the deterministic regtest fixture public keys")
+    check = commands.add_parser("check-model", help="validate and explore a logical CPN model")
+    check.add_argument("model", type=Path)
+    check.add_argument("--max-states", type=int, default=1000, help="maximum number of token markings to explore")
+    check.add_argument("--max-tokens-per-place", type=int, default=16,
+                       help="maximum token count per place in explored markings")
+    lower = commands.add_parser("lower-model", help="lower a supported logical CPN to a staged Forth workflow")
+    lower.add_argument("model", type=Path)
+    lower.add_argument("--source", type=Path, required=True, help="Forth definitions used by the graph")
+    lower.add_argument("--output", type=Path, required=True, help="generated workflow in the source directory")
+    archive = commands.add_parser("inspect-cctp", help="inspect an archived CCTP 2-to-2 transaction graph")
+    archive.add_argument("archive", type=Path)
+    archive.add_argument("--policy", type=Path, help="require a matching recipient-policy JSON")
+    archive.add_argument("--logical", action="store_true", help="emit a logical CPN model")
     verify = commands.add_parser("verify", help="check a saved receipt and rerun Script validation offline")
     verify.add_argument("receipt", type=Path)
     verify.add_argument("--report", type=Path, help="compare against the original planning or tuning report")
@@ -23,6 +36,9 @@ def main(argv):
     workbench.add_argument("--title", default="Staged workflow")
     workbench.add_argument("--source", type=Path, help="embed definitions from the matching Forth source")
     workbench.add_argument("--output", type=Path, required=True)
+    design = commands.add_parser("design", help="create an offline editor for a new logical CPN")
+    design.add_argument("--title", default="CPN draft")
+    design.add_argument("--output", type=Path, required=True)
     if argv[:1] in (["plan"], ["tune"]):
         from fourthgraph.workflow.protocol import main as compiler_main
 
@@ -37,6 +53,36 @@ def main(argv):
             from fourthgraph.replay.workflow import TestKeys
 
             report = {role: key.hex() for role, key in TestKeys().public.items()}
+        elif args.command == "check-model":
+            from fourthgraph.workflow.logical_cpn import analyze, parse_net, validate_document
+
+            document = json.loads(args.model.read_bytes())
+            report = validate_document(document)
+            if report["ok"]:
+                graph = parse_net(document)
+                report["analysis"] = analyze(
+                    graph, max_states=args.max_states, max_tokens_per_place=args.max_tokens_per_place)
+            else:
+                print(json.dumps(report, indent=2, sort_keys=True))
+                raise SystemExit(1)
+        elif args.command == "lower-model":
+            from fourthgraph.workflow.logical_cpn_lowering import lower_linear
+
+            source = args.source.resolve()
+            output = args.output.resolve()
+            if output.parent != source.parent or output == source or output == args.model.resolve():
+                raise ValueError("output must be a separate file in the Forth source directory")
+            _, generated = lower_linear(json.loads(args.model.read_bytes()), source.read_text(), source_path=source)
+            output.write_text(generated)
+            print(output)
+            return
+        elif args.command == "inspect-cctp":
+            from fourthgraph.workflow.cctp_archive import inspect_archive, logical_model, read_archive
+
+            source, digest = read_archive(args.archive)
+            policy = json.loads(args.policy.read_bytes()) if args.policy else None
+            graph = inspect_archive(source, archive_sha256=digest, policy=policy)
+            report = logical_model(graph) if args.logical else graph
         elif args.command == "workbench":
             from fourthgraph.workflow.cpn_workbench import export_workbench
 
@@ -44,11 +90,17 @@ def main(argv):
                              source=args.source)
             print(args.output)
             return
+        elif args.command == "design":
+            from fourthgraph.workflow.cpn_workbench import export_designer
+
+            export_designer(output=args.output, title=args.title)
+            print(args.output)
+            return
         else:
             from fourthgraph.replay.cpn_receipt import verify_replay
 
             original = json.loads(args.report.read_bytes()) if args.report else None
             report = verify_replay(json.loads(args.receipt.read_bytes()), original=original, selected=args.candidate)
-    except (ImportError, KeyError, OSError, TypeError, ValueError) as error:
+    except (ImportError, IndexError, KeyError, OSError, TypeError, ValueError) as error:
         cli.error(str(error))
     print(json.dumps(report, indent=2, sort_keys=True))

@@ -6,6 +6,35 @@ Keep the Forth relations, public state, private operands, signing roles and tran
 
 ## Explore the workbench
 
+For a new logical model, run `4thgraph cpn design --output workspace/cpn-draft.html` and open the resulting offline editor. Add Places and Transitions, connect typed ports, and export the model as JSON. Node metadata can record Forth source, assertions, witness requirements, authorization, proof strategies and state carriers.
+
+Run `4thgraph cpn check-model projects/workflow-examples/token-model.json` to check a two-input, two-output token-count cycle, or pass the exported model. The bounded analysis enumerates token counts and reports its explored markings, transitions, deadlocks and cutoffs. Its result is an overapproximation. Token values, Forth, guards, authorization, timing, transaction validity and metadata are not evaluated. The token model records proposed constraints and is a logical design fixture.
+
+For the currently supported linear subset, `4thgraph cpn lower-model MODEL --source WORDS.fth --output WORKFLOW.fth` generates a staged workflow in the same directory as the Forth source. Declare one initial token, capacity 1 on every Place, public `u32` states ending in a `route`, a single input and output per transition, and one authorizer per transition. The command rejects a graph or requirement it cannot lower. Feed the generated workflow into `4thgraph cpn plan` or `tune` and retain it with its imported Forth files and report.
+
+The [linear example](../../../projects/proof-counter/cpn-linear.json) and [Forth imports](../../../projects/proof-counter/cpn-words.fth) can be tried in an isolated directory:
+
+```sh
+mkdir -p workspace/cpn-linear
+cp projects/proof-counter/{cpn-linear.json,cpn-words.fth,counter.fth} workspace/cpn-linear/
+4thgraph cpn lower-model workspace/cpn-linear/cpn-linear.json --source workspace/cpn-linear/cpn-words.fth \
+  --output workspace/cpn-linear/workflow.fth
+4thgraph cpn test-keys > workspace/cpn-linear/keys.json
+4thgraph cpn plan workspace/cpn-linear/workflow.fth --keys workspace/cpn-linear/keys.json \
+  --current 19 --target both > workspace/cpn-linear/report.json
+```
+
+On the terminal transition, `metadata.witnesses` accepts objects with `name`, `type: "u32"` and `visibility: "public"` or `"private"`. For example, `"witnesses": [{"name":"delta","type":"u32","visibility":"private"}]` together with `"evidence": [{"policy":"require-zk"}]` lowers to the corresponding Forth declarations. The word must accept state followed by the declared witnesses. Supply matching circuit setup through the backend catalog. For public assignments, an evidence object can set `"assignment_disclosure":"allow"` under a compatible policy. The planner still checks each candidate.
+
+The existing CCTP archive can supply a second, historical input. In a checkout containing commit `11c919a`, run the commands below and import the generated model into the editor. The inspector checks serialized transaction identities, slots, token template and reported token quantities. Its logical boundary marking describes the archived subgraph. Script execution, issuance authorization, block inclusion and current UTXO status require their own evidence.
+
+```sh
+mkdir -p workspace/cpn-dev
+git show 11c919a:projects/spv-token/fixtures/covenant-backtrace-2x2-regtest.json.xz > workspace/cpn-dev/cctp.json.xz
+4thgraph cpn inspect-cctp workspace/cpn-dev/cctp.json.xz --logical > workspace/cpn-dev/cctp-model.json
+4thgraph cpn check-model workspace/cpn-dev/cctp-model.json > workspace/cpn-dev/cctp-analysis.json
+```
+
 With the regtest dependencies below and Node.js installed, run `bash tools/cpn_demo.sh` from the checkout root and open `workspace/cpn-demo/index.html`. The command compiles one Forth source, funds and verifies three paths, and creates a self-contained HTML file. It leaves the source, catalog, original report and replay receipts in the same directory.
 
 Start with the logical graph. A Place describes the state at an interface, and a Transition declares the inputs it consumes and the outputs it produces. Select a transition to inspect its typed computation, Forth word and validation policy. Its external inputs can include witness operands, role signatures and a proof packet. The transaction view maps the same interfaces to the ordered `vin` and `vout` of deployed or spent outputs.

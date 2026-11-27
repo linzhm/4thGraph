@@ -6,6 +6,35 @@
 
 ## 使用交互工作台
 
+新建逻辑模型时运行 `4thgraph cpn design --output workspace/cpn-draft.html`，打开生成的离线编辑器。添加 Place 和 Transition、连接类型化端口，并将模型导出为 JSON。节点元数据可记录 Forth 代码、断言、见证、授权、证明方式和状态载体。
+
+运行 `4thgraph cpn check-model projects/workflow-examples/token-model.json` 可以检查双输入、双输出的 Token 数量循环，也可传入编辑器导出的模型。有界分析枚举标记中的 Token 数量，报告访问到的状态、迁移、死锁和触及的边界。分析结果是过近似，不求值 Token 内容、Forth、守卫、授权、时序、交易有效性或元数据。Token 模型用于描述设计要求。
+
+当前支持的线性子集可用 `4thgraph cpn lower-model MODEL --source WORDS.fth --output WORKFLOW.fth` 生成分阶段工作流，输出文件须与 Forth 源码位于同一目录。声明一个初始 Token、每个 Place 容量为 1、公开 `u32` 状态以 `route` 结尾、每个迁移一个输入和输出及一个授权角色。无法降级的图或要求会被拒绝。对生成的工作流运行 `4thgraph cpn plan` 或 `tune`，并与导入的 Forth 文件和报告一起保存。
+
+可以在独立目录中运行[线性模型](../../../projects/proof-counter/cpn-linear.json)和 [Forth 导入](../../../projects/proof-counter/cpn-words.fth)：
+
+```sh
+mkdir -p workspace/cpn-linear
+cp projects/proof-counter/{cpn-linear.json,cpn-words.fth,counter.fth} workspace/cpn-linear/
+4thgraph cpn lower-model workspace/cpn-linear/cpn-linear.json --source workspace/cpn-linear/cpn-words.fth \
+  --output workspace/cpn-linear/workflow.fth
+4thgraph cpn test-keys > workspace/cpn-linear/keys.json
+4thgraph cpn plan workspace/cpn-linear/workflow.fth --keys workspace/cpn-linear/keys.json \
+  --current 19 --target both > workspace/cpn-linear/report.json
+```
+
+末段迁移的 `metadata.witnesses` 可声明 `name`、`type: "u32"` 及 `visibility: "public"` 或 `"private"`。例如 `"witnesses": [{"name":"delta","type":"u32","visibility":"private"}]` 搭配 `"evidence": [{"policy":"require-zk"}]` 会生成对应的 Forth 声明。计算词按顺序接收状态和声明的见证。匹配电路的设置通过后端目录提供。允许公开赋值时，可在兼容的策略中设置 `"assignment_disclosure":"allow"`。规划器仍会逐项检查候选。
+
+已有 CCTP 归档提供了另一组历史输入。在包含提交 `11c919a` 的检出中运行下列命令，再把生成的模型导入编辑器。检查器核对序列化交易标识、槽位、Token 模板和所记录数量。逻辑模型的初始标记描述归档子图的边界。Script 执行、发行授权、区块包含和当前 UTXO 状态需要各自的证据。
+
+```sh
+mkdir -p workspace/cpn-dev
+git show 11c919a:projects/spv-token/fixtures/covenant-backtrace-2x2-regtest.json.xz > workspace/cpn-dev/cctp.json.xz
+4thgraph cpn inspect-cctp workspace/cpn-dev/cctp.json.xz --logical > workspace/cpn-dev/cctp-model.json
+4thgraph cpn check-model workspace/cpn-dev/cctp-model.json > workspace/cpn-dev/cctp-analysis.json
+```
+
 装好下文的 regtest 依赖与 Node.js 后，从仓库根目录运行 `bash tools/cpn_demo.sh`，打开 `workspace/cpn-demo/index.html`。这条命令用同一份 Forth 编译、入金并验证三条路径，生成可单独离线打开的 HTML。源码、后端目录、原始报告和复放回执留在同一目录。
 
 先看逻辑图。Place 描述接口上的状态，Transition 声明消费的输入和生产的输出。点选迁移可查看类型化计算、Forth 词和验证策略。外部信息可包含见证操作数、角色签名和证明包。交易图将这些接口映射到部署或花费中的有序 `vin`、`vout`。

@@ -123,6 +123,17 @@ def export_workbench(report_file, receipt_files, *, output, title, selected=None
     payload = {"title": title, "current": report["request"]["current"], "sighash": report["request"]["sighash_family"],
                "selected": preferred, "candidates": candidates, "packages": packages, "report": original,
                "words": source_words(source, report) if source is not None else {}}
+    write_workbench(payload, output)
+
+
+def export_designer(*, output, title):
+    """Open a fresh logical CPN draft without inventing a compiled report."""
+    payload = {"title": title, "current": None, "sighash": "", "selected": None,
+               "candidates": [], "packages": {}, "report": None, "words": {}, "editor_start": True}
+    write_workbench(payload, output)
+
+
+def write_workbench(payload, output):
     # Treat report content as data, including names and paths supplied by the caller.
     data = json.dumps(payload, separators=(",", ":"), ensure_ascii=True).replace("<", "\\u003c")
     assets = files("fourthgraph.workflow").joinpath("workbench")

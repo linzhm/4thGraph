@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "places": [
+    {"name": "current", "type": "u32", "initial": 1, "capacity": 1},
+    {"name": "next", "type": "u32", "capacity": 1},
+    {"name": "route", "type": "route", "capacity": 1}
+  ],
+  "transitions": [
+    {
+      "name": "advance",
+      "word": "advance",
+      "inputs": [{"name": "state", "place": "current", "type": "u32"}],
+      "outputs": [{"name": "result", "place": "next", "type": "u32"}],
+      "metadata": {"authorization": ["operator"]}
+    },
+    {
+      "name": "decide",
+      "word": "decide",
+      "inputs": [{"name": "state", "place": "next", "type": "u32"}],
+      "outputs": [{"name": "result", "place": "route", "type": "route"}],
+      "metadata": {"authorization": ["bob"]}
+    }
+  ]
+}
