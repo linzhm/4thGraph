@@ -9,7 +9,8 @@ from payment import authorization, sign_payment, sign_spend
 from fixtures import INVALID_PREVOUT_CASES, fixture, test_secret, cases, mode_cases
 from engines import development_valid, chain_valid
 from fourthgraph.bsv.evaluate import evaluate, ScriptError
-from fourthgraph.bsv.script import push
+from fourthgraph.bsv.pushtx import COMPANION_CODE, ONE_DER, PUBLIC, binding_der, check_binding
+from fourthgraph.bsv.script import asm, number, push
 from fourthgraph.bsv.transaction import Output, Transaction, Input
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -140,7 +141,6 @@ class LamportTests(unittest.TestCase):
         # to find transaction preimages with those astronomically rare digests.
         from ecdsa import VerifyingKey, SECP256k1
         from ecdsa.util import sigdecode_der
-        from script import PUBLIC
         for h in (0,1,N-1,N,(N-R+1)%N,(N-R-1)%N,(N-R+128)%N,2**256-1):
             digest=h.to_bytes(32,'big')
             def check(sig,key):
@@ -149,7 +149,28 @@ class LamportTests(unittest.TestCase):
                 self.assertEqual(r,R); self.assertTrue(1<=s<=N//2)
                 return VerifyingKey.from_string(key,curve=SECP256k1).verify_digest(sig[:-1],digest,sigdecode=sigdecode_der)
             self.assertEqual(evaluate(binding(),[digest],check),([b'\x01'],[]))
-        with self.assertRaises(ScriptError): evaluate(binding(),[(N-R).to_bytes(32,'big')],lambda *_: True)
+            self.assertEqual(evaluate(binding_der(compact=True), [digest]), evaluate(binding_der(), [digest]))
+        for code in (binding(), binding_der(compact=True)):
+            with self.assertRaises(ScriptError):
+                evaluate(code, [(N-R).to_bytes(32, 'big')], lambda *_: True)
+
+    def test_compact_binding_keeps_native_checks_in_order(self):
+        digest = (N - R + 128).to_bytes(32, 'big')
+        (der,), _ = evaluate(binding_der(), [digest])
+        for selector, flag in ((0, 0x41), (0, 0x61), (1, 0x43), (1, 0xc3)):
+            with self.subTest(selector=selector, flag=hex(flag)):
+                prefix = number(selector) + asm('OP_TOALTSTACK') + push(bytes([flag])) + asm('OP_TOALTSTACK')
+                expected = [(ONE_DER + bytes([flag | 0x20]), PUBLIC)] if selector else []
+                expected.append((der + bytes([flag]), PUBLIC))
+                calls = []
+
+                def accept(signature, public_key):
+                    calls.append((signature, public_key))
+                    return True
+
+                code = prefix + check_binding(COMPANION_CODE, compact=True)
+                self.assertEqual(evaluate(code, [digest], accept), ([b'\x01'], []))
+                self.assertEqual(calls, expected)
 
     def test_binding_digest_equivalence_is_explicit(self):
         from ecdsa import SECP256k1, VerifyingKey, BadSignatureError
@@ -183,6 +204,15 @@ class LamportTests(unittest.TestCase):
         from measure import universal_vector, vector
         self.assertEqual(json.loads((ROOT/'versions/v0.1.0/vector.json').read_text()),vector())
         self.assertEqual(json.loads((ROOT/'versions/v0.1.0/universal-vectors.json').read_text()),universal_vector())
+
+    def test_v020_candidate_artifacts_reproduce(self):
+        from fixed_template import TEMPLATE_DIRECTORY, v020_forth_pattern
+        from generate_template import build_artifacts
+
+        for filename, expected in build_artifacts().items():
+            self.assertEqual((TEMPLATE_DIRECTORY / filename).read_text(encoding='ascii'), expected, filename)
+        pattern = v020_forth_pattern()
+        self.assertEqual(evaluate(pattern.program), (list(pattern.fixed_parts), []))
 
 
 if __name__ == '__main__': unittest.main()

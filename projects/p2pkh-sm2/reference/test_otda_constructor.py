@@ -1,13 +1,18 @@
 """Constructor byte equivalence and complete spending through both engines."""
 from dataclasses import replace
+import json
 import unittest
 from unittest.mock import patch
 
-from generate_otda_constructor import generate
-from p2pkh_sm2 import _otda_pattern, current_input_unlock, locking_script_from_public_key, sign_input
+from assemble import SCHEDULED_TEMPLATE_VERSION, TEMPLATE_VERSIONS
+from generate_otda_constructor import generate, generate_mixed, initialize_shared_cache, packed_repeat
+from p2pkh_sm2 import MIXED_OTDA_FILE, MIXED_OTDA_VERSIONS, _mixed_otda_program, _otda_pattern
+from p2pkh_sm2 import current_input_unlock, locking_script_from_public_key, sign_input
 from fourthgraph.benchmark.validation import chain_verdict
 from fourthgraph.bsv.evaluate import evaluate
-from fourthgraph.bsv.transaction import Input, Output, Transaction
+from fourthgraph.bsv.script import push
+from fourthgraph.bsv.transaction import Input, Output, Transaction, otda_input_parts, preimage_otda
+from fourthgraph.compiler.preimage import pack_otda_input_prefix
 from sighash import authorization
 from sm2 import USER_ID, encode_public, fixture_sign, mul
 from test_node import check_node
@@ -29,19 +34,76 @@ class ConstructorTests(unittest.TestCase):
         cls.native = Output(9_800, b'\x51')
 
     def test_frozen_program_is_reproducible_and_matches_lock(self):
-        pattern = _otda_pattern()
-        self.assertEqual(generate(), pattern.program)
-        self.assertEqual(evaluate(pattern.program), (list(pattern.fixed_parts), []))
-        for lock in self.locks:
-            fields = pattern.match(lock)
-            self.assertEqual(len(fields), 1)
-            self.assertEqual(b''.join((pattern.fixed_parts[0], *fields, pattern.fixed_parts[1])), lock)
-            self.assertIsNone(pattern.match(lock[:-1]))
-            self.assertIsNone(pattern.match(lock[:-1] + b'\x51'))
+        for version in TEMPLATE_VERSIONS:
+            with self.subTest(version=version):
+                pattern = _otda_pattern(version)
+                self.assertEqual(generate(version), pattern.program)
+                self.assertEqual(evaluate(pattern.program), (list(pattern.fixed_parts), []))
+                for key in self.keys:
+                    lock = locking_script_from_public_key(key, version=version)
+                    fields = pattern.match(lock)
+                    self.assertEqual(len(fields), 1)
+                    self.assertEqual(b''.join((pattern.fixed_parts[0], *fields, pattern.fixed_parts[1])), lock)
+                    self.assertIsNone(pattern.match(lock[:-1]))
+                    self.assertIsNone(pattern.match(lock[:-1] + b'\x51'))
+        self.assertLess(len(_otda_pattern(SCHEDULED_TEMPLATE_VERSION).program), len(_otda_pattern().program))
 
-    def sign_modes(self, tx, flag, expected):
+    def test_mixed_program_reproduces_both_dictionaries(self):
+        self.assertEqual(generate_mixed(), json.loads(MIXED_OTDA_FILE.read_text(encoding="utf-8")))
+        patterns = [_otda_pattern(version) for version in MIXED_OTDA_VERSIONS]
+        parts = [part for pattern in patterns for part in pattern.fixed_parts]
+        program = _mixed_otda_program()
+        self.assertEqual(evaluate(program), (parts, []))
+        self.assertLess(len(program), sum(len(pattern.program) for pattern in patterns))
+
+    def test_shared_cache_preserves_cached_entries_and_stack_order(self):
+        source = bytes(range(64))
+        entries = (source, b"prefix" + source[9:42] + b"suffix", source[3:60], source)
+        program = initialize_shared_cache(entries)
+        self.assertLess(len(program), sum(len(push(entry)) for entry in entries))
+        self.assertEqual(evaluate(program, [b"caller"]), ([b"caller", *entries], []))
+
+    def test_packed_repeats_respect_the_temporary_size_limit(self):
+        unit = bytes(range(32))
+        for count in (3, 7, 51):
+            for limit in (count * len(unit), 64 * len(unit)):
+                code = packed_repeat(len(unit), count, limit)
+                peak = 0
+
+                def observe(main, alt):
+                    nonlocal peak
+                    peak = max(peak, *(len(item) for item in (*main, *alt)))
+
+                with self.subTest(count=count, limit=limit):
+                    self.assertEqual(evaluate(code, [b"caller", unit], observe_stack=observe),
+                                     ([b"caller", unit * count], []))
+                    self.assertLessEqual(peak, limit)
+
+    def test_otda_input_prefix_packing_preserves_commitments(self):
+        for count, index, flag, common_sequence in ((8, 3, 0x61, True), (8, 7, 0x63, False),
+                                                     (253, 0, 0x61, True), (8, 3, 0x61, False),
+                                                     (8, 3, 0xe1, True)):
+            inputs = tuple(Input(i.to_bytes(32, "little"), 0, sequence=0xffffffff if common_sequence else i)
+                           for i in range(count))
+            tx = Transaction(inputs, (self.native,) * count)
+            preimage = preimage_otda(tx, index, b"\xac", flag)
+            outputs = tx.outputs if flag & 31 == 1 else (tx.outputs[index],)
+            raw = preimage[:-sum(len(item.serialize()) for item in outputs)-8]
+            parts = otda_input_parts(tx, index, b"\xac", flag)
+            code = pack_otda_input_prefix(raw, parts)
+            with self.subTest(count=count, index=index, flag=flag, common_sequence=common_sequence):
+                self.assertEqual(evaluate(code, [b"caller"]), ([b"caller", raw], []))
+                if len(parts) == 1 or (flag & 31 == 1 and not common_sequence):
+                    self.assertEqual(code, push(raw))
+                else:
+                    self.assertLess(len(code), len(push(raw)))
+                with self.assertRaisesRegex(ValueError, "input records differ"):
+                    pack_otda_input_prefix(raw, tuple(reversed(parts)) if len(parts) > 1 else parts + parts)
+
+    def sign_modes(self, tx, flag, expected, *, funding=None):
+        funding = self.funding if funding is None else funding
         tx_raw, tx_compact = tx, tx
-        for index, (parent, key, scalar) in enumerate(zip(self.funding, self.keys, self.scalars, strict=True)):
+        for index, (parent, key, scalar) in enumerate(zip(funding, self.keys, self.scalars, strict=True)):
             auth = authorization(tx, index, parent.outputs[0].value, flag)
             signature = fixture_sign(scalar, auth.message, 71 + index)
 
@@ -62,11 +124,11 @@ class ConstructorTests(unittest.TestCase):
                 compact, current_input_unlock(tx, index, parent.outputs[0].value, key, signature,
                                               flag),
             )
-        self.assertTrue(chain_verdict(tx_raw, self.funding))
-        self.assertTrue(chain_verdict(tx_compact, self.funding))
+        self.assertTrue(chain_verdict(tx_raw, funding))
+        self.assertTrue(chain_verdict(tx_compact, funding))
         for index in range(len(tx.inputs)):
-            check_node(tx_raw, self.funding, index)
-            check_node(tx_compact, self.funding, index)
+            check_node(tx_raw, funding, index)
+            check_node(tx_compact, funding, index)
         return tx_compact
 
     def test_all_single_and_literal_fallbacks(self):
@@ -102,12 +164,74 @@ class ConstructorTests(unittest.TestCase):
         check_node(changed, self.funding, 1, False)
         chain_check(changed, self.funding, 1, False)
 
+    def test_two_lock_versions_can_be_spent_and_rebuilt_together(self):
+        new_lock = locking_script_from_public_key(self.keys[1], version=SCHEDULED_TEMPLATE_VERSION)
+        funding = (self.funding[0], replace(self.funding[1], outputs=(Output(10_000, new_lock),)))
+        inputs = tuple(Input(parent.txid_wire(), 0) for parent in funding)
+        tx = Transaction(inputs, (self.destinations[1], Output(9_800, new_lock), Output(1, b'\x51')))
+        for flag in (0x61, 0xe1, 0x63, 0xe3):
+            with self.subTest(flag=hex(flag)):
+                signed = self.sign_modes(tx, flag, (True, True), funding=funding)
+                self.assertLess(max(len(item.script) for item in signed.inputs), 30_000)
+                for index in range(len(inputs)):
+                    check_node(signed, funding, index, old_output=True)
+                changed = replace(signed, outputs=tuple(reversed(signed.outputs)))
+                check_node(changed, funding, 1, flag in (0x63, 0xe3))
+                if flag in (0x61, 0xe1):
+                    chain_check(changed, funding, 1, False)
+
     def test_larger_constructor_falls_back_to_literal_encoding(self):
         tx = Transaction(self.inputs, self.destinations)
         pattern = _otda_pattern()
         oversized = replace(pattern, program=pattern.program + bytes(len(tx.serialize())))
         with patch('p2pkh_sm2._otda_pattern', return_value=oversized):
             self.sign_modes(tx, 0x61, (False, False))
+
+    def mixed_template_fixture(self):
+        funding = tuple(
+            replace(parent, outputs=(Output(10_000, locking_script_from_public_key(key, version=version)),))
+            for parent, key, version in zip(self.funding, self.keys, MIXED_OTDA_VERSIONS, strict=True)
+        )
+        inputs = tuple(Input(parent.txid_wire(), 0) for parent in funding)
+        outputs = tuple(
+            Output(9_950, locking_script_from_public_key(key, version=version))
+            for key, version in zip(self.keys, reversed(MIXED_OTDA_VERSIONS), strict=True)
+        )
+        return Transaction(inputs, outputs), funding
+
+    def test_mixed_templates_use_shorter_shared_constructor(self):
+        tx, funding = self.mixed_template_fixture()
+        saved = sum(len(_otda_pattern(version).program) for version in MIXED_OTDA_VERSIONS)
+        saved -= len(_mixed_otda_program())
+        for flag in (0x61, 0xe1, 0x63):
+            with self.subTest(flag=hex(flag)):
+                shared = self.sign_modes(tx, flag, (True, True), funding=funding)
+                with patch("p2pkh_sm2._combine_otda_programs", return_value=None):
+                    separate = self.sign_modes(tx, flag, (True, True), funding=funding)
+                if flag == 0x63:
+                    self.assertEqual(shared, separate)
+                expected = saved if flag in (0x61, 0xe1) else 0
+                for index, (before, after) in enumerate(zip(separate.inputs, shared.inputs, strict=True)):
+                    self.assertEqual(len(before.script) - len(after.script), expected)
+                    check_node(shared, funding, index, old_output=True)
+
+    def test_all_lock_versions_reconstruct_in_one_preimage(self):
+        versions = TEMPLATE_VERSIONS[-2:]
+        funding = tuple(
+            replace(parent, outputs=(Output(10_000, locking_script_from_public_key(key, version=version)),))
+            for parent, key, version in zip(self.funding, self.keys, versions, strict=True)
+        )
+        inputs = tuple(Input(parent.txid_wire(), 0) for parent in funding)
+        outputs = tuple(
+            Output(1_000, locking_script_from_public_key(self.keys[0], version=version))
+            for version in TEMPLATE_VERSIONS
+        )
+        tx = Transaction(inputs, outputs)
+        signed = self.sign_modes(tx, 0x61, (True, True), funding=funding)
+        # Copying any complete output verbatim would exceed this bound.
+        self.assertLess(max(len(item.script) for item in signed.inputs), min(len(out.script) for out in outputs))
+        for index in range(len(inputs)):
+            check_node(signed, funding, index, old_output=True)
 
     def test_reconstruction_requires_chronicle_before_signing(self):
         tx = Transaction(self.inputs, self.destinations)

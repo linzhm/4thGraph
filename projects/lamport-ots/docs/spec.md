@@ -15,15 +15,29 @@ signature format. The public deterministic fixture is a regression vector, not
 an official standard test vector. `generate_keypair()` uses OS-backed randomness;
 the fixture derivation is deliberately separate and must never hold funds.
 
-## Witness and supported modes
+## Witness and payment profiles
 
-The universal locking script embeds the full public key and expects three stack
-items, bottom to top: preimage P, packed 8,192-byte signature S, and a selector.
-The selector is exactly empty for ordinary authorization or the single byte
-`01` for the unpaired Chronicle SINGLE path. Each digest byte is converted to an
-unsigned Script number. MOD 2 selects one of the two inline commitments and
-DIV 2 advances the bit index. The verifier consumes all digest and signature
-bytes and leaves one true item and an empty altstack.
+The payment witness pushes the preimage P, packed proof, and selector in that
+order. The selector is the empty byte string for ordinary authorization or
+the single byte `01` for the unpaired Chronicle SINGLE path. The lock checks
+the proof length before evaluating the Lamport verifier.
+
+| Profile | Key data in the lock | Proof layout |
+| --- | --- | --- |
+| `full-key` | 512 ordered public hashes | 256 selected secrets, 8,192 bytes |
+| `committed-key` | SHA-256 of the ordered public key | 256 pairs of selected secret and sibling hash, 16,384 bytes |
+| `committed-key-forth` | Same 32-byte commitment | Same 16,384-byte proof |
+| `committed-key-forth-compact` | Same 32-byte commitment | Same 16,384-byte proof |
+| `committed-key-forth-v0.2.0` | Same 32-byte commitment | Same 16,384-byte proof |
+
+For committed profiles, record i is `x[i][b[i]] || y[i][1-b[i]]`. The lock
+hashes the secret and orders the two hashes as `y[i][0] || y[i][1]` according to
+digest bit i. The hash of the concatenated pairs must match the commitment. The
+wallet needs the full ordered public key to construct this proof. All five
+profiles enforce the same preimage and selector rules and leave one true item
+and an empty altstack on success. [Forth implementation and costs](optimization.md)
+
+## Sighash modes
 
 | Output coverage | BIP143 | BIP143 + ANYONECANPAY | Chronicle OTDA | OTDA + ANYONECANPAY |
 |---|---|---|---|---|
@@ -48,6 +62,12 @@ blanked, the active input's script replaced with `68ac`, and a type-specific
 input/output selection. Its preimage has variable length and omits the prevout
 amount. The node authenticates the serialized fields through the fixed-r
 signature relation described in [security.md](security.md).
+
+An opted-in version-2 unlock can reconstruct P for OTDA ALL or paired SINGLE,
+including ANYONECANPAY, from matching compact Forth and v0.2.0 outputs. The functional
+unlock leaves the identical preimage, proof and selector on the main stack and
+an empty altstack. The verifier binds the resulting preimage to the spending
+input in the same way as a literal push. [Reconstruction design](optimization.md#otda-unlocking-reconstruction)
 
 ALL covers all outputs, NONE covers no outputs, and SINGLE covers the output
 at the signing input index when it exists. The current outpoint, sequence,
@@ -89,10 +109,11 @@ never broadcasts or mines the transactions. This demonstrates Script acceptance
 under those settings, not mainnet relay policy, fee acceptance, UTXO existence,
 or network-wide consensus testing. Node tests also cross-check pinned chain-gang.
 
-Static opcode counts in `measurements.json` exclude payload bytes; both branches
-are counted in the encoded instruction totals, although only one public-key push
-per bit executes. The universal script has 256 SHA256 instructions, one HASH256 and two native
-signature instructions. Both signature checks execute only in the companion branch.
+Static opcode counts in `measurements.json` describe the v0.1.0 vectors. The
+full-key lock has 256 SHA256 instructions. Each commitment lock has 257 SHA256
+instructions, including the final public-key hash. The payment wrapper adds
+one HASH256 and two native signature instructions. The ordinary path executes
+one native check, and the companion path executes both.
 Node-native signature hashing performs additional work not counted by this static
 Script census. Timings include adapters and are local wall-clock samples.
 

@@ -1,0 +1,257 @@
+{
+  "activation_height": 2,
+  "cases": [
+    {
+      "actual_status": "Match",
+      "engines": {},
+      "entry": "recognize",
+      "expected_status": "Match",
+      "id": "recognize",
+      "input_sha256": "f1d770a0cd1a8647aca61ed1eb9c40ef29b95c5927e8e708b258562c83d5fac4",
+      "passed": true,
+      "result_sha256": "72982d141bd5ffc374e3b718712a58fca656d37dc7c717db5d5bb6aca3f8f01f",
+      "step": 0
+    },
+    {
+      "actual_status": "MissingContext",
+      "engines": {},
+      "entry": "recognize",
+      "expected_status": "MissingContext",
+      "id": "missing-prevout",
+      "input_sha256": "7ca8fe071ae34af9075be383ffd146b247a59b142c82fd0c8643c1126cf00203",
+      "passed": true,
+      "result_sha256": "47276feb400cccaaab1f25b6c2465fe358b28e2e567053ad69e76f4bf79fba50",
+      "step": 0
+    },
+    {
+      "actual_status": "InvalidRequest",
+      "engines": {},
+      "entry": "prepare_spend",
+      "expected_status": "InvalidRequest",
+      "id": "wrong-request-type",
+      "input_sha256": "311041138ed74945f29217881b55e17a6e678850b06ee4d3df4967e9ccf3fed4",
+      "passed": true,
+      "result_sha256": "926557a6bbd2d9700c9f15c5637f39c3eec62844206242d0bb0daa87670f1c75",
+      "step": 0
+    },
+    {
+      "actual_status": "NoMatch",
+      "engines": {},
+      "entry": "recognize",
+      "expected_status": "NoMatch",
+      "id": "unsupported",
+      "input_sha256": "9b3852569dd67bca15b137f04d57d1ae6235380eb40123561a64d370b401a31b",
+      "passed": true,
+      "result_sha256": "26806eb582ecd22b6a3d389aa7644a52719cd1af9fe9d216a58b941b44ab0218",
+      "step": 0
+    },
+    {
+      "actual_status": "Prepared",
+      "engines": {},
+      "entry": "prepare_spend",
+      "expected_status": "Prepared",
+      "id": "prepare",
+      "input_sha256": "f1d770a0cd1a8647aca61ed1eb9c40ef29b95c5927e8e708b258562c83d5fac4",
+      "passed": true,
+      "result_sha256": "e4e8847fbb4bc0e5694bcdf624e1de91471e45e643a577271383671c2eeac2cb",
+      "step": 0
+    },
+    {
+      "actual_status": "InvalidSuccessor",
+      "engines": {},
+      "entry": "prepare_spend",
+      "expected_status": "InvalidSuccessor",
+      "id": "wrong-successor",
+      "input_sha256": "87f483e92162260ec684fc155f3dfad2b8c94ef37745254eeff68c1aec44ee98",
+      "passed": true,
+      "result_sha256": "863939bb0db8377b2df8966b078294d59fd91818fa65556d31318bc433a4c376",
+      "step": 0
+    },
+    {
+      "actual_status": "InvalidAuthorization",
+      "engines": {},
+      "entry": "assemble_unlock",
+      "expected_status": "InvalidAuthorization",
+      "id": "unexpected-authorization",
+      "input_sha256": "32468c25c65877032a289397ffb213012e7aba4dc094f9eb8eb3e89645133833",
+      "passed": true,
+      "result_sha256": "8b551f4dbd97577991fe7fc31b0b039ce15d05fda241094d448c0594d6d6d679",
+      "step": 0
+    },
+    {
+      "actual_status": "Assembled",
+      "engines": {},
+      "entry": "assemble_unlock",
+      "expected_status": "Assembled",
+      "id": "assemble",
+      "input_sha256": "d12e12b4c8beff66a63cf16041a5423cffcc050927a228dd54c248941d69c693",
+      "passed": true,
+      "result_sha256": "c8bae5eb4bb5e1324a756210e98958acc4c8d5ee5813484d2ce073a5f24346f4",
+      "step": 0
+    },
+    {
+      "actual_status": "Verified",
+      "engines": {
+        "bsv_node": true,
+        "chain_gang": true
+      },
+      "entry": "host_spend",
+      "expected_status": "Verified",
+      "id": "advance",
+      "input_sha256": "f1d770a0cd1a8647aca61ed1eb9c40ef29b95c5927e8e708b258562c83d5fac4",
+      "passed": true,
+      "result_sha256": "204a05db68455ea95b3096b3fba367dc66fbc8f8cdb73bd3c162b3de7eb0023e",
+      "step": 0
+    },
+    {
+      "actual_status": "Match",
+      "engines": {},
+      "entry": "recognize",
+      "expected_status": "Match",
+      "id": "recognize",
+      "input_sha256": "25158db3aa87cea2779441456bd4806f1d9261b8987d6ab0dcd442f5ba389b30",
+      "passed": true,
+      "result_sha256": "46b0d77002857ba0c55919868ab6df8a52dfbbf7a555046953195d6295c26e38",
+      "step": 1
+    },
+    {
+      "actual_status": "MissingContext",
+      "engines": {},
+      "entry": "recognize",
+      "expected_status": "MissingContext",
+      "id": "missing-prevout",
+      "input_sha256": "5461a26857a2e5ead1ace7d7aaa77064fd683af74601a3e052f2786e2bbc6fad",
+      "passed": true,
+      "result_sha256": "47276feb400cccaaab1f25b6c2465fe358b28e2e567053ad69e76f4bf79fba50",
+      "step": 1
+    },
+    {
+      "actual_status": "InvalidRequest",
+      "engines": {},
+      "entry": "prepare_spend",
+      "expected_status": "InvalidRequest",
+      "id": "wrong-request-type",
+      "input_sha256": "327dfe0dd2d647673d9a5d5ebbafba638243871cf102f3e4c04a7eebd2763f7f",
+      "passed": true,
+      "result_sha256": "926557a6bbd2d9700c9f15c5637f39c3eec62844206242d0bb0daa87670f1c75",
+      "step": 1
+    },
+    {
+      "actual_status": "NoMatch",
+      "engines": {},
+      "entry": "recognize",
+      "expected_status": "NoMatch",
+      "id": "unsupported",
+      "input_sha256": "313efaa9119de5bf11fa8a7ccc1437be5342af5c5a87197a87124dfa6ad87d64",
+      "passed": true,
+      "result_sha256": "26806eb582ecd22b6a3d389aa7644a52719cd1af9fe9d216a58b941b44ab0218",
+      "step": 1
+    },
+    {
+      "actual_status": "Prepared",
+      "engines": {},
+      "entry": "prepare_spend",
+      "expected_status": "Prepared",
+      "id": "prepare",
+      "input_sha256": "25158db3aa87cea2779441456bd4806f1d9261b8987d6ab0dcd442f5ba389b30",
+      "passed": true,
+      "result_sha256": "3445289036bfcc93cfee6820aed4c7a5e6724d296bfb39b12d23b137c2d07419",
+      "step": 1
+    },
+    {
+      "actual_status": "InvalidSuccessor",
+      "engines": {},
+      "entry": "prepare_spend",
+      "expected_status": "InvalidSuccessor",
+      "id": "wrong-successor",
+      "input_sha256": "7c01f9a87b9b63aeee5974767d1487ac3bdfb8bce3d9029365d60f3468b0cdd5",
+      "passed": true,
+      "result_sha256": "863939bb0db8377b2df8966b078294d59fd91818fa65556d31318bc433a4c376",
+      "step": 1
+    },
+    {
+      "actual_status": "InvalidAuthorization",
+      "engines": {},
+      "entry": "assemble_unlock",
+      "expected_status": "InvalidAuthorization",
+      "id": "unexpected-authorization",
+      "input_sha256": "aa48e42434f25135f206692bd1178c506235a48284849ec09bfaf6ed00c54590",
+      "passed": true,
+      "result_sha256": "8b551f4dbd97577991fe7fc31b0b039ce15d05fda241094d448c0594d6d6d679",
+      "step": 1
+    },
+    {
+      "actual_status": "Assembled",
+      "engines": {},
+      "entry": "assemble_unlock",
+      "expected_status": "Assembled",
+      "id": "assemble",
+      "input_sha256": "dda123197025b7e39f977a7fede510b27b68832778f346ff32008f3523a0d236",
+      "passed": true,
+      "result_sha256": "c8640486956381579f6640d62f75d2f8cd83448e947c4be80b38b6cca45bb0c0",
+      "step": 1
+    },
+    {
+      "actual_status": "Verified",
+      "engines": {
+        "bsv_node": true,
+        "chain_gang": true
+      },
+      "entry": "host_spend",
+      "expected_status": "Verified",
+      "id": "advance",
+      "input_sha256": "25158db3aa87cea2779441456bd4806f1d9261b8987d6ab0dcd442f5ba389b30",
+      "passed": true,
+      "result_sha256": "204a05db68455ea95b3096b3fba367dc66fbc8f8cdb73bd3c162b3de7eb0023e",
+      "step": 1
+    }
+  ],
+  "chain_gang": {
+    "commit": "74676b9c002c452e7f21a9ed9265f4972bef03f6",
+    "version": "0.13.2"
+  },
+  "fixture_key": "not_applicable",
+  "fixture_sha256": "3ad1d2fd4463ef0104bfc2308c131fec03fda02130fce4ca8a8ac868a51077da",
+  "flags": 3997710,
+  "manifest_sha256": "5b9f758728c5b520ed97297a2b167561eb1ba1014e33e980d93b8f387569b78b",
+  "module_sha256": "c58ee15c8f6a7e3a0a983a1eca7b5b4e42c0463c47bbdd83f770a49336409c05",
+  "node_version": 101020300,
+  "path": "advance",
+  "profile": "pels-counter",
+  "public_key": null,
+  "schema": "4thgraph.project-receipt/1",
+  "spend_height": 4,
+  "status": "passed",
+  "steps": [
+    {
+      "next_amount": 99000,
+      "parent_tx": "020000000177777777777777777777777777777777777777777777777777777777777777770000000000ffffffff01a086010000000000fdc102050000000000ab74529d7c766b7601447f7701247f75aa78547f7701207f7588820134947f7601307f77547f75044100000088765c7f7701207f756b587f758102e803947600a06958807c01687f77537f77825793528001fd7c7e7b7c7e557e7b818b0500000000019755807e01ab7e7c7eaa6c886caa517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e01007e81209817f8165b81f259d928ce2ddbfc9b02070b87ce9562a055acbbdcf97e66be799321414136d08c5ed2bf3ba048afe6dcaebafeffffffffffffffffffffffffffffff009776697621414136d08c5ed2bf3ba048afe6dcaebafeffffffffffffffffffffffffffffff007c94a3826b012080517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e01206c947f77827d6b7e23022079be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798027c7e6c01249301307c7e7c7e01417e210279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798ac00000000",
+      "previous_amount": 100000,
+      "prevout": "66944eccb8a9244390b96445b52d65cfebf90fa64ba2b366be57502d71c2abe100000000",
+      "raw_tx": "020000000166944eccb8a9244390b96445b52d65cfebf90fa64ba2b366be57502d71c2abe100000000fd5c034d590302000000774f4b97a2421a5bae92d559af3107e87e6591176944d83fdc4f77a22d743fcb3bb13029ce7b1f559ef5e747fcac439f1455a2ec7c5f09b72290795e7066504466944eccb8a9244390b96445b52d65cfebf90fa64ba2b366be57502d71c2abe100000000fdba0274529d7c766b7601447f7701247f75aa78547f7701207f7588820134947f7601307f77547f75044100000088765c7f7701207f756b587f758102e803947600a06958807c01687f77537f77825793528001fd7c7e7b7c7e557e7b818b0500000000019755807e01ab7e7c7eaa6c886caa517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e01007e81209817f8165b81f259d928ce2ddbfc9b02070b87ce9562a055acbbdcf97e66be799321414136d08c5ed2bf3ba048afe6dcaebafeffffffffffffffffffffffffffffff009776697621414136d08c5ed2bf3ba048afe6dcaebafeffffffffffffffffffffffffffffff007c94a3826b012080517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e01206c947f77827d6b7e23022079be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798027c7e6c01249301307c7e7c7e01417e210279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798aca086010000000000ffffffff0991ddca9998dc8850a4d2ef6228a00255034a19744e73d48b49709c930ba3180000000041000000ffffffff01b882010000000000fdc102050100000000ab74529d7c766b7601447f7701247f75aa78547f7701207f7588820134947f7601307f77547f75044100000088765c7f7701207f756b587f758102e803947600a06958807c01687f77537f77825793528001fd7c7e7b7c7e557e7b818b0500000000019755807e01ab7e7c7eaa6c886caa517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e01007e81209817f8165b81f259d928ce2ddbfc9b02070b87ce9562a055acbbdcf97e66be799321414136d08c5ed2bf3ba048afe6dcaebafeffffffffffffffffffffffffffffff009776697621414136d08c5ed2bf3ba048afe6dcaebafeffffffffffffffffffffffffffffff007c94a3826b012080517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e01206c947f77827d6b7e23022079be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798027c7e6c01249301307c7e7c7e01417e210279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798ac00000000",
+      "tx_bytes": 1629,
+      "txid": "29774ee9233ebc70aeda6ead49b4529e915eef4fb52f0517143a55516e479459",
+      "unlock_bytes": 860
+    },
+    {
+      "next_amount": 98000,
+      "parent_tx": "020000000166944eccb8a9244390b96445b52d65cfebf90fa64ba2b366be57502d71c2abe100000000fd5c034d590302000000774f4b97a2421a5bae92d559af3107e87e6591176944d83fdc4f77a22d743fcb3bb13029ce7b1f559ef5e747fcac439f1455a2ec7c5f09b72290795e7066504466944eccb8a9244390b96445b52d65cfebf90fa64ba2b366be57502d71c2abe100000000fdba0274529d7c766b7601447f7701247f75aa78547f7701207f7588820134947f7601307f77547f75044100000088765c7f7701207f756b587f758102e803947600a06958807c01687f77537f77825793528001fd7c7e7b7c7e557e7b818b0500000000019755807e01ab7e7c7eaa6c886caa517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e01007e81209817f8165b81f259d928ce2ddbfc9b02070b87ce9562a055acbbdcf97e66be799321414136d08c5ed2bf3ba048afe6dcaebafeffffffffffffffffffffffffffffff009776697621414136d08c5ed2bf3ba048afe6dcaebafeffffffffffffffffffffffffffffff007c94a3826b012080517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e01206c947f77827d6b7e23022079be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798027c7e6c01249301307c7e7c7e01417e210279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798aca086010000000000ffffffff0991ddca9998dc8850a4d2ef6228a00255034a19744e73d48b49709c930ba3180000000041000000ffffffff01b882010000000000fdc102050100000000ab74529d7c766b7601447f7701247f75aa78547f7701207f7588820134947f7601307f77547f75044100000088765c7f7701207f756b587f758102e803947600a06958807c01687f77537f77825793528001fd7c7e7b7c7e557e7b818b0500000000019755807e01ab7e7c7eaa6c886caa517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e01007e81209817f8165b81f259d928ce2ddbfc9b02070b87ce9562a055acbbdcf97e66be799321414136d08c5ed2bf3ba048afe6dcaebafeffffffffffffffffffffffffffffff009776697621414136d08c5ed2bf3ba048afe6dcaebafeffffffffffffffffffffffffffffff007c94a3826b012080517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e01206c947f77827d6b7e23022079be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798027c7e6c01249301307c7e7c7e01417e210279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798ac00000000",
+      "previous_amount": 99000,
+      "prevout": "5994476e51553a1417052fb54fef5e919e52b449ad6edaae70bc3e23e94e772900000000",
+      "raw_tx": "02000000015994476e51553a1417052fb54fef5e919e52b449ad6edaae70bc3e23e94e772900000000fd5c034d590302000000baa7beb1b76f644f6415058338d84eb9c6ecd92eaf4995a8e866e483c203b5c63bb13029ce7b1f559ef5e747fcac439f1455a2ec7c5f09b72290795e706650445994476e51553a1417052fb54fef5e919e52b449ad6edaae70bc3e23e94e772900000000fdba0274529d7c766b7601447f7701247f75aa78547f7701207f7588820134947f7601307f77547f75044100000088765c7f7701207f756b587f758102e803947600a06958807c01687f77537f77825793528001fd7c7e7b7c7e557e7b818b0500000000019755807e01ab7e7c7eaa6c886caa517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e01007e81209817f8165b81f259d928ce2ddbfc9b02070b87ce9562a055acbbdcf97e66be799321414136d08c5ed2bf3ba048afe6dcaebafeffffffffffffffffffffffffffffff009776697621414136d08c5ed2bf3ba048afe6dcaebafeffffffffffffffffffffffffffffff007c94a3826b012080517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e01206c947f77827d6b7e23022079be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798027c7e6c01249301307c7e7c7e01417e210279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798acb882010000000000ffffffff37b62f3ad98cb2e33a3d3dd10c0d77a853fbf27851ad682751e0b53581dfc9230000000041000000ffffffff01d07e010000000000fdc102050200000000ab74529d7c766b7601447f7701247f75aa78547f7701207f7588820134947f7601307f77547f75044100000088765c7f7701207f756b587f758102e803947600a06958807c01687f77537f77825793528001fd7c7e7b7c7e557e7b818b0500000000019755807e01ab7e7c7eaa6c886caa517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e01007e81209817f8165b81f259d928ce2ddbfc9b02070b87ce9562a055acbbdcf97e66be799321414136d08c5ed2bf3ba048afe6dcaebafeffffffffffffffffffffffffffffff009776697621414136d08c5ed2bf3ba048afe6dcaebafeffffffffffffffffffffffffffffff007c94a3826b012080517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b517f7c6b6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e6c7e01206c947f77827d6b7e23022079be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798027c7e6c01249301307c7e7c7e01417e210279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798ac00000000",
+      "tx_bytes": 1629,
+      "txid": "6f93cbc6356c284a66f1fa2a10509f10dde2c1a57c684ccdce6e0e2478ad3624",
+      "unlock_bytes": 860
+    }
+  ],
+  "template": "0.1.0/full-preimage-fixed-fee",
+  "template_sha256": "8b757966d492adfadb003bd7e5d0766fa44261d5034da10fed85befd31367917",
+  "utxo_height": 3,
+  "verification_level": "dual-engine",
+  "verification_sources": {
+    "src/fourthgraph/benchmark/validation.py": "bc2a1dfbf1a08a92cf639f24d1596f6591a2f35473843b1eb702780ceeb2fc9e",
+    "src/fourthgraph/workflow/contract_runtime.mjs": "be241f1bfac15259eb50d8bf3a5dea6d41340d1a93109369f6327ed778316c60",
+    "src/fourthgraph/workflow/project_contract.py": "8b479c3468f34a1225d1f36ef2e0c9782f34d42c2bcb1f6fadf7c58169414e45",
+    "tools/verify_project_contract.py": "22ae68943c2c8ee69976a5b8e7eb9d8db1a12fbf3f1ba69634921f879748f9b1"
+  }
+}

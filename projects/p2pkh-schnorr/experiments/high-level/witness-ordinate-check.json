@@ -1,0 +1,146 @@
+{
+  "compiler": "0.2.7",
+  "control_revision": "e52283a7e84bb169b9ed9760df8dfac2fd3ebb8d",
+  "candidate_source_revision": "8f4c5e35c0f9f48e7f60f5507dc24f5b67efcbf6",
+  "profile": "glv-joint-scaled-2/dataflow/batch/tuned",
+  "bsv_node": 101020300,
+  "chain_gang": {
+    "version": "0.13.2",
+    "commit": "74676b9c002c452e7f21a9ed9265f4972bef03f6"
+  },
+  "builds": {
+    "shared_row_coordinates": {
+      "verifier_sha256": "56a7dab95e38a59b2a339a2173de562a797d33e4f3896201628e2d0ca27b24d5",
+      "lock_bytes": 22436,
+      "lock_sha256": "ca23831d475602948dc65dfc902bf3eb696b18e8a7f2dd84f6a350cf92647482",
+      "two_by_two_otda_all": {
+        "transaction_bytes": 54630,
+        "txid": "82fa4908d6eca569b74d6d4422e1c9257987afdea0fa76a8e2996adfb94da343",
+        "unlock_bytes": [
+          4820,
+          4820
+        ]
+      }
+    },
+    "paired_ordinate_check": {
+      "verifier_sha256": "17a6851f1e1d32d43ddf8218e80eb3507e663e6df0d03282529ff7ca7f22802c",
+      "lock_bytes": 22434,
+      "lock_sha256": "f2dd9e2f15c2c3ed2118769bbea5c1f965eea3b5352af0b3260357f402a3870f",
+      "two_by_two_otda_all": {
+        "transaction_bytes": 54622,
+        "txid": "348464e32be0201ec1ee50e29a07892271206198a347f724cd576d3f21ef4c57",
+        "unlock_bytes": [
+          4818,
+          4818
+        ]
+      }
+    },
+    "manual_v0_17_0": {
+      "verifier_sha256": "961935071094a9844e2747fb55e17be638c780829a47d3611177b5feee03dcb6",
+      "lock_bytes": 22435,
+      "lock_sha256": "8ccf6e1e0070112603e45e0521a9194efcf61c601d55aadef9c0e20466e734c2",
+      "two_by_two_otda_all": {
+        "transaction_bytes": 54626,
+        "txid": "55b49929976830c485a98936e86cde4f07033d09d4601a7f1b4e6c16e34b007b",
+        "unlock_bytes": [
+          4819,
+          4819
+        ]
+      }
+    }
+  },
+  "before_joint_multiplication_bytes": {
+    "shared_row_coordinates": 509,
+    "paired_ordinate_check": 507
+  },
+  "identical_windows": true,
+  "window_bytes": 18379,
+  "dual_engine_replay": {
+    "detached_cases": 28,
+    "positive_payments": 14,
+    "changed_locktime_rejections": 14,
+    "constructor_scenarios": 8,
+    "extended_scenarios": 46,
+    "companion_scenarios": 2,
+    "matrix_mutation_verdicts_match_control": true,
+    "default_wallet_recognizes_candidate": false
+  },
+  "paired_check_replay": {
+    "fragment_bytes": 10,
+    "fragment_sha256": "076b50f7c7413ce350d5e5e7d8c2b7a303d44d342064d36eb0bedcfa7d93d6f7",
+    "cases": [
+      {
+        "values": [
+          "0x0",
+          "0x0"
+        ],
+        "expected": true,
+        "bsv_node": true,
+        "chain_gang": true
+      },
+      {
+        "values": [
+          "0x0",
+          "0x1"
+        ],
+        "expected": false,
+        "bsv_node": false,
+        "chain_gang": false
+      },
+      {
+        "values": [
+          "0x1",
+          "0x0"
+        ],
+        "expected": false,
+        "bsv_node": false,
+        "chain_gang": false
+      },
+      {
+        "values": [
+          "0x1",
+          "0x1"
+        ],
+        "expected": false,
+        "bsv_node": false,
+        "chain_gang": false
+      },
+      {
+        "values": [
+          "0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2c",
+          "0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2c"
+        ],
+        "expected": true,
+        "bsv_node": true,
+        "chain_gang": true
+      },
+      {
+        "values": [
+          "0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2c",
+          "0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2d"
+        ],
+        "expected": false,
+        "bsv_node": false,
+        "chain_gang": false
+      },
+      {
+        "values": [
+          "0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2d",
+          "0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2c"
+        ],
+        "expected": false,
+        "bsv_node": false,
+        "chain_gang": false
+      },
+      {
+        "values": [
+          "0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2d",
+          "0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2d"
+        ],
+        "expected": false,
+        "bsv_node": false,
+        "chain_gang": false
+      }
+    ]
+  }
+}

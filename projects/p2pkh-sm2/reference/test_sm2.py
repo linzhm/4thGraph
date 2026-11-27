@@ -10,16 +10,27 @@ import subprocess
 import sys
 import tempfile
 import unittest
-from assemble import assemble
+from assemble import PACKED_SM3_TEMPLATE_VERSION, SIGNED_RESIDUE_TEMPLATE_VERSION, SIGNED_WINDOW_TEMPLATE_VERSION
+from assemble import POINT_KERNEL_FILE, TEMPLATE_VERSION, TEMPLATE_VERSIONS
+from assemble import WINDOW_DOUBLING_TEMPLATE_VERSION, WINDOW_KERNEL_FILE
+from assemble import AFFINE_GENERATOR_TEMPLATE_VERSION, AFFINE_KERNEL_FILE
+from assemble import CARRIED_FIELD_TEMPLATE_VERSION, CARRIED_KERNEL_FILE
+from assemble import BYTE_KERNEL_FILE
+from assemble import assemble, forth_compiler, sm3_blocks
+from byte_fields import BYTE_KERNEL_NAMES, compile_byte_kernels
+from point_kernels import AFFINE_KERNEL_NAME, WINDOW_KERNEL_NAME, compile_kernels, load_kernels
+from point_kernels import CARRIED_KERNEL_NAMES, compile_carried_kernels
 from p2pkh_sm2 import *
 from sm2 import *
 from sm3_script import hash_script,compress,IV
+from tune_window import evaluate_kernels, window_vectors
 from fourthgraph.bsv.evaluate import evaluate,ScriptError
-from fourthgraph.bsv.script import push,number,assemble as assemble_blocks
+from fourthgraph.bsv.script import asm, decode_num, encode_num, push, number, assemble as assemble_blocks
 from fourthgraph.bsv.transaction import *
 
 ROOT=Path(__file__).resolve().parents[1]
-SM3_PROFILES = ({}, {'optimized': True}, {'compact': True})
+SM3_PROFILES = ({}, {'optimized': True}, {'compact': True}, {'scheduled': True}, {'packed': True},
+                {'split_rotations': True}, {'stream_schedule': True})
 
 
 def der(tag,raw):
@@ -62,8 +73,8 @@ def native_checker(tx,index,value):
     return check
 
 
-def fixture(d=1,k=2):
-    key=encode_public(mul(d)); lock=locking_script_from_public_key(key)
+def fixture(d=1,k=2,*,template_version=TEMPLATE_VERSION):
+    key=encode_public(mul(d)); lock=locking_script_from_public_key(key, version=template_version)
     funding=Transaction((Input(b'\x22'*32,0),),(Output(1000,lock),))
     tx=Transaction((Input(funding.txid_wire(),0),),(Output(900,b'\x51'),))
     pre=preimage_all(tx,0,1000); sig=fixture_sign(d,hash256(pre),k)
@@ -110,14 +121,15 @@ class SM2Tests(unittest.TestCase):
                     self.assertEqual(stack,[za(key)]); self.assertEqual(alt,[])
 
     def test_compact_sm3_preserves_lower_stack_and_checks_input_length(self):
-        script=hash_script(64,compact=True)
         lower=[(1 << 32).to_bytes(5,'little'), b'\x80', b'lower']
-        for data in (bytes(64), b'\xff'*64, b'\x80\x01'*32):
-            with self.subTest(word=data[:2].hex()):
-                self.assertEqual(evaluate(script,lower+[data]),(lower+[sm3(data)],[]))
-        for length in (63,65):
-            with self.subTest(length=length), self.assertRaisesRegex(ScriptError,'NUMEQUALVERIFY'):
-                evaluate(script,lower+[bytes(length)])
+        for profile in SM3_PROFILES[2:]:
+            script=hash_script(64,**profile)
+            for data in (bytes(64), b'\xff'*64, b'\x80\x01'*32):
+                with self.subTest(profile=profile, word=data[:2].hex()):
+                    self.assertEqual(evaluate(script,lower+[data]),(lower+[sm3(data)],[]))
+            for length in (63,65):
+                with self.subTest(profile=profile, length=length), self.assertRaisesRegex(ScriptError,'NUMEQUALVERIFY'):
+                    evaluate(script,lower+[bytes(length)])
 
     def test_openssl_standard_and_round_trip(self):
         self.assertIsNotNone(shutil.which('openssl'),'OpenSSL with SM2 is required')
@@ -154,10 +166,141 @@ class SM2Tests(unittest.TestCase):
         r1=bytes.fromhex('046b17d1f2e12c4247f8bce6e563a440f277037d812deb33a0f4a13945d898c2964fe342e2fe1a7f9b8ee7eb4a7c0f9e162bce33576b315ececbb6406837bf51f5')
         with self.assertRaises(ValueError): public_key_hash160(r1)
 
+    def test_forth_build_and_recognition(self):
+        owner = bytes(range(20))
+        sizes = []
+        for version in TEMPLATE_VERSIONS:
+            with self.subTest(version=version):
+                lock = locking_script_from_owner_hash(owner, version=version)
+                self.assertEqual(lock, assemble(owner, version))
+                if version < SIGNED_RESIDUE_TEMPLATE_VERSION:
+                    self.assertEqual(lock, assemble_blocks(ROOT/'reference/asm', owner, sm3_blocks(version=version)))
+                self.assertEqual(identify(lock), (version, owner))
+                self.assertIsNone(identify(lock[:-1]))
+                self.assertIsNone(identify(lock[:-1] + b'\x51'))
+                sizes.append(len(lock))
+        self.assertEqual(sizes, sorted(set(sizes), reverse=True))
+
     def test_full_script_random_keys(self):
-        for d,k in ((1,2),(7,19),(19,7),(N-2,N-1),(12345,67890)):
-            key,lock,parent,tx,pre,sig=fixture(d,k)
-            with self.subTest(d=d): self.assertTrue(valid_script(lock,[pre,key,sig],tx))
+        for version in TEMPLATE_VERSIONS:
+            for d,k in ((1,2),(7,19),(19,7),(N-2,N-1),(12345,67890)):
+                key,lock,parent,tx,pre,sig=fixture(d,k,template_version=version)
+                with self.subTest(version=version,d=d): self.assertTrue(valid_script(lock,[pre,key,sig],tx))
+
+    def test_point_kernels_reproduce_signed_coordinates(self):
+        candidates = (compile_kernels(), load_kernels(POINT_KERNEL_FILE))
+        previous = forth_compiler(bytes(20), PACKED_SM3_TEMPLATE_VERSION)
+        old_add = previous.emit("sm2-add-points", b"")
+        old_double = previous.emit("sm2-double-point", b"")
+
+        infinity = (0, -7, 0)
+        x, y = mul(7)
+        point, inverse = (x, y, 1), (x, -y, 1)
+        x2, y2 = mul(19)
+        scaled = (-(2*x2 % P), -(2*y2 % P), -2)
+        cached = (P, 3*B % P, 17, 1)
+        for left, right in ((infinity, infinity), (infinity, point), (point, infinity),
+                            (point, point), (point, inverse), (scaled, point), (scaled, scaled)):
+            with self.subTest(left=left, right=right):
+                add_stack = [encode_num(value) for value in (*cached, *left, *right)]
+                double_stack = [encode_num(value) for value in (*cached, *left)]
+                for kernels in candidates:
+                    new_add = kernels["sm2-add-kernel"]
+                    new_double = kernels["sm2-double-kernel"]
+                    self.assertLess(len(new_add), len(old_add))
+                    self.assertLess(len(new_double), len(old_double))
+                    self.assertEqual(evaluate(new_add, add_stack), evaluate(old_add, add_stack))
+                    self.assertEqual(evaluate(new_double, double_stack), evaluate(old_double, double_stack))
+
+    def test_window_kernel_reproduces_five_doublings(self):
+        names = (WINDOW_KERNEL_NAME,)
+        candidates = (compile_kernels(names), load_kernels(WINDOW_KERNEL_FILE, names))
+        previous = 5 * load_kernels(POINT_KERNEL_FILE)["sm2-double-kernel"]
+        x, y = mul(19)
+        scaled = (-(2*x % P), -(2*y % P), -2)
+        prefix = (P, 3*B % P, 17)
+        for point in ((0, 1, 0), (0, -7, 0), (x, y, 1), scaled):
+            with self.subTest(point=point):
+                stack = [encode_num(value) for value in (*prefix, *point)]
+                for kernels in candidates:
+                    grouped = kernels[WINDOW_KERNEL_NAME]
+                    self.assertLess(len(grouped), len(previous))
+                    self.assertEqual(evaluate(grouped, stack), evaluate(previous, stack))
+
+    def test_signed_windows_match_scalar_multiplication(self):
+        for version in (SIGNED_WINDOW_TEMPLATE_VERSION, WINDOW_DOUBLING_TEMPLATE_VERSION,
+                        AFFINE_GENERATOR_TEMPLATE_VERSION, CARRIED_FIELD_TEMPLATE_VERSION):
+            with self.subTest(version=version):
+                self.check_signed_windows(version)
+
+    def check_signed_windows(self, version):
+        compiler = forth_compiler(bytes(20), version)
+        window = compiler.emit("sm2-window", b"")
+        qx, qy = mul(7)
+        cached = [encode_num(value) for value in (P, 3*B % P, 17)]
+        cases = (
+            (0, 0), (1, 0), (0, 1), (15, 16), (16, 31), (31, 32),
+            (N-7, 1), (N-1, N-1), (1 << 255, N-2), (N-2, 1 << 255),
+            ((1 << 256)-1, (1 << 256)-1),
+        )
+        for s, t in cases:
+            with self.subTest(s=s, t=t):
+                setup = b"".join(number(value) + asm("OP_TOALTSTACK") for value in (s, t, qy, qx))
+                stack, alt = evaluate(setup + window, cached)
+                self.assertEqual(alt, [])
+                self.assertEqual(stack[:len(cached)], cached)
+                generator_slots = 2*16 if version >= AFFINE_GENERATOR_TEMPLATE_VERSION else 3*17
+                self.assertEqual(len(stack), len(cached) + generator_slots + 3*17 + 3)
+                x, y, z = (decode_num(value) % P for value in stack[-3:])
+                self.assertTrue(x or y or z)
+                inverse_z = pow(z, -1, P) if z else None
+                actual = (x*inverse_z % P, y*inverse_z % P) if z else None
+                self.assertEqual(actual, add(mul(s), mul(t, (qx, qy))))
+
+    def test_carried_window_kernels_reproduce_template_9(self):
+        vectors = list(window_vectors())
+        evaluate_kernels(compile_carried_kernels(), vectors)
+        evaluate_kernels(load_kernels(CARRIED_KERNEL_FILE, CARRIED_KERNEL_NAMES), vectors)
+
+    def test_packed_fields_preserve_unsigned_values_and_stack_order(self):
+        kernels, _ = compile_byte_kernels()
+        self.assertEqual(kernels, load_kernels(BYTE_KERNEL_FILE, BYTE_KERNEL_NAMES))
+        compiler = forth_compiler(bytes(20), CARRIED_FIELD_TEMPLATE_VERSION)
+        unpack = compiler.emit("sm2-unpack-packed-fields", b"")
+        fields = (bytes(192), bytes(range(192)), b"\xff"*192)
+        for data in fields:
+            r, s, x, y, e, digest = (data[index:index+32] for index in range(0, len(data), 32))
+            setup = push(b"flag") + asm("OP_TOALTSTACK") + push(digest) + asm("OP_TOALTSTACK")
+            stack = [b"preimage", b"\x04"+x+y, r+s, e]
+            expected = [encode_num(int.from_bytes(part, "big")) for part in (digest, e, y, x, s, r)]
+            self.assertEqual(evaluate(setup+unpack, stack), ([b"preimage"], [b"flag", *expected]))
+            stack[1] = b"\x02"+x+y
+            with self.assertRaises(ScriptError):
+                evaluate(setup+unpack, stack)
+
+    def test_affine_kernel_reproduces_projective_addition(self):
+        names = (AFFINE_KERNEL_NAME,)
+        candidates = (compile_kernels(names), load_kernels(AFFINE_KERNEL_FILE, names))
+        general = load_kernels(POINT_KERNEL_FILE)["sm2-add-kernel"]
+        x, y = mul(19)
+        scaled = (-(2*x % P), -(2*y % P), -2)
+        prefix = (P, 3*B % P, 17)
+        for left, right in (((0, 1, 0), (x, y)), ((x, y, 1), (x, y)),
+                            ((x, y, 1), (x, -y)), (scaled, mul(7))):
+            with self.subTest(left=left, right=right):
+                stack = [encode_num(value) for value in (*prefix, *left, *right)]
+                for kernels in candidates:
+                    affine = kernels[AFFINE_KERNEL_NAME]
+                    self.assertLess(len(affine), len(general))
+                    self.assertEqual(evaluate(affine, stack), evaluate(general, [*stack, b'\x01']))
+
+    def test_compact_byte_reversal_matches_legacy(self):
+        previous = forth_compiler(bytes(20), WINDOW_DOUBLING_TEMPLATE_VERSION).emit("sm2-reverse32", b"")
+        compact = forth_compiler(bytes(20), AFFINE_GENERATOR_TEMPLATE_VERSION).emit("sm2-reverse32", b"")
+        self.assertLess(len(compact), len(previous))
+        for data in (bytes(range(32)), bytes(32), bytes(range(224, 256))):
+            with self.subTest(data=data):
+                self.assertEqual(evaluate(compact, [b'prefix', data]), ([b'prefix', data[::-1]], []))
 
     def test_script_rejects_invalid_signature_and_key(self):
         key,lock,parent,tx,pre,sig=fixture()
@@ -187,9 +330,11 @@ class SM2Tests(unittest.TestCase):
         # s=1, t=2, Q=-(1/2)G => sG+tQ=infinity.
         key=encode_public(mul(N-pow(2,-1,N)))
         self.assertFalse(verify_digest(key,bytes(32),be32(1)+be32(1)))
-        point_code=assemble_blocks(ROOT/'reference/asm',bytes(20),entry='VERIFY_SM2_POINT')
-        with self.assertRaises(ScriptError):
-            evaluate(b''.join(number(x) for x in (P,1,1,*parse_public(key),0))+point_code)
+        inputs=b''.join(number(x) for x in (P,1,1,*parse_public(key),0))
+        for version in TEMPLATE_VERSIONS:
+            point_code=forth_compiler(bytes(20), version).emit("sm2-verify-sm2-point", b"")
+            with self.subTest(version=version), self.assertRaises(ScriptError):
+                evaluate(inputs+point_code)
 
     def test_high_x_candidate(self):
         # Construct a valid verification relation with x >= n (negligible random probability).
@@ -201,8 +346,11 @@ class SM2Tests(unittest.TestCase):
         e=123; r=(e+x)%N; s=456; t=(r+s)%N
         q=mul(pow(t,-1,N),add((x,y),mul(N-s)))
         self.assertTrue(verify_digest(encode_public(q),be32(e),be32(r)+be32(s)))
-        point_code=assemble_blocks(ROOT/'reference/asm',bytes(20),entry='VERIFY_SM2_POINT')
-        self.assertEqual(evaluate(b''.join(number(v) for v in (P,r,s,*q,e))+point_code),([],[]))
+        inputs=b''.join(number(v) for v in (P,r,s,*q,e))
+        for version in TEMPLATE_VERSIONS:
+            point_code=forth_compiler(bytes(20), version).emit("sm2-verify-sm2-point", b"")
+            with self.subTest(version=version):
+                self.assertEqual(evaluate(inputs+point_code),([],[]))
 
     def test_payment_vector_and_consecutive_payments(self):
         v=json.loads((ROOT/'versions/v1.0.0/spend-all.json').read_text())
@@ -243,7 +391,10 @@ class SM2Tests(unittest.TestCase):
         self.assertEqual(result['script_sha256'], manifest['base_script_sha256'])
         self.assertEqual(subprocess.check_output([*cli, '--format', 'raw']), lock)
         self.assertEqual(subprocess.check_output([*cli, '--version', '1', '--format', 'raw']), lock)
-        for version in (0, 2, 3, 4):
+        for version in TEMPLATE_VERSIONS[1:]:
+            candidate = assemble(base_owner, version)
+            self.assertEqual(subprocess.check_output([*cli, '--version', str(version), '--format', 'raw']), candidate)
+        for version in (0, TEMPLATE_VERSIONS[-1] + 1, TEMPLATE_VERSIONS[-1] + 2):
             with self.subTest(version=version):
                 for construct in (assemble, locking_script_from_owner_hash):
                     with self.assertRaisesRegex(ValueError, 'unsupported P2PKH-SM2 template'):

@@ -17,10 +17,11 @@ from fourthgraph.bsv.transaction import CHRONICLE, FORKID, SIGHASH_ALL, Input, O
 from fourthgraph.compiler.ranges import NUMERIC_TYPES
 from fourthgraph.compiler.source import (
     GATE_BOUNDARIES, PROJECT_DESCRIPTION, PROJECT_NAME, PROJECT_VERSION, CompileError, ParentOutput, Plan,
-    SourceCompiler, Template, Workflow, WORKFLOW_MODES, availability, evaluate, fused_template, fusion_constraints, gate_constraints,
+    FUSED_PREFIX, SourceCompiler, Template, Workflow, WORKFLOW_CHOICES, availability, evaluate, fused_template, fusion_constraints, gate_constraints,
     schedule, split_templates,
 )
 from fourthgraph.compiler.lowering import BASELINE, OPTIMIZATIONS, compile_word
+from fourthgraph.compiler.pels_language import WORDS as PELS_WORDS
 from fourthgraph.compiler.stack_schedule import Graph
 from fourthgraph.stdlib import capabilities as library_capabilities, describe_export
 from fourthgraph.workflow.transaction_graph import TransactionGraph
@@ -62,6 +63,12 @@ def normalize_target(value):
 
 def normalize_sighash_family(value):
     return {"forkid": "bip143", "chronicle": "otda"}.get(value, value)
+
+
+def candidate_sighash_families(target, policy):
+    if policy != "auto":
+        return (policy,)
+    return ("bip143", "otda") if TARGETS[target][1] == "chronicle" else ("bip143",)
 
 
 def field(offset, width):
@@ -1004,7 +1011,20 @@ def compile_search(program, keys, task_id, *, source_bytes, mode="auto", gate_bo
 
 
 def main():
-    cli = argparse.ArgumentParser(prog=PROJECT_NAME, description=PROJECT_DESCRIPTION)
+    if sys.argv[1:2] == ["curve-multiply"]:
+        from fourthgraph.workflow.curve_cli import main as curve_main
+        return curve_main(sys.argv[2:])
+    if sys.argv[1:2] == ["preimage-constructor"]:
+        from fourthgraph.workflow.preimage_constructor import main as constructor_main
+        return constructor_main(sys.argv[2:])
+    if sys.argv[1:2] == ["pels-witness"]:
+        from fourthgraph.workflow.pels import witness_main
+        return witness_main(sys.argv[2:])
+    cli = argparse.ArgumentParser(prog=PROJECT_NAME, description=PROJECT_DESCRIPTION,
+                                  epilog="Subcommands: experiment, pels-witness, preimage-constructor, curve-multiply.")
+    if sys.argv[1:2] == ["experiment"]:
+        from fourthgraph.benchmark.experiment import main as experiment_main
+        return experiment_main(sys.argv[2:])
     cli.add_argument("source", type=Path, nargs="?")
     action = cli.add_mutually_exclusive_group()
     action.add_argument("--capabilities", action="store_true", help="list the supported Forth and BSV words")
@@ -1016,11 +1036,13 @@ def main():
                      help="bind a declared byte parameter at compile time (repeatable)")
     cli.add_argument("--assume-input-ranges", action="store_true",
                      help="for --entry, rely on the caller to check numeric input types and ScriptNum encodings")
-    cli.add_argument("--mode", choices=("auto", "split", *WORKFLOW_MODES), default="auto")
+    cli.add_argument("--mode", choices=("auto", "split", *WORKFLOW_CHOICES), default="auto")
     cli.add_argument("--target", type=normalize_target, choices=TARGETS, default=DEFAULT_TARGET,
                      help="permitted transaction versions")
-    cli.add_argument("--sighash-family", type=normalize_sighash_family, choices=SIGHASH_FAMILY_OPTIONS,
-                     default="bip143", help="staged workflow preimage formats accepted by the lock")
+    cli.add_argument("--sighash-family", type=normalize_sighash_family, choices=(*SIGHASH_FAMILY_OPTIONS, "auto"),
+                     default="bip143", help="preimage policy for staged workflows and PELS locks")
+    cli.add_argument("--pels-successor-state", metavar="HEX",
+                     help="link an --entry state/amount rule to the PELS successor template with this initial state")
     cli.add_argument("--optimize", choices=OPTIMIZATIONS, default=BASELINE)
     cli.add_argument("--join-witness", choices=JOIN_WITNESSES)
     cli.add_argument("--gate-boundary", choices=GATE_BOUNDARIES, default="auto")
@@ -1038,18 +1060,36 @@ def main():
         cli.error("--objective requires --search")
     if args.max_tx_bytes is not None and not args.search:
         cli.error("--max-tx-bytes requires --search")
-    if args.entry and (args.search or args.sighash_family != "bip143" or args.gate_boundary != "auto" or args.current is not None
-                       or args.mode in ("serial", "atomic")):
+    if args.entry and (args.search or args.gate_boundary != "auto" or args.current is not None
+                       or args.mode in ("serial", "atomic", FUSED_PREFIX)):
         cli.error("transaction search and boundaries require a transaction build")
     if args.assume_input_ranges and args.entry is None:
         cli.error("--assume-input-ranges requires --entry")
+    if args.pels_successor_state is not None:
+        if args.entry is None:
+            cli.error("--pels-successor-state requires --entry")
+        if args.optimize != BASELINE or args.assume_input_ranges:
+            cli.error("entry optimization and range options do not apply to PELS successor linking")
     if args.capabilities:
+        from fourthgraph.compiler.curve_windows import CURVES, scalar_plans
+
         print(json.dumps({"project": PROJECT_NAME, "compiler_version": PROJECT_VERSION, "description": PROJECT_DESCRIPTION,
                           **capabilities(), "libraries": library_capabilities(),
                           "optimizations": OPTIMIZATIONS, "join_witnesses": JOIN_WITNESSES,
-                          "topologies": ("parallel", "gated-parallel", "workflow"), "workflow_modes": WORKFLOW_MODES,
+                          "topologies": ("parallel", "gated-parallel", "workflow"), "workflow_modes": WORKFLOW_CHOICES,
                           "workflow_sighash_families": {**{name: f"{flag:02x}" for name, flag in SIGHASH_FAMILIES.items()},
                                                        "both": [f"{flag:02x}" for flag in SIGHASH_FAMILIES.values()]},
+                          "pels_sighash_policies": (*SIGHASH_FAMILY_OPTIONS, "auto"),
+                          "pels_words": tuple(PELS_WORDS),
+                          "pels_successor": {"state_option": "--pels-successor-state",
+                                             "sighash_policies": ("bip143", "auto")},
+                          "preimage_constructor": {"command": "preimage-constructor", "modes": ("auto", "literal"),
+                                                   "prepared_wasm_receipt": True},
+                          "curve_multiply": {"command": "curve-multiply", "curves": {
+                              name: {"generator": [plan.name for plan in scalar_plans(curve) if plan.eligible],
+                                     "joint": [plan.name for plan in scalar_plans(curve, joint=True) if plan.eligible]}
+                              for name, curve in CURVES.items()
+                          }},
                           "search_objectives": OBJECTIVES,
                           "gate_boundaries": GATE_BOUNDARIES, "targets": {
             name: {"transaction_versions": versions, "era": era} for name, (versions, era) in TARGETS.items()
@@ -1071,12 +1111,37 @@ def main():
                 bindings[name] = bytes.fromhex(hexadecimal)
             except ValueError:
                 cli.error(f"byte binding {name!r} requires hexadecimal byte pairs")
+        if args.pels_successor_state is not None:
+            from fourthgraph.compiler.script_builder import ScriptBuilder
+            from fourthgraph.workflow.pels import compile_successor
+
+            try:
+                state = bytes.fromhex(args.pels_successor_state)
+            except ValueError:
+                cli.error("--pels-successor-state requires hexadecimal byte pairs")
+            source = ScriptBuilder(source_bytes.decode(), source_path=args.source, bindings=bindings)
+            entry = args.entry.casefold()
+            result = compile_successor(source, entry, state, args.target, args.sighash_family, explain=args.explain)
+            result.update(project=PROJECT_NAME, compiler_version=PROJECT_VERSION, schema_version=1,
+                          entry=entry, libraries=tuple(map(asdict, source.library_imports)))
+            display_build(build_artifact(result, source_bytes), args)
+            return
         source = SourceCompiler(source_bytes.decode(), source_path=args.source, bindings=bindings)
         if args.entry is not None:
             entry = args.entry.casefold()
             word = source.words.get(entry)
             if word is None:
                 raise CompileError(f"undefined entry word {args.entry!r}")
+            if getattr(word, "pels", None) is not None:
+                from fourthgraph.workflow.pels import compile_pels
+
+                result = compile_pels(word.pels, args.target, args.sighash_family, explain=args.explain)
+                result.update(project=PROJECT_NAME, compiler_version=PROJECT_VERSION, schema_version=1,
+                              entry=word.name, libraries=tuple(map(asdict, source.library_imports)))
+                display_build(build_artifact(result, source_bytes), args)
+                return
+            if args.sighash_family != "bip143":
+                cli.error("--sighash-family requires a staged workflow or PELS lock")
             compiled = compile_word(word, args.optimize, spend_entry=True,
                                     check_input_ranges=not args.assume_input_ranges)
             result = {"project": PROJECT_NAME, "compiler_version": PROJECT_VERSION, "schema_version": 1,
@@ -1132,6 +1197,8 @@ def main():
                     result = build_artifact({**result, "schedule_explanation": report}, source_bytes)
                 display_build(result, args)
                 return
+            if args.mode == FUSED_PREFIX:
+                cli.error("fused-prefix requires a three-stage workflow")
             if args.task_id is None or args.current is not None:
                 cli.error("parallel builds require --task-id and take their u32 values at spend time")
             if args.sighash_family != "bip143":

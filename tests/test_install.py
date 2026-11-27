@@ -69,7 +69,45 @@ class InstallTests(unittest.TestCase):
             self.assertTrue(p256["script_hex"].endswith(fragment["script_hex"]))
             self.assertEqual({library["name"] for library in p256["libraries"]}, {"std/bsv", "std/p256"})
 
+            joint = json.loads(run("4thgraph", "curve-multiply", "--curve", "secp256k1", "--operation", "joint"))
+            winner = min(joint["candidates"], key=lambda candidate: candidate["script_bytes"])
+            self.assertEqual(joint["selected"], winner["algorithm"])
+            self.assertEqual(len(bytes.fromhex(joint["script_hex"])), winner["script_bytes"])
+
             catalog = json.loads(run("4thgraph", "--capabilities"))["libraries"]
+            wallet_probe = """
+from dataclasses import asdict
+import json
+import sys
+
+sys.path.insert(0, sys.argv[1])
+from fourthgraph.compiler.script_builder import ScriptBuilder
+from fourthgraph.bsv.evaluate import evaluate
+
+builder = ScriptBuilder(
+    'REQUIRE stdlib/bip340.fth\\nREQUIRE stdlib/script-fragments.fth\\n'
+    'REQUIRE stdlib/./secp256k1.fth\\n'
+)
+raw = bytes(range(32))
+stack, alt = evaluate(builder.emit('script-reverse32', b''), [b'keep', raw])
+print(json.dumps({
+    "imports": [asdict(item) for item in builder.library_imports],
+    "main": [item.hex() for item in stack],
+    "alt": [item.hex() for item in alt],
+}))
+"""
+            wallet = json.loads(subprocess.check_output(
+                [sys.executable, "-I", "-c", wallet_probe, str(workspace / "bin" / "4thgraph")], **options,
+            ))
+            evidence = wallet["imports"]
+            expected = {"std/bip340", "std/bsv", "std/script-fragments", "std/secp256k1", "std/secp256k1-window"}
+            self.assertEqual(len(evidence), len(expected))
+            self.assertEqual({item["name"] for item in evidence}, expected)
+            for item in evidence:
+                self.assertEqual(item["interface_sha256"], catalog[item["name"]]["interface_sha256"])
+            self.assertEqual(wallet["main"], [b"keep".hex(), bytes(range(31, -1, -1)).hex()])
+            self.assertEqual(wallet["alt"], [])
+
             for module, entry in (("std/p2pk", "p2pk-lock"), ("std/p2pkh", "p2pkh-lock")):
                 with self.subTest(module=module):
                     source.write_text(f"REQUIRE stdlib/{module.removeprefix('std/')}.fth\n")

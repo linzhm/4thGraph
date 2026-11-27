@@ -12,13 +12,11 @@ REQUIRE stdlib/bip340.fth
     schnorr-tag op-if op-checksigverify op-else op-codeseparator schnorr-ordinary-code
 ;
 
-: another-type ( script cell -- script ) swap op-over swap cell>byte bsv-push op-equal op-boolor ;
 : check-sighash ( script -- script )
-    op-1 op-split bytes-hex 000000 bsv-push op-equalverify op-dup
-    bytes-hex 41 bsv-push op-equal $42 another-type $43 another-type
-    $61 another-type $62 another-type $63 another-type
-    $c1 another-type $c2 another-type $c3 another-type
-    $e1 another-type $e2 another-type $e3 another-type op-verify
+    ( Require ForkID, allow Chronicle and ANYONECANPAY, and select ALL, NONE or SINGLE. )
+    op-1 op-split bytes-hex 000000 bsv-push op-equalverify
+    op-dup bytes-hex 5c bsv-push op-and bytes-hex 40 bsv-push op-equalverify
+    op-dup op-3 op-and op-verify
 ;
 
 : check-forkid-shape ( script script -- script )
@@ -100,8 +98,12 @@ REQUIRE stdlib/bip340.fth
 : push-number ( cell -- script ) bsv-empty swap bsv-num ;
 : pack-witness ( bytes bytes bytes bytes -- bytes ) bytes-cat bytes-cat bytes-cat ;
 
+: schnorr-witness-tail ( cell bytes bytes bytes bytes -- script )
+    pack-witness push-data swap push-number bsv-cat-code
+;
+
 : schnorr-unlock ( bytes cell bytes bytes bytes bytes -- script )
     ( Arguments: preimage mode px py signature ry. Emit three pushes in lock input order. )
-    pack-witness push-data swap push-number bsv-cat-code
+    schnorr-witness-tail
     swap push-data swap bsv-cat-code
 ;

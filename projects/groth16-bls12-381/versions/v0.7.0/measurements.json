@@ -1,0 +1,792 @@
+{
+  "version": "0.7.0",
+  "previous": "0.6.0",
+  "upstream_compiler_revision": "f4b29f9064e2eda5f8b6fd0d9bc6f9fc381577e8",
+  "callsite_compiler_revision": "9f859fe68df81e1a9a2d69077f7bf9b43f0f9202",
+  "fixture_sha256": "51f6524a32d8ec5d4eac1c97398dc97c1d0594caae0284b8faa36a02574c5cc6",
+  "fp2_source_sha256": "a713f2ab7681088c3d64d51de803509bd7d9d7604d654c167cdcfd1ee0bc0d91",
+  "objective": "path-bytes",
+  "witness_layout": "affine-inline",
+  "node_version": 101020300,
+  "chain_gang": {
+    "version": "0.13.2",
+    "commit": "74676b9c002c452e7f21a9ed9265f4972bef03f6"
+  },
+  "selected_round": 1,
+  "rounds": [
+    {
+      "round": 0,
+      "source_order": "public-input MSM before both G1 checks",
+      "source_revision": "9f859fe68df81e1a9a2d69077f7bf9b43f0f9202",
+      "source_sha256": "bdf34ae791bc0ee538002c13546da7ec70d7a09eec92b71f141869440f942d85",
+      "eras": {
+        "genesis": {
+          "reference": {
+            "lock_bytes": 258592,
+            "path_bytes": 267786,
+            "script_sha256": "f04e848c8fcb83958e32409ad1790703ec05a8cc9414b7edfa4156e7c1967ccd",
+            "artifact_sha256": "d83f4950bc657a6bf19b9fb592032f44cd49196ebcb2b2aa81cc5ee5e58d5674",
+            "local_verdicts": {
+              "accepted": 2,
+              "rejected": 4
+            }
+          },
+          "witness_bytes": [
+            9186,
+            9186
+          ],
+          "witness_sha256": [
+            "3089913fce520cf16c798cae57731a22fd57c04d1de3842e1c142eb1ec6ceb8e",
+            "4e3606ff09b7c9728b089f35bfe4ab7f269b96cf8a391892674214d377e9e780"
+          ],
+          "candidates": [
+            {
+              "lock_bytes": 286265,
+              "path_bytes": 295459,
+              "script_sha256": "641329741c6f46d4462fa3cd731562023b7b8ef5dd3c7d8afac66eeeb8104ceb",
+              "artifact_sha256": "fc56d5c79394207145a94cc12f1eeeab6cbb5451d351cdc662e38130bb5b901a",
+              "local_verdicts": {
+                "accepted": 2,
+                "rejected": 4
+              },
+              "plan": {
+                "fp2_rules": [],
+                "residue_association": "accumulator-frobenius-first"
+              }
+            },
+            {
+              "lock_bytes": 258565,
+              "path_bytes": 267759,
+              "script_sha256": "81a0ac474e6733db6b9f14e930122a51fbc602fb1dc541e6207c342bbf674937",
+              "artifact_sha256": "75bb3f40003214144182178990498884d66a6e97dcc0a800da0f4de1af5a22f3",
+              "local_verdicts": {
+                "accepted": 2,
+                "rejected": 4
+              },
+              "plan": {
+                "fp2_rules": [
+                  "expand-cross-products"
+                ],
+                "residue_association": "accumulator-frobenius-first"
+              }
+            },
+            {
+              "lock_bytes": 258536,
+              "path_bytes": 267730,
+              "script_sha256": "459b4c825e09eb66490d31b57d063c1eecdc1831d55728229235c4fa4f86351c",
+              "artifact_sha256": "3ad9b199f0c440afc5bd2b78d121e09d3e101f6f5af5b42abfe92af082728ab3",
+              "local_verdicts": {
+                "accepted": 2,
+                "rejected": 4
+              },
+              "fp2_choices": [
+                {
+                  "ordered_rules": [],
+                  "calls": 3
+                },
+                {
+                  "ordered_rules": [
+                    "expand-cross-products"
+                  ],
+                  "calls": 3130
+                }
+              ],
+              "plan": {
+                "fp2_rules": [
+                  "expand-cross-products"
+                ],
+                "residue_association": "accumulator-frobenius-first",
+                "fp2_selection": "callsite"
+              }
+            }
+          ],
+          "selected_plan": {
+            "fp2_rules": [
+              "expand-cross-products"
+            ],
+            "residue_association": "accumulator-frobenius-first",
+            "fp2_selection": "callsite"
+          },
+          "native_replay": {
+            "activation_height": 1000,
+            "cases": [
+              {
+                "fixture_case": "wrap",
+                "deployment_txid": "c0f36528b4b7b0bf139cc0395328ba5ad91dd69428b1f8f67f9e7403bdc12869",
+                "spend_txid": "e4b31becfde4fa6bdf11dc08629561a944bfb0d547008f62877aa79669ce1fb1",
+                "total_bytes": 267956,
+                "stack_payload": {
+                  "main_payload_bytes": 26758,
+                  "alt_payload_bytes": 59,
+                  "combined_payload_bytes": 26758
+                },
+                "witness_sha256": "3089913fce520cf16c798cae57731a22fd57c04d1de3842e1c142eb1ec6ceb8e",
+                "rejected_controls": [
+                  "crossed_statement",
+                  "g1_outside_subgroup"
+                ]
+              },
+              {
+                "fixture_case": "other",
+                "deployment_txid": "db992b1aca7b1bbbb8913e7a007f613fa43dc11d417c902d6a3828e354c3e760",
+                "spend_txid": "ec90d597d38bb8245462c8fe59acb1930733bb78eb09b0ebe1b55b54472bf937",
+                "total_bytes": 267956,
+                "stack_payload": {
+                  "main_payload_bytes": 26794,
+                  "alt_payload_bytes": 59,
+                  "combined_payload_bytes": 26794
+                },
+                "witness_sha256": "4e3606ff09b7c9728b089f35bfe4ab7f269b96cf8a391892674214d377e9e780",
+                "rejected_controls": [
+                  "crossed_statement",
+                  "g1_outside_subgroup"
+                ]
+              }
+            ]
+          }
+        },
+        "chronicle": {
+          "reference": {
+            "lock_bytes": 257691,
+            "path_bytes": 266885,
+            "script_sha256": "11b7c7356ccf7f127b3e5e29e662d1f8f380153d2b5788c992298b811ed1444d",
+            "artifact_sha256": "e41fb785c8e49539fbc98e4b2d54196fb044e571a06f8ddd3551c346f1bc1d67",
+            "local_verdicts": {
+              "accepted": 2,
+              "rejected": 4
+            }
+          },
+          "witness_bytes": [
+            9186,
+            9186
+          ],
+          "witness_sha256": [
+            "3089913fce520cf16c798cae57731a22fd57c04d1de3842e1c142eb1ec6ceb8e",
+            "4e3606ff09b7c9728b089f35bfe4ab7f269b96cf8a391892674214d377e9e780"
+          ],
+          "candidates": [
+            {
+              "lock_bytes": 285364,
+              "path_bytes": 294558,
+              "script_sha256": "baf4ee10787e4e3125011c7053a6e6921fcc8550f96ece9204e0cf00fe766850",
+              "artifact_sha256": "9820030a251190a8dfd1ef701e406154e84454c092da2b9f0327009921b2065c",
+              "local_verdicts": {
+                "accepted": 2,
+                "rejected": 4
+              },
+              "plan": {
+                "fp2_rules": [],
+                "residue_association": "accumulator-frobenius-first"
+              }
+            },
+            {
+              "lock_bytes": 257664,
+              "path_bytes": 266858,
+              "script_sha256": "b5f60e1ea45051cd2d58f766b73d21e1c59e47eca44adf6b25f33ccdfb6de27a",
+              "artifact_sha256": "590be74b45d68314648d0e73c4da3bb8796879172aa8701fcfebd0cee45a968f",
+              "local_verdicts": {
+                "accepted": 2,
+                "rejected": 4
+              },
+              "plan": {
+                "fp2_rules": [
+                  "expand-cross-products"
+                ],
+                "residue_association": "accumulator-frobenius-first"
+              }
+            },
+            {
+              "lock_bytes": 257635,
+              "path_bytes": 266829,
+              "script_sha256": "366b778790d8265eeb9645a37325cdc13a763831048e2295fb9e38351724cae4",
+              "artifact_sha256": "0102177641b2c42e1f6861c6560b06a559d82863eb8c7970ce383562c07c27e5",
+              "local_verdicts": {
+                "accepted": 2,
+                "rejected": 4
+              },
+              "fp2_choices": [
+                {
+                  "ordered_rules": [],
+                  "calls": 3
+                },
+                {
+                  "ordered_rules": [
+                    "expand-cross-products"
+                  ],
+                  "calls": 3130
+                }
+              ],
+              "plan": {
+                "fp2_rules": [
+                  "expand-cross-products"
+                ],
+                "residue_association": "accumulator-frobenius-first",
+                "fp2_selection": "callsite"
+              }
+            }
+          ],
+          "selected_plan": {
+            "fp2_rules": [
+              "expand-cross-products"
+            ],
+            "residue_association": "accumulator-frobenius-first",
+            "fp2_selection": "callsite"
+          },
+          "native_replay": {
+            "activation_height": 2,
+            "cases": [
+              {
+                "fixture_case": "wrap",
+                "deployment_txid": "c572ef8c6bfebe09897a507d6161d8c91d9c0c4b6f4a5c0ff653e80cff364097",
+                "spend_txid": "c83d3156e0db09c9e5076a8b10ca359a5a875555f235ba118445a692caf209d6",
+                "total_bytes": 267055,
+                "stack_payload": {
+                  "main_payload_bytes": 26758,
+                  "alt_payload_bytes": 59,
+                  "combined_payload_bytes": 26758
+                },
+                "witness_sha256": "3089913fce520cf16c798cae57731a22fd57c04d1de3842e1c142eb1ec6ceb8e",
+                "rejected_controls": [
+                  "crossed_statement",
+                  "g1_outside_subgroup"
+                ]
+              },
+              {
+                "fixture_case": "other",
+                "deployment_txid": "70b01f70fea6e0a657382d238a5bdc0134a2fbb13c0c25d1fd33accec629553c",
+                "spend_txid": "9f51b50c318e772d86571c1a6ca2cfe5b0877f2fc0a6eea7970c415b10fe2bab",
+                "total_bytes": 267055,
+                "stack_payload": {
+                  "main_payload_bytes": 26794,
+                  "alt_payload_bytes": 59,
+                  "combined_payload_bytes": 26794
+                },
+                "witness_sha256": "4e3606ff09b7c9728b089f35bfe4ab7f269b96cf8a391892674214d377e9e780",
+                "rejected_controls": [
+                  "crossed_statement",
+                  "g1_outside_subgroup"
+                ]
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "round": 1,
+      "source_order": "both G1 checks before public-input MSM",
+      "source_revision": "2a157350fbef8b03289a8f15c278b7645f14a5a9",
+      "source_sha256": "42bea985390c956c4d61beeb877e43a3c6c572ab73e51d9472adae1a17d6f025",
+      "eras": {
+        "genesis": {
+          "reference": {
+            "lock_bytes": 258592,
+            "path_bytes": 267786,
+            "script_sha256": "f04e848c8fcb83958e32409ad1790703ec05a8cc9414b7edfa4156e7c1967ccd",
+            "artifact_sha256": "d83f4950bc657a6bf19b9fb592032f44cd49196ebcb2b2aa81cc5ee5e58d5674",
+            "local_verdicts": {
+              "accepted": 2,
+              "rejected": 4
+            }
+          },
+          "witness_bytes": [
+            9186,
+            9186
+          ],
+          "witness_sha256": [
+            "3089913fce520cf16c798cae57731a22fd57c04d1de3842e1c142eb1ec6ceb8e",
+            "4e3606ff09b7c9728b089f35bfe4ab7f269b96cf8a391892674214d377e9e780"
+          ],
+          "candidates": [
+            {
+              "lock_bytes": 285988,
+              "path_bytes": 295182,
+              "script_sha256": "defa036cad4406d420d24845145b64316f53a07b1673975b2db3dac055c3fdc7",
+              "artifact_sha256": "2110b2d421e03c9dfadd17db3f88e25426a1c34bcc286ac464606699ae97c263",
+              "local_verdicts": {
+                "accepted": 2,
+                "rejected": 4
+              },
+              "plan": {
+                "fp2_rules": [],
+                "residue_association": "accumulator-frobenius-first"
+              }
+            },
+            {
+              "lock_bytes": 258288,
+              "path_bytes": 267482,
+              "script_sha256": "8409f378eb0ca7e7d5b1be7b37568ad2815dd15c6be117abc91b0a5f3b671eac",
+              "artifact_sha256": "481cbf2151034be7a01010dfe67969201fd86e4182b0d8c65c32ad68e7599c53",
+              "local_verdicts": {
+                "accepted": 2,
+                "rejected": 4
+              },
+              "plan": {
+                "fp2_rules": [
+                  "expand-cross-products"
+                ],
+                "residue_association": "accumulator-frobenius-first"
+              }
+            },
+            {
+              "lock_bytes": 258259,
+              "path_bytes": 267453,
+              "script_sha256": "3ba7b120156db143cf38b56d328a18eced5996ee8ebcb36e1fe255444ab5d6fc",
+              "artifact_sha256": "c90213a0942a40dfc0da8da9344b0dcd3f04dbe03a1e7a566d0b1d336774358e",
+              "local_verdicts": {
+                "accepted": 2,
+                "rejected": 4
+              },
+              "fp2_choices": [
+                {
+                  "ordered_rules": [],
+                  "calls": 3
+                },
+                {
+                  "ordered_rules": [
+                    "expand-cross-products"
+                  ],
+                  "calls": 3130
+                }
+              ],
+              "plan": {
+                "fp2_rules": [
+                  "expand-cross-products"
+                ],
+                "residue_association": "accumulator-frobenius-first",
+                "fp2_selection": "callsite"
+              }
+            }
+          ],
+          "selected_plan": {
+            "fp2_rules": [
+              "expand-cross-products"
+            ],
+            "residue_association": "accumulator-frobenius-first",
+            "fp2_selection": "callsite"
+          },
+          "native_replay": {
+            "activation_height": 1000,
+            "cases": [
+              {
+                "fixture_case": "wrap",
+                "deployment_txid": "96926af0c837f25104a00ebe949e04a503f24364fcef447ffd05b5a00b8d9d69",
+                "spend_txid": "374c2262594a83336960e512c49e70a590f38a591938adb156fab91350b20c7c",
+                "total_bytes": 267679,
+                "stack_payload": {
+                  "main_payload_bytes": 26758,
+                  "alt_payload_bytes": 59,
+                  "combined_payload_bytes": 26758
+                },
+                "witness_sha256": "3089913fce520cf16c798cae57731a22fd57c04d1de3842e1c142eb1ec6ceb8e",
+                "rejected_controls": [
+                  "crossed_statement",
+                  "g1_outside_subgroup"
+                ]
+              },
+              {
+                "fixture_case": "other",
+                "deployment_txid": "d7dd03d4f3bfb79a58f0d3d9a75d118fbfddae7ad1fc43906310893f71ad9f69",
+                "spend_txid": "7b36bf553d8a898f0b80266faffbbbe6342898b9dbdd9ef2aa85e96f2f031193",
+                "total_bytes": 267679,
+                "stack_payload": {
+                  "main_payload_bytes": 26794,
+                  "alt_payload_bytes": 59,
+                  "combined_payload_bytes": 26794
+                },
+                "witness_sha256": "4e3606ff09b7c9728b089f35bfe4ab7f269b96cf8a391892674214d377e9e780",
+                "rejected_controls": [
+                  "crossed_statement",
+                  "g1_outside_subgroup"
+                ]
+              }
+            ]
+          }
+        },
+        "chronicle": {
+          "reference": {
+            "lock_bytes": 257691,
+            "path_bytes": 266885,
+            "script_sha256": "11b7c7356ccf7f127b3e5e29e662d1f8f380153d2b5788c992298b811ed1444d",
+            "artifact_sha256": "e41fb785c8e49539fbc98e4b2d54196fb044e571a06f8ddd3551c346f1bc1d67",
+            "local_verdicts": {
+              "accepted": 2,
+              "rejected": 4
+            }
+          },
+          "witness_bytes": [
+            9186,
+            9186
+          ],
+          "witness_sha256": [
+            "3089913fce520cf16c798cae57731a22fd57c04d1de3842e1c142eb1ec6ceb8e",
+            "4e3606ff09b7c9728b089f35bfe4ab7f269b96cf8a391892674214d377e9e780"
+          ],
+          "candidates": [
+            {
+              "lock_bytes": 285087,
+              "path_bytes": 294281,
+              "script_sha256": "ca3cf7d0af19f285a924475ce3655525a051a93632f9f51d0476f0a447aff94b",
+              "artifact_sha256": "34e37ce0e57c4a8180779f56a9d19e05819b1ece5353b95786d0fafe08aa9f5c",
+              "local_verdicts": {
+                "accepted": 2,
+                "rejected": 4
+              },
+              "plan": {
+                "fp2_rules": [],
+                "residue_association": "accumulator-frobenius-first"
+              }
+            },
+            {
+              "lock_bytes": 257387,
+              "path_bytes": 266581,
+              "script_sha256": "0239222f6552a7f5e45e6c27bbea5c171ada59460fe0ed33ad435ecfedc36297",
+              "artifact_sha256": "b0528f31e60ce1deda13347ff4277756fdeabdacc57df2bd5564b1ec131435fd",
+              "local_verdicts": {
+                "accepted": 2,
+                "rejected": 4
+              },
+              "plan": {
+                "fp2_rules": [
+                  "expand-cross-products"
+                ],
+                "residue_association": "accumulator-frobenius-first"
+              }
+            },
+            {
+              "lock_bytes": 257358,
+              "path_bytes": 266552,
+              "script_sha256": "0e3807429c68cb845cf64b1b2252ebb6539830918a3a55da75b0733e6127d4a5",
+              "artifact_sha256": "a70127d62bbcf614829c3d03b7290d644671f2d314374603f2a96a8816d797e2",
+              "local_verdicts": {
+                "accepted": 2,
+                "rejected": 4
+              },
+              "fp2_choices": [
+                {
+                  "ordered_rules": [],
+                  "calls": 3
+                },
+                {
+                  "ordered_rules": [
+                    "expand-cross-products"
+                  ],
+                  "calls": 3130
+                }
+              ],
+              "plan": {
+                "fp2_rules": [
+                  "expand-cross-products"
+                ],
+                "residue_association": "accumulator-frobenius-first",
+                "fp2_selection": "callsite"
+              }
+            }
+          ],
+          "selected_plan": {
+            "fp2_rules": [
+              "expand-cross-products"
+            ],
+            "residue_association": "accumulator-frobenius-first",
+            "fp2_selection": "callsite"
+          },
+          "native_replay": {
+            "activation_height": 2,
+            "cases": [
+              {
+                "fixture_case": "wrap",
+                "deployment_txid": "cec23520565b5db27789cd4e447262b798b43cbf4725e0daf9bf963644832ed2",
+                "spend_txid": "87913db7478463ea5c0984b0552631d75531f280c7b0d7168cc7bb6544183f43",
+                "total_bytes": 266777,
+                "stack_payload": {
+                  "main_payload_bytes": 26758,
+                  "alt_payload_bytes": 59,
+                  "combined_payload_bytes": 26758
+                },
+                "witness_sha256": "3089913fce520cf16c798cae57731a22fd57c04d1de3842e1c142eb1ec6ceb8e",
+                "rejected_controls": [
+                  "crossed_statement",
+                  "g1_outside_subgroup"
+                ]
+              },
+              {
+                "fixture_case": "other",
+                "deployment_txid": "2029d9e028df43fbf68c7e15d8ad969974970b4600f6bab97a3f2e0c0bf1b820",
+                "spend_txid": "68bd123ca62b5db049b0a2f8c85b0a7a118528efb33be522a62f607e8dfb9b62",
+                "total_bytes": 266778,
+                "stack_payload": {
+                  "main_payload_bytes": 26794,
+                  "alt_payload_bytes": 59,
+                  "combined_payload_bytes": 26794
+                },
+                "witness_sha256": "4e3606ff09b7c9728b089f35bfe4ab7f269b96cf8a391892674214d377e9e780",
+                "rejected_controls": [
+                  "crossed_statement",
+                  "g1_outside_subgroup"
+                ]
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "round": 2,
+      "source_order": "A check before MSM and C check after MSM",
+      "source_revision": "1e6492900fe8474b4ba6d4eeffd0b3b83e21544b",
+      "source_sha256": "081f3639d4a848e461b0463e70eaf1367407fe50c5a6b173795461a508668c04",
+      "eras": {
+        "genesis": {
+          "reference": {
+            "lock_bytes": 258592,
+            "path_bytes": 267786,
+            "script_sha256": "f04e848c8fcb83958e32409ad1790703ec05a8cc9414b7edfa4156e7c1967ccd",
+            "artifact_sha256": "d83f4950bc657a6bf19b9fb592032f44cd49196ebcb2b2aa81cc5ee5e58d5674",
+            "local_verdicts": {
+              "accepted": 2,
+              "rejected": 4
+            }
+          },
+          "witness_bytes": [
+            9186,
+            9186
+          ],
+          "witness_sha256": [
+            "3089913fce520cf16c798cae57731a22fd57c04d1de3842e1c142eb1ec6ceb8e",
+            "4e3606ff09b7c9728b089f35bfe4ab7f269b96cf8a391892674214d377e9e780"
+          ],
+          "candidates": [
+            {
+              "lock_bytes": 286132,
+              "path_bytes": 295326,
+              "script_sha256": "6e339b74f086ce1e1be9ad38e6dde31257f35e99f9f01ef95f69749941ed3eee",
+              "artifact_sha256": "472af99bb571bbad39b2a433965bb624cbf31d45625b770488132294d1ee037f",
+              "local_verdicts": {
+                "accepted": 2,
+                "rejected": 4
+              },
+              "plan": {
+                "fp2_rules": [],
+                "residue_association": "accumulator-frobenius-first"
+              }
+            },
+            {
+              "lock_bytes": 258432,
+              "path_bytes": 267626,
+              "script_sha256": "bbeda000a4d3477f55439d9407b367d13e0c18d59c5b90b7b0afcb377972a973",
+              "artifact_sha256": "90d18e25e437028381d971450e6599b00e1ed1f4f2466517e7ee00c0dc4e8f00",
+              "local_verdicts": {
+                "accepted": 2,
+                "rejected": 4
+              },
+              "plan": {
+                "fp2_rules": [
+                  "expand-cross-products"
+                ],
+                "residue_association": "accumulator-frobenius-first"
+              }
+            },
+            {
+              "lock_bytes": 258403,
+              "path_bytes": 267597,
+              "script_sha256": "fe6f9a08aa09c9b1b53cdb44a96c7e09111254b95c1f1a0cd78685767b139dc9",
+              "artifact_sha256": "21614295910dd4753ba53e650122e43261d394e3841f0d701a1dfc0a74f339a7",
+              "local_verdicts": {
+                "accepted": 2,
+                "rejected": 4
+              },
+              "fp2_choices": [
+                {
+                  "ordered_rules": [],
+                  "calls": 3
+                },
+                {
+                  "ordered_rules": [
+                    "expand-cross-products"
+                  ],
+                  "calls": 3130
+                }
+              ],
+              "plan": {
+                "fp2_rules": [
+                  "expand-cross-products"
+                ],
+                "residue_association": "accumulator-frobenius-first",
+                "fp2_selection": "callsite"
+              }
+            }
+          ],
+          "selected_plan": {
+            "fp2_rules": [
+              "expand-cross-products"
+            ],
+            "residue_association": "accumulator-frobenius-first",
+            "fp2_selection": "callsite"
+          },
+          "native_replay": {
+            "activation_height": 1000,
+            "cases": [
+              {
+                "fixture_case": "wrap",
+                "deployment_txid": "daaaa4a22f52552c998e0d7982136dcb95d17cb3602891ac1d8d97eb816f89f7",
+                "spend_txid": "0e92ddf781760ad6e6213ca436b0d4bc19962c306aa129024d16e96ee478495b",
+                "total_bytes": 267823,
+                "stack_payload": {
+                  "main_payload_bytes": 26758,
+                  "alt_payload_bytes": 59,
+                  "combined_payload_bytes": 26758
+                },
+                "witness_sha256": "3089913fce520cf16c798cae57731a22fd57c04d1de3842e1c142eb1ec6ceb8e",
+                "rejected_controls": [
+                  "crossed_statement",
+                  "g1_outside_subgroup"
+                ]
+              },
+              {
+                "fixture_case": "other",
+                "deployment_txid": "ba95a0507fe6625d1974ea3f7e518f92afc189c6a54eab0f348a29c6293fbc2b",
+                "spend_txid": "5d5c09ec04704be343b59ba8d72ca96218c4e0d784fbde3258d5b7ef367bc1fc",
+                "total_bytes": 267823,
+                "stack_payload": {
+                  "main_payload_bytes": 26794,
+                  "alt_payload_bytes": 59,
+                  "combined_payload_bytes": 26794
+                },
+                "witness_sha256": "4e3606ff09b7c9728b089f35bfe4ab7f269b96cf8a391892674214d377e9e780",
+                "rejected_controls": [
+                  "crossed_statement",
+                  "g1_outside_subgroup"
+                ]
+              }
+            ]
+          }
+        },
+        "chronicle": {
+          "reference": {
+            "lock_bytes": 257691,
+            "path_bytes": 266885,
+            "script_sha256": "11b7c7356ccf7f127b3e5e29e662d1f8f380153d2b5788c992298b811ed1444d",
+            "artifact_sha256": "e41fb785c8e49539fbc98e4b2d54196fb044e571a06f8ddd3551c346f1bc1d67",
+            "local_verdicts": {
+              "accepted": 2,
+              "rejected": 4
+            }
+          },
+          "witness_bytes": [
+            9186,
+            9186
+          ],
+          "witness_sha256": [
+            "3089913fce520cf16c798cae57731a22fd57c04d1de3842e1c142eb1ec6ceb8e",
+            "4e3606ff09b7c9728b089f35bfe4ab7f269b96cf8a391892674214d377e9e780"
+          ],
+          "candidates": [
+            {
+              "lock_bytes": 285231,
+              "path_bytes": 294425,
+              "script_sha256": "bfb9186440a6f435aba7cfb63ac68a98ce1e5f489baaac9a499a95bb29a4abdd",
+              "artifact_sha256": "af4926f91bdabf3ba8b13895c38123c1899515f3e0367f7482fd72cc15ef582e",
+              "local_verdicts": {
+                "accepted": 2,
+                "rejected": 4
+              },
+              "plan": {
+                "fp2_rules": [],
+                "residue_association": "accumulator-frobenius-first"
+              }
+            },
+            {
+              "lock_bytes": 257531,
+              "path_bytes": 266725,
+              "script_sha256": "120b813582863e9e789d4decca626e7f013a3ca5b9c5b7186daddaa0900a2ac6",
+              "artifact_sha256": "ceaede40a5c3d4eb0fa452d0383211bf82e930af145c5b1123db56c1480eab84",
+              "local_verdicts": {
+                "accepted": 2,
+                "rejected": 4
+              },
+              "plan": {
+                "fp2_rules": [
+                  "expand-cross-products"
+                ],
+                "residue_association": "accumulator-frobenius-first"
+              }
+            },
+            {
+              "lock_bytes": 257502,
+              "path_bytes": 266696,
+              "script_sha256": "13a49bcde0e3608324fb4cf1a82e9257c80a36135b1e0a111aed3846fefce31a",
+              "artifact_sha256": "5e430f133097431f805c43fc6011dde506f6176579dd798771762899f0808bb4",
+              "local_verdicts": {
+                "accepted": 2,
+                "rejected": 4
+              },
+              "fp2_choices": [
+                {
+                  "ordered_rules": [],
+                  "calls": 3
+                },
+                {
+                  "ordered_rules": [
+                    "expand-cross-products"
+                  ],
+                  "calls": 3130
+                }
+              ],
+              "plan": {
+                "fp2_rules": [
+                  "expand-cross-products"
+                ],
+                "residue_association": "accumulator-frobenius-first",
+                "fp2_selection": "callsite"
+              }
+            }
+          ],
+          "selected_plan": {
+            "fp2_rules": [
+              "expand-cross-products"
+            ],
+            "residue_association": "accumulator-frobenius-first",
+            "fp2_selection": "callsite"
+          },
+          "native_replay": {
+            "activation_height": 2,
+            "cases": [
+              {
+                "fixture_case": "wrap",
+                "deployment_txid": "b3d865d49ed88e8ffbcbbd8333211608c189959e72c08654b7c684f7211f4891",
+                "spend_txid": "46f9450ff59caf4d1268bd3bbc56116241c4d8b3019b19a947c85b6328d7424b",
+                "total_bytes": 266921,
+                "stack_payload": {
+                  "main_payload_bytes": 26758,
+                  "alt_payload_bytes": 59,
+                  "combined_payload_bytes": 26758
+                },
+                "witness_sha256": "3089913fce520cf16c798cae57731a22fd57c04d1de3842e1c142eb1ec6ceb8e",
+                "rejected_controls": [
+                  "crossed_statement",
+                  "g1_outside_subgroup"
+                ]
+              },
+              {
+                "fixture_case": "other",
+                "deployment_txid": "1286d9dbd39359f9957efdbabe953b21ce78fdcf9907986f3c2d218f69a67537",
+                "spend_txid": "b63108a808e81928d689806bd1369f424eae42cdeda24a599c98aee058c5dfbe",
+                "total_bytes": 266921,
+                "stack_payload": {
+                  "main_payload_bytes": 26794,
+                  "alt_payload_bytes": 59,
+                  "combined_payload_bytes": 26794
+                },
+                "witness_sha256": "4e3606ff09b7c9728b089f35bfe4ab7f269b96cf8a391892674214d377e9e780",
+                "rejected_controls": [
+                  "crossed_statement",
+                  "g1_outside_subgroup"
+                ]
+              }
+            ]
+          }
+        }
+      }
+    }
+  ]
+}

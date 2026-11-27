@@ -2,38 +2,34 @@
 
 [简体中文](developer.zh-CN.md) · [Project overview](../README.md)
 
-A SHA-256 one-time signature bound to a BSV transaction input. The full-key and committed-key formats have different input and output costs.
-
-[Protocol specification](#protocol) · [Security analysis](#security) · [Validation and measurements](#validation) · [SDK and reference interfaces](#sdk)
-
 <a name="protocol"></a>
 
-## Protocol specification
+## Protocol
 
-The ordered key has 256 pairs of commitments. A signature supplies the selected 32-byte secret for each digest bit, totaling 8,192 bytes. The full-key payment lock includes all public commitments. The smaller committed-key lock instead commits to the ordered public key and uses the missing hashes from the unlocking proof. Both bind the digest to the actual input in their documented payment formats.
+The 16,384-byte public key contains 256 ordered pairs of SHA-256 commitments. The signer discloses one 32-byte secret per digest bit. The full-key payment lock verifies the selected commitments directly. The committed profiles verify SHA-256 of the reconstructed public key. All payment profiles bind the digest to the spending input under the requested sighash. [Wire encoding and native binding](spec.md)
 
-[Wire and Script specification](spec.md) · [Template measurements](../versions/v0.1.0/measurements.json) · [Mode vectors](../versions/v0.1.0/universal-vectors.json)
+<a name="optimization"></a>
+
+## Forth optimization
+
+`forth_committed_locking_script(public_key)` compiles a typed Forth reconstruction fragment. The lock uses a byte mask to select the ordering of each public-key pair. It accepts the same proof layout and transaction modes as the original committed lock. Use SDK profile `committed-key-forth` to reproduce the candidate independently of the default full-key profile. [Stack invariant and byte breakdown](optimization.md) · [Forth source](../reference/committed-verifier.fth)
+
+`compact_forth_committed_locking_script(public_key)` uses the same reconstruction fragment and compacts the fixed-r binding to reach 6,830 bytes. Select `committed-key-forth-compact` to create that experimental output. [Binding byte breakdown](optimization.md#compact-transaction-binding)
 
 <a name="security"></a>
 
-## Security analysis
+## Signing and recovery
 
-Reserve one fresh key for one UTXO, including change. Consume the key durably before returning the first signature. Restarts, backup restores and fee replacements must preserve that record. Rebroadcast the saved signed transaction for a retry. The wallet keeps the full ordered public key for the committed-key proof and checks the funding outpoint and confirmation before signing. Use the transaction-bound template for funds.
-
-The default wallet rejects an unpaired SINGLE because it commits to no outputs. An explicit policy exception uses `allow_unpaired_single=True` on `sign_spend`. [Security model, recovery and limitations](security.md)
+Reserve and consume one fresh key per output before releasing a signature. Confirm the funding outpoint before authorizing a child and preserve consumption state through backups and concurrent requests. Rebroadcast the saved signed bytes after a transient failure. A different funding outpoint requires a different digest. The reference requires `allow_unpaired_single=True` to authorize an input that commits to zero outputs through unpaired SINGLE. [Threat model and recovery procedure](security.md)
 
 <a name="validation"></a>
 
-## Validation and measurements
+## Validation and benchmarks
 
-The acceptance matrix covers 408 authorization decisions for the declared payment domain. The full-key and committed-key BIP143 ALL 2×2 fixtures are 62,392 and 48,708 bytes. The smaller funding lock shifts cost into spending. In the same fixture, a new input increases from 8,400 to 16,592 bytes while a new output drops from 22,791 to 7,757 bytes.
-
-Install the pinned [requirements](../reference/requirements.txt) and run `bash projects/lamport-ots/reference/verify.sh`. [Acceptance domain](acceptance.md) · [Test and measurement record](validation.md) · [Project cost analysis](../README.md)
+The 408-row domain tests authorization for every supported mode and profile. The committed profiles also test every proof block and the Chronicle activation boundary. The reproduction commands use an independent BSV Node alongside the pinned chain-gang package. Historical v0.1.0 vectors are kept with the release. [Acceptance domain](acceptance.md) · [Executed checks](validation.md) · [Measurements and lifecycle costs](optimization.md#transaction-and-lifecycle-costs)
 
 <a name="sdk"></a>
 
-## SDK and reference interfaces
+## Wallet and reference APIs
 
-Follow the [unified Lamport wallet guide](sdk.en.md) to generate a full-key or committed-key output and connect an external signer. The signer returns the 8,192-byte raw signature over the requested digest. The wallet needs durable consumption records and a fresh key for change.
-
-[Reference developer workflow](../reference/README.md) · [Payment source](../reference/payment.py) · [Original funding and spend vector](../versions/v0.1.0/vector.json)
+Use `WalletClient` for lock creation, recognition and signing. The external callback receives a 32-byte digest and returns an 8,192-byte raw signature. For Python reference use, `sign_spend` authenticates a prepared input against its funding transaction before calling the signer. [SDK quickstart](sdk.en.md#quickstart) · [Reference usage](../reference/README.md)

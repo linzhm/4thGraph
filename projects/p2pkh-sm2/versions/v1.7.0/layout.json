@@ -1,0 +1,34 @@
+{
+  "template": "P2PKH-SM2",
+  "version": 7,
+  "script_bytes": 98362,
+  "owner_hash160": {
+    "offset": 168,
+    "length": 20
+  },
+  "base_owner_hash160": "0000000000000000000000000000000000000000",
+  "base_script_sha256": "ca1ebfe34b2a8721b363fda2340c940a2d62946d966a83216af95d14c6deeba5",
+  "fixed_bytes_sha256": "fe0af3c26702c607fa18100978760e068e08b2ef3f242cef406a64970fb41a3b",
+  "otda_constructor": {
+    "file": "otda-constructor.hex",
+    "bytes": 9447,
+    "sha256": "6fd82638c5db5f13779b56f08695e74f328a9c520e05d2e101f3d13135dcdad7",
+    "generator": "../../reference/generate_otda_constructor.py"
+  },
+  "supported_sighash_types": [
+    "41",
+    "42",
+    "43",
+    "61",
+    "62",
+    "63",
+    "c1",
+    "c2",
+    "c3",
+    "e1",
+    "e2",
+    "e3"
+  ],
+  "sm2_user_id_hex": "31323334353637383132333435363738",
+  "generator": "../../reference/generate_lock.py"
+}

@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "4thGraph project introduction manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "title", "summary", "entry_points", "sections"],
+  "properties": {
+    "$schema": {"type": "string", "minLength": 1},
+    "schema_version": {"type": "integer", "const": 1},
+    "title": {"$ref": "#/$defs/localizedText"},
+    "summary": {"$ref": "#/$defs/localizedText"},
+    "entry_points": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "description"],
+        "properties": {
+          "name": {"$ref": "#/$defs/line"},
+          "description": {"$ref": "#/$defs/localizedText"}
+        }
+      }
+    },
+    "setup": {"$ref": "#/$defs/localizedBlocks"},
+    "sections": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["algorithm", "reproduction"],
+      "properties": {
+        "use_cases": {"$ref": "#/$defs/localizedBlocks"},
+        "algorithm": {"$ref": "#/$defs/localizedBlocks"},
+        "reproduction": {"$ref": "#/$defs/localizedBlocks"},
+        "script_sizes": {"$ref": "#/$defs/localizedBlocks"},
+        "integration": {"$ref": "#/$defs/localizedBlocks"},
+        "transactions": {"$ref": "#/$defs/localizedBlocks"},
+        "lifecycle": {"$ref": "#/$defs/localizedBlocks"}
+      }
+    }
+  },
+  "$defs": {
+    "line": {"type": "string", "pattern": "^(?![\\s\\S]*[\\r\\n])\\s*\\S"},
+    "blocks": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"type": "string", "pattern": "\\S"}
+    },
+    "localizedText": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["en", "zh-CN"],
+      "properties": {
+        "en": {"$ref": "#/$defs/line"},
+        "zh-CN": {"$ref": "#/$defs/line"}
+      }
+    },
+    "localizedBlocks": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["en", "zh-CN"],
+      "properties": {
+        "en": {"$ref": "#/$defs/blocks"},
+        "zh-CN": {"$ref": "#/$defs/blocks"}
+      }
+    }
+  }
+}

@@ -3,7 +3,7 @@ from dataclasses import replace
 import unittest
 
 from fourthgraph.bsv.evaluate import evaluate
-from fourthgraph.bsv.otda_reconstruction import Reconstruction, reconstruct_mixed
+from fourthgraph.bsv.otda_reconstruction import Reconstruction, push_repeated_bytes, reconstruct_mixed, shorter_reconstruction
 from fourthgraph.bsv.script import push
 from fourthgraph.bsv.transaction import Output, compact
 
@@ -13,6 +13,26 @@ def pattern(parts, widths):
 
 
 class MixedReconstructionTests(unittest.TestCase):
+    def test_repeated_byte_constructor_retains_the_exact_length_and_stack(self):
+        block = bytes(range(32))
+        for count in (8, 63, 64, 256):
+            with self.subTest(count=count):
+                data = b"prefix" + block * count + b"tail"
+                constructor = push_repeated_bytes(data)
+                self.assertLess(len(constructor), len(push(data)))
+                self.assertEqual(evaluate(constructor, [b"outer"]), ([b"outer", data], []))
+        for data in (b"", block, block * 2):
+            self.assertEqual(push_repeated_bytes(data), push(data))
+
+    def test_constructor_must_beat_the_literal_encoding(self):
+        template = pattern((b"A" * 100, b"B" * 100), (2,))
+        output = Output(100, b"A" * 100 + b"ab" + b"B" * 100)
+        preimage = b"prefix" + output.serialize() + bytes(8)
+        self.assertIsNone(shorter_reconstruction(preimage, (output,), (template,)))
+        repeated = b"prefix" + output.serialize() * 2 + bytes(8)
+        constructor = shorter_reconstruction(repeated, (output, output), (template,))
+        self.assertEqual(evaluate(constructor), ([repeated], []))
+
     def test_multiple_dictionaries_recreate_exact_signed_outputs(self):
         left = pattern((b"A" * 500, b"B" * 500), (2,))
         right = pattern((b"C" * 500, b"D" * 500, b"E" * 500), (1, 2))

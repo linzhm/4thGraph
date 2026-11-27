@@ -27,12 +27,13 @@ symbol           = ascii-letter, { alphanumeric | "_" | "-" } ;
 
 definition       = ":", word-name, stack-effect, { instruction }, ";" ;
 stack-effect     = "(", { stack-type }, "--", { stack-type }, ")" ;
-instruction      = straight-instruction | branch ;
+instruction      = straight-instruction | branch | counted-loop ;
 straight-instruction = call | cell-literal | byte-literal | range-check ;
 call             = word-name ;
 byte-literal     = "bytes-hex", hex-pairs ;
 range-check      = "check-range", symbol ;
 branch           = "if", { instruction }, [ "else", { instruction } ], "then" ;
+counted-loop     = ( "do" | "?do" ), { instruction }, "loop" ;
 
 declaration      = bytes-param | lock | range | work | join | gate | split-authority | recovery
                  | independent | workflow-input | stage | relation ;
@@ -87,9 +88,10 @@ cell-literal     = integer | quoted-character ;
 
 - 顶层指令和声明在读取源码时生效。普通计算、转换、构造和验证词通过定义体调用。
 - 冒号定义名之后紧跟一个包含 `--` 的栈效果注释。标准 Forth 按普通注释处理，4thGraph 将其用作静态类型合同。签名只能引用当时已知的栈类型。定义体调用在解析到该位置时已定义、导入或内置的词。`IF` 从栈上消费一个 `cell`，两条分支合并时的栈类型和顺序须一致。
+- `limit start DO ... LOOP` 与 `limit start ?DO ... LOOP` 使用相邻的 `cell` 字面量作为边界，按从 start 到 limit（不含）的顺序在构建期展开。`I` 表示最内层循环索引，`?DO` 的相等边界执行零次。编译器检查每次展开的栈效果，拒绝反向或动态边界，以及超过展开预算的定义。
 - `work:`、`gate:`、`join:` 在读取时查找计算词。`join:` 的工作步骤、`stage:` 的计算词与值依赖、`relation:` 的两个词在构建对应计划时解析。`stage:` 可以按与依赖顺序不同的次序书写。
 - 并行计划需要两个不同的工作步骤、一个汇合和一个拆分签名角色，可附带一个门。线性计划需要一个初始值、一个或多个 `u32 -- u32` 阶段，以及最终的 `u32 -- route` 阶段。每个线性值只有一个生产者，并且最多消费一次。两阶段支持 `fused`、`serial` 和 `atomic`，更长的链使用 `serial`。`deploy`、`split`、`fused` 为保留的步骤名。两类计划均可附带一个退款规则及独立提交约束。 [交易图](specification.md#交易图)
-- `relation:` 须先执行 `REQUIRE stdlib/verify.fth`。一个关系文件至多声明一个关系，且独立于交易流程声明。它给编译器提供要验证的状态关系。编译器按后端能力、策略和预算选择同一关系的实现。 [关系构建与复放](stdlib.md#验证路径)
+- `relation:` 须先执行 `REQUIRE stdlib/verify.fth`。一个关系文件至多声明一个关系，且独立于交易流程声明。它给编译器提供要验证的状态关系。编译器按后端能力、策略和预算选择同一关系的实现。 [关系构建与复放](stdlib.zh-CN.md#验证路径)
 
 栈效果注释描述词的输入和输出，由 4thGraph 静态核对。`range:`、`work:` 和 `relation:` 则是显式声明。它们分别影响数值检查、交易调度和验证关系。声明词借用 Forth 定义词的写法，每种声明有自己的参数和结束符。Forth 2012 的 `CREATE` 与 `DOES>` 提供了在完整 Forth 系统中实现定义词的机制。 [Forth 2012 CREATE](https://forth-standard.org/standard/core/CREATE) · [Forth 2012 DOES>](https://forth-standard.org/standard/core/DOES)
 
@@ -117,6 +119,8 @@ TypeScript 的 JSDoc 类型是工具读取注解的例子。Rust 属性提供显
 在构造 Script 的词中，`op-toaltstack` 和 `op-fromaltstack` 分别生成 `OP_TOALTSTACK` 和 `OP_FROMALTSTACK`。它们在 Script 执行时从主栈移到 alt stack，或从 alt stack 移回主栈。
 
 `over` 和 `2dup` 用于复制已有的栈项。`swap`、`rot` 和 `nip` 用于调整主栈。Gforth 工作流可以用 `DO … LOOP` 在宿主上迭代。Script 构造词可用 `bsv-repeat-code` 展开固定次数的指令片段。 [Forth 2012 Core](https://forth-standard.org/standard/core) · [Forth 2012 DO](https://forth-standard.org/standard/core/DO)
+
+`bsv-tile-top ( script cell -- script )` 追加代码，将运行时栈顶字节项替换为若干份拼接结果。构造时传入正数份数，生成的代码通过倍增和拼接完成重复。
 
 运算采用后缀写法（RPN）。`2 3 +` 先压入两个值，再由 `+` 消耗它们并留下 `5`。`+`、`-` 和 `*` 使用 64 位 `cell` 的回绕语义。`=`、`<` 和 `>` 产生 Forth flag。使用 `u32+` 进行无符号 32 位加法，使用 `int+`、`int-` 和 `int*` 进行 ScriptNum 运算。字节串使用 `bytes-cat` 和 `bytes=` 拼接或比较，`OP_SIZE` 保留输入并产生长度，`OP_SPLIT` 消耗输入和偏移并留下两段。 [语言语义](specification.md)
 
@@ -186,7 +190,7 @@ REQUIRE stdlib/verify.fth
 relation: u32-inc decide ;
 ```
 
-`4thgraph-circuit` 生成 Circom。`4thgraph-verify` 构建交易绑定和后端选择报告。 [完整命令](stdlib.md#验证路径)
+`4thgraph-circuit` 生成 Circom。`4thgraph-verify` 构建交易绑定和后端选择报告。 [完整命令](stdlib.zh-CN.md#验证路径)
 
 ## 7. P2PKH 锁定验证
 

@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path[:0] = [str(ROOT / "src"), str(ROOT)]
 from fourthgraph.benchmark.validation import Node, chain_verdict
 from sdk.python.bridge import PROJECTS, adapter_for
-from sdk.python.client import Client
+from sdk.python.client import Client, WalletClient
 from fourthgraph.bsv.transaction import Input, Output, Transaction
 
 
@@ -29,7 +29,9 @@ def generate(project, node):
         if "bytes" in case:
             assert len(lock) == case["bytes"]
         funding = Transaction((Input(bytes([17 + len(vectors)]) * 32, 0),), (Output(10_000, lock),))
-        outputs = (Output(9_900, case.get("destination", b"\x51")),)
+        outputs = case.get("outputs")
+        if outputs is None:
+            outputs = (Output(9_900, case.get("destination", b"\x51")),)
         tx = Transaction((Input(funding.txid_wire(), 0),), outputs)
         sighash = case.get("sighash", 0x41)
         active = bool(sighash & 0x20)
@@ -70,7 +72,10 @@ def generate(project, node):
         recognized = adapter.recognize(lock, key)
         assert client.recognize(lock, public_key=key) == recognized
         if owner := recognized.get("ownerHash160"):
-            assert client.lock_for_owner(bytes.fromhex(owner)) == lock
+            owner_hash = bytes.fromhex(owner)
+            assert adapter.lock_owner(owner_hash, profile) == lock
+            assert WalletClient(project, template=profile).create_lock(owner_hash160=owner_hash) == lock
+            assert client.lock_for_owner(owner_hash) == adapter.lock_owner(owner_hash)
         assert client.sign_spend(tx.serialize(), funding.serialize(), 0, key, replay_signer,
                                  **callback_options) == signed.serialize()
         assert client.sign_payment(funding.serialize(), 0, [(out.value, out.script) for out in outputs],

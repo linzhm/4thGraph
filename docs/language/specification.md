@@ -94,7 +94,7 @@ relation: <transition-word> <route-word> ;
 - 同一程序中，重复的外部输入名表示同一个 `u32` 值。例如 `work: a x double alice ;` 和 `work: b x inc bob ;` 都读取 `x`。融合时见证传一次 `x`，锁将其复制到各使用位置。拆分时，`split` 在每个使用 `x` 的工作锁开头写入相同的值，并核对整个输出向量。若独立的门也读取 `x`，门先将其写入拆分锁，再由拆分传给工作锁。运行器从实际花费的前输出读取该值。各分支仍可独立提交。
 - `independent-submit:` 要求指定的门、工作或状态阶段单独提交。并行布局有此约束时选择拆分，线性状态布局选择串行。排除理由包含声明的源码行号。 [旧写法](syntax.md#5-兼容语法)
 - `workflow-input:` 与 `stage:` 描述线性的状态流程。编译器从值名解析有向依赖并校验唯一来源、栈类型与消费次数。链由一个或多个 `u32 -- u32` 阶段及一个末端 `u32 -- route` 阶段组成，每步声明签名角色。不同角色使用不同公钥。`--current` 在部署时固定初始值。`--available-authorizers` 为首笔花费的可用角色列表。两阶段融合和双输入布局要求两步角色同时可用，串行只要求首阶段角色可用。
-- `relation:` 需要先加载 `REQUIRE stdlib/verify.fth`。两个词须具有 `u32 -- u32` 和 `u32 -- route` 栈效果。验证规划器把部署状态、转换和实际后继绑定到一笔花费。 [自动选择](stdlib.md#验证路径)
+- `relation:` 需要先加载 `REQUIRE stdlib/verify.fth`。两个词须具有 `u32 -- u32` 和 `u32 -- route` 栈效果。验证规划器把部署状态、转换和实际后继绑定到一笔花费。 [自动选择](stdlib.zh-CN.md#验证路径)
 
 串行模板从 `deploy:0` 开始，随后各步引用前一阶段的输出 0。每个中间锁以真实部署 txid 和五字节小端 `u32` 开头。后续花费提供从首阶段到直接父交易的原始字节。锁从实际花费的 outpoint 出发，逐笔核对哈希和输入的槽位 0，直至部署根。这种见证随阶段数增长。双输入模板引用同一笔部署的 `deploy:0` 和 `deploy:1`。每个锁依据自己的真实 outpoint 核对完整有序输入向量，运行器核对两个部署输出与构建模板的金额和脚本。各布局的末步都检查按路由选择的有价输出，以及记录部署 txid 和新状态的零值回执。
 
@@ -130,6 +130,14 @@ relation: <transition-word> <route-word> ;
 
 `stack-local-operand-scheduling` 在同一个基本块中尝试复用栈顶最后使用的值以及成对取栈。它只对完整字节码为一个可交换操作码的二元运算比较两个操作数顺序。记录的 `basis` 给出总性、剩余引用数和输出顺序条件，`script_bytes` 给出改写前后的字节数。
 
+共享栈调度器还可以从操作数位置和剩余引用数识别 `OP_TUCK`。当二元操作数已按顺序位于栈顶、左值即将用完而右值仍有后续用途时，`OP_TUCK` 先在有序操作数下方留下右值。紧凑顺序发码也识别仅含一个数字推入操作码的定义，把其中无需直接返回的常量推迟到每次使用时推入。这两条规则直接读取编译器的操作和引用信息。[共享栈调度器](../../src/fourthgraph/compiler/stack_schedule.py)
+
+对包含断言的算术图，后端可用 `emit_assertions(..., reorder=True)` 让编译器按实际 Script 字节数比较源码顺序和依赖顺序。后端须保证各运算在声明范围内总能完成，且只观察显式操作数。依赖顺序保留断言的相对顺序，并将每项计算推迟到首次需要它的断言。[Groth16 用法](../groth16-bls12-381.md#forth-词)
+
+后端可用 `Graph.packet_slice` 声明已验证边界的定长字节切片。解码程序仅消费切出的字段并返回一个值。紧凑断言发码对每种候选顺序检查字节包的所有仍需执行的用法。如果它们都是按偏移递增且互不重叠的切片，调度器逐次切分字节包，只把未读后缀传给下一次读取。其他用法采用原偏移读取。[共享栈调度器](../../src/fourthgraph/compiler/stack_schedule.py)
+
+后端可用 `Graph.select_expansion` 在具体调用点比较已经证明等价且满足范围约束的展开。每个候选共享调用方已有的公共子表达式，并在隔离的子图中构建新增定义。编译器把依赖的已有值作为局部栈输入发码，按局部字节数选出一个候选，再把胜出的定义加入调用方。完整程序的字节数由最终调度决定。[共享栈调度器](../../src/fourthgraph/compiler/stack_schedule.py)
+
 `--optimize baseline` 使用原有字节码后端。`--optimize safe` 在带类型的栈表示上做范围分析和分支指令选择。输出的 `rewrites` 记录规则、源码行列及触发规则的栈类型和范围。单独导出的词遵循 `takes` 中的数值范围，交易模板在进入计算前检查外部输入范围。
 
 `--capabilities` 输出机器可读的词集、执行位置和交易版本清单。 `--entry <word>` 只编译指定的已标注定义，便于检查 Script 字节和栈签名。事务构建在发现首个无效使用时退出，并指明源文件行列。诊断区分未知词、无法下沉的标准词和调用链中的宿主词。
@@ -150,9 +158,44 @@ formula: square ( small -- squared )
 
 `int-from-bottom INDEX RANGE` 读调用者留在栈底的数值，索引从零开始。调用者负责保证输入与栈底值采用规范的 ScriptNum 编码并符合声明范围。编译器沿公式推导中间量范围，检查输出范围与 Genesis 数值长度上限，并要求 `int-rem` 的除数有可证的正下界。
 
-优化构建比较原顺序发码、依赖图调度和加入等价改写的候选，按序列化字节数选择。报告给出候选字节数、选中规则及源码的中间量位宽上界。P2PKH-R1 用这条路径编译 P-256 的点加和倍点。 [源码和复放](../../projects/p2pkh-r1/forth)
+默认的 `ScriptBuilder(source)` 按原顺序发码。`ScriptBuilder(source, optimize=True)` 比较原顺序发码、依赖图调度及加入等价改写的候选，按序列化字节数选择。报告给出候选字节数、选中规则及源码的中间量位宽上界。P2PKH-R1 用这条路径编译 P-256 的点加和倍点。 [源码和复放](../../projects/p2pkh-r1/forth)
+
+用 `ScriptBuilder(source, formula_passes=names)` 或 `ScriptBuilder.from_file(path, formula_passes=names)` 为同一源码指定实验配置。这会应用于该构造器读到的所有 `formula:`，包括 `REQUIRE` 导入的公式。`formula_passes=()` 生成原顺序基线。显式配置与 `optimize=True` 互斥。各 pass 按下表的固定次序应用，传入的名字顺序不影响产物。未知或重复的名字会报错。
+
+| Pass | 效果 |
+| --- | --- |
+| `rewrite` | 在证明条件满足时替换等价整数运算，例如将乘二改为自加、合并缓存除数的读取或重用同一除数的余数。 |
+| `share` | 合并输入和指令相同的计算。 |
+| `stack` | 按原依赖顺序发码，复用最后使用的栈项并选择较短的操作数排列。 |
+| `search` | 尝试其它依赖顺序。需要 `stack`。搜索最多保留 96 条路径，活跃节点超过 128 时使用原依赖顺序。搜索保留原依赖顺序作为字节成本对照。 |
+
+显式配置直接发出该配置的产物。`builder.formulas[name]` 记录规范排序的 `passes`、序列化 `script_bytes`、命中的 `rewrites` 计数和公式源码的 `max_magnitude_bits`。这些指标可对照体积与数值范围。编译耗时、运行耗时和栈峰值需要单独测量。类型、范围检查、可达输出依赖和输出栈序在各配置下均保留。
+
+从同一基线独立比较 `rewrite`、`share` 和 `stack`。测试 `search` 时同时对照仅启用 `stack` 的产物，再按固定次序逐项组合通过的 pass。用下列命令重跑二次 Bézier 坐标与切线的语义、栈效果及配置回归，并串行比较编译成本。
+
+```sh
+PYTHONPATH=src:. python -m unittest tests.test_formula_passes
+PYTHONPATH=src:. python - <<'PY'
+from statistics import median
+from timeit import repeat
+from fourthgraph.compiler.script_builder import ScriptBuilder
+from tests.test_formula_passes import ENTRY, PLANS, SOURCE
+
+for plan in PLANS:
+    def compile_formula():
+        return ScriptBuilder(SOURCE, formula_passes=plan)
+
+    builder = compile_formula()
+    samples = repeat(compile_formula, number=1, repeat=15)
+    print(plan, builder.formulas[ENTRY]["script_bytes"], round(1000 * median(samples), 3))
+PY
+```
 
 编译器保存公式的中间表示。调用构造器能证明某个参数为常量时，可在生成字节前绑定该参数并重新推导中间量范围，生成少一个运行时输入的内核。R1 的仿射点加只在选中的固定生成元表项满足 `Z=1` 时进入该内核，零下标由组单位元分支处理。 [R1 前置扫描和候选](../../projects/p2pkh-r1/forth/README.md#点乘窗口候选)
+
+`compiler.curve_windows.signed_radix4` 接收已证明的非负标量上界。每个完整窗口把标量拆成 `4*q+d`，其中 `q=floor((n+1)/4)` 且 `d` 在 `[-1,2]` 内。编译器按商的上界继续规划窗口，必要时保留末尾进位。宿主端与 Script 后端可用同一窗口计划生成数位。[Groth16 MSM 对照](../../projects/groth16-bls12-381/versions/v0.8.0/measurements.json)
+
+固定基点的生成器可用 `double_from_affine_slope` 从受信的预计算切线斜率重建仿射二倍点。它以调用方提供的域运算发出坐标乘法、减法和约减。连续的 radix-4 窗口可用两次重建得到当前的二倍点和下一窗口的四倍点。[点表表示对照](../../projects/groth16-bls12-381/versions/v0.9.0/measurements.json)
 
 ## 电路入口
 

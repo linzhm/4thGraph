@@ -2,7 +2,7 @@
 
 [简体中文](spec.zh-CN.md) · [Project overview](../README.md)
 
-This specification describes the v1.0.0 baseline. A BRC number has yet to be assigned.
+This specification describes the v1.0.0 baseline and the authorization rules shared by the locking templates. A BRC number has yet to be assigned. [v1.11.0 candidate](../README.md#v1110)
 
 ## Payment and authorization
 
@@ -38,6 +38,8 @@ The script uses four-bit windows and projective coordinates. Set
 `X = (x₀ + n) Z mod p`. These are the only candidates because `p < 2n`.
 The witness supplies no inverse. Keep the original SM2 value of `s`.
 Replacing it with `n - s` can invalidate the signature.
+
+Template `3` reduces each intermediate projective coordinate to a signed residue in `(-p, p)`. The point formulas are field polynomials, so each signed residue represents the same field element as its nonnegative representative. Within this range, `Z = 0` detects infinity. The final comparisons use the nonnegative representatives of X and Z.
 
 ## Transaction scope and bytes
 

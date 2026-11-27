@@ -6,7 +6,7 @@
 
 ## Receive and spend
 
-Select project `p2pkh-schnorr` in the unified SDK. The client uses template `v0.6.0` by default. Supply a 32-byte x-only public key or its 20-byte HASH160. The client fills the owner slot in the frozen Forth build and checks all fixed script bytes when recognizing an output. You can also supply the expected public key.
+Select project `p2pkh-schnorr` in the unified SDK. The client uses template `v0.17.0` by default. Supply a 32-byte x-only public key or its 20-byte HASH160. The client fills the owner slot in the frozen Forth build and checks all fixed script bytes when recognizing an output. You can also supply the expected public key. The SDK identifies and spends UTXOs of all twelve versions from their prevout scripts. Set the wallet's `template` to an earlier supported version to create that output format. [Version catalog](../versions/index.json)
 
 The signing request identifies the algorithm as `schnorr-secp256k1`, the payload kind as `message`, and the signature format as `bip340`. Give the 32-byte payload to the BIP340 signer as the message. Return the signer's original 64 bytes. The SDK verifies the signature, derives the public witness coordinates, and runs the Forth `schnorr-unlock` word to generate the input script. [Forth source](../reference/schnorr.fth)
 
@@ -29,7 +29,7 @@ const signedHex = wallet.signPayment({
 }, ({ payload }) => signer.signBip340(payload));
 ```
 
-For a prepared transaction, use `signInput` and supply the current input index and its authenticated prevout. For Chronicle OTDA, supply `chronicleActive` from the actual chain context. SINGLE requires a same-index output. The same methods are available in Python, Rust, and Go. [Shared API table](../../../sdk/docs/reference.md#calls-and-data)
+For a prepared transaction, use `signInput` and supply the current input index and its authenticated prevout. For Chronicle OTDA, supply `chronicleActive` from the actual chain context. SINGLE requires a same-index output. For version-2 OTDA ALL or paired SINGLE, the wallet uses a shorter preimage constructor where available. Set `compressOtda: false` (`compress_otda=False` in Python) to request a literal push. The same methods are available in Python, Rust, and Go. [Shared API table](../../../sdk/docs/reference.md#calls-and-data)
 
 ## Integrate MuSig2
 

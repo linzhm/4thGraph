@@ -1,14 +1,46 @@
-# PELS Counter
+<!-- Generated from manifest.yaml with Copier. -->
 
-[简体中文](README.zh-CN.md) · [Project index](../README.md) · [Versions](versions/index.json)
+# PELS Counter v0.1.0
+
+[简体中文](README.zh-CN.md) · [4thGraph](../../README.md) · [Project index](../README.md) · [Versions](versions/index.json)
+
+## Developer resources
+
+The [development fixture package](../../docs/project-contracts.md) pairs the exact Script with a WASM module. 4thGraph compiles `advance` into a covenant that requires one successor with the incremented `u32` and the same covenant code. The [core PELS source](pels-counter-core.fth) takes the successor's amount from the witness and binds that amount to the actual successor. Its spends use different fees chosen by the transaction builder. The [original tutorial](pels-counter.fth) adds a 1,000 sat fee rule.
+
+[Algorithm and execution](#algorithm-and-execution) · [Reproduce the checks](#reproduce-the-checks)
+
+| Entry point | Purpose |
+| --- | --- |
+| `pels_counter.py build` | Compile the counter transition and emit the initial lock. |
+| `pels_counter.py replay` | Fund and replay counter updates on isolated regtest. |
+
+## Algorithm and execution
 
 **[Build the lock](#build)** · [Fund and replay on regtest](#spend-and-verify-on-regtest) · [Compare fee rules](#declare-a-fee-constraint)
 
 Run the commands from the repository root with Git and Python 3.11 or later. The counter build commands use the Python standard library.
 
-4thGraph compiles `advance` into a covenant that requires one successor with the incremented `u32` and the same covenant code. The [core PELS source](pels-counter-core.fth) takes the successor's amount from the witness and binds that amount to the actual successor. Its spends use different fees chosen by the transaction builder. The [original tutorial](pels-counter.fth) adds a 1,000 sat fee rule.
+The build combines PUSHTX and witness candidates and selects the least serialized bytes for the deployment lock field and first spend. The `optimization` record lists the typed transition, the lowering rules, and the cost of each candidate. A single input determines `hashPrevouts` and `hashSequence`. An exact successor determines `hashOutputs`. The transaction template fixes the BIP143 ALL sighash type (`0x41`), so the reconstructed witness omits these four fields. When the compiler can link a stable script size, it also supplies the script's CompactSize. The smallest PUSHTX candidate derives the compressed public key from the fixed `r` in the DER signature.
 
-## Build
+The successor assertions fix the next counter and the code that the next output preserves. The source supplies the amount rule separately. The compiler can also omit a duplicate code fragment from the witness. It links the two positions and checks that their emitted byte ranges match. The lock restores the omitted copy before hashing the successor and the transaction preimage. The replay includes a forged successor with matching tampered witness data to check that the actual input's code still governs the spend.
+
+In the lock, `OP_CODESEPARATOR` places the counter data outside `scriptCode`. The original witness carries the full BIP143 ALL preimage. Reconstructed witnesses supply the version, outpoint, `scriptCode`, previous amount, sequence, and locktime. Script builds the required successor and inserts its hash into the preimage. Every layout authenticates the full preimage against the actual spend with native `OP_CHECKSIG`. [PELS construction](https://patents.google.com/patent/EP4374535A1/en)
+
+## Reproduce the checks
+
+Run the release commands from the repository root. The lock build uses Python 3.11 or later. The funded replay uses the pinned Chronicle binding. [Regtest infrastructure](../../docs/infrastructure.md)
+
+```sh
+python -m pip install ecdsa -r tools/requirements-chronicle.txt
+```
+
+```sh
+PYTHONPATH=src:. python projects/pels-counter/pels_counter.py build
+PYTHONPATH=src:. bash tools/verify_node.sh --profile default -- python projects/pels-counter/pels_counter.py replay --output /tmp/pels-replay.json
+```
+
+### Build
 
 ```sh
 export PYTHONPATH=src:.
@@ -18,11 +50,7 @@ python3 "$counter" build
 
 The JSON gives the counter-zero lock in `script_hex` and the starting output amount in `satoshis`. The Forth increment compiles to 8 bytes. The full lock includes the checks that bind the successor output to the actual transaction.
 
-The build combines PUSHTX and witness candidates and selects the least serialized bytes for the deployment lock field and first spend. The `optimization` record lists the typed transition, the lowering rules, and the cost of each candidate. A single input determines `hashPrevouts` and `hashSequence`. An exact successor determines `hashOutputs`. The transaction template fixes the BIP143 ALL sighash type (`0x41`), so the reconstructed witness omits these four fields. When the compiler can link a stable script size, it also supplies the script's CompactSize. The smallest PUSHTX candidate derives the compressed public key from the fixed `r` in the DER signature.
-
-The successor assertions fix the next counter and the code that the next output preserves. The source supplies the amount rule separately. The compiler can also omit a duplicate code fragment from the witness. It links the two positions and checks that their emitted byte ranges match. The lock restores the omitted copy before hashing the successor and the transaction preimage. The replay includes a forged successor with matching tampered witness data to check that the actual input's code still governs the spend.
-
-## Spend and verify on regtest
+### Spend and verify on regtest
 
 On Linux x86-64, install curl, Rust/Cargo, and a C toolchain for the pinned chain-gang package. The node launcher downloads and verifies BSV Node. [Regtest infrastructure](../../docs/infrastructure.md)
 
@@ -48,9 +76,9 @@ python3 "$counter" spend --parent "$(jq -r '.deployment.raw' "$report")"
 
 The result includes `transaction_hex`, the input and output counter values, the fee, and the transaction ID. With the replay's deployment it reconstructs the first spend byte for byte. The parent lock determines the witness layout, including for deployments built with the original 705-byte lock.
 
-In the lock, `OP_CODESEPARATOR` places the counter data outside `scriptCode`. The original witness carries the full BIP143 ALL preimage. Reconstructed witnesses supply the version, outpoint, `scriptCode`, previous amount, sequence, and locktime. Script builds the required successor and inserts its hash into the preimage. Every layout authenticates the full preimage against the actual spend with native `OP_CHECKSIG`. [PELS construction](https://patents.google.com/patent/EP4374535A1/en)
+## Developer and wallet integration
 
-## Declare a fee constraint
+### Declare a fee constraint
 
 The default source fixes the fee at 1,000 sat. PELS sources can declare an inclusive interval with `pels-fee: 1000 2000 ;`. Equal endpoints let the compiler derive the fee from the rule. Distinct endpoints let the spender supply a fee. Script checks that value, derives the positive successor amount, and binds the entire successor to the actual transaction.
 
@@ -64,7 +92,7 @@ bash tools/verify_node.sh --profile default -- \
 
 Use the same `--source` with `spend --parent <raw-tx> --fee 1500` to construct a spend inside that interval. The replay checks both fee bounds, rejects claims outside the interval, and rejects a changed successor that disagrees with an allowed fee.
 
-## Compare the core PELS rule
+### Compare the core PELS rule
 
 Use the Python environment from the regtest section.
 

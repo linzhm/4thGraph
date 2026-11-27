@@ -15,7 +15,9 @@ from time import perf_counter
 from fourthgraph.verification.circuit_backend import emit_circuit, parse_circuit
 from fourthgraph.verification.circuit_tools import CircuitFixture, SNARKJS_PACKAGE
 from fourthgraph.compiler.source import evaluate
-from fourthgraph.verification.groth16_bn254 import BASE_FIELD, ScriptVerifier, build_adapter, public_signals, runar_proof
+from fourthgraph.verification.groth16_bn254 import (
+    BASE_FIELD, ForthVerifier, ScriptVerifier, build_adapter, public_signals, runar_proof,
+)
 from fourthgraph.workflow.protocol import FLAG, Outpoint, SignRequest
 from fourthgraph.replay.workflow import TestKeys
 from fourthgraph.benchmark.admission import submit_and_mine
@@ -108,18 +110,33 @@ def verify_spend(node, activation, tx, parent, parent_height, *, expected):
 def main():
     cli = argparse.ArgumentParser(description=__doc__)
     cli.add_argument("--runar", type=Path, required=True)
-    cli.add_argument("--source", type=Path, default=SOURCE, help="Forth source for the generated circuit")
+    inputs = cli.add_mutually_exclusive_group()
+    inputs.add_argument("--source", type=Path, default=SOURCE, help="Forth source for the generated circuit")
+    inputs.add_argument("--fixture", type=Path, help="a test-only key and two proofs instead of a fresh setup")
     cli.add_argument("--entries", nargs=2, metavar=("TRANSITION", "ROUTE"), help="select two Forth words")
+    cli.add_argument("--verifier-source", type=Path, help="typed BN254 verifier Forth, separate from the circuit")
     cli.add_argument("--go", default="go")
     cli.add_argument("--tx-version", type=int, choices=(1, 2), default=2)
     cli.add_argument("--output", type=Path, required=True)
     args = cli.parse_args()
+    keys = TestKeys()
+    owner = keys.public["operator"]
     try:
-        source = args.source.read_bytes()
-        program = parse_circuit(source, entries=args.entries, source_path=args.source)
-        circuit_source = emit_circuit(program)
+        if args.fixture:
+            if args.entries:
+                raise ValueError("--entries requires a generated circuit")
+            fixture_bytes = args.fixture.read_bytes()
+            fixture = json.loads(fixture_bytes)
+            fixture_owner = fixture.get("owner_public_key") if isinstance(fixture, dict) else None
+            if not isinstance(fixture_owner, str) or bytes.fromhex(fixture_owner) != owner:
+                raise ValueError("fixture owner_public_key must match the regtest operator key")
+            provenance = {"fixture_sha256": sha256(fixture_bytes).hexdigest()}
+        else:
+            source = args.source.read_bytes()
+            program = parse_circuit(source, entries=args.entries, source_path=args.source)
+            circuit_source = emit_circuit(program)
     except (OSError, ValueError) as error:
-        cli.error(f"{args.source}: {error}")
+        cli.error(str(error))
     engine = chain_metadata()
     if engine["commit"] != CONTEXT_PIN:
         raise ValueError("Groth16 replay needs the height-aware chain-gang pin")
@@ -127,18 +144,27 @@ def main():
     if node.call("getblockcount", []) or node.call("getconnectioncount", []):
         raise ValueError("Groth16 replay requires an empty peerless regtest")
     activation = int(os.environ["SCRIPT_LAB_CHRONICLE_HEIGHT"])
-    keys = TestKeys()
-    owner = keys.public["operator"]
 
     with TemporaryDirectory(prefix="4thgraph-groth16-replay-") as temporary:
         adapter = Path(temporary) / "adapter"
         build_adapter(args.runar, adapter, go=args.go)
-        circuit = CircuitFixture(circuit_source, temporary, has_route=True)
-        key = demo_keys(circuit)
-        verifier = ScriptVerifier(adapter, key, temporary)
+        if args.fixture:
+            key = json.dumps(fixture["verification_key"]).encode()
+            signals = public_signals(json.dumps(fixture["wrap"]["public"]))
+            proof = json.dumps(fixture["wrap"]["proof"]).encode()
+            other_signals = public_signals(json.dumps(fixture["other"]["public"]))
+            other_proof = json.dumps(fixture["other"]["proof"]).encode()
+        else:
+            circuit = CircuitFixture(circuit_source, temporary, has_route=True)
+            key = demo_keys(circuit)
+            signals, proof = prove(circuit, program, (1 << 32) - 1, (1, 2), "wrap")
+            other_signals, other_proof = prove(circuit, program, 19, (1, 2), "other")
+            provenance = {"forth_source_sha256": sha256(source).hexdigest(), "forth_circuit": program.describe(),
+                          "circuit": circuit.describe()}
+        verifier = (ForthVerifier(adapter, key, temporary, args.verifier_source.read_bytes(),
+                                  source_path=args.verifier_source)
+                    if args.verifier_source else ScriptVerifier(adapter, key, temporary))
         # These are fixed statement data; the owner's signature covers the actual spend.
-        signals, proof = prove(circuit, program, (1 << 32) - 1, (1, 2), "wrap")
-        other_signals, other_proof = prove(circuit, program, 19, (1, 2), "other")
         lock = verifier.compile(signals, owner)
         witness = verifier.witness(signals, proof)
         wrong_statement = verifier.witness(other_signals, other_proof)
@@ -174,8 +200,7 @@ def main():
             "setup": "local-test-only", "bsv_node_version": node.version, "chain_gang": engine,
             "activation_height": activation, "regtest_profile": os.environ.get("SCRIPT_LAB_REGTEST_PROFILE"),
             "transaction_version": args.tx_version, "expected_spend": active,
-            "forth_source_sha256": sha256(source).hexdigest(), "forth_circuit": program.describe(),
-            "circuit": circuit.describe(),
+            **provenance,
             "verification_key": json.loads(key), "artifact": verifier.artifact(signals, owner, lock),
             "proof": json.loads(proof), "other_proof": json.loads(other_proof), "other_public_signals": other_signals,
             "witness_bytes": len(witness), "bootstrap_raw": bootstrap.serialize().hex(),

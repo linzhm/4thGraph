@@ -16,16 +16,16 @@ SOURCE_DIRECTORIES = ('.github', 'docs', 'projects', 'sdk', 'showcase', 'skills'
 BUILD_DIRECTORIES = {'.git', '.venv', '__pycache__', 'node_modules', 'target', 'workspace'}
 
 
+def tracked_files(root, pathspec):
+    tracked = subprocess.run(
+        ['git', 'ls-files', '-z', '--', pathspec], cwd=root, check=True, capture_output=True,
+    ).stdout
+    return (root / os.fsdecode(name) for name in tracked.split(b'\0') if name)
+
+
 def markdown_files(root):
     if (root / '.git').exists() and which('git'):
-        tracked = subprocess.run(
-            ['git', 'ls-files', '-z', '--', '*.md'], cwd=root, check=True, capture_output=True,
-        ).stdout
-        for name in tracked.split(b'\0'):
-            if name:
-                path = root / os.fsdecode(name)
-                if path.is_file():
-                    yield path
+        yield from (path for path in tracked_files(root, '*.md') if path.is_file())
         return
 
     # Source exports have no index. Walk the repository's documentation roots
@@ -37,6 +37,19 @@ def markdown_files(root):
             for name in sorted(files):
                 if name.endswith('.md'):
                     yield Path(current) / name
+
+
+def project_directories(root):
+    projects = root / "projects"
+    if (root / ".git").exists() and which("git"):
+        candidates = {path.parent.parent for path in projects.glob("*/versions/index.json")}
+        for path in tracked_files(root, "projects"):
+            relative = path.relative_to(projects)
+            if len(relative.parts) > 1:
+                candidates.add(projects / relative.parts[0])
+    else:
+        candidates = {path for path in projects.iterdir() if path.is_dir()}
+    return sorted(candidates - {projects / "template"})
 
 
 def write_markdown(root, relative, target):
@@ -64,8 +77,9 @@ class LayoutTests(unittest.TestCase):
         self.check_local_links(ROOT)
 
     def test_project_version_catalogs(self):
-        for project in sorted(path for path in (ROOT / "projects").iterdir() if path.is_dir()):
+        for project in project_directories(ROOT):
             with self.subTest(project=project.name):
+                self.assertTrue((project / "manifest.yaml").is_file())
                 versions = project / "versions"
                 index = json.loads((versions / "index.json").read_text())
                 self.assertEqual(index["schema_version"], 1)
@@ -114,9 +128,24 @@ class LayoutTests(unittest.TestCase):
                     self.assertIn(f"](../projects/{name}/{guide}#quickstart)", shared_guide)
                     self.assertIn('<a name="quickstart"></a>', (project / guide).read_text(encoding="utf-8"))
 
+    def test_standard_project_docs_link_the_language_pair(self):
+        for project in project_directories(ROOT):
+            for kind in ("spec", "sdk", "verification"):
+                docs = project / "docs"
+                english, chinese = (docs / f"{kind}.{locale}.md" for locale in ("en", "zh-CN"))
+                if not english.exists() and not chinese.exists():
+                    continue
+                for page, counterpart in ((english, chinese), (chinese, english)):
+                    with self.subTest(page=page.relative_to(ROOT)):
+                        self.assertTrue(page.is_file())
+                        self.assertRegex(page.read_text(encoding="utf-8"),
+                                         r"\]\((?:\./)?" + re.escape(counterpart.name) + r"(?:#[^)]*)?\)")
+
     def check_local_links(self, root):
         for path in markdown_files(root):
-            for target in re.findall(r'\]\(([^)]+)\)',path.read_text(encoding='utf-8')):
+            contents = path.read_text(encoding='utf-8')
+            self.assertNotIn('<!-- docs-template:', contents, str(path.relative_to(root)))
+            for target in re.findall(r'\]\(([^)]+)\)', contents):
                 if ':' in target or target.startswith('#'): continue
                 target=target.split('#')[0]
                 self.assertTrue((path.parent/target).exists(),f'{path.relative_to(root)} -> {target}')
@@ -135,6 +164,9 @@ class LayoutTests(unittest.TestCase):
             write_markdown(root, 'local-archive/README.md', 'missing.md')
 
             self.check_local_links(root)
+            tracked.write_text("<!-- docs-template: unfinished -->\n", encoding="utf-8")
+            with self.assertRaisesRegex(AssertionError, "docs-template"):
+                self.check_local_links(root)
             write_markdown(root, tracked.name, 'missing.md')
             with self.assertRaisesRegex(AssertionError, 'Tracked guide 文档.md -> missing.md'):
                 self.check_local_links(root)

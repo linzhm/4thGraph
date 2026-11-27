@@ -1,0 +1,70 @@
+{
+  "payment_shape": {
+    "inputs": 2,
+    "outputs": 2
+  },
+  "lock_bytes": 98362,
+  "otda_program_bytes": 9447,
+  "baseline": "1.6.0",
+  "bsv_node_version": "1.2.3",
+  "chain_gang_commit": "8b60b71a12a69fdcb465d3e627dbf6f43d6ed081",
+  "validation": "Peerless regtest script replay with supplied prevouts",
+  "scalar_window": {
+    "v1.6.0": {
+      "script_bytes": 40158,
+      "windows": 64,
+      "bits_per_window": 4,
+      "signed_digits": false
+    },
+    "v1.7.0": {
+      "script_bytes": 37854,
+      "windows": 52,
+      "bits_per_window": 5,
+      "signed_digits": true
+    }
+  },
+  "payments": {
+    "bip143-all": {
+      "v1.6.0": {
+        "txid": "a8d7efb52f06e08245583f1307e77c86d5a530ddfaee9a318390f495abaacf4b",
+        "transaction_bytes": 202030,
+        "unlock_bytes": [
+          291,
+          291
+        ],
+        "peak_stack_payload_bytes": 3642
+      },
+      "v1.7.0": {
+        "txid": "aba3bcd5d6591a2f522417724bd455257b9d3fe4b53eff4c101974a8bc8a8e2b",
+        "transaction_bytes": 197428,
+        "unlock_bytes": [
+          291,
+          291
+        ],
+        "peak_stack_payload_bytes": 3781
+      }
+    },
+    "otda-all": {
+      "v1.6.0": {
+        "txid": "1ef90f55d78adeb4027f3bd8335cc66801e06a5d5aae62921c2acba9d51b0cbe",
+        "transaction_bytes": 220814,
+        "unlock_bytes": [
+          9683,
+          9683
+        ],
+        "peak_stack_payload_bytes": 403032
+      },
+      "v1.7.0": {
+        "txid": "e8e88ecd8314e2a7a78daa7f96358787a2e753d74a15e57ff974cf4629be60a0",
+        "transaction_bytes": 216380,
+        "unlock_bytes": [
+          9767,
+          9767
+        ],
+        "peak_stack_payload_bytes": 393828
+      }
+    }
+  },
+  "source": "README.md#v170",
+  "compiler_commit": "889ff6e5d37e0e0215fba306353a8a22795c327a"
+}

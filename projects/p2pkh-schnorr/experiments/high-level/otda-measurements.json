@@ -1,0 +1,127 @@
+{
+  "sighash": "0x61",
+  "bsv_node_version": 101020300,
+  "chain_gang": {
+    "version": "0.13.2",
+    "commit": "74676b9c002c452e7f21a9ed9265f4972bef03f6"
+  },
+  "results": {
+    "manual-v0.17.0": {
+      "lock_bytes": 22435,
+      "lock_sha256": "8ccf6e1e0070112603e45e0521a9194efcf61c601d55aadef9c0e20466e734c2",
+      "constructor_bytes": 4465,
+      "2x2": {
+        "literal": {
+          "transaction_bytes": 135310,
+          "txid": "ccf8f7110ad068d91220a45cc656e8c7e97a7310ffd7d09b471f3aeb40292505",
+          "unlock_bytes": [
+            45161,
+            45161
+          ]
+        },
+        "reconstructed": {
+          "transaction_bytes": 54626,
+          "txid": "55b49929976830c485a98936e86cde4f07033d09d4601a7f1b4e6c16e34b007b",
+          "unlock_bytes": [
+            4819,
+            4819
+          ]
+        }
+      },
+      "1x1_native_exit": {
+        "literal": {
+          "transaction_bytes": 348,
+          "txid": "65f68e61d513b673b3fac64db39165db564cdf3b3da36d23be013ba58ba9548b",
+          "unlock_bytes": [
+            261
+          ]
+        },
+        "reconstructed": {
+          "transaction_bytes": 348,
+          "txid": "65f68e61d513b673b3fac64db39165db564cdf3b3da36d23be013ba58ba9548b",
+          "unlock_bytes": [
+            261
+          ]
+        }
+      }
+    },
+    "source-baseline": {
+      "lock_bytes": 433567,
+      "lock_sha256": "a1a5711e7fb00c76f87ff06d0b32b87f90486aea78486202e34d710db49aee52",
+      "constructor_bytes": 6100,
+      "2x2": {
+        "literal": {
+          "transaction_bytes": 2602122,
+          "txid": "0f8ca09477e6da5196cde1fd1c53df290c74941ab6a5eb3332a157b41c7e0cb4",
+          "unlock_bytes": [
+            867431,
+            867431
+          ]
+        },
+        "reconstructed": {
+          "transaction_bytes": 880172,
+          "txid": "b68d544745350552571ea77613472406306b05e5b6f9ee4290ce875c0cd008af",
+          "unlock_bytes": [
+            6458,
+            6458
+          ]
+        }
+      },
+      "1x1_native_exit": {
+        "literal": {
+          "transaction_bytes": 348,
+          "txid": "766f22602764b264028035e533c4a4664fc4e402e51034c5ab7c6990df21e02c",
+          "unlock_bytes": [
+            261
+          ]
+        },
+        "reconstructed": {
+          "transaction_bytes": 348,
+          "txid": "766f22602764b264028035e533c4a4664fc4e402e51034c5ab7c6990df21e02c",
+          "unlock_bytes": [
+            261
+          ]
+        }
+      }
+    },
+    "compiler-auto": {
+      "lock_bytes": 218701,
+      "lock_sha256": "ca2114f530a387c06e3bb15f6118c8fe0bfa2fffd5f52ce3be8642ca3e68a857",
+      "constructor_bytes": 4340,
+      "2x2": {
+        "literal": {
+          "transaction_bytes": 1312926,
+          "txid": "4583ec1475ded01889f9324bb089cbcc329aa2122b76712abf0741d66f30269c",
+          "unlock_bytes": [
+            437699,
+            437699
+          ]
+        },
+        "reconstructed": {
+          "transaction_bytes": 446920,
+          "txid": "97d58c4a9f87c6c59dfc2b272bb2a604928eaf2be7019f8c4a990595bb01df3d",
+          "unlock_bytes": [
+            4698,
+            4698
+          ]
+        }
+      },
+      "1x1_native_exit": {
+        "literal": {
+          "transaction_bytes": 348,
+          "txid": "90742248bddcd9f8ad8c6b1bd0714febe0ef379e51d4ec81cac462a2846f7d15",
+          "unlock_bytes": [
+            261
+          ]
+        },
+        "reconstructed": {
+          "transaction_bytes": 348,
+          "txid": "90742248bddcd9f8ad8c6b1bd0714febe0ef379e51d4ec81cac462a2846f7d15",
+          "unlock_bytes": [
+            261
+          ]
+        }
+      }
+    }
+  }
+}

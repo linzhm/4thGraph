@@ -2,10 +2,12 @@
 
 import json
 from hashlib import sha256
+from itertools import chain
 from math import gcd
 import unittest
 
 from fourthgraph.replay.groth16_bls12381 import load_fixture, witness_controls
+from fourthgraph.verification.bls12381.field import ScriptField, Tower
 from fourthgraph.verification.bls12381.verifier import (
     AFFINE_BYTES, Curve, Dynamic, HOST, PACKET_BYTES, Q, QUOTIENT_ORDER, R, U, ScriptVerifier,
     bind_public_output, input_sources, public_output, public_packet, public_signals,
@@ -13,7 +15,8 @@ from fourthgraph.verification.bls12381.verifier import (
 from fourthgraph.replay.groth16_bn254 import sign_spend
 from fourthgraph.replay.workflow import TestKeys
 from fourthgraph.bsv.chain_gang import validate_at_heights
-from fourthgraph.bsv.script import asm, push
+from fourthgraph.bsv.evaluate import evaluate
+from fourthgraph.bsv.script import asm, decode_num, encode_num, push
 from fourthgraph.bsv.transaction import Input, Output, Transaction, preimage_all
 
 
@@ -40,6 +43,58 @@ class BLS12381Tests(unittest.TestCase):
         self.assertEqual(gcd(Q + U, QUOTIENT_ORDER), R)
         value = (((11, 20), (33, 49), (55, 61)), ((72, 80), (95, 105), (112, 125)))
         self.assertEqual(HOST.power12(value, Q), HOST.frobenius12(value))
+
+    def test_fp12_kernels_reduce_signed_limbs_after_recombination(self):
+        def pairs(limbs):
+            return tuple(zip(limbs[::2], limbs[1::2], strict=True))
+
+        def fp12(limbs):
+            return pairs(limbs[:6]), pairs(limbs[6:12])
+
+        def flatten(value):
+            return tuple(chain.from_iterable(chain.from_iterable(value)))
+
+        def expected_outputs(value, line):
+            squared = HOST.square12(value)
+            lined = HOST.mul_line(squared, line)
+            product = HOST.mul12(lined, value)
+            step = squared
+            for _ in range(3):
+                step = HOST.mul_line(step, line)
+            round_with_chord = step
+            for _ in range(3):
+                round_with_chord = HOST.mul_line(round_with_chord, line)
+            round_with_chord = HOST.mul12(round_with_chord, value)
+            return tuple(chain.from_iterable(map(flatten, (squared, lined, product, step, step, round_with_chord))))
+
+        limbs = (Q - 1, -Q + 1, 0, -7, 1, -1, -Q + 1, 2, Q - 2, 0, 3, -4)
+        for direct in (False, True):
+            field = ScriptField(18, assert_checks=True)
+            tower = Tower(field, sparse=True, defer_reductions=True, mul2_kernel=field.multiply2,
+                          direct_lines=direct)
+            inputs = field.graph.inputs
+            element = fp12(inputs)
+            squared = tower.square12(element)
+            line = pairs(inputs[12:])
+            lined = tower.mul_line(squared, line)
+            product = tower.mul12(lined, element)
+            step = tower.mul_lines(squared, (line,) * 3)
+            round_without_chord = tower.miller_round(element, (line,) * 3, None)
+            round_with_chord = tower.miller_round(element, (line,) * 6, element)
+            self.assertEqual(field.reduce(product[0][0][0]), product[0][0][0])
+            outputs = tuple(chain.from_iterable(map(flatten, (squared, lined, product, step,
+                                                             round_without_chord, round_with_chord))))
+            script = field.graph.emit(outputs, compact=True)
+
+            for odd_imag in (0, -Q + 2):
+                with self.subTest(direct=direct, odd_imag=odd_imag):
+                    line_limbs = (Q - 1, -Q + 1, -(Q - 1)**2, (Q - 1)**2, Q - 1, odd_imag)
+                    expected = expected_outputs(fp12(limbs), pairs(line_limbs))
+                    stack, alt = evaluate(script, list(map(encode_num, limbs + line_limbs)))
+                    signed = tuple(map(decode_num, stack))
+                    self.assertEqual(alt, [])
+                    self.assertTrue(all(abs(limb) < Q for limb in signed))
+                    self.assertEqual(tuple(limb % Q for limb in signed), expected)
 
     def test_nchain_and_residue_exponent_kernels(self):
         # Symbolically track the signed-seed nChain hard exponent straight-line program.

@@ -1,27 +1,42 @@
 """Construct, recognize, and authorize canonical P2PKH-SM2 payments."""
-from functools import cache
+from functools import cache, partial
 from hashlib import sha256
 import json
 from pathlib import Path
-from assemble import TEMPLATE_VERSION, assemble
-from sighash import authorization
+from assemble import CARRIED_FIELD_TEMPLATE_VERSION, SIGNED_WINDOW_TEMPLATE_VERSION, SPLIT_ROTATION_TEMPLATE_VERSION
+from assemble import TEMPLATE_PROFILES, TEMPLATE_VERSION, assemble
+from sighash import ORDINARY_CODE, authorization
 from sm2 import USER_ID,hash256,public_key_hash160,verify
-from fourthgraph.bsv.otda_reconstruction import Reconstruction
+from fourthgraph.bsv.otda_reconstruction import Reconstruction, reconstruct_mixed
 from fourthgraph.bsv.script import push
+from fourthgraph.bsv.transaction import ANYONECANPAY, otda_input_parts
 from fourthgraph.bsv.transaction import Transaction,Input,Output,preimage_all,amount
+from fourthgraph.compiler.preimage import pack_otda_input_prefix
 
-VERSIONS = Path(__file__).resolve().parents[1] / "versions"
-MANIFEST = VERSIONS / "v1.0.0/layout.json"
-CONSTRUCTOR_LAYOUT = VERSIONS / "v1.1.0/layout.json"
+VERSIONS = Path(__file__).resolve().parents[1] / 'versions'
+LOCK_LAYOUTS = {version: VERSIONS / profile / 'layout.json'
+                for version, profile in TEMPLATE_PROFILES.items()}
+CONSTRUCTOR_LAYOUTS = LOCK_LAYOUTS | {
+    TEMPLATE_VERSION: VERSIONS / 'v1.1.0/layout.json',
+}
+MIXED_OTDA_VERSIONS = (SPLIT_ROTATION_TEMPLATE_VERSION, SIGNED_WINDOW_TEMPLATE_VERSION)
+MIXED_OTDA_FILE = VERSIONS / 'v1.8.0/mixed-otda-constructor.json'
 RECONSTRUCT_ALL = frozenset((0x61, 0xe1))
 RECONSTRUCT_SINGLE = frozenset((0x63, 0xe3))
 
 
 @cache
-def _canonical():
-    layout=json.loads(MANIFEST.read_text())
-    raw=assemble(bytes(20))
-    if (layout['version']!=TEMPLATE_VERSION or len(raw)!=layout['script_bytes']
+def _layout(version):
+    if version not in LOCK_LAYOUTS:
+        raise ValueError('unsupported P2PKH-SM2 template version')
+    return json.loads(LOCK_LAYOUTS[version].read_text(encoding='utf-8'))
+
+
+@cache
+def _canonical(version=TEMPLATE_VERSION):
+    layout = _layout(version)
+    raw = assemble(bytes(20), version)
+    if (layout['version']!=version or len(raw)!=layout['script_bytes']
             or sha256(raw).hexdigest()!=layout['base_script_sha256']):
         raise ValueError('canonical SM2 template differs from manifest')
     start=layout['owner_hash160']['offset']
@@ -32,8 +47,7 @@ def _canonical():
 
 def locking_script_from_owner_hash(owner, *, version=TEMPLATE_VERSION):
     if not isinstance(owner,bytes) or len(owner)!=20: raise ValueError('expected a 20-byte owner hash')
-    if version != TEMPLATE_VERSION: raise ValueError('unsupported P2PKH-SM2 template version')
-    raw,start=_canonical()
+    raw,start=_canonical(version)
     return raw[:start]+owner+raw[start+20:]
 
 
@@ -45,10 +59,12 @@ def identify(raw):
     """Return (version, owner) after verifying the complete locking program."""
     if not isinstance(raw, bytes):
         return None
-    template, start = _canonical()
-    if (len(raw) == len(template) and raw[:start] == template[:start]
-            and raw[start+20:] == template[start+20:]):
-        return TEMPLATE_VERSION, raw[start:start+20]
+    for version in LOCK_LAYOUTS:
+        if len(raw) != _layout(version)['script_bytes']:
+            continue
+        template, start = _canonical(version)
+        if raw[:start] == template[:start] and raw[start+20:] == template[start+20:]:
+            return version, raw[start:start+20]
     return None
 
 
@@ -58,13 +74,34 @@ def recognize(raw):
 
 
 @cache
-def _otda_pattern():
-    layout = json.loads(CONSTRUCTOR_LAYOUT.read_text())['otda_constructor']
-    program = bytes.fromhex(CONSTRUCTOR_LAYOUT.with_name(layout['file']).read_text(encoding='ascii'))
+def _otda_pattern(version=TEMPLATE_VERSION):
+    path = CONSTRUCTOR_LAYOUTS[version]
+    layout = json.loads(path.read_text(encoding='utf-8'))['otda_constructor']
+    program = bytes.fromhex(path.with_name(layout['file']).read_text(encoding='ascii'))
     if len(program) != layout['bytes'] or sha256(program).hexdigest() != layout['sha256']:
         raise ValueError('SM2 OTDA constructor differs from its manifest')
-    template, start = _canonical()
+    template, start = _canonical(version)
     return Reconstruction(program, (template[:start], template[start+20:]), (20,))
+
+
+@cache
+def _mixed_otda_program():
+    record = json.loads(MIXED_OTDA_FILE.read_text(encoding='utf-8'))
+    program = bytes.fromhex(record['program_hex'])
+    if (tuple(record['templates']) != MIXED_OTDA_VERSIONS or len(program) != record['bytes']
+            or sha256(program).hexdigest() != record['sha256']):
+        raise ValueError('mixed SM2 OTDA constructor differs from its manifest')
+    return program
+
+
+def _combine_otda_programs(patterns):
+    pair = tuple(_otda_pattern(version) for version in MIXED_OTDA_VERSIONS)
+    for index in range(len(patterns) - 1):
+        if patterns[index:index + 2] == pair:
+            programs = [pattern.program for pattern in patterns]
+            programs[index:index + 2] = [_mixed_otda_program()]
+            return b''.join(programs)
+    return None
 
 
 def _preimage_script(tx, index, auth, *, compress_otda, chronicle_active):
@@ -81,14 +118,29 @@ def _preimage_script(tx, index, auth, *, compress_otda, chronicle_active):
         outputs = (tx.outputs[index],)
     else:
         return literal
-    program = _otda_pattern().build(auth.preimage, outputs)
-    return program if program is not None and len(program) < len(literal) else literal
+    output_sizes = {len(output.script) for output in outputs}
+    patterns = {version: _otda_pattern(version) for version in LOCK_LAYOUTS
+                if _layout(version)['script_bytes'] in output_sizes}
+    candidates = [literal]
+    for version, pattern in patterns.items():
+        encode_prefix = push
+        if version == CARRIED_FIELD_TEMPLATE_VERSION and not auth.requested_type & ANYONECANPAY and len(tx.inputs) >= 4:
+            parts = otda_input_parts(tx, index, ORDINARY_CODE, auth.requested_type)
+            encode_prefix = partial(pack_otda_input_prefix, input_parts=parts)
+        if (program := pattern.build(auth.preimage, outputs, encode_prefix=encode_prefix)) is not None:
+            candidates.append(program)
+    if len(patterns) > 1:
+        combine = _combine_otda_programs if all(version in patterns for version in MIXED_OTDA_VERSIONS) else None
+        program = reconstruct_mixed(auth.preimage, outputs, tuple(patterns.values()), combine_programs=combine)
+        if program is not None:
+            candidates.append(program)
+    return min(candidates, key=len)
 
 
 def current_input_unlock(tx, index, previous_amount, key, signature, sighash_type=0x41,
                          *, chronicle_active=True, version=TEMPLATE_VERSION, compress_otda=None):
     public_key_hash160(key)
-    if version != TEMPLATE_VERSION:
+    if version not in LOCK_LAYOUTS:
         raise ValueError('unsupported P2PKH-SM2 template version')
     auth = authorization(tx, index, previous_amount, sighash_type, chronicle_active=chronicle_active)
     preimage_script = _preimage_script(tx, index, auth, compress_otda=compress_otda,

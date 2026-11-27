@@ -1,0 +1,219 @@
+{
+  "version": "0.2.0",
+  "status": "candidate",
+  "source_base": "12379638986812aecdd9af511724734fc2d72368",
+  "bsv_node": "1.2.3",
+  "chain_gang": {
+    "version": "0.13.2",
+    "commit": "8b60b71a12a69fdcb465d3e627dbf6f43d6ed081"
+  },
+  "template_bytes": 6525,
+  "template_sha256": "04cdbb64996418011e61bfaebc456a5f85d2cedd47e67e86f134b5fe3c7a67c4",
+  "reconstruction_program_bytes": 871,
+  "benchmark_scope": "Synthetic signed transactions verified by both engines. Stack measurements use the development evaluator.",
+  "benchmark_transaction_count": 112,
+  "profiles": {
+    "committed-key-forth-compact": {
+      "41": {
+        "lock_bytes": 6830,
+        "unlock_bytes_per_input": 16549,
+        "two_input_two_output_bytes": 46876,
+        "extra_input_bytes": 16592,
+        "extra_output_bytes": 6841,
+        "lifecycle_total_bytes": {
+          "direct-exit": 47102,
+          "turnover": 93978
+        },
+        "observed_stack_input_zero": {
+          "source": "development evaluator; native CHECKSIG modeled as true",
+          "main_items": 32,
+          "alt_items": 5,
+          "combined_payload_bytes": 16707
+        }
+      },
+      "61": {
+        "lock_bytes": 6830,
+        "unlock_bytes_per_input": 30171,
+        "two_input_two_output_bytes": 74120,
+        "extra_input_bytes": 30337,
+        "extra_output_bytes": 20523,
+        "lifecycle_total_bytes": {
+          "direct-exit": 47115,
+          "turnover": 121236
+        },
+        "observed_stack_input_zero": {
+          "source": "development evaluator; native CHECKSIG modeled as true",
+          "main_items": 32,
+          "alt_items": 5,
+          "combined_payload_bytes": 43947
+        }
+      }
+    },
+    "committed-key-forth-compact-reconstructed": {
+      "41": {
+        "lock_bytes": 6830,
+        "unlock_bytes_per_input": 16549,
+        "two_input_two_output_bytes": 46876,
+        "extra_input_bytes": 16592,
+        "extra_output_bytes": 6841,
+        "lifecycle_total_bytes": {
+          "direct-exit": 47102,
+          "turnover": 93978
+        },
+        "observed_stack_input_zero": {
+          "source": "development evaluator; native CHECKSIG modeled as true",
+          "main_items": 32,
+          "alt_items": 5,
+          "combined_payload_bytes": 16707
+        }
+      },
+      "61": {
+        "lock_bytes": 6830,
+        "unlock_bytes_per_input": 17526,
+        "two_input_two_output_bytes": 48830,
+        "extra_input_bytes": 17692,
+        "extra_output_bytes": 6945,
+        "lifecycle_total_bytes": {
+          "direct-exit": 47116,
+          "turnover": 95946
+        },
+        "observed_stack_input_zero": {
+          "source": "development evaluator; native CHECKSIG modeled as true",
+          "main_items": 32,
+          "alt_items": 5,
+          "combined_payload_bytes": 43947
+        }
+      }
+    },
+    "committed-key-forth-v0.2.0": {
+      "41": {
+        "lock_bytes": 6525,
+        "unlock_bytes_per_input": 16549,
+        "two_input_two_output_bytes": 46266,
+        "extra_input_bytes": 16592,
+        "extra_output_bytes": 6536,
+        "lifecycle_total_bytes": {
+          "direct-exit": 46492,
+          "turnover": 92758
+        },
+        "observed_stack_input_zero": {
+          "source": "development evaluator; native CHECKSIG modeled as true",
+          "main_items": 32,
+          "alt_items": 5,
+          "combined_payload_bytes": 16707
+        }
+      },
+      "61": {
+        "lock_bytes": 6525,
+        "unlock_bytes_per_input": 29561,
+        "two_input_two_output_bytes": 72290,
+        "extra_input_bytes": 29727,
+        "extra_output_bytes": 19608,
+        "lifecycle_total_bytes": {
+          "direct-exit": 46506,
+          "turnover": 118795
+        },
+        "observed_stack_input_zero": {
+          "source": "development evaluator; native CHECKSIG modeled as true",
+          "main_items": 32,
+          "alt_items": 5,
+          "combined_payload_bytes": 42727
+        }
+      }
+    },
+    "committed-key-forth-v0.2.0-reconstructed": {
+      "41": {
+        "lock_bytes": 6525,
+        "unlock_bytes_per_input": 16549,
+        "two_input_two_output_bytes": 46266,
+        "extra_input_bytes": 16592,
+        "extra_output_bytes": 6536,
+        "lifecycle_total_bytes": {
+          "direct-exit": 46491,
+          "turnover": 92757
+        },
+        "observed_stack_input_zero": {
+          "source": "development evaluator; native CHECKSIG modeled as true",
+          "main_items": 32,
+          "alt_items": 5,
+          "combined_payload_bytes": 16707
+        }
+      },
+      "61": {
+        "lock_bytes": 6525,
+        "unlock_bytes_per_input": 17469,
+        "two_input_two_output_bytes": 48106,
+        "extra_input_bytes": 17635,
+        "extra_output_bytes": 6640,
+        "lifecycle_total_bytes": {
+          "direct-exit": 46506,
+          "turnover": 94611
+        },
+        "observed_stack_input_zero": {
+          "source": "development evaluator; native CHECKSIG modeled as true",
+          "main_items": 32,
+          "alt_items": 5,
+          "combined_payload_bytes": 42727
+        }
+      }
+    }
+  },
+  "funded_regtest": {
+    "profile": "default",
+    "spend_fee_sats": 250000,
+    "cases": {
+      "lamport-ots/committed-key-forth-v0.2.0-reconstructed/41": {
+        "funding": {
+          "txid": "5e0a73f6b2872c2fdcc5a2b0b0dcfe3565757db9106e41cc973cfb86d89154b9",
+          "bytes": 13229,
+          "mempool": true,
+          "mined": true,
+          "block": "12630858f4ce5a8128cf497c7189bea41bd59b64569efecd9b64c5297fb846fb",
+          "height": 102
+        },
+        "turnover": {
+          "txid": "3382a5d2be860c39bf012758592478438a2f12960fbfc7ef59780a017bcc2f3a",
+          "bytes": 46266,
+          "mempool": true,
+          "mined": true,
+          "block": "1892d05207fc6763f4141c892344c2cc33adf35c243da256e0001887e4cb43b3",
+          "height": 103
+        },
+        "exit": {
+          "txid": "b59c3cf23840faf6bab6b162245b77dde63d85e53c0078eb0197fb2ee38f73fc",
+          "bytes": 33262,
+          "mempool": true,
+          "mined": true,
+          "block": "072a3e041d28f275741a5e27e2471728790af58f1a20ff65e713e014245388f5",
+          "height": 104
+        }
+      },
+      "lamport-ots/committed-key-forth-v0.2.0-reconstructed/61": {
+        "funding": {
+          "txid": "0c84a687eb173be9714773d57748c57f0906221f842703516577fc32d1c45004",
+          "bytes": 13263,
+          "mempool": true,
+          "mined": true,
+          "block": "13ee6a3a82fa100a84b678ca6c91fb5ae59b76b47fd4ca3995466a53d553bd44",
+          "height": 105
+        },
+        "turnover": {
+          "txid": "fbabcaadf41c5a03f1c0d808fe1c963180a7ea4be3b5a85c91687dd4fa4288c3",
+          "bytes": 48106,
+          "mempool": true,
+          "mined": true,
+          "block": "1dc9f71161b09595cb24f584dfb6cffdcd0e752ba461252205d2b5970760360c",
+          "height": 106
+        },
+        "exit": {
+          "txid": "bae4718b161eeb4eaca7b9a3940a12faeb0981c6b8c87476bd2150b27be35912",
+          "bytes": 33276,
+          "mempool": true,
+          "mined": true,
+          "block": "75cb5b2a7e012bcf93d3aa814263a8c13dcbbe6d03a26231080a9677cb79ad67",
+          "height": 107
+        }
+      }
+    }
+  }
+}

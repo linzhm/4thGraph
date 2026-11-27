@@ -2,6 +2,9 @@
   "schema_version": 1,
   "current": "0.1.0",
   "versions": [
-    "0.1.0"
-  ]
+    "0.1.0",
+    "0.2.0"
+  ],
+  "next": "0.2.0",
+  "sdk_default": "0.1.0"
 }
