@@ -103,6 +103,11 @@ def library_resource(name):
     return Path("stdlib", name.removeprefix("std/") + ".fth")
 
 
+SECP256K1_DOUBLING_PLACEMENT = (
+    Parameter("placement", "cell", "Zero reads the field prime at stack bottom. A nonzero value reads it below the point."),
+)
+
+
 PELS_SUCCESSOR_BUILD_PARAMETERS = (
     Parameter("prefix", "script", "Serialized Script accumulator to extend. The assembled lock starts with a direct "
               "push of five state bytes followed immediately by OP_CODESEPARATOR."),
@@ -217,15 +222,16 @@ LIBRARIES = {
         ), failure="The caller supplies a valid point and the field prime at the bottom of the main stack."),
         script_fragment("secp256k1-double-with-field", (
             Parameter("point", "projective-point", "Three homogeneous ScriptNum coordinates"),
-        ), takes=("script", "cell"), failure="Supply a valid point and the secp256k1 field prime. Placement 0 uses "
-                            "the bottom of the main stack and placement 1 uses the slot below the point."),
+        ), takes=("script", "cell"), failure="Supply a valid point and the secp256k1 field prime at the selected slot.",
+                        build_parameters=SECP256K1_DOUBLING_PLACEMENT),
         script_fragment("secp256k1-double-pair", (
             Parameter("point", "projective-point", "Three reduced homogeneous ScriptNum coordinates"),
         ), failure="Supply a valid point with coordinate magnitudes below the field prime at the bottom of the main stack."),
         script_fragment("secp256k1-double-pair-with-field", (
             Parameter("point", "projective-point", "Three reduced homogeneous ScriptNum coordinates"),
         ), takes=("script", "cell"), failure="Supply a valid point with coordinate magnitudes below the field prime. "
-                                "Placement 0 uses the stack bottom and placement 1 uses the slot below the point."),
+                                "Place the secp256k1 field prime at the selected slot.",
+                        build_parameters=SECP256K1_DOUBLING_PLACEMENT),
         script_fragment("secp256k1-scale-affine-pair", (
             Parameter("left", "affine-point", "Two secp256k1 coordinates"),
             Parameter("right", "affine-point", "Two secp256k1 coordinates"),

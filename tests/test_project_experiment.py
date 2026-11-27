@@ -110,6 +110,8 @@ class FormulaExperiments(unittest.TestCase):
                 self.assertEqual(node.verdicts(spend, (parent,), **CONTEXT), [True], case)
                 self.assertEqual(node.verdicts(rejected, (parent,), **CONTEXT,
                                                expected_rejection=EQUALVERIFY_REJECTION), [False], case)
+                with self.assertRaisesRegex(ValueError, r"^Error evaluating the script `OP_EQUALVERIFY operands are not equal`$"):
+                    validate_at_heights(rejected, (parent,), **CONTEXT)
             field, *coords = case["operands"]
             malformed = spend.with_script(0, b"".join(map(number, (field - 1, *coords))))
             self.assertEqual(node.verdicts(malformed, (parent,), **CONTEXT,
