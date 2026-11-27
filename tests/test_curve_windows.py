@@ -2,18 +2,25 @@
 from functools import cache
 import json
 import os
+from operator import mul, sub
 from pathlib import Path
 from shutil import which
 import subprocess
 import sys
+from types import SimpleNamespace
 import unittest
 
 from fourthgraph.benchmark.validation import Node, chain_verdict
 from fourthgraph.bsv.evaluate import ScriptError, evaluate
 from fourthgraph.bsv.script import asm, decode_num, encode_num, push
 from fourthgraph.bsv.transaction import Input, Output, Transaction
-from fourthgraph.compiler.curve_lowering import compile_fixed_generator, compile_joint_generator_point, joint_vocabulary, link_joint_word
-from fourthgraph.compiler.curve_windows import CURVES, GLV_REFERENCE, GLV_SCALED, GLV_STACK, JOINT_STRATEGIES, P256, SECP256K1, SM2, fixed_table, scalar_plans
+from fourthgraph.compiler.curve_lowering import (
+    compile_fixed_generator, compile_joint_generator_point, joint_vocabulary, link_joint_word,
+)
+from fourthgraph.compiler.curve_windows import (
+    CURVES, GLV_REFERENCE, GLV_SCALED, GLV_STACK, JOINT_STRATEGIES, P256, SECP256K1, SM2,
+    double_from_affine_slope, fixed_table, scalar_plans, signed_radix4,
+)
 from fourthgraph.compiler.lowering import DATAFLOW, compile_word
 from fourthgraph.compiler.modular_scale import lower_affine_pair_scale, lower_modular_scale, lower_scaled_residuals
 from fourthgraph.compiler.script_builder import ScriptBuilder
@@ -53,6 +60,34 @@ def generator_multiple(curve, scalar):
     if len(uncompressed) != 65 or uncompressed[0] != 4:
         raise AssertionError("OpenSSL did not return an uncompressed point")
     return int.from_bytes(uncompressed[1:33], "big"), int.from_bytes(uncompressed[33:], "big")
+
+
+class ScalarRecodingTests(unittest.TestCase):
+    def test_affine_doubling_reuses_a_precomputed_tangent(self):
+        for curve in CURVES.values():
+            with self.subTest(curve=curve.name):
+                prime = curve.field
+                field = SimpleNamespace(mul=mul, sub=sub, reduce=lambda value: value % prime)
+                points = fixed_table(curve)
+                x, y = points[1]
+                slope = (3 * x*x + curve.a) * pow(2*y, -1, prime) % prime
+                self.assertEqual(double_from_affine_slope(field, (x, y), slope), points[2])
+                self.assertEqual(double_from_affine_slope(field, (x - prime, y - prime), slope - prime), points[2])
+
+    def test_signed_radix4_preserves_scalar_and_terminal_carry(self):
+        for maximum in (*range(65), 2**32 - 1, 2**255 - 1):
+            plan = tuple(signed_radix4(maximum))
+            inputs = range(maximum + 1) if maximum < 65 else (0, 3, maximum - 1, maximum)
+            for value in inputs:
+                remaining, reconstructed = value, 0
+                for index, window in enumerate(plan):
+                    shifted, quotient = window.split(remaining, shifted=True)
+                    digit, remaining = window.split(remaining)
+                    self.assertEqual((shifted, quotient), (digit + int(window.carry), remaining))
+                    self.assertLessEqual(abs(digit), window.maximum_magnitude)
+                    self.assertGreaterEqual(digit, -1 if window.carry else 0)
+                    reconstructed += digit << (index * 2)
+                self.assertEqual((remaining, reconstructed), (0, value))
 
 
 class WeierstrassModelTests(unittest.TestCase):

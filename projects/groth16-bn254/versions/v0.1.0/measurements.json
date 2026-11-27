@@ -1,0 +1,47 @@
+{
+  "version": "0.1.0",
+  "fixture_sha256": "d8eee6da5ed5780fb71dc91fa08744d1644ff1db7f53974aafb48bb26c2dd10c",
+  "runar_revision": "dbcc4269f8e0895c4738cf86948b05b7d62a2010",
+  "forth_entry": "verify-bn254-proof",
+  "source_sha256": "bf4b302339b8c2a319d772f98b7f461ba1121502a63a6e8f63dffce11f535bf1",
+  "libraries": [
+    {
+      "name": "forth/statement.fth",
+      "sha256": "2fd49a0fb75feeb27f855ad09d61daa839d7e5924102c4163f5c30491b126395",
+      "interface_sha256": null
+    }
+  ],
+  "node_version": 101020300,
+  "chain_gang": {
+    "version": "0.13.2",
+    "commit": "74676b9c002c452e7f21a9ed9265f4972bef03f6"
+  },
+  "activation_height": 2,
+  "lock_bytes": 1524095,
+  "script_sha256": "5ac91ed37490d396daf344767aa0132360a54bb25f9c1357140fae9016d66590",
+  "witness_prefix_bytes": 31056,
+  "witness_prefix_sha256": "e4b692aaccc142ea5887ebd4e1da163e1257db4ce3c6d5c31b1a34a1d418b08f",
+  "serialized_path_bytes_with_owner_signature": 1555232,
+  "deployment": {
+    "txid": "b3505181c425c37d4bc1fd27e754a26616d63916188bc9c1a7143f911167bd04",
+    "bytes": 1524231,
+    "mempool": true,
+    "mined": true,
+    "block": "4c341717bbb55b5515c313348ac239fe45bc0d8935950d5561c9563be53a7f2e",
+    "height": 103
+  },
+  "valid_spend": {
+    "txid": "09ecc01da88419d1beb5ce06f4c023c81272610c865e7672faaa8c1a33c07dd7",
+    "bytes": 31226,
+    "mempool": true,
+    "mined": true,
+    "block": "017a5431f944e350e62d0b49cc9e2929e75cd73072a3825cad35a2241917bd96",
+    "height": 104
+  },
+  "rejected_controls": [
+    "changed_output_with_stale_signature",
+    "negated_proof_point",
+    "valid_proof_for_another_statement",
+    "wrong_sighash"
+  ]
+}

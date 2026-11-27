@@ -9,7 +9,8 @@
 | [PELS 计数器](pels-counter/README.zh-CN.md) | 编译状态转换并复放逐笔递增的合约 |
 | [交易工作流](workflow-examples/README.zh-CN.md) | 比较并行、汇合和串行的交易计划，包含 Gforth 示例 |
 | [证明计数器](proof-counter/README.zh-CN.md) | 用 Script、Circom 或证明后端构建同一个公开状态转换 |
-| [Groth16 验证器](groth16-verifier/README.zh-CN.md) | 用 Forth 调用 BLS12-381 标准库并回放有资金的证明花费 |
+| [BLS12-381 Groth16](groth16-bls12-381/README.zh-CN.md) | 编译模块化 Forth 验证器并回放入金花费 |
+| [BN254 Groth16](groth16-bn254/README.zh-CN.md) | 构建固定声明的 Forth 验证器并在 Chronicle 回放 |
 
 ## 付款与签名方案
 
@@ -26,7 +27,7 @@
 
 ## 交易测试
 
-交易测试入口构造并验证付款及工作流的完整交易。付款例子覆盖入金、周转和退出，Deferred R1 另含带赞助输入的激活。PELS 计数器连续递增两次，串行工作流分别走 BIP143 ALL 与 OTDA ALL，证明计数器走直接 Script 后端。Groth16 验证器使用项目的入金回放。[交易测试入口](../tests/project_transactions.py) · [Groth16 回放](groth16-verifier/docs/verification.zh-CN.md)
+交易测试入口构造并验证付款及工作流的完整交易。付款例子覆盖入金、周转和退出，Deferred R1 另含带赞助输入的激活。PELS 计数器连续递增两次，串行工作流分别走 BIP143 ALL 与 OTDA ALL，证明计数器走直接 Script 后端。两个 Groth16 项目各自提供入金回放。[交易测试入口](../tests/project_transactions.py) · [BLS12-381 回放](groth16-bls12-381/docs/verification.zh-CN.md) · [BN254 回放](groth16-bn254/docs/verification.zh-CN.md)
 
 在仓库根目录运行。Python 环境需装有 chain-gang、`ecdsa`、`coincurve` 和 `cryptography`。ML-DSA 测试签名器需要 OpenSSL 3.5 或以上。命令末尾可加项目目录名，只执行该项目。
 

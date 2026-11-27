@@ -15,7 +15,7 @@ from fourthgraph.workflow.protocol import (
 from fourthgraph.bsv.script import asm, number, push
 from fourthgraph.bsv.transaction import Output
 
-from .field import BETA, HOST, ONE12, PSI_X, PSI_Y, Q, R, U, HostField, ScriptField, Tower
+from .field import BETA, FP2_RULES, HOST, ONE12, PSI_X, PSI_Y, Q, R, U, HostField, ScriptField, Tower
 
 FIELD_BYTES = 48
 PACKET_BYTES = (8 + 12) * FIELD_BYTES
@@ -189,7 +189,7 @@ class Curve:
         x, y = point
         return self.sub(self.square(y), self.add(self.mul(self.square(x), x), self.b))
 
-    def double(self, point):
+    def double(self, point, *, reduce_coordinates=True):
         x, y, z = point
         xx, yy = self.square(x), self.square(y)
         slope = self.scale(xx, 3)
@@ -197,7 +197,8 @@ class Curve:
         x3 = self.sub(self.square(slope), self.scale(s, 2))
         y3 = self.sub(self.mul(slope, self.sub(s, x3)), self.scale(self.square(yy), 8))
         z3 = self.scale(self.mul(y, z), 2)
-        return (self.reduce(x3), self.reduce(y3), self.reduce(z3)), slope, yy
+        doubled = x3, y3, z3
+        return (tuple(map(self.reduce, doubled)) if reduce_coordinates else doubled), slope, yy
 
     def add_mixed(self, point, affine):
         x, y, z = point
@@ -324,27 +325,34 @@ def require_affine(tower, curve, jacobian, point):
         f.all((f.nonzero(z), f.equal(dx, 0), f.equal(dy, 0)))
 
 
-def check_g1(tower, point):
+def check_g1(tower, point, *, pair_doubles=False):
     # The BLS12-381 G1 endomorphism (x, y) -> (BETA*x, y) acts as -U² on G1.
     curve = Curve(tower)
     x, y = point
     f = tower.fp
     f.all((f.equal(curve.equation(point), 0),))
     current = (*point, 1)
-    for bit in bin(U**2)[3:]:
-        current, _, _ = curve.double(current)
+    bits = bin(U**2)[3:]
+    unreduced = False
+    for i, bit in enumerate(bits):
+        # A pair starts with reduced X and Y. The two Jacobian
+        # doublings are polynomial, with degree at most 24 in these
+        # inputs. Reduce before every mixed addition and the final test.
+        normalize = not pair_doubles or unreduced or bit == "1" or i == len(bits) - 1
+        current, _, _ = curve.double(current, reduce_coordinates=normalize)
+        unreduced = not normalize
         if bit == "1":
             current, _ = curve.add_mixed(current, point)
     require_affine(tower, curve, current, (f.mul(BETA, x), f.sub(0, y)))
 
 
-def script_miller(tower, a, b, minus_c, delta, z, gamma=None):
+def script_miller(tower, a, b, minus_c, delta, z, gamma=None, *, bits=SEED_BITS):
     curve = Curve(tower, twist=True)
     f = tower.fp
     f.all(tuple(f.equal(limb, 0) for limb in curve.equation(b)))
     current = (*b, curve.one)
     acc = z
-    for step, (bit, lines) in enumerate(zip(SEED_BITS, delta, strict=True)):
+    for step, (bit, lines) in enumerate(zip(bits, delta, strict=True)):
         acc = tower.square12(acc)
         for index, fixed in enumerate(lines):
             x, y, point_z = current
@@ -470,7 +478,9 @@ def proof_stack(inputs):
 class VerifierStages:
     """Build the typed stages of one BLS12-381 Script predicate."""
 
-    def __init__(self, key, sources, *, chronicle=False, optimize=False, extra_inputs=None):
+    def __init__(self, key, sources, *, chronicle=False, optimize=False, extra_inputs=None, fp2_rules=FP2_RULES,
+                 fp2_selection="uniform", pair_g1_doubles=False):
+        self.pair_g1_doubles = pair_g1_doubles
         self.key, self.sources = key, sources
         self.slots = dynamic_slots(sources)
         self.optimize = optimize
@@ -478,7 +488,8 @@ class VerifierStages:
         if extra_inputs is None:
             extra_inputs = 2 if self.slots else 0  # Projective VK_x claim.
         self.field = ScriptField(self.proof_elements + len(self.slots) + extra_inputs,
-                                 chronicle=chronicle, assert_checks=optimize)
+                                 chronicle=chronicle, assert_checks=optimize, fp2_rules=fp2_rules,
+                                 fp2_selection=fp2_selection)
         self.tower = Tower(self.field, sparse=optimize, defer_reductions=optimize,
                            mul2_kernel=self.field.multiply2 if optimize else None)
         self.setup = b""
@@ -501,26 +512,76 @@ class VerifierStages:
         finite = msm_claim(self.tower, self.key, self.sources, values, (gx, gy))
         return fixed, delta, ((gx, self.field.sub(0, gy)), gamma_lines, finite)
 
-    def check_g1_points(self, proof):
-        a, _, c, _ = proof
-        check_g1(self.tower, a)
-        check_g1(self.tower, c)
+    def check_g1_points(self, proof, first="a"):
+        if first == "c":
+            return self.check_g1_a(self.check_g1_c(proof))
+        return self.check_g1_c(self.check_g1_a(proof))
+
+    def check_g1_a(self, proof):
+        check_g1(self.tower, proof[0], pair_doubles=self.pair_g1_doubles)
         return proof
 
-    def miller_loop(self, pairing_key, proof):
+    def check_g1_c(self, proof):
+        check_g1(self.tower, proof[2], pair_doubles=self.pair_g1_doubles)
+        return proof
+
+    @staticmethod
+    def begin_miller_plan(pairing_key, proof):
+        return pairing_key, proof, ""
+
+    @staticmethod
+    def append_miller_bit(plan, bit):
+        pairing_key, proof, bits = plan
+        bits += bit
+        if not SEED_BITS.startswith(bits):
+            raise ValueError("Miller round plan must match the BLS12-381 seed")
+        return pairing_key, proof, bits
+
+    def execute_miller_plan(self, plan):
+        pairing_key, proof, bits = plan
+        if bits != SEED_BITS:
+            raise ValueError("Miller round plan must match the BLS12-381 seed")
+        return self.miller_loop(pairing_key, proof, bits=bits)
+
+    def miller_loop(self, pairing_key, proof, *, bits=SEED_BITS):
         a, b, c, z = proof
         fixed, delta, gamma = pairing_key
         tower = self.tower
-        result = script_miller(tower, a, b, Curve(tower).negate(c), delta, z, gamma)
+        result = script_miller(tower, a, b, Curve(tower).negate(c), delta, z, gamma, bits=bits)
         return result, fixed, z
 
+    @staticmethod
+    def miller_factors(state):
+        return state
+
+    def frobenius_residue(self, z):
+        return self.tower.frobenius12(z)
+
+    def residue_product(self, accumulator, fixed, frobenius, *, association="left"):
+        # These factors are Fp12 elements. The terminal tests observe the
+        # product modulo Q, so field multiplication can commute and associate.
+        mul = self.tower.mul12
+        if association == "right":
+            return mul(accumulator, mul(fixed, frobenius))
+        if association == "accumulator-frobenius-first":
+            return mul(mul(accumulator, frobenius), fixed)
+        return mul(mul(accumulator, fixed), frobenius)
+
     def check_residue(self, state):
-        result, fixed, z = state
-        tower, field = self.tower, self.field
-        result = tower.mul12(tower.mul12(result, fixed), tower.frobenius12(z))
-        field.all(tuple(field.equal(limb, 0) for limb in chain.from_iterable(result[1])))
+        accumulator, fixed, z = state
+        mul = self.tower.mul12
+        residue = mul(mul(accumulator, fixed), self.frobenius_residue(z))
+        self.require_nonzero_fp6(self.require_fp6(residue))
+
+    def require_fp6(self, residue):
+        real, imaginary = residue
+        self.field.all(tuple(self.field.equal(limb, 0) for limb in chain.from_iterable(imaginary)))
+        return real
+
+    def require_nonzero_fp6(self, real):
+        field = self.field
         nonzero = 0
-        for limb in chain.from_iterable(result[0]):
+        for limb in chain.from_iterable(real):
             nonzero = field.op("OP_BOOLOR", nonzero, field.nonzero(limb))
         field.all((nonzero,))
 

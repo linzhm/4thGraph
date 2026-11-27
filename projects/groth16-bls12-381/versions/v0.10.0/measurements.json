@@ -1,0 +1,1245 @@
+{
+  "version": "0.10.0",
+  "previous": "0.9.0",
+  "baseline_revision": "f20d155c238951e9cff62845b08692398e962e1c",
+  "compiler_revision": "73749afd48b16f9bf243f8afa41f97ca0d6c40fb",
+  "source": "projects/groth16-verifier/experiments/high-level/verifier.fth",
+  "source_sha256": "42bea985390c956c4d61beeb877e43a3c6c572ab73e51d9472adae1a17d6f025",
+  "fixture_sha256": "51f6524a32d8ec5d4eac1c97398dc97c1d0594caae0284b8faa36a02574c5cc6",
+  "fp2_source_sha256": "a713f2ab7681088c3d64d51de803509bd7d9d7604d654c167cdcfd1ee0bc0d91",
+  "public_input_bits": [
+    32,
+    1,
+    32,
+    2,
+    2
+  ],
+  "objective": "path-bytes",
+  "search": {
+    "residue_association": "accumulator-frobenius-first",
+    "fp2_selection": "callsite",
+    "msm": "signed-radix4",
+    "witness_layout": "affine-inline"
+  },
+  "node_version": 101020300,
+  "chain_gang": {
+    "version": "0.13.2",
+    "commit": "74676b9c002c452e7f21a9ed9265f4972bef03f6"
+  },
+  "transaction_version": 2,
+  "eras": {
+    "genesis": {
+      "activation_height": 1000,
+      "v0_9_path_bytes": 262896,
+      "selected_path_bytes": 250121,
+      "path_byte_savings": {
+        "msm_only": 744,
+        "miller_only": 12031,
+        "combined": 12775
+      },
+      "selected_plan": {
+        "fp2_rules": [
+          "expand-cross-products"
+        ],
+        "residue_association": "accumulator-frobenius-first",
+        "fp2_selection": "callsite",
+        "msm": "signed-radix4",
+        "msm_table": "deferred-doubling-slopes",
+        "miller_reductions": "per-round"
+      },
+      "candidates": [
+        {
+          "lock_bytes": 255054,
+          "path_bytes": 264440,
+          "script_sha256": "2eaf0db266ec905148f78efd6ea7e8a960866663f3fc863768fff96d416b7764",
+          "artifact_sha256": "061fa2235f8dd5b7e1306e65734f17e04d53c597d9d0655d689860baf257c513",
+          "witness_bytes": [
+            9378,
+            9378
+          ],
+          "witness_sha256": [
+            "dd56640a5b84fa2192c05a0726841e427b83a24170348e51ae875cecc3640a97",
+            "4a2827dc39dbfc88079a66b617f5d3d4b379758aaead61e3ab254e4ba2d9661f"
+          ],
+          "msm_slope_count": 39,
+          "local_verdicts": {
+            "accepted": 2,
+            "rejected": 4
+          },
+          "fp2_choices": [
+            {
+              "ordered_rules": [],
+              "calls": 3
+            },
+            {
+              "ordered_rules": [
+                "expand-cross-products"
+              ],
+              "calls": 3130
+            }
+          ],
+          "plan": {
+            "fp2_rules": [
+              "expand-cross-products"
+            ],
+            "residue_association": "accumulator-frobenius-first",
+            "fp2_selection": "callsite",
+            "msm": "signed-radix4"
+          }
+        },
+        {
+          "lock_bytes": 247227,
+          "path_bytes": 256613,
+          "script_sha256": "a3f74f927a86d9723e1234ebd62c220f53d70bd3e235a04b548856caf8e02b60",
+          "artifact_sha256": "14cfd8d221b3b7dcd05deacff16c58c394bf6e97d167739cadbe22270c064971",
+          "witness_bytes": [
+            9378,
+            9378
+          ],
+          "witness_sha256": [
+            "dd56640a5b84fa2192c05a0726841e427b83a24170348e51ae875cecc3640a97",
+            "4a2827dc39dbfc88079a66b617f5d3d4b379758aaead61e3ab254e4ba2d9661f"
+          ],
+          "msm_slope_count": 39,
+          "local_verdicts": {
+            "accepted": 2,
+            "rejected": 4
+          },
+          "fp2_choices": [
+            {
+              "ordered_rules": [],
+              "calls": 3
+            },
+            {
+              "ordered_rules": [
+                "expand-cross-products"
+              ],
+              "calls": 3130
+            }
+          ],
+          "plan": {
+            "fp2_rules": [
+              "expand-cross-products"
+            ],
+            "residue_association": "accumulator-frobenius-first",
+            "fp2_selection": "callsite",
+            "msm": "signed-radix4",
+            "miller_reductions": "per-step"
+          }
+        },
+        {
+          "lock_bytes": 243023,
+          "path_bytes": 252409,
+          "script_sha256": "41d6745b50b73a6ff4bd5e4ffc80af1c91e0c07528df459dd3bde32b26de4057",
+          "artifact_sha256": "dc0fa38339598e436b7e8e69247984a29835a67202ce6efd81608e65240b5ca1",
+          "witness_bytes": [
+            9378,
+            9378
+          ],
+          "witness_sha256": [
+            "dd56640a5b84fa2192c05a0726841e427b83a24170348e51ae875cecc3640a97",
+            "4a2827dc39dbfc88079a66b617f5d3d4b379758aaead61e3ab254e4ba2d9661f"
+          ],
+          "msm_slope_count": 39,
+          "local_verdicts": {
+            "accepted": 2,
+            "rejected": 4
+          },
+          "fp2_choices": [
+            {
+              "ordered_rules": [],
+              "calls": 3
+            },
+            {
+              "ordered_rules": [
+                "expand-cross-products"
+              ],
+              "calls": 3130
+            }
+          ],
+          "plan": {
+            "fp2_rules": [
+              "expand-cross-products"
+            ],
+            "residue_association": "accumulator-frobenius-first",
+            "fp2_selection": "callsite",
+            "msm": "signed-radix4",
+            "miller_reductions": "per-round"
+          }
+        },
+        {
+          "lock_bytes": 253510,
+          "path_bytes": 262896,
+          "script_sha256": "df15ba696fc0f5a13c003e11c88e5c8528c21b589982c2a6a5c2d53dad768b5c",
+          "artifact_sha256": "959dd0718e870ba437470cb3874ed451f06778ef09f819b81a4af1f6e29df3d7",
+          "witness_bytes": [
+            9378,
+            9378
+          ],
+          "witness_sha256": [
+            "dd56640a5b84fa2192c05a0726841e427b83a24170348e51ae875cecc3640a97",
+            "4a2827dc39dbfc88079a66b617f5d3d4b379758aaead61e3ab254e4ba2d9661f"
+          ],
+          "msm_slope_count": 39,
+          "local_verdicts": {
+            "accepted": 2,
+            "rejected": 4
+          },
+          "fp2_choices": [
+            {
+              "ordered_rules": [],
+              "calls": 3
+            },
+            {
+              "ordered_rules": [
+                "expand-cross-products"
+              ],
+              "calls": 3130
+            }
+          ],
+          "plan": {
+            "fp2_rules": [
+              "expand-cross-products"
+            ],
+            "residue_association": "accumulator-frobenius-first",
+            "fp2_selection": "callsite",
+            "msm": "signed-radix4",
+            "msm_table": "doubling-slopes"
+          }
+        },
+        {
+          "lock_bytes": 245683,
+          "path_bytes": 255069,
+          "script_sha256": "bfcaa567452276a51aae97f7b1dc7a92a3f2502c122ce8b576554dc79603acdc",
+          "artifact_sha256": "67b714d6e5b6969a7c28b51e27fb6ad9d2e1fcc95468e96b27a6b230d12ba9df",
+          "witness_bytes": [
+            9378,
+            9378
+          ],
+          "witness_sha256": [
+            "dd56640a5b84fa2192c05a0726841e427b83a24170348e51ae875cecc3640a97",
+            "4a2827dc39dbfc88079a66b617f5d3d4b379758aaead61e3ab254e4ba2d9661f"
+          ],
+          "msm_slope_count": 39,
+          "local_verdicts": {
+            "accepted": 2,
+            "rejected": 4
+          },
+          "fp2_choices": [
+            {
+              "ordered_rules": [],
+              "calls": 3
+            },
+            {
+              "ordered_rules": [
+                "expand-cross-products"
+              ],
+              "calls": 3130
+            }
+          ],
+          "plan": {
+            "fp2_rules": [
+              "expand-cross-products"
+            ],
+            "residue_association": "accumulator-frobenius-first",
+            "fp2_selection": "callsite",
+            "msm": "signed-radix4",
+            "msm_table": "doubling-slopes",
+            "miller_reductions": "per-step"
+          }
+        },
+        {
+          "lock_bytes": 241479,
+          "path_bytes": 250865,
+          "script_sha256": "fbec1c439eae8022deae4ca20e435d982943c61f05177b342db395df124b65e7",
+          "artifact_sha256": "ac3bf614985b40505fcf1accb5bb78f2733667dc4cac4c662983e7558d3e6c44",
+          "witness_bytes": [
+            9378,
+            9378
+          ],
+          "witness_sha256": [
+            "dd56640a5b84fa2192c05a0726841e427b83a24170348e51ae875cecc3640a97",
+            "4a2827dc39dbfc88079a66b617f5d3d4b379758aaead61e3ab254e4ba2d9661f"
+          ],
+          "msm_slope_count": 39,
+          "local_verdicts": {
+            "accepted": 2,
+            "rejected": 4
+          },
+          "fp2_choices": [
+            {
+              "ordered_rules": [],
+              "calls": 3
+            },
+            {
+              "ordered_rules": [
+                "expand-cross-products"
+              ],
+              "calls": 3130
+            }
+          ],
+          "plan": {
+            "fp2_rules": [
+              "expand-cross-products"
+            ],
+            "residue_association": "accumulator-frobenius-first",
+            "fp2_selection": "callsite",
+            "msm": "signed-radix4",
+            "msm_table": "doubling-slopes",
+            "miller_reductions": "per-round"
+          }
+        },
+        {
+          "lock_bytes": 252766,
+          "path_bytes": 262152,
+          "script_sha256": "5efbb6406431cffb3514fe04ee02c71f5e1d5286400627d256b310970c81ff9c",
+          "artifact_sha256": "f5455360b39d808bb964fa8c97d6ac5547fccff5af33d374484f16f2a479d716",
+          "witness_bytes": [
+            9378,
+            9378
+          ],
+          "witness_sha256": [
+            "dd56640a5b84fa2192c05a0726841e427b83a24170348e51ae875cecc3640a97",
+            "4a2827dc39dbfc88079a66b617f5d3d4b379758aaead61e3ab254e4ba2d9661f"
+          ],
+          "msm_slope_count": 39,
+          "local_verdicts": {
+            "accepted": 2,
+            "rejected": 4
+          },
+          "fp2_choices": [
+            {
+              "ordered_rules": [],
+              "calls": 3
+            },
+            {
+              "ordered_rules": [
+                "expand-cross-products"
+              ],
+              "calls": 3130
+            }
+          ],
+          "plan": {
+            "fp2_rules": [
+              "expand-cross-products"
+            ],
+            "residue_association": "accumulator-frobenius-first",
+            "fp2_selection": "callsite",
+            "msm": "signed-radix4",
+            "msm_table": "deferred-doubling-slopes"
+          }
+        },
+        {
+          "lock_bytes": 244939,
+          "path_bytes": 254325,
+          "script_sha256": "1d52ad07298c4a6878267f958b3865e1abdfb6b31007c3a75dfdf30b96127959",
+          "artifact_sha256": "6ad5c2592c849811dfc0c8d64cb4be16e596c2eb7db7fd22158d47fcd4e4151d",
+          "witness_bytes": [
+            9378,
+            9378
+          ],
+          "witness_sha256": [
+            "dd56640a5b84fa2192c05a0726841e427b83a24170348e51ae875cecc3640a97",
+            "4a2827dc39dbfc88079a66b617f5d3d4b379758aaead61e3ab254e4ba2d9661f"
+          ],
+          "msm_slope_count": 39,
+          "local_verdicts": {
+            "accepted": 2,
+            "rejected": 4
+          },
+          "fp2_choices": [
+            {
+              "ordered_rules": [],
+              "calls": 3
+            },
+            {
+              "ordered_rules": [
+                "expand-cross-products"
+              ],
+              "calls": 3130
+            }
+          ],
+          "plan": {
+            "fp2_rules": [
+              "expand-cross-products"
+            ],
+            "residue_association": "accumulator-frobenius-first",
+            "fp2_selection": "callsite",
+            "msm": "signed-radix4",
+            "msm_table": "deferred-doubling-slopes",
+            "miller_reductions": "per-step"
+          }
+        },
+        {
+          "lock_bytes": 240735,
+          "path_bytes": 250121,
+          "script_sha256": "eb4f6df87e41089d2350b5705ed48926638c6a13845ba6683071f6028df58078",
+          "artifact_sha256": "78a6d8dd1297d16a8bda2a4c1dd24b24826529fcd8aa47497ec9e5b960aea609",
+          "witness_bytes": [
+            9378,
+            9378
+          ],
+          "witness_sha256": [
+            "dd56640a5b84fa2192c05a0726841e427b83a24170348e51ae875cecc3640a97",
+            "4a2827dc39dbfc88079a66b617f5d3d4b379758aaead61e3ab254e4ba2d9661f"
+          ],
+          "msm_slope_count": 39,
+          "local_verdicts": {
+            "accepted": 2,
+            "rejected": 4
+          },
+          "fp2_choices": [
+            {
+              "ordered_rules": [],
+              "calls": 3
+            },
+            {
+              "ordered_rules": [
+                "expand-cross-products"
+              ],
+              "calls": 3130
+            }
+          ],
+          "plan": {
+            "fp2_rules": [
+              "expand-cross-products"
+            ],
+            "residue_association": "accumulator-frobenius-first",
+            "fp2_selection": "callsite",
+            "msm": "signed-radix4",
+            "msm_table": "deferred-doubling-slopes",
+            "miller_reductions": "per-round"
+          }
+        }
+      ],
+      "native_replays": {
+        "baseline": {
+          "witness_layout": "affine-inline",
+          "lock_bytes": 253510,
+          "script_sha256": "df15ba696fc0f5a13c003e11c88e5c8528c21b589982c2a6a5c2d53dad768b5c",
+          "artifact_sha256": "959dd0718e870ba437470cb3874ed451f06778ef09f819b81a4af1f6e29df3d7",
+          "cases": [
+            {
+              "fixture_case": "wrap",
+              "deployment_txid": "ad71bea817c778304317353a2d236075d115174c83bd765a4d4ca79cc0861f1e",
+              "spend_txid": "7971d5ad2ce33100322082ebd4ec76da6aa16ed53b7dc7fbac4a06edd1311604",
+              "path_bytes": 262896,
+              "funded_path_bytes": 263122,
+              "witness_bytes": 9378,
+              "witness_sha256": "dd56640a5b84fa2192c05a0726841e427b83a24170348e51ae875cecc3640a97",
+              "stack_payload": {
+                "main_payload_bytes": 26709,
+                "alt_payload_bytes": 59,
+                "combined_payload_bytes": 26709
+              },
+              "rejected_controls": [
+                "crossed_statement",
+                "g1_outside_subgroup"
+              ]
+            },
+            {
+              "fixture_case": "other",
+              "deployment_txid": "96bc357990e5c41c1215c2965ed1a09b717de27567d12cd3bd0b9a0540fb2775",
+              "spend_txid": "bb9bbbf95ea32c1a33f84400f4412e70adb02d86d7881021955e459967e1b5db",
+              "path_bytes": 262896,
+              "funded_path_bytes": 263122,
+              "witness_bytes": 9378,
+              "witness_sha256": "4a2827dc39dbfc88079a66b617f5d3d4b379758aaead61e3ab254e4ba2d9661f",
+              "stack_payload": {
+                "main_payload_bytes": 26744,
+                "alt_payload_bytes": 59,
+                "combined_payload_bytes": 26744
+              },
+              "rejected_controls": [
+                "crossed_statement",
+                "g1_outside_subgroup"
+              ]
+            }
+          ]
+        },
+        "per-step": {
+          "witness_layout": "affine-inline",
+          "lock_bytes": 244939,
+          "script_sha256": "1d52ad07298c4a6878267f958b3865e1abdfb6b31007c3a75dfdf30b96127959",
+          "artifact_sha256": "6ad5c2592c849811dfc0c8d64cb4be16e596c2eb7db7fd22158d47fcd4e4151d",
+          "cases": [
+            {
+              "fixture_case": "wrap",
+              "deployment_txid": "21156bcbab2ff834bbc0462f653693c0ee69fcf0d579ead67f4ec9028b9a2bd1",
+              "spend_txid": "a48c355ad214d6d24f27dc8ce77f20bfd807b0016d9bd14f7da83311ccbc212f",
+              "path_bytes": 254325,
+              "funded_path_bytes": 254550,
+              "witness_bytes": 9378,
+              "witness_sha256": "dd56640a5b84fa2192c05a0726841e427b83a24170348e51ae875cecc3640a97",
+              "stack_payload": {
+                "main_payload_bytes": 32319,
+                "alt_payload_bytes": 59,
+                "combined_payload_bytes": 32319
+              },
+              "rejected_controls": [
+                "crossed_statement",
+                "g1_outside_subgroup"
+              ]
+            },
+            {
+              "fixture_case": "other",
+              "deployment_txid": "55d86d59c5a3af32a5f2ed05b9fa480f09217de6f5d211e7b4b1397ac79f5e5c",
+              "spend_txid": "559c335393b84152adb472f107d394308d55e948a078bb10a8f6ae349c95a691",
+              "path_bytes": 254325,
+              "funded_path_bytes": 254551,
+              "witness_bytes": 9378,
+              "witness_sha256": "4a2827dc39dbfc88079a66b617f5d3d4b379758aaead61e3ab254e4ba2d9661f",
+              "stack_payload": {
+                "main_payload_bytes": 32345,
+                "alt_payload_bytes": 59,
+                "combined_payload_bytes": 32345
+              },
+              "rejected_controls": [
+                "crossed_statement",
+                "g1_outside_subgroup"
+              ]
+            }
+          ]
+        },
+        "optimized": {
+          "witness_layout": "affine-inline",
+          "lock_bytes": 240735,
+          "script_sha256": "eb4f6df87e41089d2350b5705ed48926638c6a13845ba6683071f6028df58078",
+          "artifact_sha256": "78a6d8dd1297d16a8bda2a4c1dd24b24826529fcd8aa47497ec9e5b960aea609",
+          "cases": [
+            {
+              "fixture_case": "wrap",
+              "deployment_txid": "8b0419c3b2c048b9d0db61409c6eb02809485e96730078bf9cbda7320c57faf6",
+              "spend_txid": "edee57a984264117419d0b9a5877fd3671862ad435498834fdf85b1e98272efa",
+              "path_bytes": 250121,
+              "funded_path_bytes": 250347,
+              "witness_bytes": 9378,
+              "witness_sha256": "dd56640a5b84fa2192c05a0726841e427b83a24170348e51ae875cecc3640a97",
+              "stack_payload": {
+                "main_payload_bytes": 51983,
+                "alt_payload_bytes": 59,
+                "combined_payload_bytes": 51983
+              },
+              "rejected_controls": [
+                "crossed_statement",
+                "g1_outside_subgroup"
+              ]
+            },
+            {
+              "fixture_case": "other",
+              "deployment_txid": "e8c884f66196f4156b8d629d94d31a4317720eb84abf48c455c6286b71d7a67b",
+              "spend_txid": "3948b1a4449bc06aa8d74db7c5acdc562125f88115bf2b724c7215c62b8a75de",
+              "path_bytes": 250121,
+              "funded_path_bytes": 250346,
+              "witness_bytes": 9378,
+              "witness_sha256": "4a2827dc39dbfc88079a66b617f5d3d4b379758aaead61e3ab254e4ba2d9661f",
+              "stack_payload": {
+                "main_payload_bytes": 51957,
+                "alt_payload_bytes": 59,
+                "combined_payload_bytes": 51957
+              },
+              "rejected_controls": [
+                "crossed_statement",
+                "g1_outside_subgroup"
+              ]
+            }
+          ]
+        },
+        "optimized-affine-witness": {
+          "witness_layout": "affine-witness",
+          "lock_bytes": 219228,
+          "script_sha256": "f78866d38c24d944a13318da8dc822e7e9a7b9ccb2c6b49ea548995d53e086e7",
+          "artifact_sha256": "afe549c2078740580b5e8463939e181a2ae1c618ee017cc4e44f16bcec01af50",
+          "cases": [
+            {
+              "fixture_case": "wrap",
+              "deployment_txid": "f57aa75cd0376ef90294a3efd4e513a11c1f20b9621b7a33f5bca9a69adab092",
+              "spend_txid": "688e847091869499ebf6946f60304b9b40d8d8a28e28dfbc23ec2be586d49314",
+              "path_bytes": 254729,
+              "funded_path_bytes": 254954,
+              "witness_bytes": 35493,
+              "witness_sha256": "6c7b18396072f3246f2856c09210dfd7f63b0cddf523b4f4483d58aa21a4cf96",
+              "stack_payload": {
+                "main_payload_bytes": 77327,
+                "alt_payload_bytes": 59,
+                "combined_payload_bytes": 77327
+              },
+              "rejected_controls": [
+                "crossed_statement",
+                "g1_outside_subgroup"
+              ]
+            },
+            {
+              "fixture_case": "other",
+              "deployment_txid": "314ac74e5b7a328f7ef5c4e26d4e68a028e982225eae5b45882b8a523d2573df",
+              "spend_txid": "78180f06ae4060a50669964a19af349ea4462cad0dad05f974b7e2846bc0326d",
+              "path_bytes": 254729,
+              "funded_path_bytes": 254955,
+              "witness_bytes": 35493,
+              "witness_sha256": "b7923cfbf5cfa1cde4d06af436232fd20a7e35adccdcde61821255919ab41202",
+              "stack_payload": {
+                "main_payload_bytes": 77301,
+                "alt_payload_bytes": 59,
+                "combined_payload_bytes": 77301
+              },
+              "rejected_controls": [
+                "crossed_statement",
+                "g1_outside_subgroup"
+              ]
+            }
+          ]
+        }
+      },
+      "valid_spend_timing_ms": {
+        "samples_per_case": 9,
+        "warmup_samples_per_case": 1,
+        "rotation": "baseline, per-step, optimized rotated by sample",
+        "results": [
+          {
+            "fixture": "wrap",
+            "median": {
+              "baseline": {
+                "node_rpc_ms": 103.122,
+                "chain_gang_ms": 29.605
+              },
+              "per-step": {
+                "node_rpc_ms": 113.555,
+                "chain_gang_ms": 36.262
+              },
+              "optimized": {
+                "node_rpc_ms": 127.025,
+                "chain_gang_ms": 42.419
+              }
+            }
+          },
+          {
+            "fixture": "other",
+            "median": {
+              "baseline": {
+                "node_rpc_ms": 108.49,
+                "chain_gang_ms": 29.741
+              },
+              "per-step": {
+                "node_rpc_ms": 115.74,
+                "chain_gang_ms": 37.159
+              },
+              "optimized": {
+                "node_rpc_ms": 122.857,
+                "chain_gang_ms": 42.984
+              }
+            }
+          }
+        ]
+      }
+    },
+    "chronicle": {
+      "activation_height": 2,
+      "v0_9_path_bytes": 261991,
+      "selected_path_bytes": 249216,
+      "path_byte_savings": {
+        "msm_only": 744,
+        "miller_only": 12031,
+        "combined": 12775
+      },
+      "selected_plan": {
+        "fp2_rules": [
+          "expand-cross-products"
+        ],
+        "residue_association": "accumulator-frobenius-first",
+        "fp2_selection": "callsite",
+        "msm": "signed-radix4",
+        "msm_table": "deferred-doubling-slopes",
+        "miller_reductions": "per-round"
+      },
+      "candidates": [
+        {
+          "lock_bytes": 254217,
+          "path_bytes": 263603,
+          "script_sha256": "0c02c07ec30bcc896996b9411355642c86bd62e122601261e956aa57baa64360",
+          "artifact_sha256": "6c18a4aaf63d22b41f44a96c3177d87c3d7ed6600bedd2e590f64f5e8be86937",
+          "witness_bytes": [
+            9378,
+            9378
+          ],
+          "witness_sha256": [
+            "dd56640a5b84fa2192c05a0726841e427b83a24170348e51ae875cecc3640a97",
+            "4a2827dc39dbfc88079a66b617f5d3d4b379758aaead61e3ab254e4ba2d9661f"
+          ],
+          "msm_slope_count": 39,
+          "local_verdicts": {
+            "accepted": 2,
+            "rejected": 4
+          },
+          "fp2_choices": [
+            {
+              "ordered_rules": [],
+              "calls": 3
+            },
+            {
+              "ordered_rules": [
+                "expand-cross-products"
+              ],
+              "calls": 3130
+            }
+          ],
+          "plan": {
+            "fp2_rules": [
+              "expand-cross-products"
+            ],
+            "residue_association": "accumulator-frobenius-first",
+            "fp2_selection": "callsite",
+            "msm": "signed-radix4"
+          }
+        },
+        {
+          "lock_bytes": 246390,
+          "path_bytes": 255776,
+          "script_sha256": "bf4f72ff99369e25f2da3a1d5be497dc4dc100e96febd5ca4f8c591c8120c54f",
+          "artifact_sha256": "973a62f9b0e659ba3e274dcdd136dc068a2a714e4ac7f90b2eceaefe0664a69a",
+          "witness_bytes": [
+            9378,
+            9378
+          ],
+          "witness_sha256": [
+            "dd56640a5b84fa2192c05a0726841e427b83a24170348e51ae875cecc3640a97",
+            "4a2827dc39dbfc88079a66b617f5d3d4b379758aaead61e3ab254e4ba2d9661f"
+          ],
+          "msm_slope_count": 39,
+          "local_verdicts": {
+            "accepted": 2,
+            "rejected": 4
+          },
+          "fp2_choices": [
+            {
+              "ordered_rules": [],
+              "calls": 3
+            },
+            {
+              "ordered_rules": [
+                "expand-cross-products"
+              ],
+              "calls": 3130
+            }
+          ],
+          "plan": {
+            "fp2_rules": [
+              "expand-cross-products"
+            ],
+            "residue_association": "accumulator-frobenius-first",
+            "fp2_selection": "callsite",
+            "msm": "signed-radix4",
+            "miller_reductions": "per-step"
+          }
+        },
+        {
+          "lock_bytes": 242186,
+          "path_bytes": 251572,
+          "script_sha256": "c877f02c938390f99866dbfc5c5d50ffbe51ae817f1f36647566c7639fa61b87",
+          "artifact_sha256": "386d8ee9737b7aa018bfd9a10993cb1b34db60c3bce10ca52fc49434f9ca93e1",
+          "witness_bytes": [
+            9378,
+            9378
+          ],
+          "witness_sha256": [
+            "dd56640a5b84fa2192c05a0726841e427b83a24170348e51ae875cecc3640a97",
+            "4a2827dc39dbfc88079a66b617f5d3d4b379758aaead61e3ab254e4ba2d9661f"
+          ],
+          "msm_slope_count": 39,
+          "local_verdicts": {
+            "accepted": 2,
+            "rejected": 4
+          },
+          "fp2_choices": [
+            {
+              "ordered_rules": [],
+              "calls": 3
+            },
+            {
+              "ordered_rules": [
+                "expand-cross-products"
+              ],
+              "calls": 3130
+            }
+          ],
+          "plan": {
+            "fp2_rules": [
+              "expand-cross-products"
+            ],
+            "residue_association": "accumulator-frobenius-first",
+            "fp2_selection": "callsite",
+            "msm": "signed-radix4",
+            "miller_reductions": "per-round"
+          }
+        },
+        {
+          "lock_bytes": 252605,
+          "path_bytes": 261991,
+          "script_sha256": "271a95770bbc83433b820cf3bb94f16ecc92082ac1f56251c0a0f0398bf5e3a2",
+          "artifact_sha256": "627da93d5afc2621033bbcb943eb3479a197f64f919b97ce8e1e4db67836555f",
+          "witness_bytes": [
+            9378,
+            9378
+          ],
+          "witness_sha256": [
+            "dd56640a5b84fa2192c05a0726841e427b83a24170348e51ae875cecc3640a97",
+            "4a2827dc39dbfc88079a66b617f5d3d4b379758aaead61e3ab254e4ba2d9661f"
+          ],
+          "msm_slope_count": 39,
+          "local_verdicts": {
+            "accepted": 2,
+            "rejected": 4
+          },
+          "fp2_choices": [
+            {
+              "ordered_rules": [],
+              "calls": 3
+            },
+            {
+              "ordered_rules": [
+                "expand-cross-products"
+              ],
+              "calls": 3130
+            }
+          ],
+          "plan": {
+            "fp2_rules": [
+              "expand-cross-products"
+            ],
+            "residue_association": "accumulator-frobenius-first",
+            "fp2_selection": "callsite",
+            "msm": "signed-radix4",
+            "msm_table": "doubling-slopes"
+          }
+        },
+        {
+          "lock_bytes": 244778,
+          "path_bytes": 254164,
+          "script_sha256": "3bb38f4ef6e644a35aec2f82ea6e276545ee1f1a431833efd69eb765d83987b0",
+          "artifact_sha256": "a7394ea2573fe702a8e5177d5eafdb142a3307078e4cfd0fb7a1509923b7d22a",
+          "witness_bytes": [
+            9378,
+            9378
+          ],
+          "witness_sha256": [
+            "dd56640a5b84fa2192c05a0726841e427b83a24170348e51ae875cecc3640a97",
+            "4a2827dc39dbfc88079a66b617f5d3d4b379758aaead61e3ab254e4ba2d9661f"
+          ],
+          "msm_slope_count": 39,
+          "local_verdicts": {
+            "accepted": 2,
+            "rejected": 4
+          },
+          "fp2_choices": [
+            {
+              "ordered_rules": [],
+              "calls": 3
+            },
+            {
+              "ordered_rules": [
+                "expand-cross-products"
+              ],
+              "calls": 3130
+            }
+          ],
+          "plan": {
+            "fp2_rules": [
+              "expand-cross-products"
+            ],
+            "residue_association": "accumulator-frobenius-first",
+            "fp2_selection": "callsite",
+            "msm": "signed-radix4",
+            "msm_table": "doubling-slopes",
+            "miller_reductions": "per-step"
+          }
+        },
+        {
+          "lock_bytes": 240574,
+          "path_bytes": 249960,
+          "script_sha256": "5270a2e1e304520d077e19279c0167fb6f1e6aefc9fa96895f8600fe8fd0a37b",
+          "artifact_sha256": "f7e9b871fa5c6f3e018a2279265f5d6bd5ccacbc3cccb25a34070ea2e053e1d5",
+          "witness_bytes": [
+            9378,
+            9378
+          ],
+          "witness_sha256": [
+            "dd56640a5b84fa2192c05a0726841e427b83a24170348e51ae875cecc3640a97",
+            "4a2827dc39dbfc88079a66b617f5d3d4b379758aaead61e3ab254e4ba2d9661f"
+          ],
+          "msm_slope_count": 39,
+          "local_verdicts": {
+            "accepted": 2,
+            "rejected": 4
+          },
+          "fp2_choices": [
+            {
+              "ordered_rules": [],
+              "calls": 3
+            },
+            {
+              "ordered_rules": [
+                "expand-cross-products"
+              ],
+              "calls": 3130
+            }
+          ],
+          "plan": {
+            "fp2_rules": [
+              "expand-cross-products"
+            ],
+            "residue_association": "accumulator-frobenius-first",
+            "fp2_selection": "callsite",
+            "msm": "signed-radix4",
+            "msm_table": "doubling-slopes",
+            "miller_reductions": "per-round"
+          }
+        },
+        {
+          "lock_bytes": 251861,
+          "path_bytes": 261247,
+          "script_sha256": "ca51685a2b72ce46bfa2d71a94209462f878a2c79823968ad83f9d6c34f7a975",
+          "artifact_sha256": "59ae0bfb8715c48fba0e943e16a32324b10f8b2ec072edd2cb4bd85521db0aa6",
+          "witness_bytes": [
+            9378,
+            9378
+          ],
+          "witness_sha256": [
+            "dd56640a5b84fa2192c05a0726841e427b83a24170348e51ae875cecc3640a97",
+            "4a2827dc39dbfc88079a66b617f5d3d4b379758aaead61e3ab254e4ba2d9661f"
+          ],
+          "msm_slope_count": 39,
+          "local_verdicts": {
+            "accepted": 2,
+            "rejected": 4
+          },
+          "fp2_choices": [
+            {
+              "ordered_rules": [],
+              "calls": 3
+            },
+            {
+              "ordered_rules": [
+                "expand-cross-products"
+              ],
+              "calls": 3130
+            }
+          ],
+          "plan": {
+            "fp2_rules": [
+              "expand-cross-products"
+            ],
+            "residue_association": "accumulator-frobenius-first",
+            "fp2_selection": "callsite",
+            "msm": "signed-radix4",
+            "msm_table": "deferred-doubling-slopes"
+          }
+        },
+        {
+          "lock_bytes": 244034,
+          "path_bytes": 253420,
+          "script_sha256": "1a8ed92589bb4866d60354bf067b685be6a83f149fd6c764c197d3c2bf4e1537",
+          "artifact_sha256": "23406738253d16c9507277554d0b169ada10842cc688902d5fca2f91efce1534",
+          "witness_bytes": [
+            9378,
+            9378
+          ],
+          "witness_sha256": [
+            "dd56640a5b84fa2192c05a0726841e427b83a24170348e51ae875cecc3640a97",
+            "4a2827dc39dbfc88079a66b617f5d3d4b379758aaead61e3ab254e4ba2d9661f"
+          ],
+          "msm_slope_count": 39,
+          "local_verdicts": {
+            "accepted": 2,
+            "rejected": 4
+          },
+          "fp2_choices": [
+            {
+              "ordered_rules": [],
+              "calls": 3
+            },
+            {
+              "ordered_rules": [
+                "expand-cross-products"
+              ],
+              "calls": 3130
+            }
+          ],
+          "plan": {
+            "fp2_rules": [
+              "expand-cross-products"
+            ],
+            "residue_association": "accumulator-frobenius-first",
+            "fp2_selection": "callsite",
+            "msm": "signed-radix4",
+            "msm_table": "deferred-doubling-slopes",
+            "miller_reductions": "per-step"
+          }
+        },
+        {
+          "lock_bytes": 239830,
+          "path_bytes": 249216,
+          "script_sha256": "1c7596f6ec8491064560b35ab286b672b5e78833ae1392c89387425e59d8a976",
+          "artifact_sha256": "3d704388dbea169ed8a6c6a02d64721af7afeddbc97e682b0804b5c9815e8eb8",
+          "witness_bytes": [
+            9378,
+            9378
+          ],
+          "witness_sha256": [
+            "dd56640a5b84fa2192c05a0726841e427b83a24170348e51ae875cecc3640a97",
+            "4a2827dc39dbfc88079a66b617f5d3d4b379758aaead61e3ab254e4ba2d9661f"
+          ],
+          "msm_slope_count": 39,
+          "local_verdicts": {
+            "accepted": 2,
+            "rejected": 4
+          },
+          "fp2_choices": [
+            {
+              "ordered_rules": [],
+              "calls": 3
+            },
+            {
+              "ordered_rules": [
+                "expand-cross-products"
+              ],
+              "calls": 3130
+            }
+          ],
+          "plan": {
+            "fp2_rules": [
+              "expand-cross-products"
+            ],
+            "residue_association": "accumulator-frobenius-first",
+            "fp2_selection": "callsite",
+            "msm": "signed-radix4",
+            "msm_table": "deferred-doubling-slopes",
+            "miller_reductions": "per-round"
+          }
+        }
+      ],
+      "native_replays": {
+        "baseline": {
+          "witness_layout": "affine-inline",
+          "lock_bytes": 252605,
+          "script_sha256": "271a95770bbc83433b820cf3bb94f16ecc92082ac1f56251c0a0f0398bf5e3a2",
+          "artifact_sha256": "627da93d5afc2621033bbcb943eb3479a197f64f919b97ce8e1e4db67836555f",
+          "cases": [
+            {
+              "fixture_case": "wrap",
+              "deployment_txid": "89b049cc4092ffd7188643034a323a2a961455aec8508f9ecf12d5cb75426cfd",
+              "spend_txid": "b0e225b464703c0093343d7cbf66e495d49bbb7967dfcb0760d92f0e231c2b69",
+              "path_bytes": 261991,
+              "funded_path_bytes": 262216,
+              "witness_bytes": 9378,
+              "witness_sha256": "dd56640a5b84fa2192c05a0726841e427b83a24170348e51ae875cecc3640a97",
+              "stack_payload": {
+                "main_payload_bytes": 26709,
+                "alt_payload_bytes": 59,
+                "combined_payload_bytes": 26709
+              },
+              "rejected_controls": [
+                "crossed_statement",
+                "g1_outside_subgroup"
+              ]
+            },
+            {
+              "fixture_case": "other",
+              "deployment_txid": "5b221bdf10fb3684ea6e37ff91e7b55a45f0db5ad74c1d72443ebc88802f5284",
+              "spend_txid": "6c258f8d8f3b8841ac606868c0da4de8458422512c9d8f61029d636331e4d507",
+              "path_bytes": 261991,
+              "funded_path_bytes": 262216,
+              "witness_bytes": 9378,
+              "witness_sha256": "4a2827dc39dbfc88079a66b617f5d3d4b379758aaead61e3ab254e4ba2d9661f",
+              "stack_payload": {
+                "main_payload_bytes": 26744,
+                "alt_payload_bytes": 59,
+                "combined_payload_bytes": 26744
+              },
+              "rejected_controls": [
+                "crossed_statement",
+                "g1_outside_subgroup"
+              ]
+            }
+          ]
+        },
+        "per-step": {
+          "witness_layout": "affine-inline",
+          "lock_bytes": 244034,
+          "script_sha256": "1a8ed92589bb4866d60354bf067b685be6a83f149fd6c764c197d3c2bf4e1537",
+          "artifact_sha256": "23406738253d16c9507277554d0b169ada10842cc688902d5fca2f91efce1534",
+          "cases": [
+            {
+              "fixture_case": "wrap",
+              "deployment_txid": "4298b710314e31b0d055d71beb486cb4bc2e67e41c738f9a3031026f0a426522",
+              "spend_txid": "30f081c260b062fb239cf2e6124a3a6ed7adf515a8aa36e7c45ab3c129a82847",
+              "path_bytes": 253420,
+              "funded_path_bytes": 253646,
+              "witness_bytes": 9378,
+              "witness_sha256": "dd56640a5b84fa2192c05a0726841e427b83a24170348e51ae875cecc3640a97",
+              "stack_payload": {
+                "main_payload_bytes": 32319,
+                "alt_payload_bytes": 59,
+                "combined_payload_bytes": 32319
+              },
+              "rejected_controls": [
+                "crossed_statement",
+                "g1_outside_subgroup"
+              ]
+            },
+            {
+              "fixture_case": "other",
+              "deployment_txid": "8b8fc2336c147ac42fe8a29171c47f66626a674b6a12c74b412cdab0e59ed859",
+              "spend_txid": "675f64ed5d98ced3c892d3f34aca8f5217cccbd6b0dbcc1c26bf721d45ea0abf",
+              "path_bytes": 253420,
+              "funded_path_bytes": 253646,
+              "witness_bytes": 9378,
+              "witness_sha256": "4a2827dc39dbfc88079a66b617f5d3d4b379758aaead61e3ab254e4ba2d9661f",
+              "stack_payload": {
+                "main_payload_bytes": 32345,
+                "alt_payload_bytes": 59,
+                "combined_payload_bytes": 32345
+              },
+              "rejected_controls": [
+                "crossed_statement",
+                "g1_outside_subgroup"
+              ]
+            }
+          ]
+        },
+        "optimized": {
+          "witness_layout": "affine-inline",
+          "lock_bytes": 239830,
+          "script_sha256": "1c7596f6ec8491064560b35ab286b672b5e78833ae1392c89387425e59d8a976",
+          "artifact_sha256": "3d704388dbea169ed8a6c6a02d64721af7afeddbc97e682b0804b5c9815e8eb8",
+          "cases": [
+            {
+              "fixture_case": "wrap",
+              "deployment_txid": "7eaadbd0a4eb30867efed45caea4fbca096e6c3e141a339d91ac808e9ecb885d",
+              "spend_txid": "6821e7e6bf7b4436337fe206f1be78f234b7058cfbed805b3f0307f4b5d96e75",
+              "path_bytes": 249216,
+              "funded_path_bytes": 249442,
+              "witness_bytes": 9378,
+              "witness_sha256": "dd56640a5b84fa2192c05a0726841e427b83a24170348e51ae875cecc3640a97",
+              "stack_payload": {
+                "main_payload_bytes": 51983,
+                "alt_payload_bytes": 59,
+                "combined_payload_bytes": 51983
+              },
+              "rejected_controls": [
+                "crossed_statement",
+                "g1_outside_subgroup"
+              ]
+            },
+            {
+              "fixture_case": "other",
+              "deployment_txid": "34f2290a11535289c564458da764d81cfcc484756a714056184758b063fa1c4b",
+              "spend_txid": "ab4620485d731698c644c4eeae64fb80b552b7741c371613265c76ed701d36ff",
+              "path_bytes": 249216,
+              "funded_path_bytes": 249441,
+              "witness_bytes": 9378,
+              "witness_sha256": "4a2827dc39dbfc88079a66b617f5d3d4b379758aaead61e3ab254e4ba2d9661f",
+              "stack_payload": {
+                "main_payload_bytes": 51957,
+                "alt_payload_bytes": 59,
+                "combined_payload_bytes": 51957
+              },
+              "rejected_controls": [
+                "crossed_statement",
+                "g1_outside_subgroup"
+              ]
+            }
+          ]
+        },
+        "optimized-affine-witness": {
+          "witness_layout": "affine-witness",
+          "lock_bytes": 218322,
+          "script_sha256": "3a9edc94a365cd744a8da920a73fead29c7f5ef0968d7abbb25c7510f9559b7a",
+          "artifact_sha256": "1e3fedaf7b38a8d6135c1b214857d771ab4a4fc9126f8ed9f9b46cfa548202f9",
+          "cases": [
+            {
+              "fixture_case": "wrap",
+              "deployment_txid": "9facf5244ca3709ddc86858a1529e43f63d27dfd732f72edc5dd0ba00eb4624e",
+              "spend_txid": "9534b34a04063ef12fba2bcf1a73ed04463495febda19d2711e50d7ae1a0420e",
+              "path_bytes": 253823,
+              "funded_path_bytes": 254048,
+              "witness_bytes": 35493,
+              "witness_sha256": "6c7b18396072f3246f2856c09210dfd7f63b0cddf523b4f4483d58aa21a4cf96",
+              "stack_payload": {
+                "main_payload_bytes": 77327,
+                "alt_payload_bytes": 59,
+                "combined_payload_bytes": 77327
+              },
+              "rejected_controls": [
+                "crossed_statement",
+                "g1_outside_subgroup"
+              ]
+            },
+            {
+              "fixture_case": "other",
+              "deployment_txid": "0aa94885d8b4ab073a56241e5f6bffa187241a482e26d68767e970263fe3531a",
+              "spend_txid": "f900eca68720f015d87a97a53c0418207c15aefc725c60736dee8b0ca1045556",
+              "path_bytes": 253823,
+              "funded_path_bytes": 254049,
+              "witness_bytes": 35493,
+              "witness_sha256": "b7923cfbf5cfa1cde4d06af436232fd20a7e35adccdcde61821255919ab41202",
+              "stack_payload": {
+                "main_payload_bytes": 77301,
+                "alt_payload_bytes": 59,
+                "combined_payload_bytes": 77301
+              },
+              "rejected_controls": [
+                "crossed_statement",
+                "g1_outside_subgroup"
+              ]
+            }
+          ]
+        }
+      },
+      "valid_spend_timing_ms": {
+        "samples_per_case": 9,
+        "warmup_samples_per_case": 1,
+        "rotation": "baseline, per-step, optimized rotated by sample",
+        "results": [
+          {
+            "fixture": "wrap",
+            "median": {
+              "baseline": {
+                "node_rpc_ms": 104.788,
+                "chain_gang_ms": 28.475
+              },
+              "per-step": {
+                "node_rpc_ms": 110.527,
+                "chain_gang_ms": 35.371
+              },
+              "optimized": {
+                "node_rpc_ms": 122.705,
+                "chain_gang_ms": 38.817
+              }
+            }
+          },
+          {
+            "fixture": "other",
+            "median": {
+              "baseline": {
+                "node_rpc_ms": 107.384,
+                "chain_gang_ms": 31.148
+              },
+              "per-step": {
+                "node_rpc_ms": 119.631,
+                "chain_gang_ms": 34.195
+              },
+              "optimized": {
+                "node_rpc_ms": 123.532,
+                "chain_gang_ms": 41.248
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "native_validation": {
+    "valid_spends_mined": 12,
+    "invalid_spends_rejected": 24,
+    "excludes_v0_9_baseline_replays": true
+  }
+}

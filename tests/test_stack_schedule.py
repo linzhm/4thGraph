@@ -8,6 +8,26 @@ from fourthgraph.compiler.stack_schedule import Graph, Value, emit_steps
 
 
 class StackScheduleTests(unittest.TestCase):
+    def test_select_expansion_reuses_the_parent_graph_and_discards_other_definitions(self):
+        graph = Graph(1)
+        value, = graph.inputs
+        twice = graph.define(asm("OP_ADD"), (value, value))
+
+        def lower(plan, trial):
+            if plan == "product":
+                two = trial.integer(2)
+                return trial.define(asm("OP_MUL"), (value, two)), 1
+            return trial.define(asm("OP_ADD"), (value, value)), 1
+
+        plan, outputs = graph.select_expansion(("product", "sum"), lower)
+        self.assertEqual((plan, outputs), ("sum", (twice, 1)))
+        self.assertEqual(tuple(graph.definitions), (twice,))
+        two = graph.integer(2)
+        self.assertEqual(graph.definitions[two].script, asm("OP_2"))
+        finished = graph.define(asm("OP_SUB"), (twice, two))
+        self.assertEqual(evaluate(graph.emit((finished,), compact=True), [encode_num(-4)]),
+                         ([encode_num(-10)], []))
+
     def test_compact_schedule_keeps_a_live_right_operand(self):
         graph = Graph(2)
         left, right = graph.inputs

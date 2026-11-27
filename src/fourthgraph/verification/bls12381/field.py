@@ -1,13 +1,15 @@
 """BLS12-381 arithmetic shared by the host and the Script code generator."""
 
+from collections import Counter
 from contextlib import contextmanager
 from functools import cache
 from hashlib import sha256
 from importlib.resources import files
 
 from fourthgraph.bsv.script import asm
+from fourthgraph.compiler.formula_experiment import enumerate_orders
 from fourthgraph.compiler.script_builder import ScriptBuilder
-from fourthgraph.compiler.stack_schedule import Graph
+from fourthgraph.compiler.stack_schedule import Graph, ResidueBlock
 
 U = 0xd201000000010000  # Absolute value of the negative BLS12-381 seed.
 R = U**4 - U**2 + 1
@@ -19,10 +21,16 @@ FP2_RULES = ("expand-cross-products",)
 
 
 @cache
-def fp2_kernel():
+def fp2_kernel(rules=FP2_RULES):
     source = files("fourthgraph.stdlib").joinpath("bls12-381-fp2.fth").read_bytes()
-    builder = ScriptBuilder(source.decode("utf-8"), formula_passes=("stack",), experimental_rules=FP2_RULES)
+    builder = ScriptBuilder(source.decode("utf-8"), formula_passes=("stack",), experimental_rules=rules)
     return builder.formula_ir[FP2_ENTRY], sha256(source).hexdigest()
+
+
+@cache
+def fp2_alternatives(preferred):
+    source, _ = fp2_kernel(())
+    return tuple(dict.fromkeys((preferred, *enumerate_orders(source))))
 
 
 class HostField:
@@ -51,11 +59,14 @@ def opcode(name):
 class ScriptField:
     """Signed residues are sufficient at arithmetic boundaries inside Script."""
 
-    def __init__(self, inputs, *, chronicle=False, assert_checks=False):
+    def __init__(self, inputs, *, chronicle=False, assert_checks=False, fp2_rules=FP2_RULES, fp2_selection="uniform"):
         self.graph = Graph(inputs)
         self.valid = 1
         self.checks = set() if assert_checks else None
         self.chronicle = chronicle
+        self.fp2_rules = fp2_rules
+        self.fp2_selection = fp2_selection
+        self.fp2_choices = Counter()
 
     def value(self, a):
         return self.graph.integer(a) if type(a) is int else a
@@ -98,10 +109,29 @@ class ScriptField:
             return self.op("OP_2MUL", a)
         return self.op("OP_MUL", a, b)
 
-    def multiply2(self, *limbs):
-        formula, _ = fp2_kernel()
+    def _inline_fp2(self, rules, limbs):
+        formula, _ = fp2_kernel(rules)
         operations = {"int+": self.add, "int-": self.sub, "int*": self.mul}
         return formula.inline(limbs, lambda name, *args: operations[name](*args))
+
+    def multiply2(self, *limbs):
+        if self.fp2_selection == "uniform":
+            return self._inline_fp2(self.fp2_rules, limbs)
+        active = self.graph
+
+        def inline(rules, graph):
+            self.graph = graph
+            try:
+                return self._inline_fp2(rules, limbs)
+            finally:
+                self.graph = active
+
+        # The Fp2 formulas contain only polynomial operations, so a trial
+        # graph can use the same definitions as the active residue block.
+        graph = active.graph if isinstance(active, ResidueBlock) else active
+        rules, results = graph.select_expansion(fp2_alternatives(self.fp2_rules), inline)
+        self.fp2_choices[rules] += 1
+        return results
 
     def half_digit(self, digit):
         # MSM digits are nonnegative and occupy at most two bits.
@@ -152,11 +182,12 @@ class ScriptField:
 class Tower:
     """Fp2 = Fp[i], i² = -1, Fp6 = Fp2[v], v³ = 1+i, Fp12 = Fp6[w], w² = v."""
 
-    def __init__(self, field, *, sparse=False, defer_reductions=False, mul2_kernel=None):
+    def __init__(self, field, *, sparse=False, defer_reductions=False, mul2_kernel=None, direct_lines=False):
         self.fp = field
         self.sparse = sparse
         self.defer_reductions = defer_reductions
         self.mul2_kernel = mul2_kernel
+        self.direct_lines = direct_lines
 
     def add2(self, a, b):
         return self.fp.add(a[0], b[0]), self.fp.add(a[1], b[1])
@@ -208,6 +239,12 @@ class Tower:
             # involving a2 each have one product after reducing v³ = 1+i.
             a0, a1, a2 = a
             b0, b1, _ = b
+            if self.direct_lines:
+                return (
+                    self.add2(self.mul2(a0, b0), self.xi(self.mul2(a2, b1))),
+                    self.add2(self.mul2(a0, b1), self.mul2(a1, b0)),
+                    self.add2(self.mul2(a1, b1), self.mul2(a2, b0)),
+                )
             t0, t1 = self.mul2(a0, b0), self.mul2(a1, b1)
             cross = self.mul2(self.add2(a0, a1), self.add2(b0, b1))
             return (
@@ -257,10 +294,39 @@ class Tower:
     def _mul_line(self, a, line):
         c0, c2, c3 = line
         even, odd = a
-        t0 = self.mul6(even, (c0, c2, ZERO2))
-        t1 = self.mul_v(tuple(self.mul2(coefficient, c3) for coefficient in odd))
+        base = c0, c2, ZERO2
+        if self.direct_lines:
+            # The odd line part is c3*v. Recombine the two powers of w
+            # explicitly to shorten the lifetime of the sparse products.
+            even_product = self.add6(self.mul6(even, base), self.mul_v(self._mul_line_odd(odd, c3)))
+            odd_product = self.add6(self.mul6(odd, base), self._mul_line_odd(even, c3))
+            return even_product, odd_product
+        t0 = self.mul6(even, base)
+        t1 = self._mul_line_odd(odd, c3)
         cross = self.mul6(self.add6(even, odd), (c0, self.add2(c2, c3), ZERO2))
         return self.add6(t0, self.mul_v(t1)), self.sub6(self.sub6(cross, t0), t1)
+
+    def _mul_line_odd(self, value, coefficient):
+        return self.mul_v(tuple(self.mul2(pair, coefficient) for pair in value))
+
+    def mul_lines(self, acc, lines, extra_factor=None):
+        return self._fp12(self._mul_lines, acc, lines, extra_factor)
+
+    def _mul_lines(self, acc, lines, extra_factor):
+        for line in lines:
+            acc = self._mul_line(acc, line)
+        return acc if extra_factor is None else self._mul12(acc, extra_factor)
+
+    def miller_round(self, acc, lines, extra_factor):
+        """Square, apply three tangent lines, and include optional chord lines and residue."""
+        return self._fp12(self._miller_round, acc, lines, extra_factor)
+
+    def _miller_round(self, acc, lines, extra_factor):
+        # A round multiplies the square of a reduced accumulator by at most
+        # six evaluated lines (limbs below Q²) and one reduced residue.
+        # Even allowing a factor of 2¹⁶ for the coefficient sums in each
+        # operation, one round fits within 6,000 bits per unreduced limb.
+        return self._mul_lines(self._square12(acc), lines, extra_factor)
 
     def frobenius12(self, a):
         return tuple(
