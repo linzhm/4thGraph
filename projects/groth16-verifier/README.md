@@ -1,6 +1,6 @@
 <!-- Generated from manifest.yaml with Copier. -->
 
-# BLS12-381 Groth16 verifier v0.6.0
+# BLS12-381 Groth16 verifier v0.7.0
 
 [简体中文](README.zh-CN.md) · [4thGraph](../../README.md) · [Project index](../README.md) · [Versions](versions/index.json)
 
@@ -8,7 +8,7 @@
 
 Import the 4thGraph Groth16 standard library in Forth, build a proof lock and witness, and replay funded BSV spends.
 
-[Algorithm and execution](#algorithm-and-execution) · [Reproduce the checks](#reproduce-the-checks) · [Measurements data](versions/v0.6.0/measurements.json)
+[Algorithm and execution](#algorithm-and-execution) · [Reproduce the checks](#reproduce-the-checks) · [Measurements data](versions/v0.7.0/measurements.json)
 
 | Entry point | Purpose |
 | --- | --- |
@@ -25,7 +25,7 @@ The compact verifier compares two assertion schedules and automatically consumes
 
 The shared stack scheduler recognizes when to keep a live right operand with `OP_TUCK` and pushes one-byte numeric constants at their uses. [Operand scheduling measurements](versions/v0.5.0/measurements.json)
 
-The high-level Forth experiment writes out the Miller rounds and residue equation, then searches arithmetic plans for one verifier source. [Experiment and replay](docs/verification.en.md#high-level-forth-experiment)
+The high-level Forth experiment searches uniform and call-site Fp2 lowerings and measures verifier source edits with a common compiler. [Experiment and replay](docs/verification.en.md#high-level-forth-experiment)
 
 ## Reproduce the checks
 
@@ -36,7 +36,8 @@ python3 -m pip install ecdsa -r tools/requirements-chronicle.txt
 ```
 
 ```sh
-PYTHONPATH=src:. python3 projects/groth16-verifier/experiments/high-level/optimize.py
+PYTHONPATH=src:. python3 projects/groth16-verifier/experiments/high-level/optimize.py \
+  --residue-association accumulator-frobenius-first
 REGTEST_CHRONICLE_HEIGHT=1000 bash tools/verify_node.sh --profile raised -- \
   python3 -m fourthgraph.replay.bls12381_verifier \
   --source projects/groth16-verifier/experiments/high-level/verifier.fth \

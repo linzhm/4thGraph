@@ -32,12 +32,15 @@ v0.5.0 沿用相同的公开输入配置和证明夹具，比较自动操作数�
 
 v0.6.0 实验在 Forth 中定义证明预处理、种子首位之后的 63 轮 Miller 循环，以及 Miller 累积器、验证密钥因子和见证余数的 Frobenius 像三者相乘的剩余式。最后两个词分别断言乘积属于 Fp6 且非零。后端核对轮次与 BLS12-381 种子一致，并提供见证、群和域运算原语。[高层 Forth 源码](../experiments/high-level/verifier.fth)
 
-搜索枚举同一个 Fp2 公式上的合法改写，以及剩余式三个因子中先乘哪一对的三种选择。每个候选使用 `affine-inline` 见证布局编译完整验证器，并在开发求值器中检查两份有效证明和四个拒绝用例。搜索为每个 Script 时代选择序列化锁与见证合计最短的方案，平局取枚举中靠前的一项。输出包含候选矩阵、胜出的锁和算术计划。[搜索程序](../experiments/high-level/optimize.py) · [v0.6.0 实测记录](../versions/v0.6.0/measurements.json)
+搜索枚举同一个 Fp2 公式上的合法改写，以及剩余式三个因子中先乘哪一对的三种选择。编译器也可在每个 Fp2 调用点对公式分别做常量折叠和公共子表达式复用，再估算局部栈发码的成本。搜索使用 `affine-inline` 见证布局比较调用点选择与统一公式生成的完整验证器。每个候选在开发求值器中检查两份有效证明和四个拒绝用例。搜索为每个 Script 时代选择序列化锁与见证合计最短的方案，平局取枚举中靠前的一项。[搜索程序](../experiments/high-level/optimize.py) · [v0.6.0 实测记录](../versions/v0.6.0/measurements.json)
+
+v0.7.0 固定剩余式的乘法顺序，对同一份 Forth 文件做两轮改动，测量原顺序、两个 G1 检查都在公开输入 MSM 前，以及 MSM 在 A、C 两项检查之间。复现某一轮时，从报告记录的 Git 提交提取 `experiments/high-level/verifier.fth`，再用 `--source` 将副本传给搜索和回放。当前源码先检查两个 G1 点，再执行 MSM。[v0.7.0 实测记录](../versions/v0.7.0/measurements.json)
 
 从仓库根目录运行搜索，再回放选出的 Genesis 计划。
 
 ```sh
-PYTHONPATH=src:. python3 projects/groth16-verifier/experiments/high-level/optimize.py
+PYTHONPATH=src:. python3 projects/groth16-verifier/experiments/high-level/optimize.py \
+  --residue-association accumulator-frobenius-first
 out=projects/groth16-verifier/workspace/build/high-level
 REGTEST_CHRONICLE_HEIGHT=1000 bash tools/verify_node.sh --profile raised -- \
   python3 -m fourthgraph.replay.bls12381_verifier \

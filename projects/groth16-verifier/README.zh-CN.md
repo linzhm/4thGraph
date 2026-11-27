@@ -1,6 +1,6 @@
 <!-- Generated from manifest.yaml with Copier. -->
 
-# BLS12-381 Groth16 验证器 v0.6.0
+# BLS12-381 Groth16 验证器 v0.7.0
 
 [English](README.md) · [4thGraph](../../README.zh-CN.md) · [项目目录](../README.zh-CN.md) · [版本](versions/index.json)
 
@@ -8,7 +8,7 @@
 
 在 Forth 中调用 4thGraph 的 Groth16 标准库，构建验证锁与见证，并在 BSV regtest 复放花费。
 
-[算法与执行](#算法与执行) · [复现方法](#复现方法) · [实测数据](versions/v0.6.0/measurements.json)
+[算法与执行](#算法与执行) · [复现方法](#复现方法) · [实测数据](versions/v0.7.0/measurements.json)
 
 | 入口 | 用途 |
 | --- | --- |
@@ -25,7 +25,7 @@
 
 共享调度器识别何时用 `OP_TUCK` 保留右操作数，并在使用处推入单字节数字常量。[操作数调度实测](versions/v0.5.0/measurements.json)
 
-高层 Forth 实验写出 Miller 轮次和剩余式，再从同一份验证器源码搜索算术计划。[实验与回放](docs/verification.zh-CN.md#高层-forth-实验)
+高层 Forth 实验搜索统一公式和按调用点选择的 Fp2 发码，并用同一个编译器测量每轮验证器源码改动。[实验与回放](docs/verification.zh-CN.md#高层-forth-实验)
 
 ## 复现方法
 
@@ -36,7 +36,8 @@ python3 -m pip install ecdsa -r tools/requirements-chronicle.txt
 ```
 
 ```sh
-PYTHONPATH=src:. python3 projects/groth16-verifier/experiments/high-level/optimize.py
+PYTHONPATH=src:. python3 projects/groth16-verifier/experiments/high-level/optimize.py \
+  --residue-association accumulator-frobenius-first
 REGTEST_CHRONICLE_HEIGHT=1000 bash tools/verify_node.sh --profile raised -- \
   python3 -m fourthgraph.replay.bls12381_verifier \
   --source projects/groth16-verifier/experiments/high-level/verifier.fth \

@@ -32,12 +32,15 @@ To reproduce the Chronicle replay, set `REGTEST_CHRONICLE_HEIGHT=2`, pass `--scr
 
 The v0.6.0 experiment defines proof preparation, the 63 Miller rounds after the leading seed bit, and the terminal product of the Miller accumulator, verification-key factor, and Frobenius of the witness residue. The two terminal words require that the product lies in Fp6 and is nonzero. The backend checks the round sequence against the BLS12-381 seed and supplies the witness, group, and field arithmetic primitives. [High-level Forth](../experiments/high-level/verifier.fth)
 
-The search enumerates legal rewrites of the same Fp2 formula and all three choices for the first pair of factors in the Fp12 product. It compiles the complete verifier for each candidate with the `affine-inline` witness layout. Each candidate runs both proofs and four rejection controls in the development evaluator. The search selects the smallest serialized lock-and-witness path in each Script era, breaking ties by enumeration order. It writes the candidate matrix and the winning lock and plan files. [Search runner](../experiments/high-level/optimize.py) · [v0.6.0 measurements](../versions/v0.6.0/measurements.json)
+The search enumerates legal rewrites of the same Fp2 formula and all three choices for the first pair of factors in the Fp12 product. It can also compare the Fp2 formulas at each call site, using constant folding, shared definitions, and a local stack emission as the cost estimate. The search compares both kinds of lowering on the complete verifier with the `affine-inline` witness layout. Each candidate runs both proofs and four rejection controls in the development evaluator. The search selects the smallest serialized lock-and-witness path in each Script era, breaking ties by enumeration order. [Search runner](../experiments/high-level/optimize.py) · [v0.6.0 measurements](../versions/v0.6.0/measurements.json)
+
+The v0.7.0 experiment holds the residue multiplication order fixed and edits the same Forth file twice. It measures the original order, both G1 checks before public-input MSM, and MSM between the A and C checks. Each round records its Git revision. To reproduce a round, extract its `experiments/high-level/verifier.fth` from that revision and pass the copy using `--source` in the search and replay. The current Forth source runs both G1 checks before MSM. [v0.7.0 measurements](../versions/v0.7.0/measurements.json)
 
 Run the search and replay its selected Genesis plan from the repository root.
 
 ```sh
-PYTHONPATH=src:. python3 projects/groth16-verifier/experiments/high-level/optimize.py
+PYTHONPATH=src:. python3 projects/groth16-verifier/experiments/high-level/optimize.py \
+  --residue-association accumulator-frobenius-first
 out=projects/groth16-verifier/workspace/build/high-level
 REGTEST_CHRONICLE_HEIGHT=1000 bash tools/verify_node.sh --profile raised -- \
   python3 -m fourthgraph.replay.bls12381_verifier \

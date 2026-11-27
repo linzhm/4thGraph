@@ -35,6 +35,8 @@
 
 高层 Forth 实验用类型化的词声明 Miller 种子轮次和终端 Fp12 剩余式。编译器核对轮次和终端断言，并允许在显式三因子乘积中选择先乘哪一对。构建与回放接受 `--arithmetic-plan` 重现搜索选出的 Fp2 改写和 Fp12 乘法顺序。[高层 Forth 实验](../projects/groth16-verifier/docs/verification.zh-CN.md#高层-forth-实验)
 
+算术计划的 `fp2_selection: callsite` 让编译器在内联时按实际参数进行常量折叠和复用，再比较每个合法 Fp2 候选的局部栈发码。实验按完整锁与见证的序列化字节数比较调用点选择和统一公式。实验也对照 Forth 中 G1 检查和公开输入 MSM 的执行顺序。[v0.7.0 实测记录](../projects/groth16-verifier/versions/v0.7.0/measurements.json)
+
 调用方可先写 `REQUIRE stdlib/groth16-bls12-381.fth`，再在定义体中调用验证词。构建和复放工具支持 `--entry <word>` 来选择栈效果为 `-- groth16-verified` 的入口。构建清单记录入口、导出接口及验证密钥摘要。[项目调用演示](../projects/groth16-verifier/README.zh-CN.md) · [语法书](language/syntax.md#4-公开导出)
 
 ## 调用方选择
