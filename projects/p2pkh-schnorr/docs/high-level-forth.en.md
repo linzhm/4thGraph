@@ -172,3 +172,69 @@ REGTEST_CHRONICLE_HEIGHT=5 PYTHONPATH=src:. bash tools/verify_node.sh --profile 
   "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/experiments/high-level/window_compare.py \
   --joint-lowerings --matrix-only --output workspace/schnorr-high-level/dataflow-matrix.json
 ```
+
+## Stack and model boundaries
+
+The stack plan retains the field modulus from affine mapping through joint table preparation. The affine and homogeneous coordinate adapters compare precomputed factors with computing the powers from one root. The dataflow scheduler groups adjacent operands, removes dead slots in an already ordered return sequence, and fuses comparisons consumed only by `verify`. The shared decoder generates repeated masks by doubling and appending. [Compiler and libraries](../../../docs/optimization-paths.md#dataflow-and-return-boundaries)
+
+| Build | Payment lock | 2×2 OTDA ALL with reconstruction |
+| --- | ---: | ---: |
+| Previous dataflow and batch build | 23,484 B | 58,822 B |
+| Optimized stack and model boundaries | 23,190 B | 57,646 B |
+| Handwritten v0.17.0 | 22,435 B | 54,626 B |
+
+The table and measurements record commit `e1ee42b`. Run the commands below from that checkout to reproduce the recorded Script bytes. With the shared scheduler on `main` at `c02df4a`, the selected lock measures 23,188 B and the reconstructed two-input, two-output transaction measures 57,638 B. [Measurement checkout](https://github.com/linzhm/4thGraph/tree/e1ee42b455225934d580d172e562540286c42c56)
+
+The 18,379 B window loop matches the frozen manual implementation byte for byte. The remaining 755 B per lock is split into 441 B of joint preparation, 250 B of witness and challenge handling, and 64 B of cleanup and nonce comparison. The verifier replays the BIP340 vectors, malformed witnesses, 12 paired payment modes and two native exits. The selected build also passes the eight-case constructor matrix. [Measurements](../experiments/high-level/boundary-measurements.json) · [Transaction matrix](../experiments/high-level/boundary-matrix.json)
+
+```sh
+PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
+  "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/experiments/high-level/window_compare.py \
+  --joint-lowerings --output workspace/schnorr-high-level/boundary-measurements.json
+REGTEST_CHRONICLE_HEIGHT=5 PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
+  "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/experiments/high-level/window_compare.py \
+  --joint-lowerings --matrix-only --output workspace/schnorr-high-level/boundary-matrix.json
+```
+
+## Point comparison models
+
+The baseline is built from commit `641153b` of PR #113. The comparison at `90dd9d6` keeps the same batched witness, dataflow compilation, window loop, payment binding, and reconstruction method. The first candidate restores the multiplication result to the original model before checking the nonce point. The second moves the inverse scale inside the modular zero tests. The third maps the public and nonce points together before multiplication, and compares in the scaled model. It uses the same scale factors and passes the field prime into the joint word. [Shared model formulas](../../../src/fourthgraph/stdlib/weierstrass-model.fth)
+
+| Comparison | Before the windows | After the windows | Payment lock | 2×2 OTDA ALL with reconstruction |
+| --- | ---: | ---: | ---: | ---: |
+| Restore before comparison | 3,861 B | 138 B | 23,188 B | 57,638 B |
+| Inverse scale inside the residual | 3,861 B | 127 B | 23,177 B | 57,594 B |
+| Map both affine points together | 3,890 B | 82 B | 23,161 B | 57,530 B |
+| Handwritten v0.17.0 | 3,172 B | 74 B | 22,435 B | 54,626 B |
+
+All four builds use the same 18,379 B window sequence. The paired map adds 29 B before the loop and saves 56 B after it. The remaining 726 B per lock comprises 374 B before the joint word, 344 B in joint preparation, and 8 B after the windows. Both engines replay the detached vectors and malformed witnesses, all paired signature modes and native exits. The smallest candidate also passes the eight constructor cases. [Measurements](../experiments/high-level/model-output-measurements.json) · [Transaction matrix](../experiments/high-level/model-output-matrix.json)
+
+```sh
+PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
+  "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/experiments/high-level/window_compare.py \
+  --joint-lowerings --output workspace/schnorr-high-level/model-output-measurements.json
+REGTEST_CHRONICLE_HEIGHT=5 PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
+  "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/experiments/high-level/window_compare.py \
+  --joint-lowerings --matrix-only --output workspace/schnorr-high-level/model-output-matrix.json
+```
+
+## Source tuning for the 64-window verifier
+
+The tuned Forth carries the same field prime through the four coordinate bounds, the public curve equation, and the paired coordinate map. The script checks the original encodings and both ordinate parities before mapping, then checks the two modular residuals and rejects `Z = 0`. The compiler uses the same `dataflow` profile and secp256k1 joint word as the paired build. [Tuned Forth](../experiments/high-level/window-verifier-tuned.fth)
+
+| Build | Before the windows | After the windows | Payment lock | 2×2 OTDA ALL with reconstruction |
+| --- | ---: | ---: | ---: | ---: |
+| Paired coordinates at `90dd9d6` | 3,890 B | 82 B | 23,161 B | 57,530 B |
+| Paired coordinates, tuned Forth | 3,723 B | 80 B | 22,992 B | 56,854 B |
+| Handwritten v0.17.0 | 3,172 B | 74 B | 22,435 B | 54,626 B |
+
+The joint word and its 18,379 B window sequence are byte-identical between the automatic builds. The remaining 557 B per lock comprises 207 B before the joint word, 344 B in joint preparation, and 6 B after the windows. The dual-engine replay covers 27 standalone cases, 14 payment cases and their locktime mutations, and eight constructor cases for the tuned lock. [Measurements](../experiments/high-level/forth-tuning-measurements.json) · [Transaction matrix](../experiments/high-level/forth-tuning-matrix.json)
+
+```sh
+PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
+  "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/experiments/high-level/window_compare.py \
+  --joint-lowerings --forth-tuning --output workspace/schnorr-high-level/forth-tuning-measurements.json
+REGTEST_CHRONICLE_HEIGHT=5 PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
+  "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/experiments/high-level/window_compare.py \
+  --joint-lowerings --forth-tuning --matrix-only --output workspace/schnorr-high-level/forth-tuning-matrix.json
+```

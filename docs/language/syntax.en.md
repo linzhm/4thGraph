@@ -124,6 +124,8 @@ In Script construction words, `op-toaltstack` and `op-fromaltstack` emit `OP_TOA
 
 Use `over` and `2dup` to copy existing stack items and `swap`, `rot`, and `nip` to rearrange the main stack. Gforth workflows can use `DO … LOOP` for host iteration. Script construction words can use `bsv-repeat-code` to expand a fixed number of copies of an instruction fragment. [Forth 2012 Core](https://forth-standard.org/standard/core) · [Forth 2012 DO](https://forth-standard.org/standard/core/DO)
 
+`bsv-tile-top ( script cell -- script )` appends code that replaces the runtime top byte item with a positive build-time number of copies concatenated together. The emitted code constructs the copies by doubling and appending.
+
 Operations use postfix notation (RPN). `2 3 +` pushes both values, then `+` consumes them and leaves `5`. `+`, `-`, and `*` use wrapping 64-bit `cell` arithmetic. `=`, `<`, and `>` produce Forth flags. Use `u32+` for unsigned 32-bit addition and `int+`, `int-`, and `int*` for ScriptNum arithmetic. For byte strings, `bytes-cat` concatenates and `bytes=` compares. `OP_SIZE` preserves the input and leaves its length. `OP_SPLIT` consumes the input and offset and leaves two pieces. [Language semantics (Chinese)](specification.md)
 
 When equality of two witness values is the sole spending condition, pass the `OP_EQUAL` result to a terminal `verify`. If the values differ, the result is `0` and the spend fails. This lock compiles to a single `OP_EQUAL` instruction.

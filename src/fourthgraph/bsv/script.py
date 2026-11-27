@@ -43,6 +43,23 @@ def asm(text):
     return b''.join(token(t) for t in text.split())
 
 
+@cache
+def tile_top(count):
+    """Generate binary concatenation of copies of the top byte string."""
+    if count < 1:
+        raise ValueError("Stack byte tiling requires a positive count")
+    prefix, suffix = bytearray(), []
+    while count > 1:
+        if count & 1:
+            prefix.extend(asm("OP_DUP"))
+            suffix.append(asm("OP_CAT"))
+            count -= 1
+        else:
+            suffix.append(asm("OP_DUP OP_CAT"))
+            count //= 2
+    return bytes(prefix) + b"".join(reversed(suffix))
+
+
 def without_codeseparators(script):
     """Remove CODESEPARATOR opcodes outside pushed data for OTDA scriptCode."""
     separators = OPS['OP_CODESEPARATOR']

@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from fourthgraph.bsv.script import OPS, number, push
+from fourthgraph.bsv.script import OPS, number, push, tile_top
 
 from .source import CompileError, Located, SourceCompiler, Word, evaluate
 from .script_formula import read_formula, validate_formula_passes
@@ -14,6 +14,13 @@ def repeat(code, count):
     if not 0 <= count <= 256:
         raise CompileError("Script repetition must be between 0 and 256")
     return code * count
+
+
+def append_tile(code, count):
+    try:
+        return code + tile_top(count)
+    except ValueError as error:
+        raise CompileError(str(error)) from error
 
 
 def build_word(takes, gives, run):
@@ -35,6 +42,7 @@ SCRIPT_WORDS = {
                              lambda code, data: code + number(int.from_bytes(data, "big"))),
     "bsv-cat-code": build_word("script script", "script", bytes.__add__),
     "bsv-repeat-code": build_word("script cell", "script", repeat),
+    "bsv-tile-top": build_word("script cell", "script", append_tile),
     "script>bytes": build_word("script", "bytes", bytes),
     "script-size": build_word("script", "cell", len),
     "cell>byte": build_word("cell", "bytes", lambda value: value.to_bytes(1, "big")),

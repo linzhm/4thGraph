@@ -176,3 +176,75 @@ REGTEST_CHRONICLE_HEIGHT=5 PYTHONPATH=src:. bash tools/verify_node.sh --profile 
   "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/experiments/high-level/window_compare.py \
   --joint-lowerings --matrix-only --output workspace/schnorr-high-level/dataflow-matrix.json
 ```
+
+<a name="stack-and-model-boundaries"></a>
+
+## 栈和坐标模型边界
+
+栈候选让域模数从仿射映射一直保留到联合建表之后。仿射和齐次坐标转换比较预计算因子与在运行时从单个缩放因子求幂的写法。数据流调度器成组搬运相邻操作数，清理返回序列中夹杂的死值，并融合仅由 `verify` 消费的比较。共享解码库通过倍增和拼接生成重复掩码。[编译器和基础库](../../../docs/optimization-paths.zh-CN.md#数据流和返回边界)
+
+| 构建 | 付款锁 | 两进两出 OTDA ALL，使用模板构造器 |
+| --- | ---: | ---: |
+| 上轮数据流与批量解码 | 23,484 B | 58,822 B |
+| 栈与坐标模型边界优化 | 23,190 B | 57,646 B |
+| 手工 v0.17.0 | 22,435 B | 54,626 B |
+
+表格和实测文件对应提交 `e1ee42b`。从该提交的检出目录运行下列命令，可逐字节复现实测脚本。与 `main` 的 `c02df4a` 合并后，选中构建的付款锁为 23,188 B，两进两出的重建交易为 57,638 B。 [实测提交](https://github.com/linzhm/4thGraph/tree/e1ee42b455225934d580d172e562540286c42c56)
+
+18,379 B 的窗口循环与冻结手工版逐字节相同。每锁剩余 755 B，分布在联合点乘准备 441 B、见证和挑战值处理 250 B、清栈和 nonce 点比较 64 B。验签器复放 BIP340 向量、错误见证、12 种成对付款模式和两种普通输出退出。选中候选也通过构造器矩阵的八个场景。[实测](../experiments/high-level/boundary-measurements.json) · [交易矩阵](../experiments/high-level/boundary-matrix.json)
+
+```sh
+PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
+  "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/experiments/high-level/window_compare.py \
+  --joint-lowerings --output workspace/schnorr-high-level/boundary-measurements.json
+REGTEST_CHRONICLE_HEIGHT=5 PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
+  "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/experiments/high-level/window_compare.py \
+  --joint-lowerings --matrix-only --output workspace/schnorr-high-level/boundary-matrix.json
+```
+
+<a name="point-comparison-models"></a>
+
+## 点比较的坐标模型
+
+基线来自 #113 的 `641153b` 提交。`90dd9d6` 中的三条路径使用同一份批量见证代码、同一数据流编译选项、窗口循环、付款绑定和原像构造方式。第一条先还原点乘结果再比较 nonce 点。第二条把逆缩放并入模等式。第三条在点乘前一起映射公钥点和 nonce 点，复用缩放因子，并把已知域模数传给联合点乘词，最后在缩放模型中比较。[共享模型公式](../../../src/fourthgraph/stdlib/weierstrass-model.fth)
+
+| 比较方式 | 窗口前 | 窗口后 | 付款锁 | 两进两出 OTDA ALL，使用模板构造器 |
+| --- | ---: | ---: | ---: | ---: |
+| 先还原坐标再比较 | 3,861 B | 138 B | 23,188 B | 57,638 B |
+| 逆缩放并入模等式 | 3,861 B | 127 B | 23,177 B | 57,594 B |
+| 两个仿射点一起缩放 | 3,890 B | 82 B | 23,161 B | 57,530 B |
+| 手工 v0.17.0 | 3,172 B | 74 B | 22,435 B | 54,626 B |
+
+四个构建的 18,379 B 窗口循环逐字节相同。一起缩放在循环前多用 29 B，循环后少用 56 B。每锁还差 726 B，联合点乘调用前占 374 B，建表等联合点乘准备占 344 B，窗口后占 8 B。双引擎复放独立验签向量、错误见证、成对签名模式和普通输出退出，最短候选也通过构造器矩阵的八个场景。[实测](../experiments/high-level/model-output-measurements.json) · [交易矩阵](../experiments/high-level/model-output-matrix.json)
+
+```sh
+PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
+  "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/experiments/high-level/window_compare.py \
+  --joint-lowerings --output workspace/schnorr-high-level/model-output-measurements.json
+REGTEST_CHRONICLE_HEIGHT=5 PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
+  "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/experiments/high-level/window_compare.py \
+  --joint-lowerings --matrix-only --output workspace/schnorr-high-level/model-output-matrix.json
+```
+
+<a name="source-tuning-for-the-64-window-verifier"></a>
+
+## 64 窗口验签器的 Forth 调优
+
+调优后的 Forth 将同一个域模数用于四个坐标的上界检查、公钥曲线方程和两个仿射点的映射。在映射前检查原始编码及两个纵坐标的偶性，点乘后验证两个模余数为零并排除 `Z = 0`。编译器使用与上一版相同的 `dataflow` 选项和 secp256k1 联合点乘词。[调优后的 Forth](../experiments/high-level/window-verifier-tuned.fth)
+
+| 构建 | 窗口前 | 窗口后 | 付款锁 | 两进两出 OTDA ALL，使用构造器 |
+| --- | ---: | ---: | ---: | ---: |
+| `90dd9d6` 的两点一起缩放版 | 3,890 B | 82 B | 23,161 B | 57,530 B |
+| 两点一起缩放，调优 Forth | 3,723 B | 80 B | 22,992 B | 56,854 B |
+| 手工 v0.17.0 | 3,172 B | 74 B | 22,435 B | 54,626 B |
+
+两份自动版的联合点乘词逐字节相同，其中窗口主体为 18,379 B。每锁剩余 557 B，联合点乘调用前占 207 B，建表等准备占 344 B，窗口后占 6 B。双引擎复放覆盖 27 个独立验签用例、14 种付款及对应锁定时间篡改，以及调优版的八个构造器场景。[实测](../experiments/high-level/forth-tuning-measurements.json) · [交易矩阵](../experiments/high-level/forth-tuning-matrix.json)
+
+```sh
+PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
+  "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/experiments/high-level/window_compare.py \
+  --joint-lowerings --forth-tuning --output workspace/schnorr-high-level/forth-tuning-measurements.json
+REGTEST_CHRONICLE_HEIGHT=5 PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
+  "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/experiments/high-level/window_compare.py \
+  --joint-lowerings --forth-tuning --matrix-only --output workspace/schnorr-high-level/forth-tuning-matrix.json
+```

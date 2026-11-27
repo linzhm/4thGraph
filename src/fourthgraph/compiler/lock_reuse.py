@@ -1,10 +1,13 @@
-"""Reuse identical deterministic expressions within one lock control-flow block."""
+"""Recognize equivalent deterministic expressions inside one lock control-flow block."""
+from collections import Counter
 from dataclasses import replace
 
-from .wordsets import PRIMITIVES, Literal, Primitive
+from fourthgraph.bsv.script import tile_top
+
+from .wordsets import PRIMITIVES, Literal, Primitive, script_word
 
 
-def reuse_values(block):
+def reuse_values(block, *, recognize_tiles=True):
     """Return a rewritten block and the reasons for its replacements."""
     constants, widths, aliases, seen = {}, {}, {}, {}
     emitted, reused = [], []
@@ -52,4 +55,44 @@ def reuse_values(block):
                                (len(node.code), len(code))))
         emitted.append(step)
     returns = tuple(aliases.get(slot, slot) for slot in block.returns)
-    return replace(block, steps=tuple(emitted), returns=returns), reused
+    steps = tile_concatenations(emitted, returns, widths, reused) if recognize_tiles else tuple(emitted)
+    return replace(block, steps=steps, returns=returns), reused
+
+
+def tile_concatenations(steps, returns, widths, rewrites):
+    """Replace a contiguous concatenation of a checked byte sequence with a tile."""
+    uses = Counter(returns)
+    uses.update(slot for step in steps for slot in step.args)
+    result, pending, repeats = [], [], {}
+
+    def finish_run():
+        if len(pending) > 1:
+            inside = Counter(slot for step in pending for slot in step.args)
+            if all(inside[step.results[0]] and uses[step.results[0]] == inside[step.results[0]]
+                   for step in pending[:-1]):
+                last = pending[-1]
+                seed, count = repeats[last.results[0]]
+                tile = script_word("bytes", "bytes", tile_top(count), lambda value: value * count, may_fail=True)
+                result.append(replace(last, node=tile, args=(seed,)))
+                rewrites.append((last, "tile-repeated-bytes",
+                                 f"{count} copies of one {widths[seed]}-byte slot with no observed intermediate", None))
+                pending.clear()
+        result.extend(pending)
+        pending.clear()
+        repeats.clear()
+
+    for step in steps:
+        if step.node is PRIMITIVES["bytes-cat"]:
+            left, right = step.args
+            seed, copies = repeats.get(left, (left, 1))
+            other, extra = repeats.get(right, (right, 1))
+            if seed == other and seed in widths:
+                if pending and seed != next(iter(repeats.values()))[0]:
+                    finish_run()
+                repeats[step.results[0]] = seed, copies + extra
+                pending.append(step)
+                continue
+        finish_run()
+        result.append(step)
+    finish_run()
+    return tuple(result)

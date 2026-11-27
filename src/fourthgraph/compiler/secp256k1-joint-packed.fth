@@ -1,11 +1,15 @@
 ( Shared preparation for both table layouts. The four lanes become 64 index pairs. )
 layout: expose-lanes ( s:script-int tv:bytes k1:script-int k2:script-int -- tv k1 k2 s )
-layout: expose-public ( px:script-int py:script-int s:script-int k:script-int -- s k px py )
-layout: restore-public ( s:script-int k:script-int px:script-int py:script-int -- px py s k )
+layout: expose-public ( px:script-int py:script-int s:script-int k:script-int p:script-int -- s k p px py )
+layout: restore-public ( s:script-int k:script-int p:script-int px:script-int py:script-int -- s p px py k )
+
+: map-public ( script-int script-int script-int script-int --
+               script-int script-int script-int script-int script-int )
+    field-prime expose-public map-affine-in-field restore-public
+;
 
 : prepare-windows ( script-int script-int script-int script-int -- bytes bytes )
-    expose-public map-public restore-public
-    field-prime joint-variable split-glv keep-split signed-variable-table restore-split
+    map-public split-glv keep-split signed-variable-table restore-split
     int-abs swap int-abs swap expose-lanes split-fixed 2swap pack-windows
 ;
 
