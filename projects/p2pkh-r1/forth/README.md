@@ -41,6 +41,89 @@ PYTHONPATH=src:.:projects/p2pkh-r1/forth:projects/p2pkh-r1/reference \
 
 前两条命令输出锁十六进制、字节数和源码依赖摘要。测试用合成父输出验证 BIP143、OTDA、无配对 SINGLE、连续计数及重新签名的错误后继。结果覆盖脚本验证。两种锁都是实验参考入口，发布钱包模板继续使用版本清单。
 
+### 同一份 baseline-lock 的自动选型
+
+默认、`--optimize` 和 `--auto` 读取同一份 `r1-baseline.fth` 及其依赖。
+项目的 `--auto` 实验按前提展开有序方法，通过目标字节模型选择实现，输出精确锁和
+OTDA 重建程序。编译器保留原入口的准备、结果检查和交易绑定，报告记录有序计划、
+各状态的字节估算、链接区域和停止原因。只有源码与导入摘要匹配已验版本时才允许
+替换窗口区域。普通锁编译可以继续走现有公式路径，OTDA 目标要求能生成相配的
+重建程序。
+[实测与边界（中）](../../../docs/optimization-paths.zh-CN.md#r1-同源自动选型) ·
+[Measurements and scope (EN)](../../../docs/optimization-paths.md#r1-same-source-automatic-selection)
+
+```sh
+project=projects/p2pkh-r1
+export PYTHONPATH="src:.:$project/reference:$project/forth"
+python "$project/forth/compile_r1.py" --entry r1-baseline-lock > /tmp/r1-baseline.json
+python "$project/forth/compile_r1.py" --entry r1-baseline-lock --optimize > /tmp/r1-formula.json
+python "$project/forth/compile_r1.py" --entry r1-baseline-lock --auto --auto-target bip143-all > /tmp/r1-auto-bip143.json
+python "$project/forth/compile_r1.py" --entry r1-baseline-lock --auto --auto-target otda-all > /tmp/r1-auto-otda.json
+python -m unittest -v test_r1_baseline.BaselineAutoTests
+```
+
+目标包含默认的 `lock`、`bip143-all`、`otda-all` 和配对的 `otda-single`。
+交易目标按两进两出形状计入四份锁和相应的重建程序，排序分数是候选相关的字节
+估算。实际字节与交易判定由花费夹具独立验收。有序实验默认最多 8 步和
+160 个状态，可用 `--auto-depth` 和 `--auto-states` 改预算。历史的仅窗口对照
+用 `--auto-rounds N`，最多比较 32 个候选。
+
+构建已选方案时，用 `--replay-plan` 指定保存的计划，或直接传入带 `optimization.plan`
+的 `--auto` 报告。重放核对编译器版本、实际编译器源码摘要以及 Forth 源码和依赖摘要，
+逐项执行固定序列，再核对锁模板和 OTDA 重建程序摘要。默认的 20 字节零值标记模板参数槽；`--owner-hash160 HEX`
+只替换这个槽。钱包发布仍以版本清单为准。
+
+```sh
+for target in bip143-all otda-all otda-single; do
+  python "$project/forth/compile_r1.py" --entry r1-baseline-lock \
+    --replay-plan "$project/forth/plans/$target.json" > "/tmp/r1-fixed-$target.json"
+done
+```
+
+[BIP143 ALL](plans/bip143-all.json) · [OTDA ALL](plans/otda-all.json) · [OTDA SINGLE](plans/otda-single.json)
+
+这些计划以 `c02df4a` 上的编译器验收。初版固定计划及早期矩阵数据可以从原始提交复跑。
+同一工具链版本号下，编译器源码变化也会产生新的计划身份。[初版方案与编译器](https://github.com/linzhm/4thGraph/tree/9b13dfbbd50487ca868831788f653e2b75f9cd5a)
+
+花费测试使用固定版 chain-gang，覆盖 BIP143 ALL、OTDA ALL、配对和无配对的
+OTDA SINGLE。正例使用测试签名和实际夹具父输出。改动花费的锁定时间后，测试必须观察到
+交易绑定失败。用上文的隔离 regtest 启动器运行同一组测试时，BSV Node 也核对这些判定。
+这个入口供编译实验使用，钱包继续使用版本清单。
+
+### 两两交换优化方法
+
+`method-matrix` 固定同一份 `r1-baseline-lock`，分别从通用分表和已有仿射
+证明的分表起步。每张矩阵比较五种方法的 25 个有序对，行先列后，对角线检查
+重复应用。报告记录每一步的前提、应用后的状态和不适用原因。相同的锁和
+OTDA 重建程序共享验收回执，各个计划仍可独立追踪。
+
+```sh
+project=projects/p2pkh-r1
+export PYTHONPATH="src:.:$project/reference:$project/forth"
+python "$project/forth/msm_experiment.py" method-matrix --output /tmp/r1-methods.json
+python "$project/forth/msm_experiment.py" method-matrix --replay /tmp/r1-methods.json
+```
+
+这个探索入口用固定版 chain-gang 验收两进两出夹具。BIP143 ALL、OTDA ALL
+和配对 OTDA SINGLE 各自按资金交易加花费的实际字节排名。
+[矩阵结果（中）](../../../docs/optimization-paths.zh-CN.md#r1-有序方法探索) ·
+[Matrix results (EN)](../../../docs/optimization-paths.md#r1-ordered-method-exploration)
+
+### 自动扩展方法顺序
+
+`method-search` 从通用分表起步，逐层尝试当前状态可用的方法。方法数量由登记
+和前提决定。每个完整编译器状态只扩展一次，报告保留通往同一状态的其他顺序
+和不适用原因。允许在状态变化后再次应用同一方法。搜索默认最多 8 步和 64 个
+状态，合法状态用尽时提前停止。可用 `--max-depth` 和 `--max-states` 缩小预算。
+
+```sh
+python "$project/forth/msm_experiment.py" method-search --output /tmp/r1-method-search.json
+python "$project/forth/msm_experiment.py" method-search --replay /tmp/r1-method-search.json
+```
+
+重放使用回执里的预算。排名使用同一份两进两出夹具的实测资金交易加花费字节，
+BIP143 ALL、OTDA ALL 和配对 OTDA SINGLE 各自选出最小路径。
+
 `msm.fth` 用显式的 P‑256 双标量乘法表达窗口计算。编译器扫描固定生成元、标量范围和曲线点校验，比较各构造的实际锁与付款字节数，并逐字节核对 OTDA 重建。
 
 `compare --candidate v0.6.0` 直接读取并核对冻结的锁和 OTDA 重建程序，占用一个本地候选名额和一个付款复放名额。传入构造名时从 Forth 编译。v0.6.0 和 v0.7.0 使用同一份两进两出夹具。 [v0.6.0 清单](../versions/v0.6.0/manifest.json) · [v0.7.0 清单](../versions/v0.7.0/manifest.json)
