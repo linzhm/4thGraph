@@ -7,9 +7,12 @@ from schnorr_script import (
     TEMPLATE_DIRS, authorization_codes, compile_reconstructed_unlock, compile_unlock, lock_for_owner,
     owner_hash, recognize, recognize_template, reconstruction_for_version,
 )
-from fourthgraph.bsv.otda_reconstruction import shorter_reconstruction
+from fourthgraph.bsv.script import push
 from fourthgraph.bsv.spend_authorization import DEFAULT_SIGHASH, prepare_authorization
 from fourthgraph.bsv.transaction import CHRONICLE, SIGHASH_ALL, SIGHASH_SINGLE, SIGHASH_TYPES, Input, Transaction, amount
+from fourthgraph.compiler.preimage import compile_preimage
+
+WITNESS_TAIL_BYTES = len(push(bytes(160))) + 1
 
 
 def lock_for_public_key(public_key, *, version=None):
@@ -31,19 +34,19 @@ def sign_spend(tx, index, funding_raw, public_key, signer, *, sighash=DEFAULT_SI
                          chronicle_active=chronicle_active, compress_otda=compress_otda)
 
 
-def _otda_program(tx, index, auth):
-    if tx.version != 2 or auth.companion or not auth.requested_type & CHRONICLE:
-        return None
+def preimage_plan(tx, index, auth, *, chronicle_active, compress_otda=None):
     base = auth.requested_type & 31
-    if base == SIGHASH_ALL:
-        outputs = tx.outputs
-    elif base == SIGHASH_SINGLE:
-        outputs = (tx.outputs[index],)
-    else:
-        return None
+    outputs = ()
+    if compress_otda is not False and tx.version == 2 and auth.requested_type & CHRONICLE:
+        if base == SIGHASH_ALL:
+            outputs = tx.outputs
+        elif base == SIGHASH_SINGLE and not auth.companion:
+            outputs = (tx.outputs[index],)
     versions = {match[0] for output in outputs if (match := recognize_template(output.script)) is not None}
     patterns = tuple(reconstruction_for_version(version) for version in TEMPLATE_DIRS if version in versions)
-    return shorter_reconstruction(auth.preimage, outputs, patterns)
+    return compile_preimage(tx, index, auth, patterns, chronicle_active=chronicle_active,
+                            mode="literal" if compress_otda is False else "auto",
+                            witness_tail_bytes=WITNESS_TAIL_BYTES)
 
 
 def sign_previous(tx, index, previous, public_key, signer, *, sighash=DEFAULT_SIGHASH, chronicle_active=False,
@@ -72,8 +75,8 @@ def sign_previous(tx, index, previous, public_key, signer, *, sighash=DEFAULT_SI
     ordinary_code, companion_code = authorization_codes()
     auth = prepare_authorization(tx, index, previous.value, sighash,
                                  ordinary_code=ordinary_code, companion_code=companion_code)
-    program = _otda_program(tx, index, auth) if compress_otda is not False else None
     message = auth.checked_digest()
+    plan = preimage_plan(tx, index, auth, chronicle_active=chronicle_active, compress_otda=compress_otda)
     signature = signer(message)
     if (not isinstance(signature, bytes) or len(signature) != 64
             or not PublicKeyXOnly(public_key).verify(signature, message)):
@@ -81,7 +84,7 @@ def sign_previous(tx, index, previous, public_key, signer, *, sighash=DEFAULT_SI
 
     nonce_point = lift_x(signature[:32])
     witness = public_key, to_bytes(point[1]), signature, to_bytes(nonce_point[1])
-    unlock = (compile_reconstructed_unlock(program, *witness) if program is not None
+    unlock = (compile_reconstructed_unlock(plan.program, *witness) if plan.selected != "literal"
               else compile_unlock(auth.preimage, auth.companion, *witness))
     return tx.with_script(index, unlock)
 

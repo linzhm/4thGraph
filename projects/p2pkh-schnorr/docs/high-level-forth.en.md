@@ -63,3 +63,21 @@ PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
 ```
 
 [Comparison evidence](../experiments/high-level/otda-measurements.json)
+
+## Compiler selection across transaction types
+
+The compiler compares literal, repeated preimage, template, and shared-template encodings for the same complete preimage. Shared templates can copy a common prefix or suffix from an earlier dictionary entry. The 54-case matrix exercises 87 distinct signed encodings and compares against the previous per-template constructor. It includes consolidation, fan-out, change, mixed native inputs and outputs, mixed lock versions, all 12 sighash modes in transaction versions 1 and 2, mixed modes within a transaction, pre-activation funding, and the 252/253-output CompactSize boundary. The automatic Forth build is reproduced by its frozen hash. The released build serves as a control.
+
+| OTDA ALL case | Literal | Per-template constructor | Compiler selection |
+| --- | ---: | ---: | ---: |
+| Three release templates, plus a native output | 226,887 B | 106,729 B | 99,237 B |
+| Automatic Forth 2×2 turnover | 1,312,926 B | 446,920 B | 446,920 B |
+| Automatic Forth and release templates, plus a native output | 724,224 B | 259,686 B | 258,122 B |
+
+Each variant is independently checked with its supplied prevouts. The matrix records the expected effect of changing an amount, output order, locktime or input sequence on the chosen sighash modes. It measures verification under the raised regtest profile. [Matrix evidence](../experiments/high-level/constructor-matrix.json)
+
+```sh
+REGTEST_CHRONICLE_HEIGHT=5 PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
+  "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/experiments/high-level/constructor_matrix.py \
+  --output workspace/schnorr-high-level/constructor-matrix.json
+```

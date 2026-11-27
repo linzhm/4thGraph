@@ -63,3 +63,21 @@ PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
 ```
 
 [对照实测](../experiments/high-level/otda-measurements.json)
+
+## 不同交易类型的构造器选择
+
+编译器对同一完整预映像比较原样压栈、整段预映像的重复展开、模板字典和跨模板共享字典。后一个候选可以从先前构建的模板项取出相同前缀或后缀。矩阵包含 54 个场景、87 份不同的签名交易，覆盖归集、批量分发、找零、原生输入输出混用、新旧模板混用、交易版本 1 和 2 的全部 12 种 sighash、同笔交易内不同模式、激活前入金，以及 252/253 个输出的 CompactSize 边界。自动 Forth 版本通过已冻结的哈希复建，发布版作为对照。
+
+| OTDA ALL 场景 | 原样压栈 | 按模板构造 | 编译器选择 |
+| --- | ---: | ---: | ---: |
+| 三种发布模板加一个原生输出 | 226,887 B | 106,729 B | 99,237 B |
+| 自动 Forth 两进两出周转 | 1,312,926 B | 446,920 B | 446,920 B |
+| 自动 Forth 与发布模板混用，加一个原生输出 | 724,224 B | 259,686 B | 258,122 B |
+
+两套引擎使用对应上一输出验证每个构建。矩阵记录在每种 sighash 下改动金额、输出顺序、锁定时间或输入序号后的预期结果。复放采用 raised regtest 策略。[矩阵实测](../experiments/high-level/constructor-matrix.json)
+
+```sh
+REGTEST_CHRONICLE_HEIGHT=5 PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
+  "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/experiments/high-level/constructor_matrix.py \
+  --output workspace/schnorr-high-level/constructor-matrix.json
+```
