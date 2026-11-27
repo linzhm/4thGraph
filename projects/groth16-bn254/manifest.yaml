@@ -9,8 +9,8 @@ summary:
 entry_points:
   - name: verify-bn254-proof
     description:
-      en: Build the owner guard and specialize the pairing and G2 subgroup check for the fixed statement.
-      zh-CN: 构造所有者授权，并对固定声明生成配对及 G2 子群检查。
+      en: Compile the complete fixed-statement verifier from the typed Forth modules.
+      zh-CN: 从带类型的 Forth 模块编译完整的固定声明验证器。
 setup:
   en:
     - Run from the repository root with Python 3.11 or later, Go 1.26.6, and the pinned Rúnar checkout at `workspace/runar`. Funded replay also needs the Chronicle chain-gang binding and BSV Node.
@@ -31,11 +31,11 @@ setup:
 sections:
   algorithm:
     en:
-      - The compiler folds the fixed pairings and uses a projective G2 subgroup check. On the wrap fixture, the lock is 539,934 B and the proof witness prefix is 6,765 B. [Forth entry](forth/compact-verifier.fth) · [Statement module](forth/statement.fth) · [Verification and plan comparison](docs/verification.en.md)
+      - The Forth modules define the Jacobian formulas, subgroup and Miller schedules, and residue checks. The compiler combines paired stack moves. The wrap fixture uses a 505,179 B lock and 6,765 B witness prefix. [Forth entry](forth/verifier.fth) · [Verification guide](docs/verification.en.md)
     zh-CN:
-      - 编译器预计算固定配对，并生成投影坐标的 G2 子群检查。`wrap` 夹具的锁定脚本为 539,934 B，见证前缀为 6,765 B。[Forth 入口](forth/compact-verifier.fth) · [声明模块](forth/statement.fth) · [验证与方案对比](docs/verification.zh-CN.md)
+      - Forth 模块定义 Jacobian 公式、子群与 Miller 轮次及余数检查。编译器合并成对栈操作。`wrap` 夹具的锁为 505,179 B，见证前缀为 6,765 B。[Forth 入口](forth/verifier.fth) · [验证指南](docs/verification.zh-CN.md)
   reproduction:
     en:
-      - The build writes the lock and proof witness prefix. The funded replay checks a valid proof and five rejection controls, including a G2 point outside the subgroup. [Measurements](versions/v0.3.0/measurements.json)
+      - The build writes the lock and proof witness prefix. The funded replay checks a valid proof and five rejection controls, including a G2 point outside the subgroup. [Measurements](versions/v0.4.0/measurements.json)
     zh-CN:
-      - 构建输出锁定脚本和见证前缀。入金回放检查有效证明及五个拒绝用例，包括不在子群内的 G2 点。[实测](versions/v0.3.0/measurements.json)
+      - 构建输出锁定脚本和见证前缀。入金回放检查有效证明及五个拒绝用例，包括不在子群内的 G2 点。[实测](versions/v0.4.0/measurements.json)

@@ -2,10 +2,57 @@ package codegen
 
 import (
 	"math/big"
+	"slices"
 	"testing"
 
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 )
+
+func TestCompactForthPlanRejectsMissingChecksAndChangedSchedules(t *testing.T) {
+	rounds := func(naf []int) []int {
+		result := slices.Clone(naf[:len(naf)-1])
+		slices.Reverse(result)
+		return result
+	}
+	formula := func(inputs int) ForthFp2Formula {
+		return ForthFp2Formula{
+			Steps:   []ForthFp2Step{{"square", []int{0}}, {"square", []int{1}}, {"square", []int{2}}},
+			Returns: []int{inputs, inputs + 1, inputs + 2},
+		}
+	}
+	plan := CompactForthPlan{
+		Stages: []string{"prime", "curve-a", "curve-c", "curve-b", "subgroup", "pairs",
+			"inverse", "miller", "fixed", "frobenius", "identity"},
+		Subgroup: rounds(computeNAF(bn254SubgroupCheckScalar)), Miller: rounds(bn254SixXPlus2NAF),
+		Double: formula(3), MixedAdd: formula(5),
+	}
+	config := Groth16Config{compactDelta: &compactLines{}, compactSubgroup: "projective-naf"}
+	if err := plan.validate(config); err != nil {
+		t.Fatalf("valid plan shape rejected: %v", err)
+	}
+	for name, mutate := range map[string]func(CompactForthPlan) CompactForthPlan{
+		"missing inverse check": func(p CompactForthPlan) CompactForthPlan {
+			p.Stages = slices.Delete(slices.Clone(p.Stages), 6, 7)
+			return p
+		},
+		"missing Miller round": func(p CompactForthPlan) CompactForthPlan {
+			p.Miller = p.Miller[1:]
+			return p
+		},
+		"missing subgroup round": func(p CompactForthPlan) CompactForthPlan {
+			p.Subgroup = p.Subgroup[1:]
+			return p
+		},
+		"invalid coordinate reference": func(p CompactForthPlan) CompactForthPlan {
+			p.Double.Returns = []int{3, 4, 6}
+			return p
+		},
+	} {
+		if err := mutate(plan).validate(config); err == nil {
+			t.Errorf("accepted %s", name)
+		}
+	}
+}
 
 func TestCompactGroth16Subgroup(t *testing.T) {
 	_, _, _, generator := bn254.Generators()

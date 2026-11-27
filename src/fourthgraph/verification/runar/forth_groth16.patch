@@ -1,0 +1,67 @@
+diff --git a/compilers/go/codegen/bn254_groth16.go b/compilers/go/codegen/bn254_groth16.go
+index 1a3a68f..6bff70c 100644
+--- a/compilers/go/codegen/bn254_groth16.go
++++ b/compilers/go/codegen/bn254_groth16.go
+@@ -1040 +1040 @@ func emitWAMillerLoop3(t *BN254Tracker) {
+-	emitWAMillerLoop(t, nil)
++	emitWAMillerLoop(t, nil, nil)
+@@ -1043 +1043 @@ func emitWAMillerLoop3(t *BN254Tracker) {
+-func emitWAMillerLoop(t *BN254Tracker, fixedDelta *compactLines) {
++func emitWAMillerLoop(t *BN254Tracker, fixedDelta *compactLines, rounds []int) {
+@@ -1048,0 +1049,3 @@ func emitWAMillerLoop(t *BN254Tracker, fixedDelta *compactLines) {
++	if rounds != nil {
++		naf = nafFromForth(rounds)
++	}
+@@ -1984 +1987 @@ func EmitGroth16VerifierWitnessAssistedWithMSM(emit func(StackOp), config Groth1
+-	emitWAMillerLoop(t, config.compactDelta)
++	emitWAMillerLoop(t, config.compactDelta, nil)
+diff --git a/compilers/go/codegen/compact_groth16.go b/compilers/go/codegen/compact_groth16.go
+index 181bef3..f264d3a 100644
+--- a/compilers/go/codegen/compact_groth16.go
++++ b/compilers/go/codegen/compact_groth16.go
+@@ -258,0 +259,13 @@ func emitCompactG2Subgroup(t *BN254Tracker, x0, x1, y0, y1 string, signed bool)
++	digits := make([]int, bn254SubgroupCheckScalar.BitLen())
++	for i := range digits {
++		digits[i] = int(bn254SubgroupCheckScalar.Bit(i))
++	}
++	if signed {
++		digits = computeNAF(bn254SubgroupCheckScalar)
++	}
++	emitCompactG2Digits(t, x0, x1, y0, y1, signed, digits, compactDouble, compactAddMixed)
++}
++
++func emitCompactG2Digits(t *BN254Tracker, x0, x1, y0, y1 string, signed bool, digits []int,
++	double func(*BN254Tracker, compactJacobian),
++	addMixed func(*BN254Tracker, compactJacobian, compactFp2, compactFp2)) {
+@@ -269,4 +281,0 @@ func emitCompactG2Subgroup(t *BN254Tracker, x0, x1, y0, y1 string, signed bool)
+-	digits := make([]int, bn254SubgroupCheckScalar.BitLen())
+-	for i := range digits {
+-		digits[i] = int(bn254SubgroupCheckScalar.Bit(i))
+-	}
+@@ -275 +283,0 @@ func emitCompactG2Subgroup(t *BN254Tracker, x0, x1, y0, y1 string, signed bool)
+-		digits = computeNAF(bn254SubgroupCheckScalar)
+@@ -282 +290 @@ func emitCompactG2Subgroup(t *BN254Tracker, x0, x1, y0, y1 string, signed bool)
+-		compactDouble(t, p)
++		double(t, p)
+@@ -285 +293 @@ func emitCompactG2Subgroup(t *BN254Tracker, x0, x1, y0, y1 string, signed bool)
+-			compactAddMixed(t, p, x, y)
++			addMixed(t, p, x, y)
+@@ -287 +295 @@ func emitCompactG2Subgroup(t *BN254Tracker, x0, x1, y0, y1 string, signed bool)
+-			compactAddMixed(t, p, x, negY)
++			addMixed(t, p, x, negY)
+diff --git a/compilers/go/compiler/groth16_wa.go b/compilers/go/compiler/groth16_wa.go
+index 261d353..67570b2 100644
+--- a/compilers/go/compiler/groth16_wa.go
++++ b/compilers/go/compiler/groth16_wa.go
+@@ -47,0 +48 @@ type Groth16WAOpts struct {
++	ForthPlan        *codegen.CompactForthPlan
+@@ -354,3 +355,6 @@ func CompileGroth16WA(vkPath string, opts Groth16WAOpts) (*Artifact, error) {
+-	codegen.EmitGroth16VerifierWitnessAssistedWithMSM(func(op codegen.StackOp) {
+-		ops = append(ops, op)
+-	}, config)
++	emit := func(op codegen.StackOp) { ops = append(ops, op) }
++	if opts.ForthPlan == nil {
++		codegen.EmitGroth16VerifierWitnessAssistedWithMSM(emit, config)
++	} else if err := codegen.EmitCompactForthVerifier(emit, config, *opts.ForthPlan); err != nil {
++		return nil, fmt.Errorf("CompileGroth16WA: %w", err)
++	}
