@@ -1,0 +1,105 @@
+{
+  "version": "0.2.0",
+  "previous": "0.1.0",
+  "fixture_sha256": "d8eee6da5ed5780fb71dc91fa08744d1644ff1db7f53974aafb48bb26c2dd10c",
+  "runar_revision": "dbcc4269f8e0895c4738cf86948b05b7d62a2010",
+  "forth_entry": "verify-bn254-proof",
+  "libraries": [
+    {
+      "name": "statement.fth",
+      "sha256": "2fd49a0fb75feeb27f855ad09d61daa839d7e5924102c4163f5c30491b126395",
+      "interface_sha256": null
+    }
+  ],
+  "node_version": 101020300,
+  "chain_gang": {
+    "version": "0.13.2",
+    "commit": "74676b9c002c452e7f21a9ed9265f4972bef03f6"
+  },
+  "activation_height": 2,
+  "transaction_version": 2,
+  "fixed_public_scalars": 5,
+  "lock_bytes_saved": 702307,
+  "same_fixture_replays": {
+    "0.1.0": {
+      "source_sha256": "bf4b302339b8c2a319d772f98b7f461ba1121502a63a6e8f63dffce11f535bf1",
+      "lock_bytes": 1524095,
+      "script_sha256": "5ac91ed37490d396daf344767aa0132360a54bb25f9c1357140fae9016d66590",
+      "witness_prefix_bytes": 31056,
+      "witness_prefix_sha256": "e4b692aaccc142ea5887ebd4e1da163e1257db4ce3c6d5c31b1a34a1d418b08f",
+      "unlock_bytes_with_owner_signature": 31128,
+      "serialized_path_bytes_with_owner_signature": 1555231,
+      "funded_path_bytes": 1555456,
+      "deployment": {
+        "txid": "589b9b8d8d0d28f68683c7cd883373598465728aa8c86dc519d6b468ff738bfd",
+        "bytes": 1524231,
+        "mempool": true,
+        "mined": true,
+        "block": "54a66c2533647336acab7e33aab212b06a8c8fc9223f47b12db8b2c4007d5c81",
+        "height": 103
+      },
+      "valid_spend": {
+        "txid": "ddc547c4b0c578b1b85986fcf5d02b3b84f0700246ba7e00ad5bcf268a4fa3bb",
+        "bytes": 31225,
+        "mempool": true,
+        "mined": true,
+        "block": "1a8f0600a5c2479bacfce9c44e214de639f27cfb4aefd0803809498fc87653d7",
+        "height": 104
+      },
+      "rejected_controls": [
+        "changed_output_with_stale_signature",
+        "negated_proof_point",
+        "valid_proof_for_another_statement",
+        "wrong_sighash"
+      ]
+    },
+    "0.2.0": {
+      "source_sha256": "6db722680478992e05303572a0b2ff3a95aff0f1670194886c1660a6c84b6579",
+      "lock_bytes": 821788,
+      "script_sha256": "ca6ea40e8a0065bd6bfd25d9273c2c05d6bbb399f43e07e3a06dcde0d75abdf6",
+      "witness_prefix_bytes": 31056,
+      "witness_prefix_sha256": "e4b692aaccc142ea5887ebd4e1da163e1257db4ce3c6d5c31b1a34a1d418b08f",
+      "unlock_bytes_with_owner_signature": 31129,
+      "serialized_path_bytes_with_owner_signature": 852925,
+      "funded_path_bytes": 853150,
+      "deployment": {
+        "txid": "2c10f61feabf0b3d3164d9aad375d672925e4cb8b35281bf8e0cbe07eded5121",
+        "bytes": 821924,
+        "mempool": true,
+        "mined": true,
+        "block": "08773f7c36a8905329b22a70a29bef7906353350ee57d31e0eec947b1e0a4247",
+        "height": 103
+      },
+      "valid_spend": {
+        "txid": "567fdfc96bda5affde8be47871cf17e59b4556d442f3ae7b5bfd7b8bc3377033",
+        "bytes": 31226,
+        "mempool": true,
+        "mined": true,
+        "block": "29f8034cf4cba6ae88b672d0f9c15d6c7e018e770977596dcf04df6a202da6da",
+        "height": 104
+      },
+      "rejected_controls": [
+        "changed_output_with_stale_signature",
+        "negated_proof_point",
+        "valid_proof_for_another_statement",
+        "wrong_sighash"
+      ]
+    }
+  },
+  "scrypt_public_testnet_example": {
+    "source": "https://docs.scrypt.io/bsv-docs/tutorials/zkp/",
+    "network": "test",
+    "curve": "BN254",
+    "lock_txid": "2396a4e52555cdc29795db281d17de423697bd5cbabbcb756cb14cea8e947235",
+    "output": 0,
+    "deployment_tx_bytes": 1515536,
+    "lock_bytes": 1515332,
+    "spend_txid": "30127e0c340878d3fb7c165e2d082267eef2c8df79b5cf750896ef565ca7651d",
+    "input": 0,
+    "spend_tx_bytes": 351,
+    "unlock_bytes": 264,
+    "path_bytes": 1515604,
+    "funded_path_bytes": 1515887,
+    "lock_sha256": "889556284a2da5c643a1e155c03b9d5c66f6f0929d07b84c2e668b3103c985cc"
+  }
+}

@@ -1,6 +1,6 @@
 <!-- Generated from manifest.yaml with Copier. -->
 
-# WOTS+ (SHA-256) v0.1.0
+# WOTS+ (SHA-256) v0.12.0
 
 [简体中文](README.zh-CN.md) · [4thGraph](../../README.md) · [Project index](../README.md) · [Versions](versions/index.json)
 
@@ -8,26 +8,24 @@
 
 **[Wallet SDK quickstart](docs/sdk.en.md#quickstart)** · [Unified wallet SDK](../../sdk/README.md#quickstart)
 
-Choose a receive template and connect a durable one-time signer. The cached-step profile supports eligible OTDA reconstruction.
+WOTS+ v0.12.0 uses the `compact-v11` template. The lock is 21,272 bytes and its OTDA reconstruction program is 732 bytes. Connect a durable one-time signer to use the payment lock. [Version artifacts](versions/v0.12.0/manifest.json)
 
-[Protocol](docs/developer.en.md) · [Algorithm and execution](#algorithm-and-execution) · [Reproduce the checks](#reproduce-the-checks) · [Complete transactions and stack measurements](#complete-transactions-and-stack-measurements)
+[Protocol](docs/developer.en.md) · [Algorithm and execution](#algorithm-and-execution) · [Reproduce the checks](#reproduce-the-checks) · [Complete transactions and stack measurements](#complete-transactions-and-stack-measurements) · [Measurements data](versions/v0.12.0/measurements.json)
 
 | Entry point | Purpose |
 | --- | --- |
-| `locking_script` | Select a canonical or cached payment lock, or build a detached verifier for tests. |
+| `locking_script` | Build a canonical, cached or Compact payment lock, or a detached verifier for tests. |
 | `sign_spend` | Request the one-time signature for a selected transaction input. |
 
 ## Use cases and trade-offs
 
-Use WOTS+ to compare SHA-256 one-time signatures when witness size matters. The raw signature is 2,144 bytes, while a Lamport signature here is 8,192 bytes. A fair transaction comparison includes both the payment locks and the unlocking scripts. WOTS+ offers a canonical lock and two cache presets. Use the published measurements to examine how the smaller cached-step lock and eligible OTDA reconstruction affect funding, turnover and exit. [Measured costs](#complete-transactions-and-stack-measurements)
+Use WOTS+ to compare SHA-256 one-time signatures when witness size matters. The raw signature is 2,144 bytes, while a Lamport signature here is 8,192 bytes. A fair transaction comparison includes both the payment locks and the unlocking scripts. [Measured costs](#compact-profile)
 
 The payment workflow requires a fresh key per UTXO, including change. Reserve that key durably before returning a signature. A wallet investigating repeated turnover should test key reservation and rebroadcast alongside script verification. [Wallet integration](docs/sdk.en.md)
 
 ## Algorithm and execution
 
 [Protocol](docs/developer.en.md#protocol) · [Security](docs/developer.en.md#security) · [Verify](#run-the-checks) · [Transaction costs](#complete-transactions-and-stack-measurements)
-
-**Status** · v0.1.0 development baseline.
 
 This experiment verifies a WOTS+ one-time signature in Bitcoin Script and binds
 it to the current BSV transaction input. It uses the RFC 8391
@@ -54,7 +52,7 @@ python -m pip install -r projects/wots-plus/reference/requirements.txt
 ```
 
 ```sh
-PYTHONPATH=src:. python projects/wots-plus/reference/generate_reconstruction.py --check
+python projects/wots-plus/reference/generate_reconstruction.py --version v0.12.0
 bash projects/wots-plus/reference/verify.sh
 ```
 
@@ -126,8 +124,9 @@ durable signer wrapper used for the synthetic keys.
 
 Use `compress_otda=True` with `sign_spend` or `sign_payment` only when
 Chronicle functional unlocking is available. Version 2 OTDA ALL and paired
-OTDA SINGLE use the [prebuilt reconstruction program](versions/v0.1.0/cached-steps-layout.json)
-to recreate cached-steps outputs. SINGLE covers only its same-index output.
+OTDA SINGLE use the [prebuilt cached-steps program](versions/v0.1.0/cached-steps-layout.json)
+or a compact program generated from the chain body. An ALL transaction may
+use all twelve dictionaries. SINGLE covers only its same-index output.
 Earlier null outputs stay in the signed prefix, and unpaired SINGLE
 uses the existing companion authorization. Mixed transactions copy
 unrecognized outputs literally. The wallet chooses the shorter encoding,
@@ -156,7 +155,7 @@ Build the [bsv-script-lean evaluator](https://github.com/Calhooon/bsv-script-lea
 and run the same synthetic spend fixtures through its complete-input API.
 
 ```sh
-python projects/wots-plus/reference/test_lean.py /path/to/bsv-script-lean/eval/bsvs
+python projects/wots-plus/reference/test_lean.py --compact-v11 /path/to/bsv-script-lean/eval/bsvs
 ```
 
 The runner checks the transaction gate and the selected input's Script verdict
@@ -164,9 +163,102 @@ for the sighash matrix and malformed witnesses. It also checks a BIP143 `ALL`
 spend at Genesis-era heights before Chronicle. This is a separate executable
 specification check alongside BSV Node and chain-gang.
 
+Run `python projects/wots-plus/reference/generate_reconstruction.py --version v0.12.0 --check` to compare the current compiler output with the archived lock and reconstruction program.
+
 ## Script sizes
 
-The complete transaction table lists lock and unlock sizes for the canonical, cached-constant, and cached-step profiles. [Validation record](docs/validation.md)
+### Compact profile
+
+`locking_script(key, cached_constants="compact")` builds a 29,217-byte
+lock, 4,739 bytes smaller than `cached-steps`. The verifier compiles a
+single [Forth chain body](reference/compact.fth) for all 67 chains. It
+uses a running chain index and a cached bit to form both key-and-mask
+addresses. The BIP143 unlocking script is 2,310 bytes.
+
+`locking_script(key, cached_constants="compact-v2")` builds a 27,070-byte
+lock. For signed digit `d`, the chain starts a stack counter at `15 - d`.
+The nested conditions consume the counter before hashing steps
+`d` through 14. Keeping the checksum below the constants also shortens
+some stack lookups. Together these changes reduce each chain from 406 to
+374 bytes.
+
+`locking_script(key, cached_constants="compact-v3")` builds a 25,965-byte
+lock. It copies the zero function prefix and chain address together, carries
+the chain index as a byte, and generates the cached padding in Script.
+The chain body is 363 bytes. The transaction binding uses a masked sighash
+range check and the compact DER builder.
+
+`locking_script(key, cached_constants="compact-v4")` builds a 23,296-byte
+lock. It keeps the selector mask next to the chain value and arranges the
+two PRF inputs with `OP_TUCK` and `OP_2SWAP`, bringing the chain body down
+to 324 bytes. The transaction binding extracts the fixed public key from
+the ordinary signature and reuses it for the unpaired OTDA SINGLE check.
+
+`locking_script(key, cached_constants="compact-v5")` builds a 22,494-byte
+lock. It keeps the function prefix and selector mask across chains and
+derives remaining step counts during digest and checksum decoding. This
+reduces the chain body to 312 bytes. The OTDA program also assembles
+repeated digit, hash and reversal instructions from cached byte strings.
+
+`locking_script(key, cached_constants="compact-v6")` builds a 21,982-byte
+lock. An alternate-stack buffer holds the unprocessed signature followed by
+the computed endpoints. Each chain consumes one element from the front
+and appends its endpoint. The verifier increments the chain index in
+the PRF base directly, shortening the chain body to 305 bytes. The
+companion binding assembles its fixed DER signature from the public key.
+
+`locking_script(key, cached_constants="compact-v7")` builds a 21,774-byte
+lock. It extracts digest nibbles with a mask and a byte shift. It
+normalizes the zero-index PRF address on the first increment. Later
+increments already return canonical byte strings, so the repeated chain
+body is 304 bytes. It also builds the fixed PRF padding and the companion
+zero hash in Script. The reconstruction program generates the countdown
+and reversal runs by doubling their instructions and trimming the excess.
+
+`locking_script(key, cached_constants="compact-v8")` builds a 21,540-byte
+lock. It keeps the signature and endpoint buffer on the main stack between
+chains and parks its tail on the alternate stack while hashing. Moving the
+address increment into the step suffix table shortens one lookup per chain.
+The repeated chain body is 301 bytes. The digest decoder uses `OP_2DUP` to
+save each nibble pair for the chain countdowns.
+
+`locking_script(key, cached_constants="compact-v9")` builds a 21,332-byte
+lock. It computes the checksum in parallel by folding complemented digest
+nibbles into 16-bit lanes and reducing the packed sum modulo 65,535.
+The countdown accepts raw nibble flags. For the last 15 digest bytes, the decoder
+splits at the remaining digest length minus one. These identical splits
+let the OTDA program reconstruct the whole run by doubling and trimming.
+
+`locking_script(key, cached_constants="compact-v10")` builds a 21,320-byte
+lock. It keeps the complemented digest in a buffer and decodes one byte
+for each pair of message chains. OTDA reconstructs the pair by inserting
+the byte decoder into one copy of the 301-byte chain body. It then
+duplicates the pair to fill the 64 message positions.
+
+`locking_script(key, cached_constants="compact-v11")` builds a 21,272-byte
+lock. It generates all 15 PRF step suffixes with one division and splits
+the result into eight-byte entries. The entries go on the stack in
+descending order. The chain loads them by their new positions. OTDA
+reconstruction also shares the opcode before each variable lookup depth.
+
+In the two-input, two-output BIP143 ALL fixture, the development evaluator
+measured a peak of 32 main stack items for `compact-v6` through `compact-v8`.
+The alternate stack peak fell from 68 to 67 items in `compact-v8`.
+`compact-v9` peaked at 32 main and 67 alternate stack items, with combined
+stack payload rising from 2,916 to 2,922 bytes. `compact-v10` and `compact-v11`
+peaked at 32 main and 6 alternate stack items, with a combined stack
+payload of 2,891 bytes.
+
+| Measured bytes | `cached-steps` | `compact` | `compact-v2` | `compact-v3` | `compact-v4` | `compact-v5` | `compact-v6` | `compact-v7` | `compact-v8` | `compact-v9` | `compact-v10` | `compact-v11` |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Version | [v0.1.0](versions/v0.1.0/manifest.json) | [v0.2.0](versions/v0.2.0/manifest.json) | [v0.3.0](versions/v0.3.0/manifest.json) | [v0.4.0](versions/v0.4.0/manifest.json) | [v0.5.0](versions/v0.5.0/manifest.json) | [v0.6.0](versions/v0.6.0/manifest.json) | [v0.7.0](versions/v0.7.0/manifest.json) | [v0.8.0](versions/v0.8.0/manifest.json) | [v0.9.0](versions/v0.9.0/manifest.json) | [v0.10.0](versions/v0.10.0/manifest.json) | [v0.11.0](versions/v0.11.0/manifest.json) | [v0.12.0](versions/v0.12.0/manifest.json) |
+| Payment lock | 33,956 | 29,217 | 27,070 | 25,965 | 23,296 | 22,494 | 21,982 | 21,774 | 21,540 | 21,332 | 21,320 | 21,272 |
+| OTDA reconstruction program | 3,097 | 2,395 | 2,358 | 1,979 | 1,884 | 1,126 | 1,076 | 957 | 952 | 910 | 795 | 732 |
+| 2×2 BIP143 ALL payment | 72,650 | 63,172 | 58,878 | 56,668 | 51,330 | 49,726 | 48,702 | 48,286 | 47,818 | 47,402 | 47,378 | 47,282 |
+| 2×2 OTDA ALL, reconstructed | 79,090 | 68,208 | 63,840 | 60,872 | 55,344 | 52,224 | 51,100 | 50,446 | 49,968 | 49,468 | 49,214 | 48,992 |
+| 2×2 paired OTDA SINGLE, reconstructed | 78,921 | 68,039 | 63,671 | 60,703 | 55,175 | 52,055 | 50,931 | 50,277 | 49,799 | 49,299 | 49,045 | 48,823 |
+
+Select the v0.12.0 lock in the wallet SDK with `template: "compact-v11"`. Each version manifest records its SDK template, Git tag and source commit. [SDK quickstart](docs/sdk.en.md#quickstart) · [Version index](versions/index.json)
 
 ## Developer and wallet integration
 

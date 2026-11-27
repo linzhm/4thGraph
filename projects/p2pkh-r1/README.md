@@ -1,6 +1,6 @@
 <!-- Generated from manifest.yaml with Copier. -->
 
-# P2PKH-R1 v0.6.0
+# P2PKH-R1 v0.8.0
 
 [简体中文](README.zh-CN.md) · [4thGraph](../../README.md) · [Project index](../README.md) · [Versions](versions/index.json)
 
@@ -10,7 +10,7 @@
 
 P2PKH-R1 lets a BSV wallet use an existing P-256 signer. The output commits to the recipient's public-key HASH160. A spend supplies the uncompressed public key and a 64-byte ECDSA signature in `r || s` format.
 
-[Protocol](docs/spec.en.md) · [Algorithm and execution](#algorithm-and-execution) · [Reproduce the checks](#reproduce-the-checks) · [Complete transactions and stack measurements](#complete-transactions-and-stack-measurements) · [Measurements data](versions/v0.6.0/measurements.json)
+[Protocol](docs/spec.en.md) · [Algorithm and execution](#algorithm-and-execution) · [Reproduce the checks](#reproduce-the-checks) · [Complete transactions and stack measurements](#complete-transactions-and-stack-measurements) · [Measurements data](versions/v0.8.0/measurements.json)
 
 | Entry point | Purpose |
 | --- | --- |
@@ -28,8 +28,8 @@ The payment lock checks the revealed public key against the owner HASH160, verif
 Run the release commands from the repository root in the compiler experiment environment. [Dependencies and replay profiles](forth/README.md)
 
 ```sh
-PYTHONPATH=src:.:projects/p2pkh-r1/reference python projects/p2pkh-r1/forth/msm_experiment.py build --candidate split-5x4-affine-g
-PYTHONPATH=src:.:projects/p2pkh-r1/reference bash tools/verify_node.sh --profile raised -- python projects/p2pkh-r1/forth/msm_experiment.py compare --workflow explicit --matrix --candidate v0.5.0 --candidate v0.6.0 --budget 2 --full-budget 2
+PYTHONPATH=src:.:projects/p2pkh-r1/reference python projects/p2pkh-r1/forth/compile_r1.py --entry r1-baseline-lock --replay-plan projects/p2pkh-r1/versions/v0.8.0/plan.json
+PYTHONPATH=src:.:projects/p2pkh-r1/reference bash tools/verify_node.sh --profile raised -- python projects/p2pkh-r1/forth/msm_experiment.py compare --workflow explicit --matrix --candidate v0.7.0 --candidate v0.8.0 --budget 2 --full-budget 2
 ```
 
 The selected compiler release and the wallet’s default template have separate manifests. Use the compiler guide for the full replay procedure and the acceptance record for the payment matrix. [Compiler experiment](forth/README.md) · [Payment acceptance](reference/acceptance.md)
@@ -50,16 +50,16 @@ R1 creates the full lock at funding so the recipient can pay in one spend. Defer
 
 ### Measured results
 
-#### v0.5.0 → v0.6.0
+#### v0.7.0 → v0.8.0
 
-**v0.6.0** freezes `split-5x4-affine-g` as the latest compiler template. It saves **357 B per lock** and **714 B per BIP143 ALL payment**. The OTDA reconstruction program grows by 148 B, and each measured OTDA payment shrinks by **418 B**. Payments use two inputs and two outputs. [Frozen artifacts and hashes](versions/v0.6.0/layout.json) · [Build and replay](forth/README.md)
+**v0.8.0** saves **148 B per lock**, **296 B per BIP143 ALL payment**, and **1,020 B per OTDA payment** in each of the two measured OTDA modes. Payment sizes count the two-input, two-output spend. [Version manifest](versions/v0.8.0/manifest.json) · [Build and replay](forth/README.md)
 
 | Version | Compiler construction | Lock | BIP143 ALL payment | OTDA ALL payment | OTDA SINGLE payment |
 | --- | --- | ---: | ---: | ---: | ---: |
-| v0.5.0 | `split-5x4` | 41,721 B | 84,212 B | 95,282 B | 95,211 B |
-| **v0.6.0** | `split-5x4-affine-g` | **41,364 B** | **83,498 B** | **94,864 B** | **94,793 B** |
+| v0.7.0 | Affine fixed table with a shorter zero guard | 41,262 B | 83,294 B | 94,632 B | 94,561 B |
+| **v0.8.0** | Compact fixed table and shared OTDA fragments | **41,114 B** | **82,998 B** | **93,612 B** | **93,541 B** |
 
-Both versions compile the same Forth call to `P256.mul2(u,G,v,Q)` with 5-bit and 4-bit windows for `G` and `Q`. In v0.6.0, the compiler proves `Z=1` for nonzero entries in the fixed-generator table, specializes 51 additions, and guards the zero index. Both versions passed funded BSV Node and independent chain-gang replay for the three payment modes above and the R1 acceptance matrix. [High-level source](forth/msm.fth) · [Version measurements](versions/v0.6.0/comparison.json) · [Acceptance matrix](reference/acceptance.md)
+The compiler stores only X and Y in the fixed-generator table, using its proof that nonzero entries have `Z=1`. The OTDA constructor reuses repeated byte strings and reconstructs the same lock byte for byte. The iteration reuses the existing Forth source. Funded BSV Node and independent chain-gang replay passed for all three modes. The selected template also passed the R1 acceptance matrix. [Forth entry](forth/r1-baseline.fth) · [Optimization plan](versions/v0.8.0/plan.json) · [Version comparison](versions/v0.8.0/comparison.json) · [Acceptance matrix](reference/acceptance.md)
 
 <details>
 <summary>Earlier version iterations</summary>
@@ -73,6 +73,8 @@ Each row shows the validated template selected that round. Payments use two inpu
 | v0.2.0 | Forth v0.3.0 | Generate the full lock from Forth and shorten 263 point doublings | 45,776 B | 92,322 B | 100,192 B |
 | Forth v0.3.0 | Forth v0.4.0 | Express point arithmetic as bounded formulas and let the compiler rewrite and schedule them | 42,536 B | 85,842 B | 93,664 B |
 | Forth v0.4.0 | v0.5.0 (`split-5x4`) | Compile the double-scalar multiplication with a 5-bit fixed table and a 4-bit public-key table to reduce loop additions | 41,721 B | 84,212 B | 95,282 B |
+| v0.5.0 | v0.6.0 | Prove `Z=1` for nonzero fixed-generator entries and specialize 51 point additions | 41,364 B | 83,498 B | 94,864 B |
+| v0.6.0 | v0.7.0 | Shorten the zero-digit guard at each fixed-generator lookup | 41,262 B | 83,294 B | 94,632 B |
 
 The main sequence selects templates by lock and BIP143 payment size. The window iteration also selected `joint-2` for OTDA, where it still gives a 91,692 B two-input, two-output payment. [Window replay results](versions/v0.6.0/comparison.json)
 

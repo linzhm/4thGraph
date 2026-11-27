@@ -1,7 +1,7 @@
 """Prepare and verify an external ML-DSA-44 signature for a BSV input."""
 
 from fips204 import verify
-from script import COMPANION_CODE, ORDINARY_CODE, locking_script
+from script import COMPANION_CODE, ORDINARY_CODE, matches_lock
 from fourthgraph.bsv.spend_authorization import DEFAULT_SIGHASH, SpendAuthorization, prepare_authorization
 from fourthgraph.bsv.transaction import Input, Transaction, amount
 
@@ -41,7 +41,7 @@ def sign_spend(tx, index, funding_raw, public_key, signer, *, sighash=DEFAULT_SI
 
 def sign_previous(tx, index, previous, public_key, signer, *, sighash=DEFAULT_SIGHASH):
     """Authorize an input with its already matched previous output."""
-    if previous.script != locking_script(public_key):
+    if not matches_lock(previous.script, public_key):
         raise ValueError("funding output does not match public key and canonical template")
     auth = authorization(tx, index, previous.value, sighash)
     signature = signer(auth.checked_digest())

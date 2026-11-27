@@ -82,6 +82,12 @@ done
 
 [BIP143 ALL](plans/bip143-all.json) · [OTDA ALL](plans/otda-all.json) · [OTDA SINGLE](plans/otda-single.json)
 
+v0.8.0 的版本计划在紧凑生成元表的基础上使用 `share-otda-fragments`。这条规则
+在构造器里试着复用多次出现的字节串，只采用更短的编码。链接器执行构造器并逐字节
+比对两段固定锁字节，再与计划记录的产物摘要比对。版本清单给出了该计划的构建命令及
+和上一轮的双引擎复放命令。 [版本清单](../versions/v0.8.0/manifest.json) ·
+[实测对照](../versions/v0.8.0/comparison.json)
+
 回放时使用各计划记录的 `compiler_sha256` 校验编译器源码。同一工具链版本号下，源码变化也会产生新的指纹。更新指纹前，按原计划重建锁和构造器并核对已记录的产物哈希。初版固定计划及早期矩阵数据可以从原始提交复跑。[初版方案与编译器](https://github.com/linzhm/4thGraph/tree/9b13dfbbd50487ca868831788f653e2b75f9cd5a)
 
 花费测试使用固定版 chain-gang，覆盖 BIP143 ALL、OTDA ALL、配对和无配对的

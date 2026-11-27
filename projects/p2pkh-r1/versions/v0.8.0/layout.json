@@ -1,0 +1,97 @@
+{
+  "template_version": "0.8.0",
+  "script_file": "template.hex",
+  "script_bytes": 41114,
+  "script_sha256": "71ad4d2bb0a2b0e059094ec18b3aa9f866d47df08fa76b7ceb720b322171642a",
+  "owner_hash160": {
+    "offset": 208,
+    "length": 20
+  },
+  "fixed_bytes_sha256": "af4e3e64bb0cb493bd2ef36870f21aad1d4267f61a5b4f806790e9d188148d98",
+  "supported_sighash_types": [
+    "41",
+    "42",
+    "43",
+    "61",
+    "62",
+    "63",
+    "c1",
+    "c2",
+    "c3",
+    "e1",
+    "e2",
+    "e3"
+  ],
+  "ordinary_script_code_hex": "68ac",
+  "compressed_preimage": {
+    "spend_transaction_version": 2,
+    "sighash_types": [
+      "61",
+      "63",
+      "e1",
+      "e3"
+    ],
+    "program_file": "otda-reconstruct.hex",
+    "program_bytes": 5282,
+    "program_sha256": "d14d7eca5109df33ad8e5102b2a4537278fc493333978c7c1efe10d3b6b87a0b"
+  },
+  "construction": "split-5x4-affine-g-ifdup-compact",
+  "build_source": {
+    "source_sha256": "877f30ef15d05758d30aefc0d2666dc338d118d802492e795cb0400b44f3a3c6",
+    "dependencies": {
+      "r1.fth": "c79cf9ba9a20d9a9c01274ae6676e2ae51b0de2de365266ebe3467c706ba13e3",
+      "std/bsv": "92f4510c9d3e8e0371d9b41d08f9f7e639324c9795e6d0a1c3f9779e9179b404"
+    },
+    "window_backend": {
+      "source_sha256": "08df84282d5624ff8a010a9a24631a974322d75c72b3634ff6c6306c2d6451d5",
+      "dependencies": {
+        "r1.fth": "c79cf9ba9a20d9a9c01274ae6676e2ae51b0de2de365266ebe3467c706ba13e3",
+        "std/bsv": "92f4510c9d3e8e0371d9b41d08f9f7e639324c9795e6d0a1c3f9779e9179b404"
+      }
+    }
+  },
+  "estimated": {
+    "window_sections_bytes": {
+      "table_setup": 3571,
+      "digit_extraction": 902,
+      "window_loop": 34247
+    },
+    "window_bytes": 38720,
+    "static_window_mul_opcodes": 5407,
+    "affine_g": {
+      "calls": 51,
+      "generic_kernel_bytes": 123,
+      "affine_kernel_bytes": 113,
+      "kernel_bytes_saved": 510,
+      "lookup_bytes_saved": 153,
+      "guard_bytes_added": 153,
+      "multiplications_removed_on_nonzero_path": 153,
+      "formula": {
+        "selected": "rewrite-and-schedule",
+        "candidates": {
+          "baseline": 393,
+          "schedule": 148,
+          "rewrite-and-schedule": 113
+        },
+        "rewrites": {
+          "multiply-by-one": 3,
+          "expand-cross-products": 3,
+          "fuse-cached-divisor-load": 3
+        },
+        "max_magnitude_bits": 1280
+      }
+    },
+    "lock_bytes": 41114,
+    "otda_program_bytes": 5282,
+    "payment_bytes": {
+      "bip143-all": 82998,
+      "otda-all": 93612,
+      "otda-single": 93541
+    },
+    "payment_peak_stack_payload_bytes": {
+      "bip143-all": 4328,
+      "otda-all": 164856,
+      "otda-single": 82628
+    }
+  }
+}

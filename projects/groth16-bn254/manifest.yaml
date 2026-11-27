@@ -9,8 +9,8 @@ summary:
 entry_points:
   - name: verify-bn254-proof
     description:
-      en: Construct the authorization and bind the five public inputs before emitting the Rúnar verifier predicate.
-      zh-CN: 先构造授权并绑定五个公开输入，再生成 Rúnar 验证谓词。
+      en: Construct the authorization and fold the five deployment-selected public inputs into the MSM before emitting the Rúnar predicate.
+      zh-CN: 构造授权，把部署时选定的五个公开输入折叠进 MSM，再生成 Rúnar 验证谓词。
 setup:
   en:
     - Run from the repository root with Python 3.11 or later, Go 1.26.6, and the pinned Rúnar checkout at `workspace/runar`. Funded replay also needs the Chronicle chain-gang binding and BSV Node.
@@ -31,11 +31,11 @@ setup:
 sections:
   algorithm:
     en:
-      - The Forth entry composes an owner guard, the fixed statement module, and the predicate that checks the public-input MSM and pairing with a residue witness. [Forth entry](verifier.fth) · [Statement module](forth/statement.fth) · [Arithmetic and verification](docs/verification.en.md)
+      - The Forth entry combines owner authorization, the fixed statement, and the pairing predicate. Precomputing the statement MSM reduces the locking script from 1,524,095 B to 821,788 B. [Forth entry](forth/fixed-verifier.fth) · [Statement module](forth/statement.fth) · [Verification and sCrypt comparison](docs/verification.en.md)
     zh-CN:
-      - Forth 入口组合所有者授权、固定声明模块以及核验公开输入 MSM 和配对余数的谓词。[Forth 入口](verifier.fth) · [声明模块](forth/statement.fth) · [算术与验证](docs/verification.zh-CN.md)
+      - Forth 入口组合所有者授权、固定声明和配对谓词。预计算声明的 MSM 后，锁定脚本从 1,524,095 B 降到 821,788 B。[Forth 入口](forth/fixed-verifier.fth) · [声明模块](forth/statement.fth) · [验证与 sCrypt 对照](docs/verification.zh-CN.md)
   reproduction:
     en:
-      - The build uses a checked-in test-only fixture and writes the lock and witness prefix. The funded replay tests the valid statement and four rejection controls with BSV Node and chain-gang. [Measurements](versions/v0.1.0/measurements.json)
+      - The build uses a checked-in test-only fixture and writes the lock and witness prefix. The funded replay tests the valid statement and four rejection controls with BSV Node and chain-gang. [Measurements](versions/v0.2.0/measurements.json)
     zh-CN:
-      - 构建使用仓库内的测试夹具，输出验证锁和见证前缀。入金回放在 BSV Node 和 chain-gang 上检查有效声明及四个拒绝用例。[实测](versions/v0.1.0/measurements.json)
+      - 构建使用仓库内的测试夹具，输出验证锁和见证前缀。入金回放在 BSV Node 和 chain-gang 上检查有效声明及四个拒绝用例。[实测](versions/v0.2.0/measurements.json)

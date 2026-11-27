@@ -2,7 +2,7 @@
 
 [简体中文](sdk.zh-CN.md) · [Developer guide](developer.en.md#sdk) · [Wallet quickstart](../../../sdk/README.md)
 
-Select `canonical` (default), `cached-constants`, or `cached-steps`. Supply the expected 64-byte public key to recognize a receive script. The signer receives a 32-byte digest and returns a 2,144-byte signature. Persist one-time key consumption before releasing the signature, use a fresh key for change, and keep the signed transaction for retries. With Chronicle active, `compressOtda: true` enables eligible compact unlocks in version-2 transactions.
+Select `canonical` (default), `cached-constants`, `cached-steps`, `compact`, `compact-v2`, `compact-v3`, `compact-v4`, `compact-v5`, `compact-v6`, `compact-v7`, `compact-v8`, `compact-v9`, `compact-v10`, or `compact-v11`. Supply the expected 64-byte public key to recognize a receive script. The signer receives a 32-byte digest and returns a 2,144-byte signature. Persist one-time key consumption before releasing the signature, use a fresh key for change, and keep the signed transaction for retries. With Chronicle active, `compressOtda: true` enables eligible reconstructed unlocks in version-2 transactions.
 
 <a name="quickstart"></a>
 
@@ -21,7 +21,7 @@ Use authenticated transaction data. Set `config.python` to the absolute path of 
 ```ts
 import { WalletClient } from "./sdk/typescript/index.ts";
 
-const wallet = new WalletClient("wots-plus", { ...config, template: "cached-steps" });
+const wallet = new WalletClient("wots-plus", { ...config, template: "compact-v11" });
 const receiveScript = wallet.createLock({ publicKey: receiveKeyHex });
 const prevout = wallet.prevoutFromFunding(fundingTxHex, fundingVout);
 const recognized = wallet.recognize({ script: prevout.script, publicKey: spendKeyHex });
@@ -39,7 +39,7 @@ Use `signInput` for a prepared transaction. Supply the transaction, its input in
 
 ## Choose a receive template and rehearse a retry
 
-Use `canonical` as a control, then compare `cached-constants` and `cached-steps` with your expected input and output counts. For a version-2 Chronicle transaction that creates eligible cached-step outputs, set `compressOtda: true` to test reconstruction. Retain the canonical 64-byte public key for each output. [Template measurements](../README.md#complete-transactions-and-stack-measurements)
+For a version-2 Chronicle transaction that creates eligible compact or `cached-steps` outputs, set `compressOtda: true` to test reconstruction. Retain the canonical 64-byte public key for each output. [Template measurements](../README.md#compact-profile)
 
 Use a durable signer and a fresh key for each output. For a broadcaster retry, replay the stored transaction bytes. A different transaction needs a fresh authorization, so check key consumption before requesting it. Test that a second signing request for the same key is blocked across process restarts. [Durable signer reference](../../../src/fourthgraph/bsv/one_time_signer.py)
 

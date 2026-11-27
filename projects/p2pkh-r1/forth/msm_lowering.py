@@ -1,5 +1,6 @@
 """Preserve P-256 mul2 tables and bounded windows until Script lowering."""
 
+from collections import Counter
 from dataclasses import dataclass
 from functools import cache
 from math import lcm
@@ -346,9 +347,13 @@ def repeat_stack(count):
     return asm("OP_DUP") + b"".join(double + (add_unit if bit == "1" else b"") for bit in bits) + asm("OP_NIP")
 
 
+def fragment_pattern(entries):
+    return b"|".join(re.escape(entry) for entry in sorted(entries, key=len, reverse=True))
+
+
 def reconstruction(prefix, before, pieces, after, kernels, *,
-                   prefix_repeat=False, stack_repeat=False, adjacent_kernels=False):
-    matches = re.compile(b"|".join(re.escape(kernel) for kernel in sorted(kernels, key=len, reverse=True)))
+                   prefix_repeat=False, stack_repeat=False, adjacent_kernels=False, shared_fragments=()):
+    entries = (*kernels, *shared_fragments)
 
     suffix_size = 0
     if prefix_repeat:
@@ -364,27 +369,27 @@ def reconstruction(prefix, before, pieces, after, kernels, *,
             options.append(repeat_stack(count))
         return min(options, key=len)
 
-    def append(raw, staged):
+    def append(raw, above, values, matches):
         runs = []
         for match in matches.finditer(raw):
             start, end = match.span()
-            kernel = match.group()
-            if adjacent_kernels and runs and runs[-1][1] == start and runs[-1][2] == kernel:
+            fragment = match.group()
+            if adjacent_kernels and runs and runs[-1][1] == start and runs[-1][2] == fragment:
                 previous, _, _, count = runs[-1]
-                runs[-1] = (previous, end, kernel, count + 1)
+                runs[-1] = (previous, end, fragment, count + 1)
             else:
-                runs.append((start, end, kernel, 1))
+                runs.append((start, end, fragment, 1))
 
         encoded = bytearray()
         position = 0
-        for start, end, kernel, count in runs:
+        for start, end, fragment, count in runs:
             if position < start:
                 encoded.extend(push(raw[position:start]) + CAT)
-            depth = len(kernels) + 1 + staged - kernels.index(kernel)
+            depth = len(values) - 1 - values.index(fragment) + above
             copy = pick(depth)
             separate = (copy + CAT) * count
             if count > 1:
-                together = copy + repeat_code(count, len(kernel)) + CAT
+                together = copy + repeat_code(count, len(fragment)) + CAT
                 separate = min(separate, together, key=len)
             encoded.extend(separate)
             position = end
@@ -392,20 +397,61 @@ def reconstruction(prefix, before, pieces, after, kernels, *,
             encoded.extend(push(raw[position:]) + CAT)
         return min(push(raw) + CAT, bytes(encoded), key=len)
 
-    code = bytearray(b"".join(push(kernel) for kernel in kernels) + push(prefix) + asm("0"))
-    code.extend(append(before, 0))
+    code = bytearray(b"".join(push(kernel) for kernel in kernels))
+    for index, raw in enumerate(shared_fragments, start=len(kernels)):
+        values = entries[:index]
+        code.extend(min(push(raw), asm("0") + append(raw, 1, values, re.compile(fragment_pattern(values))), key=len))
+    code.extend(push(prefix) + asm("0"))
+    matches = re.compile(fragment_pattern(entries))
+    # The prefix and suffix accumulator sit above the shared entries.
+    code.extend(append(before, 2, entries, matches))
     for raw, count in pieces:
         literal = push(raw)
-        compact = asm("0") + append(raw, 1)
+        compact = asm("0") + append(raw, 3, entries, matches)
         assembled = min(literal, compact, key=len)
-        code.extend(min(append(raw * count, 0), assembled + repeat_code(count, len(raw)) + CAT, key=len))
-    code.extend(append(after, 0))
-    if len(kernels) == 2:
+        code.extend(min(append(raw * count, 2, entries, matches),
+                        assembled + repeat_code(count, len(raw)) + CAT, key=len))
+    code.extend(append(after, 2, entries, matches))
+    if len(entries) == 2:
         code.extend(asm("OP_2SWAP OP_2DROP"))
     else:
-        code.extend(asm("OP_TOALTSTACK OP_TOALTSTACK") + asm("OP_2DROP") * (len(kernels) // 2)
-                    + asm("OP_DROP") * (len(kernels) % 2) + asm("OP_FROMALTSTACK OP_FROMALTSTACK"))
+        code.extend(asm("OP_TOALTSTACK OP_TOALTSTACK") + asm("OP_2DROP") * (len(entries) // 2)
+                    + asm("OP_DROP") * (len(entries) % 2) + asm("OP_FROMALTSTACK OP_FROMALTSTACK"))
     return bytes(code)
+
+
+def share_reconstruction_fragments(prefix, before, pieces, after, kernels, **options):
+    """Try a small dictionary of repeated byte strings in the OTDA constructor."""
+    pieces = tuple(pieces)
+    parts = (before, *(raw for raw, _ in pieces), after)
+    args = (prefix, before, pieces, after, kernels)
+    best = reconstruction(*args, **options)
+    shared = ()
+    for _ in range(4):
+        entries = (*kernels, *shared)
+        matches = re.compile(b"(" + fragment_pattern(entries) + b")")
+        counts = Counter()
+        for raw in parts:
+            segments = list(filter(None, matches.split(raw)))
+            for start in range(len(segments)):
+                for end in range(start + 1, min(len(segments), start + 12) + 1):
+                    fragment = b"".join(segments[start:end])
+                    if len(fragment) > 768:
+                        break
+                    if len(fragment) >= 4:
+                        counts[fragment] += 1
+        candidates = (raw for raw, count in counts.items() if count > 1 and raw not in entries)
+        ranked = sorted(candidates, key=lambda raw: (-(counts[raw] - 1) * (len(raw) - 3), len(raw), raw))
+        trials = (
+            (raw, reconstruction(*args, **options, shared_fragments=(*shared, raw)))
+            for raw in ranked[:32]
+        )
+        choice = min(trials, key=lambda row: len(row[1]), default=None)
+        if choice is None or len(choice[1]) >= len(best):
+            break
+        fragment, best = choice
+        shared += (fragment,)
+    return best
 
 
 def opcode_count(script, name):
