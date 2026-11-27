@@ -7,6 +7,8 @@ from heapq import nsmallest
 from fourthgraph.bsv.script import asm, number
 
 COMMUTATIVE = frozenset(map(asm, ("OP_ADD", "OP_MUL", "OP_MIN", "OP_MAX", "OP_NUMEQUAL", "OP_EQUAL")))
+NUMERIC_BOOLEANS = frozenset(map(asm, ("OP_BOOLAND", "OP_BOOLOR")))
+NONZERO = asm("OP_0NOTEQUAL")
 VERIFY = asm("OP_VERIFY")
 REMAINDER = asm("OP_MOD")
 SINGLE_BYTE_NUMBERS = frozenset(number(value) for value in range(-1, 17))
@@ -52,18 +54,30 @@ class PacketSlice:
 class Graph:
     """Inputs are ordered from bottom to top. Each operation returns one value."""
 
-    def __init__(self, input_count, *, share=True):
+    def __init__(self, input_count, *, share=True, compact_booleans=False):
         self.inputs = tuple(Value(i) for i in range(input_count))
         self._first_slot = input_count
         self.definitions = {}
         self.common = {}
         self.packet_reads = {}
         self.share = share
+        self.compact_booleans = compact_booleans
+        self.commutative = COMMUTATIVE | NUMERIC_BOOLEANS if compact_booleans else COMMUTATIVE
+
+    def _numeric_operand(self, value):
+        origin = self.definitions.get(value)
+        if origin is not None and origin.script == NONZERO and len(origin.args) == 1:
+            return origin.args[0]
+        return value
 
     def define(self, script, args=(), *, kind=None):
         if not script and len(args) == 1:
             # A representation-preserving conversion leaves the same stack slot.
             return args[0]
+        if self.compact_booleans and script in NUMERIC_BOOLEANS:
+            # Both operations read Script numbers and already normalize their
+            # result. Preserve any separate uses of the canonical flag.
+            args = tuple(map(self._numeric_operand, args))
         node = Definition(script, tuple(args))
         key = kind, node
         if self.share and key in self.common:
@@ -109,7 +123,7 @@ class Graph:
         """
         candidates = []
         for alternative in alternatives:
-            trial = Graph(0, share=self.share)
+            trial = Graph(0, share=self.share, compact_booleans=self.compact_booleans)
             trial._first_slot = self._first_slot + len(self.definitions)
             trial.common = ChainMap({}, self.common)
             outputs = tuple(lower(alternative, trial))
@@ -130,7 +144,8 @@ class Graph:
                 needed.update(node.args)
                 steps.append((node.script, node.args, (value,)))
         inputs = sorted(needed.difference(self.definitions), key=lambda value: value.slot)
-        return constants + len(emit_steps(inputs, list(reversed(steps)), returns, compact=True))
+        return constants + len(emit_steps(inputs, list(reversed(steps)), returns, compact=True,
+                                          commutative=self.commutative))
 
     def live_definitions(self, returns):
         needed = set(returns)
@@ -159,13 +174,13 @@ class Graph:
                 steps.append((VERIFY, (value,), ()))
         if compact and self.packet_reads:
             steps = self._stream_packet_reads(steps)
-        source = emit_steps(self.inputs, steps, (), compact=compact)
+        source = emit_steps(self.inputs, steps, (), compact=compact, commutative=self.commutative)
         if not reorder:
             return source
         steps = list(self._assertion_dependencies(checks))
         if compact and self.packet_reads:
             steps = self._stream_packet_reads(steps)
-        dependencies = emit_steps(self.inputs, steps, (), compact=compact)
+        dependencies = emit_steps(self.inputs, steps, (), compact=compact, commutative=self.commutative)
         return min(source, dependencies, key=len)
 
     def _stream_packet_reads(self, steps):
@@ -223,7 +238,7 @@ class Graph:
     def _emit_order(self, ordered, returns, *, last_use, compact, trace=None):
         uses = Counter(returns)
         uses.update(arg for _, node in ordered for arg in node.args)
-        stack = Layout(self.inputs, uses)
+        stack = Layout(self.inputs, uses, commutative=self.commutative)
         if trace is not None:
             trace.update(order="source", last_use=last_use, compact=compact,
                          inputs=[value.slot for value in self.inputs], returns=[value.slot for value in returns],
@@ -259,14 +274,14 @@ class Graph:
                       for value, node in definitions]
         uses = Counter(returns)
         uses.update(arg for _, node in definitions for arg in node.args)
-        beam = [(0, Layout(self.inputs, uses), ())]
+        beam = [(0, Layout(self.inputs, uses, commutative=self.commutative), ())]
         for _ in operations:
             candidates = {}
             for done, stack, path in beam:
                 for flag, dependencies, value, node in operations:
                     if done & flag or dependencies & ~done:
                         continue
-                    candidate = Layout(stack.slots, stack.uses.copy())
+                    candidate = Layout(stack.slots, stack.uses.copy(), commutative=self.commutative)
                     candidate.execute(node.script, node.args, (value,), last_use=True, compact=True)
                     candidate.code = stack.code + candidate.code
                     state = done | flag, tuple(candidate.slots)
@@ -328,7 +343,8 @@ def fuse_verifications(steps, uses):
     return fused
 
 
-def emit_steps(inputs, steps, returns, *, last_use=True, compact=False, trim_suffix=False, group_operands=False):
+def emit_steps(inputs, steps, returns, *, last_use=True, compact=False, trim_suffix=False, group_operands=False,
+               commutative=COMMUTATIVE):
     """Schedule already ordered operations with any number of results."""
     uses = Counter(returns)
     uses.update(arg for _, args, _ in steps for arg in args)
@@ -339,7 +355,7 @@ def emit_steps(inputs, steps, returns, *, last_use=True, compact=False, trim_suf
         literals = {results[0]: script for script, args, results in steps
                     if not args and len(results) == 1 and script in SINGLE_BYTE_NUMBERS
                     and results[0] not in returned}
-    stack = Layout(inputs, uses, literals=literals)
+    stack = Layout(inputs, uses, literals=literals, commutative=commutative)
     for script, args, results in fuse_verifications(steps, uses):
         if not args and len(results) == 1 and results[0] in literals:
             continue
@@ -348,10 +364,11 @@ def emit_steps(inputs, steps, returns, *, last_use=True, compact=False, trim_suf
 
 
 class Layout:
-    def __init__(self, inputs, uses, *, literals=None):
+    def __init__(self, inputs, uses, *, literals=None, commutative=COMMUTATIVE):
         self.slots = list(inputs)
         self.uses = uses
         self.literals = literals
+        self.commutative = commutative
         self.code = bytearray()
 
     def execute(self, script, args, results, *, last_use, compact, trace=None, group_operands=False):
@@ -362,7 +379,7 @@ class Layout:
             preserved = {slot: self.uses[slot] - count for slot, count in Counter(args).items() if slot in results}
             self.uses.subtract(preserved)
         if compact and last_use and args and (group_operands or len(args) <= 2):
-            self.arrange(args, commutative=script in COMMUTATIVE, group_operands=group_operands)
+            self.arrange(args, commutative=script in self.commutative, group_operands=group_operands)
         else:
             for staged, operand in enumerate(args):
                 self.access(operand, staged, last_use=last_use)
