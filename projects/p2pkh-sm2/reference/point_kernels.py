@@ -9,6 +9,7 @@ from fourthgraph.compiler.script_builder import ScriptBuilder
 SOURCE = Path(__file__).with_name("point-formulas.fth")
 KERNEL_NAMES = ("sm2-add-kernel", "sm2-double-kernel")
 WINDOW_KERNEL_NAME = "sm2-double-window-kernel"
+AFFINE_KERNEL_NAME = "sm2-add-affine-kernel"
 
 
 def compile_kernels(names=KERNEL_NAMES):
@@ -24,8 +25,14 @@ def load_kernels(path, names=KERNEL_NAMES):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("output", type=Path, help="destination for the hexadecimal kernels in JSON")
-    parser.add_argument("--window", action="store_true", help="generate the five-doubling window kernel")
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument("--window", action="store_true", help="generate the five-doubling window kernel")
+    group.add_argument("--affine", action="store_true", help="generate the fixed-generator addition kernel")
     args = parser.parse_args()
-    names = (WINDOW_KERNEL_NAME,) if args.window else KERNEL_NAMES
+    names = KERNEL_NAMES
+    if args.window:
+        names = (WINDOW_KERNEL_NAME,)
+    elif args.affine:
+        names = (AFFINE_KERNEL_NAME,)
     encoded = {name: raw.hex() for name, raw in compile_kernels(names).items()}
     args.output.write_text(json.dumps(encoded, indent=2) + "\n", encoding="utf-8")

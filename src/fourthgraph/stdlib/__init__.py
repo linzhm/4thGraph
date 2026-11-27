@@ -198,6 +198,7 @@ LIBRARIES = {
         ("compiled-points?", "Select the supplied compiled point kernels"),
         ("signed-windows?", "Select signed five-bit scalar windows"),
         ("window-doubling?", "Select the supplied five-doubling window kernel"),
+        ("affine-generator?", "Select the supplied affine generator kernel and compact byte reversal"),
     )),
     "std/wallet/lamport-ots": wallet_library("lamport-ots", ("lamport-full-key", "lamport-committed-key"), parameters=(
         ("key", "Lamport public-key commitment or full-key verifier fragment"),

@@ -87,13 +87,20 @@ PYTHONPATH=src:. python projects/p2pkh-sm2/reference/point_kernels.py --window /
 cmp /tmp/sm2-window-kernel.json projects/p2pkh-sm2/versions/v1.9.0/window-kernel.json
 ```
 
+Template `9` uses an affine kernel for the fixed generator.
+
+```sh
+PYTHONPATH=src:. python projects/p2pkh-sm2/reference/point_kernels.py --affine /tmp/sm2-affine-kernel.json
+cmp /tmp/sm2-affine-kernel.json projects/p2pkh-sm2/versions/v1.10.0/affine-kernel.json
+```
+
 [Point formulas](point-formulas.fth) · [Kernel compiler](point_kernels.py)
 
 <a name="otda-constructor"></a>
 
 ## Reproduce the OTDA constructor
 
-The wallet loads the frozen program and checks its byte length and SHA-256 against the layout manifest. The offline generator starts with point arithmetic blocks and discovers reusable spans in the template. Templates `1` through `5` also seed named SM3 ranges. For templates `2` through `8` it evaluates which copied fragments are worth caching, tries a dictionary ordered by reuse frequency and selects the smallest serialized encoding. Rebuild the programs from the repository root and compare them with the checked-in files.
+The wallet loads the frozen program and checks its byte length and SHA-256 against the layout manifest. The offline generator starts with point arithmetic blocks and discovers reusable spans in the template. Templates `1` through `5` also seed named SM3 ranges. For templates `2` through `9` it evaluates which copied fragments are worth caching, tries a dictionary ordered by reuse frequency and selects the smallest serialized encoding. Rebuild the programs from the repository root and compare them with the checked-in files.
 
 ```sh
 python projects/p2pkh-sm2/reference/generate_otda_constructor.py /tmp/sm2-otda.hex
@@ -112,6 +119,8 @@ python projects/p2pkh-sm2/reference/generate_otda_constructor.py --version 7 /tm
 cmp /tmp/sm2-otda-v7.hex projects/p2pkh-sm2/versions/v1.7.0/otda-constructor.hex
 python projects/p2pkh-sm2/reference/generate_otda_constructor.py --version 8 /tmp/sm2-otda-v8.hex
 cmp /tmp/sm2-otda-v8.hex projects/p2pkh-sm2/versions/v1.9.0/otda-constructor.hex
+python projects/p2pkh-sm2/reference/generate_otda_constructor.py --version 9 /tmp/sm2-otda-v9.hex
+cmp /tmp/sm2-otda-v9.hex projects/p2pkh-sm2/versions/v1.10.0/otda-constructor.hex
 ```
 
 The constructor tests compare exact preimage, public key, and signature stack values, then verify complete spends against BSV Node and chain-gang. [Layout and fingerprint](../versions/v1.1.0/layout.json) · [Wallet integration](../docs/sdk.en.md)
@@ -137,11 +146,26 @@ Run the matrix from the repository root with the pinned SM2 Python environment. 
 
 ```sh
 bash tools/verify_node.sh -- python projects/p2pkh-sm2/reference/test_otda_matrix.py \
-  --template 8 --report /tmp/sm2-latest-template-coverage.json
-cmp /tmp/sm2-latest-template-coverage.json projects/p2pkh-sm2/versions/v1.9.0/latest-template-coverage.json
+  --template 9 --report /tmp/sm2-latest-template-coverage.json
+cmp /tmp/sm2-latest-template-coverage.json projects/p2pkh-sm2/versions/v1.10.0/latest-template-coverage.json
 ```
 
-Run the same command with `--template 7` to reproduce the baseline report. Each run uses one SM2 template for all SM2 prevouts and all recognized SM2 destinations. [Template 8 coverage](../versions/v1.9.0/latest-template-coverage.json) · [Template 7 coverage](../versions/v1.8.0/latest-template-coverage.json)
+Run the same command with `--template 8` or `--template 7` to reproduce the earlier reports. Each run uses one SM2 template for all SM2 prevouts and all recognized SM2 destinations. [Template 9 coverage](../versions/v1.10.0/latest-template-coverage.json) · [Template 8 coverage](../versions/v1.9.0/latest-template-coverage.json) · [Template 7 coverage](../versions/v1.8.0/latest-template-coverage.json)
+
+<a name="p2pkh-sponsorship"></a>
+
+## Reproduce funded P2PKH sponsorship
+
+Run each policy profile on a fresh isolated regtest node. Both reports record mempool admission and block inclusion. The raised profile also verifies each complete Script through BSV Node and chain-gang.
+
+```sh
+bash tools/verify_node.sh --profile default -- python projects/p2pkh-sm2/reference/verify_fee_sponsorship.py \
+  --template 9 --report /tmp/sm2-p2pkh-default.json
+bash tools/verify_node.sh --profile raised -- python projects/p2pkh-sm2/reference/verify_fee_sponsorship.py \
+  --template 9 --report /tmp/sm2-p2pkh-raised.json
+```
+
+Funding transaction IDs and signatures depend on the generated regtest blocks. Compare the outcomes and sizes.
 
 ## SignedData payment interop
 

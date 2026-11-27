@@ -6,7 +6,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "src"))
 from fourthgraph.bsv.script import push
 from fourthgraph.compiler.script_builder import ScriptBuilder, build_word
 from fourthgraph.stdlib import LIBRARIES, read_library
-from point_kernels import KERNEL_NAMES, WINDOW_KERNEL_NAME, load_kernels
+from point_kernels import AFFINE_KERNEL_NAME, KERNEL_NAMES, WINDOW_KERNEL_NAME, load_kernels
 from sm2 import A,B,G,USER_ID,be32
 from sm3_script import IV,compile_hash,compress,hash_script
 
@@ -19,6 +19,7 @@ COMPILED_POINT_TEMPLATE_VERSION = 5
 SPLIT_ROTATION_TEMPLATE_VERSION = 6
 SIGNED_WINDOW_TEMPLATE_VERSION = 7
 WINDOW_DOUBLING_TEMPLATE_VERSION = 8
+AFFINE_GENERATOR_TEMPLATE_VERSION = 9
 TEMPLATE_PROFILES = {
     TEMPLATE_VERSION: "v1.0.0",
     SCHEDULED_TEMPLATE_VERSION: "v1.2.0",
@@ -28,12 +29,14 @@ TEMPLATE_PROFILES = {
     SPLIT_ROTATION_TEMPLATE_VERSION: "v1.6.0",
     SIGNED_WINDOW_TEMPLATE_VERSION: "v1.7.0",
     WINDOW_DOUBLING_TEMPLATE_VERSION: "v1.9.0",
+    AFFINE_GENERATOR_TEMPLATE_VERSION: "v1.10.0",
 }
 TEMPLATE_VERSIONS = tuple(TEMPLATE_PROFILES)
 FORTH_LIBRARY = "std/wallet/p2pkh-sm2"
 VERSION_DIRECTORY = Path(__file__).resolve().parents[1] / "versions"
 POINT_KERNEL_FILE = VERSION_DIRECTORY / "v1.5.0/point-kernels.json"
 WINDOW_KERNEL_FILE = VERSION_DIRECTORY / "v1.9.0/window-kernel.json"
+AFFINE_KERNEL_FILE = VERSION_DIRECTORY / "v1.10.0/affine-kernel.json"
 
 
 def assemble(owner, version=TEMPLATE_VERSION):
@@ -46,12 +49,14 @@ def forth_compiler(owner, version=TEMPLATE_VERSION):
     blocks = sm3_blocks(version=version)
     compiled_points = version >= COMPILED_POINT_TEMPLATE_VERSION
     window_doubling = version >= WINDOW_DOUBLING_TEMPLATE_VERSION
+    affine_generator = version >= AFFINE_GENERATOR_TEMPLATE_VERSION
     vocabulary = {
         "owner-hash": build_word("", "bytes", lambda: owner),
         "signed-residues?": build_word("", "cell", lambda: -int(version >= SIGNED_RESIDUE_TEMPLATE_VERSION)),
         "compiled-points?": build_word("", "cell", lambda: -int(compiled_points)),
         "signed-windows?": build_word("", "cell", lambda: -int(version >= SIGNED_WINDOW_TEMPLATE_VERSION)),
         "window-doubling?": build_word("", "cell", lambda: -int(window_doubling)),
+        "affine-generator?": build_word("", "cell", lambda: -int(affine_generator)),
     }
     for name, code in blocks.items():
         vocabulary[name.lower().replace("_", "-")] = build_word("", "script", lambda code=code: code)
@@ -60,6 +65,10 @@ def forth_compiler(owner, version=TEMPLATE_VERSION):
         kernels.update(load_kernels(WINDOW_KERNEL_FILE, (WINDOW_KERNEL_NAME,)))
     else:
         kernels[WINDOW_KERNEL_NAME] = b""
+    if affine_generator:
+        kernels.update(load_kernels(AFFINE_KERNEL_FILE, (AFFINE_KERNEL_NAME,)))
+    else:
+        kernels[AFFINE_KERNEL_NAME] = b""
     for name, code in kernels.items():
         vocabulary[name] = build_word("", "script", lambda code=code: code)
     return ScriptBuilder(read_library(FORTH_LIBRARY).decode("utf-8"),

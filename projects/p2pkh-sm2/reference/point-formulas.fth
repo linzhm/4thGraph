@@ -77,3 +77,24 @@ formula: sm2-double-with-prime ( field-prime coordinate coordinate coordinate --
         op-3 op-roll op-drop
     op-endif
 ;
+
+( The fixed generator table supplies the second point in affine form. )
+formula: sm2-add-affine-kernel ( coordinate coordinate coordinate coordinate coordinate -- coordinate coordinate coordinate )
+    {: x1 y1 z1 x2 y2 :}
+    x1 x2 int* let xx
+    y1 y2 int* let yy
+    x1 y2 int* y1 x2 int* int+ let xy
+    x1 z1 x2 int* int+ let xz
+    y1 z1 y2 int* int+ let yz
+
+    -3 xz int* int-from-bottom 1 three-b z1 int* int+ let h
+    yy h int- let minus
+    yy h int+ let plus
+    -3 z1 int* let azz
+    3 xx int* azz int+ let t
+    int-from-bottom 1 three-b xz int* 3 xx azz int- int* int- let k
+
+    xy minus int* yz k int* int- int-from-bottom 0 field-prime int-rem
+    minus plus int* t k int* int+ int-from-bottom 0 field-prime int-rem
+    yz plus int* xy t int* int+ int-from-bottom 0 field-prime int-rem
+;

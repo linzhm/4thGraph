@@ -13,8 +13,9 @@ import unittest
 from assemble import PACKED_SM3_TEMPLATE_VERSION, SIGNED_RESIDUE_TEMPLATE_VERSION, SIGNED_WINDOW_TEMPLATE_VERSION
 from assemble import POINT_KERNEL_FILE, TEMPLATE_VERSION, TEMPLATE_VERSIONS
 from assemble import WINDOW_DOUBLING_TEMPLATE_VERSION, WINDOW_KERNEL_FILE
+from assemble import AFFINE_GENERATOR_TEMPLATE_VERSION, AFFINE_KERNEL_FILE
 from assemble import assemble, forth_compiler, sm3_blocks
-from point_kernels import WINDOW_KERNEL_NAME, compile_kernels, load_kernels
+from point_kernels import AFFINE_KERNEL_NAME, WINDOW_KERNEL_NAME, compile_kernels, load_kernels
 from p2pkh_sm2 import *
 from sm2 import *
 from sm3_script import hash_script,compress,IV
@@ -222,7 +223,8 @@ class SM2Tests(unittest.TestCase):
                 self.assertEqual(evaluate(grouped, stack), evaluate(previous, stack))
 
     def test_signed_windows_match_scalar_multiplication(self):
-        for version in (SIGNED_WINDOW_TEMPLATE_VERSION, WINDOW_DOUBLING_TEMPLATE_VERSION):
+        for version in (SIGNED_WINDOW_TEMPLATE_VERSION, WINDOW_DOUBLING_TEMPLATE_VERSION,
+                        AFFINE_GENERATOR_TEMPLATE_VERSION):
             with self.subTest(version=version):
                 self.check_signed_windows(version)
 
@@ -242,12 +244,37 @@ class SM2Tests(unittest.TestCase):
                 stack, alt = evaluate(setup + window, cached)
                 self.assertEqual(alt, [])
                 self.assertEqual(stack[:len(cached)], cached)
-                self.assertEqual(len(stack), len(cached) + 2*17*3 + 3)
+                generator_slots = 2*16 if version >= AFFINE_GENERATOR_TEMPLATE_VERSION else 3*17
+                self.assertEqual(len(stack), len(cached) + generator_slots + 3*17 + 3)
                 x, y, z = (decode_num(value) % P for value in stack[-3:])
                 self.assertTrue(x or y or z)
                 inverse_z = pow(z, -1, P) if z else None
                 actual = (x*inverse_z % P, y*inverse_z % P) if z else None
                 self.assertEqual(actual, add(mul(s), mul(t, (qx, qy))))
+
+    def test_affine_kernel_reproduces_projective_addition(self):
+        names = (AFFINE_KERNEL_NAME,)
+        kernels = compile_kernels(names)
+        self.assertEqual(kernels, load_kernels(AFFINE_KERNEL_FILE, names))
+        general = load_kernels(POINT_KERNEL_FILE)["sm2-add-kernel"]
+        affine = kernels[AFFINE_KERNEL_NAME]
+        self.assertLess(len(affine), len(general))
+        x, y = mul(19)
+        scaled = (-(2*x % P), -(2*y % P), -2)
+        prefix = (P, 3*B % P, 17)
+        for left, right in (((0, 1, 0), (x, y)), ((x, y, 1), (x, y)),
+                            ((x, y, 1), (x, -y)), (scaled, mul(7))):
+            with self.subTest(left=left, right=right):
+                stack = [encode_num(value) for value in (*prefix, *left, *right)]
+                self.assertEqual(evaluate(affine, stack), evaluate(general, [*stack, b'\x01']))
+
+    def test_compact_byte_reversal_matches_legacy(self):
+        previous = forth_compiler(bytes(20), WINDOW_DOUBLING_TEMPLATE_VERSION).emit("sm2-reverse32", b"")
+        compact = forth_compiler(bytes(20), AFFINE_GENERATOR_TEMPLATE_VERSION).emit("sm2-reverse32", b"")
+        self.assertLess(len(compact), len(previous))
+        for data in (bytes(range(32)), bytes(32), bytes(range(224, 256))):
+            with self.subTest(data=data):
+                self.assertEqual(evaluate(compact, [b'prefix', data]), ([b'prefix', data[::-1]], []))
 
     def test_script_rejects_invalid_signature_and_key(self):
         key,lock,parent,tx,pre,sig=fixture()
@@ -341,7 +368,7 @@ class SM2Tests(unittest.TestCase):
         for version in TEMPLATE_VERSIONS[1:]:
             candidate = assemble(base_owner, version)
             self.assertEqual(subprocess.check_output([*cli, '--version', str(version), '--format', 'raw']), candidate)
-        for version in (0, 9, 10):
+        for version in (0, 10, 11):
             with self.subTest(version=version):
                 for construct in (assemble, locking_script_from_owner_hash):
                     with self.assertRaisesRegex(ValueError, 'unsupported P2PKH-SM2 template'):

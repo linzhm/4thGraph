@@ -18,8 +18,28 @@ REQUIRE BSV
 : sm2-append-byte ( script -- script )
     op-fromaltstack op-cat ;
 
+: sm2-reverse-halves ( script cell script -- script )
+    rot rot bsv-num op-split over bsv-cat-code op-swap swap bsv-cat-code op-cat ;
+
+: sm2-reverse2 ( script -- script )
+    op-1 op-split op-swap op-cat ;
+
+: sm2-reverse4 ( script -- script )
+    2 bsv-empty sm2-reverse2 sm2-reverse-halves ;
+
+: sm2-reverse8 ( script -- script )
+    4 bsv-empty sm2-reverse4 sm2-reverse-halves ;
+
+: sm2-reverse16 ( script -- script )
+    8 bsv-empty sm2-reverse8 sm2-reverse-halves ;
+
 : sm2-reverse32 ( script -- script )
-    bsv-empty sm2-reverse-byte 31 bsv-repeat-code bsv-cat-code bsv-empty sm2-append-byte 31 bsv-repeat-code bsv-cat-code ;
+    affine-generator? if
+        16 bsv-empty sm2-reverse16 sm2-reverse-halves
+    else
+        bsv-empty sm2-reverse-byte 31 bsv-repeat-code bsv-cat-code
+        bsv-empty sm2-append-byte 31 bsv-repeat-code bsv-cat-code
+    then ;
 
 : sm2-uint256be ( script -- script )
     sm2-reverse32 bytes-hex 00 bsv-push op-cat op-bin2num ;
@@ -153,7 +173,7 @@ REQUIRE BSV
 
 : sm2-g16 ( script -- script )
     bytes-hex 35648233f554ae51bbce44ef5db3e419ea133cd248a93e2555645bbc8704fb68 bsv-num-be
-    bytes-hex 04d7ac60f6d975ef6117bca9ce885dd6154b1870a6a651664411a9a30eca2046 bsv-num-be op-1 ;
+    bytes-hex 04d7ac60f6d975ef6117bca9ce885dd6154b1870a6a651664411a9a30eca2046 bsv-num-be ;
 
 : sm2-drop-two ( script -- script )
     op-2drop ;
@@ -220,9 +240,18 @@ REQUIRE BSV
     op-dup op-pick op-over op-pick op-fromaltstack op-if op-negate op-endif
     op-rot op-1sub op-pick sm2-add-points ;
 
+: sm2-add-signed-generator ( script -- script )
+    ( The fixed table contains affine pairs for magnitudes 1 through 16. )
+    op-fromaltstack op-ifdup op-if
+        op-dup op-0 op-lessthan op-toaltstack op-abs op-2 op-mul
+        88 bsv-num op-swap op-sub op-dup op-pick op-over op-pick
+        op-fromaltstack op-if op-negate op-endif op-rot op-drop
+        sm2-add-affine-kernel bsv-cat-code
+    op-endif ;
+
 : sm2-add-split5 ( script -- script )
-    ( The Q and G tables hold triples for magnitudes 0 through 16. )
-    54 sm2-add-signed-selected 105 sm2-add-signed-selected ;
+    54 sm2-add-signed-selected
+    affine-generator? if sm2-add-signed-generator else 105 sm2-add-signed-selected then ;
 
 : sm2-step-split5 ( script -- script )
     window-doubling? if
@@ -231,12 +260,20 @@ REQUIRE BSV
         bsv-empty sm2-double-point 5 bsv-repeat-code bsv-cat-code
     then sm2-add-split5 ;
 
+: sm2-generator-z ( script -- script )
+    affine-generator? if else op-1 then ;
+
 : sm2-window-table ( script -- script )
-    op-0 op-1 op-0 sm2-gx sm2-gy op-1 sm2-gx2 sm2-gy2 op-1 sm2-gx3 sm2-gy3 op-1 sm2-gx4 sm2-gy4
-    op-1 sm2-gx5 sm2-gy5 op-1 sm2-gx6 sm2-gy6 op-1 sm2-gx7 sm2-gy7 op-1 sm2-gx8 sm2-gy8 op-1
-    sm2-gx9 sm2-gy9 op-1 sm2-gx10 sm2-gy10 op-1 sm2-gx11 sm2-gy11 op-1 sm2-gx12 sm2-gy12 op-1
-    sm2-gx13 sm2-gy13 op-1 sm2-gx14 sm2-gy14 op-1 sm2-gx15 sm2-gy15 op-1
-    signed-windows? if sm2-g16 then
+    affine-generator? if else op-0 op-1 op-0 then
+    sm2-gx sm2-gy sm2-generator-z sm2-gx2 sm2-gy2 sm2-generator-z
+    sm2-gx3 sm2-gy3 sm2-generator-z sm2-gx4 sm2-gy4 sm2-generator-z
+    sm2-gx5 sm2-gy5 sm2-generator-z sm2-gx6 sm2-gy6 sm2-generator-z
+    sm2-gx7 sm2-gy7 sm2-generator-z sm2-gx8 sm2-gy8 sm2-generator-z
+    sm2-gx9 sm2-gy9 sm2-generator-z sm2-gx10 sm2-gy10 sm2-generator-z
+    sm2-gx11 sm2-gy11 sm2-generator-z sm2-gx12 sm2-gy12 sm2-generator-z
+    sm2-gx13 sm2-gy13 sm2-generator-z sm2-gx14 sm2-gy14 sm2-generator-z
+    sm2-gx15 sm2-gy15 sm2-generator-z
+    signed-windows? if sm2-g16 sm2-generator-z then
     op-0 op-1 op-0
     op-fromaltstack op-fromaltstack op-1 op-3dup sm2-double-point op-3dup 8 bsv-num op-pick
     8 bsv-num op-pick 8 bsv-num op-pick sm2-add-points 5 bsv-num op-pick 5 bsv-num op-pick 5 bsv-num
@@ -268,13 +305,16 @@ REQUIRE BSV
     sm2-window-table signed-windows? if sm2-window-split5 else sm2-window-split4 then ;
 
 : sm2-copy-r-low ( script -- script )
-    signed-windows? if 106 else 100 then bsv-num op-pick ;
+    affine-generator? if 87 else signed-windows? if 106 else 100 then then bsv-num op-pick ;
 
 : sm2-copy-r-high ( script -- script )
-    signed-windows? if 105 else 99 then bsv-num op-pick ;
+    affine-generator? if 86 else signed-windows? if 105 else 99 then then bsv-num op-pick ;
 
 : sm2-clear-points ( script -- script )
-    bsv-empty sm2-drop-two signed-windows? if 54 else 51 then bsv-repeat-code bsv-cat-code ;
+    bsv-empty sm2-drop-two
+    affine-generator? if 44 else signed-windows? if 54 else 51 then then
+    bsv-repeat-code bsv-cat-code
+    affine-generator? if op-drop then ;
 
 ( Canonicalize X and Z before comparing X to a nonnegative multiple of Z modulo p. )
 : sm2-normalize-result ( script -- script )

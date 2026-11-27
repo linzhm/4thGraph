@@ -1,0 +1,110 @@
+{
+  "payment_shape": {
+    "inputs": 2,
+    "outputs": 2
+  },
+  "lock_bytes": 95790,
+  "otda_program_bytes": 7718,
+  "baseline": "1.9.0",
+  "bsv_node_version": "1.2.3",
+  "chain_gang_commit": "8b60b71a12a69fdcb465d3e627dbf6f43d6ed081",
+  "validation": "Peerless regtest script replay with supplied prevouts",
+  "component_bytes": {
+    "v1.9.0": {
+      "reverse_32_bytes": 186,
+      "sm2_window": 36732,
+      "add": 123
+    },
+    "v1.10.0": {
+      "reverse_32_bytes": 124,
+      "sm2_window": 36349,
+      "affine_generator_add": 114
+    }
+  },
+  "payments": {
+    "bip143-all": {
+      "v1.9.0": {
+        "txid": "e88830f910edc040f469f937665ecadc4207b3fd8aee9a8391b94ace9b0a8888",
+        "transaction_bytes": 193936,
+        "unlock_bytes": [
+          291,
+          291
+        ],
+        "peak_stack_payload_bytes": 3816
+      },
+      "v1.10.0": {
+        "txid": "2ff9a0d4323d9936cfa00e8f3572709a6b7bf53d8e1af74c89630d55438f6b5c",
+        "transaction_bytes": 192284,
+        "unlock_bytes": [
+          291,
+          291
+        ],
+        "peak_stack_payload_bytes": 3808
+      }
+    },
+    "otda-all": {
+      "v1.9.0": {
+        "txid": "848705683d1c35e6cbfdf5453ada459c77ca86e5835ec1abfd05686105e51912",
+        "transaction_bytes": 209282,
+        "unlock_bytes": [
+          7964,
+          7964
+        ],
+        "peak_stack_payload_bytes": 386844
+      },
+      "v1.10.0": {
+        "txid": "677a8bb159a6a5bd4f8538086b4b4c588e172b80c15d283a60b8d1bc21edea34",
+        "transaction_bytes": 207778,
+        "unlock_bytes": [
+          8038,
+          8038
+        ],
+        "peak_stack_payload_bytes": 383540
+      }
+    }
+  },
+  "source": "README.md#v1100",
+  "compiler_commit": "822160dd61ff7c4f77a71ba7edcd17d59212df57",
+  "otda_all_fan_in": {
+    "inputs": 12,
+    "outputs": 1,
+    "payments": {
+      "v1.9.0": {
+        "transaction_bytes": 197151,
+        "txid": "ad49e138f3ab1927be211397f18969a6103af56de8924d57db9be76079780b23",
+        "unlock_bytes": [
+          8333,
+          8333,
+          8333,
+          8333,
+          8333,
+          8333,
+          8333,
+          8333,
+          8333,
+          8333,
+          8333,
+          8333
+        ]
+      },
+      "v1.10.0": {
+        "transaction_bytes": 197213,
+        "txid": "191b4d7a5ea708d31058c92ba15f3a14bcfb9cadb6d2d43647a55b94522ec2d8",
+        "unlock_bytes": [
+          8407,
+          8407,
+          8407,
+          8407,
+          8407,
+          8407,
+          8407,
+          8407,
+          8407,
+          8407,
+          8407,
+          8407
+        ]
+      }
+    }
+  }
+}

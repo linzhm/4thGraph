@@ -4,7 +4,7 @@
 
 ## Developer resources
 
-**[Wallet SDK quickstart](docs/sdk.en.md#quickstart)** · [v1.9.0 candidate](#v190) · [Unified wallet SDK](../../sdk/README.md#quickstart)
+**[Wallet SDK quickstart](docs/sdk.en.md#quickstart)** · [v1.10.0 candidate](#v1100) · [Unified wallet SDK](../../sdk/README.md#quickstart)
 
 Choose a raw SM2 or SignedData signer. The wallet automatically selects a shorter OTDA unlocking script for eligible payments.
 
@@ -25,13 +25,13 @@ For payments that create other SM2 outputs, compare BIP143 and OTDA using the sa
 
 ## Project version and locking template
 
-Version 1.1.0 enables OTDA reconstruction by default for locking template `1` from the first public release, v1.0.0. Versions 1.2.0 through 1.7.0 correspond to templates `2` through `7`. Version 1.9.0 adds template `8`. The wallet recognizes and spends all eight templates from the previous output's exact bytes.
+Version 1.1.0 enables OTDA reconstruction by default for locking template `1` from the first public release, v1.0.0. Versions 1.2.0 through 1.7.0 correspond to templates `2` through `7`. Versions 1.9.0 and 1.10.0 add templates `8` and `9`. The wallet recognizes and spends all nine templates from the previous output's exact bytes.
 
 | Property | Value |
 | --- | --- |
 | Recipient identifier | HASH160 of the 65-byte public key `04 \|\| X_BE32 \|\| Y_BE32` |
 | SM2 user ID | The fixed ASCII value `1234567812345678` |
-| Locking script | 144,925 bytes for template `1`, 131,565 for `2`, 125,616 for `3`, 121,847 for `4`, 110,747 for `5`, 100,663 for `6`, 98,362 for `7`, and 96,616 for `8` |
+| Locking script | 144,925 bytes for template `1`, 131,565 for `2`, 125,616 for `3`, 121,847 for `4`, 110,747 for `5`, 100,663 for `6`, 98,362 for `7`, 96,616 for `8`, and 95,790 for `9` |
 | Unlocking script | 291 bytes with BIP143, 294 bytes with unpaired OTDA SINGLE, and transaction-dependent for other OTDA modes |
 | Unlocking stack | Signing preimage, uncompressed public key, and 64-byte `r \|\| s` signature |
 | Signature modes | BIP143 and Chronicle OTDA, each with ALL, NONE, or SINGLE and optional ANYONECANPAY |
@@ -41,9 +41,39 @@ The current source includes the [layout manifest](versions/v1.0.0/layout.json),
 [complete payment vector](versions/v1.0.0/spend-all.json), and
 [16 signing preimages](versions/v1.0.0/sighash-modes.json). [v1.0.0 release](https://github.com/linzhm/bsv-script-lab/releases/tag/p2pkh-sm2-v1.0.0)
 
+<a name="v1100"></a>
+
+## v1.10.0 candidate
+
+Template `9` stores fixed generator points as affine X and Y pairs and uses an addition kernel specialized for an affine second point. It also reverses 32-byte values by recursively splitting the input in half. The 2×2 OTDA ALL payment saves 1,504 bytes. Each reconstructed input carries a constructor that is 74 bytes larger. For a 12-input, one-output OTDA ALL payment, the total grows from 197,151 to 197,213 bytes.
+
+| Measured bytes | v1.9.0 | v1.10.0 | Change |
+| --- | ---: | ---: | ---: |
+| Locking script | 96,616 | 95,790 | −0.9% |
+| OTDA constructor | 7,644 | 7,718 | +1.0% |
+| BIP143 ALL, 2×2 transaction | 193,936 | 192,284 | −0.9% |
+| OTDA ALL, 2×2 transaction with reconstruction | 209,282 | 207,778 | −0.7% |
+
+Select template `9` with `--version 9` or SDK `template: "v1.10.0"`. [Template fingerprint](versions/v1.10.0/layout.json) · [Measurements](versions/v1.10.0/measurements.json) · [34 latest-template cases](versions/v1.10.0/latest-template-coverage.json)
+
+<a name="p2pkh-sponsorship"></a>
+
+### P2PKH interactions and zero-fee sponsorship
+
+Funded regtest exercised P2PKH funding of template `9`, a same-template SM2 payment with a P2PKH fee input, and an SM2 exit to P2PKH with sponsor change. Under the launcher's default policy profile, the BIP143 and OTDA cases all admitted and mined those funded transactions.
+
+| Scenario | Funded regtest result |
+| --- | --- |
+| Append a P2PKH fee input before submission | The BIP143 `0xc1` and OTDA `0xe1` SM2 witnesses remained valid with the same outputs. A separately confirmed P2PKH UTXO paid 150,000 sat and the completed transactions mined. |
+| Plan a sponsor change output | The approved transaction paid the full 10,000,000 sat principal to a template `9` or P2PKH output, returned 50,000 sat to the sponsor and paid a 150,000 sat fee. Adding a change output after signing ALL invalidated the SM2 witness. |
+| Submit zero fee first, then try a sponsored replacement | The zero-fee transaction entered the mempool and stayed unmined in three blocks. The same-input sponsored transaction returned `txn-mempool-conflict`. |
+| Pay from a child transaction | Both zero-fee parents included a P2PKH output. A P2PKH child spending that output and a sponsor UTXO paid 150,000 sat. Each parent and child mined in the same block. |
+
+The isolated node used a 0.5 sat/B mining floor. The raised-profile run also checks the complete scripts on BSV Node and chain-gang and rejects an appended input with ordinary ALL. [Default policy replay](versions/v1.10.0/p2pkh-default.json) · [Raised policy replay](versions/v1.10.0/p2pkh-raised.json) · [Reproduction](reference/README.md#p2pkh-sponsorship)
+
 <a name="v190"></a>
 
-## v1.9.0 candidate
+## v1.9.0
 
 Template `8` checks for infinity once per group of five doublings and reuses one copy of the SM2 field prime throughout the group. SM3 expands message words as compression rounds need them, with a rolling schedule of 16 words. The shorter scripts and their byte layout also reduce the OTDA constructor for a payment using template `8` throughout.
 
@@ -251,7 +281,7 @@ Each marginal cell shows the **change in total bytes (output locks / input unloc
 
 ## Reconstruct OTDA outputs
 
-The constructor is part of `scriptSig`. It uses 12,703 bytes for template `1`, 11,816 for `2`, 11,807 for `3`, 11,618 for `4`, 11,549 for `5`, 9,363 for `6`, 9,447 for `7`, and 7,644 for `8`. Templates `2` through `8` select reusable fragments from the initial encoding and place frequently used fragments near the top of the stack. The constructor reconstructs the exact signing preimage and fills each eligible output's HASH160 slot. The signing callback receives the same message and SM2 user ID as the literal encoding. Use the final signed transaction ID to build a child.
+The constructor is part of `scriptSig`. It uses 12,703 bytes for template `1`, 11,816 for `2`, 11,807 for `3`, 11,618 for `4`, 11,549 for `5`, 9,363 for `6`, 9,447 for `7`, 7,644 for `8`, and 7,718 for `9`. Templates `2` through `9` select reusable fragments from the initial encoding and place frequently used fragments near the top of the stack. The constructor reconstructs the exact signing preimage and fills each eligible output's HASH160 slot. The signing callback receives the same message and SM2 user ID as the literal encoding. Use the final signed transaction ID to build a child.
 
 After Chronicle activation, version-2 OTDA ALL can reconstruct matching outputs in their original order. Paired OTDA SINGLE can reconstruct the same-index output and preserve the preceding null outputs in the preimage. Both support `ANYONECANPAY`. Other output templates keep their literal bytes. BIP143, NONE, unpaired SINGLE, version 1 and non-smaller encodings continue with the literal unlocking script. [SDK options](docs/sdk.en.md) · [Constructor and generator](reference/README.md#otda-constructor)
 

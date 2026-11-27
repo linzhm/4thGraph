@@ -196,7 +196,8 @@ class LatestTemplateMatrixTests(unittest.TestCase):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--report', type=Path, help='write the verified construction matrix as JSON')
-    parser.add_argument('--template', type=int, choices=(SIGNED_WINDOW_TEMPLATE_VERSION, LATEST_VERSION),
+    parser.add_argument('--template', type=int,
+                        choices=tuple(version for version in TEMPLATE_VERSIONS if version >= SIGNED_WINDOW_TEMPLATE_VERSION),
                         default=LATEST_VERSION, help='locking template for the entire matrix')
     args = parser.parse_args()
     matrix = LatestTemplateMatrixTests('test_transaction_construction_matrix')

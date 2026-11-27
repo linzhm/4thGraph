@@ -2,7 +2,7 @@
 
 [简体中文](spec.zh-CN.md) · [Project overview](../README.md)
 
-This specification describes the v1.0.0 baseline and the authorization rules shared by the locking templates. A BRC number has yet to be assigned. [v1.9.0 candidate](../README.md#v190)
+This specification describes the v1.0.0 baseline and the authorization rules shared by the locking templates. A BRC number has yet to be assigned. [v1.10.0 candidate](../README.md#v1100)
 
 ## Payment and authorization
 

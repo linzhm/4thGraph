@@ -6,8 +6,9 @@ import json
 from pathlib import Path
 
 from assemble import TEMPLATE_VERSION, TEMPLATE_VERSIONS, forth_compiler, sm3_blocks
-from assemble import SPLIT_ROTATION_TEMPLATE_VERSION
+from assemble import AFFINE_GENERATOR_TEMPLATE_VERSION, SPLIT_ROTATION_TEMPLATE_VERSION
 from p2pkh_sm2 import MIXED_OTDA_VERSIONS, _canonical
+from sm3_script import SPLIT_ROTATION_WRAP
 from fourthgraph.bsv.evaluate import evaluate
 from fourthgraph.bsv.script import asm, number, push
 
@@ -40,6 +41,8 @@ def function_library(version=TEMPLATE_VERSION):
     compiler = forth_compiler(bytes(20), version)
     for name in ("sm2-double-point", "sm2-add-points"):
         library.append(compiler.emit(name, b""))
+    if version >= AFFINE_GENERATOR_TEMPLATE_VERSION:
+        library.append(SPLIT_ROTATION_WRAP)
     return library
 
 
