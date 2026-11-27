@@ -6,10 +6,12 @@ from pathlib import Path
 import subprocess
 
 from fourthgraph.bsv.artifacts import script_listing
-from fourthgraph.bsv.transaction import Input, hash256, preimage_forkid
+from fourthgraph.bsv.script import without_codeseparators
+from fourthgraph.bsv.transaction import Input, hash256, preimage_forkid, preimage_otda
 
 
 ABI = "4thgraph.project-contract/1"
+SETTLEMENT_FIELDS = ("version", "outpoint", "sequence", "outputs", "locktime")
 
 
 class ContractError(ValueError):
@@ -51,8 +53,20 @@ class ProjectContract:
             end = stop
         boundaries = {0} | {row["offset"]+1 for row in script_listing(self.template) if row["op"]=="OP_CODESEPARATOR"}
         for rule in self.package["paths"].values():
-            if rule["script_code_offset"] not in boundaries or rule["signatures"] not in (0,1) or rule["mode"] != 65:
+            offset = rule["script_code_offset"]
+            mode = rule["mode"]
+            if offset not in boundaries or rule["signatures"] not in (0, 1) or mode not in (0x41, 0x61):
                 raise ContractError("InvalidManifest", "path has invalid signature anchor or unsupported coverage")
+            if "witness_layout" in rule or mode == 0x61:
+                fields = list(SETTLEMENT_FIELDS) + (["previous_amount"] if mode == 0x41 else [])
+                code = self.template[offset:]
+                if mode == 0x61:
+                    code = without_codeseparators(code)
+                if (self.slots or rule.get("witness_layout") != "reconstructed" or rule["signatures"] != 0
+                        or rule.get("requires_chronicle") is not (mode == 0x61)
+                        or rule.get("authenticated_fields") != fields
+                        or rule.get("script_code_sha256") != sha256(code).hexdigest()):
+                    raise ContractError("InvalidManifest", "linked path metadata contradicts the approved coverage")
         for field in ("listing", "fixtures"):
             checked_file(path.parent, self.package[field])
 
@@ -109,7 +123,8 @@ class ProjectContract:
             raise ContractError(result["status"], result.get("detail", "preparation failed"))
         prev = parent.outputs[tx.inputs[index].vout]
         code = prev.script[rule["script_code_offset"]:]
-        preimage = preimage_forkid(tx, index, prev.value, code, rule["mode"])
+        preimage = (preimage_otda(tx, index, without_codeseparators(code), rule["mode"])
+                    if rule["mode"] == 0x61 else preimage_forkid(tx, index, prev.value, code, rule["mode"]))
         expected = {"candidate": sha256(tx.serialize()).hexdigest(), "outpoint": tx.inputs[index].outpoint().hex(),
                     "input_index": index, "path": path, "mode": rule["mode"], "preimage": preimage.hex(),
                     "digest": hash256(preimage).hex()}
