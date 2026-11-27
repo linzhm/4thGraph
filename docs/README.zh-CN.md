@@ -165,7 +165,15 @@ python3 -m fourthgraph.workflow.protocol experiment replay workspace/tuning/poin
 
 点加夹具在调用点 0 使用构建期验证过的常量，可选完整射影点加或仿射右操作数点加。调用点 1 从运行时栈接收合法射影点，可选完整射影点加，或登记的 `secp256k1-add-affine-guarded` 调用方案。该方案只在右操作数的 `Z` 字节匹配规范 ScriptNum `1` 时使用仿射内核，其余输入走完整射影内核。调用方仍需满足合法曲线点契约。候选的链接大小计入检查与两个分支。夹具覆盖 `Z=0、1、2、11`，并用独立群运算和固定版 chain-gang 验收。[夹具源码](../src/fourthgraph/benchmark/fixtures/point-add.fth)
 
-可用 `"plans":[{"bindings":[{"site":1,"kernel":"secp256k1-add-affine-guarded"}]}]` 测单个显式绑定。报告在 `compile.lowering.call_sites` 给出证据、排除原因、选中实现、转换和链接字节。带守卫的绑定还记录两个内核的摘要和相对调用点的偏移。错曲线、重复绑定或强制使用前提不足的内核均在编译期拒绝。
+可用 `"plans":[{"bindings":[{"site":1,"kernel":"secp256k1-add-affine-guarded"}]}]` 测单个显式绑定。报告在 `compile.lowering.call_sites` 给出证据、排除原因和选中实现，并分别记录守卫 `guard_bytes`、内核 `kernel_bytes` 和调用点链接字节 `bytes`。有守卫时，`adapter_bytes` 包含守卫开销。带守卫的绑定还记录两个内核的摘要和相对调用点的偏移。错曲线、重复绑定、未知调用点或前提不足的强制绑定均在编译期拒绝。
+
+| 常量调用点 | 运行时调用点 | 运行时守卫／内核／链接 | 完整路径 |
+| --- | --- | ---: | ---: |
+| 仿射 | 通用 | 0／97／97 B | 777 B |
+| 通用 | 通用 | 0／97／97 B | 789 B |
+| 通用 | 带守卫 | 7／183／190 B | 882 B |
+
+三套计划均通过同一组 13 个正例和 13 个拒绝用例。按字节数选择常量仿射加运行时通用，带守卫的运行时方案仍可重放。
 
 <a name="documentation-index"></a>
 

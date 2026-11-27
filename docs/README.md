@@ -165,7 +165,15 @@ python3 -m fourthgraph.workflow.protocol experiment replay workspace/tuning/poin
 
 Call site 0 uses a constant verified at build time and admits complete projective addition or affine-right addition. Call site 1 receives a valid projective point on the runtime stack. It admits complete projective addition or the registered `secp256k1-add-affine-guarded` binding. The latter selects the affine kernel on an exact byte match for canonical ScriptNum `1` in the right operand's `Z`, and otherwise uses complete projective addition. The caller's valid-point contract still applies. Linked size includes the guard and both branches. The fixture covers `Z` values of 0, 1, 2, and 11 and checks the computation against an independent group oracle and pinned chain-gang. [Fixture source](../src/fourthgraph/benchmark/fixtures/point-add.fth)
 
-Use `"plans":[{"bindings":[{"site":1,"kernel":"secp256k1-add-affine-guarded"}]}]` to test one explicit binding. Read `compile.lowering.call_sites` for evidence, exclusions, the selected implementation, and adapter and linked byte counts. A guarded binding also records both kernel digests and their offsets relative to the call site. The compiler rejects wrong curves, duplicate bindings, and forced kernels whose preconditions are unproved.
+Use `"plans":[{"bindings":[{"site":1,"kernel":"secp256k1-add-affine-guarded"}]}]` to test one explicit binding. Read `compile.lowering.call_sites` for evidence, exclusions, the selected implementation, and the costs in `guard_bytes`, `kernel_bytes`, and `bytes` (the linked call site). `adapter_bytes` includes the guard when present. A guarded binding also records both kernel digests and their offsets relative to the call site. The compiler rejects wrong curves, duplicate bindings, unknown call sites, and forced kernels whose preconditions are unproved.
+
+| Constant site | Runtime site | Runtime guard / kernels / linked | Full path |
+| --- | --- | ---: | ---: |
+| Affine | General | 0 / 97 / 97 B | 777 B |
+| General | General | 0 / 97 / 97 B | 789 B |
+| General | Guarded | 7 / 183 / 190 B | 882 B |
+
+All three plans pass the same 13 accepted and 13 rejected spends. The byte-ranked winner uses the constant affine binding and the runtime general binding. The guarded runtime binding remains available for replay.
 
 <a name="documentation-index"></a>
 

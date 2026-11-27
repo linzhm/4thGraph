@@ -84,9 +84,10 @@ class PointAddBuilder(ScriptBuilder):
         otherwise = asm("OP_ELSE")
         end = asm("OP_ENDIF")
         code = entry + affine + otherwise + general + end
+        guard_bytes = len(entry) + len(otherwise) + len(end)
         return code, {
             "kernel": GUARDED, "kind": "guarded-binding", "kernel_bytes": len(affine) + len(general),
-            "adapter_bytes": len(entry) + len(otherwise) + len(end),
+            "adapter_bytes": guard_bytes, "guard_bytes": guard_bytes,
             "guard": {"argument": "rhs.z", "kind": "canonical-scriptnum-equality", "value": 1,
                       "match": {**fast, "relative_offset": len(entry)},
                       "fallback": {**fallback, "relative_offset": len(entry) + len(affine) + len(otherwise)}},
@@ -119,7 +120,7 @@ class PointAddBuilder(ScriptBuilder):
                 coords = (*constant, 1) if constant and not KERNELS[name].affine_rhs else constant
                 adapter = b"".join(map(number, coords))
                 snippet = adapter + code
-                selected["adapter_bytes"] = len(adapter)
+                selected.update(adapter_bytes=len(adapter), guard_bytes=0)
             sites.append({"site": site, "source": {"module": token.module, "line": token.line, "column": token.column},
                           "operation": "point-add", "curve": "secp256k1",
                           "evidence": {"kind": "checked-constant", "finite": True, "z": 1, "coordinates": encoded.hex()}

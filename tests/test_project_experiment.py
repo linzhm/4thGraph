@@ -315,7 +315,7 @@ class FormulaExperiments(unittest.TestCase):
         self.assertEqual(capabilities()["call_site_fixtures"]["point-add"]["enumerate"], "bindings")
         report = run({"fixture": "point-add", "evaluation": "spend", "enumerate": "bindings", "workers": 2})
         base, optimized, guarded = report["candidates"]
-        self.assertEqual(base["source_sha256"], optimized["source_sha256"])
+        self.assertEqual(len({row["source_sha256"] for row in (base, optimized, guarded)}), 1)
         for row, fixed_kernel, runtime_kernel in (
             (base, GENERAL, GENERAL), (optimized, AFFINE, GENERAL), (guarded, GENERAL, GUARDED),
         ):
@@ -327,6 +327,8 @@ class FormulaExperiments(unittest.TestCase):
             emitted = bytes.fromhex(row["artifact"]["hex"])
             for site in (fixed, runtime):
                 offset = site["offset"]
+                self.assertEqual(site["bytes"], site["kernel_bytes"] + site["adapter_bytes"])
+                self.assertEqual(site["guard_bytes"], site["adapter_bytes"] if site["kernel"] == GUARDED else 0)
                 self.assertEqual(sha256(emitted[offset:offset+site["bytes"]]).hexdigest(), site["linked_sha256"])
             spend = row["test"]["spend"]
             self.assertEqual((spend["status"], spend["accepted"], spend["rejected"]), ("passed", 13, 13))
@@ -335,10 +337,18 @@ class FormulaExperiments(unittest.TestCase):
         self.assertEqual((condition["kind"], condition["value"]), ("canonical-scriptnum-equality", 1))
         self.assertEqual((condition["match"]["kernel"], condition["fallback"]["kernel"]), (AFFINE, GENERAL))
         script = bytes.fromhex(guarded["artifact"]["hex"])
+        start = runtime["offset"]
+        self.assertEqual(script[start:start + condition["match"]["relative_offset"]],
+                         asm("OP_DUP OP_1 OP_EQUAL OP_IF OP_DROP"))
+        for branch, direct_site in zip((condition["match"], condition["fallback"]),
+                                       optimized["compile"]["lowering"]["call_sites"], strict=True):
+            self.assertEqual(branch["kernel_sha256"], direct_site["kernel_sha256"])
+            self.assertEqual(branch["library_sha256"], direct_site["library_sha256"])
         for branch in (condition["match"], condition["fallback"]):
             offset = runtime["offset"] + branch["relative_offset"]
             self.assertEqual(sha256(script[offset:offset+branch["kernel_bytes"]]).hexdigest(), branch["kernel_sha256"])
         self.assertEqual({case["operands"][-1] for case in guarded["test"]["spend"]["cases"]}, {0, 1, 2, 11})
+        self.assertEqual([row["metrics"]["path_bytes"] for row in (base, optimized, guarded)], [789, 777, 882])
         self.assertEqual(optimized["delta"]["baseline_path_bytes"], -12)
         self.assertGreater(guarded["delta"]["baseline_path_bytes"], 0)
         self.assertEqual(report["ranking"][0], optimized["id"])
