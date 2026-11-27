@@ -69,6 +69,21 @@ class StackScheduleTests(unittest.TestCase):
         with self.assertRaises(ScriptError):
             evaluate(script, [prefix, b""])
 
+    def test_numeric_boolean_folds_nonzero_without_changing_other_uses(self):
+        for opcode, operation in (("OP_BOOLOR", lambda a, b: a or b), ("OP_BOOLAND", lambda a, b: a and b)):
+            with self.subTest(opcode=opcode):
+                graph = Graph(2, compact_booleans=True)
+                a, b = graph.inputs
+                nonzero_a = graph.define(asm("OP_0NOTEQUAL"), (a,))
+                nonzero_b = graph.define(asm("OP_0NOTEQUAL"), (b,))
+                flag = graph.define(asm(opcode), (nonzero_a, nonzero_b))
+                self.assertEqual(graph.emit((flag,), compact=True), asm(opcode))
+                preserving = graph.emit((flag, nonzero_a), compact=True)
+                for left, right in ((0, 0), (0, 9), (-14, 0), (-5, 8)):
+                    stack = list(map(encode_num, (left, right)))
+                    expected = list(map(encode_num, (int(bool(operation(left, right))), int(left != 0))))
+                    self.assertEqual(evaluate(preserving, stack), (expected, []))
+
     def test_input_assertions_and_undefined_flags(self):
         graph = Graph(1)
         self.assertEqual(graph.emit_assertions(graph.inputs, compact=True), asm("OP_VERIFY"))
