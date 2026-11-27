@@ -426,6 +426,10 @@ PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
 
 已持有验证密钥时，用 `groth16_script.py --runar DIR --verification-key verification_key.json --public expected.json --owner HEX --output lock.json` 生成锁。`expected.json` 是由部署方确定的五个公开标量。加 `--proof proof.json --witness-output witness.hex` 会导出 push-only 解锁前缀。花费时在前缀后追加对完整锁脚本生成的 DER 签名及 `0x41`。复放报告同时记录测试专用设置、Script 字节、两独立引擎判定和 regtest 挖块结果。
 
+### Winterfell STARK
+
+两个 Winterfell 项目共用公开计数器关系。BLAKE3 项目提供宿主参考，SHA-256 项目用 `merkle-sha256-root` 编译轨迹开封锁。宿主验证完整证明，Script 核验轨迹行及其到预期根的路径。 [BLAKE3 项目](../projects/stark-counter/README.zh-CN.md) · [SHA-256 复放与对照](../projects/stark-winterfell-sha256/docs/verification.zh-CN.md#开封锁对照)
+
 ## 链上编译器里程碑
 
 v0.5 以 PELS counter 核验有界的链上编译结果承诺。让 Script 编译器计算确定性的后继脚本或符号交易计划，让部署输出承诺该编译结果。计划先编码 `(父步骤, vout)`，部署交易最终字节和 txid 确定后再绑定真实 outpoint 和授权。这样部署承诺的对象在部署 txid 出现前就能确定。当前原型完成宿主侧编译、绑定和复放。

@@ -187,7 +187,7 @@ All three plans pass the same 13 accepted and 13 rejected spends. The byte-ranke
 | Compare and replay optimization candidates | [Agent development and tuning loop](#agent-tuning-loop) |
 | Write Forth for BSV | [SDL specification, syntax, and standard library](language/README.md) |
 | Compile and replay a transaction workflow | [Toolchain guide](toolchain.md) · [Regtest infrastructure](infrastructure.md) · [Chronicle regression](chronicle-regression.md) |
-| Generate or verify a proof | [Proof counter](../projects/proof-counter/README.md) · [BLS12-381 Groth16](groth16-bls12-381.md) |
+| Generate or verify a proof | [Proof counter](../projects/proof-counter/README.md) · [BLS12-381 Groth16](groth16-bls12-381.md) · [Winterfell SHA-256 STARK](../projects/stark-winterfell-sha256/README.md) |
 | Connect a wallet and signer | [Wallet SDK](../sdk/README.md) |
 | Review or reproduce measurements | [Showcase](../showcase/README.md) · [Transaction benchmarks](benchmark.md) |
 | Find source, fixtures, and workspaces | [Repository layout](repository-layout.md) |

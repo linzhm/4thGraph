@@ -36,6 +36,8 @@
 │   ├── p2pkh-sm2/
 │   ├── pels-counter/
 │   ├── proof-counter/
+│   ├── stark-counter/             # Winterfell BLAKE3 proof reference
+│   ├── stark-winterfell-sha256/   # SHA-256 profile and trace-opening replay
 │   ├── template/                 # Copier project template, schema, and version examples
 │   ├── workflow-examples/
 │   └── wots-plus/
