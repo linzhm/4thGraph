@@ -1,6 +1,6 @@
 <!-- Generated from manifest.yaml with Copier. -->
 
-# BLS12-381 Groth16 verifier v0.7.0
+# BLS12-381 Groth16 verifier v0.8.0
 
 [简体中文](README.zh-CN.md) · [4thGraph](../../README.md) · [Project index](../README.md) · [Versions](versions/index.json)
 
@@ -8,7 +8,7 @@
 
 Import the 4thGraph Groth16 standard library in Forth, build a proof lock and witness, and replay funded BSV spends.
 
-[Algorithm and execution](#algorithm-and-execution) · [Reproduce the checks](#reproduce-the-checks) · [Measurements data](versions/v0.7.0/measurements.json)
+[Algorithm and execution](#algorithm-and-execution) · [Reproduce the checks](#reproduce-the-checks) · [Measurements data](versions/v0.8.0/measurements.json)
 
 | Entry point | Purpose |
 | --- | --- |
@@ -26,6 +26,8 @@ The compact verifier compares two assertion schedules and automatically consumes
 The shared stack scheduler recognizes when to keep a live right operand with `OP_TUCK` and pushes one-byte numeric constants at their uses. [Operand scheduling measurements](versions/v0.5.0/measurements.json)
 
 The high-level Forth experiment searches uniform and call-site Fp2 lowerings and measures verifier source edits with a common compiler. [Experiment and replay](docs/verification.en.md#high-level-forth-experiment)
+
+The search also compares signed and unsigned public-input MSM by the serialized size of each lock and its matching witness. [MSM measurements](versions/v0.8.0/measurements.json)
 
 ## Reproduce the checks
 

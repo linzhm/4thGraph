@@ -36,6 +36,8 @@ The search enumerates legal rewrites of the same Fp2 formula and all three choic
 
 The v0.7.0 experiment holds the residue multiplication order fixed and edits the same Forth file twice. It measures the original order, both G1 checks before public-input MSM, and MSM between the A and C checks. Each round records its Git revision. To reproduce a round, extract its `experiments/high-level/verifier.fth` from that revision and pass the copy using `--source` in the search and replay. The current Forth source runs both G1 checks before MSM. [v0.7.0 measurements](../versions/v0.7.0/measurements.json)
 
+The v0.8.0 search compares unsigned and signed radix-4 MSM on that Forth source, generating a matching witness for each strategy. The signed digits reuse positive multiples for negative digits and can require extra slope windows for carries. Search ranks the serialized lock and witness together. Use `--msm unsigned-radix4` to reproduce the earlier unsigned comparison. The signed plan applies to both affine layouts. [v0.8.0 MSM measurements](../versions/v0.8.0/measurements.json)
+
 Run the search and replay its selected Genesis plan from the repository root.
 
 ```sh

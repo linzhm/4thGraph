@@ -1,5 +1,6 @@
 """Affine Groth16 layouts with checked slopes and optional committed pairing lines."""
 
+from dataclasses import dataclass
 from functools import lru_cache
 from hashlib import sha256
 from itertools import chain
@@ -11,8 +12,10 @@ from .verifier import (
     proof_stack, public_packet, read_proof, require_affine, unpack_packet, unpack_public,
 )
 from fourthgraph.bsv.script import asm, number, push
+from fourthgraph.compiler.curve_windows import SignedRadix4Window, signed_radix4
 
 LAYOUTS = ("projective", "affine-inline", "affine-witness")
+MSM_STRATEGIES = ("unsigned-radix4", "signed-radix4")
 IDENTITY = (0, 0)
 PAIRING_STEPS = len(SEED_BITS) + SEED_BITS.count("1")
 
@@ -21,19 +24,37 @@ def encode_fields(values):
     return b"".join(value.to_bytes(FIELD_BYTES, "little") for value in values)
 
 
-def msm_windows(key, sources):
+@dataclass(frozen=True)
+class MsmWindow:
+    index: int
+    bit: int
+    points: tuple
+    signed: SignedRadix4Window | None = None
+
+
+def msm_windows(key, sources, *, strategy=MSM_STRATEGIES[0]):
     """Fixed-base tables shared by the compiler and witness generator."""
     curve = Curve(HOST)
     for index, source in dynamic_slots(sources):
         base = key.ic[index + 1]
         if base is None:
             continue
+        if strategy == "signed-radix4":
+            for window, digits in enumerate(signed_radix4(source.limit - 1)):
+                if digits.maximum_magnitude == 1:
+                    yield MsmWindow(index, window * 2, (base,), digits)
+                else:
+                    twice = curve.add_host(base, base)
+                    yield MsmWindow(index, window * 2, (base, twice), digits)
+                    if digits.carry:
+                        base = curve.add_host(twice, twice)
+            continue
         for bit in range(0, source.bits, 2):
             if source.bits - bit == 1:
-                yield index, bit, (base,)
+                yield MsmWindow(index, bit, (base,))
             else:
                 twice = curve.add_host(base, base)
-                yield index, bit, (base, twice, curve.add_host(base, twice))
+                yield MsmWindow(index, bit, (base, twice, curve.add_host(base, twice)))
                 base = curve.add_host(twice, twice)
 
 
@@ -51,7 +72,7 @@ def slope_packet_bytes(window_count):
     return (window_count + PAIRING_STEPS * 2) * FIELD_BYTES
 
 
-def affine_witness(key, sources, signals, raw_proof, *, lines_in_witness):
+def affine_witness(key, sources, signals, raw_proof, *, lines_in_witness, msm=MSM_STRATEGIES[0]):
     public = public_packet(sources, signals)
     if not public:
         raise ValueError("an affine witness layout requires at least one spend-time public input")
@@ -60,12 +81,19 @@ def affine_witness(key, sources, signals, raw_proof, *, lines_in_witness):
     curve = Curve(HOST)
     acc = fold_msm(key, sources)
     slopes = []
-    for index, bit, points in msm_windows(key, sources):
-        digit = (signals[index] >> bit) & len(points)
+    remaining = list(signals)
+    for window in msm_windows(key, sources, strategy=msm):
+        index, bit, points = window.index, window.bit, window.points
+        if window.signed is None:
+            digit = (signals[index] >> bit) & len(points)
+        else:
+            digit, remaining[index] = window.signed.split(remaining[index])
         if digit == 0:
             slopes.append(0)
             continue
-        point = points[digit - 1]
+        point = points[abs(digit) - 1]
+        if digit < 0:
+            point = curve.negate(point)
         if acc is None or acc == curve.negate(point):
             acc = curve.add_host(acc, point)
             slopes.append(0)
@@ -92,7 +120,7 @@ class PackedFields:
         return value
 
 
-def add_msm_window(f, acc, point, digit, slope):
+def add_msm_window(f, acc, point, digit, slope, *, bounded=False):
     """Check the selected affine addition, including the two identity cases."""
     x, y = acc
     px, py = point
@@ -100,8 +128,10 @@ def add_msm_window(f, acc, point, digit, slope):
     distinct_x = f.nonzero(dx)
     same_y = f.equal(dy, 0)
     # All finite accumulator states are in the odd-order subgroup, so y != 0.
-    finite = f.nonzero(y)
-    active = f.nonzero(digit)
+    # A reduced coordinate and a bounded digit are zero in Fp exactly when
+    # their Script integer is zero.
+    finite = f.op("OP_0NOTEQUAL", y) if bounded else f.nonzero(y)
+    active = f.op("OP_0NOTEQUAL", digit) if bounded else f.nonzero(digit)
     regular = f.op("OP_BOOLOR", distinct_x, same_y)
     has_slope = f.op("OP_BOOLAND", active, f.op("OP_BOOLAND", finite, regular))
     denominator = f.select(distinct_x, dx, f.mul(2, y))
@@ -111,8 +141,10 @@ def add_msm_window(f, acc, point, digit, slope):
 
     nx = f.reduce(f.sub(f.sub(f.mul(slope, slope), x), px))
     ny = f.reduce(f.sub(f.mul(slope, f.sub(x, nx)), y))
+    # BOOLOR returns a normalized 0 or 1, so it can also mask a coordinate.
     return tuple(
-        f.select(active, f.select(finite, f.select(regular, result, 0), base), old)
+        f.select(active, f.select(finite, f.mul(regular, result) if bounded else f.select(regular, result, 0),
+                                  base), old)
         for result, base, old in zip((nx, ny), point, acc, strict=True)
     )
 
@@ -137,14 +169,15 @@ def checked_b_line(curve, point, other, slope, *, doubling):
 
 class AffineStages(VerifierStages):
     def __init__(self, key, sources, *, lines_in_witness, chronicle=False, optimize=False, fp2_rules=FP2_RULES,
-                 fp2_selection="uniform"):
+                 fp2_selection="uniform", msm=MSM_STRATEGIES[0]):
         self.witness_items = 2 if lines_in_witness else 1
         super().__init__(key, sources, chronicle=chronicle, optimize=optimize, extra_inputs=self.witness_items,
                          fp2_rules=fp2_rules, fp2_selection=fp2_selection)
         if not self.slots:
             raise ValueError("an affine witness layout requires at least one spend-time public input")
         self.lines_in_witness = lines_in_witness
-        self.windows = tuple(msm_windows(key, sources))
+        self.msm = msm
+        self.windows = tuple(msm_windows(key, sources, strategy=msm))
         inputs = self.field.graph.inputs
         self.trace = PackedFields(self.field, inputs[self.witness_items - 1])
         self.lines = PackedFields(self.field, inputs[0]) if lines_in_witness else None
@@ -163,11 +196,14 @@ class AffineStages(VerifierStages):
         return proof_stack(inputs[self.witness_items:end]), inputs[end:]
 
     def check_public_inputs(self, public):
+        if self.msm == "signed-radix4":
+            return self.check_signed_msm(public)
         f = self.field
         scalars = {index: value for (index, _), value in zip(self.slots, public, strict=True)}
         widths = {index: source.bits for index, source in self.slots}
         acc = fold_msm(self.key, self.sources) or IDENTITY
-        for offset, (index, bit, points) in enumerate(self.windows):
+        for offset, window in enumerate(self.windows):
+            index, bit, points = window.index, window.bit, window.points
             quotient = f.op("OP_DIV", scalars[index], 4) if bit + 2 < widths[index] else 0
             digit = f.sub(scalars[index], f.mul(quotient, 4))
             scalars[index] = quotient
@@ -179,6 +215,28 @@ class AffineStages(VerifierStages):
                               for p1, p2, p3 in zip(*points, strict=True))
             acc = add_msm_window(f, acc, point, digit, self.trace.read(offset))
         return Curve(self.tower).negate(acc), f.nonzero(acc[1])
+
+    def check_signed_msm(self, public):
+        f = self.field
+        scalars = {index: value for (index, _), value in zip(self.slots, public, strict=True)}
+        acc = fold_msm(self.key, self.sources) or IDENTITY
+
+        def divmod_script(value, radix):
+            return f.op("OP_DIV", value, radix), f.op("OP_MOD", value, radix)
+
+        for offset, window in enumerate(self.windows):
+            index, points, step = window.index, window.points, window.signed
+            digit, scalars[index] = step.split(scalars[index], add=f.add, sub=f.sub, divide=divmod_script)
+            point = points[0]
+            if len(points) == 2:
+                twice = f.op("OP_NUMEQUAL", digit, 2)
+                px, py = (f.select(twice, high, low) for low, high in zip(*points, strict=True))
+                if step.carry:
+                    negative = f.op("OP_LESSTHAN", digit, 0)
+                    py = f.select(negative, f.sub(0, py), py)
+                point = px, py
+            acc = add_msm_window(f, acc, point, digit, self.trace.read(offset), bounded=True)
+        return Curve(self.tower).negate(acc), f.op("OP_0NOTEQUAL", acc[1])
 
     def miller_loop(self, pairing_key, proof, *, bits=SEED_BITS):
         a, b, c, z = proof

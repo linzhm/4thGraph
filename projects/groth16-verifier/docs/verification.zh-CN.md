@@ -36,6 +36,8 @@ v0.6.0 实验在 Forth 中定义证明预处理、种子首位之后的 63 轮 M
 
 v0.7.0 固定剩余式的乘法顺序，对同一份 Forth 文件做两轮改动，测量原顺序、两个 G1 检查都在公开输入 MSM 前，以及 MSM 在 A、C 两项检查之间。复现某一轮时，从报告记录的 Git 提交提取 `experiments/high-level/verifier.fth`，再用 `--source` 将副本传给搜索和回放。当前源码先检查两个 G1 点，再执行 MSM。[v0.7.0 实测记录](../versions/v0.7.0/measurements.json)
 
+v0.8.0 在这份 Forth 上比较无符号和有符号 radix-4 MSM，并为每种方案生成对应的见证。负数位复用正倍点，末尾进位可能增加斜率窗口。搜索按序列化锁与见证的合计字节数排名。复现之前的无符号对照时可加 `--msm unsigned-radix4`。有符号计划适用于两种仿射布局。[v0.8.0 MSM 实测](../versions/v0.8.0/measurements.json)
+
 从仓库根目录运行搜索，再回放选出的 Genesis 计划。
 
 ```sh

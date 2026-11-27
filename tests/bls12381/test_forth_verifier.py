@@ -136,22 +136,28 @@ class ForthVerifierTests(unittest.TestCase):
             "vk_delta_2": g2_json(q),
         }
         sources = Dynamic(), Dynamic(2)
-        verifier = ForthVerifier(json.dumps(key), self.source, witness_layout="affine-witness")
-        lock = verifier.compile(sources)
-        cases = ((0, 0), (1, 0), (0, 1), (R - 1, 2))
-        for s, t in cases:
-            with self.subTest(signals=(s, t)):
-                # VK_x=[1-s+t]P, and A=[3-s+t]P makes the test pairing exact.
-                proof = {**metadata, "pi_a": g1_json(curve.mul_host(p, (3 - s + t) % R)),
-                         "pi_b": g2_json(q), "pi_c": g1_json(p)}
-                witnesses = verifier.witness((s, t), json.dumps(proof), sources=sources)
-                parent, spend = spend_fixture(lock, witnesses)
-                check_spend(parent, spend)
-                if s == R - 1:
-                    packet = push(public_packet(sources, (s, t)))
-                    malformed = witnesses[:-len(packet)] + push(R.to_bytes(32, "little") + bytes([t]))
-                    with self.assertRaises((RuntimeError, ValueError)):
-                        check_spend(parent, spend.with_script(0, malformed))
+        unsigned = ForthVerifier(json.dumps(key), self.source, witness_layout="affine-witness")
+        signed = ForthVerifier(json.dumps(key), self.source, witness_layout="affine-witness",
+                               plan=ArithmeticPlan(msm="signed-radix4"))
+        for verifier in (unsigned, signed):
+            lock = verifier.compile(sources)
+            for s, t in ((0, 0), (1, 0), (0, 1), (0, 3), (R - 1, 2)):
+                with self.subTest(msm=verifier.msm, signals=(s, t)):
+                    # VK_x=[1-s+t]P, and A=[3-s+t]P makes the test pairing exact.
+                    proof = json.dumps({**metadata, "pi_a": g1_json(curve.mul_host(p, (3 - s + t) % R)),
+                                        "pi_b": g2_json(q), "pi_c": g1_json(p)})
+                    witness = verifier.witness((s, t), proof, sources=sources)
+                    parent, spend = spend_fixture(lock, witness)
+                    check_spend(parent, spend)
+                    if s == R - 1:
+                        packet = push(public_packet(sources, (s, t)))
+                        malformed = witness[:-len(packet)] + push(R.to_bytes(32, "little") + bytes([t]))
+                        with self.assertRaises((RuntimeError, ValueError)):
+                            check_spend(parent, spend.with_script(0, malformed))
+                    if verifier is signed and t == 3:
+                        old_witness = unsigned.witness((s, t), proof, sources=sources)
+                        with self.assertRaises((RuntimeError, ValueError)):
+                            check_spend(parent, spend.with_script(0, old_witness))
 
     def test_affine_layout_shares_public_packet_with_successor_check(self):
         verifier = ForthVerifier(self.key, self.source, witness_layout="affine-inline")

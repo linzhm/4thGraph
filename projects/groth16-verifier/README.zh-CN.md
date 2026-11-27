@@ -1,6 +1,6 @@
 <!-- Generated from manifest.yaml with Copier. -->
 
-# BLS12-381 Groth16 验证器 v0.7.0
+# BLS12-381 Groth16 验证器 v0.8.0
 
 [English](README.md) · [4thGraph](../../README.zh-CN.md) · [项目目录](../README.zh-CN.md) · [版本](versions/index.json)
 
@@ -8,7 +8,7 @@
 
 在 Forth 中调用 4thGraph 的 Groth16 标准库，构建验证锁与见证，并在 BSV regtest 复放花费。
 
-[算法与执行](#算法与执行) · [复现方法](#复现方法) · [实测数据](versions/v0.7.0/measurements.json)
+[算法与执行](#算法与执行) · [复现方法](#复现方法) · [实测数据](versions/v0.8.0/measurements.json)
 
 | 入口 | 用途 |
 | --- | --- |
@@ -26,6 +26,8 @@
 共享调度器识别何时用 `OP_TUCK` 保留右操作数，并在使用处推入单字节数字常量。[操作数调度实测](versions/v0.5.0/measurements.json)
 
 高层 Forth 实验搜索统一公式和按调用点选择的 Fp2 发码，并用同一个编译器测量每轮验证器源码改动。[实验与回放](docs/verification.zh-CN.md#高层-forth-实验)
+
+搜索按序列化锁和对应见证的总长度比较有符号与无符号的公开输入 MSM。[MSM 实测](versions/v0.8.0/measurements.json)
 
 ## 复现方法
 

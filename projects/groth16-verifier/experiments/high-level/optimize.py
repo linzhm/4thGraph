@@ -1,6 +1,7 @@
 """Search complete Groth16 locks compiled from one high-level Forth source."""
 
 import argparse
+from dataclasses import replace
 import json
 from hashlib import sha256
 from itertools import product
@@ -10,6 +11,7 @@ from fourthgraph.bsv.evaluate import ScriptError, evaluate
 from fourthgraph.bsv.transaction import blob
 from fourthgraph.compiler.formula_experiment import enumerate_orders
 from fourthgraph.replay.bls12381_verifier import FIXTURE, SOURCES, fixture, witness_controls
+from fourthgraph.verification.bls12381.affine_witness import MSM_STRATEGIES
 from fourthgraph.verification.bls12381.build import (
     RESIDUE_ASSOCIATIONS, SCRIPT_ERAS, ArithmeticPlan, ForthVerifier,
 )
@@ -55,6 +57,9 @@ def measure(compiler, witnesses, packets):
         "path_bytes": len(blob(lock)) + max(len(blob(witness)) for witness in witnesses),
         "script_sha256": artifact["script_sha256"],
         "artifact_sha256": artifact["artifact_sha256"],
+        "witness_bytes": [len(witness) for witness in witnesses],
+        "witness_sha256": [sha256(witness).hexdigest() for witness in witnesses],
+        "msm_slope_count": artifact["msm_slope_count"],
         "local_verdicts": verify_vectors(lock, witnesses, controls),
         **diagnostics,
     }
@@ -73,6 +78,7 @@ def main():
     cli.add_argument("--source", type=Path, default=SOURCE, help="Forth source revision to compile")
     cli.add_argument("--residue-association", choices=RESIDUE_ASSOCIATIONS,
                      help="hold the residue multiplication order fixed while comparing Fp2 lowerings")
+    cli.add_argument("--msm", choices=MSM_STRATEGIES, help="restrict the MSM witness and lowering strategy")
     cli.add_argument("--output", type=Path, default=PROJECT / "workspace/build/high-level")
     args = cli.parse_args()
     args.output.mkdir(parents=True, exist_ok=True)
@@ -86,6 +92,8 @@ def main():
     plans = [ArithmeticPlan(rules, association) for rules, association
              in product(enumerate_orders(formula), associations)]
     plans.extend(ArithmeticPlan(FP2_RULES, association, "callsite") for association in associations)
+    strategies = (args.msm,) if args.msm else MSM_STRATEGIES
+    plans = [replace(plan, msm=msm) for msm, plan in product(strategies, plans)]
     packets = [public_packet(SOURCES, signals) for signals, _ in cases]
     report = {
         "objective": "path-bytes",
@@ -99,17 +107,22 @@ def main():
     for era in (args.era,) if args.era else SCRIPT_ERAS:
         reference = verifier(key, reference_source, reference_path, era)
         witnesses = [reference.witness(signals, proof, sources=SOURCES) for signals, proof in cases]
+        witness_sets = {reference.msm: witnesses}
         reference_row, _ = measure(reference, witnesses, packets)
         candidates = []
         for plan in plans:
-            result, artifact = measure(verifier(key, source, args.source, era, plan), witnesses, packets)
+            compiler = verifier(key, source, args.source, era, plan)
+            if plan.msm not in witness_sets:
+                witness_sets[plan.msm] = [compiler.witness(signals, proof, sources=SOURCES)
+                                         for signals, proof in cases]
+            result, artifact = measure(compiler, witness_sets[plan.msm], packets)
             candidates.append((result, artifact))
             print(era, plan, result["lock_bytes"], flush=True)
         winner, lock = min(candidates, key=lambda row: row[0]["path_bytes"])
         report["eras"][era] = {
             "reference": reference_row,
-            "witness_bytes": [len(witness) for witness in witnesses],
-            "witness_sha256": [sha256(witness).hexdigest() for witness in witnesses],
+            "witness_bytes": winner["witness_bytes"],
+            "witness_sha256": winner["witness_sha256"],
             "candidates": [result for result, _ in candidates],
             "selected_plan": winner["plan"],
         }

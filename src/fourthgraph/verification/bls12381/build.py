@@ -6,7 +6,9 @@ from hashlib import sha256
 import json
 from pathlib import Path
 
-from fourthgraph.verification.bls12381.affine_witness import AffineStages, LAYOUTS, affine_witness, line_packet, msm_windows, slope_packet_bytes
+from fourthgraph.verification.bls12381.affine_witness import (
+    AffineStages, LAYOUTS, MSM_STRATEGIES, affine_witness, line_packet, msm_windows, slope_packet_bytes,
+)
 from fourthgraph.verification.bls12381.field import FP2_ENTRY, FP2_RULES, fp2_alternatives, fp2_kernel
 from fourthgraph.verification.bls12381.verifier import (
     PACKET_BYTES, ScriptVerifier, VerifierStages, _FIXED_WITNESS, dynamic_slots, input_sources, public_signals,
@@ -37,6 +39,7 @@ class ArithmeticPlan:
     fp2_rules: tuple[str, ...] = FP2_RULES
     residue_association: str = "left"
     fp2_selection: str = "uniform"
+    msm: str = MSM_STRATEGIES[0]
 
     def __post_init__(self):
         object.__setattr__(self, "fp2_rules", validate_rules(self.fp2_rules))
@@ -44,18 +47,22 @@ class ArithmeticPlan:
             raise ValueError(f"residue association must be one of {', '.join(RESIDUE_ASSOCIATIONS)}")
         if self.fp2_selection not in ("uniform", "callsite"):
             raise ValueError("Fp2 selection must be uniform or callsite")
+        if self.msm not in MSM_STRATEGIES:
+            raise ValueError(f"MSM must be one of {', '.join(MSM_STRATEGIES)}")
 
     def document(self):
         document = asdict(self)
         if self.fp2_selection == "uniform":
             del document["fp2_selection"]
+        if self.msm == MSM_STRATEGIES[0]:
+            del document["msm"]
         return document
 
     @classmethod
     def read(cls, path):
         plan = json.loads(path.read_bytes())
         required = {"fp2_rules", "residue_association"}
-        if not isinstance(plan, dict) or not required <= plan.keys() <= required | {"fp2_selection"}:
+        if not isinstance(plan, dict) or not required <= plan.keys() <= required | {"fp2_selection", "msm"}:
             raise ValueError("arithmetic plan requires fp2_rules and residue_association")
         return cls(**plan)
 
@@ -140,12 +147,15 @@ class ForthVerifier(ScriptVerifier):
         super().__init__(verification_key)
         if witness_layout not in LAYOUTS:
             raise ValueError(f"unknown witness layout {witness_layout!r}")
+        if plan is not None and plan.msm == "signed-radix4" and witness_layout == "projective":
+            raise ValueError("signed radix-4 MSM requires an affine witness layout")
         if script_era not in SCRIPT_ERAS:
             raise ValueError(f"unknown Script era {script_era!r}")
         self.witness_layout = witness_layout
         self.script_era = script_era
         self.source = source
         self.plan = plan
+        self.msm = plan.msm if plan is not None else MSM_STRATEGIES[0]
         frontend = VerifierSource(source.decode(), vocabulary=VOCABULARY, stack_types=STACK_TYPES,
                                   backend="groth16-bls12-381", source_path=source_path)
         self.libraries = frontend.library_imports
@@ -184,7 +194,7 @@ class ForthVerifier(ScriptVerifier):
             stages = VerifierStages(self.key, sources, **options)
         else:
             stages = AffineStages(self.key, sources, lines_in_witness=self.witness_layout == "affine-witness",
-                                  **options)
+                                  msm=self.msm, **options)
         stack = []
         for instruction, _ in self.instructions:
             if isinstance(instruction, Shuffle):
@@ -212,7 +222,7 @@ class ForthVerifier(ScriptVerifier):
             return super().witness(signals, proof, sources=sources)
         config = self.sources(None if sources is _FIXED_WITNESS else sources)
         return affine_witness(self.key, config, tuple(signals), proof,
-                              lines_in_witness=self.witness_layout == "affine-witness")
+                              lines_in_witness=self.witness_layout == "affine-witness", msm=self.msm)
 
     def artifact(self, signals, owner, script, *, compact=True):
         result = super().artifact(signals, owner, script, compact=compact)
@@ -235,7 +245,7 @@ class ForthVerifier(ScriptVerifier):
         if self.script_era == "chronicle":
             result.update(minimum_era="chronicle", minimum_utxo_era="chronicle")
         if self.witness_layout != "projective":
-            windows = sum(1 for _ in msm_windows(self.key, self.sources(signals)))
+            windows = sum(1 for _ in msm_windows(self.key, self.sources(signals), strategy=self.msm))
             result.update(schema_version=3, witness_layout=self.witness_layout, proof_packet_bytes=PACKET_BYTES,
                           slope_packet_bytes=slope_packet_bytes(windows), msm_slope_count=windows)
             result.pop("vk_claim_bytes", None)
@@ -255,13 +265,19 @@ class LayoutCandidate:
 def layout_candidates(verification_key, source, sources=None, owner=None, *, compact=True, script_era="genesis",
                       entry=None, source_path=None, plan=None):
     """Build the applicable layouts under the same proof and deployment policy."""
-    projective = ForthVerifier(verification_key, source, script_era=script_era, entry=entry, source_path=source_path,
-                               plan=plan)
-    sources = projective.sources(sources)
-    layouts = LAYOUTS if dynamic_slots(sources) else (projective.witness_layout,)
+    signed_msm = plan is not None and plan.msm == "signed-radix4"
+    primary = ForthVerifier(verification_key, source, entry=entry, source_path=source_path, script_era=script_era,
+                            witness_layout="affine-inline" if signed_msm else "projective", plan=plan)
+    sources = primary.sources(sources)
+    if dynamic_slots(sources):
+        layouts = LAYOUTS[1:] if signed_msm else LAYOUTS
+    else:
+        if signed_msm:
+            raise ValueError("signed radix-4 MSM requires at least one spend-time public input")
+        layouts = (primary.witness_layout,)
     candidates = []
     for layout in layouts:
-        verifier = projective if layout == projective.witness_layout else ForthVerifier(
+        verifier = primary if layout == primary.witness_layout else ForthVerifier(
             verification_key, source, witness_layout=layout, script_era=script_era, entry=entry, source_path=source_path,
             plan=plan,
         )
