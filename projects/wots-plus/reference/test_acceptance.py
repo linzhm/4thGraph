@@ -5,6 +5,7 @@ import os
 import unittest
 
 from fixtures import malformed_cases, mode_cases, mode_fixture
+from script import CACHE_PROFILES
 from fourthgraph.bsv.evaluate import evaluate
 from fourthgraph.bsv.script import push
 from test_node import engine_transaction, node_check
@@ -75,6 +76,39 @@ class AcceptanceTests(unittest.TestCase):
     def test_cached_steps_complete_payment_domain(self):
         self.check_payment_domain(cached_constants="steps")
 
+    def test_compact_complete_payment_domain(self):
+        self.check_payment_domain(cached_constants="compact")
+
+    def test_compact_v2_complete_payment_domain(self):
+        self.check_payment_domain(cached_constants="compact-v2")
+
+    def test_compact_v3_complete_payment_domain(self):
+        self.check_payment_domain(cached_constants="compact-v3")
+
+    def test_compact_v4_complete_payment_domain(self):
+        self.check_payment_domain(cached_constants="compact-v4")
+
+    def test_compact_v5_complete_payment_domain(self):
+        self.check_payment_domain(cached_constants="compact-v5")
+
+    def test_compact_v6_complete_payment_domain(self):
+        self.check_payment_domain(cached_constants="compact-v6")
+
+    def test_compact_v7_complete_payment_domain(self):
+        self.check_payment_domain(cached_constants="compact-v7")
+
+    def test_compact_v8_complete_payment_domain(self):
+        self.check_payment_domain(cached_constants="compact-v8")
+
+    def test_compact_v9_complete_payment_domain(self):
+        self.check_payment_domain(cached_constants="compact-v9")
+
+    def test_compact_v10_complete_payment_domain(self):
+        self.check_payment_domain(cached_constants="compact-v10")
+
+    def test_compact_v11_complete_payment_domain(self):
+        self.check_payment_domain(cached_constants="compact-v11")
+
     def check_payment_domain(self, *, cached_constants):
         expected = base_verdicts()
         self.assertEqual(len(expected), 123)
@@ -124,7 +158,7 @@ class AcceptanceTests(unittest.TestCase):
         print(f"{engines}: {len(visited)} WOTS+ rows, {len(accepted)} accepted, cached={cached_constants}")
 
     def test_every_signature_chain_in_a_complete_input(self):
-        for cached_constants in (False, True, "steps"):
+        for cached_constants in CACHE_PROFILES:
             with self.subTest(cached_constants=cached_constants):
                 self.check_signature_chains(cached_constants=cached_constants)
 

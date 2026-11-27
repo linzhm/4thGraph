@@ -12,15 +12,16 @@ CHALLENGE_WEIGHT = 39
 CHALLENGE_SIGN_BYTES = 8
 # FIPS 204, Appendix C, Table 3, including the bytes reserved for signs.
 SAMPLE_IN_BALL_BYTES = 221
+RESPONSE_BITS = 18
+GAMMA1 = 1 << 17
+RESPONSE_NORM_LIMIT = GAMMA1 - 78
 
 # FIPS 204, Table 1, category 2.
 _K = _L = 4
 _D = 13
-_BETA = 78
-_GAMMA1 = 1 << 17
 _GAMMA2 = (MODULUS - 1) // 88
 _OMEGA = 80
-_T1_WIDTH, _Z_WIDTH, _W1_WIDTH = 10, 18, 6
+_T1_WIDTH, _W1_WIDTH = 10, 6
 
 
 def _unpack(data, count, width):
@@ -136,12 +137,12 @@ def verify(public_key, message, signature, *, context=b""):
         return False
 
     challenge = signature[:CHALLENGE_BYTES]
-    hint_offset = CHALLENGE_BYTES + _L * DEGREE * _Z_WIDTH // 8
+    hint_offset = CHALLENGE_BYTES + _L * DEGREE * RESPONSE_BITS // 8
     hints = _hints(signature[hint_offset:])
     if hints is None:
         return False
-    z = [_GAMMA1 - value for value in _unpack(signature[CHALLENGE_BYTES:hint_offset], _L * DEGREE, _Z_WIDTH)]
-    if any(abs(coefficient) >= _GAMMA1 - _BETA for coefficient in z):
+    z = [GAMMA1 - value for value in _unpack(signature[CHALLENGE_BYTES:hint_offset], _L * DEGREE, RESPONSE_BITS)]
+    if any(abs(coefficient) >= RESPONSE_NORM_LIMIT for coefficient in z):
         return False
 
     public_hash = shake_256(public_key).digest(64)

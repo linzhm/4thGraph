@@ -1,6 +1,6 @@
 <!-- Generated from manifest.yaml with Copier. -->
 
-# WOTS+（SHA-256） v0.1.0
+# WOTS+（SHA-256） v0.12.0
 
 [English](README.md) · [4thGraph](../../README.zh-CN.md) · [项目目录](../README.zh-CN.md) · [版本](versions/index.json)
 
@@ -8,18 +8,18 @@
 
 **[钱包 SDK 快速上手](docs/sdk.zh-CN.md#quickstart)** · [统一钱包 SDK](../../sdk/README.zh-CN.md#quickstart)
 
-选择收款模板并接入有持久化记录的一次性签名器。缓存步骤模板支持符合条件的 OTDA 重建。
+WOTS+ v0.12.0 采用 `compact-v11` 模板，付款锁为 21,272 字节，OTDA 重建程序为 732 字节。使用付款锁时，请接入能持久记录密钥消耗的一次性签名器。[版本产物](versions/v0.12.0/manifest.json)
 
-[协议](docs/developer.zh-CN.md) · [算法与执行](#算法与执行) · [复现方法](#复现方法) · [完整交易与栈测量](#完整交易与栈测量)
+[协议](docs/developer.zh-CN.md) · [算法与执行](#算法与执行) · [复现方法](#复现方法) · [完整交易与栈测量](#完整交易与栈测量) · [实测数据](versions/v0.12.0/measurements.json)
 
 | 入口 | 用途 |
 | --- | --- |
-| `locking_script` | 构造标准或缓存付款锁，也可生成用于测试的独立验签器。 |
+| `locking_script` | 构造标准、缓存或 Compact 付款锁，也可生成用于测试的独立验签器。 |
 | `sign_spend` | 为所选交易输入请求一次性签名。 |
 
 ## 使用场景与取舍
 
-当研究重点是 SHA‑256 一次性签名的见证体积时，可以评估 WOTS+。WOTS+ 的原始签名为 2,144 字节，本仓库的 Lamport 签名为 8,192 字节。比较整笔交易时，要把付款锁和解锁脚本都算上。WOTS+ 提供标准锁和两种缓存模板。可对照实测结果，查看缓存步骤模板及适用的 OTDA 重建如何影响入金、周转和退出。[交易实测](#完整交易与栈测量)
+当研究重点是 SHA‑256 一次性签名的见证体积时，可以评估 WOTS+。WOTS+ 的原始签名为 2,144 字节，本仓库的 Lamport 签名为 8,192 字节。比较整笔交易时，要把付款锁和解锁脚本都算上。[交易实测](#compact-模板实测)
 
 每个 UTXO 使用新密钥，找零也一样。签名返回前要持久记录密钥已消耗。评估连续周转时，除了脚本验证，还应演练密钥保留和已签交易重播。[钱包接入](docs/sdk.zh-CN.md)
 
@@ -27,7 +27,7 @@
 
 [协议规范](docs/developer.zh-CN.md#protocol) · [安全分析](docs/developer.zh-CN.md#security) · [复现与验证](#开发和钱包接入) · [交易成本](#完整交易与栈测量)
 
-WOTS+ 是 v0.1.0 开发基线，按 RFC 8391 的 `WOTSP-SHA2_256` 哈希链验证一次性签名。项目定义 64 字节的 BSV 公钥编码，原始签名为 2,144 字节。付款锁将证明绑定到实际花费的交易输入。 [编码规范](docs/spec.md) · [RFC 8391](https://www.rfc-editor.org/rfc/rfc8391)
+WOTS+ 按 RFC 8391 的 `WOTSP-SHA2_256` 哈希链验证一次性签名。项目定义 64 字节的 BSV 公钥编码，原始签名为 2,144 字节。付款锁将证明绑定到实际花费的交易输入。[编码规范](docs/spec.md) · [RFC 8391](https://www.rfc-editor.org/rfc/rfc8391)
 
 ### 模板与签名模式
 
@@ -36,8 +36,19 @@ WOTS+ 是 v0.1.0 开发基线，按 RFC 8391 的 `WOTSP-SHA2_256` 哈希链验�
 | 默认 `locking_script(key)` | 42,266 字节 | 交易绑定模板 |
 | `cached_constants=True` | 36,283 字节 | 在栈上保存复用的常量 |
 | `cached_constants="steps"` | 33,956 字节 | 再缓存 15 个四字节步骤索引 |
+| `cached_constants="compact"` | 29,217 字节 | 复用 Forth 生成的哈希链指令，缓存完整地址后缀和选择位 |
+| `cached_constants="compact-v2"` | 27,070 字节 | 用栈上的剩余步数选择需要执行的哈希步骤 |
+| `cached_constants="compact-v3"` | 25,965 字节 | 成对复制哈希输入的固定字段，压缩缓存常量和交易绑定 |
+| `cached_constants="compact-v4"` | 23,296 字节 | 在链值旁缓存地址选择位掩码，复用交易绑定的公钥 |
+| `cached_constants="compact-v5"` | 22,494 字节 | 跨链保留常量，在解析摘要时计算剩余步数 |
+| `cached_constants="compact-v6"` | 21,982 字节 | 用同一个缓冲区保存签名和端点，直接递增地址里的链索引 |
+| `cached_constants="compact-v7"` | 21,774 字节 | 用位运算解析摘要，只在第一次进位时规范化地址 |
+| `cached_constants="compact-v8"` | 21,540 字节 | 在链之间把签名缓冲区留在主栈，成对保存摘要半字节 |
+| `cached_constants="compact-v9"` | 21,332 字节 | 并行计算摘要校验和，复用连续的摘要拆分指令 |
+| `cached_constants="compact-v10"` | 21,320 字节 | 每两条消息链按需解码一个摘要字节 |
+| `cached_constants="compact-v11"` | 21,272 字节 | 批量生成并拆分哈希步骤的地址后缀 |
 
-三种锁的普通 BIP143 解锁都为 2,310 字节。启用 Chronicle 并采用版本 2 交易时，可为缓存步骤输出显式启用 `compress_otda=True`。OTDA ALL 重建签名原文里的相关输出，配对 SINGLE 只重建同索引输出。未知输出原样处理，无配对 SINGLE 采用伴随验签。仅验证给定摘要的 `transaction=False` 模板用于算法测试。
+十四种锁的普通 BIP143 解锁都为 2,310 字节。启用 Chronicle 并采用版本 2 交易时，可用 `compress_otda=True` 重建 Compact 系列和 `cached-steps` 输出。OTDA ALL 可在同一笔交易中重建这十二种输出，配对 SINGLE 只重建同索引输出。未知输出原样处理，无配对 SINGLE 采用伴随验签。仅验证给定摘要的 `transaction=False` 模板用于算法测试。
 
 ## 复现方法
 
@@ -48,7 +59,7 @@ python -m pip install -r projects/wots-plus/reference/requirements.txt
 ```
 
 ```sh
-PYTHONPATH=src:. python projects/wots-plus/reference/generate_reconstruction.py --check
+python projects/wots-plus/reference/generate_reconstruction.py --version v0.12.0
 bash projects/wots-plus/reference/verify.sh
 ```
 
@@ -63,14 +74,49 @@ python -m unittest discover -s projects/wots-plus/reference -p test_wots.py -v
 可选用 [Lean Script 求值器](https://github.com/Calhooon/bsv-script-lean#try-it)重放同一批合成输入。
 
 ```sh
-python projects/wots-plus/reference/test_lean.py /path/to/bsv-script-lean/eval/bsvs
+python projects/wots-plus/reference/test_lean.py --compact-v11 /path/to/bsv-script-lean/eval/bsvs
 ```
 
 该入口单独检查交易激活规则和指定输入的 Script 判定。
 
+运行 `python projects/wots-plus/reference/generate_reconstruction.py --version v0.12.0 --check`，可逐字节核对当前编译结果与归档的付款锁和重建程序。
+
 ## 脚本尺寸
 
-### 输入输出取舍
+### Compact 模板实测
+
+`compact` 的 67 条哈希链共用同一段编译后的指令，OTDA 重建时只需携带一份。`compact-v2` 用栈上的 `15 − d` 选择从签名值 `d` 到第 14 步要执行的哈希，将每条链从 406 字节减到 374 字节。
+
+`compact-v3` 一次复制零前缀和链地址，把链索引保留为一个字节，并用指令生成缓存的填充字节。每条链降到 363 字节。更短的签名模式检查和 DER 构造也减少了交易绑定代码。
+
+`compact-v4` 将地址选择位掩码留在链值旁边，用 `OP_TUCK` 和 `OP_2SWAP` 减少每步的重复取值，每条链降到 324 字节。交易绑定从普通签名中构造固定公钥，并在无配对 OTDA SINGLE 的伴随验签中复用。
+
+`compact-v5` 跨链保留零前缀和选择位掩码，在解析摘要和校验和时直接算出剩余步数。每条链降到 312 字节。OTDA 重建程序用缓存的字节串拼接重复指令。
+
+`compact-v6` 每条链从备用栈缓冲区的开头取一个签名元素，将算出的端点追加到末尾，并直接递增 PRF 地址的链索引。每条链降到 305 字节，固定的伴随签名也改由公钥重建。
+
+`compact-v7` 用掩码和移位解析摘要，只在第一次递增链索引时规范化地址。其余链复用 304 字节的指令。脚本生成固定的 PRF 填充字节和伴随验签的零哈希。重建程序通过倍增指令序列并裁去多余字节来生成倒计时和字节反转指令。
+
+`compact-v8` 在两条链之间把缓冲区留在主栈，哈希时才把缓冲区剩余部分放入备用栈。它还把地址增量移入步骤后缀表，缩短每条链的一次取值。重复链体降到 301 字节，摘要解析改用 `OP_2DUP` 成对保存半字节。在两进两出 BIP143 ALL 夹具中，开发求值器测得主栈峰值为 32 项，备用栈峰值从 68 项降到 67 项。[Forth 实现](reference/compact.fth)
+
+`compact-v9` 把取反后的摘要半字节合并为 16 位字组，再对 65,535 取模得到校验和。倒计时直接读取按字节保存的半字节值。拆分最后 15 个摘要字节时，脚本用剩余长度计算索引，OTDA 重建程序可通过倍增复原这段连续指令。两进两出 BIP143 ALL 夹具中的主栈和备用栈峰值仍为 32 项和 67 项，合计栈载荷峰值由 2,916 B 增至 2,922 B。
+
+`compact-v10` 将取反后的摘要保存在一个缓冲区里，每两条消息链按需解码一个字节。OTDA 在 301 字节链体的一份副本里插入解码指令，再倍增链对生成全部 64 条消息链。两进两出 BIP143 ALL 夹具中，开发求值器测得主栈峰值为 32 项，备用栈峰值由 67 项降至 6 项，合计栈载荷峰值为 2,891 B。
+
+`compact-v11` 用一次除法生成 15 个 PRF 步骤的地址后缀，再按每项 8 字节拆到栈上。哈希链按新栈位置取值，OTDA 重建程序复用每次取值前的相同指令。在同一 BIP143 ALL 夹具中，开发求值器测得主栈和备用栈峰值分别为 32 项和 6 项，合计栈载荷峰值为 2,891 B。
+
+| 实测项目 | `cached-steps` | `compact` | `compact-v2` | `compact-v3` | `compact-v4` | `compact-v5` | `compact-v6` | `compact-v7` | `compact-v8` | `compact-v9` | `compact-v10` | `compact-v11` |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 版本 | [v0.1.0](versions/v0.1.0/manifest.json) | [v0.2.0](versions/v0.2.0/manifest.json) | [v0.3.0](versions/v0.3.0/manifest.json) | [v0.4.0](versions/v0.4.0/manifest.json) | [v0.5.0](versions/v0.5.0/manifest.json) | [v0.6.0](versions/v0.6.0/manifest.json) | [v0.7.0](versions/v0.7.0/manifest.json) | [v0.8.0](versions/v0.8.0/manifest.json) | [v0.9.0](versions/v0.9.0/manifest.json) | [v0.10.0](versions/v0.10.0/manifest.json) | [v0.11.0](versions/v0.11.0/manifest.json) | [v0.12.0](versions/v0.12.0/manifest.json) |
+| 锁定脚本 | 33,956 B | 29,217 B | 27,070 B | 25,965 B | 23,296 B | 22,494 B | 21,982 B | 21,774 B | 21,540 B | 21,332 B | 21,320 B | 21,272 B |
+| OTDA 重建程序 | 3,097 B | 2,395 B | 2,358 B | 1,979 B | 1,884 B | 1,126 B | 1,076 B | 957 B | 952 B | 910 B | 795 B | 732 B |
+| 两进两出 BIP143 ALL | 72,650 B | 63,172 B | 58,878 B | 56,668 B | 51,330 B | 49,726 B | 48,702 B | 48,286 B | 47,818 B | 47,402 B | 47,378 B | 47,282 B |
+| 两进两出 OTDA ALL，启用重建 | 79,090 B | 68,208 B | 63,840 B | 60,872 B | 55,344 B | 52,224 B | 51,100 B | 50,446 B | 49,968 B | 49,468 B | 49,214 B | 48,992 B |
+| 两进两出配对 OTDA SINGLE，启用重建 | 78,921 B | 68,039 B | 63,671 B | 60,703 B | 55,175 B | 52,055 B | 50,931 B | 50,277 B | 49,799 B | 49,299 B | 49,045 B | 48,823 B |
+
+钱包 SDK 用 `template: "compact-v11"` 选择 v0.12.0 的付款锁。各版清单记录了 SDK 模板、Git 标签和源码提交。[接入示例](docs/sdk.zh-CN.md#quickstart)
+
+### 缓存步骤模板实测
 
 缓存步骤把每个锁从 42,266 降到 33,956 字节，降低入金及新建输出的成本。OTDA ALL 的重建再把同类两进两出从 208,406 降到 79,090 字节。配对 SINGLE 从 140,473 降到 78,921 字节，而重建前后的两栈载荷峰值都是 70,280 字节。新增第三个输入与前两个输出无配对，边际仍是 2,440 字节。
 

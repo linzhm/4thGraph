@@ -1,6 +1,6 @@
 <!-- Generated from manifest.yaml with Copier. -->
 
-# Pure ML-DSA-44 v0.1.0
+# Pure ML-DSA-44 v0.11.0
 
 [简体中文](README.zh-CN.md) · [4thGraph](../../README.md) · [Project index](../README.md) · [Versions](versions/index.json)
 
@@ -10,7 +10,7 @@
 
 Make a lock from the raw ML-DSA-44 public key and sign the payment message in Pure mode with an empty context.
 
-[Protocol](docs/developer.en.md) · [Algorithm and execution](#algorithm-and-execution) · [Reproduce the checks](#reproduce-the-checks) · [Complete transactions and stack measurements](#complete-transactions-and-stack-measurements)
+[Protocol](docs/developer.en.md) · [Algorithm and execution](#algorithm-and-execution) · [Reproduce the checks](#reproduce-the-checks) · [Complete transactions and stack measurements](#complete-transactions-and-stack-measurements) · [Measurements data](versions/v0.11.0/measurements.json)
 
 | Entry point | Purpose |
 | --- | --- |
@@ -22,25 +22,29 @@ Make a lock from the raw ML-DSA-44 public key and sign the payment message in Pu
 
 Evaluate Pure ML-DSA-44 when measuring FIPS 204 signer interoperability or large-script resource limits. A lab can start with the detached conformance vectors and then run the payment wrapper with the same kind of public key and a dedicated payment signer. The wrapper passes a 32-byte payment message to Pure ML-DSA-44 with an empty context. Key and signature validation, transaction binding, and node admission each have their own evidence. [Reproduction steps](#reproduce-the-checks)
 
-The fixed-key payment lock is about 926 kB in the measured fixtures. Evaluate script size, transaction size and validation policy on the target node or miner before choosing this format for a funded workflow. [Funded regtest method](../../docs/benchmark.md#funded-regtest-measurements)
+The fixed-key payment lock is about 252 kB in the measured fixtures. Evaluate script size, transaction size and validation policy on the target node or miner before choosing this format for a funded workflow. [Funded regtest method](../../docs/benchmark.md#funded-regtest-measurements)
 
 ## Algorithm and execution
 
 [Protocol](docs/developer.en.md#protocol) · [Security](docs/developer.en.md#security) · [Verify](#reproduce-the-checks) · [Transaction costs](#complete-transactions-and-stack-measurements)
 
-**Status** · v0.1.0 development baseline.
+ML-DSA is the post-quantum digital signature algorithm standardized in NIST
+FIPS 204. It derives from CRYSTALS-Dilithium and relies on the computational
+hardness of module-lattice problems. ML-DSA-44 targets NIST security category 2
+and has the smallest public key and signature of the three parameter sets, at
+1,312 and 2,420 bytes respectively. The two 4s in the name refer to the
+dimensions of its 4 × 4 public matrix.
+[NIST FIPS 204](https://csrc.nist.gov/pubs/fips/204/final)
 
-The verifier uses the FIPS 204 Pure ML-DSA-44 public-key and signature
-encodings. A public key is 1,312 bytes and a signature is 2,420 bytes.
-The OpenSSL fixture uses a public test seed and deterministic signing.
-[FIPS 204](https://csrc.nist.gov/pubs/fips/204/final)
+The verifier checks the signature encoding, response bounds and canonical
+hints. It uses the number-theoretic transform (NTT) for polynomial arithmetic
+and SHAKE256 to recompute the challenge and check it against the encoded one.
+When building a BSV payment lock, the Script compiler precomputes the matrix
+and transformed public-key polynomials for the fixed key. [Script verifier](reference/script.py)
 
-The Script compiler precomputes the matrix and transformed public-key
-polynomials. At execution the script checks the signature encoding, response
-norm and canonical hints, derives the challenge polynomial, and reconstructs
-and hashes the commitment. The payment wrapper supports all twelve BIP143 and
-Chronicle OTDA sighash combinations. Unpaired OTDA `SINGLE` uses the companion
-BIP143 binding. The wallet checks the funding output before requesting an
+The payment wrapper supports all twelve BIP143 and Chronicle OTDA sighash
+combinations. Unpaired OTDA `SINGLE` uses the companion BIP143 binding.
+The wallet checks the funding output before requesting an
 external signature. The caller authenticates the funding transaction and
 approves the transaction intent.
 [Transaction-binding construction](../../src/fourthgraph/bsv/pushtx.py)
@@ -62,9 +66,11 @@ python -m pip install -r tools/requirements-chronicle.txt
 ```
 
 ```sh
-PYTHONPATH=src:. python -m unittest discover -s projects/ml-dsa/reference -p test_signature_script.py
-PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- python -m unittest discover -s projects/ml-dsa/reference -p test_payment.py
+PYTHONPATH=src:.:projects/ml-dsa/reference python -c 'from benchmark_adapter import components; print(components(None))'
+PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- python -m unittest discover -s projects/ml-dsa/reference
 ```
+
+The OpenSSL fixture uses a public test seed and deterministic signing.
 
 ```sh
 python -m unittest discover -s projects/ml-dsa/reference -p test_mldsa.py -v
@@ -72,8 +78,11 @@ python projects/ml-dsa/reference/check_chain_gang.py -v
 python projects/ml-dsa/reference/test_shake_script.py -v
 python projects/ml-dsa/reference/test_signature_script.py -v
 python projects/ml-dsa/reference/test_challenge_script.py -v
+python projects/ml-dsa/reference/test_boundaries.py -v
 python projects/ml-dsa/reference/test_payment.py -v
 ```
+
+Both engines matched 276 component boundary checks and 18 complete-payment boundary checks. [Boundary checks](reference/payment-acceptance.md#boundary-rejection)
 
 The Python verifier matched OpenSSL-generated test fixtures and all 80
 standard ML-DSA-44 Wycheproof cases. The bounded Python verifier and the
@@ -101,53 +110,51 @@ prevout eras, and three single changes. Its coverage record gives the exact
 domain and expected decisions. [Payment acceptance](reference/payment-acceptance.md)
 
 Set `ML_DSA_BSVS` to the executable `bsvs` path to repeat the Lean comparison.
-Because the canonical lock is 926,403 bytes, the native node requires an
-explicit script policy limit for the replay.
-The shared launchers set `-maxscriptsizepolicy=100000000` alongside the existing
+The native replay uses an explicit script policy limit. The shared launchers
+set `-maxscriptsizepolicy=100000000` alongside the existing
 transaction-size and stack-memory limits. An isolated regtest can repeat the
 matrix through `REGTEST_COOKIE` and `REGTEST_URL`.
 [Shared regression evidence](../../docs/chronicle-regression.md)
 
 ## Script sizes
 
-These are fixture-specific Script bytes, excluding transaction serialization.
-The SHAKE measurements fix the input and output lengths at compile time.
+These are Script bytes for identical fixtures, before transaction serialization.
 
-| Component | Bytes |
-|---|---:|
-| NTT | 46,134 |
-| Inverse NTT | 43,500 |
-| Negacyclic ring product | 141,915 |
-| Fixed-key verification equation | 500,794 |
-| Signature decoding | 62,723 |
-| SampleInBall with the 221-byte budget | 70,229 |
-| Apply hints and encode high bits | 89,687 |
-| SHAKE256, 832-byte input to 32-byte output | 176,542 |
-| Complete payment lock | 926,403 |
-| One-input BIP143 `ALL` unlock | 2,588 |
+| Component | PR #68 baseline | Compact `879b52c` | v0.2.0 | v0.3.0 | v0.4.0 | v0.5.0 | v0.6.0 | v0.7.0 | v0.8.0 | v0.9.0 | v0.10.0 | v0.11.0 |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| Fixed-key verification equation | 500,794 | 310,198 | 257,122 | 137,874 | 137,874 | 137,874 | 124,849 | 124,849 | 127,876 | 122,627 | 122,627 | 122,627 |
+| Signature decoding | 62,723 | 46,392 | 36,152 | 36,152 | 28,224 | 28,224 | 28,224 | 28,224 | 6,007 | 6,007 | 6,007 | 6,007 |
+| SampleInBall with the 221-byte budget | 70,229 | 63,701 | 61,101 | 61,101 | 61,101 | 45,211 | 43,512 | 40,827 | 40,827 | 40,827 | 30,638 | 25,717 |
+| Apply hints and encode high bits | 89,687 | 66,135 | 66,135 | 66,135 | 31,087 | 31,087 | 31,087 | 23,389 | 23,389 | 11,829 | 11,829 | 11,829 |
+| Standalone Keccak-f[1600] with little-endian lanes | 25,097 | 21,833 | 20,533 | 20,533 | 20,533 | 12,588 | 12,588 | 12,588 | 12,588 | 12,588 | 12,588 | 12,588 |
+| SHAKE256, 832-byte input to 32-byte output | 176,542 | 153,694 | 144,594 | 144,594 | 144,594 | 88,979 | 81,821 | 79,133 | 79,133 | 79,133 | 74,766 | 74,023 |
+| Current-input binding | 718 | 718 | 718 | 718 | 718 | 506 | 506 | 506 | 506 | 506 | 506 | 506 |
+| Complete payment lock | 926,403 | 663,284 | 586,981 | 467,733 | 424,757 | 345,095 | 322,447 | 308,992 | 289,802 | 272,993 | 257,662 | **251,704** |
+| One-input BIP143 `ALL` unlock | 2,588 | 2,588 | 2,588 | 2,588 | 2,588 | 2,588 | 2,588 | 2,588 | 2,588 | 2,588 | 2,588 | 2,588 |
 
-The fixed-key equation accepts packed challenge and response coefficients and
-produces four canonical residual polynomials. The arithmetic and SHAKE scripts
-are also independently replayable. [Deterministic fixture](versions/v0.1.0/deterministic.json)
+The Forth payment entry uses `stack` optimization on upstream revision `889ff6e`. v0.5.0 emits Keccak's theta and chi over five-lane rows. Theta masks the one-bit shifts at lane boundaries, and rho and pi operate on individual lanes. Ten permutations in the payment lock save 79,450 bytes. The shared compact input binding saves another 212 bytes. [Forth entry](reference/payment-lock.fth) · [v0.4.0 measurements](versions/v0.4.0/measurements.json) · [v0.5.0 measurements](versions/v0.5.0/measurements.json)
 
-### Signed-residue NTT experiment
+v0.6.0 applies two adjacent NTT butterfly stages to each four-coefficient group at the top of the stack. Bounds on the centered transforms allow a modulus-aligned offset that keeps each packed lane below its sign bit, saving 13,025 bytes together with the paired butterflies. SHAKE keeps its internal lanes big-endian across permutations and converts only absorbed and squeezed bytes, saving another 9,623 bytes in the lock. [v0.6.0 measurements](versions/v0.6.0/measurements.json)
 
-`transform_script(signed_residues=True)` keeps intermediates as signed
-representatives of the field and restores canonical coefficients before
-serialization. The forward transform measures 38,454 bytes and the inverse
-40,940 bytes. The fixed-key equation measures 452,154 bytes for the same
-fixture, down from 500,794. Independent polynomial evaluation and complete
-input replay check the canonical result, including zero and alternating
-field-boundary coefficients. This experiment lives at the arithmetic
-kernel boundary. Full payment and external signature conformance use the
-canonical verifier.
+v0.7.0 applies each sparse hint by shifting its residue by one rounding interval modulo q−1, then encodes the high bits in one scan with shared constants. This saves 7,698 bytes. Keeping the challenge coefficients in one signed byte each saves 1,917 bytes. Keccak applies chi as soon as each rho/pi row is ready and moves it off the main stack, saving 384 bytes per permutation and 3,840 bytes per lock. [v0.7.0 measurements](versions/v0.7.0/measurements.json)
+
+v0.8.0 checks the strict response norm in 64-coefficient blocks in the original 18-bit encoding. A guard bit in each lane prevents borrows between lanes. The NTT reads the checked wire response directly, reuses the modulus across pointwise products, and concatenates fixed-width inverse input lanes. The signature decoder is 22,217 bytes smaller and the equation grows by 3,027 bytes, for a net reduction of 19,190 bytes. [v0.8.0 measurements](versions/v0.8.0/measurements.json)
+
+v0.9.0 complements the wire response and subtracts one bias from all four packed response lanes at once. The NTT reuses the forward bias and modulus at fixed stack depths. Together with the fixed-depth inverse bias, this saves 5,249 bytes in the equation. A reciprocal multiplication rounds 64 hint-adjusted residues in parallel. A second multiplication gathers four six-bit digits at a time into the FIPS 204 encoding, saving 11,560 bytes in hint application and encoding. [v0.9.0 measurements](versions/v0.9.0/measurements.json)
+
+v0.10.0 makes a mask of acceptable draws with a parallel byte comparison, then bisects it to find the first acceptable byte for each SampleInBall selection. The original 221-byte budget still applies, including the sign bytes. This saves 8,683 bytes in the sampler. SHAKE swaps byte groups in parallel when converting the rate block and uses the shorter shift for some Keccak rotations, saving 6,648 bytes in the lock. [v0.10.0 measurements](versions/v0.10.0/measurements.json)
+
+v0.11.0 locates the first accepted draw by subtracting one from the nonzero acceptance mask and XORing the result with the mask. The minimal byte length of the result identifies the draw and saves 4,560 bytes in the sampler. SHAKE constructs zero padding and capacity in Script and absorbs the first block directly into the empty state, saving another 1,398 bytes. [v0.11.0 measurements](versions/v0.11.0/measurements.json)
+
+The arithmetic and SHAKE scripts are also independently replayable. [Deterministic fixture](versions/v0.1.0/deterministic.json)
 
 ## Developer and wallet integration
 
-Use `locking_script(public_key)` to create a payment output and retain the
-authenticated 1,312-byte public key. Before authorizing a payment, compare the
-funding output with the script generated for that key, verify its amount and
-outpoint, and apply the wallet's confirmation requirement. Call `sign_payment`
+Use `locking_script(public_key)` to create a compact payment output and retain
+the authenticated 1,312-byte public key. The wallet recognizes and spends
+the eleven earlier generations for that key. Use `locking_script(public_key, legacy=True)`
+to reproduce the original v0.1.0 lock bytes. Before authorizing a payment, verify the
+funding amount, outpoint and confirmations. Call `sign_payment`
 for a single-input payment or `sign_spend` for an already prepared input.
 The callback signs the supplied 32 bytes as the message with Pure ML-DSA-44
 and an empty context. It returns the 2,420-byte standard signature for
@@ -155,19 +162,17 @@ verification and witness assembly. The message verifier can separately test
 variable-length messages and permitted contexts. [Wallet source](reference/payment.py)
 
 Fixed-key script generation can serialize different keys to slightly different
-lengths, so the single-lock arithmetic fixture above and the payment rows
-below have different values. In OTDA ALL, each witness also carries the full
-serialized outputs. That cost dominates the 5,563,725-byte two-in, two-out
-fixture. The signed-residue NTT numbers describe a component experiment.
+lengths. In OTDA ALL, each witness carries the full serialized outputs, which
+amplifies the savings from smaller output locks.
 
 ## Complete transactions and stack measurements
 
-These deterministic fixtures use commit `beeb4dd`. BSV Node 1.2.3 and the project's pinned chain-gang validate the complete inputs. The node replays scripts with supplied prevouts. Funded mempool and mining tests have separate records. Scripts and transactions are measured in bytes. Script sizes follow input and output order. `× n` indicates n equal sizes. Stack peaks refer to input zero, with independent peaks for main-stack items, altstack items, and combined payload. The development evaluator measures stack payload bytes on the successful path. The evaluator stops at `OP_GREATERTHANOREQUAL`, so stack results are unavailable for both ML-DSA-44 rows.
+BSV Node 1.2.3 and the pinned chain-gang validate these transactions with supplied prevouts. Sizes are in bytes and follow input and output order. `× n` indicates n equal sizes. The development evaluator lacks the comparison opcodes needed for stack measurements. The two-input, two-output transactions measured 520,616 bytes for BIP143 ALL and 1,551,168 bytes for OTDA ALL in v0.10.0.
 
 | Template and mode | Inputs×outputs | Previous locks | Unlocks | New locks | Total | Main / alt items | Stack payload |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| `pure-ml-dsa-44` · `0x41` | 2×2 | 926,412 × 2 | 2,588 × 2 | 926,410 / 926,414 | 1,858,122 | — / — | — |
-| `pure-ml-dsa-44` · `0x61` | 2×2 | 926,421 / 926,413 | 1,855,385 × 2 | 926,416 / 926,413 | 5,563,725 | — / — | — |
+| `pure-ml-dsa-44` · `0x41` | 2×2 | 251,702 / 251,704 | 2,588 × 2 | 251,701 × 2 | 508,700 | — / — | — |
+| `pure-ml-dsa-44` · `0x61` | 2×2 | 251,708 / 251,700 | 505,950 × 2 | 251,694 / 251,700 | 1,515,420 | — / — | — |
 
 ## Marginal and lifecycle costs
 
@@ -175,7 +180,7 @@ Each marginal cell shows the **change in total bytes (output locks / input unloc
 
 | Template and mode | Added-input shape | Added-input bytes | Added-output shape | Added-output bytes | Fund and exit | One turnover |
 | --- | --- | --- | --- | --- | --- | --- |
-| `pure-ml-dsa-44` · `0x41` | 3×2 | 2,627 (-4 / 2,588 / 43) | 2×3 | 926,418 (926,405 / 0 / 13) | 1,858,346 | 3,716,464 |
-| `pure-ml-dsa-44` · `0x61` | 3×2 | 1,855,545 (-2 / 1,855,502 / 45) | 2×3 | 2,779,266 (926,409 / 1,852,844 / 13) | 1,858,363 | 7,422,076 |
+| `pure-ml-dsa-44` · `0x41` | 3×2 | 2,635 (4 / 2,588 / 43) | 2×3 | 251,708 (251,695 / 0 / 13) | 508,934 | 1,017,626 |
+| `pure-ml-dsa-44` · `0x61` | 3×2 | 506,102 (-4 / 506,061 / 45) | 2×3 | 755,130 (251,697 / 503,420 / 13) | 508,946 | 2,024,357 |
 
 [Unified benchmark and reproduction](../../docs/benchmark.md)

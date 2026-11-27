@@ -1,6 +1,6 @@
 <!-- Generated from manifest.yaml with Copier. -->
 
-# P2PKH-R1 v0.6.0
+# P2PKH-R1 v0.8.0
 
 [English](README.md) · [4thGraph](../../README.zh-CN.md) · [项目目录](../README.zh-CN.md) · [版本](versions/index.json)
 
@@ -10,7 +10,7 @@
 
 P2PKH-R1 让 BSV 钱包接入已有的 P‑256 签名器。输出锁定到收款公钥的 HASH160，花费时提供未压缩公钥和 64 字节的 ECDSA 签名 `r || s`。
 
-[协议](docs/spec.zh-CN.md) · [算法与执行](#算法与执行) · [复现方法](#复现方法) · [完整交易与栈测量](#完整交易与栈测量) · [实测数据](versions/v0.6.0/measurements.json)
+[协议](docs/spec.zh-CN.md) · [算法与执行](#算法与执行) · [复现方法](#复现方法) · [完整交易与栈测量](#完整交易与栈测量) · [实测数据](versions/v0.8.0/measurements.json)
 
 | 入口 | 用途 |
 | --- | --- |
@@ -28,8 +28,8 @@ P2PKH-R1 让 BSV 钱包接入已有的 P‑256 签名器。输出锁定到收款
 在编译器实验环境中从仓库根目录运行版本命令。[依赖与复放配置](forth/README.md)
 
 ```sh
-PYTHONPATH=src:.:projects/p2pkh-r1/reference python projects/p2pkh-r1/forth/msm_experiment.py build --candidate split-5x4-affine-g
-PYTHONPATH=src:.:projects/p2pkh-r1/reference bash tools/verify_node.sh --profile raised -- python projects/p2pkh-r1/forth/msm_experiment.py compare --workflow explicit --matrix --candidate v0.5.0 --candidate v0.6.0 --budget 2 --full-budget 2
+PYTHONPATH=src:.:projects/p2pkh-r1/reference python projects/p2pkh-r1/forth/compile_r1.py --entry r1-baseline-lock --replay-plan projects/p2pkh-r1/versions/v0.8.0/plan.json
+PYTHONPATH=src:.:projects/p2pkh-r1/reference bash tools/verify_node.sh --profile raised -- python projects/p2pkh-r1/forth/msm_experiment.py compare --workflow explicit --matrix --candidate v0.7.0 --candidate v0.8.0 --budget 2 --full-budget 2
 ```
 
 选定的编译器版本和钱包默认模板分别归档。完整复放流程见编译器指南，付款矩阵见验收记录。[编译器实验](forth/README.md) · [付款验收](reference/acceptance.md)
@@ -50,16 +50,16 @@ R1 在入金时创建完整付款锁，收款人可用一次花费付款。Defer
 
 ### 实测结果
 
-#### v0.5.0 → v0.6.0
+#### v0.7.0 → v0.8.0
 
-**v0.6.0** 将 `split-5x4-affine-g` 固定为最新的编译器模板。每个完整锁缩短 **357 B**，BIP143 ALL 付款缩短 **714 B**。OTDA 重建程序增加 148 B，两种 OTDA 付款各缩短 **418 B**。付款均为两进两出。 [冻结产物与哈希](versions/v0.6.0/layout.json) · [构建与复放](forth/README.md)
+**v0.8.0** 每个完整锁缩短 **148 B**，BIP143 ALL 付款缩短 **296 B**，两种 OTDA 付款各缩短 **1,020 B**。付款字节数按两进两出的花费交易计。 [版本清单](versions/v0.8.0/manifest.json) · [构建与复放](forth/README.md)
 
 | 版本 | 编译器构造 | 完整锁 | BIP143 ALL 付款 | OTDA ALL 付款 | OTDA SINGLE 付款 |
 | --- | --- | ---: | ---: | ---: | ---: |
-| v0.5.0 | `split-5x4` | 41,721 B | 84,212 B | 95,282 B | 95,211 B |
-| **v0.6.0** | `split-5x4-affine-g` | **41,364 B** | **83,498 B** | **94,864 B** | **94,793 B** |
+| v0.7.0 | 仿射固定表与更短的零下标分支 | 41,262 B | 83,294 B | 94,632 B | 94,561 B |
+| **v0.8.0** | 双坐标固定表与 OTDA 片段共享 | **41,114 B** | **82,998 B** | **93,612 B** | **93,541 B** |
 
-两个版本编译同一份调用 `P256.mul2(u,G,v,Q)` 的 Forth，分别给 `G`、`Q` 使用 5 位和 4 位窗口。v0.6.0 的编译器证明固定生成元表的非零项满足 `Z=1`，据此特化 51 处点加，并单独处理零下标。两个版本在上述三种付款模式中都通过了 BSV Node 和独立 chain-gang 的带资金复放，也通过了 R1 验收矩阵。 [高阶源码](forth/msm.fth) · [版本实测数据](versions/v0.6.0/comparison.json) · [验收矩阵](reference/acceptance.md)
+本轮复用现有 Forth 源码。编译器利用固定生成元表非零项的 `Z=1` 证明，只存 X 和 Y。OTDA 重建程序复用重复字节片段，逐字节还原同一把锁。 三种付款均通过 BSV Node 和独立 chain-gang 的带资金复放，选定模板也通过了 R1 验收矩阵。 [Forth 入口](forth/r1-baseline.fth) · [优化计划](versions/v0.8.0/plan.json) · [版本对照](versions/v0.8.0/comparison.json) · [验收矩阵](reference/acceptance.md)
 
 <details>
 <summary>展开此前的版本迭代</summary>
@@ -73,6 +73,8 @@ R1 在入金时创建完整付款锁，收款人可用一次花费付款。Defer
 | v0.2.0 | Forth v0.3.0 | 从 Forth 生成整锁，缩短 263 处倍点 | 45,776 B | 92,322 B | 100,192 B |
 | Forth v0.3.0 | Forth v0.4.0 | 用带范围的公式表达点运算，编译器做等价改写与栈调度 | 42,536 B | 85,842 B | 93,664 B |
 | Forth v0.4.0 | v0.5.0（`split-5x4`） | 把双标量乘法留给编译器，用 5 位固定表和 4 位公钥表减少循环点加 | 41,721 B | 84,212 B | 95,282 B |
+| v0.5.0 | v0.6.0 | 证明固定生成元表非零项满足 `Z=1`，特化 51 处点加 | 41,364 B | 83,498 B | 94,864 B |
+| v0.6.0 | v0.7.0 | 缩短每次固定生成元查表的零下标分支 | 41,262 B | 83,294 B | 94,632 B |
 
 主线以锁和 BIP143 付款字节数选版。以 OTDA 付款为首要目标时，沿用窗口迭代选出的 `joint-2`，两进两出 OTDA ALL 为 91,692 B。 [窗口复放数据](versions/v0.6.0/comparison.json)
 

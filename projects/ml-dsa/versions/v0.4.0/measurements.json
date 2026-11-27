@@ -1,0 +1,165 @@
+{
+  "compiler_revision": "aa1332b5ef5d5a24218ee1a8ef828df7de87327b",
+  "forth_optimization": "stack",
+  "baseline_revision": "5f640a1",
+  "fixture_public_key_sha256": "9f107644c1084526af3bc8098680b05499a2325a644e388fb4f970e058d19d46",
+  "payment_lock_sha256": "5ce650cd40ac69c56016541b107328ff45e03d1bfbd9053ae499ecf5d9721799",
+  "script_bytes": {
+    "arithmetic_script_bytes": {
+      "canonical": {
+        "ntt": 46134,
+        "inverse_ntt": 43500,
+        "fixed_key_equation": 500794
+      },
+      "signed_residues": {
+        "ntt": 38454,
+        "inverse_ntt": 40940,
+        "fixed_key_equation": 452154
+      },
+      "compact": {
+        "ntt": 28721,
+        "inverse_ntt": 29929,
+        "fixed_key_equation": 310198
+      }
+    },
+    "checked_equation_script_bytes": 137874,
+    "v02_checked_equation_script_bytes": 257122,
+    "forth_lock_with_previous_verifier_bytes": 663281,
+    "shake256_832_to_32_script_bytes": 144594,
+    "payment_script_bytes": {
+      "legacy": {
+        "signature_decode": 62723,
+        "sample_in_ball": 70229,
+        "apply_hints": 89687,
+        "shake256_832_to_32": 176542,
+        "payment_lock": 926403
+      },
+      "compact": {
+        "signature_decode": 46392,
+        "sample_in_ball": 63701,
+        "apply_hints": 66135,
+        "shake256_832_to_32": 153694,
+        "payment_lock": 663284
+      },
+      "v0.2.0": {
+        "signature_decode": 36152,
+        "sample_in_ball": 61101,
+        "apply_hints": 66135,
+        "shake256_832_to_32": 144594,
+        "payment_lock": 586981
+      },
+      "v0.3.0": {
+        "signature_decode": 36152,
+        "sample_in_ball": 61101,
+        "apply_hints": 66135,
+        "shake256_832_to_32": 144594,
+        "payment_lock": 467733
+      },
+      "optimized": {
+        "signature_decode": 28224,
+        "sample_in_ball": 61101,
+        "apply_hints": 31087,
+        "shake256_832_to_32": 144594,
+        "payment_lock": 424757
+      }
+    }
+  },
+  "acceptance": {
+    "payment_cases": 640,
+    "expected_acceptances": 216,
+    "expected_rejections": 424,
+    "historical_lock_spends": 12,
+    "node_max_standard_validation_ms": 5000,
+    "node_max_nonstandard_validation_ms": 7000,
+    "acvp_cases": 15,
+    "wycheproof_python_cases": 80,
+    "wycheproof_script_cases": 77,
+    "wycheproof_compile_rejections": 3
+  },
+  "benchmark": {
+    "scope": "synthetic transactions with supplied prevouts",
+    "bsv_node_version": 101020300,
+    "chain_gang": {
+      "version": "0.13.2",
+      "commit": "74676b9c002c452e7f21a9ed9265f4972bef03f6"
+    },
+    "verified_transactions": 16,
+    "two_by_two": {
+      "0x41": {
+        "previous_transaction_bytes": 940758,
+        "transaction_bytes": 854806,
+        "previous_lock_bytes": [
+          424755,
+          424757
+        ],
+        "output_lock_bytes": [
+          424754,
+          424754
+        ],
+        "unlock_bytes": [
+          2588,
+          2588
+        ]
+      },
+      "0x61": {
+        "previous_transaction_bytes": 2811594,
+        "transaction_bytes": 2553738,
+        "previous_lock_bytes": [
+          424761,
+          424753
+        ],
+        "output_lock_bytes": [
+          424747,
+          424753
+        ],
+        "unlock_bytes": [
+          852056,
+          852056
+        ]
+      }
+    },
+    "timing": {
+      "unit": "ms",
+      "protocol": "alternate versions on one isolated node after one warm-up per version",
+      "samples_per_version_and_engine": 7,
+      "bsv_node_scope": "local RPC round trip with explicit prevouts",
+      "two_by_two_medians": {
+        "0x41": {
+          "bsv_node": {
+            "baseline": 286.74,
+            "optimized": 324.4
+          },
+          "chain_gang": {
+            "baseline": 60.94,
+            "optimized": 57.07
+          }
+        },
+        "0x61": {
+          "bsv_node": {
+            "baseline": 471.38,
+            "optimized": 469.94
+          },
+          "chain_gang": {
+            "baseline": 80.87,
+            "optimized": 77.36
+          }
+        }
+      },
+      "bip143_bsv_node_repeat": {
+        "warmups_per_version": 2,
+        "samples_per_version": 15,
+        "baseline": {
+          "median": 269.53,
+          "min": 254.89,
+          "max": 363.97
+        },
+        "optimized": {
+          "median": 249.03,
+          "min": 236.56,
+          "max": 404.87
+        }
+      }
+    }
+  },
+  "upstream_byte_reproduction_revision": "889ff6e5d37e0e0215fba306353a8a22795c327a"
+}

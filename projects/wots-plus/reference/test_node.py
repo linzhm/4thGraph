@@ -1,6 +1,7 @@
 """Check complete WOTS+ inputs with BSV Node 1.2.3 and pinned chain-gang."""
 
 from dataclasses import replace
+from hashlib import sha256
 from itertools import chain
 import os
 from pathlib import Path
@@ -11,12 +12,12 @@ from tx_engine import Script, Tx, TxIn, TxOut, sig_hash_preimage
 
 from fixtures import fixture_seeds, funding_transaction, malformed_cases, mode_cases
 from payment import authorization, current_input_unlock, sign_payment, sign_spend
-from script import ORDINARY_CODE, locking_script
+from script import ORDINARY_CODE, _payment_script, locking_script
 from fourthgraph.benchmark.cases import SHAPES, batch
 from fourthgraph.bsv.evaluate import evaluate
 from fourthgraph.bsv.transaction import SIGHASH_TYPES, Input, Output, Transaction, hash256
 from wots import OneTimeSigner
-from fixed_template import TEMPLATE_DIRECTORY, fixed_pattern
+from fixed_template import TEMPLATE_DIRECTORY, compact_pattern, fixed_pattern
 from generate_reconstruction import build_artifacts
 
 
@@ -104,22 +105,149 @@ class NodeTests(unittest.TestCase):
         self.assertEqual(pattern.match(sample), (key[:32], key[32:]))
         self.assertIsNone(pattern.match(sample[:-1] + bytes([sample[-1] ^ 1])))
 
-    def test_reconstructed_wots_transactions_and_marginals(self):
-        from benchmark_adapter import TEMPLATES
-        from tempfile import TemporaryDirectory
+    def test_compact_reconstruction_matches_compiled_lock(self):
+        for profile, lock_bytes, program_bytes, fingerprint in (
+            ("compact", 29217, 2395, "b5de618ce7e3429a4f4b2f1d6c386a8841afb40c11dcf1eb57ee135765cea4ca"),
+            ("compact-v2", 27070, 2358, "6325b2e472c95893b9d76cf95d3240c9c3ff5ec4f334f9f69784f905004dbd91"),
+            ("compact-v3", 25965, 1979, "a47457b71ef80921da0cc82d216e98331ea1365de0045854f8f2a37abd1dca7a"),
+            ("compact-v4", 23296, 1884, "c8c46dd97b2b2687e6684af4bf23cb9ed9c61e9c7527e08efb96efa6de8d76d7"),
+            ("compact-v5", 22494, 1126, "fceba5059467b3325f8ce470c8c629715c64357f9e1a46448be6337d42189b5e"),
+            ("compact-v6", 21982, 1076, "cabbe2c1c0a36707f557efdfc9bcfdaf02fd38367de441eb27b604da671aa5e5"),
+            ("compact-v7", 21774, 957, "b21a5fe9d071fb20660de8f8b0b9c17ab07d51a78709fba941099586823e4e52"),
+            ("compact-v8", 21540, 952, "756bb0d7e7791efaa24038c91134f21a41f5c4e15eab3343b54986b0f0d43cd4"),
+            ("compact-v9", 21332, 910, "05a5035d80363d14f09d6df41ffe3ab85ecc6eed0b779882c3e1ec5c5e39bbff"),
+            ("compact-v10", 21320, 795, "90429e54c47edca287f4dc28d986b22a1727274f817a9493ea40b354fdc030ad"),
+            ("compact-v11", 21272, 732, "8c16f9ddfdd68bfe30fa66580a8c3d762115198632c307300e9aace13fd8a019"),
+        ):
+            with self.subTest(profile=profile):
+                pattern = compact_pattern(profile)
+                self.assertEqual(len(pattern.program), program_bytes)
+                self.assertEqual(evaluate(pattern.program), (list(pattern.fixed_parts), []))
+                zero_key_lock = locking_script(bytes(64), cached_constants=profile)
+                self.assertEqual(sha256(zero_key_lock).hexdigest(), fingerprint)
+                for key in (bytes(64), bytes(range(64)), b"\xff" * 64):
+                    lock = locking_script(key, cached_constants=profile)
+                    self.assertEqual(len(lock), lock_bytes)
+                    self.assertEqual(lock, _payment_script(key, cached_constants=profile))
+                    self.assertEqual(pattern.match(lock), (key[:32], key[32:]))
+                    self.assertIsNone(pattern.match(lock[:-1] + bytes([lock[-1] ^ 1])))
 
-        template = TEMPLATES["cached-steps-reconstructed"]
-        sizes = {
+    def test_reconstructed_wots_transactions_and_marginals(self):
+        self.check_transactions_and_marginals("cached-steps-reconstructed", fixed_pattern(), {
             0x61: (79090, 84786, 113235),
             0xe1: (79006, 84537, 113151),
             0x63: (78921, 81361, 112888),
             0xe3: (78837, 81195, 112804),
-        }
+        })
+
+    def test_compact_transactions_and_marginals(self):
+        self.check_transactions_and_marginals("compact-reconstructed", compact_pattern(), {
+            0x41: (63172, 65525, 92400),
+            0x61: (68208, 73202, 97614),
+            0xe1: (68124, 72953, 97530),
+            0x63: (68039, 70479, 97267),
+            0xe3: (67955, 70313, 97183),
+        })
+
+    def test_compact_v2_transactions_and_marginals(self):
+        self.check_transactions_and_marginals("compact-v2-reconstructed", compact_pattern("compact-v2"), {
+            0x41: (58878, 61231, 85959),
+            0x61: (63840, 68797, 91099),
+            0xe1: (63756, 68548, 91015),
+            0x63: (63671, 66111, 90752),
+            0xe3: (63587, 65945, 90668),
+        })
+
+    def test_compact_v3_transactions_and_marginals(self):
+        self.check_transactions_and_marginals("compact-v3-reconstructed", compact_pattern("compact-v3"), {
+            0x41: (56668, 59021, 82644),
+            0x61: (60872, 65450, 87026),
+            0xe1: (60788, 65201, 86942),
+            0x63: (60703, 63143, 86679),
+            0xe3: (60619, 62977, 86595),
+        })
+
+    def test_compact_v4_transactions_and_marginals(self):
+        self.check_transactions_and_marginals("compact-v4-reconstructed", compact_pattern("compact-v4"), {
+            0x41: (51330, 53683, 74637),
+            0x61: (55344, 59827, 78829),
+            0xe1: (55260, 59578, 78745),
+            0x63: (55175, 57615, 78482),
+            0xe3: (55091, 57449, 78398),
+        })
+
+    def test_compact_v5_transactions_and_marginals(self):
+        self.check_transactions_and_marginals("compact-v5-reconstructed", compact_pattern("compact-v5"), {
+            0x41: (49726, 52079, 72231),
+            0x61: (52224, 55949, 74907),
+            0xe1: (52140, 55700, 74823),
+            0x63: (52055, 54495, 74560),
+            0xe3: (51971, 54329, 74476),
+        })
+
+    def test_compact_v6_transactions_and_marginals(self):
+        self.check_transactions_and_marginals("compact-v6-reconstructed", compact_pattern("compact-v6"), {
+            0x41: (48702, 51055, 70695),
+            0x61: (51100, 54775, 73271),
+            0xe1: (51016, 54526, 73187),
+            0x63: (50931, 53371, 72924),
+            0xe3: (50847, 53205, 72840),
+        })
+
+    def test_compact_v7_transactions_and_marginals(self):
+        self.check_transactions_and_marginals("compact-v7-reconstructed", compact_pattern("compact-v7"), {
+            0x41: (48286, 50639, 70071),
+            0x61: (50446, 54002, 72409),
+            0xe1: (50362, 53753, 72325),
+            0x63: (50277, 52717, 72062),
+            0xe3: (50193, 52551, 71978),
+        })
+
+    def test_compact_v8_transactions_and_marginals(self):
+        self.check_transactions_and_marginals("compact-v8-reconstructed", compact_pattern("compact-v8"), {
+            0x41: (47818, 50171, 69369),
+            0x61: (49968, 53519, 71697),
+            0xe1: (49884, 53270, 71613),
+            0x63: (49799, 52239, 71350),
+            0xe3: (49715, 52073, 71266),
+        })
+
+    def test_compact_v9_transactions_and_marginals(self):
+        self.check_transactions_and_marginals("compact-v9-reconstructed", compact_pattern("compact-v9"), {
+            0x41: (47402, 49755, 68745),
+            0x61: (49468, 52977, 70989),
+            0xe1: (49384, 52728, 70905),
+            0x63: (49299, 51739, 70642),
+            0xe3: (49215, 51573, 70558),
+        })
+
+    def test_compact_v10_transactions_and_marginals(self):
+        self.check_transactions_and_marginals("compact-v10-reconstructed", compact_pattern("compact-v10"), {
+            0x41: (47378, 49731, 68709),
+            0x61: (49214, 52608, 70723),
+            0xe1: (49130, 52359, 70639),
+            0x63: (49045, 51485, 70376),
+            0xe3: (48961, 51319, 70292),
+        })
+
+    def test_compact_v11_transactions_and_marginals(self):
+        self.check_transactions_and_marginals("compact-v11-reconstructed", compact_pattern("compact-v11"), {
+            0x41: (47282, 49635, 68565),
+            0x61: (48992, 52323, 70453),
+            0xe1: (48908, 52074, 70369),
+            0x63: (48823, 51263, 70106),
+            0xe3: (48739, 51097, 70022),
+        })
+
+    def check_transactions_and_marginals(self, template, pattern, sizes):
+        from benchmark_adapter import TEMPLATES
+        from tempfile import TemporaryDirectory
+
         with TemporaryDirectory() as temp:
             for mode, expected_sizes in sizes.items():
                 for shape, expected in zip(SHAPES, expected_sizes, strict=True):
                     with self.subTest(mode=hex(mode), shape=shape):
-                        leg = batch(template, mode, shape, f"test/{mode:02x}/{shape}", Path(temp))
+                        leg = batch(TEMPLATES[template], mode, shape, f"test/{mode:02x}/{shape}", Path(temp))
                         tx = leg.tx
                         self.assertEqual(len(tx.serialize()), expected)
                         self.assertTrue(chain_valid(tx, leg.parents))
@@ -128,10 +256,10 @@ class NodeTests(unittest.TestCase):
                             witness, alt = evaluate(tx.inputs[index].script)
                             preimage, signature, _ = witness
                             expected_auth = authorization(tx, index, parent.outputs[0].value, mode)
-                            key = b"".join(fixed_pattern().match(parent.outputs[0].script))
+                            key = b"".join(pattern.match(parent.outputs[0].script))
                             literal = current_input_unlock(expected_auth, key, signature)
                             self.assertEqual((witness, alt), evaluate(literal))
-                            if expected_auth.companion:
+                            if expected_auth.companion or mode == 0x41:
                                 self.assertEqual(tx.inputs[index].script, literal)
                             else:
                                 self.assertLess(len(tx.inputs[index].script), len(literal))
@@ -147,22 +275,69 @@ class NodeTests(unittest.TestCase):
     def test_reconstruction_matches_signer_and_both_engines_across_modes(self):
         modes = (0x41, 0x42, 0x43, 0x61, 0x62, 0x63, 0xc1, 0xc2, 0xc3, 0xe1, 0xe2, 0xe3)
         self.assertEqual(SIGHASH_TYPES, set(modes))
-        recipients = [OneTimeSigner(*fixture_seeds(f"coverage/recipient/{i}".encode())) for i in range(3)]
+        recipients = [OneTimeSigner(*fixture_seeds(f"coverage/recipient/{i}".encode())) for i in range(12)]
         fixed = [locking_script(recipient.public_key, cached_constants="steps") for recipient in recipients]
+        compact = [locking_script(recipient.public_key, cached_constants="compact") for recipient in recipients]
+        v2 = [locking_script(recipient.public_key, cached_constants="compact-v2") for recipient in recipients]
+        v3 = [locking_script(recipient.public_key, cached_constants="compact-v3") for recipient in recipients]
+        v4 = [locking_script(recipient.public_key, cached_constants="compact-v4") for recipient in recipients]
+        v5 = [locking_script(recipient.public_key, cached_constants="compact-v5") for recipient in recipients]
+        v6 = [locking_script(recipient.public_key, cached_constants="compact-v6") for recipient in recipients]
+        v7 = [locking_script(recipient.public_key, cached_constants="compact-v7") for recipient in recipients]
+        v8 = [locking_script(recipient.public_key, cached_constants="compact-v8") for recipient in recipients]
+        v9 = [locking_script(recipient.public_key, cached_constants="compact-v9") for recipient in recipients]
+        v10 = [locking_script(recipient.public_key, cached_constants="compact-v10") for recipient in recipients]
+        v11 = [locking_script(recipient.public_key, cached_constants="compact-v11") for recipient in recipients]
+        layouts = (
+            ((False, True, "steps"), (fixed[0], b"\x51", fixed[1], fixed[2])),
+            ((False, True, "steps"), (fixed[0], fixed[1])),
+            ((False, "steps", "compact"), (compact[0], b"\x51", fixed[1], compact[2])),
+            ((False, "steps", "compact"), (compact[0], compact[1])),
+            (("steps", "compact", "compact-v2"), (v2[0], b"\x51", fixed[1], compact[2])),
+            (("steps", "compact", "compact-v2"), (v2[0], v2[1])),
+            (("compact", "compact-v2", "compact-v3"), (v3[0], b"\x51", v2[1], compact[2], fixed[3])),
+            (("compact", "compact-v2", "compact-v3"), (v3[0], v3[1])),
+            (("compact-v2", "compact-v3", "compact-v4"), (v4[0], b"\x51", v3[1], v2[2], compact[3], fixed[4])),
+            (("compact-v2", "compact-v3", "compact-v4"), (v4[0], v4[1])),
+            (("compact-v3", "compact-v4", "compact-v5"),
+             (v5[0], b"\x51", v4[1], v3[2], v2[3], compact[4], fixed[5])),
+            (("compact-v3", "compact-v4", "compact-v5"), (v5[0], v5[1])),
+            (("compact-v4", "compact-v5", "compact-v6"),
+             (v6[0], b"\x51", v5[1], v4[2], v3[3], v2[4], compact[5], fixed[6])),
+            (("compact-v4", "compact-v5", "compact-v6"), (v6[0], v6[1])),
+            (("compact-v5", "compact-v6", "compact-v7"),
+             (v7[0], b"\x51", v6[1], v5[2], v4[3], v3[4], v2[5], compact[6], fixed[7])),
+            (("compact-v5", "compact-v6", "compact-v7"), (v7[0], v7[1])),
+            (("compact-v6", "compact-v7", "compact-v8"),
+             (v8[0], b"\x51", v7[1], v6[2], v5[3], v4[4], v3[5], v2[6], compact[7], fixed[8])),
+            (("compact-v6", "compact-v7", "compact-v8"), (v8[0], v8[1])),
+            (("compact-v7", "compact-v8", "compact-v9"),
+             (v9[0], b"\x51", v8[1], v7[2], v6[3], v5[4], v4[5], v3[6], v2[7], compact[8], fixed[9])),
+            (("compact-v7", "compact-v8", "compact-v9"), (v9[0], v9[1])),
+            (("compact-v8", "compact-v9", "compact-v10"),
+             (v10[0], b"\x51", v9[1], v8[2], v7[3], v6[4], v5[5], v4[6], v3[7], v2[8], compact[9], fixed[10])),
+            (("compact-v8", "compact-v9", "compact-v10"), (v10[0], v10[1])),
+            (("compact-v9", "compact-v10", "compact-v11"),
+             (v11[0], b"\x51", v10[1], v9[2], v8[3], v7[4], v6[5], v5[6], v4[7], v3[8], v2[9], compact[10], fixed[11])),
+            (("compact-v9", "compact-v10", "compact-v11"), (v11[0], v11[1])),
+        )
         for version in (1, 2):
-            for locks in ((fixed[0], b"\x51", fixed[1], fixed[2]), (fixed[0], fixed[1])):
+            for profiles, locks in layouts:
                 for mode in modes:
-                    with self.subTest(version=version, mode=hex(mode), shape=(3, len(locks))):
-                        self.check_reconstruction_case(version, mode, locks)
+                    with self.subTest(version=version, mode=hex(mode), profiles=profiles, shape=(3, len(locks))):
+                        self.check_reconstruction_case(version, mode, profiles, locks)
 
-    def check_reconstruction_case(self, version, mode, locks):
+    def check_reconstruction_case(self, version, mode, profiles, locks):
         # Each of these public fixture keys is used for exactly one signature.
-        keys = [OneTimeSigner(*fixture_seeds(bytes((version, mode, len(locks), i)))) for i in range(3)]
+        label = f"coverage/{version}/{mode}/{profiles}/{len(locks)}".encode()
+        keys = [OneTimeSigner(*fixture_seeds(label + bytes([i]))) for i in range(3)]
         parents = tuple(funding_transaction(key.public_key, cached_constants=profile)
-                        for key, profile in zip(keys, (False, True, "steps"), strict=True))
+                        for key, profile in zip(keys, profiles, strict=True))
+        available = sum(parent.outputs[0].value for parent in parents)
+        output_value = min(5000, available // len(locks))
         tx = Transaction(tuple(Input(parent.txid_wire(), 0, sequence=0xfffffffe - i)
                                for i, parent in enumerate(parents)),
-                         tuple(Output(5000 - i, lock) for i, lock in enumerate(locks)),
+                         tuple(Output(output_value - i, lock) for i, lock in enumerate(locks)),
                          version=version, locktime=17)
         engine = engine_transaction(tx)
         code = Script()
@@ -192,6 +367,10 @@ class NodeTests(unittest.TestCase):
             )
             if version == 2 and compresses:
                 self.assertLess(len(witness), len(literal), i)
+                covered = locks if mode in (0x61, 0xe1) else (locks[i],)
+                for output_lock in covered:
+                    if output_lock != b"\x51":
+                        self.assertFalse(output_lock in witness, f"literal lock in reconstructed input {i}")
             else:
                 self.assertEqual(witness, literal, i)
         self.assertTrue(chain_valid(tx, parents))
