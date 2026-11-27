@@ -147,13 +147,16 @@ class FormulaExperiments(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, "parent run"):
                     run(follow_up, edited)
 
-    def test_spend_receipts_measure_and_replay_the_same_compiler_plans(self):
+    def _require_pinned_chain(self):
         try:
             pinned = chain_metadata()["commit"] == CONTEXT_PIN
         except PackageNotFoundError:
             pinned = False
         if not pinned:
             self.skipTest("requires pinned chain-gang")
+
+    def test_spend_receipts_measure_and_replay_the_same_compiler_plans(self):
+        self._require_pinned_chain()
         request = {"fixture": "square", "evaluation": "spend", "workers": 2,
                    "plans": [{}, {"passes": ["stack"]}]}
         first = run(request)
@@ -176,6 +179,36 @@ class FormulaExperiments(unittest.TestCase):
         self.assertEqual(run(second["request"], first)["run_id"], second["run_id"])
         with self.assertRaisesRegex(ValueError, "frozen snapshot mismatch"):
             run({**follow, "evaluation": "formula"}, first)
+
+    def test_bezier_spend_checks_both_outputs_and_replays_the_search_delta(self):
+        self._require_pinned_chain()
+        self.assertIn("bezier", capabilities()["evaluations"]["spend"]["fixtures"])
+        first = run({"fixture": "bezier", "evaluation": "spend", "workers": 3,
+                     "plans": [{}, {"passes": ["stack"]}, {"passes": ["rewrite", "share", "stack"]}]})
+        follow = next_request(json.loads(json.dumps(first)))
+        self.assertEqual(len(follow["plans"]), 2)
+        second = run(follow, first)
+        rows = first["candidates"] + second["candidates"]
+        self.assertEqual([row["metrics"]["script_bytes"] for row in rows], [118, 47, 47, 47, 46])
+        self.assertEqual(len({row["source_sha256"] for row in rows}), 1)
+        for row in rows:
+            receipt = row["test"]["spend"]
+            self.assertEqual((row["test"]["passed"], receipt["accepted"], receipt["rejected"]), (625, 625, 625))
+            self.assertEqual(row["test"]["status"], "passed")
+            path_max = max(case["bytes"]["funding_transaction_bytes"] + case["bytes"]["transaction_bytes"]
+                           for case in receipt["cases"])
+            self.assertEqual(row["metrics"]["path_bytes"], path_max)
+        self.assertEqual([row["metrics"]["path_bytes"] for row in rows], [260, 189, 189, 189, 188])
+        examples = {case["operands"]: case for case in rows[-1]["test"]["spend"]["cases"]}
+        endpoint = examples[(0, 0, 0, 0)]
+        self.assertEqual(endpoint["expected_outputs"], (0, 0))
+        self.assertEqual(endpoint["rejected_operands"], (0, 1, 0, 0))
+        interior = examples[(0, 0, 0, 8)]
+        self.assertEqual(interior["expected_outputs"], (0, 0))
+        self.assertEqual(interior["rejected_operands"], (1, 1, 1, 8))
+        self.assertEqual([row["delta"]["parent_path_bytes"] for row in second["candidates"]], [0, -1])
+        self.assertEqual(second["winner_including_parents"], rows[-1]["id"])
+        self.assertEqual(run(second["request"], first)["run_id"], second["run_id"])
 
     def test_spend_mode_requires_pinned_engine_and_a_passing_receipt(self):
         request = {"fixture": "square", "evaluation": "spend", "plans": [{}]}

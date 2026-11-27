@@ -114,7 +114,7 @@ python3 -m fourthgraph.workflow.protocol experiment replay workspace/tuning/seco
   --parent workspace/tuning/first.json
 ```
 
-对已登记的 `square` 花费夹具，在安装了[固定版 chain-gang](../tools/requirements-chronicle.txt) 的环境中用相同命令加上 `"evaluation":"spend"`。执行器先检查公式向量，再把候选链接进合成资金输出，离线对照这些实际父交易验证完整花费。每个向量预期一次通过、一次拒绝。默认仍运行公式评估。
+对已登记的 `square` 或 `bezier` 花费夹具，在安装了[固定版 chain-gang](../tools/requirements-chronicle.txt) 的环境中用相同命令加上 `"evaluation":"spend"`。执行器先检查公式向量，再把候选链接进合成资金输出，离线对照这些实际父交易验证完整花费。每个向量预期一次通过、一次拒绝。默认仍运行公式评估。
 
 ```sh
 printf '%s\n' '{"fixture":"square","evaluation":"spend","workers":2,"plans":[{},{"passes":["stack"]}]}' |
@@ -126,7 +126,9 @@ python3 -m fourthgraph.workflow.protocol experiment replay workspace/tuning/spen
   --parent workspace/tuning/spend.json
 ```
 
-花费评估按各向量中「资金交易加花费交易」的最大序列化字节数，对通过验收的候选排名。报告分别记录锁、见证、资金交易和花费交易的大小，以及引擎提交、Script 摘要和交易 ID。所报栈峰值来自公式评估，完整花费的栈峰值尚未测量。[工作流复放](toolchain.md#复放与编译) · [Agent skill](../skills/4thgraph/SKILL.md)
+花费评估按各向量中「资金交易加花费交易」的最大序列化字节数，对通过验收的候选排名。路径总字节使用同一向量的两笔交易。锁、见证、资金交易和花费交易各自的峰值可能来自不同向量。报告也记录引擎提交、Script 摘要和交易 ID。所报栈峰值来自公式评估，完整花费的栈峰值尚未测量。[工作流复放](toolchain.md#复放与编译) · [Agent skill](../skills/4thgraph/SKILL.md)
+
+要把上面的两轮 Bézier 实验接到完整花费上，在第一轮请求中加 `"evaluation":"spend"`。各候选固定同一份 Forth 和交易上下文，跑同一组 625 个向量。链接后的锁同时检查位置和切向量。拒绝用例分别覆盖只改变位置和只改变切向量的情况。花费回执随报告进入 `next` 和 `replay`。
 
 <a name="documentation-index"></a>
 

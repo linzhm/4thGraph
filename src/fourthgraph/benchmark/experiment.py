@@ -39,7 +39,7 @@ def pass_sets():
 def capabilities():
     return {"schema": SCHEMA, "compiler": PROJECT_VERSION, "target": TARGET,
             "fixtures": {name: list(fix.implementations) for name, fix in FIXTURES.items()},
-            "evaluations": {"formula": {"default": True}, "spend": {"fixtures": SPEND_FIXTURES}},
+            "evaluations": {"formula": {"default": True}, "spend": {"fixtures": tuple(SPEND_FIXTURES)}},
             "plan_sets": pass_sets(), "requires": {"search": ["stack"]},
             "ordered_rules": RULES, "max_rule_depth": MAX_DEPTH, "max_candidates": LIMIT, "max_workers": WORKERS,
             "stages": ["formula", "graph", "terminal schedule and emission"], "commands": ["run", "next", "replay"]}
