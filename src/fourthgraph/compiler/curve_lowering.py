@@ -211,12 +211,20 @@ def _pack_windows(*lanes):
                  for shift in range(126, -1, -2))
 
 
+def _pack_fixed_scalar_windows(scalar, first, second):
+    high, low = divmod(scalar, 1 << 128)
+    return _pack_windows(low, high, first, second)
+
+
 def _optimized_joint_words(vocabulary, optimization, *, scaled):
     library = _joint_library(optimize=optimization != BASELINE)
     prefix = "secp256k1-scaled-" if scaled else "secp256k1-"
     words = vocabulary | {
         "pack-windows": script_word("script-int script-int script-int script-int", "bytes",
                                     library.emit("secp-window-pack-windows", b""), _pack_windows),
+        "pack-fixed-scalar-windows": script_word("script-int script-int script-int", "bytes",
+                                                library.emit("secp-window-pack-fixed-scalar", b""),
+                                                _pack_fixed_scalar_windows),
         "double-pair": numeric_fragment(library.emit(prefix + "double-pair-with-field", b"", 1), 4, 4),
         "double-point": numeric_fragment(library.emit(prefix + "double-with-field", b"", 1), 4, 4),
         "add-fixed-affine": numeric_fragment(library.emit(prefix + "add-affine-with-field", b"", 1), 6, 4),

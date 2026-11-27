@@ -27,9 +27,7 @@ formula: secp-window-map-row-coordinates ( secp-window-field secp-window-coordin
     17 bsv-num op-num2bin op-16 op-split op-drop
 ;
 
-: secp-window-pack-windows ( script -- script )
-    ( s0 s1 abs-k1 abs-k2 -> 64 bytes with one fixed and one variable index per window. )
-    secp-window-uint128le bsv-empty op-swap secp-window-uint128le op-cat 3 script-append-repeated
+: secp-window-transpose-lanes ( script -- script )
     ( Digit positions are numbered from the low end of the 512-bit string. )
     ( Transpose lane and digit bits. The first four swaps also reverse little-endian byte order. )
     ( Swap position bits 4 and 6, complementing both. )
@@ -47,6 +45,19 @@ formula: secp-window-map-row-coordinates ( secp-window-field secp-window-coordin
     6 bytes-hex 00cc 5 script-repeat-mask script-swap-bit-groups
     ( Swap position bits 1 and 3. )
     12 bytes-hex 0000f0f0 4 script-repeat-mask script-swap-bit-groups
+;
+
+: secp-window-pack-windows ( script -- script )
+    ( s0 s1 abs-k1 abs-k2 -> 64 bytes with one fixed and one variable index per window. )
+    secp-window-uint128le bsv-empty op-swap secp-window-uint128le op-cat 3 script-append-repeated
+    secp-window-transpose-lanes
+;
+
+: secp-window-pack-fixed-scalar ( script -- script )
+    ( s abs-k1 abs-k2. The extra byte holds the sign even when bit 255 is set. )
+    secp-window-uint128le op-swap secp-window-uint128le op-cat
+    op-swap 33 bsv-num op-num2bin op-16 op-split op-16 op-split op-drop
+    op-swap op-cat op-cat secp-window-transpose-lanes
 ;
 
 : secp-window-nonzero-window-digits ( script -- script )

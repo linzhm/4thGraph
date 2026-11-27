@@ -15,7 +15,7 @@ layout: second-ordinate ( p:script-int px:script-int py:script-int k2:script-int
 : pack-row-ordinates ( script-int script-int script-int script-int script-int --
                        script-int script-int script-int script-int bytes )
     split-glv retain-signs signed-row-ordinates restore-signs
-    int-abs swap int-abs swap rot split-fixed 2swap pack-windows
+    int-abs swap int-abs swap pack-fixed-scalar-windows
 ;
 
 : prepare-stack-windows ( script-int script-int script-int script-int --

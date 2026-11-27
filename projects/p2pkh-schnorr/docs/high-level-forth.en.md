@@ -270,7 +270,7 @@ Preparation computes the signed ordinates and the window digits. It defers `Q.x 
 | Shared map for `Q`, `2Q`, and `3Q` | 3,017 B | 22,902 B | 56,494 B |
 | Handwritten v0.17.0 | 2,763 B | 22,435 B | 54,626 B |
 
-The comparison uses the same `dataflow` settings and transaction fixtures. The 18,379 B window sequence is byte-identical. The 467 B gap to the handwritten lock comprises 207 B before the joint word, 254 B in joint preparation, and 6 B after the windows. BSV Node and chain-gang replayed the standalone and payment cases and the eight constructor scenarios. [Measurements](../experiments/high-level/window-beta-measurements.json) · [Transaction matrix](../experiments/high-level/window-beta-matrix.json)
+The comparison at `380ecae` uses the same `dataflow` settings and transaction fixtures. The 18,379 B window sequence is byte-identical. The 467 B gap to the handwritten lock comprises 207 B before the joint word, 254 B in joint preparation, and 6 B after the windows. BSV Node and chain-gang replayed the standalone and payment cases and the eight constructor scenarios. [Measurements](../experiments/high-level/window-beta-measurements.json) · [Transaction matrix](../experiments/high-level/window-beta-matrix.json)
 
 ```sh
 PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
@@ -279,4 +279,25 @@ PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
 REGTEST_CHRONICLE_HEIGHT=5 PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
   "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/experiments/high-level/window_compare.py \
   --joint-lowerings --forth-tuning --matrix-only --output workspace/schnorr-high-level/window-beta-matrix.json
+```
+
+## Packing the fixed-base scalar directly
+
+The stack-table preparation serializes the checked nonnegative scalar `s` once into a 33-byte little-endian ScriptNum. Two 16-byte slices supply the fixed-base lanes, and the last byte holds the sign even when bit 255 is set. The two GLV magnitudes and these slices feed the existing lane transpose in the same order. This removes division and remainder by `2^128` and the separate numeric encoding of each fixed-base lane. [Forth packing](../../../src/fourthgraph/stdlib/secp256k1-window.fth)
+
+| Build | Joint preparation | Payment lock | 2×2 OTDA ALL with reconstruction |
+| --- | ---: | ---: | ---: |
+| Numeric split at `380ecae` | 3,017 B | 22,902 B | 56,494 B |
+| Direct byte packing | 2,970 B | 22,855 B | 56,306 B |
+| Handwritten v0.17.0 | 2,763 B | 22,435 B | 54,626 B |
+
+Both automatic builds use the same `dataflow` configuration and the same transaction fixtures. The 18,379 B window sequence is byte-identical. The 420 B gap to the handwritten lock comprises 207 B before the joint word, 207 B in joint preparation, and 6 B after the windows. Packing tests cover every 2-bit position of each lane, the all-zero and all-ones cases, and deterministic mixed inputs. Both engines replayed the verifier and payment cases and the eight constructor scenarios. [Measurements](../experiments/high-level/fixed-scalar-measurements.json) · [Transaction matrix](../experiments/high-level/fixed-scalar-matrix.json)
+
+```sh
+PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
+  "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/experiments/high-level/window_compare.py \
+  --joint-lowerings --forth-tuning --output workspace/schnorr-high-level/fixed-scalar-measurements.json
+REGTEST_CHRONICLE_HEIGHT=5 PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
+  "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/experiments/high-level/window_compare.py \
+  --joint-lowerings --forth-tuning --matrix-only --output workspace/schnorr-high-level/fixed-scalar-matrix.json
 ```
