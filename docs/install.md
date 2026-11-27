@@ -34,7 +34,7 @@ Use `--mode fused` to require a single post-deployment spend, or `--mode split` 
 4thgraph-report replay.json --output-dir decision
 ```
 
-Use the same checkout revision for the CLI and skill. Use `4thgraph-circuit` to emit Circom and `4thgraph-verify` to build a `relation:` declaration. Run funded replay with the checkout's [regtest workflow](toolchain.md#复放与编译), BSV Node, and the pinned chain-gang build. [Syntax book](language/syntax.md) · [Verification paths](language/stdlib.md#验证路径)
+Use the same checkout revision for the CLI and skill. Use `4thgraph-circuit` to emit Circom and `4thgraph-verify` to build a `relation:` declaration. Run funded replay with the checkout's [regtest workflow](toolchain.md#复放与编译), BSV Node, and the pinned chain-gang build. [Syntax book](language/syntax.md) · [Verification paths](language/stdlib.md#verification-paths)
 
 Install the Python package from the checkout when developing against the SDK or Python API:
 

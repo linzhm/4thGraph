@@ -106,7 +106,7 @@ In these comparisons, **BIP143 / OTDA** names the two BSV signature digest forma
 | **Compiler and planner** | The compiler emits BSV Script. The planner compares eligible transaction layouts and their costs. For supported relations, the proof backend builds circuits and verifiers. [Toolchain guide](docs/toolchain.md) |
 | **Runtime and verification** | The runtime binds real parent outputs, requests signatures, and assembles witnesses. Replay reports connect a build to the actual transactions and the verdicts from BSV Node and chain-gang. [Repository layout](docs/repository-layout.md) · [Replay workflow](docs/toolchain.md#复放与编译) |
 
-**Recursive proofs are a research direction.** The token transfers above check direct parent outputs and the current transition at each spend. A recursive construction would also verify a predecessor proof inside the next proof and bind its authenticated state to the output being spent. [Verification paths available today](docs/language/stdlib.md#验证路径)
+**Recursive proofs are a research direction.** The token transfers above check direct parent outputs and the current transition at each spend. A recursive construction would also verify a predecessor proof inside the next proof and bind its authenticated state to the output being spent. [Verification paths available today](docs/language/stdlib.md#verification-paths)
 
 ---
 
