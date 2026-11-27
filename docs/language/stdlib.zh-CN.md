@@ -71,7 +71,9 @@ PYTHONPATH=src:. python -m fourthgraph.workflow.protocol "projects/workflow-exam
 
 ## 复用 PELS 原像重建
 
-`REQUIRE stdlib/wallet/pels-verify.fth` 提供 BIP143 ALL 的动态单后继成员。构建参数是 Script 前缀和状态／金额规则。规则在花费时读取当前状态及前序金额，返回五字节后继状态和八字节小端金额。库把输出和执行代码绑定到实际花费，留下认证后的摘要。如果应用自行认证同一份完整原像，可用 `stdlib/wallet/pels-successor.fth` 断言后继输出。[非计数标签夹具](../../tests/test_pels_successor_library.py) · [R1 组合示例](../../projects/p2pkh-r1/forth/r1-pels-lock.fth)
+动态 PELS 词要求 BIP143 ALL（`0x41`）、单输入和单后继输出。两个词的构建参数都是 Script 前缀和状态／金额规则。组装后的锁以直接推入五字节当前状态开头（`05` 后接状态字节），紧接 `OP_CODESEPARATOR`（`ab`）。分隔符之后的字节构成 `scriptCode`，原样复制到后继锁。花费时，规则读取当前状态和以 ScriptNum 表示的前序金额，依序留下五字节后继状态和八字节无符号小端金额。
+
+使用 `REQUIRE stdlib/wallet/pels-verify.fth` 时，见证先推入 `tail`（原像末尾八字节，依次为锁定时间和 sighash 类型，各占四字节小端），再推入 `head`（`hashOutputs` 之前的全部原像字节）。锁把 `state` 推到它们上面。`pels-verify` 重建并认证原像，留下摘要。完整原像版本 `pels-assert-successor` 来自 `stdlib/wallet/pels-successor.fth`，要求 `preimage` 位于栈顶、`state` 紧贴其下。调用方须针对实际输入认证同一份原像。[非计数标签夹具](../../tests/test_pels_successor_library.py) · [R1 组合示例](../../projects/p2pkh-r1/forth/r1-pels-lock.fth)
 
 将见证压缩放在交易编译层。合约定义并构造完整、有序的输出向量，重建器按签名模式拼回原像，认证片段再用原生 `OP_CHECKSIG` 将原像绑定到实际花费。Counter 的单后继构造和 Workflow 的有序多输出构造都遵循这个边界。[Counter 构建与复放](../../projects/pels-counter/README.zh-CN.md) · [重建实现](../../src/fourthgraph/workflow/forkid_lowering.py)
 

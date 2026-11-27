@@ -8,6 +8,7 @@ from fourthgraph.benchmark.validation import CONTEXT_PIN, chain_metadata
 from fourthgraph.bsv.script import push
 from fourthgraph.bsv.transaction import Input, Output, Transaction, preimage_forkid
 from fourthgraph.compiler.script_builder import ScriptBuilder
+from fourthgraph.stdlib import capabilities
 
 
 SOURCE = """
@@ -54,6 +55,23 @@ class PelsSuccessorLibraryTests(unittest.TestCase):
         draft = self.builder.emit("status-lock", b"", DRAFT)
         self.assertEqual(len(draft), 645)
         self.assertEqual(sha256(draft).hexdigest(), "f2e8d422e2e6a27542590114a3ca46f564a62b1c872f778bd5f4030cca6e8e57")
+
+    def test_catalog_records_build_and_spend_requirements(self):
+        libraries = capabilities()
+        for module, word, runtime in (
+            ("pels-verify", "pels-verify", ["tail", "head", "state"]),
+            ("pels-successor", "pels-assert-successor", ["state", "preimage"]),
+        ):
+            with self.subTest(word=word):
+                interface = libraries[f"std/wallet/{module}"]["interfaces"][word]
+                self.assertEqual([field["name"] for field in interface["runtime_inputs"]], runtime)
+                build = {field["name"]: field["type"] for field in interface["build_parameters"]}
+                self.assertEqual(build, {"prefix": "script", "state-amount-rule": "script"})
+                context = {field["name"]: field["description"] for field in interface["transaction_context"]}
+                self.assertEqual(context["sighash"], "BIP143 ALL (0x41)")
+                self.assertEqual(context["input-count"], "Exactly one input")
+                self.assertEqual(context["output-count"], "Exactly one successor output")
+                self.assertIn("script-code", context)
 
     @unittest.skipUnless(pinned_chain_available(), "requires pinned chain-gang")
     def test_non_counter_rule_follows_actual_parent_outputs(self):
