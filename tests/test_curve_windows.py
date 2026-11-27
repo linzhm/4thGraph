@@ -2,6 +2,7 @@
 from functools import cache
 import json
 import os
+from pathlib import Path
 from shutil import which
 import subprocess
 import sys
@@ -15,6 +16,7 @@ from fourthgraph.compiler.curve_lowering import compile_fixed_generator, compile
 from fourthgraph.compiler.curve_windows import CURVES, GLV_REFERENCE, JOINT_STRATEGIES, P256, SECP256K1, SM2, fixed_table, scalar_plans
 from fourthgraph.compiler.lowering import DATAFLOW, compile_word
 from fourthgraph.compiler.modular_scale import lower_affine_pair_scale, lower_modular_scale, lower_scaled_residuals
+from fourthgraph.compiler.script_builder import ScriptBuilder
 from fourthgraph.compiler.source import CompileError, SourceCompiler
 from fourthgraph.stdlib.weierstrass import CoordinateScale
 
@@ -51,6 +53,18 @@ def generator_multiple(curve, scalar):
     if len(uncompressed) != 65 or uncompressed[0] != 4:
         raise AssertionError("OpenSSL did not return an uncompressed point")
     return int.from_bytes(uncompressed[1:33], "big"), int.from_bytes(uncompressed[33:], "big")
+
+
+class WeierstrassModelTests(unittest.TestCase):
+    def test_model_and_schnorr_arithmetic_can_be_imported_together(self):
+        source = (Path(__file__).resolve().parents[1] / "projects" / "p2pkh-schnorr"
+                  / "experiments" / "high-level" / "window-verifier.fth")
+        imports = ("REQUIRE stdlib/weierstrass-model.fth", "REQUIRE arithmetic.fth")
+        for order in (imports, imports[::-1]):
+            with self.subTest(order=order):
+                builder = ScriptBuilder("\n".join(order), source_path=source)
+                self.assertIn("weierstrass-scaled-residuals", builder.formulas)
+                self.assertIn("add-points", builder.formulas)
 
 
 class CurveWindowsTests(unittest.TestCase):
