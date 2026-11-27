@@ -25,7 +25,7 @@
 
 编译器的余数块只接受多项式运算和同一正模数的取模。余数块的输出按模数相等，具体的有符号代表元可以不同。Verifier 在写回配对累积器或检查余数前完成约减。 [编译器实现](../src/fourthgraph/compiler/stack_schedule.py)
 
-调用方可先写 `REQUIRE stdlib/groth16-bls12-381.fth`，再在定义体中调用验证词。构建和复放工具支持 `--entry <word>` 来选择栈效果为 `-- groth16-verified` 的入口。构建清单记录入口、导出接口及验证密钥摘要。 [语法书](language/syntax.md#4-公开导出)
+调用方可先写 `REQUIRE stdlib/groth16-bls12-381.fth`，再在定义体中调用验证词。构建和复放工具支持 `--entry <word>` 来选择栈效果为 `-- groth16-verified` 的入口。构建清单记录入口、导出接口及验证密钥摘要。[项目调用演示](../projects/groth16-verifier/README.zh-CN.md) · [语法书](language/syntax.md#4-公开导出)
 
 ## 调用方选择
 
