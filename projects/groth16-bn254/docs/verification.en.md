@@ -27,7 +27,7 @@ The v0.5.0 Forth entry selects a compiler pass that combines removals of stack i
 | `wrap` | 492,007 B | 6,765 B | 498,852 B | 492,143 B | 6,934 B | **499,077 B** |
 | `other` | 492,005 B | 6,761 B | 498,847 B | 492,141 B | 6,931 B | **499,072 B** |
 
-Each lock is 13,172 B smaller than its v0.4.0 counterpart. The totals include full serialization of the deployment and one spend. Regtest funding transactions are separate. The combined stack payload peaks at 8,872 B for `wrap` and 8,870 B for `other`. [v0.5.0 measurements](../versions/v0.5.0/measurements.json)
+Each lock is 13,172 B smaller than its v0.4.0 counterpart. The table records one regtest run and counts the fully serialized deployment and one spend. Regtest funding transactions are separate. DER signature lengths can change the serialized script path and transaction totals across replays. Each fixture has fixed lock and proof witness-prefix digests. The combined stack payload peaks at 8,872 B for `wrap` and 8,870 B for `other`. [v0.5.0 measurements](../versions/v0.5.0/measurements.json)
 
 ## Compiler plan comparison
 
