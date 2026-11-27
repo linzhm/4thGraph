@@ -184,18 +184,21 @@ class CurveWindowsTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "requires secp256k1"):
                 compile_joint_generator_point(curve)
 
-    def test_paired_row_map_preserves_signed_representatives(self):
+    def test_row_maps_preserve_signed_representatives(self):
         field = SECP256K1.field
         beta, _ = SECP256K1.endomorphism
         first = field - 1, 2 - field, 3
         second = 1 - field, field - 2, -5
+        x, y = SECP256K1.generator
         for optimize in (False, True):
             library = ScriptBuilder("REQUIRE stdlib/secp256k1-window.fth", optimize=optimize)
             code = asm("17 OP_TOALTSTACK") + library.emit("secp-window-map-row-coordinates", b"")
             for sign in (-1, 1):
-                args = (field, *first, *second, sign, beta)
+                qy = y * sign
+                args = (field, x, *first, *second, qy, sign, beta)
                 result, alt = evaluate(code, [b"caller", *map(encode_num, args)])
-                expected = (first[0] * beta % field, first[1] * sign, first[2],
+                expected = (x * beta % field, qy, 1,
+                            first[0] * beta % field, first[1] * sign, first[2],
                             -(-second[0] * beta % field), second[1] * sign, second[2])
                 self.assertEqual((result, alt), ([b"caller", *map(encode_num, expected)], [encode_num(17)]))
 

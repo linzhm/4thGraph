@@ -6,12 +6,17 @@ range: secp-window-coordinate script-int $-fffffffffffffffffffffffffffffffffffff
 range: secp-window-field script-int 2 $10000000000000000000000000000000000000000000000000000000000000000 ;
 range: secp-window-sign script-int -1 2 ;
 
-( Apply the same signed endomorphism to the projective row starts. )
-formula: secp-window-map-row-coordinates ( secp-window-field secp-window-coordinate secp-window-coordinate
-    secp-window-coordinate secp-window-coordinate secp-window-coordinate secp-window-coordinate
-    secp-window-sign secp-window-coordinate -- secp-window-coordinate secp-window-coordinate secp-window-coordinate
+( Q starts with the signed affine ordinate. Its x and the two projective
+  x coordinates use the same endomorphism constant and field modulus. )
+formula: secp-window-map-row-coordinates ( secp-window-field secp-window-coordinate
+    secp-window-coordinate secp-window-coordinate secp-window-coordinate
+    secp-window-coordinate secp-window-coordinate secp-window-coordinate
+    secp-window-coordinate secp-window-sign secp-window-coordinate --
+    secp-window-coordinate secp-window-coordinate secp-window-coordinate
+    secp-window-coordinate secp-window-coordinate secp-window-coordinate
     secp-window-coordinate secp-window-coordinate secp-window-coordinate )
-    {: p x2 y2 z2 x3 y3 z3 sign beta :}
+    {: p x x2 y2 z2 x3 y3 z3 qy sign beta :}
+    x beta int* p int-rem qy 1
     x2 beta int* p int-rem y2 sign int* z2
     x3 beta int* p int-rem y3 sign int* z3
 ;
