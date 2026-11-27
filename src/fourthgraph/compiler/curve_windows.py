@@ -1,6 +1,7 @@
 """Curve-specific facts and reproducible fixed-base tables for scalar lowering."""
 from dataclasses import dataclass
 from functools import cache
+from operator import add, sub
 
 from fourthgraph.bsv.script import SECP256K1_FIELD
 from fourthgraph.stdlib.weierstrass import CoordinateScale
@@ -72,6 +73,33 @@ class ScalarPlan:
     windows: int
     eligible: bool = True
     reason: str | None = None
+
+
+@dataclass(frozen=True)
+class SignedRadix4Window:
+    maximum_magnitude: int
+    carry: bool
+
+    def split(self, scalar, *, add=add, sub=sub, divide=divmod):
+        """Return the digit and the remaining scalar using host or Script operations."""
+        if not self.carry:
+            return scalar, 0
+        high, low = divide(add(scalar, 1), 4)
+        return sub(low, 1), high
+
+
+def signed_radix4(maximum):
+    """Plan low-first digits for a scalar proved to lie in [0, maximum].
+
+    For a full window, n = 4*floor((n+1)/4) + d with -1 <= d <= 2.
+    Recur on the quotient bound so the final carry gets its own window.
+    """
+    if type(maximum) is not int or maximum < 0:
+        raise ValueError("signed radix-4 requires a nonnegative scalar bound")
+    while maximum:
+        high = (maximum + 1) // 4
+        yield SignedRadix4Window(min(maximum, 2), high != 0)
+        maximum = high
 
 
 def scalar_plans(curve, *, joint=False):

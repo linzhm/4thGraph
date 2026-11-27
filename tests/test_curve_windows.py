@@ -13,7 +13,9 @@ from fourthgraph.bsv.evaluate import ScriptError, evaluate
 from fourthgraph.bsv.script import asm, decode_num, encode_num, push
 from fourthgraph.bsv.transaction import Input, Output, Transaction
 from fourthgraph.compiler.curve_lowering import compile_fixed_generator, compile_joint_generator_point
-from fourthgraph.compiler.curve_windows import CURVES, GLV_REFERENCE, JOINT_STRATEGIES, P256, SECP256K1, SM2, fixed_table, scalar_plans
+from fourthgraph.compiler.curve_windows import (
+    CURVES, GLV_REFERENCE, JOINT_STRATEGIES, P256, SECP256K1, SM2, fixed_table, scalar_plans, signed_radix4,
+)
 from fourthgraph.compiler.lowering import DATAFLOW, compile_word
 from fourthgraph.compiler.modular_scale import lower_affine_pair_scale, lower_modular_scale, lower_scaled_residuals
 from fourthgraph.compiler.script_builder import ScriptBuilder
@@ -53,6 +55,21 @@ def generator_multiple(curve, scalar):
     if len(uncompressed) != 65 or uncompressed[0] != 4:
         raise AssertionError("OpenSSL did not return an uncompressed point")
     return int.from_bytes(uncompressed[1:33], "big"), int.from_bytes(uncompressed[33:], "big")
+
+
+class ScalarRecodingTests(unittest.TestCase):
+    def test_signed_radix4_preserves_scalar_and_terminal_carry(self):
+        for maximum in (*range(65), 2**32 - 1, 2**255 - 1):
+            plan = tuple(signed_radix4(maximum))
+            inputs = range(maximum + 1) if maximum < 65 else (0, 3, maximum - 1, maximum)
+            for value in inputs:
+                remaining, reconstructed = value, 0
+                for index, window in enumerate(plan):
+                    digit, remaining = window.split(remaining)
+                    self.assertLessEqual(abs(digit), window.maximum_magnitude)
+                    self.assertGreaterEqual(digit, -1 if window.carry else 0)
+                    reconstructed += digit << (index * 2)
+                self.assertEqual((remaining, reconstructed), (0, value))
 
 
 class WeierstrassModelTests(unittest.TestCase):
