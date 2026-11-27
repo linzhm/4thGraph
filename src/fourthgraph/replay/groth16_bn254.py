@@ -119,12 +119,17 @@ def main():
     cli.add_argument("--tx-version", type=int, choices=(1, 2), default=2)
     cli.add_argument("--output", type=Path, required=True)
     args = cli.parse_args()
+    keys = TestKeys()
+    owner = keys.public["operator"]
     try:
         if args.fixture:
             if args.entries:
                 raise ValueError("--entries requires a generated circuit")
             fixture_bytes = args.fixture.read_bytes()
             fixture = json.loads(fixture_bytes)
+            fixture_owner = fixture.get("owner_public_key") if isinstance(fixture, dict) else None
+            if not isinstance(fixture_owner, str) or bytes.fromhex(fixture_owner) != owner:
+                raise ValueError("fixture owner_public_key must match the regtest operator key")
             provenance = {"fixture_sha256": sha256(fixture_bytes).hexdigest()}
         else:
             source = args.source.read_bytes()
@@ -139,8 +144,6 @@ def main():
     if node.call("getblockcount", []) or node.call("getconnectioncount", []):
         raise ValueError("Groth16 replay requires an empty peerless regtest")
     activation = int(os.environ["SCRIPT_LAB_CHRONICLE_HEIGHT"])
-    keys = TestKeys()
-    owner = keys.public["operator"]
 
     with TemporaryDirectory(prefix="4thgraph-groth16-replay-") as temporary:
         adapter = Path(temporary) / "adapter"
