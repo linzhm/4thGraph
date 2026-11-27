@@ -3,7 +3,7 @@
 import unittest
 
 from fourthgraph.bsv.evaluate import ScriptError, evaluate
-from fourthgraph.bsv.script import asm, decode_num, encode_num
+from fourthgraph.bsv.script import asm, decode_num, encode_num, push
 from fourthgraph.compiler.stack_schedule import Graph, Value
 
 
@@ -54,6 +54,45 @@ class StackScheduleTests(unittest.TestCase):
                         else:
                             with self.assertRaises(ScriptError):
                                 evaluate(script, stack)
+
+    def test_packet_slices_use_the_unread_suffix(self):
+        prefix, packet = b"caller", b"ab--cdxyz"
+        for chronicle in (False, True):
+            graph = Graph(1)
+            value, = graph.inputs
+            checks = []
+            for offset, expected in ((0, b"AB"), (4, b"CD"), (6, b"XY")):
+                decoded = graph.packet_slice(value, offset, 2, decode=push(b"  ") + asm("OP_XOR"),
+                                             chronicle=chronicle)
+                literal = graph.define(push(expected))
+                checks.append(graph.define(asm("OP_EQUAL"), (decoded, literal)))
+            baseline = graph.emit_assertions(checks)
+            compact = graph.emit_assertions(checks, compact=True, reorder=True)
+            self.assertLess(len(compact), len(baseline))
+
+            def observe(main, alt):
+                self.assertLessEqual(main.count(packet) + alt.count(packet), 1)
+
+            self.assertEqual(evaluate(compact, [prefix, packet], observe_stack=observe), ([prefix], []))
+            for malformed in (packet[:7], b"ab--zzxyz"):
+                for script in (baseline, compact):
+                    with self.assertRaises(ScriptError):
+                        evaluate(script, [prefix, malformed])
+
+    def test_packet_slices_keep_random_access_for_other_uses(self):
+        for offsets, check_packet in (((2, 0), False), ((0, 1), False), ((0, 2), True)):
+            with self.subTest(offsets=offsets, check_packet=check_packet):
+                graph = Graph(1)
+                packet, = graph.inputs
+                chunks = [graph.packet_slice(packet, offset, 2) for offset in offsets]
+                checks = [graph.define(asm("OP_EQUAL"), tuple(chunks))]
+                if check_packet:
+                    literal = graph.define(push(b"aaaa"))
+                    checks.append(graph.define(asm("OP_EQUAL"), (packet, literal)))
+                plain = graph.emit_assertions(checks, compact=True)
+                graph.packet_reads.clear()
+                self.assertEqual(plain, graph.emit_assertions(checks, compact=True))
+                self.assertEqual(evaluate(plain, [b"aaaa"]), ([], []))
 
     def test_residue_block_defers_polynomial_remainders(self):
         graph = Graph(2)

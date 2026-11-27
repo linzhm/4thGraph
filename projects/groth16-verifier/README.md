@@ -1,6 +1,6 @@
 <!-- Generated from manifest.yaml with Copier. -->
 
-# BLS12-381 Groth16 verifier v0.3.0
+# BLS12-381 Groth16 verifier v0.4.0
 
 [简体中文](README.zh-CN.md) · [4thGraph](../../README.md) · [Project index](../README.md) · [Versions](versions/index.json)
 
@@ -8,7 +8,7 @@
 
 Import the 4thGraph Groth16 standard library in Forth, build a proof lock and witness, and replay funded BSV spends.
 
-[Algorithm and execution](#algorithm-and-execution) · [Reproduce the checks](#reproduce-the-checks) · [Measurements data](versions/v0.3.0/measurements.json)
+[Algorithm and execution](#algorithm-and-execution) · [Reproduce the checks](#reproduce-the-checks) · [Measurements data](versions/v0.4.0/measurements.json)
 
 | Entry point | Purpose |
 | --- | --- |
@@ -21,7 +21,7 @@ The project word imports the verifier with `REQUIRE` and calls its public entry.
 
 The compact verifier constructs its Fp2 kernel with `ScriptBuilder` and inlines the cross-product rewrite. The lock manifest records the formula hash and ordered rule. [Fp2 formula](../../src/fourthgraph/stdlib/bls12-381-fp2.fth)
 
-The compact verifier also compares source-order and dependency-order schedules for the same assertions and selects the smaller Script. [Schedule measurements](versions/v0.3.0/measurements.json)
+The compact verifier compares two assertion schedules and automatically consumes fixed-width packet fields from the unread suffix when the reads are ordered and disjoint. [Packet lowering measurements](versions/v0.4.0/measurements.json)
 
 ## Reproduce the checks
 

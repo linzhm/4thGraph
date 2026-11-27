@@ -29,6 +29,8 @@
 
 对只依赖显式操作数的算术图，`compact` 还比较源码顺序和按断言依赖发码的两种布局，选用序列化字节数较小的一种。两种布局按相同顺序执行断言。按依赖发码时，编译器只在断言需要某个值时发出该值的计算。 [共享栈调度器](../src/fourthgraph/compiler/stack_schedule.py)
 
+仿射布局把斜率包定长读取交给共享调度器，`affine-witness` 也用同样的方式读取通过哈希承诺校验的配对线包。调度器把符合条件的读取改为逐次切分未读后缀，减少整包复制和偏移指令。[v0.4.0 实测记录](../projects/groth16-verifier/versions/v0.4.0/measurements.json)
+
 调用方可先写 `REQUIRE stdlib/groth16-bls12-381.fth`，再在定义体中调用验证词。构建和复放工具支持 `--entry <word>` 来选择栈效果为 `-- groth16-verified` 的入口。构建清单记录入口、导出接口及验证密钥摘要。[项目调用演示](../projects/groth16-verifier/README.zh-CN.md) · [语法书](language/syntax.md#4-公开导出)
 
 ## 调用方选择

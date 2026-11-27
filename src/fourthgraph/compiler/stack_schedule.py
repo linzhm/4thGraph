@@ -30,6 +30,24 @@ class Definition:
     args: tuple[Value, ...]
 
 
+@dataclass(frozen=True)
+class PacketSlice:
+    offset: int
+    width: int
+    decode: bytes
+    chronicle: bool
+
+    def emit(self, position=0, *, keep_tail=False):
+        skip = self.offset - position
+        width = number(self.width)
+        if not keep_tail and self.chronicle:
+            read = number(skip) + width + asm("OP_SUBSTR") if skip else width + asm("OP_LEFT")
+        else:
+            prefix = number(skip) + asm("OP_SPLIT OP_NIP") if skip else b""
+            read = prefix + width + asm("OP_SPLIT OP_SWAP" if keep_tail else "OP_SPLIT OP_DROP")
+        return read + self.decode
+
+
 class Graph:
     """Inputs are ordered from bottom to top. Each operation returns one value."""
 
@@ -37,6 +55,7 @@ class Graph:
         self.inputs = tuple(Value(i) for i in range(input_count))
         self.definitions = {}
         self.common = {}
+        self.packet_reads = {}
         self.share = share
 
     def define(self, script, args=(), *, kind=None):
@@ -54,6 +73,18 @@ class Graph:
 
     def integer(self, value):
         return self.define(number(value))
+
+    def packet_slice(self, packet, offset, width, *, decode=b"", chronicle=False):
+        """Read a fixed slice of a size-checked packet.
+
+        The decoder consumes that slice alone and returns one value.
+        """
+        if offset < 0 or width <= 0:
+            raise ValueError("a packet slice requires a nonnegative offset and a positive width")
+        read = PacketSlice(offset, width, decode, chronicle)
+        value = self.define(read.emit(), (packet,), kind=read)
+        self.packet_reads[value] = read
+        return value
 
     def remainder(self, dividend, divisor, *, reuse=False):
         if reuse:
@@ -91,12 +122,51 @@ class Graph:
             steps.append((node.script, node.args, (value,)))
             if value in checks:
                 steps.append((VERIFY, (value,), ()))
+        if compact and self.packet_reads:
+            steps = self._stream_packet_reads(steps)
         source = emit_steps(self.inputs, steps, (), compact=compact)
         if not reorder:
             return source
         steps = list(self._assertion_dependencies(checks))
+        if compact and self.packet_reads:
+            steps = self._stream_packet_reads(steps)
         dependencies = emit_steps(self.inputs, steps, (), compact=compact)
         return min(source, dependencies, key=len)
+
+    def _stream_packet_reads(self, steps):
+        uses = Counter(arg for _, args, _ in steps for arg in args)
+        reads = {}
+        for _, args, results in steps:
+            read = self.packet_reads.get(results[0]) if results else None
+            if read is not None:
+                packet, = args
+                end, count, _ = reads.get(packet, (0, 0, None))
+                if read.offset >= end:
+                    reads[packet] = (read.offset + read.width, count + 1, results[0])
+        # The unread suffix replaces the original packet only when every live
+        # use is a slice, and those slices consume disjoint ranges in order.
+        tails = {packet: (packet, 0) for packet, (_, count, _) in reads.items()
+                 if count > 1 and uses[packet] == count}
+        if not tails:
+            return steps
+
+        lowered = []
+        next_slot = len(self.inputs) + len(self.definitions)
+        for script, args, results in steps:
+            read = self.packet_reads.get(results[0]) if results else None
+            if read is not None and args[0] in tails:
+                packet, = args
+                tail, position = tails[packet]
+                args = (tail,)
+                keep_tail = results[0] != reads[packet][2]
+                script = read.emit(position, keep_tail=keep_tail)
+                if keep_tail:
+                    remainder = Value(next_slot)
+                    next_slot += 1
+                    tails[packet] = (remainder, read.offset + read.width)
+                    results = (remainder, *results)
+            lowered.append((script, args, results))
+        return lowered
 
     def _assertion_dependencies(self, checks):
         emitted = set(self.inputs)

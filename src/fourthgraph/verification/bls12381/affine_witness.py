@@ -83,15 +83,9 @@ class PackedFields:
         self.packet = packet
 
     def read(self, index, *, committed=False):
-        width = number(FIELD_BYTES)
-        if self.field.chronicle:
-            code = number(index * FIELD_BYTES) + width + asm("OP_SUBSTR") if index else width + asm("OP_LEFT")
-        else:
-            prefix = number(index * FIELD_BYTES) + asm("OP_SPLIT OP_NIP") if index else b""
-            code = prefix + width + asm("OP_SPLIT OP_DROP")
-        if not committed:
-            code += push(b"\x00") + asm("OP_CAT")
-        value = self.field.graph.define(code + asm("OP_BIN2NUM"), (self.packet,))
+        decode = (b"" if committed else push(b"\x00") + asm("OP_CAT")) + asm("OP_BIN2NUM")
+        value = self.field.graph.packet_slice(self.packet, index * FIELD_BYTES, FIELD_BYTES,
+                                              decode=decode, chronicle=self.field.chronicle)
         if not committed:
             self.field.all((self.field.op("OP_LESSTHAN", value, Q),))
         return value
