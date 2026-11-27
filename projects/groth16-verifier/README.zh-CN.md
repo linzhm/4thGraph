@@ -1,6 +1,6 @@
 <!-- Generated from manifest.yaml with Copier. -->
 
-# BLS12-381 Groth16 验证器 v0.4.0
+# BLS12-381 Groth16 验证器 v0.5.0
 
 [English](README.md) · [4thGraph](../../README.zh-CN.md) · [项目目录](../README.zh-CN.md) · [版本](versions/index.json)
 
@@ -8,7 +8,7 @@
 
 在 Forth 中调用 4thGraph 的 Groth16 标准库，构建验证锁与见证，并在 BSV regtest 复放花费。
 
-[算法与执行](#算法与执行) · [复现方法](#复现方法) · [实测数据](versions/v0.4.0/measurements.json)
+[算法与执行](#算法与执行) · [复现方法](#复现方法) · [实测数据](versions/v0.5.0/measurements.json)
 
 | 入口 | 用途 |
 | --- | --- |
@@ -22,6 +22,8 @@
 紧凑模式用 `ScriptBuilder` 构造 Fp2 内核，并内联交叉项改写。锁定脚本清单记录公式摘要和有序规则。[Fp2 公式](../../src/fourthgraph/stdlib/bls12-381-fp2.fth)
 
 紧凑模式对同一组断言比较两种调度顺序。定长字段按偏移递增且互不重叠时，编译器自动从未读后缀依次取出字段。[字节包发码实测](versions/v0.4.0/measurements.json)
+
+共享调度器识别何时用 `OP_TUCK` 保留右操作数，并在使用处推入单字节数字常量。[操作数调度实测](versions/v0.5.0/measurements.json)
 
 ## 复现方法
 

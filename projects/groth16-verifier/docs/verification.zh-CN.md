@@ -24,6 +24,6 @@ REQUIRE stdlib/groth16-bls12-381.fth
 
 ## 测量与证据
 
-v0.4.0 沿用相同的公开输入配置和证明夹具，比较顺序切分字节包与 v0.3.0 构建。布局目标计量锁与见证脚本的序列化字段。入金回放计量完整部署和花费，包含资金输入签名与交易结构。栈峰值由开发求值器按栈内数据的字节数测量。[v0.4.0 字节包实测](../versions/v0.4.0/measurements.json) · [v0.3.0 调度实测](../versions/v0.3.0/measurements.json) · [v0.2.0 Fp2 实测](../versions/v0.2.0/measurements.json) · [v0.1.0 实测](../versions/v0.1.0/measurements.json)
+v0.5.0 沿用相同的公开输入配置和证明夹具，比较自动操作数调度与 v0.4.0 构建。布局目标计量锁与见证脚本的序列化字段。入金回放计量完整部署和花费，包含资金输入签名与交易结构。栈峰值由开发求值器按栈内数据的字节数测量。[v0.5.0 操作数实测](../versions/v0.5.0/measurements.json) · [v0.4.0 字节包实测](../versions/v0.4.0/measurements.json) · [版本索引](../versions/index.json)
 
-复现 Chronicle 回放时，设置 `REGTEST_CHRONICLE_HEIGHT=2`，传入 `--script-era chronicle` 并使用单独的输出文件。在任一 Script 时代复现配对线包的承诺校验时，将 `--objective path-bytes` 改为 `--witness-layout affine-witness`。
+复现 Chronicle 回放时，设置 `REGTEST_CHRONICLE_HEIGHT=2`，传入 `--script-era chronicle` 并使用单独的输出文件。在任一 Script 时代指定回放布局时，将 `--objective path-bytes` 改为 `--witness-layout affine-witness` 或 `--witness-layout projective`。

@@ -9,6 +9,7 @@ from fourthgraph.bsv.script import asm, number
 COMMUTATIVE = frozenset(map(asm, ("OP_ADD", "OP_MUL", "OP_MIN", "OP_MAX", "OP_NUMEQUAL", "OP_EQUAL")))
 VERIFY = asm("OP_VERIFY")
 REMAINDER = asm("OP_MOD")
+SINGLE_BYTE_NUMBERS = frozenset(number(value) for value in range(-1, 17))
 POLYNOMIAL_ARITIES = {asm(name): arity for name, arity in (
     ("OP_ADD", 2), ("OP_SUB", 2), ("OP_MUL", 2), ("OP_NEGATE", 1), ("OP_2MUL", 1),
 )}
@@ -297,16 +298,26 @@ def emit_steps(inputs, steps, returns, *, last_use=True, compact=False):
     """Schedule already ordered operations with any number of results."""
     uses = Counter(returns)
     uses.update(arg for _, args, _ in steps for arg in args)
-    stack = Layout(inputs, uses)
+    literals = {}
+    if compact and last_use:
+        returned = set(returns)
+        # These pushes cost at most as much as copying one stack item.
+        literals = {results[0]: script for script, args, results in steps
+                    if not args and len(results) == 1 and script in SINGLE_BYTE_NUMBERS
+                    and results[0] not in returned}
+    stack = Layout(inputs, uses, literals=literals)
     for script, args, results in fuse_verifications(steps, uses):
+        if not args and len(results) == 1 and results[0] in literals:
+            continue
         stack.execute(script, args, results, last_use=last_use, compact=compact)
     return stack.finish(returns, last_use=last_use)
 
 
 class Layout:
-    def __init__(self, inputs, uses):
+    def __init__(self, inputs, uses, *, literals=None):
         self.slots = list(inputs)
         self.uses = uses
+        self.literals = literals
         self.code = bytearray()
 
     def execute(self, script, args, results, *, last_use, compact, trace=None):
@@ -332,6 +343,11 @@ class Layout:
         return bytes(self.code)
 
     def access(self, value, staged, *, last_use):
+        if self.literals and value in self.literals:
+            self.code.extend(self.literals[value])
+            self.uses[value] -= 1
+            self.slots.append(value)
+            return
         # Operands already brought to the top are consumed by the instruction.
         # They cannot be reused as the original slot of another operand.
         ready = len(self.slots) - staged
@@ -349,6 +365,15 @@ class Layout:
         self.slots.append(value)
 
     def arrange(self, args, *, commutative=False):
+        if len(args) == 2:
+            left, right = args
+            if self.uses[left] == 1 and self.uses[right] > 1 and self.slots[-2:] == [left, right]:
+                # TUCK preserves the live right operand below the ordered
+                # pair. The operation consumes the other two slots.
+                self.slots.insert(len(self.slots) - 2, right)
+                self.uses.subtract(args)
+                self.code.extend(asm("OP_TUCK"))
+                return
         # Try reusing a suffix in place only when consuming those slots
         # accounts for every remaining use of the staged values.
         orders = (args, args[::-1]) if commutative and len(args) == 2 and args[0] != args[1] else (args,)
@@ -363,7 +388,7 @@ class Layout:
                 if staged and (tuple(self.slots[-staged:]) != prefix
                                or any(self.uses[value] != count for value, count in Counter(prefix).items())):
                     continue
-                candidate = Layout(self.slots, uses.copy())
+                candidate = Layout(self.slots, uses.copy(), literals=self.literals)
                 candidate.uses.subtract(prefix)
                 for index in range(staged, len(order)):
                     candidate.access(order[index], index, last_use=True)

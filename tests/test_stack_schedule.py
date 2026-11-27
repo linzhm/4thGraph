@@ -4,10 +4,37 @@ import unittest
 
 from fourthgraph.bsv.evaluate import ScriptError, evaluate
 from fourthgraph.bsv.script import asm, decode_num, encode_num, push
-from fourthgraph.compiler.stack_schedule import Graph, Value
+from fourthgraph.compiler.stack_schedule import Graph, Value, emit_steps
 
 
 class StackScheduleTests(unittest.TestCase):
+    def test_compact_schedule_keeps_a_live_right_operand(self):
+        graph = Graph(2)
+        left, right = graph.inputs
+        first = graph.define(asm("OP_SUB"), (left, right))
+        second = graph.define(asm("OP_SUB"), (first, right))
+        compact = graph.emit((second,), compact=True)
+        self.assertEqual(compact, asm("OP_TUCK OP_SUB OP_SWAP OP_SUB"))
+        for a, b in ((12, 5), (3, -7), (-2, 4)):
+            prefix = b"caller"
+            stack = [prefix, encode_num(a), encode_num(b)]
+            result = [prefix, encode_num(a - 2 * b)]
+            self.assertEqual(evaluate(compact, stack), (result, []))
+            self.assertEqual(evaluate(graph.emit((second,)), stack), (result, []))
+
+    def test_compact_schedule_repushes_single_byte_literals(self):
+        steps = [
+            (asm("OP_1"), (), (1,)),
+            (asm("OP_SUB"), (0, 1), (2,)),
+            (asm("OP_SUB"), (2, 1), (3,)),
+        ]
+        compact = emit_steps((0,), steps, (3,), compact=True)
+        self.assertEqual(compact, asm("OP_1 OP_SUB OP_1 OP_SUB"))
+        for returns, expected in (((3,), (5,)), ((3, 1), (5, 1))):
+            for compact in (False, True):
+                script = emit_steps((0,), steps, returns, compact=compact)
+                self.assertEqual(evaluate(script, [encode_num(7)]), (list(map(encode_num, expected)), []))
+
     def test_assertions_consume_flags_and_preserve_other_uses(self):
         graph = Graph(1)
         operand, = graph.inputs
