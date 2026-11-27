@@ -22,8 +22,7 @@ from fourthgraph.bsv.otda_reconstruction import Reconstruction
 from fourthgraph.bsv.transaction import Input, Output, Transaction
 from fourthgraph.workflow.protocol import FLAG
 from msm_compiler import OWNER, R1MSMCompiler
-from msm_lowering import (Strategy, clear_window_table, reconstruction, repeat_prefix, repeated, verify_window,
-                          window_program)
+from msm_lowering import Strategy, clear_window_table, reconstruction, verify_window, window_program
 from replay_r1 import FIXTURE, FIXTURE_PATH, MODES, signer, spend
 
 
@@ -39,7 +38,15 @@ METHODS = {
 SEARCH_METHODS = {
     **METHODS,
     "widen-g-window": ("fixed G digit extraction, table and call schedule", "separate G table with sufficient slots"),
-    "pack-prefix-repeat": ("OTDA reconstruction of repeated Script fragments", "a shorter repetition program"),
+    "pack-prefix-repeat": ("OTDA reconstruction of repeated Script fragments", "a smaller constructor"),
+    "narrow-q-window": ("runtime Q digit extraction, table and call schedule", "a separate Q table"),
+    "pack-stack-repeat": ("OTDA repetition of Script fragments on the main stack", "a smaller constructor"),
+    "pack-adjacent-kernels": ("OTDA copies of consecutive identical kernels", "a smaller constructor"),
+}
+PACKING_OPTIONS = {
+    "pack-prefix-repeat": "prefix_repeat",
+    "pack-stack-repeat": "stack_repeat",
+    "pack-adjacent-kernels": "adjacent_kernels",
 }
 TERMINAL = ("rewrite", "share", "stack", "search")
 STALE_ERROR = "Error evaluating the script `Top of stack is false`"
@@ -50,14 +57,14 @@ class State:
     strategy: Strategy
     projective: bytes
     affine: bytes | None = None
-    prefix_repeat: bool = False
+    packing: frozenset[str] = frozenset()
 
 
 def digest(code):
     return sha256(code).hexdigest()
 
 
-def apply(method, state, *, backend, scheduled, program_for):
+def apply(method, state, *, backend, scheduled, constructor_for):
     strategy = state.strategy
     if method == "joint-window":
         if strategy.affine_g:
@@ -86,13 +93,22 @@ def apply(method, state, *, backend, scheduled, program_for):
         except ValueError as error:
             raise IneligibleMethod(str(error)) from error
         return replace(state, strategy=wider)
-    if method == "pack-prefix-repeat":
-        if state.prefix_repeat:
+    if method == "narrow-q-window":
+        if strategy.joint:
+            raise IneligibleMethod("the joint window cannot narrow Q independently of G")
+        narrower = replace(strategy, q_width=3)
+        try:
+            backend.plan(narrower.name)
+        except ValueError as error:
+            raise IneligibleMethod(str(error)) from error
+        return replace(state, strategy=narrower)
+    if method in PACKING_OPTIONS:
+        if method in state.packing:
             return state
-        program = program_for(strategy, state.projective, state.affine)
-        if not any(len(repeat_prefix(count)) < len(repeated(count)) for _, count in program.pieces):
-            raise IneligibleMethod("no repeated region benefits from prefix slicing")
-        return replace(state, prefix_repeat=True)
+        candidate = replace(state, packing=state.packing | {method})
+        if len(constructor_for(candidate)) >= len(constructor_for(state)):
+            raise IneligibleMethod("this packing option does not shorten the current constructor")
+        return candidate
     if method != "point-add-stack-search":
         raise ValueError(f"unknown R1 method {method!r}")
     return replace(state, projective=scheduled["projective"],
@@ -100,7 +116,7 @@ def apply(method, state, *, backend, scheduled, program_for):
 
 
 def info(state):
-    return {"window": state.strategy.name, "prefix_repeat": state.prefix_repeat,
+    return {"window": state.strategy.name, "packing": sorted(state.packing),
             "projective_kernel": {"bytes": len(state.projective), "sha256": digest(state.projective)},
             "affine_kernel": None if state.affine is None else
                 {"bytes": len(state.affine), "sha256": digest(state.affine)}}
@@ -178,14 +194,24 @@ def run_experiment(*, search_budget=None):
         return window_program(backend.plan(strategy.name), projective, double, affine=affine)
 
     @cache
+    def verify_curve(strategy, projective, affine):
+        return verify_window(program_for(strategy, projective, affine), 12)
+
+    @cache
+    def constructor_for(state):
+        program = program_for(state.strategy, state.projective, state.affine)
+        after = clear_window_table(program.table_slots) + epilogue
+        options = {PACKING_OPTIONS[method]: True for method in state.packing}
+        return reconstruction(prefix, before, program.pieces, after, program.kernels, **options)
+
+    @cache
     def build(state):
         try:
             program = program_for(state.strategy, state.projective, state.affine)
             after = clear_window_table(program.table_slots) + epilogue
             suffix = before + program.emit() + after
             lock = replace(backend.reference, script=prefix + bytes(len(OWNER)) + suffix, owner_start=len(prefix))
-            compressed = reconstruction(prefix, before, program.pieces, after, program.kernels,
-                                        prefix_repeat=state.prefix_repeat)
+            compressed = constructor_for(state)
             if evaluate(compressed) != ([prefix, suffix], []):
                 raise ValueError("OTDA reconstructed different lock bytes")
             pattern = Reconstruction(compressed, (prefix, suffix), (len(OWNER),))
@@ -202,7 +228,7 @@ def run_experiment(*, search_budget=None):
                 "table_slots": program.table_slots, "sections_bytes": program.sections,
             }
             try:
-                vectors = verify_window(program, 12)
+                vectors = verify_curve(state.strategy, state.projective, state.affine)
                 tested = {"status": "passed", "point_vectors": vectors, "modes": replay(lock, pattern)}
             except (ValueError, RuntimeError, AssertionError) as error:
                 tested = {"status": "failed", "diagnostic": str(error)}
@@ -212,7 +238,7 @@ def run_experiment(*, search_budget=None):
 
     registry = METHODS if search_budget is None else SEARCH_METHODS
     methods = {
-        name: Method(region, requires, partial(apply, name, backend=backend, scheduled=scheduled, program_for=program_for))
+        name: Method(region, requires, partial(apply, name, backend=backend, scheduled=scheduled, constructor_for=constructor_for))
         for name, (region, requires) in registry.items()
     }
     if search_budget is None:

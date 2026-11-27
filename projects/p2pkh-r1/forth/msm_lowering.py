@@ -335,35 +335,69 @@ def repeat_prefix(count):
     return min(standard, sliced, key=len)
 
 
-def reconstruction(prefix, before, pieces, after, kernels, *, prefix_repeat=False):
-    matches = re.compile(b"|".join(re.escape(kernel) for kernel in sorted(kernels, key=len, reverse=True)))
+def repeat_stack(count):
+    """Keep the repeat unit below the accumulator on the main stack."""
+    bits = bin(count)[3:]
+    if "1" not in bits:
+        return repeated(count)
+    double = asm("OP_DUP OP_CAT")
+    add_unit = asm("OP_OVER OP_CAT")
+    return asm("OP_DUP") + b"".join(double + (add_unit if bit == "1" else b"") for bit in bits) + asm("OP_NIP")
 
-    def append(raw, staged):
-        encoded = bytearray()
-        position = 0
-        for match in matches.finditer(raw):
-            if position < match.start():
-                encoded.extend(push(raw[position:match.start()]) + CAT)
-            depth = len(kernels) + 1 + staged - kernels.index(match.group())
-            encoded.extend(pick(depth) + CAT)
-            position = match.end()
-        if position < len(raw):
-            encoded.extend(push(raw[position:]) + CAT)
-        return min(push(raw) + CAT, bytes(encoded), key=len)
+
+def reconstruction(prefix, before, pieces, after, kernels, *,
+                   prefix_repeat=False, stack_repeat=False, adjacent_kernels=False):
+    matches = re.compile(b"|".join(re.escape(kernel) for kernel in sorted(kernels, key=len, reverse=True)))
 
     suffix_size = 0
     if prefix_repeat:
         pieces = tuple(pieces)
         suffix_size = len(before) + sum(len(raw) * count for raw, count in pieces) + len(after)
+
+    def repeat_code(count, unit_size):
+        options = [repeated(count)]
+        # An extra copy must fit within the size of the suffix already built.
+        if prefix_repeat and unit_size * (count + 1) <= suffix_size:
+            options.append(repeat_prefix(count))
+        if stack_repeat:
+            options.append(repeat_stack(count))
+        return min(options, key=len)
+
+    def append(raw, staged):
+        runs = []
+        for match in matches.finditer(raw):
+            start, end = match.span()
+            kernel = match.group()
+            if adjacent_kernels and runs and runs[-1][1] == start and runs[-1][2] == kernel:
+                previous, _, _, count = runs[-1]
+                runs[-1] = (previous, end, kernel, count + 1)
+            else:
+                runs.append((start, end, kernel, 1))
+
+        encoded = bytearray()
+        position = 0
+        for start, end, kernel, count in runs:
+            if position < start:
+                encoded.extend(push(raw[position:start]) + CAT)
+            depth = len(kernels) + 1 + staged - kernels.index(kernel)
+            copy = pick(depth)
+            separate = (copy + CAT) * count
+            if count > 1:
+                together = copy + repeat_code(count, len(kernel)) + CAT
+                separate = min(separate, together, key=len)
+            encoded.extend(separate)
+            position = end
+        if position < len(raw):
+            encoded.extend(push(raw[position:]) + CAT)
+        return min(push(raw) + CAT, bytes(encoded), key=len)
+
     code = bytearray(b"".join(push(kernel) for kernel in kernels) + push(prefix) + asm("0"))
     code.extend(append(before, 0))
     for raw, count in pieces:
         literal = push(raw)
         compact = asm("0") + append(raw, 1)
         assembled = min(literal, compact, key=len)
-        # An extra copy must fit within the size of the suffix already built.
-        repeat = repeat_prefix if prefix_repeat and len(raw) * (count + 1) <= suffix_size else repeated
-        code.extend(min(append(raw * count, 0), assembled + repeat(count) + CAT, key=len))
+        code.extend(min(append(raw * count, 0), assembled + repeat_code(count, len(raw)) + CAT, key=len))
     code.extend(append(after, 0))
     if len(kernels) == 2:
         code.extend(asm("OP_2SWAP OP_2DROP"))

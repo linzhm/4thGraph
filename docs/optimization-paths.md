@@ -42,6 +42,8 @@ The `method-search` command starts from the generic split state and expands ever
 
 The next method-search revision adds an OTDA packing choice for repeated fragments. For `joint-2`, the constructor can build 128 copies of a window by doubling and remove the final copy. It tries the alternative only when it uses fewer bytes and its temporary fits within the suffix being reconstructed. The 42,382 B lock is byte-identical. The constructor falls from 3,062 B to 3,043 B. With two signed inputs, the complete fixture path falls from 176,617 B to 176,579 B under OTDA ALL and from 176,546 B to 176,508 B under paired OTDA SINGLE. The BIP143 paths and the observed stack peaks are unchanged.
 
+The expanded search also compares a narrower separate Q window, repeats constructed on the main stack, and one dictionary lookup for consecutive copies of an identical kernel. The two packing choices are admitted only when the emitted constructor is smaller on the current state. All retained candidates are ranked using complete verified transactions. The report distinguishes reaching the state budget from exhausting the graph. The ten-method run reached the 64-state budget and independently verified 61 distinct artifacts. Narrowing Q made the generic split's OTDA ALL path 8,229 B larger even though its constructor shrank. Main-stack repetition reduced the compact affine candidate's OTDA path by 16 B. Adjacent references reduced the winning joint-window OTDA path by another 2 B, to 176,577 B under ALL and 176,506 B under paired SINGLE. The best BIP143 ALL path was 165,575 B.
+
 ## Ordered formula rules
 
 Use these rules on closed formulas whose caller establishes canonical ScriptNum encodings and the declared input intervals.

@@ -10,7 +10,7 @@ from fourthgraph.bsv.evaluate import evaluate
 from fourthgraph.bsv.script import asm, push
 from msm_compiler import CALIBRATION, SOURCE, R1MSMCompiler
 from msm_experiment import frozen_build, local_build
-from msm_lowering import repeat_prefix, repeated
+from msm_lowering import reconstruction, repeat_prefix, repeat_stack, repeated
 from r1_method_matrix import run_experiment
 
 
@@ -89,13 +89,27 @@ class R1MSMTests(unittest.TestCase):
         self.assertEqual(len(baseline.script) - len(lock.script), 102)
         self.assertEqual(opportunity["estimated"]["window_loop_bytes_saved"], 102)
 
-    def test_repeat_prefix_keeps_the_exact_bytes_and_altstack(self):
-        for chunk in (b"", b"x", b"\x00value\xff"):
-            for count in (1, 2, 3, 5, 7, 15, 63, 127, 128, 255):
-                with self.subTest(chunk=chunk, count=count):
-                    code = asm("OP_TOALTSTACK") + push(chunk) + repeat_prefix(count)
-                    self.assertEqual(evaluate(code, [b"sentinel"]), ([chunk * count], [b"sentinel"]))
+    def test_repeat_encoders_keep_the_exact_bytes_and_altstack(self):
+        for encode in (repeat_prefix, repeat_stack):
+            for chunk in (b"", b"x", b"\x00value\xff"):
+                for count in (1, 2, 3, 5, 7, 15, 63, 127, 128, 255):
+                    with self.subTest(encode=encode.__name__, chunk=chunk, count=count):
+                        code = asm("OP_TOALTSTACK") + push(chunk) + encode(count)
+                        self.assertEqual(evaluate(code, [b"sentinel"]), ([chunk * count], [b"sentinel"]))
         self.assertEqual(len(repeated(127)) - len(repeat_prefix(127)), 19)
+        self.assertLess(len(repeat_stack(12)), len(repeated(12)))
+
+    def test_adjacent_kernel_packing_keeps_gaps_and_order(self):
+        first, second = b"first kernel" * 5, b"second kernel" * 5
+        fragment = first * 4 + b"/" + second + first
+        before, after = b"start", b"end"
+        parts = (b"prefix", before, ((fragment, 12),), after, (first, second))
+        baseline = reconstruction(*parts)
+        packed = reconstruction(*parts, stack_repeat=True, adjacent_kernels=True)
+        expected = [b"prefix", before + fragment * 12 + after]
+        self.assertEqual(evaluate(baseline), (expected, []))
+        self.assertEqual(evaluate(packed), (expected, []))
+        self.assertLess(len(packed), len(baseline))
 
     def test_ordered_method_matrix_verifies_pairs_and_ranks_each_target(self):
         try:
