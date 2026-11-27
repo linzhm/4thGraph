@@ -1,6 +1,6 @@
 <!-- Generated from manifest.yaml with Copier. -->
 
-# P2PKH-Schnorr v0.16.0
+# P2PKH-Schnorr v0.17.0
 
 [简体中文](README.zh-CN.md) · [4thGraph](../../README.md) · [Project index](../README.md) · [Versions](versions/index.json)
 
@@ -10,7 +10,7 @@
 
 Create a BSV payment lock from the HASH160 of a BIP340 x-only public key. The key is 32 bytes, the owner hash is 20 bytes, and the external signer returns a 64-byte BIP340 signature. This is an experimental payment template. [BIP340](https://github.com/bitcoin/bips/blob/master/bip-0340.mediawiki)
 
-[Protocol](docs/spec.en.md) · [Algorithm and execution](#algorithm-and-execution) · [Reproduce the checks](#reproduce-the-checks) · [Complete transactions and stack measurements](#complete-transactions-and-stack-measurements) · [Measurements data](versions/v0.16.0/measurements.json)
+[Protocol](docs/spec.en.md) · [Algorithm and execution](#algorithm-and-execution) · [Reproduce the checks](#reproduce-the-checks) · [Complete transactions and stack measurements](#complete-transactions-and-stack-measurements) · [Measurements data](versions/v0.17.0/measurements.json)
 
 | Entry point | Purpose |
 | --- | --- |
@@ -24,7 +24,7 @@ The detached verifier covers BIP340 signer interoperability with empty and varia
 
 Two parties can use BIP327 MuSig2. The lock commits to the aggregate x-only key and verifies the final BIP340 signature through the same wallet interface. The fixtures cover signing-session interruptions and compare the same all-participants policy with native `CHECKMULTISIG`. [MuSig2 and native 2-of-2](docs/threshold-comparison.en.md)
 
-Each Schnorr output carries a 22,515-byte lock. Under OTDA ALL, every input witness also carries the serialized outputs, so the cost of adding an output grows with the number of inputs. The measured one-input exit to ordinary P2PKH is 416 bytes under BIP143 ALL and 348 bytes under OTDA ALL for both v0.15.0 and v0.16.0. The lock reduction saves bytes in the transaction that creates the Schnorr UTXO. [Recorded measurements](versions/v0.16.0/measurements.json)
+Each Schnorr output carries a 22,435-byte lock. Under OTDA ALL, every input witness also carries the serialized outputs, so the cost of adding an output grows with the number of inputs. The measured one-input exit to ordinary P2PKH is 416 bytes under BIP143 ALL and 348 bytes under OTDA ALL for both v0.16.0 and v0.17.0. The lock reduction saves bytes in the transaction that creates the Schnorr UTXO. [Recorded measurements](versions/v0.17.0/measurements.json)
 
 ## Algorithm and execution
 
@@ -40,13 +40,15 @@ v0.15.0 introduced a coordinate map that sends `(X:Y:Z)` to `(u²X:u³Y:Z)` with
 
 For joint multiplication, the verifier splits `s` at bit 128 and applies the secp256k1 endomorphism `φ(P) = λP` to split `k = n − e` into `k1 + λk2 ≡ k mod n`. The bounds give `|k1|, |k2| < 2¹²⁸`. The verifier accumulates the four components in 64 two-bit windows. v0.16.0 reuses two GLV lattice constants during rounding and reconstruction, and passes the group order from challenge reduction to the split. [Joint multiplication and bound](docs/spec.en.md#joint-scalar-multiplication) · [Reusable kernels](../../src/fourthgraph/stdlib/secp256k1.fth)
 
-The same kernels apply to Script paths that explicitly multiply secp256k1 points by runtime scalars. The current PELS Counter uses fixed public parameters `d = k = 1` for transaction binding. With the candidate preimage digest `H` and the fixed generator coordinate `r`, Script computes `s = (H + r) mod n`, applies low-S normalization, encodes DER, and delegates ECDSA verification to native `OP_CHECKSIG`. All three PELS Counter builds produced byte-identical locks across v0.15.0 and v0.16.0. [PELS Counter](../pels-counter/README.md) · [Fixed-key binding](../../src/fourthgraph/bsv/pushtx.py)
+v0.17.0 applies the point-at-infinity identity in the first window. When the variable selector is nonzero, the verifier loads that projective point directly into the accumulator. With a zero selector it keeps infinity. The fixed point uses complete affine addition when selected. [First window](docs/spec.en.md#joint-scalar-multiplication)
+
+The same kernels apply to Script paths that explicitly multiply secp256k1 points by runtime scalars. The current PELS Counter uses fixed public parameters `d = k = 1` for transaction binding. With the candidate preimage digest `H` and the fixed generator coordinate `r`, Script computes `s = (H + r) mod n`, applies low-S normalization, encodes DER, and delegates ECDSA verification to native `OP_CHECKSIG`. All three PELS Counter builds produced byte-identical locks across v0.16.0 and v0.17.0. [PELS Counter](../pels-counter/README.md) · [Fixed-key binding](../../src/fourthgraph/bsv/pushtx.py)
 
 ## Reproduce the checks
 
 <a name="validate-the-baseline"></a>
 
-Run from the repository root with Python 3.12. The SDK replay also uses Node.js 22, Go, and Rust/Cargo. The suites use public fixture keys and replay against pinned chain-gang and an isolated BSV Node regtest.
+Run from the repository root with Python 3.12. The SDK replay also uses Node.js 24, Go, and Rust/Cargo. The suites use public fixture keys and replay against pinned chain-gang and an isolated BSV Node regtest.
 
 ```sh
 bash tools/setup-workspaces.sh
@@ -71,18 +73,16 @@ The acceptance suite checks all 19 official BIP340 verification vectors through 
 
 ## Script sizes
 
-| Component | v0.15.0 | v0.16.0 |
+| Component | v0.16.0 | v0.17.0 |
 | --- | ---: | ---: |
-| GLV split with embedded group order | 182 B | 112 B |
-| GLV split with the group order supplied on the stack | — | 78 B |
-| Detached BIP340 verifier | 21,848 B | 21,705 B |
-| Complete payment lock | 22,658 B | 22,515 B |
+| Detached BIP340 verifier | 21,705 B | 21,625 B |
+| Complete payment lock | 22,515 B | 22,435 B |
 
-The v0.16.0 owner field starts at byte offset 189. Across 56 alternating detached verification runs per version, chain-gang medians were 2.547 and 2.505 ms. Local BSV Node RPC medians were 9.567 and 9.584 ms. The sCrypt report compares the earlier v0.6.0 baseline with the legacy verifier and a separate BIP340 implementation using the same witness layout. [Layout and fingerprint](versions/v0.16.0/layout.json) · [Recorded measurements](versions/v0.16.0/measurements.json) · [sCrypt comparison](docs/scrypt-comparison.en.md)
+The owner field starts at byte offset 189. The release record includes paired measurements on chain-gang and BSV Node for the detached verifier and both native P2PKH exit modes. The sCrypt report compares v0.6.0 with the legacy verifier and a separate BIP340 implementation using the same witness layout. [Layout and fingerprint](versions/v0.17.0/layout.json) · [Recorded measurements](versions/v0.17.0/measurements.json) · [sCrypt comparison](docs/scrypt-comparison.en.md)
 
 ## Developer and wallet integration
 
-1. Create a receive lock with `createLock` using the x-only key or its HASH160. Before spending, recognize the authenticated funding output, check the outpoint and amount, and approve the destinations and fee. The SDK defaults to v0.16.0 and recognizes and spends all releases from v0.6.0 to v0.16.0.
+1. Create a receive lock with `createLock` using the x-only key or its HASH160. Before spending, recognize the authenticated funding output, check the outpoint and amount, and approve the destinations and fee. The SDK defaults to v0.17.0 and recognizes and spends all releases from v0.6.0 to v0.17.0.
 2. Use `signPayment` for a single-input payment or `signInput` for a prepared transaction. The signer callback takes the supplied 32 bytes as the BIP340 message and returns the standard 64-byte signature. The SDK verifies it with libsecp256k1 and derives the two public y coordinates.
 3. The SDK calls the Forth `schnorr-unlock` word with the approved preimage and public witness. Every spend pushes the complete literal preimage. The lock uses PUSHTX and native `OP_CHECKSIG` to bind the digest to the actual input after validating the BIP340 signature.
 
@@ -96,12 +96,12 @@ Load `REQUIRE stdlib/bip340.fth` to reuse the detached verifier. The payment exa
 
 <a name="measured-sizes"></a>
 
-The v0.16.0 fixtures spend two Schnorr outputs and create two Schnorr outputs. BSV Node 1.2.3 and pinned chain-gang verify complete inputs with explicit prevouts. The development evaluator measures stack peaks for input zero. The main and alternate item peaks and combined payload peak are recorded independently. Transaction and payload sizes are in bytes. [Recorded measurements](versions/v0.16.0/measurements.json) · [Benchmark method](../../docs/benchmark.md)
+The v0.17.0 fixtures spend two Schnorr outputs and create two Schnorr outputs. BSV Node 1.2.3 and pinned chain-gang verify complete inputs with explicit prevouts. The development evaluator measures stack peaks for input zero. The main and alternate item peaks and combined payload peak are recorded independently. Transaction and payload sizes are in bytes. [Recorded measurements](versions/v0.17.0/measurements.json) · [Benchmark method](../../docs/benchmark.md)
 
 | Mode | Inputs × outputs | Previous locks | Unlocks | New locks | Total | Main / alt items | Stack payload |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| BIP143 ALL (`0x41`) | 2 × 2 | 22,515 × 2 | 329 × 2 | 22,515 × 2 | 45,806 | 90 / 13 | 3,403 |
-| Chronicle OTDA ALL (`0x61`) | 2 × 2 | 22,515 × 2 | 45,321 × 2 | 22,515 × 2 | 135,790 | 90 / 13 | 90,474 |
+| BIP143 ALL (`0x41`) | 2 × 2 | 22,435 × 2 | 329 × 2 | 22,435 × 2 | 45,646 | 90 / 13 | 3,401 |
+| Chronicle OTDA ALL (`0x61`) | 2 × 2 | 22,435 × 2 | 45,161 × 2 | 22,435 × 2 | 135,310 | 90 / 13 | 90,154 |
 
 ```sh
 PYTHONPATH=src:. bash tools/verify_node.sh -- "$SCRIPT_LAB_SDK_PYTHON" -m fourthgraph.benchmark.run \
@@ -112,7 +112,7 @@ Under BSV Node 1.2.3's default regtest policy, funding, turnover, and exit enter
 
 ```sh
 PYTHONPATH=src:. bash tools/verify_node.sh --profile default -- "$SCRIPT_LAB_SDK_PYTHON" -m fourthgraph.benchmark.admission \
-  p2pkh-schnorr --template v0.16.0 --turnover --output projects/p2pkh-schnorr/workspace/build/admission.json
+  p2pkh-schnorr --template v0.17.0 --turnover --output projects/p2pkh-schnorr/workspace/build/admission.json
 ```
 
 ## Marginal and lifecycle costs
@@ -121,7 +121,7 @@ Each added-input or added-output cell gives the change from 2 × 2 in **total by
 
 | Mode | Added-input shape | Added-input bytes | Added-output shape | Added-output bytes | Fund and exit | One turnover |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| BIP143 ALL (`0x41`) | 3 × 2 | 372 (0 / 329 / 43) | 2 × 3 | 22,526 (22,515 / 0 / 11) | 46,032 | 91,838 |
-| Chronicle OTDA ALL (`0x61`) | 3 × 2 | 45,487 (0 / 45,444 / 43) | 2 × 3 | 67,586 (22,515 / 45,056 / 15) | 46,046 | 181,835 |
+| BIP143 ALL (`0x41`) | 3 × 2 | 372 (0 / 329 / 43) | 2 × 3 | 22,446 (22,435 / 0 / 11) | 45,872 | 91,518 |
+| Chronicle OTDA ALL (`0x61`) | 3 × 2 | 45,327 (0 / 45,284 / 43) | 2 × 3 | 67,346 (22,435 / 44,896 / 15) | 45,886 | 181,195 |
 
 [Unified benchmark and reproduction](../../docs/benchmark.md) · [Native 2-of-2 lifecycle comparison](docs/threshold-comparison.en.md)
