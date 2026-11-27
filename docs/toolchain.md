@@ -383,7 +383,7 @@ PYTHONPATH=src:. python -m fourthgraph.verification.bls12381.build src/fourthgra
   --proof proof.json --witness-output witness.hex
 ```
 
-`--input-sources` 决定哪些槽在部署时固定，`--public` 和 `--proof` 为见证生成提供完整声明和证明。省略 `--input-sources` 会生成完整 Fr 范围的动态锁。动态和混合路径可用 `--stack-schedule baseline` 对照默认的紧凑栈调度。
+`--input-sources` 决定哪些槽在部署时固定，`--public` 和 `--proof` 为见证生成提供完整声明和证明。省略 `--input-sources` 会生成完整 Fr 范围的动态锁。固定、混合和动态路径均可用 `--stack-schedule baseline` 生成对照脚本。构建产物记录选用的模式。 [验证器编译模式](groth16-bls12-381.md#forth-词)
 
 测试夹具来自 `projects/proof-counter/workflow.fth`，使用 `circom2@0.2.22 --prime bls12381` 和 `snarkjs@0.7.5` 的本地测试专用设置。签名密钥也是测试专用。已导出的夹具让完整复放无需重新出证，同一个程序可分别复放 v1 和 v2。
 

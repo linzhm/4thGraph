@@ -21,7 +21,7 @@
 | `bls12-381-miller-loop` | 检查 B 点，计算 Miller 乘积并复用循环验证 B 的子群 |
 | `bls12-381-check-residue` | 检查配对余数条件 |
 
-`groth16-bls12-381-verify` 的静态输出 `groth16-verified` 代表完整验证路径。失败立即终止 Script，成功留下一个真值。生成器在原有谓词后加上 `OP_VERIFY OP_1`，共 2 B。`groth16-verify` 为兼容别名。当前入口支持 BSV 验证词、Forth 词定义及栈排列词。应用可在锁外层组合签名和交易绑定。 [公开输入及绑定接口](toolchain.md#bls12-381)
+`groth16-bls12-381-verify` 的静态输出 `groth16-verified` 代表完整验证路径。验证失败会终止 Script，成功留下一个真值。默认的 `--stack-schedule compact` 对稀疏配对线乘法做特化，并在检查结果可用时发出 `OP_VERIFY`。`--stack-schedule baseline` 使用通用域乘法和汇总验证谓词。两种模式共用见证编码。`groth16-verify` 为兼容别名。当前入口支持 BSV 验证词、Forth 词定义及栈排列词。应用可在锁外层组合签名和交易绑定。 [公开输入及绑定接口](toolchain.md#bls12-381)
 
 调用方可先写 `REQUIRE stdlib/groth16-bls12-381.fth`，再在定义体中调用验证词。构建和复放工具支持 `--entry <word>` 来选择栈效果为 `-- groth16-verified` 的入口。构建清单记录入口、导出接口及验证密钥摘要。 [语法书](language/syntax.md#4-公开导出)
 

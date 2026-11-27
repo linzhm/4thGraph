@@ -6,7 +6,8 @@ import json
 import unittest
 
 from fourthgraph.verification.bls12381.verifier import (
-    HOST, R, Curve, Dynamic, ScriptVerifier, bind_public_output, input_sources, public_output, public_packet,
+    FIELD_BYTES, HOST, Q, R, Curve, Dynamic, ScriptVerifier, bind_public_output, input_sources, public_output,
+    public_packet,
 )
 from fourthgraph.verification.bls12381.build import ForthVerifier, SOURCE, layout_candidates, select_layout
 from fourthgraph.compiler.source import CompileError
@@ -25,21 +26,26 @@ class ForthVerifierTests(unittest.TestCase):
         cls.key, cls.cases = fixture()
         cls.source = SOURCE.read_bytes()
 
-    def test_matches_original_fixed_hybrid_and_dynamic(self):
+    def test_compact_and_baseline_fixed_hybrid_and_dynamic(self):
         verifier = ForthVerifier(self.key, self.source)
         original = ScriptVerifier(self.key)
         signals, proof = self.cases[0]
-        profiles = ((signals, True), (SOURCES[:3] + signals[3:], True), (SOURCES, True), (SOURCES, False))
-        for sources, compact in profiles:
-            with self.subTest(sources=sources, compact=compact):
-                lock = verifier.compile(sources, compact=compact)
-                self.assertEqual(lock, original.compile(sources, compact=compact) + asm("OP_VERIFY OP_1"))
-                self.assertEqual(verifier.witness(signals, proof, sources=sources),
-                                 original.witness(signals, proof, sources=sources))
-                artifact = verifier.artifact(sources, None, lock, compact=compact)
+        for sources in (signals, SOURCES[:3] + signals[3:], SOURCES):
+            with self.subTest(sources=sources):
+                suffix = asm("OP_VERIFY OP_1")
+                baseline = verifier.compile(sources, compact=False)
+                self.assertEqual(baseline, original.compile(sources, compact=False) + suffix)
+                lock = verifier.compile(sources)
+                self.assertLess(len(lock), len(original.compile(sources) + suffix))
+                witness = original.witness(signals, proof, sources=sources)
+                self.assertEqual(verifier.witness(signals, proof, sources=sources), witness)
+                for script in (baseline, lock):
+                    check_spend(*spend_fixture(script, witness))
+                artifact = verifier.artifact(sources, None, lock)
                 self.assertEqual(artifact["source_sha256"], sha256(self.source).hexdigest())
                 self.assertEqual(artifact["artifact_sha256"], artifact_digest(artifact))
                 self.assertEqual(artifact["forth_entry"], GROTH16_ENTRY)
+                self.assertEqual(artifact["stack_schedule"], "compact")
 
     def test_legacy_source_and_module_share_the_asserting_verifier(self):
         current = ForthVerifier(self.key, b"REQUIRE groth16-bls12-381/verifier.fth")
@@ -150,6 +156,29 @@ class ForthVerifierTests(unittest.TestCase):
                 else:
                     with self.assertRaises((RuntimeError, ValueError)):
                         check_spend(parent, spend)
+
+    def test_affine_compact_checks_slope_and_committed_lines(self):
+        verifier = ForthVerifier(self.key, self.source, witness_layout="affine-witness")
+        signals, proof = self.cases[0]
+        lock = verifier.compile(SOURCES)
+        artifact = verifier.artifact(SOURCES, None, lock)
+        witness = verifier.witness(signals, proof, sources=SOURCES)
+        parent, spend = spend_fixture(lock, witness)
+        check_spend(parent, spend)
+
+        line_size = artifact["pairing_line_packet_bytes"]
+        slope_size = artifact["slope_packet_bytes"]
+        line_push = len(push(bytes(line_size)))
+        line_start = line_push - line_size
+        slope_start = line_push + len(push(bytes(slope_size))) - slope_size
+        # The first public scalar is zero, so its first window requires slope zero.
+        self.assertEqual(witness[slope_start:slope_start + FIELD_BYTES], bytes(FIELD_BYTES))
+        for offset, replacement in ((line_start, bytes([witness[line_start] ^ 1])),
+                                    (slope_start, (1).to_bytes(FIELD_BYTES, "little")),
+                                    (slope_start, Q.to_bytes(FIELD_BYTES, "little"))):
+            with self.subTest(offset=offset, replacement=replacement), self.assertRaises((RuntimeError, ValueError)):
+                bad = witness[:offset] + replacement + witness[offset + len(replacement):]
+                check_spend(parent, spend.with_script(0, bad))
 
     def test_objectives_report_serialized_cost_and_use_the_selected_witness(self):
         candidates = layout_candidates(self.key, self.source, SOURCES)

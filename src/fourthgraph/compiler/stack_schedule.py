@@ -59,6 +59,18 @@ class Graph:
         return self._emit_order(self.live_definitions(returns), returns, last_use=last_use, compact=compact,
                                 trace=trace)
 
+    def emit_assertions(self, checks, *, compact=False):
+        """Consume required flags at their producers in a graph of total operations."""
+        checks = set(checks)
+        if checks.difference(self.inputs, self.definitions):
+            raise ValueError("assertion refers to an undefined graph value")
+        steps = [(VERIFY, (value,), ()) for value in self.inputs if value in checks]
+        for value, node in self.live_definitions(checks):
+            steps.append((node.script, node.args, (value,)))
+            if value in checks:
+                steps.append((VERIFY, (value,), ()))
+        return emit_steps(self.inputs, steps, (), compact=compact)
+
     def _emit_order(self, ordered, returns, *, last_use, compact, trace=None):
         uses = Counter(returns)
         uses.update(arg for _, node in ordered for arg in node.args)

@@ -470,13 +470,16 @@ def proof_stack(inputs):
 class VerifierStages:
     """Build the typed stages of one BLS12-381 Script predicate."""
 
-    def __init__(self, key, sources, *, chronicle=False):
+    def __init__(self, key, sources, *, chronicle=False, optimize=False, extra_inputs=None):
         self.key, self.sources = key, sources
         self.slots = dynamic_slots(sources)
+        self.optimize = optimize
         self.proof_elements = PACKET_BYTES // FIELD_BYTES
-        extra = 2 + len(self.slots) if self.slots else 0
-        self.field = ScriptField(self.proof_elements + extra, chronicle=chronicle)
-        self.tower = Tower(self.field)
+        if extra_inputs is None:
+            extra_inputs = 2 if self.slots else 0  # Projective VK_x claim.
+        self.field = ScriptField(self.proof_elements + len(self.slots) + extra_inputs,
+                                 chronicle=chronicle, assert_checks=optimize)
+        self.tower = Tower(self.field, sparse=optimize)
         self.setup = b""
 
     def read_witness(self):
@@ -521,7 +524,7 @@ class VerifierStages:
         field.all((nonzero,))
 
     def compile(self, *, compact):
-        return self.setup + self.field.compile(compact=compact and bool(self.slots))
+        return self.setup + self.field.compile(compact=compact and (self.optimize or bool(self.slots)))
 
 
 @lru_cache(maxsize=8)
