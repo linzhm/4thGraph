@@ -12,6 +12,7 @@ import re
 from fourthgraph import PROJECT_VERSION
 from fourthgraph.bsv.script import asm, number
 
+from fourthgraph.compiler import pels_language
 from fourthgraph.compiler.ranges import NUMERIC_TYPES, RangeType, Slot, primitive_outputs, range_bound, script_num_checks
 from fourthgraph.stdlib import (
     LIBRARIES, WALLET_BACKEND, LibraryImport, interface_digest, p256_vocabulary, read_library, required_source,
@@ -110,7 +111,7 @@ class Tokens:
 
 
 TOKEN = re.compile(r"'[ -~]'(?=\s|$)|\S+")
-CONTROL = {":", ";", "if", "else", "then"}
+CONTROL = {":", ";", "if", "else", "then", "do", "?do", "loop"}
 BUILTIN_WORDS = (CONTROL | BSV_SOURCE | FILE_EXT_SOURCE | PRIMITIVES.keys() | SHUFFLES.keys()
                  | NAMED_LITERALS.keys() | HOST_WORDS.keys() | {"bytes-hex", "check-range"})
 RESERVED_STEPS = {"deploy", "split", "fused"}
@@ -148,6 +149,7 @@ class Word:
     name: str | None = None
     ranges: tuple[RangeType, ...] = ()
     lock: LockBlock | None = None
+    pels: pels_language.SpendConstraints | None = None
 
     def slots(self, kinds):
         refinements = {item.name: item.slot for item in self.ranges}
@@ -294,20 +296,71 @@ def unavailable(token):
     return token.error(f"unknown Forth word {token.text!r}")
 
 
-def body(tokens, stack, words, opener, ranges, *, native_opcodes=False):
+def counted_loop(tokens, stack, words, opener, ranges, instructions, *,
+                 native_opcodes, budget):
+    bounds = [item.instruction for item in instructions[-2:]]
+    if len(bounds) != 2 or any(not isinstance(node, Literal) or node.kind != "cell" for node in bounds):
+        raise opener.error("DO and ?DO require literal limit and start values")
+    limit, start = (node.value for node in bounds)
+    count = limit - start
+    if count < 0 or (count == 0 and opener.name == "do") or count > MAX_EXPANSION:
+        raise opener.error(f"loop requires ascending bounds and at most {MAX_EXPANSION} iterations")
+    del instructions[-2:]
+    del stack[-2:]
+
+    inner, depth = [], 1
+    for token in tokens:
+        if token.name in ("do", "?do"):
+            depth += 1
+        elif token.name == "loop":
+            depth -= 1
+            if depth == 0:
+                end = Token(";", token.line, token.column, token.module)
+                break
+        elif token.name == ";":
+            raise opener.error("expected LOOP before the end of the definition")
+        inner.append(token)
+    else:
+        raise opener.error("unterminated counted loop")
+
+    replay = (*inner, end)
+    loop_host_uses = {}
+    for index in range(start, start + max(1, count)):
+        iteration_stack = stack if count else list(stack)
+        steps, host_uses, stop = body(iter(replay), iteration_stack, words, opener, ranges,
+                                      native_opcodes=native_opcodes, loop_index=index, budget=budget)
+        if stop is not end:
+            raise stop.error("unexpected end of counted loop body")
+        if count:
+            instructions.extend(steps)
+            loop_host_uses.update(dict.fromkeys(host_uses))
+    return loop_host_uses
+
+
+def body(tokens, stack, words, opener, ranges, *, native_opcodes=False, loop_index=None, budget=None):
+    if budget is None:
+        budget = [MAX_EXPANSION]
     instructions = []
     host_uses = {}
     for token in tokens:
         name = token.name
+        budget[0] -= 1
+        if budget[0] < 0:
+            raise token.error(f"definition exceeds the {MAX_EXPANSION}-token expansion budget")
         if name in {"else", "then", ";"}:
             return tuple(instructions), tuple(host_uses), token
+        if name in {"do", "?do"}:
+            host_uses.update(counted_loop(tokens, stack, words, token, ranges, instructions,
+                                          native_opcodes=native_opcodes, budget=budget))
+            continue
         if name == "if":
             transform(stack, (Slot.of("cell"),), (), token)
             other = list(stack)
-            yes, yes_host, stop = body(tokens, stack, words, token, ranges, native_opcodes=native_opcodes)
+            options = dict(native_opcodes=native_opcodes, loop_index=loop_index, budget=budget)
+            yes, yes_host, stop = body(tokens, stack, words, token, ranges, **options)
             no, no_host = (), ()
             if stop.name == "else":
-                no, no_host, stop = body(tokens, other, words, token, ranges, native_opcodes=native_opcodes)
+                no, no_host, stop = body(tokens, other, words, token, ranges, **options)
             if stop.name != "then" or [slot.kind for slot in stack] != [slot.kind for slot in other]:
                 raise token.error("IF must end in THEN and leave equal stack types on both branches")
             stack[:] = [a.merge(b) for a, b in zip(stack, other, strict=True)]
@@ -324,7 +377,10 @@ def body(tokens, stack, words, opener, ranges, *, native_opcodes=False):
             stack[-count:] = [entries[i] for i in order]
             instructions.append(Located(Shuffle(name), token))
             continue
-        instruction = resolve(tokens, token, words, ranges)
+        instruction = (Literal("cell", loop_index) if name == "i" and loop_index is not None
+                       else resolve(tokens, token, words, ranges))
+        if instruction is pels_language.OUTPUTS_EQUAL:
+            instruction = pels_language.output_assertion(instructions, stack, token)
         if isinstance(instruction, Literal):
             stack.append(Slot.literal(instruction))
         elif isinstance(instruction, Word):
@@ -372,6 +428,8 @@ def resolve(tokens, token, words, ranges):
 
 
 def require_script(word):
+    if isinstance(word, Word) and word.pels is not None:
+        raise CompileError(f"{word.name!r} requires a PELS transaction target")
     if word.location == "build":
         if isinstance(word, Word) and word.name is not None:
             raise CompileError(f"{word.name!r} is a build-time Script constructor")
@@ -511,6 +569,9 @@ class SourceCompiler:
                     self.definitions[spelling] = defined
                     self.imported_words[spelling] = (name, export)
             interface = interface_digest(name, library)
+        if name == "std/pels":
+            self.words.update(pels_language.WORDS)
+            self.stack_types = self.stack_types | {"output"}
         self.loaded_files.add(path)
         self.libraries[name] = LibraryImport(name, sha256(raw).hexdigest(), interface)
 
@@ -604,7 +665,8 @@ class SourceCompiler:
                                             native_opcodes=self.native_opcodes)
         if stop.name != ";":
             raise stop.error(f"unexpected {stop.text!r}, expected ';'")
-        if host_uses:
+        pels = "std/pels" in self.libraries and any(token.name in pels_language.WORDS for token in host_uses)
+        if host_uses and not pels:
             token = host_uses[0]
             raise token.error(f"host-only word {token.text!r} cannot run in a lock")
         if stack and [slot.kind for slot in stack] != ["cell"]:
@@ -612,7 +674,11 @@ class SourceCompiler:
         takes = tuple(takes)
         ranges = tuple(self.ranges[kind] for kind in dict.fromkeys(takes) if kind in self.ranges)
         lock = plan_lock(instructions, takes, name)
-        self.words[name.name] = Word(takes, ("cell",), instructions, "script", name=name.name, ranges=ranges, lock=lock)
+        if pels and takes:
+            raise name.error("this PELS lock takes its transaction witness from the selected target")
+        constraints = pels_language.read_constraints(lock, name) if pels else None
+        self.words[name.name] = Word(takes, ("cell",), instructions, "script", name=name.name, ranges=ranges,
+                                     lock=lock, pels=constraints)
         self.definitions[name.name] = name
         self.imported_words.pop(name.name, None)
 
@@ -1007,6 +1073,8 @@ def run_primitive(instruction, args, *, context=None, checksig=None):
 
 
 def evaluate(word, *values, context=None, checksig=None):
+    if word.pels is not None:
+        require_script(word)
     if len(values) != len(word.takes):
         raise ValueError("incorrect argument count for Forth word")
     for kind, slot, value in zip(word.takes, word.slots(word.takes), values, strict=True):

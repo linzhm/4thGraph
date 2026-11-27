@@ -130,6 +130,7 @@ LIBRARIES = {
         lock_export("p2pk-lock", "compressed-public-key", 33),
     )),
     "std/native-p2pkh": Library(ROOT / "stdlib/native-p2pkh.fth", declarations=("bytes-param:", "lock:")),
+    "std/pels": Library(ROOT / "stdlib/pels.fth", declarations=("lock:",)),
     "std/p2pkh": Library(ROOT / "stdlib/p2pkh.fth", (
         lock_export("p2pkh-lock", "public-key-hash", 20),
     )),

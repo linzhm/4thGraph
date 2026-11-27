@@ -21,6 +21,7 @@ from fourthgraph.compiler.source import (
     schedule, split_templates,
 )
 from fourthgraph.compiler.lowering import BASELINE, OPTIMIZATIONS, compile_word
+from fourthgraph.compiler.pels_language import WORDS as PELS_WORDS
 from fourthgraph.compiler.stack_schedule import Graph
 from fourthgraph.stdlib import capabilities as library_capabilities, describe_export
 from fourthgraph.workflow.transaction_graph import TransactionGraph
@@ -62,6 +63,12 @@ def normalize_target(value):
 
 def normalize_sighash_family(value):
     return {"forkid": "bip143", "chronicle": "otda"}.get(value, value)
+
+
+def candidate_sighash_families(target, policy):
+    if policy != "auto":
+        return (policy,)
+    return ("bip143", "otda") if TARGETS[target][1] == "chronicle" else ("bip143",)
 
 
 def field(offset, width):
@@ -1007,6 +1014,9 @@ def main():
     if sys.argv[1:2] == ["experiment"]:
         from fourthgraph.benchmark.experiment import main as experiment_main
         return experiment_main(sys.argv[2:])
+    if sys.argv[1:2] == ["pels-witness"]:
+        from fourthgraph.workflow.pels import witness_main
+        return witness_main(sys.argv[2:])
     cli = argparse.ArgumentParser(prog=PROJECT_NAME, description=PROJECT_DESCRIPTION)
     cli.add_argument("source", type=Path, nargs="?")
     action = cli.add_mutually_exclusive_group()
@@ -1022,8 +1032,8 @@ def main():
     cli.add_argument("--mode", choices=("auto", "split", *WORKFLOW_MODES), default="auto")
     cli.add_argument("--target", type=normalize_target, choices=TARGETS, default=DEFAULT_TARGET,
                      help="permitted transaction versions")
-    cli.add_argument("--sighash-family", type=normalize_sighash_family, choices=SIGHASH_FAMILY_OPTIONS,
-                     default="bip143", help="staged workflow preimage formats accepted by the lock")
+    cli.add_argument("--sighash-family", type=normalize_sighash_family, choices=(*SIGHASH_FAMILY_OPTIONS, "auto"),
+                     default="bip143", help="preimage policy for staged workflows and PELS locks")
     cli.add_argument("--optimize", choices=OPTIMIZATIONS, default=BASELINE)
     cli.add_argument("--join-witness", choices=JOIN_WITNESSES)
     cli.add_argument("--gate-boundary", choices=GATE_BOUNDARIES, default="auto")
@@ -1041,7 +1051,7 @@ def main():
         cli.error("--objective requires --search")
     if args.max_tx_bytes is not None and not args.search:
         cli.error("--max-tx-bytes requires --search")
-    if args.entry and (args.search or args.sighash_family != "bip143" or args.gate_boundary != "auto" or args.current is not None
+    if args.entry and (args.search or args.gate_boundary != "auto" or args.current is not None
                        or args.mode in ("serial", "atomic")):
         cli.error("transaction search and boundaries require a transaction build")
     if args.assume_input_ranges and args.entry is None:
@@ -1053,6 +1063,8 @@ def main():
                           "topologies": ("parallel", "gated-parallel", "workflow"), "workflow_modes": WORKFLOW_MODES,
                           "workflow_sighash_families": {**{name: f"{flag:02x}" for name, flag in SIGHASH_FAMILIES.items()},
                                                        "both": [f"{flag:02x}" for flag in SIGHASH_FAMILIES.values()]},
+                          "pels_sighash_policies": (*SIGHASH_FAMILY_OPTIONS, "auto"),
+                          "pels_words": tuple(PELS_WORDS),
                           "search_objectives": OBJECTIVES,
                           "gate_boundaries": GATE_BOUNDARIES, "targets": {
             name: {"transaction_versions": versions, "era": era} for name, (versions, era) in TARGETS.items()
@@ -1080,6 +1092,16 @@ def main():
             word = source.words.get(entry)
             if word is None:
                 raise CompileError(f"undefined entry word {args.entry!r}")
+            if getattr(word, "pels", None) is not None:
+                from fourthgraph.workflow.pels import compile_pels
+
+                result = compile_pels(word.pels, args.target, args.sighash_family, explain=args.explain)
+                result.update(project=PROJECT_NAME, compiler_version=PROJECT_VERSION, schema_version=1,
+                              entry=word.name, libraries=tuple(map(asdict, source.library_imports)))
+                display_build(build_artifact(result, source_bytes), args)
+                return
+            if args.sighash_family != "bip143":
+                cli.error("--sighash-family requires a staged workflow or PELS lock")
             compiled = compile_word(word, args.optimize, spend_entry=True,
                                     check_input_ranges=not args.assume_input_ranges)
             result = {"project": PROJECT_NAME, "compiler_version": PROJECT_VERSION, "schema_version": 1,

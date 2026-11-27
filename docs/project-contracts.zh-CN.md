@@ -15,6 +15,34 @@ Forth 源码、依赖、计划 → ScriptBuilder → Formula / Step → Graph �
                                                    完整花费验证 → 回执及公开重放
 ```
 
+### 按编译目标构建 PELS 锁
+
+用普通 Forth 计算预期输出。以下锁的业务条件是一个输入、两项有序输出及 `nLockTime = 42`。调用方把收款脚本作为构建参数绑定。单输入的交易上下文见证由编译器和组装器确定。
+
+```forth
+REQUIRE stdlib/pels.fth
+bytes-param: recipient-lock 25 ;
+
+: payout ( -- output ) 9999 1+ recipient-lock tx-output ;
+: receipt ( -- output ) 0 bytes-hex 006a055245414459 tx-output ;
+
+lock: settle ( )
+    1 inputs= verify
+    payout receipt 2 outputs= verify
+    tx-locktime 42 = verify
+;
+```
+
+```sh
+4thgraph settle.fth --entry settle --bind-bytes recipient-lock="$RECIPIENT_SCRIPT_HEX" \
+  --target chronicle-v2 --sighash-family auto --explain > lock.json
+4thgraph pels-witness lock.json --parent parent.hex --unsigned unsigned.hex
+```
+
+`parent.hex` 是实际包含编译锁的父交易。候选交易必须花费该输出并满足上述锁的断言。用 `--sighash-family both` 构建时，组装要显式传 `--sighash-family bip143` 或 `otda`。组装器只填见证，适用的 Chronicle 规则随构建路径记录。独立交易验证应使用实际父交易和对应链上下文。
+
+两条实验轴可各自重跑。固定目标和编译器，比较 Forth 源码修改。固定源码和参数，比较目标内的原像布局及汇编实现。构建报告记录 `source_sha256`、`constraints_sha256`、候选的 `script_sha256`、各片段的散列与依赖边，以及花费路径的签名锚点。`--explain` 保留所有候选字节。比如 `9999 1+` 和 `10000` 源码摘要不同，这个锁的业务约束摘要和最终字节却相同。[实验入口与比较报告](#公式优化与-agent-的两轮实验)
+
 ### 做一次构造测试
 
 以 R1 的普通 ForkID ALL 路径为例。命令从 Forth 重建模板并对照冻结的 v0.6.0 字节，独立编译 WASM，在内存生成本轮 P-256 密钥，将所选公钥的 HASH160 填入模板并构造合成父交易。宿主核对候选后签名，比较 WASM 与既有参考实现生成的见证字节，再把组装好的交易与实际父交易交给 chain-gang。临时私钥只在签名进程内使用。回执保存公钥、父交易、签后交易以及各用例结果。需要逐项比对材料时，验证器的 `--include-io` 会保存入口的实际输入、期望与返回值。

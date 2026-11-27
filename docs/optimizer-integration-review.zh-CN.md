@@ -36,13 +36,13 @@
 
 **双模式是一份锁、两条明确的花费路径。** `both` 从同一锁分别走 `0x41` 或 `0x61`，每次花费选择其一。多模式沿用相同约定。对于同一个公开的业务入口，每条路径都必须证明相同的约束，并绑定自己的见证布局、签名类型、`scriptCode` 和实际输入。共用词可返回同样的业务结果，或返回带模式的已认证原像。锁内分支必须验证所选模式及其布局。宿主按最终清单选取一条已编入的花费路径，准备及组装见证。若同一项目有两种业务意图，例如结算约束完整输出、另一条路径只约束成对输出，分别给这些业务入口命名，再按每条路径独立验收。
 
-应用统一引用拟议的 `stdlib/pels.fth`。下文带 BIP143 名称的低层路径是已有的评审夹具。具体模式汇编的模块路径由后端目录解析。每条花费路径的栈效果、受约束字段、输入输出数量和见证布局由成员契约及最终清单给出。
+应用统一引用 `stdlib/pels.fth`。下文带 BIP143 名称的低层路径是已有的评审夹具。具体模式汇编由后端解析。每条花费路径的受约束字段、输入输出数量和见证布局由成员契约及最终清单给出。[当前构建命令](project-contracts.zh-CN.md#按编译目标构建-pels-锁)
 
-现有 Workflow 的 `--sighash-family both` 已用同一锁实际验过两路，常规 BIP143 和 Chronicle OTDA 有各自的签名请求和见证。这项开关选择摘要算法，`--target both` 单独选择交易版本及执行目标。本次用固定 chain-gang 复跑 BIP143 重建、OTDA、双模式和覆盖检查，4 项均通过。双模式用例验证了同一父输出的两路花费及 Chronicle 激活边界。公开的 PELS OTDA 和双模式成员仍在设计，项目合约宿主当前明确只接受 `0x41`，后续要按每条路径的实际模式和 `scriptCode` 规则准备及核验。[Workflow 双模式实现](../src/fourthgraph/workflow/forkid_lowering.py) · [双模式实跑测试](../tests/test_workflow.py) · [项目合约宿主](../src/fourthgraph/workflow/project_contract.py)
+Workflow 和单输入 PELS 锁均支持 BIP143、OTDA、双模式及自动构建。双模式用例使用固定 chain-gang 验证同一父输出的两路花费及 Chronicle 激活边界。新的独立锁使用 `pels-witness` 组装。项目 WASM 宿主仍验证 `0x41`，多模式的标准钱包包属于后续集成。[原像重建](../src/fourthgraph/workflow/forkid_lowering.py) · [Workflow 实跑](../tests/test_workflow.py) · [独立锁实跑](../tests/test_pels_lock.py)
 
 ### Forth 直接定义锁
 
-建议沿用现有的 `lock:`、命名构建参数和普通 Forth 业务词。首版只需输出构造、输入或输出断言和已认证字段访问。下例是拟议的应用写法。`tx-output` 构造一个预期输出，`outputs=` 按顺序断言完整输出列表，`tx-locktime` 表示当前花费已认证的原像字段。现有 Workflow 的 `context:`、`ordered:` 和 `stage:` 提供可复用的表示和字段覆盖检查。[现有锁语法](language/syntax.md) · [现有 Forth 声明词](../src/fourthgraph/workflow/workflow.fth) · [覆盖检查](../src/fourthgraph/workflow/gforth.py)
+独立锁沿用现有的 `lock:`、命名构建参数和普通 Forth 业务词。`tx-output` 构造一个预期输出，`outputs=` 按顺序断言完整输出列表，`tx-locktime` 表示当前花费已认证的原像字段。当前实现也支持断言前序金额等于常量，以及用字面量边界的 `DO` 或 `?DO` 循环构造输出列表。[锁语法](language/syntax.md) · [覆盖检查](../src/fourthgraph/workflow/gforth.py)
 
 ```forth
 REQUIRE stdlib/pels.fth
@@ -58,7 +58,7 @@ lock: settle ( )
 ;
 ```
 
-例中锁约定单输入、付款和回执两个有序输出，以及 `nLockTime = 42`。应用只写跟业务有关的命名输入。原语需要的原像材料、分支选择和栈布局由编译器生成，并在产物中交付给宿主。若业务需要所有者授权，可组合现有验签词，授权和 PELS 约束各自可读。编译器沿调用图追踪每个字段需求。如果 `payout` 后来读取前序金额，而目标要求 OTDA，构建器须找到可认证该金额的原语组合，缺少匹配时在该词的源码位置报告。应用需要完整原像时，可以显式要求保留原像，纳入栈和字节成本计算。
+例中锁约定单输入、付款和回执两个有序输出，以及 `nLockTime = 42`。原像见证布局由编译器生成并交付给宿主。当前输出在构建时求值。动态状态、任意已认证字段运算和 R1 所有者授权的组合留作其他成员。断言真实前序金额时，`auto` 会排除 OTDA。显式要求 OTDA 或双模式会报告缺少认证金额。
 
 ### 编译目标选定交易签名规则
 
@@ -144,7 +144,7 @@ REQUIRE stdlib/pels/bip143-all-1in-1out.fth
 
 **哪一层已经好读。** 上面的项目组合让人看见授权依赖的是哪一次推导。再往下一层，`pels-read-script-code` 仍直接写了按 104 字节切分及 CompactSize 宽度选择，`increment-and-pay-fee` 也手排了数值编码和栈操作。前者宜留在有标准字节向量的序列化词里，后者宜把“推导后继状态”和“推导金额”各自命名，保持编码交界明确。评审高层源码时，应能指出每个关键结果来自哪个词；编译器决定该值是否占槽。只有测过成本的低层片段才需要保留手工排栈。[后继构造词](https://github.com/linzhm/4thGraph/blob/5fef0b71bb93507fb1d0206d7d72e3d692a74847/projects/p2pkh-r1/forth/pels-successor.fth)
 
-**升入标准库尚缺的证据。** 第一，登记最小公开词及依赖摘要，把构建期、Script 运行期、备用栈借用和失败语义分别写入接口。沿用现有栈契约测试，在两栈放哨兵，核对返回值、顺序与栈底保留。第二，把下面已实跑的非计数用例纳入标准库回归，避免原像认证或金额规则隐含依赖递增语义。第三，记录实例的钱包策略边界。本分支的 `u32-inc` 允许回绕，`advance.wasm` 在最大值拒绝准备。应明确钱包支持域并测试最大值，避免把宿主拒绝解释成 Script 拒绝。当前标准库清单尚无 PELS 模块条目。[后继构造](https://github.com/linzhm/4thGraph/blob/5fef0b71bb93507fb1d0206d7d72e3d692a74847/projects/p2pkh-r1/forth/pels-successor.fth) · [认证入口](https://github.com/linzhm/4thGraph/blob/5fef0b71bb93507fb1d0206d7d72e3d692a74847/projects/p2pkh-r1/forth/pels-verify.fth) · [主线栈契约测试](https://github.com/linzhm/4thGraph/blob/5fef0b71bb93507fb1d0206d7d72e3d692a74847/tests/test_stdlib_stack_contracts.py) · [实例钱包策略](../projects/pels-counter/contract/main.go)
+**动态后继成员升入标准库的验收。** 登记公开词及依赖摘要，用栈底哨兵测试两栈保留，并把下面的非计数实例纳入回归。记录各实例的钱包支持域。本分支的 `u32-inc` 允许回绕，`advance.wasm` 在最大值拒绝准备，须分开验证这两个边界。[后继构造](https://github.com/linzhm/4thGraph/blob/5fef0b71bb93507fb1d0206d7d72e3d692a74847/projects/p2pkh-r1/forth/pels-successor.fth) · [认证入口](https://github.com/linzhm/4thGraph/blob/5fef0b71bb93507fb1d0206d7d72e3d692a74847/projects/p2pkh-r1/forth/pels-verify.fth) · [实例钱包策略](../projects/pels-counter/contract/main.go)
 
 **非计数调用已经跑通。** 评审夹具在主线原有的 `pels-verify` 上组合了一个两态标签规则。“草稿”与“就绪”分别编码为 3、9，实际前序走完 `3 → 9 → 3`，两步保留金额，使用该成员原有的单输入、单后继及五字节布局。独立期望值从实际前序复制代码、替换标签并序列化输出。初始锁 645 B，两笔花费各 1,478 B，固定 chain-gang 均通过。该结果验证了非计数规则复用、实际前序和成功花费。它是评审夹具，尚无钱包包及公开模块登记。[Forth 规则](reviews/optimizer-integration/status-labels.fth) · [执行器](reviews/optimizer-integration/verify_status_labels.py) · [逐笔回执](reviews/optimizer-integration/measurements.json)
 
@@ -200,7 +200,7 @@ Forth 程序、依赖 + 编译目标 + 固定计划
 | OTDA，重建 | 1,313 B | 4,180 B |
 | 双模式，重建 | BIP143 1,399 B · OTDA 1,391 B | `41→41` 4,498 B · `41→61` 4,491 B · `61→41` 4,482 B · `61→61` 4,475 B |
 
-在固定 BIP143 的情况下，重建给融合路径省 **111 B**，给串行路径省 **335 B**。要求双模式时，编译器在双模式候选中决选，并报告每条轨迹。两个混合顺序的结果相差 **9 B**，所以成本报告要保留逐阶段模式。这里实测的是现有 Workflow 的选择和链接，拟议的 PELS 前端及通用原语目录尚待实现。以下命令在已安装仓库固定 chain-gang 的环境重放这一组样本。
+在固定 BIP143 的情况下，重建给融合路径省 **111 B**，给串行路径省 **335 B**。两个混合顺序的结果相差 **9 B**，所以成本报告要保留逐阶段模式。这组测量针对 Workflow 的选择和链接。以下命令在已安装仓库固定 chain-gang 的环境重放这一组样本。
 
 ```sh
 PYTHONPATH="src:.${PYTHONPATH:+:$PYTHONPATH}" python docs/reviews/optimizer-integration/measure_selection.py

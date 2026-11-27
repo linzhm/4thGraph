@@ -28,11 +28,12 @@ Forth 公共入口表达输入形状、要认证的字段及输出约束。编�
 
 ## 公开接口
 
-PELS 在架构上归属标准库模板族，应用提供状态和金额规则，编译器按编译目标选择实现。主线已有可独立加载的项目内 PELS 词。评审稿给出了约定唯一输出和原像字段的低层试验，以及统一的应用引用 `REQUIRE stdlib/pels.fth` 的拟议写法。下面的表列出已登记模块。[模板族及公开接口评审](../optimizer-integration-review.zh-CN.md)
+PELS 在架构上归属标准库模板族，应用提供输出和字段约束，编译器按编译目标选择实现。`REQUIRE stdlib/pels.fth` 提供单输入、完整输出向量的独立 `lock:`。模板族的后继状态和授权组合见评审稿。[模板族及公开接口评审](../optimizer-integration-review.zh-CN.md)
 
 | 模块 | 公开接口 | 现有项目 |
 | --- | --- | --- |
 | `std/bsv` | `REQUIRE BSV` 加载 `verify ( cell -- )` 和受支持的原生 `OP_*` 词 | [P2PKH 示例](../../projects/p2pk-p2pkh-baseline/forth/p2pkh.fth) |
+| `std/pels` | `tx-output` 构造预期输出，`inputs=` 和 `outputs=` 约束单输入及完整有序输出，`tx-locktime` 和 `tx-prevout-amount` 可与常量比较 | [构建与组装](../project-contracts.zh-CN.md#按编译目标构建-pels-锁) |
 | `std/u32` | `u32-inc ( u32 -- u32 )`，按 32 位回绕 | [PELS Counter](../../projects/pels-counter/pels-counter.fth) |
 | `std/p2pk` | `p2pk-lock ( bytes -- bytes )`，接收 33 字节压缩公钥并返回锁脚本 | [库源码](../../src/fourthgraph/stdlib/p2pk.fth) · [P2PK 示例](../../projects/p2pk-p2pkh-baseline/forth/p2pk.fth) |
 | `std/p2pkh` | `p2pkh-lock ( bytes -- bytes )`，接收 20 字节公钥哈希并返回锁脚本 | [库源码](../../src/fourthgraph/stdlib/p2pkh.fth) · [P2PKH 示例](../../projects/p2pk-p2pkh-baseline/forth/p2pkh.fth) |
