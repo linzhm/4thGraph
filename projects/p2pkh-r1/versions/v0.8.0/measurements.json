@@ -1,0 +1,76 @@
+{
+  "template_version": "0.8.0",
+  "engines": {
+    "bsv_node_version": 101020300,
+    "chain_gang": {
+      "version": "0.13.2",
+      "commit": "74676b9c002c452e7f21a9ed9265f4972bef03f6"
+    },
+    "regtest_profile": "raised"
+  },
+  "payment_shape": {
+    "inputs": 2,
+    "outputs": 2
+  },
+  "payment_fixture_sha256": "94703c73ffb3fdfd68c87c90124d692ec46b84e848c252b218735591cfa7409b",
+  "lock_sha256": "71ad4d2bb0a2b0e059094ec18b3aa9f866d47df08fa76b7ceb720b322171642a",
+  "otda_program_sha256": "d14d7eca5109df33ad8e5102b2a4537278fc493333978c7c1efe10d3b6b87a0b",
+  "point_vectors": 64,
+  "measured": {
+    "lock_bytes": 41114,
+    "otda_program_bytes": 5282,
+    "payment_bytes": {
+      "bip143-all": 82998,
+      "otda-all": 93612,
+      "otda-single": 93541
+    },
+    "payment_peak_stack_payload_bytes": {
+      "bip143-all": 4720,
+      "otda-all": 164862,
+      "otda-single": 82629
+    },
+    "unlock_bytes": {
+      "bip143-all": [
+        326,
+        326
+      ],
+      "otda-all": [
+        5633,
+        5633
+      ],
+      "otda-single": [
+        5593,
+        5602
+      ]
+    }
+  },
+  "payment_evidence": {
+    "bip143-all": {
+      "deployment_txid": "9e0432a95f4acbc1fda7b8029be386b92c4b43f4f9ebbe373eacad4b01d42ec3",
+      "payment_txid": "b8a3f0215bbe3c2fa91b2bd3ba0e12587a2e80de61c3a6bfd77b6bdb83a5b868",
+      "node_mined": true,
+      "chain_gang_passed": true,
+      "changed_locktime_rejected": true
+    },
+    "otda-all": {
+      "deployment_txid": "eef24ce7f635e168b9c6eb4aef535d451920713fbd706eb069f68ff0218161eb",
+      "payment_txid": "a8aef5ece99c1e495a1758ec8559c84583ecc0e99ce701e2b05bdef94f41a2bb",
+      "node_mined": true,
+      "chain_gang_passed": true,
+      "changed_locktime_rejected": true
+    },
+    "otda-single": {
+      "deployment_txid": "201f47dfdfb28a18dac95eb078143e52c69ddc16786a871a6457ce28664b2db9",
+      "payment_txid": "32d0c77d950ae4e4bd8d24fcbe5be2095567fab9c06cb725400d6ffaaf9680a2",
+      "node_mined": true,
+      "chain_gang_passed": true,
+      "changed_locktime_rejected": true
+    }
+  },
+  "acceptance": {
+    "node_payment_cases": 1296,
+    "chain_gang_payment_cases": 432,
+    "valid_witness_controls": 4,
+    "invalid_witness_controls": 24
+  }
+}

@@ -3,7 +3,7 @@
 | Result | Evidence and reproduction |
 | --- | --- |
 | **Native payments** | [P2PK and P2PKH measurements](../projects/p2pk-p2pkh-baseline/README.md) and [Forth builds](../projects/p2pk-p2pkh-baseline/forth/README.md) |
-| **P-256 lock optimization** | P2PKH-R1 v0.6.0 measures 41,364 B per lock and 83,498 B per two-input, two-output BIP143 ALL payment. [P2PKH-R1 results](../projects/p2pkh-r1/README.md#measured-results) |
+| **P-256 lock optimization** | P2PKH-R1 v0.8.0 measures 41,114 B per lock, 82,998 B per two-input, two-output BIP143 ALL payment, and 93,612 B per two-input, two-output OTDA ALL payment. [P2PKH-R1 results](../projects/p2pkh-r1/README.md#measured-results) |
 | **SM2 lock and reconstruction** | P2PKH-SM2 v1.11.0 measures 94,355 B per lock and 204,306 B for a same-template two-input, two-output OTDA ALL transaction. [Measurements and fee sponsorship](../projects/p2pkh-sm2/README.md#v1110) |
 | **Deferred R1 activation** | [Deferred v0.3.0](../projects/p2pkh-r1-deferred/README.md#4thgraph-forth-comparison) uses a 1,085 B funding lock built with `stack` optimization |
 | **PELS Counter** | [Build and replay](../projects/pels-counter/README.md) covers the funded `0 → 1 → 2` sequence and rejected mutations |
