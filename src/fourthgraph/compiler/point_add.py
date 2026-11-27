@@ -73,7 +73,7 @@ class PointAddBuilder(ScriptBuilder):
         }
 
     def emit_plan(self, entry, bindings):
-        return emit_bound_calls(self, entry, POINT_ADD, bindings, self.lower_call)
+        return emit_bound_calls(self, entry, bindings, ((POINT_ADD, self.lower_call),))
 
     def lower_call(self, token, site, name, encoded):
         constant = fixed_operand(encoded)

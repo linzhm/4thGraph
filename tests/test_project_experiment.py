@@ -8,13 +8,14 @@ from itertools import product
 import unittest
 from unittest.mock import patch
 
-from fourthgraph.benchmark.experiment import capabilities, digest, next_request, run
-from fourthgraph.benchmark.fixtures import FIXTURES, HashChainFixture
+from fourthgraph.benchmark.experiment import binding_plans, capabilities, digest, next_request, run
+from fourthgraph.benchmark.fixtures import ByteLayoutFixture, FIXTURES, HashChainFixture
 from fourthgraph.benchmark.spend_fixture import CONTEXT, linked_spends
 from fourthgraph.benchmark.validation import CONTEXT_PIN, NODE_GENESIS_FLAGS, Node, chain_metadata
 from fourthgraph.bsv.evaluate import evaluate
 from fourthgraph.bsv.script import asm, encode_num, number
 from fourthgraph.compiler.formula_experiment import RULES, enumerate_orders, transform
+from fourthgraph.compiler.byte_layout import PACKED as PACKED_BYTES, REPEAT as REPEAT_BYTES
 from fourthgraph.compiler.hash_chain import PAIRS, SINGLE, HashChainBuilder
 from fourthgraph.compiler.point_add import AFFINE, GENERAL, GUARDED, PointAddBuilder
 from fourthgraph.compiler.ranges import Slot
@@ -24,9 +25,102 @@ from fourthgraph.compiler.script_formula import GENESIS_NUM_BYTES, Formula, Step
 
 
 EQUALVERIFY_REJECTION = "Script failed an OP_EQUALVERIFY operation"
+FALSE_TOP_REJECTION = "Script evaluated without error but finished with a false/empty top stack element"
 
 
 class FormulaExperiments(unittest.TestCase):
+    def test_byte_layout_composes_distinct_bindings_and_respects_the_payload_budget(self):
+        self._require_pinned_chain()
+        request = {"fixture": "byte-layout", "evaluation": "spend", "enumerate": "binding-combinations"}
+        report = run(request)
+        base, packed, repeat, combined = report["candidates"]
+        self.assertEqual(len({row["source_sha256"] for row in report["candidates"]}), 1)
+        self.assertEqual([row["metrics"]["path_bytes"] for row in report["candidates"]], [1720, 1090, 1542, 912])
+        self.assertEqual([row["metrics"]["peak_payload_bytes"] for row in report["candidates"]], [425, 617, 425, 617])
+        self.assertEqual(report["ranking"][0], combined["id"])
+        self.assertIn("peak_payload_bytes", report["frontier_costs"])
+        for row in (base, packed, repeat, combined):
+            receipt = row["test"]["spend"]
+            self.assertEqual((receipt["status"], receipt["accepted"], receipt["rejected"]), ("passed", 24, 24))
+            script = bytes.fromhex(row["artifact"]["hex"])
+            for site in row["compile"]["lowering"]["call_sites"]:
+                start = site["offset"]
+                self.assertEqual(site["linked_sha256"], sha256(script[start:start + site["bytes"]]).hexdigest())
+        reverse_site, mask_site, single_site, irregular_site = combined["compile"]["lowering"]["call_sites"]
+        self.assertEqual((reverse_site["kernel"], mask_site["kernel"]), (PACKED_BYTES, REPEAT_BYTES))
+        self.assertEqual(reverse_site["evidence"]["checked_input_bytes"], 192)
+        self.assertEqual((mask_site["evidence"]["seed_bytes"], mask_site["evidence"]["doublings"]), (3, 6))
+        self.assertFalse(single_site["candidates"][1]["eligible"])
+        self.assertFalse(irregular_site["candidates"][1]["eligible"])
+
+        bounded = run({**request, "max_payload_bytes": 500})
+        self.assertEqual(bounded["baseline_path_bytes"], 1720)
+        self.assertEqual(bounded["ranking"], [repeat["id"], base["id"]])
+        self.assertEqual(bounded["winner_including_parents"], repeat["id"])
+        self.assertEqual(bounded["candidates"][-1]["selection"], {"eligible": False, "reason": "payload_budget_exceeded"})
+        self.assertEqual(run(bounded["request"], replaying=True)["run_id"], bounded["run_id"])
+        self.assertEqual(run({**request, "max_payload_bytes": 424})["ranking"], [])
+        self.assertEqual(len(run({**request, "max_payload_bytes": 617})["ranking"]), 4)
+
+    def test_byte_layout_excludes_bindings_without_matching_width_and_contents(self):
+        report = run({"fixture": "byte-layout", "plans": [
+            {"bindings": [{"site": 2, "kernel": PACKED_BYTES}]},
+            {"bindings": [{"site": 3, "kernel": REPEAT_BYTES}]},
+            {"bindings": [{"site": 0, "kernel": REPEAT_BYTES}]},
+        ]})
+        self.assertEqual(report["ranking"], [])
+        for row, message in zip(report["candidates"], ("exactly six", "identical halves", "wrong operation"), strict=True):
+            self.assertEqual(row["compile"]["status"], "failed")
+            self.assertIn(message, row["compile"]["diagnostic"])
+
+    def test_binding_combinations_keep_one_kernel_per_site_and_obey_the_candidate_limit(self):
+        choices = [{"kernel": name, "eligible": True} for name in ("base", "a", "b")]
+        sites = [{"site": site, "kernel": "base", "candidates": choices} for site in (0, 0, 1)]
+        plans = list(binding_plans(sites, combine=True))
+        self.assertEqual([len(row.get("bindings", ())) for row in plans], [0, 1, 1, 1, 1, 2, 2, 2, 2])
+        self.assertTrue(all(len({row["site"] for row in p["bindings"]}) == 2 for p in plans[-4:]))
+        report = run({"fixture": "byte-layout", "enumerate": "binding-combinations", "max_candidates": 3})
+        self.assertEqual(report["stop"], "candidate_budget")
+        self.assertEqual(len(report["candidates"]), 3)
+
+    def test_payload_budget_survives_follow_up_and_is_verified_during_replay(self):
+        report = run({"fixture": "square", "plans": [{}, {"passes": ["stack"]}], "max_payload_bytes": 50})
+        request = next_request(report)
+        self.assertEqual(request["max_payload_bytes"], 50)
+        with self.assertRaisesRegex(ValueError, "keep the parent's max_payload_bytes"):
+            run({**request, "max_payload_bytes": 51}, report)
+        self.assertEqual(run(request, report)["winner_including_parents"], report["ranking"][0])
+        report["request"]["max_payload_bytes"] = 51
+        result = subprocess.run([sys.executable, "-m", "fourthgraph.workflow.protocol", "experiment", "replay", "-"],
+                                input=json.dumps(report), text=True, capture_output=True)
+        self.assertEqual(result.returncode, 2)
+
+    @unittest.skipUnless(os.environ.get("REGTEST_COOKIE"), "requires tools/verify_node.sh")
+    def test_byte_layout_spends_and_malformed_fields_match_both_engines(self):
+        from fourthgraph.bsv.chain_gang import validate_at_heights
+
+        self._require_pinned_chain()
+        fixture = ByteLayoutFixture()
+        node = Node(os.environ["REGTEST_URL"], os.environ["REGTEST_COOKIE"])
+        report = run({"fixture": fixture.name, "evaluation": "spend", "enumerate": "binding-combinations"})
+        for row in report["candidates"]:
+            self.assertEqual(row["test"]["status"], "passed")
+            script = bytes.fromhex(row["artifact"]["hex"])
+            for case, parent, spend, rejected in linked_spends(fixture, script):
+                self.assertEqual(node.verdicts(spend, (parent,), **CONTEXT), [True], case)
+                changed_short = case["operands"][0] != case["rejected_operands"][0]
+                expected_rejection = FALSE_TOP_REJECTION if changed_short else EQUALVERIFY_REJECTION
+                self.assertEqual(node.verdicts(rejected, (parent,), **CONTEXT,
+                                               expected_rejection=expected_rejection), [False], case)
+            for short, wide in ((31, 192), (33, 192), (32, 191), (32, 193)):
+                witness = fixture.encode(bytes(short).hex()) + fixture.encode(bytes(wide).hex())
+                malformed = spend.with_script(0, witness)
+                self.assertEqual(node.verdicts(malformed, (parent,), **CONTEXT,
+                                               expected_rejection="Script failed an OP_NUMEQUALVERIFY operation"),
+                                 [False], (short, wide))
+                with self.assertRaisesRegex(ValueError, r"^Error evaluating the script `Numbers are not equal`$"):
+                    validate_at_heights(malformed, (parent,), **CONTEXT)
+
     def test_modular_rules_reduce_a_full_spend_with_the_same_source(self):
         self._require_pinned_chain()
         report = run({"fixture": "modular-dot", "enumerate": "orders", "trace": True, "evaluation": "spend"})
@@ -101,14 +195,13 @@ class FormulaExperiments(unittest.TestCase):
         self._require_pinned_chain()
         report = run({"fixture": "modular-dot", "enumerate": "orders", "evaluation": "spend"})
         node = Node(os.environ["REGTEST_URL"], os.environ["REGTEST_COOKIE"])
-        expected_rejection = "Script evaluated without error but finished with a false/empty top stack element"
         for row in report["candidates"]:
             self.assertEqual(row["test"]["status"], "passed")
             script = bytes.fromhex(row["artifact"]["hex"])
             for case, parent, spend, rejected in linked_spends(FIXTURES["modular-dot"], script):
                 self.assertEqual(node.verdicts(spend, (parent,), **CONTEXT), [True], case)
                 self.assertEqual(node.verdicts(rejected, (parent,), **CONTEXT,
-                                               expected_rejection=expected_rejection), [False], case)
+                                               expected_rejection=FALSE_TOP_REJECTION), [False], case)
 
     def test_large_matrix_keeps_the_smallest_linked_plan(self):
         self._require_pinned_chain()

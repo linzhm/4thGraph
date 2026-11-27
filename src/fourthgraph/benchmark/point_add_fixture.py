@@ -72,13 +72,14 @@ class PointAddFixture:
         return operands[:1] + homogeneous(left, 5) + operands[4:]
 
     def check(self, script):
-        main_peak = alt_peak = 0
+        main_peak = alt_peak = payload_peak = 0
         marker = b"caller"
         code = asm("OP_TOALTSTACK") + script
 
         def observe(main, alt):
-            nonlocal main_peak, alt_peak
+            nonlocal main_peak, alt_peak, payload_peak
             main_peak, alt_peak = max(main_peak, len(main)), max(alt_peak, len(alt))
+            payload_peak = max(payload_peak, sum(map(len, main)) + sum(map(len, alt)))
 
         passed = 0
         for operands, expected in self.vectors():
@@ -92,7 +93,8 @@ class PointAddFixture:
             except (ValueError, IndexError) as exc:
                 return {"status": "failed", "passed": passed, "vector": operands, "diagnostic": str(exc)}
             passed += 1
-        return {"status": "passed", "passed": passed, "main_peak_items": main_peak, "alt_peak_items": alt_peak}
+        return {"status": "passed", "passed": passed, "main_peak_items": main_peak, "alt_peak_items": alt_peak,
+                "peak_payload_bytes": payload_peak}
 
     @staticmethod
     def result_checks(expected):
