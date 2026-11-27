@@ -1,0 +1,161 @@
+{
+  "version": "0.5.0",
+  "previous": "0.4.0",
+  "compiler_revision": "8c217e3a84429b862cabc8759747470d37b7989d",
+  "fixture_sha256": "d8eee6da5ed5780fb71dc91fa08744d1644ff1db7f53974aafb48bb26c2dd10c",
+  "runar_revision": "dbcc4269f8e0895c4738cf86948b05b7d62a2010",
+  "runar_extension_sha256": {
+    "compact_groth16.go": "05d99aaac40efd7dbde553dc5d52dbe8b698b5cb3c70abbbe58effb6c9a9388a",
+    "compact_groth16.patch": "638054986762faf8008fb13391d561bd32ac143384be318ac0b74859697f2270",
+    "forth_groth16.go": "bd6b3491b9584ba74e11ac937877cdcaf8c9f12468e392320239dbf2ead3e41e",
+    "forth_groth16.patch": "e17d6487c81f4a596ed0e4af9c97da35592ef39168011adaef3523eb32a74905"
+  },
+  "forth_entry": "verify-bn254-proof",
+  "source_sha256": "aac34a42402cfad0c2ddd788b046dda81b36fd0bdcb26463223389cf175bbcd7",
+  "libraries": [
+    {
+      "name": "jacobian.fth",
+      "sha256": "aa5e4e314c382a6f2249c2fc50eb59e942ff86583ce3e7e18a015e38c4ec8af1",
+      "interface_sha256": null
+    },
+    {
+      "name": "miller.fth",
+      "sha256": "46b465a22590ee50f80c6949aaeb77c9b9f3be0671b5ae4148784638ff48c4d8",
+      "interface_sha256": null
+    },
+    {
+      "name": "residue.fth",
+      "sha256": "25c838f87acca351d036ee77615daa25cc6d60319a3d899a21217a11c050e545",
+      "interface_sha256": null
+    },
+    {
+      "name": "statement.fth",
+      "sha256": "2fd49a0fb75feeb27f855ad09d61daa839d7e5924102c4163f5c30491b126395",
+      "interface_sha256": null
+    },
+    {
+      "name": "subgroup.fth",
+      "sha256": "201afb55434846499fa5b049379530ae02f36661711edb92a4a9d8d1017fa48c",
+      "interface_sha256": null
+    }
+  ],
+  "stages": [
+    "prime",
+    "curve-a",
+    "curve-c",
+    "curve-b",
+    "subgroup",
+    "pairs",
+    "inverse",
+    "miller",
+    "fixed",
+    "frobenius",
+    "identity"
+  ],
+  "formula_operations": {
+    "double": 15,
+    "mixed_add": 18
+  },
+  "subgroup_rounds": 127,
+  "miller_rounds": 65,
+  "stack_optimization": "compact-moves",
+  "modulo_threshold": 64,
+  "node_version": 101020300,
+  "chain_gang": {
+    "version": "0.13.2",
+    "commit": "74676b9c002c452e7f21a9ed9265f4972bef03f6"
+  },
+  "activation_height": 2,
+  "funded_replays": {
+    "wrap": {
+      "baseline_lock_bytes": 505179,
+      "baseline_serialized_script_path_bytes": 512024,
+      "baseline_deployment_plus_spend_bytes": 512250,
+      "lock_bytes": 492007,
+      "lock_bytes_saved": 13172,
+      "script_sha256": "97fa2ee5eb74a028a55acecdcf4ee8d33f06f760bcf4058fc8d766d80123c480",
+      "artifact_sha256": "b6901df873c81db62d706adf094ce4bb8dec0d47ccc1cc93153fbd00a25c1c08",
+      "witness_prefix_bytes": 6765,
+      "witness_prefix_sha256": "c1483d42242f4545184abd5b9fffe90569bfebe50c2bd95a324520230b321f47",
+      "unlock_bytes": 6837,
+      "serialized_script_path_bytes": 498852,
+      "stack_payload_peak_bytes": 8872,
+      "owner_authorization": {
+        "sighash": 65,
+        "signing_preimage_bytes": 492168,
+        "preimage_in_unlock_bytes": 0
+      },
+      "deployment": {
+        "txid": "110b4e5ee821e21da5f288bb51dfa8510e7a18a8d9275e3773252e87b57b42c2",
+        "bytes": 492143,
+        "mempool": true,
+        "mined": true,
+        "block": "6eb9629b90e6b3236fd62b9fbb170b2c86450493133bbeab19ccb747ff61e9e3",
+        "height": 103
+      },
+      "valid_spend": {
+        "txid": "7e7337d3dfad2ddf3bb6328d2bf11def3ce725dbeb5c4409e7200ca5ef81eb80",
+        "bytes": 6934,
+        "mempool": true,
+        "mined": true,
+        "block": "5da7908197804539ab541a42556c4f4c9c2e743d09719f66bf3c34c13990cca9",
+        "height": 104,
+        "chain_gang": true
+      },
+      "deployment_plus_spend_bytes": 499077,
+      "rejected_by_bsv_node_and_chain_gang": [
+        "changed_output_with_stale_signature",
+        "g2_outside_subgroup",
+        "negated_proof_point",
+        "valid_proof_for_another_statement",
+        "wrong_sighash"
+      ]
+    },
+    "other": {
+      "baseline_lock_bytes": 505177,
+      "baseline_serialized_script_path_bytes": 512018,
+      "baseline_deployment_plus_spend_bytes": 512244,
+      "lock_bytes": 492005,
+      "lock_bytes_saved": 13172,
+      "script_sha256": "b87c6240273eaf0f1c7cd9c16c2fd6ea6cb80d7ad2f1c71e44cd3be52b3f439d",
+      "artifact_sha256": "1bcb0509fade2cbdf603e516b5380860ee4841c0733b9312a71fb84fc8ee9bd6",
+      "witness_prefix_bytes": 6761,
+      "witness_prefix_sha256": "24109899b736c96c0c4e057dbadc2920aff3375bd041d36ecc3edad6a5ae39ad",
+      "unlock_bytes": 6834,
+      "serialized_script_path_bytes": 498847,
+      "stack_payload_peak_bytes": 8870,
+      "owner_authorization": {
+        "sighash": 65,
+        "signing_preimage_bytes": 492166,
+        "preimage_in_unlock_bytes": 0
+      },
+      "deployment": {
+        "txid": "9fa0eeda328a299f6f05dbf72fb22e305666fca38a85ea21583a109f0b01b080",
+        "bytes": 492141,
+        "mempool": true,
+        "mined": true,
+        "block": "325bba44b3decfbfb74997180f880a5e9b69fa73d298cdab72a8f3d8f7ba3c39",
+        "height": 103
+      },
+      "valid_spend": {
+        "txid": "6d5606568ee020622d4ddd1fafca4727790d98c56f51f9950840c498e7959496",
+        "bytes": 6931,
+        "mempool": true,
+        "mined": true,
+        "block": "4a43bd08bd1fea3db2d6bb8a2e1baa89e3e6e0cf5da2356fcf9a4a29cd4528b8",
+        "height": 104,
+        "chain_gang": true
+      },
+      "deployment_plus_spend_bytes": 499072,
+      "rejected_by_bsv_node_and_chain_gang": [
+        "changed_output_with_stale_signature",
+        "g2_outside_subgroup",
+        "negated_proof_point",
+        "valid_proof_for_another_statement",
+        "wrong_sighash"
+      ]
+    }
+  },
+  "compiler_stack_pass_revision": "ed99841c1aef1578d103aa74f0b624d7fde3cf30",
+  "deployment_plus_spend_budget_bytes": 500000
+}

@@ -1,0 +1,165 @@
+{
+  "version": "0.6.0",
+  "previous": "0.5.0",
+  "compiler_revision": "c286d4e3ee3c1684f201958dee9360fdda2f379f",
+  "fixture_sha256": "d8eee6da5ed5780fb71dc91fa08744d1644ff1db7f53974aafb48bb26c2dd10c",
+  "runar_revision": "dbcc4269f8e0895c4738cf86948b05b7d62a2010",
+  "runar_extension_sha256": {
+    "compact_groth16.go": "05d99aaac40efd7dbde553dc5d52dbe8b698b5cb3c70abbbe58effb6c9a9388a",
+    "compact_groth16.patch": "638054986762faf8008fb13391d561bd32ac143384be318ac0b74859697f2270",
+    "forth_groth16.go": "bd6b3491b9584ba74e11ac937877cdcaf8c9f12468e392320239dbf2ead3e41e",
+    "forth_groth16.patch": "e17d6487c81f4a596ed0e4af9c97da35592ef39168011adaef3523eb32a74905",
+    "forth_liveness.go": "b3bb93b3f6a57c05a6cb7773adcf02aa388ae08d403ea4a887ab10900b99955a",
+    "forth_liveness.patch": "03143accec9bf49d66b0df467227be403092b43451b480fb14118ee2d2ca7749"
+  },
+  "forth_entry": "verify-bn254-proof",
+  "source_sha256": "c752aeb593d2c8593822b1845b9902b8e8968defbabcb6cf1a76f1035366baaa",
+  "libraries": [
+    {
+      "name": "jacobian.fth",
+      "sha256": "aa5e4e314c382a6f2249c2fc50eb59e942ff86583ce3e7e18a015e38c4ec8af1",
+      "interface_sha256": null
+    },
+    {
+      "name": "miller.fth",
+      "sha256": "46b465a22590ee50f80c6949aaeb77c9b9f3be0671b5ae4148784638ff48c4d8",
+      "interface_sha256": null
+    },
+    {
+      "name": "residue.fth",
+      "sha256": "25c838f87acca351d036ee77615daa25cc6d60319a3d899a21217a11c050e545",
+      "interface_sha256": null
+    },
+    {
+      "name": "statement.fth",
+      "sha256": "2fd49a0fb75feeb27f855ad09d61daa839d7e5924102c4163f5c30491b126395",
+      "interface_sha256": null
+    },
+    {
+      "name": "subgroup.fth",
+      "sha256": "201afb55434846499fa5b049379530ae02f36661711edb92a4a9d8d1017fa48c",
+      "interface_sha256": null
+    }
+  ],
+  "stages": [
+    "prime",
+    "curve-a",
+    "curve-c",
+    "curve-b",
+    "subgroup",
+    "pairs",
+    "inverse",
+    "miller",
+    "fixed",
+    "frobenius",
+    "identity"
+  ],
+  "formula_operations": {
+    "double": 15,
+    "mixed_add": 18
+  },
+  "subgroup_rounds": 127,
+  "miller_rounds": 65,
+  "stack_optimization": "compact-moves",
+  "modulo_threshold": 64,
+  "node_version": 101020300,
+  "chain_gang": {
+    "version": "0.13.2",
+    "commit": "74676b9c002c452e7f21a9ed9265f4972bef03f6"
+  },
+  "activation_height": 2,
+  "funded_replays": {
+    "wrap": {
+      "baseline_lock_bytes": 492007,
+      "baseline_serialized_script_path_bytes": 498852,
+      "baseline_deployment_plus_spend_bytes": 499077,
+      "lock_bytes": 470781,
+      "lock_bytes_saved": 21226,
+      "script_sha256": "c6ae1c906532d79ba4c65ba36d1f7209f39f130264d54148c8d4b0502f62ba6f",
+      "artifact_sha256": "f68e017de5fbdffd1a456f09e5610818afb1df5bf4bc4a3c4c68adf532ebd5b6",
+      "witness_prefix_bytes": 6765,
+      "witness_prefix_sha256": "c1483d42242f4545184abd5b9fffe90569bfebe50c2bd95a324520230b321f47",
+      "unlock_bytes": 6838,
+      "serialized_script_path_bytes": 477627,
+      "stack_payload_peak_bytes": 8872,
+      "owner_authorization": {
+        "sighash": 65,
+        "signing_preimage_bytes": 470942,
+        "preimage_in_unlock_bytes": 0
+      },
+      "deployment": {
+        "txid": "50528bc3af87685727057ac072891946e6f3c482d43c38983c47fff5b780b4f2",
+        "bytes": 470917,
+        "mempool": true,
+        "mined": true,
+        "block": "66907abb62d24ca1ed13d64980a4973771d3a8adc0fd72b13bcab01e774bdfc2",
+        "height": 103
+      },
+      "valid_spend": {
+        "txid": "5fabfa2620d722570d8a8bec556042f5567b3501970651aa2689af69b61d4e8e",
+        "bytes": 6935,
+        "mempool": true,
+        "mined": true,
+        "block": "1a1afdf09c30482c83bbeb53c97e88cb28f2b2a198768dfae58bcad0dbb19ee7",
+        "height": 104,
+        "chain_gang": true
+      },
+      "deployment_plus_spend_bytes": 477852,
+      "rejected_by_bsv_node_and_chain_gang": [
+        "changed_output_with_stale_signature",
+        "g2_outside_subgroup",
+        "negated_proof_point",
+        "valid_proof_for_another_statement",
+        "wrong_sighash"
+      ]
+    },
+    "other": {
+      "baseline_lock_bytes": 492005,
+      "baseline_serialized_script_path_bytes": 498847,
+      "baseline_deployment_plus_spend_bytes": 499072,
+      "lock_bytes": 470779,
+      "lock_bytes_saved": 21226,
+      "script_sha256": "6e05dc104505e9ed26412a7f780f935c5c0467d37d0a286be2fbf9d46d84ce34",
+      "artifact_sha256": "cf43351f331a0c9b6b3b707e8d73b4ada88c7100a3ca5df228772d294f0ee520",
+      "witness_prefix_bytes": 6761,
+      "witness_prefix_sha256": "24109899b736c96c0c4e057dbadc2920aff3375bd041d36ecc3edad6a5ae39ad",
+      "unlock_bytes": 6833,
+      "serialized_script_path_bytes": 477620,
+      "stack_payload_peak_bytes": 8870,
+      "owner_authorization": {
+        "sighash": 65,
+        "signing_preimage_bytes": 470940,
+        "preimage_in_unlock_bytes": 0
+      },
+      "deployment": {
+        "txid": "b0e3ee1dd57c4423009d92f338c66af03bc891b17e9c3cdc698e7b135e069e3a",
+        "bytes": 470916,
+        "mempool": true,
+        "mined": true,
+        "block": "6c3c9456d62278078e95064a9ce4a167c23c7cdca1a43eaed168b4756e79f26e",
+        "height": 103
+      },
+      "valid_spend": {
+        "txid": "53af5cd4bb1e51a4a43cd97c755c534f0efb1408796579aa9b09149f642a1a4b",
+        "bytes": 6930,
+        "mempool": true,
+        "mined": true,
+        "block": "38babefb4010f5007817aff0c750ec51714d9f349a84cc596c6cd111d27c9193",
+        "height": 104,
+        "chain_gang": true
+      },
+      "deployment_plus_spend_bytes": 477846,
+      "rejected_by_bsv_node_and_chain_gang": [
+        "changed_output_with_stale_signature",
+        "g2_outside_subgroup",
+        "negated_proof_point",
+        "valid_proof_for_another_statement",
+        "wrong_sighash"
+      ]
+    }
+  },
+  "compiler_stack_pass_revision": "ed99841c1aef1578d103aa74f0b624d7fde3cf30",
+  "deployment_plus_spend_budget_bytes": 500000,
+  "compiler_fp2_scheduling_revision": "745871fc454adef457e13c963120432e84c5e8bf",
+  "jacobian_operand_scheduling": "last-use"
+}

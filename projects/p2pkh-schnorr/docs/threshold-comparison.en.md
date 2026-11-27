@@ -2,11 +2,15 @@
 
 [简体中文](threshold-comparison.zh-CN.md) · [Project overview](../README.md) · [Wallet integration](sdk.en.md#integrate-musig2)
 
-The current P2PKH-Schnorr template supports a UTXO controlled by two MuSig2 participants. At funding, the wallet aggregates two distinct compressed public keys in the agreed order using BIP327, then fills the fixed template with the HASH160 of the aggregate key's x-coordinate. For each input, both signers approve the 32-byte transaction digest, exchange public nonces, and produce partial signatures. The coordinator verifies the partial signatures and combines them into a standard 64-byte BIP340 signature. The existing wallet interface accepts that signature and prepares the coordinate witnesses. The on-chain key and signature are aggregated. The participant keys and count stay off-chain. Native `CHECKMULTISIG` publishes both public keys in the lock. [BIP327](https://github.com/bitcoin/bips/blob/4f9567fd60021cb7dea032250ab241cd68d9ff91/bip-0327.mediawiki) · [Two-party signing fixture](../reference/musig2_fixture.py)
+## Two-party authorization
+
+Before funding, the wallet aggregates two distinct compressed keys in the agreed order with BIP327 and puts HASH160 of the aggregate x-only key in the Schnorr lock. Each input has its own signing session. Both participants approve the same 32-byte message, exchange public nonces and generate partial signatures. The coordinator verifies both shares and supplies the unified SDK with a standard 64-byte BIP340 signature. The participant keys and count remain in the off-chain wallet policy. [BIP327](https://github.com/bitcoin/bips/blob/4f9567fd60021cb7dea032250ab241cd68d9ff91/bip-0327.mediawiki) · [Signing fixture](../reference/musig2_fixture.py)
+
+Native `CHECKMULTISIG` puts both keys in the lock and lets the two participants sign the transaction independently. Both schemes need the two participants' signing material before the spend can complete. After an aborted MuSig2 session, the signers discard its nonces before restarting with fresh ones. [Wallet integration](sdk.en.md#integrate-musig2)
 
 ## Transaction and lifecycle costs
 
-Both schemes require both signatures. The fixtures use the same transaction shapes, values, and sighash modes. The 2×2 case creates two protected outputs of the same scheme. Input and output marginals are measured as 3×2 minus 2×2 and 2×3 minus 2×2. A lifecycle starts with ordinary P2PKH funding and ends at two ordinary P2PKH outputs. One turnover inserts a 2×2 transfer to fresh outputs of the same scheme.
+The table pins the MuSig2 payment lock to v0.16.0. The native multisig control uses the same transaction shapes, values, and sighash modes. The 2×2 case creates two protected outputs of the same scheme. Input and output marginals are measured as 3×2 minus 2×2 and 2×3 minus 2×2. A lifecycle starts with ordinary P2PKH funding and ends at two ordinary P2PKH outputs. One turnover inserts a 2×2 transfer to fresh outputs of the same scheme.
 
 | Scheme | ALL mode | Lock | 2×2 unlocks by input | 2×2 transaction | Extra input | Extra output | Fund and exit | With one turnover | First-input peak stack payload |
 | --- | --- | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: |
@@ -19,7 +23,7 @@ All sizes are in bytes. At a common rate of one satoshi per byte, the transactio
 
 For the 2×2 fixtures, median chain-gang verification was **6.93 ms** for MuSig2 and **0.39 ms** for native BIP143, and **5.61 ms** and **0.39 ms** for OTDA. BSV Node loopback RPC medians were **21.22 ms** and **0.70 ms** for BIP143, and **36.34 ms** and **0.71 ms** for OTDA. These host-specific medians use 15 measurements after one warmup and include input preparation and verification. Node timings include local RPC overhead.
 
-The OTDA ALL rows use literal preimages, each containing the complete committed outputs. [Constructor measurements](high-level-forth.en.md#otda-constructor)
+The OTDA ALL rows use v0.16.0's literal preimage. The experiment guide records the tuned Forth constructor separately. [Constructor measurements](high-level-forth.en.md#otda-constructor)
 
 When exiting into ordinary P2PKH outputs, each MuSig2 OTDA unlock falls to 336 bytes. Native `CHECKMULTISIG` constructs the signature digest in the node and requires only the dummy item and two signatures in the unlocking script.
 
@@ -31,13 +35,15 @@ Across the direct-exit and one-turnover lifecycles, the protected inputs produce
 
 Acceptance covers two official BIP327 signature aggregation vectors. Session cases exercise missing nonces and shares, nonce cancellation, retries, mismatched digests, reordered participants, and stale shares. For both on-chain schemes, BSV Node 1.2.3 and chain-gang accepted **12 paired BIP143 / OTDA modes × two transaction versions** and matched the expected locktime and output value mutation results. Funding and exit entered the mempool and were mined under default regtest policy for both schemes under BIP143 ALL and OTDA ALL. The unified Python, TypeScript, Go, and Rust SDK suites replay the MuSig2 aggregate-signature fixtures for BIP143 ALL and OTDA SINGLE. [Acceptance suite](../reference/test_musig2.py) · [Official aggregation vectors](https://github.com/bitcoin/bips/blob/4f9567fd60021cb7dea032250ab241cd68d9ff91/bip-0327/vectors/sig_agg_vectors.json) · [Wallet fixtures](../reference/sdk_fixture.py)
 
-Set up the [project environment](../README.md#validate-the-baseline) and run from the repository root.
+## Reproduce the historical comparison
+
+Run from the root of revision `7adb2c5`. Set `SCRIPT_LAB_SDK_PYTHON` to the project interpreter. [Pinned v0.16.0 source](https://github.com/linzhm/4thGraph/tree/7adb2c559eb3aa9b7cc6a5f4eb9a0d13421785d3/projects/p2pkh-schnorr) · [Environment setup](../README.md#validate-the-baseline)
 
 ```sh
 PYTHONPATH=src:. bash tools/verify_node.sh -- \
-  projects/p2pkh-schnorr/workspace/p2pkh-schnorr/bin/python projects/p2pkh-schnorr/reference/compare_threshold.py \
-  --output /tmp/p2pkh-schnorr-threshold.json
+  "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/reference/compare_threshold.py \
+  --output workspace/p2pkh-schnorr-threshold.json
 PYTHONPATH=src:. bash tools/verify_node.sh --profile default -- \
-  projects/p2pkh-schnorr/workspace/p2pkh-schnorr/bin/python projects/p2pkh-schnorr/reference/compare_threshold.py \
-  --admission --output /tmp/p2pkh-schnorr-threshold-admission.json
+  "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/reference/compare_threshold.py \
+  --admission --output workspace/p2pkh-schnorr-threshold-admission.json
 ```

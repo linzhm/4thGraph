@@ -18,6 +18,7 @@ type request struct {
 	CompactStatement bool
 	CompactSubgroup  string
 	ModuloThreshold  int
+	ForthPlan        *codegen.CompactForthPlan
 	Proof            *struct {
 		A []string
 		B []string
@@ -52,7 +53,7 @@ func run() error {
 	if req.Proof == nil {
 		artifact, err := compiler.CompileGroth16WA(req.VK, compiler.Groth16WAOpts{
 			PublicInputs: pub, CompactStatement: req.CompactStatement, CompactSubgroup: req.CompactSubgroup,
-			ModuloThreshold: req.ModuloThreshold,
+			ModuloThreshold: req.ModuloThreshold, ForthPlan: req.ForthPlan,
 		})
 		if err != nil {
 			return err

@@ -1,26 +1,41 @@
 # P2PKH-Schnorr payment format
 
-[简体中文](spec.zh-CN.md) · [Project overview](../README.md)
+[简体中文](spec.zh-CN.md) · [Project overview](../README.md) · [Wallet SDK](sdk.en.md#quickstart)
 
-The owner field is HASH160 of the 32-byte BIP340 x-only public key. The rest of the file is fixed. Fill the owner slot identified in the manifest when creating a receive output. When recognizing an output, compare its length and all fixed bytes before taking the owner hash. [Frozen template](../versions/v0.17.0/template.hex) · [Layout](../versions/v0.17.0/layout.json)
+## Lock and spend
 
-Versions 0.6.0 through 0.17.0 use the same `scriptCode` fragments for the current-input binding and the same stack layout after unlocking. A wallet can spend outputs from different versions in one transaction. [Version catalog](../versions/index.json)
+A receive output commits to HASH160 of a 32-byte BIP340 x-only public key. Fill the owner slot defined by the selected release. A wallet identifies the release by comparing the script length and every fixed byte. The published v0.6.0 through v0.17.0 templates use the same binding `scriptCode` fragments and the same stack layout after unlocking. [Current template and owner slot](../versions/v0.17.0/layout.json) · [Release index](../versions/index.json)
 
-The wallet builds the BSV sighash preimage for the current input. The external signer receives SHA256d of that preimage as the 32-byte BIP340 message and returns the standard signature bytes. The lock verifies the signature and binds the same message to the current input with PUSHTX. BIP143 ALL is the wallet default. A wallet must supply trusted Chronicle activation context for OTDA and a same-index output for SINGLE. [Forth contract](../reference/schnorr.fth)
-
-| Unlock stack item | Encoding |
+| Step | Actor and enforced condition |
 | --- | --- |
-| Signing preimage | The chosen BSV sighash preimage with the template's scriptCode |
-| Packed witness | Public x (32 bytes), even public y (32 bytes), BIP340 signature (64 bytes), even nonce y (32 bytes) |
-| Mode selector | Script number 0 for the ordinary payment path |
+| Fund | The payer places the selected Schnorr lock and amount in a transaction output. The receiving wallet identifies the outpoint and checks its amount, template and owner. |
+| Authorize | The wallet prepares the current input's signing preimage under the approved sighash. The external signer receives its SHA256d as the 32-byte BIP340 message and releases a 64-byte signature. |
+| Assemble | The wallet verifies the signature and derives the two public ordinates before building the input script. Each ordinate is an unsigned big-endian field element. |
+| Verify | Script checks the owner hash and BIP340 relation. PUSHTX binds the verified message to the actual input through native `OP_CHECKSIG`. The node evaluates the spend against its previous output and chain context. |
 
-In a Chronicle-active version-2 transaction, the wallet can replace the literal preimage push with a shorter Script program for OTDA ALL or a paired OTDA SINGLE. The constructor expands the exact fixed parts of recognized Schnorr outputs and inserts each output's own amount and owner hash at its signed position. The program leaves the same complete preimage as the literal push, including the signed order, script lengths, locktime, and sighash. Unrecognized outputs retain their literal bytes. [Shared OTDA constructor](../../../src/fourthgraph/bsv/otda_reconstruction.py) · [Verified sizes](high-level-forth.en.md#otda-constructor)
+[Payment Forth](../reference/schnorr.fth) · [Wallet signing flow](../reference/payment.py) · [Authorization inputs](../../../src/fourthgraph/bsv/spend_authorization.py)
 
-The wallet derives both extra ordinates from public data after signing. They are unsigned, big-endian field elements. Script checks the field bounds, even parity, and public-point equation. The checker calculates the tagged challenge over r, public x, and the message. It evaluates sG − eP, rejects infinity, and compares both projective coordinates with the finite even nonce point using field congruences. This verifies the nonce coordinates without executing a square root or field inversion inside Script. [BIP340 verification](https://github.com/bitcoin/bips/blob/master/bip-0340.mediawiki) · [Complete addition formulas](https://eprint.iacr.org/2015/1060)
+## Unlock stack and sighash
 
-After checking the witness lengths, the verifier hashes the original `r`, public x and message with the BIP340 tag. It joins the four coordinates, signature scalar and challenge hash into six 32-byte fields. Five masked swaps exchange adjacent blocks of 1, 2, 4, 8 and 16 bytes. The mask repeats within each 32-byte field, so each field reverses in place. The verifier reads the reversed fields as unsigned integers, checks the coordinate bounds and curve equation against the field prime, and uses one copy of the group order to check the signature scalar and compute `n − e`. [Challenge preparation](../../../src/fourthgraph/stdlib/bip340.fth)
+Read from bottom to top after the input script runs.
 
-The detached verifier consumes message, public x, public y, signature, and nonce y. Use it for conformance tests. Use the fixed payment template to lock a UTXO. The copied official CSV fixture is pinned to the Bitcoin BIPs commit below. [Official test vectors](https://github.com/bitcoin/bips/blob/200f9b26fe0a2f235a2af8b30c4be9f12f6bc9cb/bip-0340/test-vectors.csv)
+| Stack item | Encoding |
+| --- | --- |
+| Signing preimage | Complete BSV preimage for the ordinary or companion branch. |
+| Packed witness | Public x (32 B), even public y (32 B), BIP340 `r \|\| s` (64 B), and even nonce y (32 B), in that order. |
+| Mode selector | Script number 0 for ordinary binding or 1 for unpaired OTDA SINGLE companion binding. |
+
+The wallet defaults to BIP143 ALL (`0x41`). For ALL, NONE, and SINGLE, output coverage follows the chosen BSV sighash. ANYONECANPAY changes input coverage. The SDK requires trusted Chronicle activation context for OTDA and a same-index output for SINGLE. The lock also implements the separately tested unpaired OTDA SINGLE companion branch. That branch binds the Schnorr message to a BIP143 SINGLE preimage with zero `hashOutputs` and checks the corresponding native OTDA SINGLE condition. The standard wallet path requires a paired output. [Binding and sighash checks](../reference/schnorr.fth) · [Acceptance cases](../reference/test_schnorr.py)
+
+### OTDA preimage encoding
+
+In an active version-2 OTDA ALL or paired OTDA SINGLE spend, including ANYONECANPAY forms, the assembler can choose a shorter program. It ranks valid encodings of the same full preimage, and copies unrecognized output scripts as literal bytes when reconstructing a mixed template. The signer and lock consume the same preimage in either encoding. The transaction ID depends on the final serialized unlocking script. [Selection rules](../../../src/fourthgraph/compiler/preimage.py) · [Constructor results](high-level-forth.en.md#otda-constructor)
+
+## BIP340 verification
+
+Script checks the four coordinate bounds, the even parity of both ordinates and the public-point curve equation. It checks the signature scalar against the group order, and computes the challenge from the original `r`, x-only key and message with the BIP340 tag. It evaluates `sG − eP`, checks that `Z` is nonzero and compares both resulting projective coordinates with the finite nonce point by field congruences. The public coordinate witnesses let Script evaluate these checks without computing a square root or inversion. [Verifier](../../../src/fourthgraph/stdlib/bip340.fth) · [BIP340](https://github.com/bitcoin/bips/blob/master/bip-0340.mediawiki)
+
+The implementation decodes the four coordinates, signature scalar and challenge hash as six separate unsigned 32-byte fields. Five masked block swaps reverse each field in place before integer conversion. The detached entry accepts message, public x, public y, signature, and nonce y, and the payment lock uses the 32-byte preimage hash as the message. [Shared decoding](../../../src/fourthgraph/stdlib/script-fragments.fth) · [Pinned official vectors](../versions/v0.6.0/bip340-vectors.csv)
 
 ## Coordinate scaling
 

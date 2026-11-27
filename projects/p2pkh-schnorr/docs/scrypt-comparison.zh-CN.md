@@ -2,7 +2,9 @@
 
 [English](scrypt-comparison.en.md) · [项目首页](../README.zh-CN.md)
 
-下文记录 v0.6.0 Forth 验签器的实测数据。当前版本的验签器和付款交易大小见项目实测。[v0.6.0 源码](https://github.com/linzhm/4thGraph/tree/bc6fe95784cc810e96fc51806f6106f5207cdb9d/projects/p2pkh-schnorr) · [当前交易实测](../README.zh-CN.md#交易实测)
+这里记录两组 v0.6.0 历史对照。第一组使用各自的签名格式，第二组固定 BIP340 格式与见证布局。大小和耗时均来自各自夹具。当前发布模板和调优 Forth 的交易大小另见构造器对照。[固定的 v0.6.0 源码](https://github.com/linzhm/4thGraph/tree/9cce0f0e72c9bfcbace6729ab6a6cfca38af9ead/projects/p2pkh-schnorr) · [当前构造器对照](high-level-forth.zh-CN.md#otda-constructor)
+
+## 历史合约与原见证格式
 
 2021 年文章介绍的是由见证数据辅助点乘的做法。归档合约调用三次 `isMul`。每组链下点乘辅助数据声明了 512 个点和 510 个斜率，三组共 4,602 个整数字段，此外还有其他参数。配套文章提到的约 400 字节是校验一次点加的开销。以上数字来自归档源码与原文。[Schnorr 原文](https://scryptplatform.medium.com/schnorr-signatures-on-bitcoin-397ca51d8bda) · [归档合约](https://github.com/sCrypt-Inc/boilerplate/blob/2284e11c9aa22faccd266d85a992e8a91a5b70f3/contracts/schnorr.scrypt) · [归档点运算实现](https://github.com/sCrypt-Inc/boilerplate/blob/2284e11c9aa22faccd266d85a992e8a91a5b70f3/contracts/ec.scrypt) · [点运算文章](https://scryptplatform.medium.com/efficient-elliptic-curve-point-addition-and-multiplication-in-scrypt-script-f7e143a752e2)
 
@@ -48,7 +50,7 @@ Script Lab 使用 BIP340 带标签的挑战哈希和 32 字节的公钥横坐标
 
 ## 复现
 
-按[项目验收说明](../README.zh-CN.md#复现验收)准备 Python 环境，然后在仓库根目录运行。本次使用 Node.js 22 运行复放程序。编译器和 BSV Node 使用 Linux x86-64 发行包。复放程序校验上游源码提交和编译器的 SHA-256。
+从提交 `9cce0f0` 的检出目录根路径运行。把 `SCRIPT_LAB_SDK_PYTHON` 设为项目解释器。原实测使用 Node.js 22，编译器和 BSV Node 为 Linux x86-64。脚本检查上游源码提交和编译器 SHA-256。[项目环境](../README.zh-CN.md#复现验收)
 
 ```sh
 scratch=$(mktemp -d)
@@ -60,9 +62,9 @@ gh release download v1.19.1 --repo sCrypt-Inc/compiler_dist \
 chmod +x "$scratch/scryptc-1.19.1-Linux-x86_64"
 export SCRYPTC="$scratch/scryptc-1.19.1-Linux-x86_64" GHCRTS=-N2
 PYTHONPATH=src:. bash tools/verify_node.sh -- \
-  projects/p2pkh-schnorr/workspace/p2pkh-schnorr/bin/python projects/p2pkh-schnorr/reference/compare_scrypt.py \
+  "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/reference/compare_scrypt.py \
   "$scratch/boilerplate" --compiler-study --samples 15
 PYTHONPATH=src:. bash tools/verify_node.sh -- \
-  projects/p2pkh-schnorr/workspace/p2pkh-schnorr/bin/python projects/p2pkh-schnorr/reference/compare_bip340.py \
+  "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/reference/compare_bip340.py \
   --compiler "$SCRYPTC" --samples 15
 ```

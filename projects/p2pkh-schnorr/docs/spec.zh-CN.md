@@ -1,26 +1,43 @@
 # P2PKH-Schnorr 付款协议
 
-[English](spec.en.md) · [项目首页](../README.zh-CN.md)
+[English](spec.en.md) · [项目首页](../README.zh-CN.md) · [钱包 SDK](sdk.zh-CN.md#quickstart)
 
-所有者字段是 32 字节 BIP340 x-only 公钥的 HASH160。其余脚本字节固定。创建收款输出时按布局清单填入所有者字段。识别输出时先比对脚本长度和全部固定字节，再读取所有者哈希。[固定模板](../versions/v0.17.0/template.hex) · [布局清单](../versions/v0.17.0/layout.json)
+## 锁定与花费
 
-v0.6.0 至 v0.17.0 的当前输入绑定使用相同的 `scriptCode` 片段和解锁后的栈布局，钱包可以在同一笔交易中花费不同版本的输出。[版本目录](../versions/index.json)
+收款输出承诺 32 字节 BIP340 x-only 公钥的 HASH160。按所选发布模板填写所有者字段。钱包比对脚本长度和全部固定字节来识别版本。v0.6.0 至 v0.17.0 的发布模板使用相同的输入绑定 `scriptCode` 片段和解锁后栈布局。[当前模板与所有者字段](../versions/v0.17.0/layout.json) · [版本目录](../versions/index.json)
 
-钱包按所选 sighash 为当前输入构造 BSV 签名预映像。外部签名器收到其 SHA256d 作为 32 字节 BIP340 消息，返回标准签名字节。锁验证 Schnorr 签名，并通过 PUSHTX 将同一消息绑定到当前输入。钱包默认用 BIP143 ALL。使用 OTDA 时应从可信链视图取得 Chronicle 激活状态，使用 SINGLE 时要提供同索引输出。[Forth 合约](../reference/schnorr.fth)
-
-| 解锁栈项 | 编码 |
+| 阶段 | 角色与校验条件 |
 | --- | --- |
-| 签名预映像 | 按所选 BSV sighash 规则和本模板的 scriptCode 构造 |
-| 打包见证 | 公钥 x（32 字节）、偶数公钥 y（32 字节）、BIP340 签名（64 字节）、偶数签名点 y（32 字节） |
-| 模式选择值 | 普通付款路径为 Script 数值 0 |
+| 入金 | 付款方创建包含 Schnorr 锁和金额的交易输出。收款钱包核验上一输出位置、金额、模板和所有者。 |
+| 授权 | 钱包按已审批的 sighash 构造当前输入的签名预映像。外部签名器将其 SHA256d 作为 32 字节 BIP340 消息，返回 64 字节签名。 |
+| 组装 | 钱包核验签名，从公开数据推导两个纵坐标，再生成输入解锁脚本。纵坐标按无符号大端域元素编码。 |
+| 验证 | Script 校验所有者哈希和 BIP340 等式。PUSHTX 通过原生 `OP_CHECKSIG` 把已验证消息绑定到实际输入。节点根据上一输出和链上下文验证花费。 |
 
-Chronicle 已激活时，版本 2 交易的 OTDA ALL 或有同索引输出的 OTDA SINGLE 可用更短的 Script 程序代替原样压栈。构造器展开已识别 Schnorr 输出的固定字节，并在签名顺序中填入各自的金额和所有者哈希。程序在栈上留下相同的完整预映像，包括输出顺序、脚本长度、锁定时间和 sighash。未识别的输出保留原始字节。[共用 OTDA 构造器](../../../src/fourthgraph/bsv/otda_reconstruction.py) · [交易实测](high-level-forth.zh-CN.md#otda-constructor)
+[付款 Forth](../reference/schnorr.fth) · [钱包签名流程](../reference/payment.py) · [授权输入](../../../src/fourthgraph/bsv/spend_authorization.py)
 
-签名完成后，钱包根据公开数据推导两个额外的 y 坐标，按无符号大端域元素编码。脚本检查坐标范围、偶数条件和公钥点曲线方程，计算包含 r、公钥 x 和消息的标签哈希挑战。脚本求 sG − eP，排除无穷远点，再用域上的同余关系与有限偶数签名点比对两个射影坐标。这样可以在脚本内验证坐标，无需执行开方或求逆。[BIP340 验签](https://github.com/bitcoin/bips/blob/master/bip-0340.mediawiki) · [完备点加公式](https://eprint.iacr.org/2015/1060)
+<a name="unlock-stack-and-sighash"></a>
 
-验签器检查见证长度后，用原始 `r`、公钥横坐标和消息计算 BIP340 带标签哈希。它将四个坐标、签名标量和挑战哈希拼为六个 32 字节字段。五次带掩码的操作分别交换相邻的 1、2、4、8 和 16 字节块。掩码按 32 字节重复，使每个字段各自反转。验签器将反转后的字段读成无符号整数，用域素数检查坐标范围和曲线方程，并复用同一个群阶检查签名标量和计算 `n − e`。[挑战计算](../../../src/fourthgraph/stdlib/bip340.fth)
+## 解锁栈与 sighash
 
-独立验签器接收消息、公钥 x、公钥 y、签名和签名点 y，供合规向量测试使用。锁定 UTXO 时使用固定付款模板。仓库中的 CSV 来自下列固定提交。[官方测试向量](https://github.com/bitcoin/bips/blob/200f9b26fe0a2f235a2af8b30c4be9f12f6bc9cb/bip-0340/test-vectors.csv)
+按输入脚本执行后的栈底到栈顶读取。
+
+| 栈项 | 编码 |
+| --- | --- |
+| 签名预映像 | 普通路径或配套路径所需的完整 BSV 预映像。 |
+| 打包见证 | 按顺序拼接公钥 x（32 B）、偶数公钥 y（32 B）、BIP340 `r \|\| s`（64 B）和偶数 nonce y（32 B）。 |
+| 模式选择值 | 普通路径为 Script 数值 0，缺少同索引输出的 OTDA SINGLE 配套路径为 1。 |
+
+钱包默认使用 BIP143 ALL（`0x41`）。ALL、NONE 和 SINGLE 的输出承诺按所选 BSV sighash 规则执行，ANYONECANPAY 改变输入承诺范围。SDK 请求 OTDA 时需要可信的 Chronicle 激活上下文，请求 SINGLE 时需要同索引输出。锁还实现了单独验收的无配对 OTDA SINGLE 路径。该路径将 Schnorr 消息绑定到 `hashOutputs` 为零的 BIP143 SINGLE 预映像，并检查对应的原生 OTDA SINGLE 条件。常规钱包调用要求提供同索引输出。[绑定与 sighash 检查](../reference/schnorr.fth) · [验收用例](../reference/test_schnorr.py)
+
+### OTDA 预映像编码
+
+Chronicle 已激活时，版本 2 的 OTDA ALL 或有同索引输出的 OTDA SINGLE 可选用较短的构造程序，两者均涵盖 ANYONECANPAY 形式。组装器对相同完整预映像的有效编码按大小排序。混合模板里未识别的输出脚本保留原始字节。签名器与锁取得相同的完整预映像，交易 ID 取决于包含最终解锁脚本的完整交易序列化。[选择规则](../../../src/fourthgraph/compiler/preimage.py) · [构造器实测](high-level-forth.zh-CN.md#otda-constructor)
+
+## BIP340 验签
+
+Script 检查四个坐标的范围、两个纵坐标的偶性和公钥点的曲线方程，再用群阶检查签名标量。挑战使用原始 `r`、x-only 公钥和消息计算 BIP340 标签哈希。验签器计算 `sG − eP`，检查 `Z` 非零，并用域上的同余关系将两个射影坐标与有限 nonce 点比对。公开坐标见证使 Script 无需开方或求逆即可完成检查。[验签实现](../../../src/fourthgraph/stdlib/bip340.fth) · [BIP340](https://github.com/bitcoin/bips/blob/master/bip-0340.mediawiki)
+
+实现把四个坐标、签名标量和挑战哈希解码为六个无符号 32 字节字段。整数转换前，五次带掩码的块交换在原位置反转各字段。独立验签入口接收消息、公钥 x、公钥 y、签名和 nonce y。付款锁以 32 字节预映像哈希作为消息。[共享解码](../../../src/fourthgraph/stdlib/script-fragments.fth) · [固定的官方向量](../versions/v0.6.0/bip340-vectors.csv)
 
 ## 坐标缩放
 
