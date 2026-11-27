@@ -10,6 +10,8 @@ from fourthgraph.bsv.script import asm, encode_num
 
 
 MATRIX_MIN, MATRIX_MAX = -(2**255), 2**255 - 1
+DOT_MIN, DOT_MAX = -(2**31), 2**31 - 1
+DOT_BIAS = 1729 * 3329 + 256
 
 
 def matrix_product(operands):
@@ -30,6 +32,26 @@ def matrix_vectors():
         yield tuple(rng.randint(MATRIX_MIN, MATRIX_MAX) for _ in range(8))
 
 
+def modular_dot_vectors():
+    rng = Random(3329)
+    for m in (257, 3329, 8380417):
+        for target in (-m - 1, -m, -m + 1, -1, 0, 1, m - 1, m, m + 1):
+            yield 0, 0, 0, 0, target - DOT_BIAS, m
+        yield DOT_MIN, DOT_MAX, DOT_MIN, DOT_MAX, DOT_MIN, m
+        yield DOT_MAX, DOT_MIN, DOT_MAX, DOT_MIN, DOT_MAX, m
+        yield 3, -5, -8, 8, 0, m
+        yield -5, 3, 7, 7, -1, m
+        for _ in range(19):
+            yield (*(rng.randint(DOT_MIN, DOT_MAX) for _ in range(5)), m)
+
+
+def modular_dot(operands):
+    a, b, x, y, offset, modulus = operands
+    value = (a + b) * x + (a - b) * y + DOT_BIAS + offset
+    residue = abs(value) % modulus
+    return (-residue if value < 0 else residue,)
+
+
 @dataclass(frozen=True)
 class Fixture:
     name: str
@@ -48,6 +70,9 @@ class Fixture:
         elif self.name == "matrix-mul":
             for operands in matrix_vectors():
                 yield operands, matrix_product(operands)
+        elif self.name == "modular-dot":
+            for operands in modular_dot_vectors():
+                yield operands, modular_dot(operands)
         else:
             edges = (-128, -1, 0, 1, 127)
             for p0, p1, p2, t in product(edges, edges, edges, (0, 1, 8, 15, 16)):
@@ -87,4 +112,5 @@ FIXTURES = {
     "bezier": Fixture("bezier", "bezier-coordinate", ("bezier", "bezier-linear")),
     "square": Fixture("square", "square", ("square",)),
     "matrix-mul": Fixture("matrix-mul", "matrix-product-2x2", ("matrix-mul", "matrix-mul-strassen")),
+    "modular-dot": Fixture("modular-dot", "modular-accumulate", ("modular-dot",)),
 }

@@ -70,17 +70,20 @@ class ScriptBuilder(SourceCompiler):
         name, formula = read_formula(self.tokens, token, self.ranges)
         if name.name.startswith("bsv-") or name.name in self.words:
             raise name.error(f"invalid or duplicate formula name {name.text!r}")
+        diagnostics = []
         if self.experimental_rules or self.formula_snapshots is not None:
             from .formula_experiment import snapshot, transform, validate_rules
             states = [snapshot(formula)] if self.formula_snapshots is not None else None
             for rule in validate_rules(self.experimental_rules):
-                formula = transform(formula, rule)
+                formula = transform(formula, rule, diagnostics=diagnostics)
                 if states is not None:
                     states.append(snapshot(formula))
             if states is not None:
                 self.formula_snapshots[name.name] = states
         plan = {} if self.formula_stack_plans is not None else None
         code, report = formula.lower(optimize=self.optimize, passes=self.formula_passes, trace=plan)
+        if diagnostics:
+            report["ordered_rules"] = diagnostics
         if plan is not None:
             self.formula_stack_plans[name.name] = plan
         append = build_word("script", "script", lambda prefix: prefix + code)

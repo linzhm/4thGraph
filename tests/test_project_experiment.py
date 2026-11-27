@@ -14,14 +14,97 @@ from fourthgraph.benchmark.spend_fixture import CONTEXT, linked_spends
 from fourthgraph.benchmark.validation import CONTEXT_PIN, Node, chain_metadata
 from fourthgraph.bsv.evaluate import evaluate
 from fourthgraph.bsv.script import asm, encode_num, number
-from fourthgraph.compiler.formula_experiment import enumerate_orders
+from fourthgraph.compiler.formula_experiment import RULES, enumerate_orders, transform
 from fourthgraph.compiler.hash_chain import PAIRS, SINGLE, HashChainBuilder
 from fourthgraph.compiler.point_add import AFFINE, GENERAL, GUARDED, PointAddBuilder
+from fourthgraph.compiler.ranges import Slot
 from fourthgraph.benchmark.point_add_fixture import PointAddFixture
 from fourthgraph.compiler.script_builder import ScriptBuilder
+from fourthgraph.compiler.script_formula import GENESIS_NUM_BYTES, Formula, Step
 
 
 class FormulaExperiments(unittest.TestCase):
+    def test_modular_rules_reduce_a_full_spend_with_the_same_source(self):
+        self._require_pinned_chain()
+        report = run({"fixture": "modular-dot", "enumerate": "orders", "trace": True, "evaluation": "spend"})
+        rows = report["candidates"]
+        index = {row["id"]: row for row in rows}
+        winner = index[report["ranking"][0]]
+        self.assertEqual(len({row["source_sha256"] for row in rows}), 1)
+        self.assertEqual(len(rows), 9)
+        self.assertEqual(report["baseline_path_bytes"], 245)
+        self.assertEqual(rows[1]["metrics"]["path_bytes"], 202)
+        self.assertEqual(winner["metrics"]["path_bytes"], 187)
+        self.assertEqual(winner["applied"]["rules"], list(RULES[-3:]))
+        self.assertEqual(winner["compile"]["lowering"]["ordered_rules"], [
+            {"rule": "fold-literals", "applications": 2},
+            {"rule": "factor-products", "applications": 2},
+            {"rule": "elide-redundant-remainder", "applications": 1},
+        ])
+        self.assertEqual(winner["metrics"]["peak_payload_bytes"], 44)
+        for row, multiply, remainder in ((rows[1], 5, 2), (winner, 2, 1)):
+            instructions = [entry["op"] for entry in row["artifact"]["instructions"]]
+            self.assertEqual((instructions.count("OP_MUL"), instructions.count("OP_MOD")), (multiply, remainder))
+        for row in rows:
+            spend = row["test"]["spend"]
+            self.assertEqual((spend["status"], spend["accepted"], spend["rejected"]), ("passed", 96, 96))
+        follow = run(next_request(report), report)
+        self.assertEqual(follow["winner_including_parents"], winner["id"])
+        self.assertEqual(run(follow["request"], report)["run_id"], follow["run_id"])
+        self.assertEqual(run(report["request"])["run_id"], report["run_id"])
+
+    def test_constant_and_remainder_rules_preserve_signed_boundaries(self):
+        source = """REQUIRE BSV
+        range: inexact script-int -10 11 ;
+        range: narrow script-int -9 10 ;
+        formula: exact ( inexact -- narrow narrow ) {: x :}
+            -13 5 int-rem
+            x 10 int-rem 10 int-rem
+        ;
+        formula: identity ( narrow -- narrow ) {: x :}
+            x 10 int-rem
+        ;
+        """
+        builder = ScriptBuilder(source, formula_passes=["stack"],
+                                experimental_rules=["fold-literals", "elide-redundant-remainder"])
+        code = builder.emit("exact", b"")
+        self.assertEqual(builder.emit("identity", b""), b"")
+        for x, result in ((-10, 0), (-9, -9), (0, 0), (9, 9), (10, 0)):
+            self.assertEqual(evaluate(code, [encode_num(x)]), ([encode_num(-3), encode_num(result)], []))
+        unsafe = source.replace("-13 5 int-rem", "-13 0 int-rem")
+        with self.assertRaisesRegex(ValueError, "positive divisor"):
+            ScriptBuilder(unsafe, formula_passes=["stack"], experimental_rules=["fold-literals"])
+
+    def test_factorization_keeps_original_when_new_intermediate_is_too_wide(self):
+        bound = 1 << (GENESIS_NUM_BYTES * 8 - 2)
+        wide = Slot("script-int", (bound, bound))
+        zero = Slot("script-int", (0, 0))
+        steps = (Step("input", wide), Step("input", wide), Step("literal", zero, immediate=0),
+                 Step("int*", zero, (2, 0)), Step("int*", zero, (2, 1)), Step("int+", zero, (3, 4)))
+        formula = Formula(2, steps, (5,), ((),) * len(steps))
+        self.assertEqual(transform(formula, "factor-products"), formula)
+
+    def test_order_enumeration_reports_the_candidate_limit(self):
+        orders = [*product(RULES, repeat=3)]
+        with patch("fourthgraph.benchmark.experiment.enumerate_orders", return_value=iter(orders)):
+            report = run({"fixture": "square", "enumerate": "orders"})
+        self.assertEqual(len(report["candidates"]), 32)
+        self.assertEqual(report["stop"], "candidate_budget")
+        self.assertEqual(report["baseline"]["applied"]["passes"], [])
+        self.assertEqual(run(report["request"], replaying=True)["run_id"], report["run_id"])
+
+    @unittest.skipUnless(os.environ.get("REGTEST_COOKIE"), "requires tools/verify_node.sh")
+    def test_modular_spends_match_regtest(self):
+        self._require_pinned_chain()
+        report = run({"fixture": "modular-dot", "enumerate": "orders", "evaluation": "spend"})
+        node = Node(os.environ["REGTEST_URL"], os.environ["REGTEST_COOKIE"])
+        for row in report["candidates"]:
+            self.assertEqual(row["test"]["status"], "passed")
+            script = bytes.fromhex(row["artifact"]["hex"])
+            for case, parent, spend, rejected in linked_spends(FIXTURES["modular-dot"], script):
+                self.assertEqual(node.verdicts(spend, (parent,), **CONTEXT), [True], case)
+                self.assertEqual(node.verdicts(rejected, (parent,), **CONTEXT), [False], case)
+
     def test_large_matrix_keeps_the_smallest_linked_plan(self):
         self._require_pinned_chain()
         report = run({"fixture": "matrix-mul", "axis": "B", "evaluation": "spend", "trace": True, "plans": [
