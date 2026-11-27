@@ -28,3 +28,9 @@ The typed AST and dependency graph record how a result arises. Record a separate
 | Wallet and examples | The R1 and PELS examples on main have distinct authorization and successor rules. | Verify exact Script/WASM pairing at the project boundary. Add multimode recognition, preparation, and assembly per approved path before treating a dual-mode build as a wallet package. Run R1 with test keys as an integration example. |
 
 Move an item to complete when its code, build command, and observed acceptance result are linked. Compiler changes can be reviewed with neutral fixtures. Project-specific payment code and WASM releases have their own review and verification.
+
+## Changes under review
+
+- Typed PELS compile targets, literal-count unrolling, and byte provenance. The standalone settlement fixture verifies both paths of the same lock. [Compiler PR #87](https://github.com/linzhm/4thGraph/pull/87)
+- Bounded Agent selection and fixed evaluation with replayable formula reports. The homepage diagram and skill document the same loop. [Tuning PR #88](https://github.com/linzhm/4thGraph/pull/88)
+- BIP143 ALL project WASM packages, with R1 and PELS Counter as fixture examples. [Wallet examples PR #89](https://github.com/linzhm/4thGraph/pull/89)

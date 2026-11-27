@@ -28,3 +28,9 @@
 | 钱包与示例 | 主线的 R1 和 PELS 示例各有授权和后继规则。 | 精确配对项目 Script 与 WASM。多模式钱包包要按已认可路径验收识别、准备和组装。R1 用测试密钥作为集成示例复跑。 |
 
 需求项具备代码、构建命令和实测验收记录后再标记完成。编译器用中性的夹具独立评审，支付项目和 WASM 发布走各自的评审和验收。
+
+## 评审中的改动
+
+- 类型化 PELS 编译目标、字面量循环展开与字节追踪。独立结算夹具验收同一份锁的两条路径。[编译器 PR #87](https://github.com/linzhm/4thGraph/pull/87)
+- Agent 有界选候选、固定评估和公式报告重放。首页流程图与 skill 说明同一个循环。[调优 PR #88](https://github.com/linzhm/4thGraph/pull/88)
+- BIP143 ALL 项目 WASM 包，R1 和 PELS Counter 作为验收实例。[钱包示例 PR #89](https://github.com/linzhm/4thGraph/pull/89)
