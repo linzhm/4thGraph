@@ -13,6 +13,16 @@ from .wordsets import PRIMITIVES, cell_literal
 ARITHMETIC = {"int+", "int-", "int*", "int-rem"}
 SYNTAX = ARITHMETIC | {"let", "int-from-bottom"}
 GENESIS_NUM_BYTES = 750_000
+FORMULA_PASSES = ("rewrite", "share", "stack", "search")
+
+
+def validate_formula_passes(passes):
+    passes = tuple(passes)
+    if len(set(passes)) != len(passes) or set(passes).difference(FORMULA_PASSES):
+        raise ValueError(f"unknown or repeated formula pass in {passes!r}")
+    if "search" in passes and "stack" not in passes:
+        raise ValueError("formula search requires stack scheduling")
+    return tuple(name for name in FORMULA_PASSES if name in passes)
 
 
 @dataclass(frozen=True)
@@ -50,13 +60,25 @@ class Formula:
             steps.append(step)
         return Formula(inputs, tuple(steps), tuple(slots[index] for index in self.returns))
 
-    def lower(self, *, optimize, specialized=False):
+    def lower(self, *, optimize=False, specialized=False, passes=None):
         args = self.input_count, self.steps, self.returns
-        baseline, _ = emit(*args, optimize=False)
+        if passes is not None:
+            if optimize or specialized:
+                raise ValueError("explicit formula passes cannot be combined with automatic selection or specialization")
+            passes = validate_formula_passes(passes)
+            code, rules = emit(*args, rewrite="rewrite" in passes, share="share" in passes,
+                               stack="stack" in passes, search="search" in passes)
+            return code, {
+                "passes": passes, "script_bytes": len(code), "rewrites": rules,
+                "max_magnitude_bits": magnitude_bits(self.steps),
+            }
+        baseline, _ = emit(*args)
         candidates = {"baseline": (baseline, {})}
         if optimize:
-            candidates["schedule"] = emit(*args, optimize=True)
-            candidates["rewrite-and-schedule"] = emit(*args, optimize=True, rewrite=True, specialized=specialized)
+            candidates["schedule"] = emit(*args, share=True, stack=True, search=True)
+            candidates["rewrite-and-schedule"] = emit(
+                *args, share=True, stack=True, search=True, rewrite=True, specialized=specialized,
+            )
         selected = min(candidates, key=lambda name: len(candidates[name][0]))
         code, rules = candidates[selected]
         return code, {
@@ -103,8 +125,9 @@ def cross_products(step, steps):
     return None
 
 
-def emit(input_count, steps, returns, *, optimize, rewrite=False, specialized=False):
-    graph = Graph(input_count, share=optimize)
+def emit(input_count, steps, returns, *, rewrite=False, share=False, stack=False, search=False,
+         specialized=False):
+    graph = Graph(input_count, share=share)
     values = list(graph.inputs)
     rules = Counter()
 
@@ -144,7 +167,8 @@ def emit(input_count, steps, returns, *, optimize, rewrite=False, specialized=Fa
                 rules["fuse-cached-divisor-load"] += 1
         values.append(graph.define(code, args))
     outputs = tuple(values[result] for result in returns)
-    code = graph.search_order(outputs) if optimize else graph.emit(outputs, last_use=False)
+    code = (graph.search_order(outputs) if search
+            else graph.emit(outputs, last_use=stack, compact=stack))
     return code, dict(rules)
 
 

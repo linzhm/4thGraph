@@ -5,7 +5,7 @@ from pathlib import Path
 from fourthgraph.bsv.script import OPS, number, push
 
 from .source import CompileError, Located, SourceCompiler, Word, evaluate
-from .script_formula import read_formula
+from .script_formula import read_formula, validate_formula_passes
 from fourthgraph.stdlib import WALLET_BACKEND
 from .wordsets import script_word
 
@@ -42,17 +42,20 @@ SCRIPT_WORDS = {
 
 
 class ScriptBuilder(SourceCompiler):
-    def __init__(self, source, *, source_path=None, vocabulary=None, optimize=False):
+    def __init__(self, source, *, source_path=None, vocabulary=None, optimize=False, formula_passes=None):
+        if optimize and formula_passes is not None:
+            raise ValueError("choose automatic formula optimization or explicit passes")
         self.optimize = optimize
+        self.formula_passes = None if formula_passes is None else validate_formula_passes(formula_passes)
         self.formulas = {}
         self.formula_ir = {}
         super().__init__(source, vocabulary=SCRIPT_WORDS | (vocabulary or {}), backend=WALLET_BACKEND,
                          source_path=source_path)
 
     @classmethod
-    def from_file(cls, path):
+    def from_file(cls, path, **options):
         path = Path(path)
-        return cls(path.read_text(encoding="utf-8"), source_path=path)
+        return cls(path.read_text(encoding="utf-8"), source_path=path, **options)
 
     def declaration(self, token):
         if token.name != "formula:":
@@ -61,7 +64,7 @@ class ScriptBuilder(SourceCompiler):
         name, formula = read_formula(self.tokens, token, self.ranges)
         if name.name.startswith("bsv-") or name.name in self.words:
             raise name.error(f"invalid or duplicate formula name {name.text!r}")
-        code, report = formula.lower(optimize=self.optimize)
+        code, report = formula.lower(optimize=self.optimize, passes=self.formula_passes)
         append = build_word("script", "script", lambda prefix: prefix + code)
         self.words[name.name] = Word(("script",), ("script",), (Located(append, name),), "build", name=name.name)
         self.definitions[name.name] = name

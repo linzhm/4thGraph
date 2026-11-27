@@ -1,0 +1,96 @@
+"""Same-source differential checks for the formula builder's public pass options."""
+
+from itertools import product
+from pathlib import Path
+from tempfile import TemporaryDirectory
+import unittest
+
+from fourthgraph.bsv.evaluate import evaluate
+from fourthgraph.bsv.script import asm, encode_num
+from fourthgraph.compiler.script_builder import ScriptBuilder
+from fourthgraph.compiler.source import CompileError
+
+
+# Integer numerators of a quadratic Bézier coordinate and its derivative.
+# The parameter is t/16. The returns have denominators 256 and 16.
+SOURCE = """
+REQUIRE BSV
+range: coordinate script-int -128 128 ;
+range: parameter script-int 0 17 ;
+range: position script-int -131072 131073 ;
+range: tangent script-int -16320 16321 ;
+
+formula: bezier-coordinate ( coordinate coordinate coordinate parameter -- position tangent )
+    {: p0 p1 p2 t :}
+    16 t int- let complement
+    p0 complement complement int* int*
+    2 p1 int* t int* complement int* int+
+    p2 t t int* int* int+
+
+    p1 p0 int- complement int*
+    p2 p1 int- t int* int+
+    2 int*
+;
+"""
+ENTRY = "bezier-coordinate"
+BASELINE = ()
+ALL = ("rewrite", "share", "stack", "search")
+PLANS = (BASELINE, ("rewrite",), ("share",), ("stack",), ("stack", "search"),
+         ("rewrite", "share"), ("rewrite", "share", "stack"), ALL)
+
+
+def coordinate_and_tangent(p0, p1, p2, t):
+    u = 16 - t
+    position = p0 * u**2 + 2 * p1 * t * u + p2 * t**2
+    tangent = 2 * ((p1 - p0) * u + (p2 - p1) * t)
+    return position, tangent
+
+
+class FormulaPassTests(unittest.TestCase):
+    def test_passes_preserve_exact_signed_results_and_both_stacks(self):
+        values = (-128, -1, 0, 1, 127)
+        prefix = b"\x81"
+        alt = b"sentinel"
+        for plan in PLANS:
+            builder = ScriptBuilder(SOURCE, formula_passes=plan)
+            code = builder.emit(ENTRY, asm("OP_TOALTSTACK"))
+            with self.subTest(plan=plan):
+                for operands in product(values, values, values, (0, 1, 8, 15, 16)):
+                    initial = [prefix, *map(encode_num, operands), alt]
+                    expected = [prefix, *map(encode_num, coordinate_and_tangent(*operands))]
+                    self.assertEqual(evaluate(code, initial), (expected, [alt]), operands)
+
+    def test_default_modes_and_explicit_report(self):
+        default = ScriptBuilder(SOURCE)
+        automatic = ScriptBuilder(SOURCE, optimize=True)
+        with TemporaryDirectory() as directory:
+            path = Path(directory) / "bezier.fth"
+            path.write_text(SOURCE, encoding="utf-8")
+            disabled = ScriptBuilder.from_file(path, formula_passes=())
+            ordered = ScriptBuilder.from_file(path, formula_passes=ALL)
+            reversed_order = ScriptBuilder.from_file(path, formula_passes=reversed(ALL))
+        self.assertEqual(disabled.emit(ENTRY, b""), default.emit(ENTRY, b""))
+        self.assertEqual(default.formulas[ENTRY]["selected"], "baseline")
+        self.assertEqual(set(automatic.formulas[ENTRY]["candidates"]),
+                         {"baseline", "schedule", "rewrite-and-schedule"})
+        self.assertEqual(len(automatic.emit(ENTRY, b"")), min(automatic.formulas[ENTRY]["candidates"].values()))
+        self.assertEqual(ordered.emit(ENTRY, b""), reversed_order.emit(ENTRY, b""))
+        self.assertEqual(ordered.formulas, reversed_order.formulas)
+        self.assertEqual(ordered.formulas[ENTRY]["passes"], ALL)
+        self.assertEqual(ordered.formulas[ENTRY]["script_bytes"], len(ordered.emit(ENTRY, b"")))
+        self.assertEqual(ordered.formulas[ENTRY]["rewrites"]["multiply-by-two-as-addition"], 2)
+        self.assertEqual(ordered.formulas[ENTRY]["max_magnitude_bits"], disabled.formulas[ENTRY]["max_magnitude_bits"])
+
+    def test_range_proof_and_configuration_errors(self):
+        bad_range = SOURCE.replace("position script-int -131072 131073", "position script-int -1 2")
+        possibly_zero_divisor = SOURCE.replace("p2 t t int* int* int+", "p2 t int-rem int+")
+        for plan in (BASELINE, ALL):
+            for source, error in ((bad_range, "results do not fit"), (possibly_zero_divisor, "positive divisor")):
+                with self.subTest(plan=plan, error=error), self.assertRaisesRegex(CompileError, error):
+                    ScriptBuilder(source, formula_passes=plan)
+        for names, error in ((("search",), "requires stack"), (("share", "share"), "repeated"),
+                             (("unknown",), "unknown")):
+            with self.subTest(names=names), self.assertRaisesRegex(ValueError, error):
+                ScriptBuilder(SOURCE, formula_passes=names)
+        with self.assertRaisesRegex(ValueError, "automatic formula optimization"):
+            ScriptBuilder(SOURCE, optimize=True, formula_passes=())

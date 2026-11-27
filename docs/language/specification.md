@@ -150,7 +150,38 @@ formula: square ( small -- squared )
 
 `int-from-bottom INDEX RANGE` 读调用者留在栈底的数值，索引从零开始。调用者负责保证输入与栈底值采用规范的 ScriptNum 编码并符合声明范围。编译器沿公式推导中间量范围，检查输出范围与 Genesis 数值长度上限，并要求 `int-rem` 的除数有可证的正下界。
 
-优化构建比较原顺序发码、依赖图调度和加入等价改写的候选，按序列化字节数选择。报告给出候选字节数、选中规则及源码的中间量位宽上界。P2PKH-R1 用这条路径编译 P-256 的点加和倍点。 [源码和复放](../../projects/p2pkh-r1/forth)
+默认的 `ScriptBuilder(source)` 按原顺序发码。`ScriptBuilder(source, optimize=True)` 比较原顺序发码、依赖图调度及加入等价改写的候选，按序列化字节数选择。报告给出候选字节数、选中规则及源码的中间量位宽上界。P2PKH-R1 用这条路径编译 P-256 的点加和倍点。 [源码和复放](../../projects/p2pkh-r1/forth)
+
+用 `ScriptBuilder(source, formula_passes=names)` 或 `ScriptBuilder.from_file(path, formula_passes=names)` 为同一源码指定实验配置。这会应用于该构造器读到的所有 `formula:`，包括 `REQUIRE` 导入的公式。`formula_passes=()` 生成原顺序基线。显式配置与 `optimize=True` 互斥。各 pass 按下表的固定次序应用，传入的名字顺序不影响产物。未知或重复的名字会报错。
+
+| Pass | 效果 |
+| --- | --- |
+| `rewrite` | 在证明条件满足时替换等价整数运算，例如将乘二改为自加或合并缓存除数的读取。 |
+| `share` | 合并输入和指令相同的计算。 |
+| `stack` | 按原依赖顺序发码，复用最后使用的栈项并选择较短的操作数排列。 |
+| `search` | 尝试其它依赖顺序。需要 `stack`。搜索最多保留 96 条路径，活跃节点超过 128 时使用原依赖顺序。搜索保留原依赖顺序作为字节成本对照。 |
+
+显式配置直接发出该配置的产物。`builder.formulas[name]` 记录规范排序的 `passes`、序列化 `script_bytes`、命中的 `rewrites` 计数和公式源码的 `max_magnitude_bits`。这些指标可对照体积与数值范围。编译耗时、运行耗时和栈峰值需要单独测量。类型、范围检查、可达输出依赖和输出栈序在各配置下均保留。
+
+从同一基线独立比较 `rewrite`、`share` 和 `stack`。测试 `search` 时同时对照仅启用 `stack` 的产物，再按固定次序逐项组合通过的 pass。用下列命令重跑二次 Bézier 坐标与切线的语义、栈效果及配置回归，并串行比较编译成本。
+
+```sh
+PYTHONPATH=src:. python -m unittest tests.test_formula_passes
+PYTHONPATH=src:. python - <<'PY'
+from statistics import median
+from timeit import repeat
+from fourthgraph.compiler.script_builder import ScriptBuilder
+from tests.test_formula_passes import ENTRY, PLANS, SOURCE
+
+for plan in PLANS:
+    def compile_formula():
+        return ScriptBuilder(SOURCE, formula_passes=plan)
+
+    builder = compile_formula()
+    samples = repeat(compile_formula, number=1, repeat=15)
+    print(plan, builder.formulas[ENTRY]["script_bytes"], round(1000 * median(samples), 3))
+PY
+```
 
 编译器保存公式的中间表示。调用构造器能证明某个参数为常量时，可在生成字节前绑定该参数并重新推导中间量范围，生成少一个运行时输入的内核。R1 的仿射点加只在选中的固定生成元表项满足 `Z=1` 时进入该内核，零下标由组单位元分支处理。 [R1 前置扫描和候选](../../projects/p2pkh-r1/forth/README.md#点乘窗口候选)
 
