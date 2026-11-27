@@ -63,6 +63,8 @@ ABI 标识为 `4thgraph.project-contract/1`。请求与回应用 UTF-8 JSON，�
 
 功能 Profile 选择本地理解的项目，模板版本固定具体的 Script、布局与 WASM。单次签署候选用精确交易字节绑定。模板字节升级要保留旧包以花费旧 UTXO。多步流程逐笔引用已构造并验证的父输出。PELS 归属标准库模板族。此处的 `pels-counter` 实例选用单输入、单后继、固定费用及保留代码的 `advance` 路径。R1 包支持 v0.6.0 的 `ordinary-all` 路径，MESA 签名槽对签后逆元的支持仍待单独评审。[模板族及优化接入评审](optimizer-integration-review.zh-CN.md)
 
+当前项目包宿主验证 BIP143 ALL（`0x41`）。将来接入 OTDA 或 PELS 双模式成员时，模板清单按具体路径绑定所选 sighash、有效 `scriptCode`、见证布局、已认证字段和适用链规则。一次 `prepare_spend` 选定一种模式，宿主按该路径重算原像并核对覆盖后再授权。[模式及约束表](optimizer-integration-review.zh-CN.md#用什么模板验证什么内容)
+
 ### 夹具可以追加错误输入
 
 每个项目在 `contract/cases.json` 中指定 `id`、`entry`、对固定请求的 `patch` 和 `expect`。期望可以引用独立计算的 `$prepared` 和 `$expected_unlock`。下面是 R1 真实用例，验证拒绝发生在宿主签名之前。
