@@ -1,6 +1,6 @@
 <!-- Generated from manifest.yaml with Copier. -->
 
-# P2PKH-SM2 v1.10.0
+# P2PKH-SM2 v1.11.0
 
 [简体中文](README.zh-CN.md) · [4thGraph](../../README.md) · [Project index](../README.md) · [Versions](versions/index.json)
 
@@ -10,7 +10,7 @@
 
 Choose a raw SM2 or SignedData signer. The wallet automatically selects a shorter OTDA unlocking script for eligible payments.
 
-[Protocol](docs/spec.en.md) · [Algorithm and execution](#algorithm-and-execution) · [Reproduce the checks](#reproduce-the-checks) · [Complete transactions and stack measurements](#complete-transactions-and-stack-measurements) · [Measurements data](versions/v1.10.0/measurements.json)
+[Protocol](docs/spec.en.md) · [Algorithm and execution](#algorithm-and-execution) · [Reproduce the checks](#reproduce-the-checks) · [Complete transactions and stack measurements](#complete-transactions-and-stack-measurements) · [Measurements data](versions/v1.11.0/measurements.json)
 
 | Entry point | Purpose |
 | --- | --- |
@@ -25,7 +25,7 @@ For payments that create other SM2 outputs, compare BIP143 and OTDA using the sa
 
 ## Algorithm and execution
 
-[v1.11.0 candidate](#v1110)
+[v1.12.0 candidate](#v1120)
 
 [Protocol](docs/spec.en.md) · [Security](docs/developer.en.md#security) · [Verify](#developer-checks-and-cost-analysis) · [Transaction costs](#complete-transactions-and-stack-measurements)
 
@@ -38,13 +38,13 @@ transaction through PUSHTX and native `OP_CHECKSIG`.
 
 ### Project version and locking template
 
-Version 1.1.0 enables OTDA reconstruction by default for locking template `1` from the first public release, v1.0.0. Versions 1.2.0 through 1.7.0 correspond to templates `2` through `7`. Versions 1.9.0 through 1.11.0 add templates `8` through `10`. The wallet recognizes and spends all ten templates from the previous output's exact bytes.
+Version 1.1.0 enables OTDA reconstruction by default for locking template `1` from the first public release, v1.0.0. Versions 1.2.0 through 1.7.0 correspond to templates `2` through `7`. Versions 1.9.0 through 1.12.0 add templates `8` through `11`. The wallet recognizes and spends all eleven templates from the previous output's exact bytes.
 
 | Property | Value |
 | --- | --- |
 | Recipient identifier | HASH160 of the 65-byte public key `04 \|\| X_BE32 \|\| Y_BE32` |
 | SM2 user ID | The fixed ASCII value `1234567812345678` |
-| Locking script | 144,925 bytes for template `1`, 131,565 for `2`, 125,616 for `3`, 121,847 for `4`, 110,747 for `5`, 100,663 for `6`, 98,362 for `7`, 96,616 for `8`, 95,790 for `9`, and 94,355 for `10` |
+| Locking script | 144,925 bytes for template `1`, 131,565 for `2`, 125,616 for `3`, 121,847 for `4`, 110,747 for `5`, 100,663 for `6`, 98,362 for `7`, 96,616 for `8`, 95,790 for `9`, 94,355 for `10`, and 94,117 for `11` |
 | Unlocking script | 291 bytes with BIP143, 294 bytes with unpaired OTDA SINGLE, and transaction-dependent for other OTDA modes |
 | Unlocking stack | Signing preimage, uncompressed public key, and 64-byte `r \|\| s` signature |
 | Signature modes | BIP143 and Chronicle OTDA, each with ALL, NONE, or SINGLE and optional ANYONECANPAY |
@@ -58,7 +58,7 @@ The current source includes the [layout manifest](versions/v1.0.0/layout.json),
 
 ### Reconstruct OTDA outputs
 
-The constructor is part of `scriptSig`. It uses 12,703 bytes for template `1`, 11,816 for `2`, 11,807 for `3`, 11,618 for `4`, 11,549 for `5`, 9,363 for `6`, 9,447 for `7`, 7,644 for `8`, 7,718 for `9`, and 7,417 for `10`. Templates `2` through `10` select reusable fragments from the initial encoding and place frequently used fragments near the top of the stack. The constructor reconstructs the exact signing preimage and fills each eligible output's HASH160 slot. The signing callback receives the same message and SM2 user ID as the literal encoding. Use the final signed transaction ID to build a child.
+The constructor is part of `scriptSig`. It uses 12,703 bytes for template `1`, 11,816 for `2`, 11,807 for `3`, 11,618 for `4`, 11,549 for `5`, 9,363 for `6`, 9,447 for `7`, 7,644 for `8`, 7,718 for `9`, and 7,417 for `10`, and 7,412 for `11`. Templates `2` through `11` select reusable fragments from the initial encoding and place frequently used fragments near the top of the stack. The constructor reconstructs the exact signing preimage and fills each eligible output's HASH160 slot. The signing callback receives the same message and SM2 user ID as the literal encoding. Use the final signed transaction ID to build a child.
 
 After Chronicle activation, version-2 OTDA ALL can reconstruct matching outputs in their original order. Paired OTDA SINGLE can reconstruct the same-index output and preserve the preceding null outputs in the preimage. Both support `ANYONECANPAY`. Other output templates keep their literal bytes. BIP143, NONE, unpaired SINGLE, version 1 and non-smaller encodings continue with the literal unlocking script. [SDK options](docs/sdk.en.md) · [Constructor and generator](reference/README.md#otda-constructor)
 
@@ -83,7 +83,7 @@ python -m pip install -r projects/p2pkh-sm2/reference/requirements.txt
 ```
 
 ```sh
-PYTHONPATH=src:. python projects/p2pkh-sm2/reference/point_kernels.py --affine /tmp/sm2-affine-kernel.json && python projects/p2pkh-sm2/reference/generate_otda_constructor.py --version 9 /tmp/sm2-otda-v9.hex
+export PYTHONPATH=src:. && python projects/p2pkh-sm2/reference/point_kernels.py --carried /tmp/sm2-window-kernels.json && python projects/p2pkh-sm2/reference/byte_fields.py /tmp/sm2-byte-kernels.json && python projects/p2pkh-sm2/reference/generate_otda_constructor.py --version 10 /tmp/sm2-otda-v10.hex
 bash projects/p2pkh-sm2/reference/verify.sh
 ```
 
@@ -111,6 +111,26 @@ changes both existing OTDA unlocks. The marginal table shows those costs
 separately. Transaction version and the two SignedData version fields apply to their own encodings.
 
 ## Script sizes
+
+<a name="v1120"></a>
+
+### v1.12.0 candidate
+
+The 4thGraph `0.2.7` compiler at `1c44d28` schedules the public-key table from named values. The selected plan doubles for even multiples, adds the checked affine public key for odd multiples, and reuses the window's finite doubling fragment. The OTDA encoder seeds its dictionary with the same point fragments. On the shortened lock, this reduces the constructor from 7,461 to 7,412 bytes.
+
+| Measured bytes | v1.11.0 | v1.12.0 |
+| --- | ---: | ---: |
+| Locking script | 94,355 | 94,117 |
+| OTDA constructor | 7,417 | 7,412 |
+| BIP143 ALL, 2 inputs and 2 outputs | 189,414 | 188,938 |
+| OTDA ALL, 2 inputs and 2 outputs | 204,306 | 203,820 |
+| OTDA ALL, 12 inputs and 1 output | 191,615 | 191,317 |
+| OTDA ALL, 24 inputs and 1 output | 299,219 | 298,861 |
+| OTDA ALL, 40 inputs and 1 output | 458,819 | 458,381 |
+
+Both engines replayed the 38 transaction shapes. Every SM2 input and recognized SM2 destination in a candidate replay uses template `11`. Automatic transactions shrink in 37 cases. The native-only destination case stays at 719 bytes. For the 2×2 fixture the BIP143 peak stack payload grows by 2 bytes and the OTDA peak falls by 952 bytes. Funded default and raised policy replays cover P2PKH funding and exits, sponsored zero-fee drafts, planned change and CPFP. [Transaction cases](versions/v1.12.0/latest-template-coverage.json) · [Default policy](versions/v1.12.0/p2pkh-default.json) · [Raised policy](versions/v1.12.0/p2pkh-raised.json)
+
+Select template `11` with `--version 11` or SDK `template: "v1.12.0"`. [Reproduction](reference/README.md#public-table-tuning) · [Template fingerprint](versions/v1.12.0/layout.json) · [Measurements](versions/v1.12.0/measurements.json)
 
 <a name="v1110"></a>
 

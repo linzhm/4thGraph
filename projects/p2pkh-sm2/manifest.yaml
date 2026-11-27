@@ -51,7 +51,7 @@ sections:
       - 如果付款会新建 SM2 输出，用相同的输入输出数量比较 BIP143 和 OTDA。钱包会为符合条件的 Chronicle 花费重建签名预映像，缩短 OTDA 解锁脚本。每个新输出携带所选模板的完整锁定脚本。[重建实测](#otda-constructor)
   algorithm:
     en:
-      - '[v1.11.0 candidate](#v1110)'
+      - '[v1.12.0 candidate](#v1120)'
       - '[Protocol](docs/spec.en.md) · [Security](docs/developer.en.md#security) · [Verify](#developer-checks-and-cost-analysis)
         · [Transaction costs](#complete-transactions-and-stack-measurements)'
       - |-
@@ -64,14 +64,14 @@ sections:
       - '### Project version and locking template'
       - Version 1.1.0 enables OTDA reconstruction by default for locking template `1` from the first public
         release, v1.0.0. Versions 1.2.0 through 1.7.0 correspond to templates `2` through `7`. Versions
-        1.9.0 through 1.11.0 add templates `8` through `10`. The wallet recognizes and spends all ten templates
+        1.9.0 through 1.12.0 add templates `8` through `11`. The wallet recognizes and spends all eleven templates
         from the previous output's exact bytes.
       - |-
         | Property | Value |
         | --- | --- |
         | Recipient identifier | HASH160 of the 65-byte public key `04 \|\| X_BE32 \|\| Y_BE32` |
         | SM2 user ID | The fixed ASCII value `1234567812345678` |
-        | Locking script | 144,925 bytes for template `1`, 131,565 for `2`, 125,616 for `3`, 121,847 for `4`, 110,747 for `5`, 100,663 for `6`, 98,362 for `7`, 96,616 for `8`, 95,790 for `9`, and 94,355 for `10` |
+        | Locking script | 144,925 bytes for template `1`, 131,565 for `2`, 125,616 for `3`, 121,847 for `4`, 110,747 for `5`, 100,663 for `6`, 98,362 for `7`, 96,616 for `8`, 95,790 for `9`, 94,355 for `10`, and 94,117 for `11` |
         | Unlocking script | 291 bytes with BIP143, 294 bytes with unpaired OTDA SINGLE, and transaction-dependent for other OTDA modes |
         | Unlocking stack | Signing preimage, uncompressed public key, and 64-byte `r \|\| s` signature |
         | Signature modes | BIP143 and Chronicle OTDA, each with ALL, NONE, or SINGLE and optional ANYONECANPAY |
@@ -84,7 +84,7 @@ sections:
       - '### Reconstruct OTDA outputs'
       - The constructor is part of `scriptSig`. It uses 12,703 bytes for template `1`, 11,816 for `2`,
         11,807 for `3`, 11,618 for `4`, 11,549 for `5`, 9,363 for `6`, 9,447 for `7`, 7,644 for `8`, 7,718 for `9`, and
-        7,417 for `10`. Templates `2` through `10` select reusable fragments from the initial encoding and
+        7,417 for `10`, and 7,412 for `11`. Templates `2` through `11` select reusable fragments from the initial encoding and
         place frequently used fragments near the top of the stack. The constructor reconstructs the exact
         signing preimage and fills each eligible output's HASH160 slot. The signing callback receives
         the same message and SM2 user ID as the literal encoding. Use the final signed transaction ID
@@ -107,7 +107,7 @@ sections:
         build. The table uses benchmark profile `v1.1.0` for template `1` with automatic reconstruction
         and `v1.0.0` for the literal encoding.
     zh-CN:
-      - '[v1.11.0 候选版](#v1110)'
+      - '[v1.12.0 候选版](#v1120)'
       - '[协议规范](docs/spec.zh-CN.md) · [安全分析](docs/developer.zh-CN.md#security) · [复现与验证](#开发复现与输入输出分析)
         · [交易成本](#完整交易与栈测量)'
       - |-
@@ -116,13 +116,13 @@ sections:
         用户标识摘要 ZA 和消息摘要，然后验证 SM2 签名，并通过 PUSHTX 和原生
         `OP_CHECKSIG` 将授权绑定到实际的花费交易。
       - '### 项目版本与锁定模板'
-      - v1.1.0 为首个公开版本 v1.0.0 的锁定模板 `1` 默认启用 OTDA 重建。v1.2.0 至 v1.7.0 依次对应模板 `2` 至 `7`。v1.9.0 至 v1.11.0 依次增加模板 `8` 至 `10`。钱包按上一输出的完整字节识别并花费十种模板。
+      - v1.1.0 为首个公开版本 v1.0.0 的锁定模板 `1` 默认启用 OTDA 重建。v1.2.0 至 v1.7.0 依次对应模板 `2` 至 `7`。v1.9.0 至 v1.12.0 依次增加模板 `8` 至 `11`。钱包按上一输出的完整字节识别并花费十一种模板。
       - |-
         | 项目 | 取值 |
         | --- | --- |
         | 收款标识 | 65 字节公钥 `04 \|\| X_BE32 \|\| Y_BE32` 的 HASH160 |
         | SM2 用户标识 | 固定的 ASCII 字符串 `1234567812345678` |
-        | 锁定脚本 | 模板 `1` 为 144,925 字节，`2` 为 131,565 字节，`3` 为 125,616 字节，`4` 为 121,847 字节，`5` 为 110,747 字节，`6` 为 100,663 字节，`7` 为 98,362 字节，`8` 为 96,616 字节，`9` 为 95,790 字节，`10` 为 94,355 字节 |
+        | 锁定脚本 | 模板 `1` 为 144,925 字节，`2` 为 131,565 字节，`3` 为 125,616 字节，`4` 为 121,847 字节，`5` 为 110,747 字节，`6` 为 100,663 字节，`7` 为 98,362 字节，`8` 为 96,616 字节，`9` 为 95,790 字节，`10` 为 94,355 字节，`11` 为 94,117 字节 |
         | 解锁脚本 | BIP143 为 291 字节，无配对输出的 OTDA SINGLE 为 294 字节，其他 OTDA 模式的长度随交易变化 |
         | 解锁栈 | 签名预映像、未压缩公钥，以及 64 字节的 `r \|\| s` 签名 |
         | 交易签名模式 | BIP143 和 Chronicle OTDA 均支持 ALL、NONE、SINGLE，每种模式均可选用 ANYONECANPAY |
@@ -132,7 +132,7 @@ sections:
       - <a name="otda-constructor"></a>
       - '### 重建 OTDA 输出'
       - 构造器是 `scriptSig` 的一部分，模板 `1` 使用 12,703 字节，`2` 使用 11,816 字节，`3` 使用 11,807 字节，`4` 使用 11,618 字节，`5`
-        使用 11,549 字节，`6` 使用 9,363 字节，`7` 使用 9,447 字节，`8` 使用 7,644 字节，`9` 使用 7,718 字节，`10` 使用 7,417 字节。模板 `2` 至 `10` 从初始编码实际复制的指令中选出可复用片段，并把高频片段放在靠近栈顶的位置。构造器逐字节重建签名预映像，把收款人的
+        使用 11,549 字节，`6` 使用 9,363 字节，`7` 使用 9,447 字节，`8` 使用 7,644 字节，`9` 使用 7,718 字节，`10` 使用 7,417 字节，`11` 使用 7,412 字节。模板 `2` 至 `11` 从初始编码实际复制的指令中选出可复用片段，并把高频片段放在靠近栈顶的位置。构造器逐字节重建签名预映像，把收款人的
         HASH160 填入各个适用输出。签名回调接收与原样编码一致的消息和 SM2 用户标识。构建子交易时使用最终已签交易的 ID。
       - Chronicle 激活后，版本 2 的 OTDA ALL 交易可以按原顺序重建匹配的输出。配对 OTDA SINGLE 可以重建同索引输出，并保留预映像中前置的空输出。两种模式均支持 `ANYONECANPAY`。其他模板的输出按原字节写入。BIP143、NONE、无配对
         SINGLE、版本 1 及体积未缩小的交易继续使用原样解锁。[SDK 选项](docs/sdk.zh-CN.md) · [构造器与生成方式](reference/README.zh-CN.md#otda-constructor)
@@ -185,6 +185,32 @@ sections:
         字节的输出锁本身外，两个已有输入的解锁也会变长。下表分项列出这些开销。交易版本和 SignedData 的两层版本值分别按各自的编码规则处理。
   script_sizes:
     en:
+      - <a name="v1120"></a>
+      - '### v1.12.0 candidate'
+      - The 4thGraph `0.2.7` compiler at `1c44d28` schedules the public-key table from named values. The
+        selected plan doubles for even multiples, adds the checked affine public key for odd multiples,
+        and reuses the window's finite doubling fragment. The OTDA encoder seeds its dictionary with
+        the same point fragments. On the shortened lock, this reduces the constructor from 7,461 to
+        7,412 bytes.
+      - |-
+        | Measured bytes | v1.11.0 | v1.12.0 |
+        | --- | ---: | ---: |
+        | Locking script | 94,355 | 94,117 |
+        | OTDA constructor | 7,417 | 7,412 |
+        | BIP143 ALL, 2 inputs and 2 outputs | 189,414 | 188,938 |
+        | OTDA ALL, 2 inputs and 2 outputs | 204,306 | 203,820 |
+        | OTDA ALL, 12 inputs and 1 output | 191,615 | 191,317 |
+        | OTDA ALL, 24 inputs and 1 output | 299,219 | 298,861 |
+        | OTDA ALL, 40 inputs and 1 output | 458,819 | 458,381 |
+      - Both engines replayed the 38 transaction shapes. Every SM2 input and recognized SM2 destination
+        in a candidate replay uses template `11`. Automatic transactions shrink in 37 cases. The
+        native-only destination case stays at 719 bytes. For the 2×2 fixture the BIP143 peak stack
+        payload grows by 2 bytes and the OTDA peak falls by 952 bytes. Funded default and raised policy
+        replays cover P2PKH funding and exits, sponsored zero-fee drafts, planned change and CPFP.
+        [Transaction cases](versions/v1.12.0/latest-template-coverage.json) · [Default policy](versions/v1.12.0/p2pkh-default.json)
+        · [Raised policy](versions/v1.12.0/p2pkh-raised.json)
+      - 'Select template `11` with `--version 11` or SDK `template: "v1.12.0"`. [Reproduction](reference/README.md#public-table-tuning)
+        · [Template fingerprint](versions/v1.12.0/layout.json) · [Measurements](versions/v1.12.0/measurements.json)'
       - <a name="v1110"></a>
       - '### v1.11.0 candidate'
       - Template `10` carries the field prime and `3b` across the scalar windows and reuses the projective
@@ -388,6 +414,21 @@ sections:
         · [Recorded measurements](versions/v1.2.0/measurements.json) · [Forth lock](../../src/fourthgraph/stdlib/wallet/p2pkh-sm2.fth)
         · [Benchmark reproduction](../../docs/benchmark.md#run)'
     zh-CN:
+      - <a name="v1120"></a>
+      - '### v1.12.0 候选版'
+      - 提交 `1c44d28` 上的 4thGraph `0.2.7` 按命名值调度公钥点表。选定方案通过倍点生成偶数倍点，以已验证的仿射公钥生成奇数倍点，并复用标量窗口的有限点倍点片段。OTDA 字典以同一组点运算片段为初始条目，在缩短后的锁定脚本上将构造器从 7,461 降到 7,412 字节。
+      - |-
+        | 实测字节数 | v1.11.0 | v1.12.0 |
+        | --- | ---: | ---: |
+        | 锁定脚本 | 94,355 | 94,117 |
+        | OTDA 构造器 | 7,417 | 7,412 |
+        | BIP143 ALL，两进两出 | 189,414 | 188,938 |
+        | OTDA ALL，两进两出 | 204,306 | 203,820 |
+        | OTDA ALL，十二进一出 | 191,615 | 191,317 |
+        | OTDA ALL，二十四进一出 | 299,219 | 298,861 |
+        | OTDA ALL，四十进一出 | 458,819 | 458,381 |
+      - 两套引擎回放了 38 种交易构造。候选版回放中的每个 SM2 输入和可识别的 SM2 输出均使用模板 `11`。自动构造的交易有 37 种变小，纯 P2PKH 输出用例仍为 719 字节。两进两出的 BIP143 栈载荷峰值增加 2 字节，OTDA 栈载荷峰值减少 952 字节。默认和放宽策略的有资金回放覆盖原生 P2PKH 入金和退出、零费草稿补费、预先安排找零和 CPFP。[交易用例](versions/v1.12.0/latest-template-coverage.json) · [默认策略](versions/v1.12.0/p2pkh-default.json) · [放宽策略](versions/v1.12.0/p2pkh-raised.json)
+      - '用 `--version 11` 或 SDK 的 `template: "v1.12.0"` 选用模板 `11`。[复现方式](reference/README.zh-CN.md#public-table-tuning) · [模板指纹](versions/v1.12.0/layout.json) · [测量记录](versions/v1.12.0/measurements.json)'
       - <a name="v1110"></a>
       - '### v1.11.0 候选版'
       - 模板 `10` 在标量乘法窗口之间保留域模数和 `3b`，构建公钥表时也复用投影加点内核。提交 `64624db` 上的 4thGraph `0.2.7` 比较了 21 组编译阶段和规则组合，每组核对 16 个固定用例。选定方案使用

@@ -15,9 +15,10 @@ from assemble import POINT_KERNEL_FILE, TEMPLATE_VERSION, TEMPLATE_VERSIONS
 from assemble import WINDOW_DOUBLING_TEMPLATE_VERSION, WINDOW_KERNEL_FILE
 from assemble import AFFINE_GENERATOR_TEMPLATE_VERSION, AFFINE_KERNEL_FILE
 from assemble import CARRIED_FIELD_TEMPLATE_VERSION, CARRIED_KERNEL_FILE
-from assemble import BYTE_KERNEL_FILE
+from assemble import BYTE_KERNEL_FILE, PUBLIC_TABLE_KERNEL_FILE, PUBLIC_TABLE_TEMPLATE_VERSION
 from assemble import assemble, forth_compiler, sm3_blocks
 from byte_fields import BYTE_KERNEL_NAMES, compile_byte_kernels
+from compile_public_table import PUBLIC_TABLE_KERNEL, compile_tables
 from point_kernels import AFFINE_KERNEL_NAME, WINDOW_KERNEL_NAME, compile_kernels, load_kernels
 from point_kernels import CARRIED_KERNEL_NAMES, compile_carried_kernels
 from p2pkh_sm2 import *
@@ -227,9 +228,27 @@ class SM2Tests(unittest.TestCase):
                     self.assertLess(len(grouped), len(previous))
                     self.assertEqual(evaluate(grouped, stack), evaluate(previous, stack))
 
+    def test_public_table_matches_sm2_multiples(self):
+        frozen = load_kernels(PUBLIC_TABLE_KERNEL_FILE, (PUBLIC_TABLE_KERNEL,))[PUBLIC_TABLE_KERNEL]
+        variants = compile_tables() | {"frozen": frozen}
+        for label, code in variants.items():
+            for scalar in (1, 7, N - 1, 12_345_678):
+                with self.subTest(variant=label, scalar=scalar):
+                    qx, qy = mul(scalar)
+                    main, alt = evaluate(asm("17 OP_TOALTSTACK") + code,
+                                         [b"caller", *map(encode_num, (qx, qy, 3 * B % P, P))])
+                    self.assertEqual(alt, [encode_num(17)])
+                    self.assertEqual(main[0], b"caller")
+                    self.assertEqual(len(main), 1 + 3 * 16)
+                    coords = iter(map(decode_num, main[1:]))
+                    for multiple, (x, y, z) in enumerate(zip(coords, coords, coords, strict=True), 1):
+                        inv = pow(z, -1, P)
+                        self.assertEqual((x * inv % P, y * inv % P), mul(scalar * multiple))
+
     def test_signed_windows_match_scalar_multiplication(self):
         for version in (SIGNED_WINDOW_TEMPLATE_VERSION, WINDOW_DOUBLING_TEMPLATE_VERSION,
-                        AFFINE_GENERATOR_TEMPLATE_VERSION, CARRIED_FIELD_TEMPLATE_VERSION):
+                        AFFINE_GENERATOR_TEMPLATE_VERSION, CARRIED_FIELD_TEMPLATE_VERSION,
+                        PUBLIC_TABLE_TEMPLATE_VERSION):
             with self.subTest(version=version):
                 self.check_signed_windows(version)
 
