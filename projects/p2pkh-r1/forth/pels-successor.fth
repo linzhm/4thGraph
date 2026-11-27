@@ -57,13 +57,18 @@ REQUIRE BSV
     op-toaltstack op-bin2num
 ;
 
-: pels-check-successor-output ( script -- script )
-    ( Runtime: successor-state-bytes successor-amount-bytes -- nothing. )
+: pels-successor-hash ( script -- script )
+    ( Runtime: successor-state-bytes successor-amount-bytes -- hash | consumes code from alt. )
     op-fromaltstack op-rot
     bytes-hex 05 bsv-push op-swap op-cat
     bytes-hex ab bsv-push op-cat op-swap op-cat
     op-size pels-script-size op-swap op-cat op-cat
-    op-hash256 op-fromaltstack op-equalverify
+    op-hash256
+;
+
+: pels-check-successor-output ( script -- script )
+    ( Runtime: successor-state-bytes successor-amount-bytes -- nothing. )
+    pels-successor-hash op-fromaltstack op-equalverify
 ;
 
 : pels-assert-successor ( script script -- script )
