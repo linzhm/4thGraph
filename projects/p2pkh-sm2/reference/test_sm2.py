@@ -12,8 +12,9 @@ import tempfile
 import unittest
 from assemble import PACKED_SM3_TEMPLATE_VERSION, SIGNED_RESIDUE_TEMPLATE_VERSION, SIGNED_WINDOW_TEMPLATE_VERSION
 from assemble import POINT_KERNEL_FILE, TEMPLATE_VERSION, TEMPLATE_VERSIONS
+from assemble import WINDOW_DOUBLING_TEMPLATE_VERSION, WINDOW_KERNEL_FILE
 from assemble import assemble, forth_compiler, sm3_blocks
-from point_kernels import compile_kernels, load_kernels
+from point_kernels import WINDOW_KERNEL_NAME, compile_kernels, load_kernels
 from p2pkh_sm2 import *
 from sm2 import *
 from sm3_script import hash_script,compress,IV
@@ -23,7 +24,7 @@ from fourthgraph.bsv.transaction import *
 
 ROOT=Path(__file__).resolve().parents[1]
 SM3_PROFILES = ({}, {'optimized': True}, {'compact': True}, {'scheduled': True}, {'packed': True},
-                {'split_rotations': True})
+                {'split_rotations': True}, {'stream_schedule': True})
 
 
 def der(tag,raw):
@@ -205,8 +206,28 @@ class SM2Tests(unittest.TestCase):
                 self.assertEqual(evaluate(new_add, add_stack), evaluate(old_add, add_stack))
                 self.assertEqual(evaluate(new_double, double_stack), evaluate(old_double, double_stack))
 
+    def test_window_kernel_reproduces_five_doublings(self):
+        names = (WINDOW_KERNEL_NAME,)
+        kernels = compile_kernels(names)
+        self.assertEqual(kernels, load_kernels(WINDOW_KERNEL_FILE, names))
+        grouped = kernels[WINDOW_KERNEL_NAME]
+        previous = 5 * load_kernels(POINT_KERNEL_FILE)["sm2-double-kernel"]
+        self.assertLess(len(grouped), len(previous))
+        x, y = mul(19)
+        scaled = (-(2*x % P), -(2*y % P), -2)
+        prefix = (P, 3*B % P, 17)
+        for point in ((0, 1, 0), (0, -7, 0), (x, y, 1), scaled):
+            with self.subTest(point=point):
+                stack = [encode_num(value) for value in (*prefix, *point)]
+                self.assertEqual(evaluate(grouped, stack), evaluate(previous, stack))
+
     def test_signed_windows_match_scalar_multiplication(self):
-        compiler = forth_compiler(bytes(20), SIGNED_WINDOW_TEMPLATE_VERSION)
+        for version in (SIGNED_WINDOW_TEMPLATE_VERSION, WINDOW_DOUBLING_TEMPLATE_VERSION):
+            with self.subTest(version=version):
+                self.check_signed_windows(version)
+
+    def check_signed_windows(self, version):
+        compiler = forth_compiler(bytes(20), version)
         window = compiler.emit("sm2-window", b"")
         qx, qy = mul(7)
         cached = [encode_num(value) for value in (P, 3*B % P, 17)]
@@ -320,7 +341,7 @@ class SM2Tests(unittest.TestCase):
         for version in TEMPLATE_VERSIONS[1:]:
             candidate = assemble(base_owner, version)
             self.assertEqual(subprocess.check_output([*cli, '--version', str(version), '--format', 'raw']), candidate)
-        for version in (0, 8, 9):
+        for version in (0, 9, 10):
             with self.subTest(version=version):
                 for construct in (assemble, locking_script_from_owner_hash):
                     with self.assertRaisesRegex(ValueError, 'unsupported P2PKH-SM2 template'):

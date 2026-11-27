@@ -1,6 +1,7 @@
 from assemble import COMPILED_POINT_TEMPLATE_VERSION, PACKED_SM3_TEMPLATE_VERSION, SCHEDULED_TEMPLATE_VERSION
 from assemble import SIGNED_RESIDUE_TEMPLATE_VERSION, SIGNED_WINDOW_TEMPLATE_VERSION
 from assemble import SPLIT_ROTATION_TEMPLATE_VERSION, TEMPLATE_PROFILES
+from assemble import WINDOW_DOUBLING_TEMPLATE_VERSION
 from fourthgraph.bsv.transaction import Output
 from p2pkh_sm2 import MIXED_OTDA_VERSIONS, locking_script_from_public_key
 from sm2 import USER_ID, encode_public, fixture_sign, mul
@@ -45,6 +46,7 @@ def cases():
         (COMPILED_POINT_TEMPLATE_VERSION, 110747),
         (SPLIT_ROTATION_TEMPLATE_VERSION, 100663),
         (SIGNED_WINDOW_TEMPLATE_VERSION, 98362),
+        (WINDOW_DOUBLING_TEMPLATE_VERSION, 96616),
     ):
         destination = locking_script_from_public_key(encode_public(mul(9)), version=version)
         profile = TEMPLATE_PROFILES[version]
@@ -63,11 +65,11 @@ def cases():
 
     latest_outputs = tuple(
         Output(3_300, locking_script_from_public_key(encode_public(mul(scalar)),
-                                                    version=SIGNED_WINDOW_TEMPLATE_VERSION))
+                                                    version=WINDOW_DOUBLING_TEMPLATE_VERSION))
         for scalar in (9, 10, 11)
     )
-    latest_case = dict(public_key=encode_public(mul(2)), signer=raw_signer(2), profile="v1.7.0",
-                       bytes=98362, outputs=latest_outputs)
+    latest_case = dict(public_key=encode_public(mul(2)), signer=raw_signer(2), profile="v1.9.0",
+                       bytes=96616, outputs=latest_outputs)
     for flag in (0x61, 0xe1):
         yield dict(latest_case, sighash=flag, reconstructed=True)
     yield dict(latest_case, sighash=0x61, compress_otda=False, reconstructed=False)

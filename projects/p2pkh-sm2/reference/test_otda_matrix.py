@@ -7,7 +7,7 @@ import os
 import unittest
 from unittest.mock import Mock, patch
 
-from assemble import SIGNED_WINDOW_TEMPLATE_VERSION, TEMPLATE_PROFILES
+from assemble import SIGNED_WINDOW_TEMPLATE_VERSION, TEMPLATE_PROFILES, TEMPLATE_VERSIONS
 from fourthgraph.benchmark.cases import allocations, native_coin, seed
 from fourthgraph.benchmark.validation import ACTIVATION_HEIGHT, SPEND_HEIGHT, UTXO_HEIGHT
 from fourthgraph.benchmark.validation import Node, chain_metadata, chain_verdict
@@ -17,7 +17,7 @@ from fourthgraph.bsv.transaction import Input, Output, Transaction
 from p2pkh_sm2 import authorization, locking_script_from_owner_hash, locking_script_from_public_key, sign_input
 from sm2 import USER_ID, encode_public, fixture_sign, mul
 
-VERSION = SIGNED_WINDOW_TEMPLATE_VERSION
+LATEST_VERSION = TEMPLATE_VERSIONS[-1]
 INPUT_VALUE = 10_000
 FEE = 100
 require_chain_gang_pin(Path(__file__).with_name('requirements.txt'))
@@ -64,13 +64,13 @@ def construction_cases():
     )
 
 
-def fixture(case):
+def fixture(case, template_version):
     """Build balanced, deterministic synthetic transactions using public test keys."""
     native = native_coin(f"sm2-matrix/{case.name}/native", INPUT_VALUE)
     scalars = range(17, 17 + len(case.flags))
     keys = tuple(encode_public(mul(scalar)) for scalar in scalars)
     locks = tuple(native.output.script if index in case.native_inputs else
-                  locking_script_from_public_key(key, version=VERSION) for index, key in enumerate(keys))
+                  locking_script_from_public_key(key, version=template_version) for index, key in enumerate(keys))
     funding = tuple(Output(INPUT_VALUE, lock) for lock in locks)
     if case.same_parent:
         parent = Transaction((Input(seed(case.name), 0),), (Output(1, b'\x51'), *funding))
@@ -87,7 +87,7 @@ def fixture(case):
     for index, value in enumerate(amounts):
         owner = seed(f"{case.name}/destination/{index}")[:20]
         lock = (native.output.script if index in case.native_outputs else
-                locking_script_from_owner_hash(owner, version=VERSION))
+                locking_script_from_owner_hash(owner, version=template_version))
         if index == case.similar_output:
             lock = bytes([lock[0] ^ 1]) + lock[1:]
         outputs.append(Output(value, lock))
@@ -96,6 +96,8 @@ def fixture(case):
 
 
 class LatestTemplateMatrixTests(unittest.TestCase):
+    template_version = LATEST_VERSION
+
     @classmethod
     def setUpClass(cls):
         cls.node = Node(os.environ['REGTEST_URL'], os.environ['REGTEST_COOKIE'])
@@ -133,7 +135,7 @@ class LatestTemplateMatrixTests(unittest.TestCase):
                    side_effect=AssertionError('unexpected mixed SM2 constructor')):
             for case in construction_cases():
                 with self.subTest(case=case.name):
-                    tx, parents, keys, scalars, native = fixture(case)
+                    tx, parents, keys, scalars, native = fixture(case, self.template_version)
                     compact, literal = self.sign_variants(case, tx, parents, keys, scalars, native)
                     spend_height = SPEND_HEIGHT if case.chronicle_active else ACTIVATION_HEIGHT - 1
                     utxo_height = UTXO_HEIGHT if case.chronicle_active else spend_height
@@ -170,7 +172,7 @@ class LatestTemplateMatrixTests(unittest.TestCase):
 
     def test_latest_otda_activation_and_output_commitments(self):
         case = Case('binding-and-activation', (0x61, 0xe1), 2, (0, 1))
-        tx, parents, keys, scalars, native = fixture(case)
+        tx, parents, keys, scalars, native = fixture(case, self.template_version)
         signer = Mock(side_effect=AssertionError('signer called before activation'))
         with self.assertRaisesRegex(ValueError, 'disabled'):
             sign_input(tx, 0, parents[0].serialize(), keys[0], signer, 0x61, chronicle_active=False)
@@ -194,13 +196,16 @@ class LatestTemplateMatrixTests(unittest.TestCase):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--report', type=Path, help='write the verified construction matrix as JSON')
+    parser.add_argument('--template', type=int, choices=(SIGNED_WINDOW_TEMPLATE_VERSION, LATEST_VERSION),
+                        default=LATEST_VERSION, help='locking template for the entire matrix')
     args = parser.parse_args()
     matrix = LatestTemplateMatrixTests('test_transaction_construction_matrix')
     binding = LatestTemplateMatrixTests('test_latest_otda_activation_and_output_commitments')
+    matrix.template_version = binding.template_version = args.template
     result = unittest.TextTestRunner(verbosity=2).run(unittest.TestSuite([matrix, binding]))
     if result.wasSuccessful() and args.report:
         evidence = {
-            'sm2_locking_template': TEMPLATE_PROFILES[VERSION],
+            'sm2_locking_template': TEMPLATE_PROFILES[args.template],
             'bsv_node_version': '1.2.3',
             'chain_gang_commit': chain_metadata()['commit'],
             'validation': 'Peerless regtest script replay with supplied prevouts',

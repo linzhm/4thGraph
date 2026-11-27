@@ -225,7 +225,11 @@ REQUIRE BSV
     54 sm2-add-signed-selected 105 sm2-add-signed-selected ;
 
 : sm2-step-split5 ( script -- script )
-    bsv-empty sm2-double-point 5 bsv-repeat-code bsv-cat-code sm2-add-split5 ;
+    window-doubling? if
+        sm2-double-window-kernel bsv-cat-code
+    else
+        bsv-empty sm2-double-point 5 bsv-repeat-code bsv-cat-code
+    then sm2-add-split5 ;
 
 : sm2-window-table ( script -- script )
     op-0 op-1 op-0 sm2-gx sm2-gy op-1 sm2-gx2 sm2-gy2 op-1 sm2-gx3 sm2-gy3 op-1 sm2-gx4 sm2-gy4

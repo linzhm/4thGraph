@@ -53,3 +53,27 @@ formula: sm2-add-kernel ( coordinate coordinate coordinate coordinate coordinate
         sm2-double-finite
     op-endif
 ;
+
+formula: sm2-double-with-prime ( field-prime coordinate coordinate coordinate -- field-prime coordinate coordinate coordinate )
+    {: p x y z :}
+    3 x z int- x z int+ int* int* let w
+    2 y z int* int* let s
+    y s int* let r
+    2 x r int* int* let b
+    w w int* 2 b int* int- let h
+
+    p
+    h s int* p int-rem
+    b h int- w int* 2 r r int* int* int- p int-rem
+    s s int* s int* p int-rem
+;
+
+: sm2-double-window-kernel ( script -- script )
+    ( SM2 has odd group order. Doubling a finite point keeps it finite. )
+    op-dup op-0notequal op-if
+        ( Copy p from the bottom and put it below X Y Z for all five calls. )
+        op-depth op-1sub op-pick op-swap op-2swap op-rot
+        bsv-empty sm2-double-with-prime 5 bsv-repeat-code bsv-cat-code
+        op-3 op-roll op-drop
+    op-endif
+;

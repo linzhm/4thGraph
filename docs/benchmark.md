@@ -32,6 +32,7 @@ The unified benchmark measured **260 complete transactions** across seven projec
 | P2PKH-SM2 v1.5.0 | 2 × 2 | 110,747 | 291 | 222,198 | 245,354 | 3,643 |
 | P2PKH-SM2 v1.6.0 | 2 × 2 | 100,663 | 291 | 202,030 | 220,814 | 3,642 |
 | P2PKH-SM2 v1.7.0 | 2 × 2 | 98,362 | 291 | 197,428 | 216,380 | 3,781 |
+| P2PKH-SM2 v1.9.0 candidate | 2 × 2 | 96,616 | 291 | 193,936 | 209,282 | 3,816 |
 | Lamport OTS, committed key | 2 × 2 | 7,746 | 16,549 | 48,708 | 79,616 | 16,707 |
 | WOTS+, cached steps with reconstruction | 2 × 2 | 33,956 | 2,310 | 72,650 | 79,090 | 2,701 |
 | Pure ML-DSA-44 | 2 × 2 | 926,412 | 2,588 | 1,858,122 | 5,563,725 | — |
@@ -42,7 +43,7 @@ The OTDA ALL measurements for R1 v0.2.0 and cached-steps WOTS+ use explicit reco
 
 With SM2 template `1`, automatic reconstruction reduced the 2×2 OTDA ALL transaction from 870,194 to 316,018 bytes. Template `2` reduces it to 287,524 bytes with smaller output locks and a shorter reconstruction program. Template `3` uses signed residues during point arithmetic to reach 275,608 bytes. Template `4` reaches 267,692 bytes by reducing SM3 word conversions and shortening the reconstruction program. Template `5` compiles shorter point addition and doubling kernels, bringing the transaction to 245,354 bytes. Template `6` uses split rotations in SM3 and brings the transaction to 220,814 bytes. Template `7` uses signed five-bit windows in scalar multiplication, bringing the transaction to 216,380 bytes. [SM2 measurements](../projects/p2pkh-sm2/versions/v1.7.0/measurements.json)
 
-SM2 v1.8.0 shares an OTDA constructor across outputs from templates `6` and `7`. The mixed 2×2 OTDA ALL transaction falls from 237,409 to 219,151 bytes. [Mixed SM2 measurements](../projects/p2pkh-sm2/versions/v1.8.0/measurements.json)
+SM2 v1.8.0 shares an OTDA constructor across outputs from templates `6` and `7`. The mixed 2×2 OTDA ALL transaction falls from 237,409 to 219,151 bytes. Template `8` groups five doublings and expands SM3 message words during compression, reducing a same-template 2×2 OTDA ALL payment to 209,282 bytes. [Template 8 measurements](../projects/p2pkh-sm2/versions/v1.9.0/measurements.json)
 
 ## Run
 

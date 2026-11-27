@@ -197,6 +197,7 @@ LIBRARIES = {
         ("signed-residues?", "Select signed intermediate point coordinates"),
         ("compiled-points?", "Select the supplied compiled point kernels"),
         ("signed-windows?", "Select signed five-bit scalar windows"),
+        ("window-doubling?", "Select the supplied five-doubling window kernel"),
     )),
     "std/wallet/lamport-ots": wallet_library("lamport-ots", ("lamport-full-key", "lamport-committed-key"), parameters=(
         ("key", "Lamport public-key commitment or full-key verifier fragment"),

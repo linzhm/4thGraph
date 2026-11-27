@@ -207,10 +207,27 @@ class Builder:
             self.raw('OP_BIN2NUM')
         self.stack[-1]=name
 
+    def expand_word(self, words, index, fragments, *, consume_oldest=False):
+        start = len(self.code)
+        oldest = words[index - 16]
+        x = xor(xor(self.last(oldest) if consume_oldest else oldest, words[index - 9]),
+                rot(words[index - 3], 15))
+        if self.optimized:
+            self.assign('expansion_mix', x, binary=self.packed)
+            x = 'expansion_mix'
+        expanded = (xor(xor(x, rot(x, 15)), rot(self.last(x), 23))
+                    if self.scheduled else perm(x, 15, 23))
+        self.assign(words[index], xor(xor(expanded, rot(words[index - 13], 7)), words[index - 6]),
+                    binary=self.packed)
+        if self.optimized and not self.scheduled:
+            self.drop('expansion_mix')
+        if fragments is not None:
+            fragments.setdefault('message_expansion', []).append(bytes(self.code[start:]))
+
 
 @cache
 def hash_script(length, state=IV, processed=0, *, optimized=False, compact=False, scheduled=False,
-                packed=False, split_rotations=False):
+                packed=False, split_rotations=False, stream_schedule=False):
     """Top item is exactly length bytes. Replace it with SM3, preserving lower stack.
 
     state is a known fixed-prefix midstate; processed must be whole blocks.
@@ -220,15 +237,19 @@ def hash_script(length, state=IV, processed=0, *, optimized=False, compact=False
     renames surviving state slots across rounds. packed keeps bitwise-heavy
     words in five-byte form between operations. split_rotations splits the
     left-shifted product into its high and low 32-bit parts before wrapping.
+    stream_schedule expands message words at their first round use and
+    retires the oldest word to keep a rolling schedule of 16 words.
     """
     return compile_hash(length, state, processed, optimized=optimized, compact=compact,
-                        scheduled=scheduled, packed=packed, split_rotations=split_rotations)
+                        scheduled=scheduled, packed=packed, split_rotations=split_rotations,
+                        stream_schedule=stream_schedule)
 
 
 def compile_hash(length, state=IV, processed=0, *, optimized=False, compact=False, scheduled=False,
-                 packed=False, split_rotations=False, fragments=None):
+                 packed=False, split_rotations=False, stream_schedule=False, fragments=None):
     """Emit SM3 Script and optionally collect named instruction ranges for construction."""
     if processed%64: raise ValueError('midstate must start on a block boundary')
+    split_rotations = split_rotations or stream_schedule
     packed = packed or split_rotations
     scheduled = scheduled or packed
     compact = compact or scheduled
@@ -250,21 +271,16 @@ def compile_hash(length, state=IV, processed=0, *, optimized=False, compact=Fals
         else:
             words=[f'w{j}' for j in range(68)]
             for j in range(16): b.word(words[j],offset+j*4)
-            for j in range(16,68):
-                start = len(b.code)
-                x=xor(xor(words[j-16],words[j-9]),rot(words[j-3],15))
-                if optimized:
-                    b.assign('expansion_mix',x,binary=packed)
-                    x='expansion_mix'
-                expanded = (xor(xor(x, rot(x, 15)), rot(b.last(x), 23))
-                            if scheduled else perm(x, 15, 23))
-                b.assign(words[j],xor(xor(expanded,rot(words[j-13],7)),words[j-6]),binary=packed)
-                if optimized and not scheduled: b.drop('expansion_mix')
-                if fragments is not None:
-                    fragments.setdefault('message_expansion', []).append(bytes(b.code[start:]))
+            if not stream_schedule:
+                for j in range(16, 68):
+                    b.expand_word(words, j, fragments)
         # Start the Boolean round inputs in packed form when the profile uses it.
         for i,c in enumerate('abcdefgh'): b.assign(c,'h'+str(i),binary=packed and c in 'abefg')
         for j in range(64):
+            # Round j first needs W[j+4]. That expansion is the last
+            # use of W[j-12], whose compression rounds have finished.
+            if stream_schedule and not static_padding and j >= 12:
+                b.expand_word(words, j + 4, fragments, consume_oldest=True)
             start = len(b.code)
             a_rot12=rot('a',12)
             if optimized:
@@ -295,7 +311,8 @@ def compile_hash(length, state=IV, processed=0, *, optimized=False, compact=Fals
             name = 'h' + str(i)
             b.assign(name, xor(b.last(name), b.last(c)), binary=packed)
         if not static_padding:
-            for name in words: b.drop(name)
+            for name in words[-16:] if stream_schedule else words:
+                b.drop(name)
         if not scheduled:
             for name in (*'abcdefgh','ss1','ss2','tt1','tt2'): b.drop(name)
     b.drop('data')
