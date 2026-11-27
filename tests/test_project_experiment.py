@@ -12,7 +12,7 @@ from fourthgraph.benchmark.validation import CONTEXT_PIN, chain_metadata
 from fourthgraph.bsv.evaluate import evaluate
 from fourthgraph.bsv.script import asm, encode_num, number
 from fourthgraph.compiler.formula_experiment import enumerate_orders
-from fourthgraph.compiler.point_add import AFFINE, GENERAL, PointAddBuilder
+from fourthgraph.compiler.point_add import AFFINE, GENERAL, GUARDED, PointAddBuilder
 from fourthgraph.benchmark.point_add_fixture import PointAddFixture
 from fourthgraph.compiler.script_builder import ScriptBuilder
 
@@ -314,11 +314,13 @@ class FormulaExperiments(unittest.TestCase):
         self._require_pinned_chain()
         self.assertEqual(capabilities()["call_site_fixtures"]["point-add"]["enumerate"], "bindings")
         report = run({"fixture": "point-add", "evaluation": "spend", "enumerate": "bindings", "workers": 2})
-        base, optimized = report["candidates"]
+        base, optimized, guarded = report["candidates"]
         self.assertEqual(base["source_sha256"], optimized["source_sha256"])
-        for row, selected in ((base, GENERAL), (optimized, AFFINE)):
+        for row, fixed_kernel, runtime_kernel in (
+            (base, GENERAL, GENERAL), (optimized, AFFINE, GENERAL), (guarded, GENERAL, GUARDED),
+        ):
             fixed, runtime = row["compile"]["lowering"]["call_sites"]
-            self.assertEqual((fixed["kernel"], runtime["kernel"]), (selected, GENERAL))
+            self.assertEqual((fixed["kernel"], runtime["kernel"]), (fixed_kernel, runtime_kernel))
             self.assertEqual(fixed["evidence"]["z"], 1)
             self.assertEqual(runtime["evidence"]["kind"], "runtime-projective")
             self.assertFalse(runtime["candidates"][1]["eligible"])
@@ -327,8 +329,18 @@ class FormulaExperiments(unittest.TestCase):
                 offset = site["offset"]
                 self.assertEqual(sha256(emitted[offset:offset+site["bytes"]]).hexdigest(), site["linked_sha256"])
             spend = row["test"]["spend"]
-            self.assertEqual((spend["status"], spend["accepted"], spend["rejected"]), ("passed", 9, 9))
+            self.assertEqual((spend["status"], spend["accepted"], spend["rejected"]), ("passed", 13, 13))
+        runtime = guarded["compile"]["lowering"]["call_sites"][1]
+        condition = runtime["guard"]
+        self.assertEqual((condition["kind"], condition["value"]), ("canonical-scriptnum-equality", 1))
+        self.assertEqual((condition["match"]["kernel"], condition["fallback"]["kernel"]), (AFFINE, GENERAL))
+        script = bytes.fromhex(guarded["artifact"]["hex"])
+        for branch in (condition["match"], condition["fallback"]):
+            offset = runtime["offset"] + branch["relative_offset"]
+            self.assertEqual(sha256(script[offset:offset+branch["kernel_bytes"]]).hexdigest(), branch["kernel_sha256"])
+        self.assertEqual({case["operands"][-1] for case in guarded["test"]["spend"]["cases"]}, {0, 1, 2, 11})
         self.assertEqual(optimized["delta"]["baseline_path_bytes"], -12)
+        self.assertGreater(guarded["delta"]["baseline_path_bytes"], 0)
         self.assertEqual(report["ranking"][0], optimized["id"])
         self.assertEqual(report["run_id"], run(report["request"])["run_id"])
 
@@ -338,11 +350,13 @@ class FormulaExperiments(unittest.TestCase):
             {"bindings": [{"site": 1, "kernel": AFFINE}]},
             {"bindings": [{"site": 0, "kernel": AFFINE}, {"site": 0, "kernel": GENERAL}]},
             {"bindings": [{"site": 2, "kernel": GENERAL}]},
+            {"bindings": [{"site": 0, "kernel": GUARDED}]},
         ]}
         report = run(request)
         self.assertEqual(report["ranking"], [])
         for row, message in zip(report["candidates"],
-                                ("wrong curve", "proven Z=1", "duplicate binding", "unknown call site"), strict=True):
+                                ("wrong curve", "proven Z=1", "duplicate binding", "unknown call site",
+                                 "already has a constant"), strict=True):
             self.assertEqual(row["compile"]["status"], "failed")
             self.assertIn(message, row["compile"]["diagnostic"])
             self.assertEqual(row["test"]["status"], "not_run")

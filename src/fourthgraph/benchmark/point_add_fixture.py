@@ -61,9 +61,11 @@ class PointAddFixture:
         g = self.generator
         inverse = (g[0], -g[1] % FIELD)
         double = affine_add(g, g)
-        for left, right in ((None, None), (None, g), (g, None), (inverse, None), (None, inverse),
-                            (g, g), (double, inverse), (inverse, g), (g, double)):
-            yield (FIELD, *homogeneous(left, 5), *homogeneous(right, 11)), affine_add(affine_add(left, g), right)
+        projective = ((None, None), (None, g), (g, None), (inverse, None), (None, inverse),
+                      (g, g), (double, inverse), (inverse, g), (g, double))
+        boundary = ((None, g, 1), (None, inverse, 1), (inverse, g, 1), (g, double, 2))
+        for left, right, z in (*((left, right, 11) for left, right in projective), *boundary):
+            yield (FIELD, *homogeneous(left, 5), *homogeneous(right, z)), affine_add(affine_add(left, g), right)
 
     def wrong(self, operands):
         left = affine_add(affine(operands[1:4]), self.generator)
