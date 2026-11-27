@@ -28,7 +28,7 @@
 
 三条规则组合后，Script 从五次乘法和两次取余变成两次乘法和一次取余，实测栈载荷峰值从 48 B 降到 44 B。有序搜索最多接纳 32 个候选。终端 pass 列表非空时会加入未优化基线，同一终端计划下的空规则候选可用于衡量规则本身的收益。`compile.lowering.ordered_rules` 记录命中次数，追踪保留结果范围和源码位置。调用方也可用 `ScriptBuilder(..., formula_passes=["stack"], experimental_rules=[...])` 显式应用这些规则。[夹具源码](../src/fourthgraph/benchmark/formulas/modular-dot.fth)
 
-`expand-cross-products` 在检查新中间量的范围后，将 `(a+b)(c+d)-ac-bd` 改写为 `ad+bc`。
+`expand-cross-products` 在检查新中间量的范围后，将 `(a+b)(c+d)-ac-bd` 改写为 `ad+bc`。Groth16 用 `ScriptBuilder` 对 Fp2 公式应用这条规则，再把结果内联到整个验证器的算术图。栈调度器可以安排相邻运算共享的值。[Fp2 公式](../src/fourthgraph/stdlib/bls12-381-fp2.fth) · [验证器项目](../projects/groth16-verifier/README.zh-CN.md)
 
 ## 批量换序与重复常量
 
