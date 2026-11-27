@@ -21,6 +21,17 @@ formula: secp-window-map-row-coordinates ( secp-window-field secp-window-coordin
     x3 beta int* p int-rem y3 sign int* z3
 ;
 
+( The stack table already owns Qy, 1, Z2 and Z3. Return only transformed
+  coordinates, with the signed ordinates below the three mapped abscissas. )
+formula: secp-window-map-row-components ( secp-window-field secp-window-coordinate
+    secp-window-coordinate secp-window-coordinate secp-window-coordinate secp-window-coordinate
+    secp-window-sign secp-window-coordinate --
+    secp-window-coordinate secp-window-coordinate secp-window-coordinate secp-window-coordinate secp-window-coordinate )
+    {: p x x2 y2 x3 y3 sign beta :}
+    y2 sign int* y3 sign int*
+    x beta int* p int-rem x2 beta int* p int-rem x3 beta int* p int-rem
+;
+
 ( Pack four secp256k1 GLV lanes and read the associated table depths. )
 : secp-window-uint128le ( script -- script )
     ( The magnitude is below 2^128. Drop the separate positive sign byte. )

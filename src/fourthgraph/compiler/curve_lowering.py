@@ -231,6 +231,7 @@ def _optimized_joint_words(vocabulary, optimization, *, scaled):
         "add-fixed-affine": numeric_fragment(library.emit(prefix + "add-affine-with-field", b"", 1), 6, 4,
                                               stack_local=True),
         "map-row-coordinates": numeric_fragment(library.emit("secp-window-map-row-coordinates", b""), 11, 9),
+        "map-glv-components": numeric_fragment(library.emit("secp-window-map-row-components", b""), 8, 5),
     }
     points = fixed_table(SECP256K1, split_bits=128)
     scale_public = restore = b""
@@ -253,7 +254,9 @@ def _optimized_joint_words(vocabulary, optimization, *, scaled):
 def _variable_stack_table(frontend, words, optimization):
     """Schedule the three nonzero rows around the shared P, 2P and 3P."""
     p, px, py, qy = inputs = (0, 1, 2, 3)
-    map_rows = compile_word(frontend.words["map-row-starts"], optimization).script
+    dataflow = optimization == DATAFLOW
+    map_word = "map-row-components" if dataflow else "map-row-starts"
+    map_rows = compile_word(frontend.words[map_word], optimization).script
     row = compile_word(frontend.words["stack-table-row"], optimization).script
 
     def schedule(preserve_field):
@@ -273,15 +276,20 @@ def _variable_stack_table(frontend, words, optimization):
         drop = b"" if preserve_field else asm("3 OP_ROLL OP_DROP")
         P2 = emit(words["double-point"].code + drop, (p, *P), 3, retained)
         P3 = emit(words["add-fixed-affine"].code + drop, (p, *P2, px, py), 3, retained)
-        starts = emit(map_rows, (p, px, *P2, *P3, qy, py), 9)
-        Q, Q2, Q3 = starts[:3], starts[3:6], starts[6:]
+        if dataflow:
+            x2, y2, z2 = P2
+            x3, y3, z3 = P3
+            q2y, q3y, qx, q2x, q3x = emit(map_rows, (p, px, x2, y2, x3, y3, qy, py), 5)
+            Q, Q2, Q3 = (qx, qy, one), (q2x, q2y, z2), (q3x, q3y, z3)
+        else:
+            starts = emit(map_rows, (p, px, *P2, *P3, qy, py), 9)
+            Q, Q2, Q3 = starts[:3], starts[3:6], starts[6:]
         rows = [emit(row, (p, px, py, *point), 12) for point in (Q, Q2, Q3)]
         returns = (p, *P, *P2, *P3, *(slot for values in rows for slot in values))
-        return emit_steps(inputs, steps, returns, compact=True, trim_suffix=optimization == DATAFLOW,
-                          group_operands=optimization == DATAFLOW)
+        return emit_steps(inputs, steps, returns, compact=True, trim_suffix=dataflow, group_operands=dataflow)
 
     plain = schedule(False)
-    return min((plain, schedule(True)), key=len) if optimization == DATAFLOW else plain
+    return min((plain, schedule(True)), key=len) if dataflow else plain
 
 
 def _stack_joint_script(frontend, words, points, optimization, *, preparation, scaled_output=False):

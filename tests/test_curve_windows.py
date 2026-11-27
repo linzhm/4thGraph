@@ -13,7 +13,7 @@ from fourthgraph.bsv.evaluate import ScriptError, evaluate
 from fourthgraph.bsv.script import asm, decode_num, encode_num, push
 from fourthgraph.bsv.transaction import Input, Output, Transaction
 from fourthgraph.compiler.curve_lowering import compile_fixed_generator, compile_joint_generator_point, joint_vocabulary, link_joint_word
-from fourthgraph.compiler.curve_windows import CURVES, GLV_REFERENCE, GLV_SCALED, JOINT_STRATEGIES, P256, SECP256K1, SM2, fixed_table, scalar_plans
+from fourthgraph.compiler.curve_windows import CURVES, GLV_REFERENCE, GLV_SCALED, GLV_STACK, JOINT_STRATEGIES, P256, SECP256K1, SM2, fixed_table, scalar_plans
 from fourthgraph.compiler.lowering import DATAFLOW, compile_word
 from fourthgraph.compiler.modular_scale import lower_affine_pair_scale, lower_modular_scale, lower_scaled_residuals
 from fourthgraph.compiler.script_builder import ScriptBuilder
@@ -193,6 +193,7 @@ class CurveWindowsTests(unittest.TestCase):
         for optimize in (False, True):
             library = ScriptBuilder("REQUIRE stdlib/secp256k1-window.fth", optimize=optimize)
             code = asm("17 OP_TOALTSTACK") + library.emit("secp-window-map-row-coordinates", b"")
+            components = asm("17 OP_TOALTSTACK") + library.emit("secp-window-map-row-components", b"")
             for sign in (-1, 1):
                 qy = y * sign
                 args = (field, x, *first, *second, qy, sign, beta)
@@ -200,6 +201,10 @@ class CurveWindowsTests(unittest.TestCase):
                 expected = (x * beta % field, qy, 1,
                             first[0] * beta % field, first[1] * sign, first[2],
                             -(-second[0] * beta % field), second[1] * sign, second[2])
+                self.assertEqual((result, alt), ([b"caller", *map(encode_num, expected)], [encode_num(17)]))
+                args = (field, x, *first[:2], *second[:2], sign, beta)
+                result, alt = evaluate(components, [b"caller", *map(encode_num, args)])
+                expected = tuple(expected[index] for index in (4, 7, 0, 3, 6))
                 self.assertEqual((result, alt), ([b"caller", *map(encode_num, expected)], [encode_num(17)]))
 
     @unittest.skipUnless(which("openssl"), "requires OpenSSL for independent point multiplication")
@@ -240,7 +245,10 @@ class CurveWindowsTests(unittest.TestCase):
         vectors = ((1, 0, 0), (1, 1, 0), (1, 0, curve.order), (curve.order - 1, 3, 3),
                    (5, (1 << 128) + 3, curve.order - 1), (17, curve.order - 1, (1 << 253) + 77),
                    (5, 123, curve.order // 2), (31, (1 << 127) - 1, curve.order // 7))
-        for mode, build in self.joint.items():
+        builds = dict(self.joint)
+        for mode in (GLV_STACK, GLV_SCALED):
+            builds[f"{mode}/{DATAFLOW}"] = compile_joint_generator_point(curve, mode, optimization=DATAFLOW)
+        for mode, build in builds.items():
             for point_n, s, k in vectors:
                 with self.subTest(mode=mode, point_n=point_n, s=s, k=k):
                     public = generator_multiple(curve, point_n)
