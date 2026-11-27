@@ -19,8 +19,9 @@ layout: tuned-model-input ( rx:script-int ry:script-int px:script-int py:script-
 layout: tuned-model-result ( s:script-int e:script-int p:script-int rx:script-int ry:script-int
                              px:script-int py:script-int -- rx ry px py p s e )
 
-: require-even ( script-int -- )
-    2 cell>int int-rem 0 cell>int int= verify
+( Both decoded ordinates are unsigned. Their remainders are 0 or 1. )
+: require-even-pair ( script-int script-int -- )
+    2 cell>int int-rem swap 2 cell>int int-rem int+ 0 cell>int int= verify
 ;
 
 : reduce-challenge-with-order ( script-int script-int script-int -- script-int script-int script-int )
@@ -36,7 +37,7 @@ layout: tuned-model-result ( s:script-int e:script-int p:script-int rx:script-in
     decode-witness field-prime coordinate-bounds
     require-coordinate-bound require-coordinate-bound require-coordinate-bound require-coordinate-bound
     public-curve check-curve
-    witness-parity require-even require-even
+    witness-parity require-even-pair
     challenge-input
 ;
 
