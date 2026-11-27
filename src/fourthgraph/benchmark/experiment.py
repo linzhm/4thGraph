@@ -1,4 +1,4 @@
-"""Compile, execute, compare and replay bounded Forth formula experiments."""
+"""Compile, execute, compare and replay bounded Forth experiments."""
 
 import argparse
 from concurrent.futures import ThreadPoolExecutor
@@ -14,10 +14,11 @@ from time import monotonic, perf_counter_ns
 from fourthgraph import PROJECT_VERSION
 from fourthgraph.bsv.artifacts import describe_script
 from fourthgraph.compiler.formula_experiment import MAX_DEPTH, RULES, enumerate_orders, validate_rules
+from fourthgraph.compiler.call_sites import normalize_bindings
 from fourthgraph.compiler.script_builder import ScriptBuilder
 from fourthgraph.compiler.script_formula import FORMULA_PASSES, validate_formula_passes
-from .formula_fixture import FIXTURES
-from .spend_fixture import SPEND_FIXTURES, check_spends, spend_profile
+from .fixtures import CALL_SITE_FIXTURES, FIXTURES, SPEND_FIXTURES
+from .spend_fixture import check_spends, spend_profile
 
 SCHEMA = "4thgraph.formula-experiment/1"
 LIMIT = 32
@@ -39,6 +40,8 @@ def pass_sets():
 def capabilities():
     return {"schema": SCHEMA, "compiler": PROJECT_VERSION, "target": TARGET,
             "fixtures": {name: list(fix.implementations) for name, fix in FIXTURES.items()},
+            "call_site_fixtures": {name: {"axis": "call-site", "enumerate": "bindings"}
+                                   for name in CALL_SITE_FIXTURES},
             "evaluations": {"formula": {"default": True}, "spend": {"fixtures": tuple(SPEND_FIXTURES)}},
             "plan_sets": pass_sets(), "requires": {"search": ["stack"]},
             "ordered_rules": RULES, "max_rule_depth": MAX_DEPTH, "max_candidates": LIMIT, "max_workers": WORKERS,
@@ -49,17 +52,25 @@ def freeze(fixture):
     # Include actual implementation files and resolved Forth imports, even for a dirty checkout.
     components = sorted(ROOT.rglob("*.py"))
     sources = {key: fixture.source(key) for key in fixture.implementations}
-    builder = ScriptBuilder(sources[fixture.name].decode(), formula_passes=())
+    source = sources[fixture.name]
+    builder = (fixture.builder(source) if fixture.name in CALL_SITE_FIXTURES
+               else ScriptBuilder(source.decode(), formula_passes=()))
+    vectors = list(fixture.vectors())
     frozen = {"schema": SCHEMA, "compiler_version": PROJECT_VERSION, "python": platform.python_version(),
               "fixture": fixture.name, "entry": fixture.entry, "target": TARGET, "engine": "fourthgraph.bsv.evaluate",
               "sources": {k: sha256(v).hexdigest() for k, v in sources.items()},
               "dependencies": [asdict(lib) for lib in builder.library_imports],
               "tool_sha256": digest({str(p.relative_to(ROOT)): sha256(p.read_bytes()).hexdigest() for p in components}),
-              "vectors_sha256": digest(list(fixture.vectors())), "vector_count": sum(1 for _ in fixture.vectors())}
+              "vectors_sha256": digest(vectors), "vector_count": len(vectors)}
     return frozen, sources
 
 
 def plan_spec(raw, fixture):
+    if fixture.name in CALL_SITE_FIXTURES:
+        if not isinstance(raw, dict) or set(raw) - {"bindings", "parent_id"}:
+            raise ValueError(f"{fixture.name} plans accept bindings with the source and internal passes fixed")
+        return {"implementation": fixture.name, "rules": [], "passes": [],
+                "bindings": normalize_bindings(raw.get("bindings", []))}
     if not isinstance(raw, dict) or set(raw) - {"passes", "rules", "implementation", "parent_id"}:
         raise ValueError("candidate must contain only passes, rules, implementation or parent_id")
     passes = raw.get("passes", [])
@@ -78,15 +89,22 @@ def compile_row(raw, fixture, sources, frozen, trace):
     try:
         spec = plan_spec(raw, fixture)
         row.update(id=digest([digest(frozen), spec, raw.get("parent_id")]), applied=spec)
-        builder = ScriptBuilder(sources[spec["implementation"]].decode(), formula_passes=spec["passes"],
-                                experimental_rules=spec["rules"], trace_formulas=trace)
+        source = sources[spec["implementation"]]
+        call_site = fixture.name in CALL_SITE_FIXTURES
+        if call_site:
+            builder = fixture.builder(source)
+            code, sites = builder.emit_plan(fixture.entry, spec["bindings"])
+            lowering = {"call_sites": sites}
+        else:
+            builder = ScriptBuilder(source.decode(), formula_passes=spec["passes"],
+                                    experimental_rules=spec["rules"], trace_formulas=trace)
+            code, lowering = builder.emit(fixture.entry, b""), builder.formulas[fixture.entry]
         if [asdict(lib) for lib in builder.library_imports] != frozen["dependencies"]:
             raise ValueError("dependencies differ from the frozen contract")
-        code, lowering = builder.emit(fixture.entry, b""), builder.formulas[fixture.entry]
         elapsed = perf_counter_ns() - started
         row.update(compile={"status": "passed", "lowering": lowering},
                    artifact=describe_script(code, listing=trace), source_sha256=frozen["sources"][spec["implementation"]])
-        if trace:
+        if trace and not call_site:
             row["trace"] = {"formula_snapshots": builder.formula_snapshots[fixture.entry],
                             "target_stack_plan": builder.formula_stack_plans[fixture.entry]}
     except (ValueError, TypeError, KeyError) as exc:
@@ -115,7 +133,9 @@ def matching_baseline(axis, fixture, eligible, parents, previous):
     if not eligible:
         return None
     plan = dict(eligible[0]["applied"])
-    if axis == "A":
+    if axis == "call-site":
+        plan["bindings"] = []
+    elif axis == "A":
         plan.update(passes=[], rules=[])
     else:
         plan["implementation"] = fixture.name
@@ -140,7 +160,9 @@ def run(request, previous=None, *, replaying=False):
                                                         "axis","max_candidates","time_ms","enumerate","depth","terminal",
                                                         "evaluation"}:
         raise ValueError("unknown experiment request fields")
-    fixture = FIXTURES[request["fixture"]]
+    name = request["fixture"]
+    call_site = name in CALL_SITE_FIXTURES
+    fixture = CALL_SITE_FIXTURES[name]() if call_site else FIXTURES[name]
     evaluation = request.get("evaluation", "formula")
     if evaluation not in ("formula", "spend"):
         raise ValueError("choose formula or spend evaluation")
@@ -157,17 +179,22 @@ def run(request, previous=None, *, replaying=False):
     if previous and (previous["snapshot"] != identity or previous["run_id"] != request["parent_run"]
                      or previous["run_id"] != report_id(previous)):
         raise ValueError("parent run or snapshot mismatch")
-    axis = request.get("axis", "A")
-    if axis not in ("A","B"):
-        raise ValueError("choose axis A or B")
+    axis = request.get("axis", "call-site" if call_site else "A")
+    if axis not in (("call-site",) if call_site else ("A", "B")):
+        raise ValueError("binding fixtures require the call-site axis and formula fixtures require axis A or B")
     plans = request.get("plans")
     mode = request.get("enumerate")
     if mode is not None:
-        if plans is not None or axis != "A":
-            raise ValueError("enumeration requires axis A without explicit plans")
-        if mode == "sets":
+        if plans is not None:
+            raise ValueError("enumeration requires a request without explicit plans")
+        if axis == "call-site" and mode == "bindings":
+            _, sites = fixture.builder(sources[fixture.name]).emit_plan(fixture.entry, [])
+            plans = [{}] + [{"bindings": [{"site": row["site"], "kernel": choice["kernel"]}]}
+                            for row in sites for choice in row["candidates"]
+                            if choice["eligible"] and choice["kernel"] != row["kernel"]]
+        elif axis == "A" and mode == "sets":
             plans = [{"passes": p} for p in pass_sets()]
-        elif mode == "orders":
+        elif axis == "A" and mode == "orders":
             ir = ScriptBuilder(sources[fixture.name].decode(), formula_passes=()).formula_ir[fixture.entry]
             plans = [{"rules": list(r), "passes": request.get("terminal", ["stack"])}
                      for r in enumerate_orders(ir, request.get("depth", MAX_DEPTH))]
@@ -230,7 +257,8 @@ def run(request, previous=None, *, replaying=False):
                         test = fixture.check(script)
                         if spend:
                             receipt = check_spends(fixture, script) if test["status"] == "passed" else {"status": "not_run"}
-                            test = {**test, "formula_status": test["status"], "spend": receipt,
+                            local = "caller_status" if call_site else "formula_status"
+                            test = {**test, local: test["status"], "spend": receipt,
                                     "status": "passed" if receipt["status"] == "passed" else "failed"}
                         cache[key] = test
                     row["test"] = cache[key]
@@ -254,6 +282,8 @@ def run(request, previous=None, *, replaying=False):
         row["metrics"] = {"script_bytes": size, "compile_ns": row["compile"]["elapsed_ns"],
                           "main_peak_items": row["test"]["main_peak_items"], "alt_peak_items": row["test"]["alt_peak_items"],
                           "transaction_bytes": {"status":"not_measured"}, "caller_bytes":{"status":"not_measured"}}
+        if "peak_payload_bytes" in row["test"]:
+            row["metrics"]["peak_payload_bytes"] = row["test"]["peak_payload_bytes"]
         if spend:
             row["metrics"].update(row["test"]["spend"]["max_bytes"])
             row["metrics"]["caller_bytes"] = row["metrics"]["lock_script_bytes"]
@@ -272,7 +302,7 @@ def run(request, previous=None, *, replaying=False):
     def rank(row):
         spec = row["applied"]
         size = path_bytes(row) if spend else row["artifact"]["bytes"]
-        return size, len(spec["passes"]) + len(spec["rules"]), row["id"]
+        return size, len(spec["passes"]) + len(spec["rules"]) + len(spec.get("bindings", ())), row["id"]
 
     order = sorted(eligible, key=rank)
     frontier_costs = [primary_cost, "main_peak_items", "alt_peak_items", "compile_ns"]
@@ -294,11 +324,12 @@ def run(request, previous=None, *, replaying=False):
         replay["parent_run"] = previous["run_id"]
     if spend:
         replay["evaluation"] = evaluation
+    tie_break = "fewer explicit bindings" if call_site else "fewer passes"
+    scope = "maximum fixture funding plus spend bytes" if spend else "fixture script bytes"
     report = {"schema": SCHEMA, "snapshot": identity, "frozen": frozen, "request": replay, "candidates": rows,
               "baseline": baseline, "baseline_bytes": base_size, "ranking": [r["id"] for r in order],
               **({"baseline_path_bytes": base_path} if spend else {}),
-              "ranking_scope": ("maximum fixture funding plus spend bytes, then fewer passes" if spend
-                                else "fixture script bytes, then fewer passes"),
+              "ranking_scope": f"{scope}, then {tie_break}",
               "winner_including_parents": winner, "observed_frontier": frontier, "frontier_costs": frontier_costs,
               "requested": request, "deduplicated_plans": duplicates, "stop": stop}
     return {**report, "run_id": report_id(report)}

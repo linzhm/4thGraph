@@ -1,4 +1,6 @@
 import json
+from hashlib import sha256
+import os
 import subprocess
 import sys
 from importlib.metadata import PackageNotFoundError
@@ -7,14 +9,128 @@ import unittest
 from unittest.mock import patch
 
 from fourthgraph.benchmark.experiment import capabilities, digest, next_request, run
-from fourthgraph.benchmark.validation import CONTEXT_PIN, chain_metadata
+from fourthgraph.benchmark.fixtures import FIXTURES, HashChainFixture
+from fourthgraph.benchmark.spend_fixture import CONTEXT, linked_spends
+from fourthgraph.benchmark.validation import CONTEXT_PIN, NODE_GENESIS_FLAGS, Node, chain_metadata
 from fourthgraph.bsv.evaluate import evaluate
 from fourthgraph.bsv.script import asm, encode_num, number
 from fourthgraph.compiler.formula_experiment import enumerate_orders
+from fourthgraph.compiler.hash_chain import PAIRS, SINGLE, HashChainBuilder
+from fourthgraph.compiler.point_add import AFFINE, GENERAL, GUARDED, PointAddBuilder
+from fourthgraph.benchmark.point_add_fixture import PointAddFixture
 from fourthgraph.compiler.script_builder import ScriptBuilder
 
 
+EQUALVERIFY_REJECTION = "Script failed an OP_EQUALVERIFY operation"
+
+
 class FormulaExperiments(unittest.TestCase):
+    def test_large_matrix_keeps_the_smallest_linked_plan(self):
+        self._require_pinned_chain()
+        report = run({"fixture": "matrix-mul", "axis": "B", "evaluation": "spend", "trace": True, "plans": [
+            {"passes": ["stack", "search"]},
+            {"implementation": "matrix-mul-strassen", "passes": ["stack", "search"]},
+        ]})
+        direct, strassen = report["candidates"]
+        self.assertEqual(report["ranking"][0], direct["id"])
+        self.assertNotEqual(direct["source_sha256"], strassen["source_sha256"])
+        for row, multiplications in ((direct, 8), (strassen, 7)):
+            self.assertEqual(row["test"]["status"], "passed")
+            self.assertEqual((row["test"]["spend"]["accepted"], row["test"]["spend"]["rejected"]), (64, 64))
+            self.assertEqual(sum(op["op"] == "OP_MUL" for op in row["artifact"]["instructions"]), multiplications)
+            self.assertGreater(row["metrics"]["peak_payload_bytes"], 256)
+        self.assertEqual([row["metrics"]["path_bytes"] for row in (direct, strassen)], [710, 753])
+        same_source = run({"fixture": "matrix-mul", "evaluation": "spend", "plans": [
+            {}, {"passes": ["stack"]}, {"passes": ["rewrite", "share", "stack", "search"]},
+            {"passes": ["stack", "search"]},
+        ]})
+        base, scheduled, full, simpler = same_source["candidates"]
+        self.assertEqual([row["metrics"]["path_bytes"] for row in (base, scheduled, full, simpler)],
+                         [788, 712, 710, 710])
+        self.assertEqual(same_source["ranking"][:2], [simpler["id"], full["id"]])
+
+    def test_hash_chain_binds_the_long_region_and_retains_the_checkpoint(self):
+        self._require_pinned_chain()
+        report = run({"fixture": "hash-chain", "evaluation": "spend", "enumerate": "bindings"})
+        base, paired = report["candidates"]
+        self.assertEqual(report["ranking"][0], paired["id"])
+        self.assertEqual(base["source_sha256"], paired["source_sha256"])
+        self.assertEqual([row["metrics"]["path_bytes"] for row in (base, paired)], [4363, 4331])
+        first, final = paired["compile"]["lowering"]["call_sites"]
+        self.assertEqual((first["kernel"], final["kernel"]), (SINGLE, PAIRS))
+        self.assertFalse(first["candidates"][1]["eligible"])
+        self.assertEqual((final["evidence"]["rounds"], final["kernel_bytes"], final["adapter_bytes"]), (65, 32, 1))
+        code = bytes.fromhex(paired["artifact"]["hex"])
+        start = final["offset"]
+        self.assertEqual(code[start:start + final["bytes"]], asm("OP_HASH256") * 32 + asm("OP_SHA256"))
+        for row in (base, paired):
+            self.assertEqual(row["test"]["status"], "passed")
+            self.assertEqual((row["test"]["spend"]["accepted"], row["test"]["spend"]["rejected"]), (29, 29))
+        self.assertEqual(run(report["request"])["run_id"], report["run_id"])
+
+    def test_hash_chain_rejects_bindings_without_compatible_rounds(self):
+        report = run({"fixture": "hash-chain", "plans": [
+            {"bindings": [{"site": 0, "kernel": PAIRS}]},
+            {"bindings": [{"site": 1, "kernel": AFFINE}]},
+        ]})
+        self.assertEqual(report["ranking"], [])
+        self.assertIn("at least two", report["candidates"][0]["compile"]["diagnostic"])
+        self.assertIn("wrong operation", report["candidates"][1]["compile"]["diagnostic"])
+        for rounds in (0, 2, 64, 256):
+            with self.subTest(rounds=rounds):
+                builder = HashChainBuilder(f"REQUIRE stdlib/hash-chain.fth\n"
+                                           f": fold ( script -- script ) {rounds} sha256-chain ;")
+                bindings = [{"site": 0, "kernel": PAIRS}] if rounds else []
+                code, _ = builder.emit_plan("fold", bindings)
+                self.assertEqual(code, asm("OP_HASH256") * (rounds // 2))
+        builder = HashChainBuilder("REQUIRE stdlib/hash-chain.fth\n: fold ( script -- script ) 257 sha256-chain ;")
+        with self.assertRaisesRegex(ValueError, "between 0 and 256"):
+            builder.emit_plan("fold", [])
+
+    def test_hash_chain_spans_follow_repeated_fragments(self):
+        source = """REQUIRE stdlib/hash-chain.fth
+        : pair ( script -- script ) 2 sha256-chain ;
+        : repeated ( script -- script ) op-nop bsv-empty pair 3 bsv-repeat-code bsv-cat-code ;
+        """
+        builder = HashChainBuilder(source)
+        code, sites = builder.emit_plan("repeated", [{"site": 0, "kernel": PAIRS}])
+        self.assertEqual(code, asm("OP_NOP OP_HASH256 OP_HASH256 OP_HASH256"))
+        self.assertEqual([(site["site"], site["offset"], site["bytes"]) for site in sites],
+                         [(0, 1, 1), (0, 2, 1), (0, 3, 1)])
+
+    def test_node_negative_control_requires_the_expected_script_error(self):
+        fixture = HashChainFixture()
+        builder = fixture.builder(fixture.source(fixture.name))
+        script, _ = builder.emit_plan(fixture.entry, [])
+        _, parent, _, rejected = next(linked_spends(fixture, script))
+        node = Node.__new__(Node)
+        reply = {"result": "error", "flags": NODE_GENESIS_FLAGS,
+                 "description": "Operation not valid with the current stack size"}
+        with patch.object(node, "call", return_value=[reply]):
+            with self.assertRaisesRegex(ValueError, "current stack size"):
+                node.verdicts(rejected, (parent,), **CONTEXT, expected_rejection=EQUALVERIFY_REJECTION)
+            reply["description"] = EQUALVERIFY_REJECTION
+            self.assertEqual(node.verdicts(rejected, (parent,), **CONTEXT,
+                                           expected_rejection=EQUALVERIFY_REJECTION), [False])
+
+    @unittest.skipUnless(os.environ.get("REGTEST_COOKIE"), "requires tools/verify_node.sh")
+    def test_large_arithmetic_and_hash_spends_match_regtest(self):
+        self._require_pinned_chain()
+        node = Node(os.environ["REGTEST_URL"], os.environ["REGTEST_COOKIE"])
+        matrix = FIXTURES["matrix-mul"]
+        matrix_plans = [{"implementation": implementation, "passes": ["stack", "search"]}
+                        for implementation in matrix.implementations]
+        for fixture, options in ((matrix, {"axis": "B", "plans": matrix_plans}),
+                                 (HashChainFixture(), {"enumerate": "bindings"})):
+            report = run({"fixture": fixture.name, "evaluation": "spend", **options})
+            for row in report["candidates"]:
+                self.assertEqual(row["test"]["status"], "passed")
+                script = bytes.fromhex(row["artifact"]["hex"])
+                for case, parent, spend, rejected in linked_spends(fixture, script):
+                    self.assertEqual(node.verdicts(spend, (parent,), **CONTEXT), [True], case)
+                    self.assertEqual(node.verdicts(rejected, (parent,), **CONTEXT,
+                                                   expected_rejection=EQUALVERIFY_REJECTION), [False], case)
+
     def test_cross_axis_baseline_uses_the_same_compiler_plan(self):
         first = run({"fixture": "bezier", "plans": [{}, {"passes": ["stack"]}]})
         _, stack = first["candidates"]
@@ -312,6 +428,89 @@ class FormulaExperiments(unittest.TestCase):
                          ("failed", "rejected", "error"))
         self.assertEqual(receipt["diagnostic"], "engine unavailable")
         self.assertEqual(report["ranking"], [])
+
+    def test_point_add_spans_follow_composed_and_repeated_fragments(self):
+        fixture = PointAddFixture()
+        source = fixture.source(fixture.name).decode() + (
+            "\n: outer ( script -- script ) op-nop bsv-empty add-two 2 bsv-repeat-code bsv-cat-code ;\n"
+        )
+        builder = PointAddBuilder(source)
+        fragment, original = builder.emit_plan(fixture.entry, [])
+        code, sites = builder.emit_plan("outer", [])
+        self.assertEqual(code, asm("OP_NOP") + fragment * 2)
+        self.assertEqual([site["offset"] for site in sites],
+                         [1 + copy * len(fragment) + site["offset"] for copy in range(2) for site in original])
+        for site in sites:
+            offset = site["offset"]
+            self.assertEqual(sha256(code[offset:offset + site["bytes"]]).hexdigest(), site["linked_sha256"])
+
+    def test_point_add_enumerates_only_eligible_call_site_bindings(self):
+        self._require_pinned_chain()
+        self.assertEqual(capabilities()["call_site_fixtures"]["point-add"]["enumerate"], "bindings")
+        report = run({"fixture": "point-add", "evaluation": "spend", "enumerate": "bindings", "workers": 2})
+        base, optimized, guarded = report["candidates"]
+        self.assertEqual(len({row["source_sha256"] for row in (base, optimized, guarded)}), 1)
+        for row, fixed_kernel, runtime_kernel in (
+            (base, GENERAL, GENERAL), (optimized, AFFINE, GENERAL), (guarded, GENERAL, GUARDED),
+        ):
+            fixed, runtime = row["compile"]["lowering"]["call_sites"]
+            self.assertEqual((fixed["kernel"], runtime["kernel"]), (fixed_kernel, runtime_kernel))
+            self.assertEqual(fixed["evidence"]["z"], 1)
+            self.assertEqual(runtime["evidence"]["kind"], "runtime-projective")
+            self.assertFalse(runtime["candidates"][1]["eligible"])
+            emitted = bytes.fromhex(row["artifact"]["hex"])
+            for site in (fixed, runtime):
+                offset = site["offset"]
+                self.assertEqual(site["bytes"], site["kernel_bytes"] + site["adapter_bytes"])
+                self.assertEqual(site["guard_bytes"], site["adapter_bytes"] if site["kernel"] == GUARDED else 0)
+                self.assertEqual(sha256(emitted[offset:offset+site["bytes"]]).hexdigest(), site["linked_sha256"])
+            spend = row["test"]["spend"]
+            self.assertEqual((spend["status"], spend["accepted"], spend["rejected"]), ("passed", 13, 13))
+        runtime = guarded["compile"]["lowering"]["call_sites"][1]
+        condition = runtime["guard"]
+        self.assertEqual((condition["kind"], condition["value"]), ("canonical-scriptnum-equality", 1))
+        self.assertEqual((condition["match"]["kernel"], condition["fallback"]["kernel"]), (AFFINE, GENERAL))
+        script = bytes.fromhex(guarded["artifact"]["hex"])
+        start = runtime["offset"]
+        self.assertEqual(script[start:start + condition["match"]["relative_offset"]],
+                         asm("OP_DUP OP_1 OP_EQUAL OP_IF OP_DROP"))
+        for branch, direct_site in zip((condition["match"], condition["fallback"]),
+                                       optimized["compile"]["lowering"]["call_sites"], strict=True):
+            self.assertEqual(branch["kernel_sha256"], direct_site["kernel_sha256"])
+            self.assertEqual(branch["library_sha256"], direct_site["library_sha256"])
+        for branch in (condition["match"], condition["fallback"]):
+            offset = runtime["offset"] + branch["relative_offset"]
+            self.assertEqual(sha256(script[offset:offset+branch["kernel_bytes"]]).hexdigest(), branch["kernel_sha256"])
+        self.assertEqual({case["operands"][-1] for case in guarded["test"]["spend"]["cases"]}, {0, 1, 2, 11})
+        self.assertEqual([row["metrics"]["path_bytes"] for row in (base, optimized, guarded)], [789, 777, 882])
+        self.assertEqual(optimized["delta"]["baseline_path_bytes"], -12)
+        self.assertGreater(guarded["delta"]["baseline_path_bytes"], 0)
+        self.assertEqual(report["ranking"][0], optimized["id"])
+        self.assertEqual(report["run_id"], run(report["request"])["run_id"])
+
+    def test_point_add_rejects_wrong_curve_missing_proof_and_duplicate_bindings(self):
+        request = {"fixture": "point-add", "plans": [
+            {"bindings": [{"site": 0, "kernel": "p256-add"}]},
+            {"bindings": [{"site": 1, "kernel": AFFINE}]},
+            {"bindings": [{"site": 0, "kernel": AFFINE}, {"site": 0, "kernel": GENERAL}]},
+            {"bindings": [{"site": 2, "kernel": GENERAL}]},
+            {"bindings": [{"site": 0, "kernel": GUARDED}]},
+        ]}
+        report = run(request)
+        self.assertEqual(report["ranking"], [])
+        for row, message in zip(report["candidates"],
+                                ("wrong curve", "proven Z=1", "duplicate binding", "unknown call site",
+                                 "already has a constant"), strict=True):
+            self.assertEqual(row["compile"]["status"], "failed")
+            self.assertIn(message, row["compile"]["diagnostic"])
+            self.assertEqual(row["test"]["status"], "not_run")
+        fixture = PointAddFixture()
+        source = fixture.source("point-add").decode()
+        x, y = fixture.generator
+        encoded = f"{x:064x}{y:064x}"
+        invalid = PointAddBuilder(source.replace(encoded, "00" * 64))
+        with self.assertRaisesRegex(ValueError, "outside the secp256k1 curve"):
+            invalid.emit_plan(fixture.entry, [{"site": 0, "kernel": AFFINE}])
 
     def test_invalid_candidates_and_limits(self):
         report=run({"fixture":"square","plans":[{"passes":["search"]},{},{"passes":[]}]})

@@ -4,7 +4,7 @@ from dataclasses import asdict
 from types import MappingProxyType
 
 from fourthgraph.compiler.source import (
-    PROJECT_NAME, PROJECT_VERSION, WORKFLOW_MODES, CompileError, ParentOutput, Template,
+    FUSED_PREFIX, PROJECT_NAME, PROJECT_VERSION, WORKFLOW_CHOICES, WORKFLOW_MODES, CompileError, ParentOutput, Template,
     evaluate, plan_workflow, workflow_blockers, workflow_layout,
 )
 from fourthgraph.workflow.forkid_lowering import COPY_LINKED_SIGHASH, LINKED_OUTPOINT_OFFSET, DualLinkedContext, LinkedContext
@@ -88,6 +88,8 @@ def open_ancestry(depth, outpoint_offset):
 
 
 def sighash_blocker(workflow, mode, family):
+    if family != "bip143" and mode == FUSED_PREFIX:
+        return {"code": "unsupported_sighash_context", "message": "fused-prefix requires BIP143"}
     if family != "bip143" and (mode == "atomic" or workflow.recovery):
         message = ("Chronicle OTDA requires a single-input workflow" if mode == "atomic"
                    else "Chronicle OTDA with a recovery branch is unavailable")
@@ -172,42 +174,42 @@ class WorkflowContracts:
 
     def compile_locks(self):
         workflow = self.plan.program
-        first = workflow.stages[0]
         templates = self.plan.templates
-        advance = number(self.current) + self.words[first.name].script
+        names = templates[0].executes if templates[0].outputs == ("state",) else templates[0].executes[:-1]
+        advance = number(self.current) + b"".join(self.words[name].script for name in names)
         decide = terminal_check(self.words[workflow.stages[-1].name].script, self.terminals)
         decide += self.output_check(templates[-1])
         if self.plan.mode == "atomic":
             self.deployment_outputs = self.atomic_outputs(advance, decide)
             self.root = self.deployment_outputs[0]
             return
-        if self.plan.mode == "serial":
+        if templates[0].outputs == ("state",):
             self.state_codes = {}
             body = decide
-            for depth in range(len(workflow.stages) - 1, 0, -1):
-                stage = workflow.stages[depth]
+            for depth in range(len(templates) - 1, 0, -1):
                 template = templates[depth]
+                owner, = template.authorizers
                 offset = self.outpoint_offset(template)
                 if depth == 1:
-                    opening = (open_parent(offset) + asm("OP_2SWAP") + self.authorize(self.keys[stage.owner])
+                    opening = (open_parent(offset) + asm("OP_2SWAP") + self.authorize(self.keys[owner])
                                + asm("OP_DROP"))
                 else:
                     opening = (open_ancestry(depth, offset) + asm("OP_ROT")
-                               + self.authorize(self.keys[stage.owner]))
+                               + self.authorize(self.keys[owner]))
                 state_code = (asm("OP_DEPTH") + number(depth + 4) + asm("OP_NUMEQUALVERIFY OP_ROT")
                               + self.context_entry(template) + opening + asm("OP_BIN2NUM")
                               + validate_u32() + asm("OP_SWAP") + body + self.finish())
-                producer = workflow.stages[depth - 1]
-                amount = self.state_amount(depth)
+                producer = templates[depth - 1]
+                amount = self.state_amount(sum(len(item.executes) for item in templates[:depth]))
                 code = self.with_recovery(state_code, amount, prefixed=2)
                 self.state_codes[producer.name] = amount, code
                 if depth > 1:
-                    body = (asm("OP_SWAP") + self.words[producer.name].script
+                    body = (asm("OP_SWAP") + b"".join(self.words[name].script for name in producer.executes)
                             + number(RESULT_WIDTH) + asm("OP_NUM2BIN OP_SWAP")
                             + self.commit_state(amount, code, templates[depth - 1]))
-            self.state_code = self.state_codes[first.name][1]
+            self.state_code = self.state_codes[templates[0].name][1]
             body = (number(RESULT_WIDTH) + asm("OP_NUM2BIN") + root_txid(self.outpoint_offset(templates[0]))
-                    + self.commit_state(*self.state_codes[first.name], templates[0]))
+                    + self.commit_state(*self.state_codes[templates[0].name], templates[0]))
         else:
             body = root_txid(self.outpoint_offset(templates[0])) + decide
         auth = templates[0].authorizers
@@ -271,7 +273,7 @@ class WorkflowContracts:
                      for value, lock in ((STATE_VALUE, first_lock), (ROOT_VALUE - STATE_VALUE, second_lock)))
 
     def state_output(self, root, value, producer=None):
-        producer = self.plan.program.stages[0].name if producer is None else producer
+        producer = self.plan.templates[0].name if producer is None else producer
         amount, code = self.state_codes[producer]
         return Output(amount, state_fields(root, value) + code)
 
@@ -294,17 +296,19 @@ class WorkflowContracts:
         value, ancestor, ancestry = self.current, root, []
         if reference.step == "deploy":
             return UTXO(root, reference.vout), root_id, value, ()
-        for stage in self.plan.program.stages[:-1]:
-            parent = completed.get(stage.name)
+        words = {stage.name: stage.word for stage in self.plan.program.stages}
+        for template in self.plan.templates[:-1]:
+            parent = completed.get(template.name)
             if parent is None or len(parent.inputs) != 1 or len(parent.outputs) != 1:
-                raise ValueError(f"missing or malformed stage {stage.name}")
+                raise ValueError(f"missing or malformed stage {template.name}")
             if parent.inputs[0].outpoint() != Input(ancestor.txid_wire(), 0).outpoint() or parent.version not in self.versions:
                 raise ValueError("intermediate output is from a different workflow root or parent")
-            value, = evaluate(stage.word, value)
-            if parent.outputs[0] != self.state_output(root_id, value, stage.name):
+            for name in template.executes:
+                value, = evaluate(words[name], value)
+            if parent.outputs[0] != self.state_output(root_id, value, template.name):
                 raise ValueError("intermediate output does not carry the expected state")
             ancestry.append(parent)
-            if stage.name == reference.step:
+            if template.name == reference.step:
                 return UTXO(parent, reference.vout), root_id, value, tuple(ancestry)
             ancestor = parent
         raise ValueError(f"unknown state output {reference.text()}")
@@ -326,15 +330,15 @@ class WorkflowContracts:
         previous = (utxo,)
         payload = (tuple(tx.serialize() for tx in ancestry),)
         roles = None
-        stages = self.plan.program.stages
+        words = {stage.name: stage.word for stage in self.plan.program.stages}
         if template.outputs == ("state",):
-            stage = stages[len(ancestry)]
-            value, = evaluate(stage.word, value)
-            outputs = (self.state_output(root_id, value, stage.name),)
+            for step in template.executes:
+                value, = evaluate(words[step], value)
+            outputs = (self.state_output(root_id, value, template.name),)
         else:
-            if self.plan.mode != "serial":
-                value, = evaluate(stages[0].word, value)
-            route, = evaluate(stages[-1].word, value)
+            for step in template.executes[:-1]:
+                value, = evaluate(words[step], value)
+            route, = evaluate(words[template.executes[-1]], value)
             outputs = (self.terminals[route], self.receipt(root_id, value))
             if self.plan.mode == "atomic":
                 previous = (utxo, UTXO(utxo.parent, template.inputs[1].vout))
@@ -441,8 +445,9 @@ class WorkflowContracts:
             spec["sighash"] = f"{self.sighash:02x}"
         if workflow.libraries:
             spec["libraries"] = tuple(map(asdict, workflow.libraries))
-        if self.plan.mode == "serial":
-            spec["state_output"] = {"satoshis": self.state_amount(1), "script_suffix_hex": self.state_code.hex(),
+        if self.plan.templates[0].outputs == ("state",):
+            first_amount, first_code = self.state_codes[self.plan.templates[0].name]
+            spec["state_output"] = {"satoshis": first_amount, "script_suffix_hex": first_code.hex(),
                                     "fields": spec["receipt"]["fields"]}
             if len(self.state_codes) > 1:
                 spec["state_outputs"] = {name: {"satoshis": amount, "script_suffix_hex": code.hex(),
@@ -461,8 +466,8 @@ def compile_workflow(workflow, keys, current, *, source_bytes, mode="auto", targ
                      max_tx_bytes=None, sighash_family="bip143"):
     target = normalize_target(target)
     sighash_family = normalize_sighash_family(sighash_family)
-    if mode not in ("auto", *WORKFLOW_MODES):
-        raise CompileError("workflow mode must be fused, serial or atomic")
+    if mode not in ("auto", *WORKFLOW_CHOICES):
+        raise CompileError("unknown workflow layout")
     if max_tx_bytes is not None and (not search or type(max_tx_bytes) is not int or max_tx_bytes <= 0):
         raise CompileError("a positive transaction byte budget requires search")
     families = candidate_sighash_families(target, sighash_family)
@@ -472,7 +477,8 @@ def compile_workflow(workflow, keys, current, *, source_bytes, mode="auto", targ
     available = roles if available_authorizers is None else set(available_authorizers)
     order = OBJECTIVES[objective]
     candidates, artifacts = {}, {}
-    for layout in WORKFLOW_MODES:
+    layouts = WORKFLOW_CHOICES if mode == FUSED_PREFIX or search and len(workflow.stages) == 3 else WORKFLOW_MODES
+    for layout in layouts:
         blockers = workflow_blockers(workflow, layout, available)
         family_blockers = {family: sighash_blocker(workflow, layout, family) for family in families}
         if all(family_blockers.values()):

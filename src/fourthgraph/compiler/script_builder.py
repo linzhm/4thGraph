@@ -42,7 +42,7 @@ SCRIPT_WORDS = {
 
 
 class ScriptBuilder(SourceCompiler):
-    def __init__(self, source, *, source_path=None, vocabulary=None, optimize=False, formula_passes=None,
+    def __init__(self, source, *, source_path=None, vocabulary=None, bindings=None, optimize=False, formula_passes=None,
                  experimental_rules=(), trace_formulas=False):
         if optimize and formula_passes is not None:
             raise ValueError("choose automatic formula optimization or explicit passes")
@@ -56,7 +56,7 @@ class ScriptBuilder(SourceCompiler):
         self.formulas = {}
         self.formula_ir = {}
         super().__init__(source, vocabulary=SCRIPT_WORDS | (vocabulary or {}), backend=WALLET_BACKEND,
-                         source_path=source_path)
+                         source_path=source_path, bindings=bindings)
 
     @classmethod
     def from_file(cls, path, **options):
@@ -89,9 +89,9 @@ class ScriptBuilder(SourceCompiler):
         self.formulas[name.name] = report
         self.formula_ir[name.name] = formula
 
-    def emit(self, entry, *args):
+    def emit(self, entry, *args, build_call=None):
         word = self.words.get(entry.casefold())
         if not isinstance(word, Word) or word.gives != ("script",):
             raise CompileError(f"{entry} must produce one Script")
-        result, = evaluate(word, *args)
+        result, = evaluate(word, *args, build_call=build_call)
         return result

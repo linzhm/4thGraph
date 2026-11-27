@@ -9,6 +9,7 @@ Load source with Forth 2012 `REQUIRE filename`. The interface catalog and build 
 | Purpose | `REQUIRE` paths |
 | --- | --- |
 | Language basics and Script fragments | `BSV`, `stdlib/u32.fth`, `stdlib/script-fragments.fth` |
+| Repeated hashing | `stdlib/hash-chain.fth` |
 | Native payments | `stdlib/p2pk.fth`, `stdlib/p2pkh.fth`, `stdlib/native-p2pk.fth`, `stdlib/native-p2pkh.fth` |
 | Curve arithmetic and signature verification | `stdlib/p256.fth`, `stdlib/secp256k1.fth`, `stdlib/bip340.fth` |
 | Wallet lock construction | `stdlib/wallet/` contains `r1.fth`, `p2pkh-r1-deferred.fth`, `p2pkh-sm2.fth`, `lamport-ots.fth`, `wots-plus.fth`, and `ml-dsa.fth` |
@@ -38,6 +39,7 @@ The shared PELS entry supports a single-input `lock:` with a complete output vec
 | `std/native-p2pk`, `std/native-p2pkh` | Compile native payment locks with a bound recipient | [Payment build commands](../../projects/p2pk-p2pkh-baseline/forth/README.md) |
 | `std/p256` | `p256-add` and `p256-double` use projective coordinates and preserve `p b3` at the bottom of the stack | [P-256 kernels](../../src/fourthgraph/stdlib/p256.fth) |
 | `std/script-fragments` | Build fragments for stack movement, 32-byte reversal, and unsigned big-endian decoding | [Source](../../src/fourthgraph/stdlib/script-fragments.fth) |
+| `std/hash-chain` | `sha256-chain-single` and `sha256-chain-pairs` build a fixed count of SHA-256 rounds or pairs. Each runtime region consumes one byte string. | [Hash kernels](../../src/fourthgraph/stdlib/hash-chain.fth) |
 | `std/secp256k1` | Homogeneous projective addition, mixed affine addition, doubling, and their scaled-coordinate kernels. `secp256k1-lambda-split` splits a scalar. `secp256k1-lambda-split-with-order` takes `k n` when the group order is already on the stack. | [Curve kernels](../../src/fourthgraph/stdlib/secp256k1.fth) |
 | `std/bip340` | `bip340-verify ( script -- script )` builds a BIP340 verification fragment | [Payment example](../../projects/p2pkh-schnorr/README.md) |
 | `std/groth16-bls12-381` | `groth16-bls12-381-verify ( -- groth16-verified )` compiles through the BLS12-381 verifier backend | [Forth source](../../src/fourthgraph/stdlib/groth16-bls12-381.fth) |
