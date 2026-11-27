@@ -70,6 +70,25 @@ OTDA SINGLE。正例使用测试签名和实际夹具父输出。改动花费的
 交易绑定失败。用上文的隔离 regtest 启动器运行同一组测试时，BSV Node 也核对这些判定。
 这个入口供编译实验使用，钱包继续使用版本清单。
 
+### 两两交换优化方法
+
+`method-matrix` 固定同一份 `r1-baseline-lock`，分别从通用分表和已有仿射
+证明的分表起步。每张矩阵比较五种方法的 25 个有序对，行先列后，对角线检查
+重复应用。报告记录每一步的前提、应用后的状态和不适用原因。相同的锁和
+OTDA 重建程序共享验收回执，各个计划仍可独立追踪。
+
+```sh
+project=projects/p2pkh-r1
+export PYTHONPATH="src:.:$project/reference:$project/forth"
+python "$project/forth/msm_experiment.py" method-matrix --output /tmp/r1-methods.json
+python "$project/forth/msm_experiment.py" method-matrix --replay /tmp/r1-methods.json
+```
+
+这个探索入口用固定版 chain-gang 验收两进两出夹具。BIP143 ALL、OTDA ALL
+和配对 OTDA SINGLE 各自按资金交易加花费的实际字节排名。
+[矩阵结果（中）](../../../docs/optimization-paths.zh-CN.md#r1-有序方法探索) ·
+[Matrix results (EN)](../../../docs/optimization-paths.md#r1-ordered-method-exploration)
+
 `msm.fth` 用显式的 P‑256 双标量乘法表达窗口计算。编译器扫描固定生成元、标量范围和曲线点校验，比较各构造的实际锁与付款字节数，并逐字节核对 OTDA 重建。
 
 `compare --candidate v0.6.0` 直接读取并核对冻结的锁和 OTDA 重建程序，占用一个本地候选名额和一个付款复放名额。传入构造名时从 Forth 编译。v0.6.0 和 v0.7.0 使用同一份两进两出夹具。 [v0.6.0 清单](../versions/v0.6.0/manifest.json) · [v0.7.0 清单](../versions/v0.7.0/manifest.json)

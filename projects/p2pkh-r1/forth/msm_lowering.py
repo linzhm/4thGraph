@@ -25,6 +25,7 @@ class Strategy:
     q_width: int | None = None
     affine_g: bool = False
     affine_guard_ifdup: bool = False
+    compact_g: bool = False
 
     @property
     def name(self):
@@ -32,15 +33,21 @@ class Strategy:
         widths = str(self.width) if self.q_width is None else f"{self.width}x{self.q_width}"
         affine = "-affine-g" if self.affine_g else ""
         guard = "-ifdup" if self.affine_guard_ifdup else ""
-        return f"{mode}-{widths}{affine}{guard}"
+        compact = "-compact" if self.compact_g else ""
+        return f"{mode}-{widths}{affine}{guard}{compact}"
+
+    @property
+    def g_slots(self):
+        return (2 if self.compact_g else 3) << self.width
 
     @classmethod
     def parse(cls, text):
-        match = re.fullmatch(r"(split|joint)-([1-9][0-9]?)(?:x([1-9][0-9]?))?(?:(-affine-g)(-ifdup)?)?", text)
+        match = re.fullmatch(r"(split|joint)-([1-9][0-9]?)(?:x([1-9][0-9]?))?(?:(-affine-g)(-ifdup)?)?(-compact)?", text)
         if not match:
-            raise ValueError("expected split-N, split-NxM or joint-N, optionally followed by -affine-g or -affine-g-ifdup")
-        layout, width, q_width, affine_g, ifdup = match.groups()
-        return cls(int(width), layout == "joint", int(q_width) if q_width else None, bool(affine_g), bool(ifdup))
+            raise ValueError("expected split-N, split-NxM or joint-N, optionally with -affine-g[-ifdup][-compact]")
+        layout, width, q_width, affine_g, ifdup, compact = match.groups()
+        return cls(int(width), layout == "joint", int(q_width) if q_width else None,
+                   bool(affine_g), bool(ifdup), bool(compact))
 
 
 @dataclass(frozen=True)
@@ -52,6 +59,8 @@ class WindowPlan:
         strategy = self.strategy
         if strategy.joint and strategy.q_width is not None:
             raise ValueError("joint lookup needs the same digit width for G and Q")
+        if strategy.compact_g and not strategy.affine_g:
+            raise ValueError("compact G requires affine lookup with a zero-digit guard")
         if strategy.joint and strategy.affine_g:
             raise ValueError("affine-g needs a separate G table with Z=1 at every nonzero index; joint entries also contain multiples of Q")
         widths = (strategy.width, strategy.q_width or strategy.width)
@@ -63,6 +72,12 @@ class WindowPlan:
         mode = self.strategy
         return (1 << (2 * mode.width) if mode.joint
                 else (1 << mode.width) + (1 << (mode.q_width or mode.width)))
+
+    @property
+    def table_slots(self):
+        strategy = self.strategy
+        return (3 * self.table_points if strategy.joint
+                else strategy.g_slots + 3 * (1 << (strategy.q_width or strategy.width)))
 
     def counts(self):
         mode = self.strategy
@@ -88,7 +103,7 @@ class WindowPlan:
 class Program:
     strategy: Strategy
     pieces: tuple[tuple[bytes, int], ...]
-    table_points: int
+    table_slots: int
     kernels: tuple[bytes, ...]
     sections: dict[str, int]
 
@@ -126,7 +141,9 @@ def table_setup(strategy, add, double):
     code = bytearray()
 
     def fixed(index):
-        code.extend(constant_point(index))
+        point = constant_point(index)
+        # Both encodings end with a one-byte Z. G[0] retains X=0, Y=1.
+        code.extend(point[:-1] if strategy.compact_g else point)
         points.append((index, 0))
 
     def copy(point, staged=0):
@@ -161,7 +178,7 @@ def table_setup(strategy, add, double):
         code.extend(INFINITY)
         points.append(("q-zero", 0))
         q_row()
-    return bytes(code), len(points)
+    return bytes(code)
 
 
 def split_digits(width, *, joint, stride=None):
@@ -175,16 +192,22 @@ def split_digits(width, *, joint, stride=None):
     return code + radix + asm("OP_DIV OP_SWAP") + radix + asm("OP_DIV OP_SWAP")
 
 
-def lookup(zero_depth, *, affine=False):
+def lookup(zero_depth, *, affine=False, stride=3):
     # Retain a depth one larger for the first two picks, which keep an extra copy.
-    head = asm("3 OP_MUL") + number(zero_depth + 1) + asm("OP_SWAP OP_SUB OP_DUP OP_PICK OP_SWAP")
+    head = number(stride) + asm("OP_MUL") + number(zero_depth + 1)
+    head += asm("OP_SWAP OP_SUB OP_DUP OP_PICK OP_SWAP")
     return head + (asm("OP_1SUB OP_PICK") if affine else asm("OP_DUP OP_PICK OP_SWAP OP_1SUB OP_PICK"))
 
 
-def selected(zero_depth, add, *, accumulate, affine=None, affine_guard_ifdup=False):
+def selected(zero_depth, add, *, accumulate, affine=None, affine_guard_ifdup=False, compact=False):
     take_digit = asm("OP_FROMALTSTACK")
+    if compact and not accumulate:
+        # Seed the accumulator with Z=0 for G[0] and Z=1 for every other entry.
+        # The staged Z shifts the table depth by one until the final rotation.
+        return (take_digit + asm("OP_DUP OP_0NOTEQUAL OP_SWAP")
+                + lookup(zero_depth + 1, affine=True, stride=2) + asm("OP_ROT"))
     if accumulate and affine is not None:
-        body = lookup(zero_depth, affine=True) + affine
+        body = lookup(zero_depth, affine=True, stride=2 if compact else 3) + affine
         # G[0] is infinity. OP_IF consumes zero or one of the two copies of a nonzero digit.
         if affine_guard_ifdup:
             return take_digit + asm("OP_IFDUP OP_IF") + body + asm("OP_ENDIF")
@@ -194,9 +217,11 @@ def selected(zero_depth, add, *, accumulate, affine=None, affine_guard_ifdup=Fal
 
 def window_program(plan, add, double, affine=None):
     strategy, bits = plan.strategy, plan.bits
+    if strategy.compact_g and affine is None:
+        raise ValueError("compact G needs the affine addition kernel")
     if strategy.q_width is not None:
         return mixed_program(plan, add, double, affine)
-    setup, points = table_setup(strategy, add, double)
+    setup = table_setup(strategy, add, double)
     radix = 1 << strategy.width
     full_windows, extra = divmod(bits, strategy.width)
     to_main = asm("OP_FROMALTSTACK OP_FROMALTSTACK OP_SWAP")
@@ -205,11 +230,11 @@ def window_program(plan, add, double, affine=None):
         pieces.append((split_digits(extra, joint=strategy.joint, stride=strategy.width), 1))
 
     if strategy.joint:
-        first = selected(3 * points - 1, add, accumulate=False)
-        add_window = selected(3 * points + 2, add, accumulate=True)
+        first = selected(plan.table_slots - 1, add, accumulate=False)
+        add_window = selected(plan.table_slots + 2, add, accumulate=True)
     else:
-        g_add = selected(6 * radix + 2, add, accumulate=True, affine=affine,
-                         affine_guard_ifdup=strategy.affine_guard_ifdup)
+        g_add = selected(plan.table_slots + 2, add, accumulate=True, affine=affine,
+                         affine_guard_ifdup=strategy.affine_guard_ifdup, compact=strategy.compact_g)
         first = selected(3 * radix - 1, add, accumulate=False) + g_add
         add_window = selected(3 * radix + 2, add, accumulate=True) + g_add
     digit_bytes = sum(len(code) * count for code, count in pieces[1:])
@@ -219,8 +244,16 @@ def window_program(plan, add, double, affine=None):
         pieces.append((double * strategy.width + add_window, remaining))
     setup_bytes = len(setup + to_main)
     loop_bytes = sum(len(code) * count for code, count in pieces) - setup_bytes - digit_bytes
-    return Program(strategy, tuple(pieces), points, (double, add) if affine is None else (double, add, affine),
+    return Program(strategy, tuple(pieces), plan.table_slots,
+                   (double, add) if affine is None else (double, add, affine),
                    {"table_setup": setup_bytes, "digit_extraction": digit_bytes, "window_loop": loop_bytes})
+
+
+def clear_window_table(slots):
+    """Remove a window table below a three-coordinate result."""
+    if slots % 2:
+        raise ValueError("window table must occupy an even number of slots")
+    return asm("OP_TOALTSTACK") * 3 + asm("OP_2DROP") * (slots // 2) + asm("OP_FROMALTSTACK") * 3
 
 
 def periodic_pieces(blocks):
@@ -244,7 +277,7 @@ def periodic_pieces(blocks):
 
 def mixed_program(plan, add, double, affine):
     strategy, bits = plan.strategy, plan.bits
-    setup, points = table_setup(strategy, add, double)
+    setup = table_setup(strategy, add, double)
     q_points = 1 << strategy.q_width
     offsets = sorted(set(range(0, bits, strategy.width)) | set(range(0, bits, strategy.q_width)))
     digits = []
@@ -264,17 +297,20 @@ def mixed_program(plan, add, double, affine):
     steps = []
     for offset in reversed(offsets):
         code = double * (previous - offset)
-        for width, table_end, kernel in ((strategy.q_width, q_points, None), (strategy.width, points, affine)):
+        for width, slots, kernel, compact in (
+                (strategy.q_width, 3 * q_points, None, False),
+                (strategy.width, plan.table_slots, affine, strategy.compact_g)):
             if offset % width == 0:
-                depth = 3 * table_end - 1 + 3 * accumulate
+                depth = slots - 1 + 3 * accumulate
                 code += selected(depth, add, accumulate=accumulate, affine=kernel,
-                                 affine_guard_ifdup=strategy.affine_guard_ifdup)
+                                 affine_guard_ifdup=strategy.affine_guard_ifdup, compact=compact)
                 accumulate = True
         steps.append(code)
         previous = offset
     prepare = setup + asm("OP_FROMALTSTACK OP_FROMALTSTACK OP_SWAP")
     pieces = [(prepare, 1), *periodic_pieces(digits), (asm("OP_2DROP"), 1), *periodic_pieces(steps)]
-    return Program(strategy, tuple(pieces), points, (double, add) if affine is None else (double, add, affine),
+    return Program(strategy, tuple(pieces), plan.table_slots,
+                   (double, add) if affine is None else (double, add, affine),
                    {"table_setup": len(prepare), "digit_extraction": sum(map(len, digits)),
                     "window_loop": 1 + sum(map(len, steps))})
 
@@ -354,7 +390,7 @@ def verify_window(program, vector_budget):
     for alt, expected in rows:
         stack, remainder = evaluate(raw, [*prefix, *map(encode_num, reversed(alt))])
         x, y, z = map(decode_num, stack[-3:])
-        if stack[:3] != list(prefix) or len(stack) != 3 * program.table_points + 6 or remainder:
+        if stack[:3] != list(prefix) or len(stack) != program.table_slots + 6 or remainder:
             raise ValueError(f"{program.strategy.name}: incorrect stack layout")
         if expected == ellipticcurve.INFINITY:
             if z % FIELD != 0 or x % FIELD != 0 or y % FIELD == 0:

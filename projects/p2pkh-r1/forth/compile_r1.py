@@ -7,7 +7,6 @@ from hashlib import sha256
 import json
 from pathlib import Path
 
-from fourthgraph.bsv.script import asm
 from fourthgraph.compiler.script_builder import ScriptBuilder, build_word
 
 VERSION = "0.4.0"
@@ -101,6 +100,8 @@ def next_window_plans(backend, tested, candidates):
 
 
 def window_search(backend, before, after, candidates, rounds):
+    from msm_lowering import clear_window_table
+
     fragments, tested, history = {}, {}, []
     plans = [backend.plan(name) for name in WINDOW_PLANS]
     seed_names = list(candidates)
@@ -109,9 +110,7 @@ def window_search(backend, before, after, candidates, rounds):
         for plan in plans:
             program = backend.lower(plan)
             # The original result check expects only the projective result above p, 3b, r.
-            cleanup = (asm("OP_TOALTSTACK") * 3 + asm("OP_2DROP") * (3 * program.table_points // 2)
-                       + asm("OP_FROMALTSTACK") * 3)
-            fragment = program.emit() + cleanup
+            fragment = program.emit() + clear_window_table(program.table_slots)
             name = plan.strategy.name
             tested[name] = plan
             candidates[name] = before + fragment + after
@@ -133,6 +132,12 @@ def window_search(backend, before, after, candidates, rounds):
     return fragments, history, stop
 
 
+def payment_window_boundaries(compiler):
+    before = compiler.emit("r1-prepare-scalars", compiler.emit("r1-prepare-lock", b""))
+    after = compiler.emit("r1-bind-transaction", compiler.emit("r1-baseline-check-x", b""))
+    return before, after
+
+
 def baseline_plans(source, owner, *, source_path=ENTRY_SOURCES[PAYMENT_ENTRY], rounds=1):
     if type(rounds) is not int or not 1 <= rounds <= MAX_AUTO_ROUNDS:
         raise ValueError(f"auto rounds must be an integer between 1 and {MAX_AUTO_ROUNDS}")
@@ -152,8 +157,7 @@ def baseline_plans(source, owner, *, source_path=ENTRY_SOURCES[PAYMENT_ENTRY], r
         if backend.source_identity["dependencies"] != imports:
             raise ValueError("R1 window backend dependencies differ from the payment entry")
         # Keep the original prologue, result check and transaction binding.
-        before = optimized.emit("r1-prepare-scalars", optimized.emit("r1-prepare-lock", b""))
-        after = optimized.emit("r1-bind-transaction", optimized.emit("r1-baseline-check-x", b""))
+        before, after = payment_window_boundaries(optimized)
         fragments, history, stop = window_search(backend, before, after, candidates, rounds)
         region = {"status": "matched", "backend": backend.source_identity, "fragments": fragments}
     else:

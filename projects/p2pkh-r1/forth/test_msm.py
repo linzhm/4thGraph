@@ -1,11 +1,14 @@
+from importlib.metadata import PackageNotFoundError
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
 
 from comparison_report import read_report
 from fixed_templates import VERSIONS_DIRECTORY
+from fourthgraph.benchmark.validation import CONTEXT_PIN, chain_metadata
 from msm_compiler import CALIBRATION, SOURCE, R1MSMCompiler
 from msm_experiment import frozen_build, local_build
+from r1_method_matrix import run_experiment
 
 
 class R1MSMTests(unittest.TestCase):
@@ -82,6 +85,37 @@ class R1MSMTests(unittest.TestCase):
         self.assertEqual((next_lock, next_pattern), (lock, pattern))
         self.assertEqual(len(baseline.script) - len(lock.script), 102)
         self.assertEqual(opportunity["estimated"]["window_loop_bytes_saved"], 102)
+
+    def test_ordered_method_matrix_verifies_pairs_and_ranks_each_target(self):
+        try:
+            engine = chain_metadata()
+        except PackageNotFoundError:
+            self.skipTest("requires pinned chain-gang")
+        if engine["commit"] != CONTEXT_PIN:
+            self.skipTest("requires pinned chain-gang")
+        evidence = run_experiment()
+        self.assertEqual(evidence["status"], "passed")
+        self.assertEqual(len(evidence["artifacts"]), 9)
+
+        def cells(seed):
+            rows = evidence["matrices"][seed]["cells"]
+            self.assertEqual(len(rows), 25)
+            return {tuple(row["order"]): row for row in rows}
+
+        split = cells("from_split")
+        affine = cells("from_affine")
+        self.assertEqual(split["compact-g", "affine-g"]["status"], "ineligible")
+        self.assertEqual(split["joint-window", "affine-g"]["status"], "ineligible")
+        a = split["affine-g", "point-add-stack-search"]["artifact"]
+        b = split["point-add-stack-search", "affine-g"]["artifact"]
+        self.assertNotEqual(a, b)
+        self.assertEqual(evidence["artifacts"][a]["compile"]["lock_bytes"], 41_927)
+        self.assertEqual(evidence["artifacts"][b]["compile"]["lock_bytes"], 41_366)
+        shared = affine["compact-g", "ifdup"]["artifact"]
+        self.assertEqual(shared, affine["ifdup", "compact-g"]["artifact"])
+        self.assertEqual(evidence["rankings"]["bip143-all"][0]["artifact"], shared)
+        self.assertEqual(evidence["rankings"]["otda-all"][0]["artifact"],
+                         split["joint-window", "joint-window"]["artifact"])
 
 
 if __name__ == "__main__":

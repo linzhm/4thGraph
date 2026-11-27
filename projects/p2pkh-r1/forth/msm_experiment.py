@@ -32,7 +32,7 @@ def objective(row, field, metric):
 
 def estimated_cost(compiler, plan, program, lock, pattern):
     costs = compiler.local_cost(plan, program)
-    size = len(compiler.prepare) + costs["window_bytes"] + len(compiler.finish(program.table_points))
+    size = len(compiler.prepare) + costs["window_bytes"] + len(compiler.finish(program.table_slots))
     if size != len(lock.script):
         raise ValueError("counted window cost does not match the compiled lock")
     otda = len(pattern.program)
@@ -40,7 +40,7 @@ def estimated_cost(compiler, plan, program, lock, pattern):
     # reconstructed OTDA bytes dominate the two OTDA fixture modes.
     counts = plan.counts()
     digits = counts["g_lookups"] + counts["q_lookups"] + counts["joint_lookups"]
-    bip143_peak = 99 * plan.table_points + 2 * digits + 400
+    bip143_peak = 33 * plan.table_slots + 2 * digits + 400
     return {
         **costs, "lock_bytes": size, "otda_program_bytes": otda, "payment_bytes": payment_estimates(size, otda),
         "payment_peak_stack_payload_bytes": {
@@ -367,6 +367,9 @@ def dump(value, output=None):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
+    matrix = sub.add_parser("method-matrix", help="compile and verify the ordered R1 method pairs")
+    matrix.add_argument("--output", type=Path)
+    matrix.add_argument("--replay", type=Path, help="require exact agreement with a previous method-matrix report")
     for name in ("scan", "local", "build", "compare"):
         command = sub.add_parser(name)
         command.add_argument("--source", type=Path,
@@ -392,6 +395,20 @@ def main():
             command.add_argument("--markdown", type=Path)
             command.add_argument("--reference", type=Path, help="previous R1 comparison report (schema version 2)")
     args = parser.parse_args()
+    if args.command == "method-matrix":
+        from r1_method_matrix import SCHEMA, run_experiment
+
+        try:
+            previous = json.loads(args.replay.read_text()) if args.replay else None
+            if args.replay and (not isinstance(previous, dict) or previous.get("schema") != SCHEMA):
+                raise ValueError("expected an R1 method-matrix report")
+            report = run_experiment()
+            if args.replay and previous != json.loads(json.dumps(report)):
+                raise ValueError("method-matrix replay differs from the recorded evidence")
+        except (OSError, ValueError) as error:
+            parser.error(str(error))
+        dump(report, args.output)
+        return 0 if report["status"] == "passed" else 1
     source_requested = args.source is not None
     if not source_requested:
         args.source = SOURCE

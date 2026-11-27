@@ -30,6 +30,14 @@ The transaction metric is for one synthetic input spending into one output. The 
 
 With `--auto-rounds 6`, the search compiled 32 distinct candidates in five rounds and stopped at the candidate budget. The same spend checks cover all 32 candidates. Adjusting the window widths and guard choices left the winning Script at 41,264 B. The JSON records which candidates entered each round and the best lock through that round.
 
+## R1 ordered method exploration
+
+Each matrix cell applies the row method followed by the column method. Both matrices use the same Forth and two-input, two-output fixture. The first starts with separate generic tables. The second starts with a proven affine G kernel so that compact storage and its zero-digit guard can be compared in each order. The five methods select a joint window, specialize fixed G calls, compact the G table, shorten the zero guard, and run explicit stack search on the point-add kernels visible at that step.
+
+Applying affine specialization before stack search emits a 41,927 B lock. Applying stack search first leaves the new affine kernel on its default lowering and emits 41,366 B. Compact storage and the guard commute from the affine seed and emit the same 41,165 B lock. This compact plan leads on the BIP143 ALL path at 165,575 B. The joint window leads on the OTDA ALL path at 176,617 B, compared with 176,807 B for the compact plan.
+
+The run records all 50 ordered pairs. The 25 eligible cells link to nine distinct lock and reconstruction artifacts, each verified against actual fixture prevouts by pinned chain-gang. The report ranks targets separately and can be reproduced with `method-matrix --replay`. [Build and replay](../projects/p2pkh-r1/forth/README.md)
+
 ## Ordered formula rules
 
 Use these rules on closed formulas whose caller establishes canonical ScriptNum encodings and the declared input intervals.
