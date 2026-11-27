@@ -1,8 +1,8 @@
-# Lamport SHA-256 v1 wire and Script specification
+# Lamport SHA-256 wire and Script specification
 
 ## Primitive
 
-For i=0..255 and b=0,1, independently generate a uniformly random 32-byte secret
+For classic bit-pair Lamport, for i=0..255 and b=0,1, independently generate a uniformly random 32-byte secret
 x[i][b]. Publish y[i][b]=SHA256(x[i][b]). Serialize in order x[0][0], x[0][1],
 x[1][0], x[1][1], ...; the public key uses the same order. Both are 16,384 bytes.
 The 32-byte digest D is read in byte order, **LSB-first within each byte**:
@@ -29,13 +29,19 @@ the proof length before evaluating the Lamport verifier.
 | `committed-key-forth` | Same 32-byte commitment | Same 16,384-byte proof |
 | `committed-key-forth-compact` | Same 32-byte commitment | Same 16,384-byte proof |
 | `committed-key-forth-v0.2.0` | Same 32-byte commitment | Same 16,384-byte proof |
+| `committed-key-forth-subset` (research) | SHA-256 of 352 ordered SHA-256 hashes | 128 secrets and 224 public hashes in slot order, 11,264 bytes |
 
-For committed profiles, record i is `x[i][b[i]] || y[i][1-b[i]]`. The lock
+For classic committed profiles, record i is `x[i][b[i]] || y[i][1-b[i]]`. The lock
 hashes the secret and orders the two hashes as `y[i][0] || y[i][1]` according to
 digest bit i. The hash of the concatenated pairs must match the commitment. The
-wallet needs the full ordered public key to construct this proof. All five
-profiles enforce the same preimage and selector rules and leave one true item
-and an empty altstack on success. [Forth implementation and costs](optimization.md)
+wallet needs the full ordered public key to construct this proof.
+
+The fixed-weight candidate maps each digest byte to a four-element subset of
+11 slots. The wallet supplies a secret in each selected slot and the public
+hash in each remaining slot. Script derives the selection, reconstructs the key
+and checks its commitment. The classic and fixed-weight payment profiles
+enforce the same preimage and selector rules and leave one true item and an
+empty altstack on success. [Fixed-weight format](subset.en.md) · [Forth implementation and costs](optimization.md)
 
 ## Sighash modes
 
@@ -64,8 +70,8 @@ amount. The node authenticates the serialized fields through the fixed-r
 signature relation described in [security.md](security.md).
 
 An opted-in version-2 unlock can reconstruct P for OTDA ALL or paired SINGLE,
-including ANYONECANPAY, from matching compact Forth and v0.2.0 outputs. The functional
-unlock leaves the identical preimage, proof and selector on the main stack and
+including ANYONECANPAY, from matching compact Forth, v0.2.0 and fixed-weight
+outputs. The functional unlock leaves the identical preimage, proof and selector on the main stack and
 an empty altstack. The verifier binds the resulting preimage to the spending
 input in the same way as a literal push. [Reconstruction design](optimization.md#otda-unlocking-reconstruction)
 
@@ -110,8 +116,10 @@ under those settings, not mainnet relay policy, fee acceptance, UTXO existence,
 or network-wide consensus testing. Node tests also cross-check pinned chain-gang.
 
 Static opcode counts in `measurements.json` describe the v0.1.0 vectors. The
-full-key lock has 256 SHA256 instructions. Each commitment lock has 257 SHA256
-instructions, including the final public-key hash. The payment wrapper adds
+full-key lock has 256 SHA256 instructions. Each classic commitment lock
+executes 257 SHA256 instructions, including the final public-key hash. On
+success the fixed-weight candidate executes 128 selected-slot hashes and the
+final public-key hash. The payment wrapper adds
 one HASH256 and two native signature instructions. The ordinary path executes
 one native check, and the companion path executes both.
 Node-native signature hashing performs additional work not counted by this static

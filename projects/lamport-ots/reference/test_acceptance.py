@@ -1,19 +1,21 @@
 """Exhaustive bounded acceptance checks for the repository Lamport profiles."""
 from dataclasses import replace
 from hashlib import sha256
-from itertools import product
+from itertools import combinations, product
 import os
 import unittest
 
+import lamport
+import subset
 from engines import chain_valid
 from fixtures import INVALID_PREVOUT_CASES, cases, mode_fixture, test_secret
-from forth_verifier import committed_verifier_code, committed_verifier_parts
-from lamport import OneTimeSigner, public_key, sign_digest, verify_digest
+from forth_verifier import committed_verifier_code, committed_verifier_parts, subset_verifier_parts
+from lamport import public_key, sign_digest, verify_digest
 from measure import instructions
 from payment import authorization, sign_spend
 from script import (
     COMPANION_CODE, ORDINARY_CODE, committed_locking_script, compact_forth_committed_locking_script,
-    compact_forth_pattern, forth_committed_locking_script, locking_script,
+    compact_forth_pattern, forth_committed_locking_script, locking_script, subset_forth_pattern, subset_locking_script,
     v020_forth_committed_locking_script, v020_forth_pattern,
 )
 from fourthgraph.bsv.evaluate import evaluate, ScriptError
@@ -26,7 +28,8 @@ from test_node import node_check
 
 VERSIONS = (1, 2)
 PAIRING = (False, True)
-RECONSTRUCTION_FACTORIES = (compact_forth_committed_locking_script, v020_forth_committed_locking_script)
+RECONSTRUCTION_FACTORIES = (compact_forth_committed_locking_script, v020_forth_committed_locking_script,
+                            subset_locking_script)
 COMMITTED_FACTORIES = (committed_locking_script, forth_committed_locking_script, *RECONSTRUCTION_FACTORIES)
 # The twelve byte values and commitment groups are specified in docs/spec.md.
 ALL = {0x41, 0x61, 0xc1, 0xe1}
@@ -74,6 +77,31 @@ def edited_payments(signed, parents):
 
 
 class LamportAcceptance(unittest.TestCase):
+    def test_subset_mask_domain_and_witness(self):
+        masks = sorted(sum(1 << slot for slot in slots) for slots in combinations(range(11), 4))[:256]
+        self.assertEqual(tuple(masks), subset.MASKS)
+        self.assertEqual(len(set(masks)), 256)
+        self.assertEqual({mask.bit_count() for mask in masks}, {4})
+        secret = test_secret(b'subset/exhaustive mask')[:subset.KEY_BYTES]
+        key = subset.public_key(secret)
+        start, one_byte, finish = subset_verifier_parts()
+        code = start + one_byte * 32 + finish
+        commitment = sha256(key).digest()
+        pattern = subset_forth_pattern()
+        self.assertEqual(evaluate(pattern.program), (list(pattern.fixed_parts), []))
+        self.assertEqual(pattern.match(subset_locking_script(key)), (commitment,))
+        uniform = (bytes([value]) * 32 for value in range(256))
+        for digest in (*uniform, bytes(range(224, 256))):
+            with self.subTest(digest=digest.hex()):
+                signature = subset.sign_digest(secret, digest)
+                proof = subset.proof(key, digest, signature)
+                self.assertEqual((len(signature), len(proof)), (4096, 11264))
+                self.assertEqual(evaluate(code, [proof, digest]), ([commitment], []))
+                changed_digest = bytes([digest[0] ^ 1]) + digest[1:]
+                self.assertFalse(subset.verify_digest(key, changed_digest, signature))
+                other, _ = evaluate(code, [proof, changed_digest])
+                self.assertNotEqual(other, [commitment])
+
     def test_every_commitment_selection_and_its_counterexamples(self):
         secret = test_secret(b'acceptance/commitment-slots')
         blocks = [secret[i:i+32] for i in range(0, len(secret), 32)]
@@ -162,8 +190,10 @@ class LamportAcceptance(unittest.TestCase):
                                                 lock_factory=compact_forth_committed_locking_script)
         first, compact = initial.outputs
         fresh = public_key(test_secret(b'mixed v0.2.0 output'))
+        subset_key = subset.public_key(test_secret(b'mixed fixed-weight output')[:subset.KEY_BYTES])
         outputs = (replace(first, script=b'\x51'), compact,
-                   Output(1, v020_forth_committed_locking_script(fresh)), Output(1, b'\x00'))
+                   Output(1, v020_forth_committed_locking_script(fresh)),
+                   Output(1, subset_locking_script(subset_key)), Output(1, b'\x00'))
         tx = replace(initial.with_script(1, b''), outputs=outputs)
 
         def sign(digest):
@@ -175,7 +205,7 @@ class LamportAcceptance(unittest.TestCase):
         unlock = signed.inputs[1].script
         self.assertLess(len(unlock), len(literal.inputs[1].script))
         preimage = authorization(tx, 1, parents[1].outputs[0].value, 0x61).preimage
-        program = reconstruct_mixed(preimage, outputs, (compact_forth_pattern(), v020_forth_pattern()))
+        program = reconstruct_mixed(preimage, outputs, (compact_forth_pattern(), v020_forth_pattern(), subset_forth_pattern()))
         self.assertIsNotNone(program)
         self.assertTrue(unlock.startswith(program))
         self.assertEqual(evaluate(unlock), evaluate(literal.inputs[1].script))
@@ -291,7 +321,8 @@ class LamportAcceptance(unittest.TestCase):
     def check_committed_proof(self, factory):
         _, parents, signed = mode_fixture(0x41, lock_factory=factory)
         (preimage, proof, mode), _ = evaluate(signed.inputs[1].script)
-        self.assertEqual(len(proof), 16384)
+        scheme = subset if factory is subset_locking_script else lamport
+        self.assertEqual(len(proof), scheme.KEY_BYTES)
         self.assertEqual(mode, b'')
 
         def check(candidate, valid):
@@ -301,8 +332,8 @@ class LamportAcceptance(unittest.TestCase):
                 self.assertEqual(node_check(tx, parents[1], 1), valid)
 
         check(proof, True)
-        for slot in range(512):
-            with self.subTest(slot=slot, selected_secret=slot % 2 == 0):
+        for slot in range(scheme.KEY_BYTES // 32):
+            with self.subTest(slot=slot):
                 offset = 32 * slot
                 check(proof[:offset] + bytes([proof[offset] ^ 1]) + proof[offset+1:], False)
         check(proof[:-1], False)
@@ -311,18 +342,22 @@ class LamportAcceptance(unittest.TestCase):
     def test_committed_2in_2out_and_fresh_key_preflight(self):
         for factory, mode in product(COMMITTED_FACTORIES, (0x41, 0x61)):
             with self.subTest(template=factory.__name__, mode=hex(mode)):
-                signers = [OneTimeSigner(test_secret(bytes([mode, index]))) for index in range(2)]
+                scheme = subset if factory is subset_locking_script else lamport
+                prefix = b'subset/' if scheme is subset else b''
+                secrets = [test_secret(prefix + bytes([mode, i]))[:scheme.KEY_BYTES] for i in range(4)]
+                signers = [scheme.OneTimeSigner(secret) for secret in secrets[:2]]
                 keys = [signer.public_key for signer in signers]
                 funding = tuple(
                     Transaction((Input(bytes([index + 1]) * 32, 0),),
                                 (Output(1000, factory(key)),))
                     for index, key in enumerate(keys)
                 )
-                fresh_locks = tuple(factory(public_key(test_secret(bytes([mode, index]))))
-                                    for index in (2, 3))
+                fresh_locks = tuple(factory(scheme.public_key(secret)) for secret in secrets[2:])
                 tx = Transaction(tuple(Input(parent.txid_wire(), 0) for parent in funding),
                                  tuple(Output(900, lock) for lock in fresh_locks))
-                for lock_factory in (locking_script, *COMMITTED_FACTORIES):
+                same_scheme = ((subset_locking_script,) if scheme is subset
+                               else (locking_script, *COMMITTED_FACTORIES[:-1]))
+                for lock_factory in same_scheme:
                     reused = replace(tx, outputs=(Output(900, lock_factory(keys[0])), tx.outputs[1]))
                     with self.assertRaisesRegex(ValueError, 'fresh Lamport key'):
                         sign_spend(reused, 0, funding[0].serialize(), keys[0], signers[0].sign, sighash=mode)

@@ -158,6 +158,7 @@ def replay(project, rows):
                     raise AssertionError("Deferred activation accepted a different target amount")
             continue
         algorithm, kind, fmt = CALLBACKS[project]
+        algorithm = row.get("algorithm", algorithm)
         if request.get("signMessage"):
             kind = "message"
         if "signerIdentifier" in request:

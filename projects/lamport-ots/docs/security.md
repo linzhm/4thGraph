@@ -144,6 +144,18 @@ The tests deliberately show that two signatures on complementary raw digests
 reveal all blocks and allow forgery for any third digest. This is a primitive-level
 demonstration, not an assertion that real transaction hashes can be chosen freely.
 
+## Fixed-weight candidate
+
+The candidate uses one fresh set of 352 independent 32-byte secrets per output.
+Two different 32-byte digests require different four-of-eleven selections in at
+least one group. Equal selection sizes force disclosure of a previously unopened
+secret for that group. The proof includes the full 32-byte SHA-256 hash for
+each unopened slot. This gives a SHA-256 preimage reduction for a second digest
+under the same public key after one disclosure. Authenticating the reconstructed
+public key and binding the transaction still require the existing commitment and
+native checks. Apply the same durable signer lifecycle to both schemes and
+generate new keys when changing profile. [Encoding and security argument](subset.en.md)
+
 ## Detached digest verifier is intentionally unsafe as a payment lock
 
 An attacker can copy its digest and signature to a different transaction. The node

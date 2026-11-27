@@ -49,3 +49,20 @@ def committed_verifier_parts(*, packed=False):
 def committed_verifier_code():
     start, one_byte, finish = committed_verifier_parts()
     return start + one_byte * 32 + finish
+
+
+@cache
+def subset_verifier_parts():
+    from subset import MASK_TABLE
+
+    source = SOURCE.with_name('subset-verifier.fth')
+    words = {
+        **SCRIPT_WORDS,
+        'subset-mask-table': Literal('bytes', MASK_TABLE),
+        'digest-offset': runtime_word('bytes', 'cell', '0x00 OP_CAT OP_BIN2NUM OP_DUP OP_ADD'),
+        'copy-third': runtime_word('bytes bytes bytes', 'bytes bytes bytes bytes', 'OP_2 OP_PICK'),
+        'copy-fourth': runtime_word('bytes bytes bytes cell', 'bytes bytes bytes cell bytes', 'OP_3 OP_PICK'),
+        'hash-if': runtime_word('bytes cell', 'bytes', 'OP_IF OP_SHA256 OP_ENDIF'),
+    }
+    compiler = SourceCompiler(source.read_text(encoding='ascii'), vocabulary=words, source_path=source)
+    return tuple(lower(compiler.words[name]) for name in ('start-subset', 'subset-byte', 'finish-subset'))

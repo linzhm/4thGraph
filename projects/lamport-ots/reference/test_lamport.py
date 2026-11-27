@@ -3,11 +3,13 @@ from hashlib import sha256
 import json
 from pathlib import Path
 import unittest
+import subset
 from lamport import *
 from script import locking_script, binding, N, R
 from payment import authorization, sign_payment, sign_spend
 from fixtures import INVALID_PREVOUT_CASES, fixture, test_secret, cases, mode_cases
 from engines import development_valid, chain_valid
+from sdk_fixture import cases as sdk_cases
 from fourthgraph.bsv.evaluate import evaluate, ScriptError
 from fourthgraph.bsv.pushtx import COMPANION_CODE, ONE_DER, PUBLIC, binding_der, check_binding
 from fourthgraph.bsv.script import asm, number, push
@@ -17,6 +19,14 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class LamportTests(unittest.TestCase):
+    def test_buffered_sdk_cases_keep_their_own_signing_key(self):
+        digest = sha256(b"buffered SDK fixtures").digest()
+        for case in list(sdk_cases()):
+            with self.subTest(profile=case["profile"], sighash=case["sighash"]):
+                key = case["public_key"]
+                verify = subset.verify_digest if subset.is_subset_key(key) else verify_digest
+                self.assertTrue(verify(key, digest, case["signer"](digest)))
+
     def test_keygen_and_lengths(self):
         secret, key = generate_keypair()
         self.assertEqual((len(secret),len(key)),(16384,16384))
