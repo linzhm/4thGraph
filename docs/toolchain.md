@@ -293,8 +293,16 @@ Forth 声明先生成阶段 DAG，记录值的生产者、消费者、类型及�
 
 | 示例 | 编译与复放 |
 | --- | --- |
-| [三段串行](../projects/workflow-examples/serial-graph.fth) | 递增、翻倍、路由。两笔状态交易分别约束后继金额和脚本。下游沿真实父输入回查部署根 |
+| [三阶段串行与前缀融合](../projects/workflow-examples/serial-graph.fth) | 递增、翻倍、路由。可分别提交，或在首笔花费融合前两阶段。下游沿实际父输入回查部署根 |
 | [准备、并行与汇合](../projects/workflow-examples/fork-join-graph.fth) | 同一份源码可将准备步骤与拆分合并，也可独立提交准备交易。工作 A 和 B 在两种布局中都独立签署及提交 |
+
+三阶段线性工作流支持 BIP143 的 `--mode fused-prefix`。首笔花费需要前两个阶段的授权，提交两阶段的共同结果供最后阶段单独花费。`independent-submit` 约束前两个阶段中的任一阶段时，融合在排序前排除。最后阶段可保留独立提交要求。该布局要求工作流没有恢复分支。默认三阶段布局仍为串行，`--search --explain` 才会自动比较前缀融合与串行。
+
+```sh
+PYTHONPATH=src:. python3 -m fourthgraph.replay.prefix_workflow projects/workflow-examples/serial-graph.fth
+```
+
+离线回执验证部署与全部实际子交易，并为每个步骤记录执行的 Forth 阶段、父交易 ID、前序锁摘要和交易字节。
 
 ## 两阶段状态工作流的三种布局
 

@@ -1,0 +1,8 @@
+{
+  "profile": "pels-settlement",
+  "template_version": "1/dual-linked-context",
+  "role": "settlement",
+  "module": "settlement.wasm",
+  "parameters": [],
+  "fixture": "pels-settlement"
+}

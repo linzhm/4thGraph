@@ -85,6 +85,8 @@ PYTHONPATH=src:. python -m fourthgraph.reporting "$out/search-replay.json" \
 
 下一轮可以用 `--objective peak-validation` 换排序目标，或者用 `--available-authorizers operator` 模拟首步只有 Operator 能签名。为每轮保留不同的复放文件和报告目录，再对照排除理由、正向轨迹和拒绝用例。后续脚手架的重点是让更多项目从自己的阶段声明和测试夹具生成这一套产物。[带门示例源码](../projects/workflow-examples/gated.fth)
 
+BIP143 三阶段线性工作流可用 `--mode fused-prefix` 合并前两阶段，保留最后阶段的独立授权与花费。前两阶段的授权必须在首笔花费可用，其中任一阶段需要独立提交就会排除融合。此布局适用于无恢复分支的工作流。三阶段默认串行，使用 `--search --explain` 比较布局，并用离线复放验证实际前序和序列化大小。[复跑命令](toolchain.md#可执行交易图)
+
 <a name="agent-tuning-loop"></a>
 
 ## Agent 开发与调优循环
