@@ -12,10 +12,21 @@ Make a lock from the raw ML-DSA-44 public key and sign the payment message in Pu
 
 **Status** · v0.11.0.
 
-The verifier uses the FIPS 204 Pure ML-DSA-44 public-key and signature
-encodings. A public key is 1,312 bytes and a signature is 2,420 bytes.
-The OpenSSL fixture uses a public test seed and deterministic signing.
-[FIPS 204](https://csrc.nist.gov/pubs/fips/204/final)
+## Algorithm overview
+
+ML-DSA is the post-quantum digital signature algorithm standardized in NIST
+FIPS 204. It derives from CRYSTALS-Dilithium and relies on the computational
+hardness of module-lattice problems. ML-DSA-44 targets NIST security category 2
+and has the smallest public key and signature of the three parameter sets, at
+1,312 and 2,420 bytes respectively. The two 4s in the name refer to the
+dimensions of its 4 × 4 public matrix.
+[NIST FIPS 204](https://csrc.nist.gov/pubs/fips/204/final)
+
+The verifier checks the signature encoding, response bounds and canonical
+hints. It uses the number-theoretic transform (NTT) for polynomial arithmetic
+and SHAKE256 to recompute the challenge and check it against the encoded one.
+When building a BSV payment lock, the Script compiler precomputes the matrix
+and transformed public-key polynomials for the fixed key. [Script verifier](reference/script.py)
 
 | Entry point | Purpose |
 |---|---|
@@ -23,12 +34,9 @@ The OpenSSL fixture uses a public test seed and deterministic signing.
 | `script.verify_message_script(public_key, message_bytes, context=...)` | Compile the Script verifier. The public key, byte length and context are fixed at generation. The message and signature go on the stack. |
 | `script.locking_script(public_key)` | Bind the same verifier to the current input. It verifies the signature over a 32-byte transaction digest with the empty context. |
 
-The Script compiler precomputes the matrix and transformed public-key
-polynomials. At execution the script checks the signature encoding, response
-norm and canonical hints, derives the challenge polynomial, and reconstructs
-and hashes the commitment. The payment wrapper supports all twelve BIP143 and
-Chronicle OTDA sighash combinations. Unpaired OTDA `SINGLE` uses the companion
-BIP143 binding. The wallet checks the funding output before requesting an
+The payment wrapper supports all twelve BIP143 and Chronicle OTDA sighash
+combinations. Unpaired OTDA `SINGLE` uses the companion BIP143 binding.
+The wallet checks the funding output before requesting an
 external signature. The caller authenticates the funding transaction and
 approves the transaction intent.
 [Transaction-binding construction](../../src/fourthgraph/bsv/pushtx.py)
@@ -48,6 +56,8 @@ Script sampler discards its intermediate stack values before failing.
 [Sampler](reference/challenge_script.py)
 
 ## Reproduce the checks
+
+The OpenSSL fixture uses a public test seed and deterministic signing.
 
 ```sh
 python -m unittest discover -s projects/ml-dsa/reference -p test_mldsa.py -v

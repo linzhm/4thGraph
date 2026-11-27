@@ -10,7 +10,13 @@
 
 [协议规范](docs/developer.zh-CN.md#protocol) · [安全分析](docs/developer.zh-CN.md#security) · [复现与验证](#复现方法) · [交易成本](#完整交易与栈测量)
 
-当前版本为 v0.11.0，采用 FIPS 204 纯模式编码。公钥为 1,312 字节，签名为 2,420 字节。编译器预计算与公钥相关的矩阵和多项式，执行时校验签名编码、响应范数和提示值，再计算挑战和验证方程。 [FIPS 204](https://csrc.nist.gov/pubs/fips/204/final)
+当前版本为 v0.11.0。
+
+## 算法特点
+
+ML-DSA 是 NIST 在 FIPS 204 中标准化的后量子数字签名算法，源自 CRYSTALS-Dilithium，安全性基于模格问题的计算困难性。ML-DSA-44 面向 NIST 第 2 类安全目标，在三套标准参数中公钥和签名最小，分别为 1,312 和 2,420 字节。名称中的两个 4 对应 4 × 4 的公开矩阵。[NIST FIPS 204](https://csrc.nist.gov/pubs/fips/204/final)
+
+验签先检查签名编码、响应范数和提示值，再用数论变换（NTT）进行多项式运算，并用 SHAKE256 重算并核对挑战。本项目在生成 BSV 付款锁时，会为固定公钥预计算矩阵和变换后的公钥多项式。[Script 验签实现](reference/script.py)
 
 | 入口 | 用途 |
 |---|---|
