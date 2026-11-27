@@ -37,4 +37,4 @@ python3 -m fourthgraph.workflow.protocol pels-witness successor.json \
 
 此模板用 BIP143 ALL 认证前序金额。对 Chronicle 目标，`auto` 选择 BIP143 并记录排除 OTDA 的原因。显式指定 `otda` 或 `both` 原像策略会失败。交易版本由目标决定，并在 Script 中断言。
 
-用同一规则和目标分别编译各个状态。产物记录精确的前序输出 Script 及其 `scriptCode` 锚点。组装器检查交易花费该前序输出，且唯一后继输出沿用相同代码。后继状态和金额是否符合规则由独立的 Script 验证决定。可执行夹具用两笔合成交易验收草稿到就绪、就绪到草稿的转换，并用固定版本的 chain-gang 验证拒绝用例。[夹具源码和验收测试](../tests/test_pels_successor_library.py)
+用同一规则和目标分别编译各个状态。产物记录精确的前序输出 Script 及其 `scriptCode` 锚点。组装器检查交易花费该前序输出，且唯一后继输出沿用相同代码。实际前序输出的金额必须覆盖后继金额。后继状态和金额是否符合规则由独立的 Script 验证决定。可执行夹具用两笔合成交易验收草稿到就绪、就绪到草稿的转换，并用固定版本的 chain-gang 验证拒绝用例。[夹具源码和验收测试](../tests/test_pels_successor_library.py)

@@ -172,6 +172,9 @@ class PelsSuccessorTargetTests(unittest.TestCase):
 
         output = tx.outputs[0]
         prevout = parent.outputs[0]
+        overspend = replace(tx, outputs=(replace(output, value=prevout.value + 1),))
+        with self.assertRaisesRegex(ValueError, "exceeds the actual prevout amount"):
+            assemble_pels(artifact, parent, overspend)
         for bad_output in (replace(output, value=output.value - 1), replace(output, script=prevout.script)):
             with self.subTest(output=bad_output):
                 wrong = replace(tx, outputs=(bad_output,))

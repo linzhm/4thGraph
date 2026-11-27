@@ -197,7 +197,10 @@ def _assemble_successor(script, path, prevout, unsigned):
         raise ValueError("the binding anchor or sighash differs from the selected successor")
     if len(unsigned.outputs) != 1:
         raise ValueError("PELS successor requires one output")
-    successor = unsigned.outputs[0].script
+    output, = unsigned.outputs
+    if output.value > prevout.value:
+        raise ValueError("PELS output total exceeds the actual prevout amount")
+    successor = output.script
     if successor[0:1] != bytes([STATE_BYTES]) or successor[code_offset - 1:] != SEPARATOR + code:
         raise ValueError("the candidate output does not use the selected successor template")
     preimage = preimage_forkid(unsigned, 0, prevout.value, code, FLAG)
