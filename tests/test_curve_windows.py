@@ -14,6 +14,7 @@ from fourthgraph.bsv.transaction import Input, Output, Transaction
 from fourthgraph.compiler.curve_lowering import compile_fixed_generator, compile_joint_generator_point
 from fourthgraph.compiler.curve_windows import CURVES, GLV_REFERENCE, JOINT_STRATEGIES, P256, SECP256K1, SM2, fixed_table, scalar_plans
 from fourthgraph.compiler.lowering import DATAFLOW, compile_word
+from fourthgraph.compiler.modular_scale import lower_modular_scale
 from fourthgraph.compiler.source import CompileError, SourceCompiler
 from fourthgraph.stdlib.weierstrass import CoordinateScale
 
@@ -103,6 +104,19 @@ class CurveWindowsTests(unittest.TestCase):
                     scale = CoordinateScale(curve.field, root)
                     expected = evaluate(powers, [*inputs, *map(encode_num, scale.factors())])
                     self.assertEqual(evaluate(rooted, [*inputs, encode_num(root)]), expected)
+
+    def test_modular_scale_selection_requires_an_intermediate_size_proof(self):
+        model = SECP256K1.normalized_a0()
+        options = {"affine": True, "scriptnum_bytes": 129}
+        fallback = lower_modular_scale(model.field, model.root, DATAFLOW, **options)
+        narrow = lower_modular_scale(model.field, model.root, DATAFLOW, affine=True,
+                                     coordinate_bound=model.field - 1, scriptnum_bytes=65)
+        self.assertEqual(fallback, narrow)
+        optimized = lower_modular_scale(model.field, model.root, DATAFLOW, coordinate_bound=model.field - 1, **options)
+        self.assertLess(len(optimized), len(fallback))
+        for x, y in ((-19, model.field - 1), (0, 12), (-1, 0)):
+            source = [b"caller", *map(encode_num, (model.field, x, y))]
+            self.assertEqual(evaluate(optimized, source), evaluate(fallback, source))
 
     @unittest.skipUnless(which("openssl"), "requires OpenSSL for independent point multiplication")
     def test_curve_registry_and_fixed_tables(self):

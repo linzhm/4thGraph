@@ -211,9 +211,9 @@ def emit(operations):
     return b"".join(op.script for op in operations)
 
 
-def emit_lock_block(block, inputs, rewrites, *, optimize, dataflow=False):
+def emit_lock_block(block, inputs, rewrites, *, optimize, dataflow=False, recognize_tiles=True):
     if dataflow:
-        block, reused = reuse_values(block)
+        block, reused = reuse_values(block, recognize_tiles=recognize_tiles)
         for step, rule, basis, sizes in reused:
             at = step.source
             rewrites.append(Rewrite(rule, at.line if at else None, at.column if at else None, (), sizes,
@@ -249,8 +249,9 @@ def emit_lock_block(block, inputs, rewrites, *, optimize, dataflow=False):
                 prefix = b""
                 rewrites.append(Rewrite("comparison-feeds-if", line, column, (Slot.of("cell"),),
                                         (before, len(code)), module=module))
-            yes = emit_lock_block(node.yes, node.inputs, rewrites, optimize=optimize, dataflow=dataflow)
-            no = emit_lock_block(node.no, node.inputs, rewrites, optimize=optimize, dataflow=dataflow)
+            branch_options = dict(optimize=optimize, dataflow=dataflow, recognize_tiles=recognize_tiles)
+            yes = emit_lock_block(node.yes, node.inputs, rewrites, **branch_options)
+            no = emit_lock_block(node.no, node.inputs, rewrites, **branch_options)
             script = prefix + asm("OP_IF") + yes + asm("OP_ELSE") + no + asm("OP_ENDIF")
         else:
             script = node.lower() if isinstance(node, Literal) else node.code
@@ -276,8 +277,14 @@ def compile_word(word, optimization=BASELINE, *, check_input_ranges=True, spend_
                                      optimize=optimization != BASELINE)
             if optimization == DATAFLOW:
                 candidate_rewrites = []
-                candidate = emit_lock_block(word.lock, tuple(range(len(word.takes))), candidate_rewrites,
-                                            optimize=True, dataflow=True)
+                inputs = tuple(range(len(word.takes)))
+                candidate = emit_lock_block(word.lock, inputs, candidate_rewrites, optimize=True, dataflow=True)
+                if any(change.rule == "tile-repeated-bytes" for change in candidate_rewrites):
+                    plain_rewrites = []
+                    plain = emit_lock_block(word.lock, inputs, plain_rewrites, optimize=True, dataflow=True,
+                                            recognize_tiles=False)
+                    if len(plain) <= len(candidate):
+                        candidate, candidate_rewrites = plain, plain_rewrites
                 if len(candidate) < len(script):
                     script, rewrites = candidate, candidate_rewrites
             return CompiledWord(prefix + script, rewrites=tuple(rewrites))

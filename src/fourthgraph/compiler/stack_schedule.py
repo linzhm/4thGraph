@@ -157,6 +157,12 @@ class Layout:
         self.code = bytearray()
 
     def execute(self, script, args, results, *, last_use, compact, trace=None, group_operands=False):
+        preserved = {}
+        if group_operands and last_use:
+            # A result with an operand's slot ID returns that value unchanged.
+            # It may move into the call even if later instructions need it again.
+            preserved = {slot: self.uses[slot] - count for slot, count in Counter(args).items() if slot in results}
+            self.uses.subtract(preserved)
         if compact and last_use and args and (group_operands or len(args) <= 2):
             self.arrange(args, commutative=script in COMMUTATIVE, group_operands=group_operands)
         else:
@@ -169,6 +175,7 @@ class Layout:
             del self.slots[-len(args):]
         self.code.extend(script)
         self.slots.extend(results)
+        self.uses.update(preserved)
 
     def finish(self, returns, *, last_use, trim_suffix=False):
         if tuple(self.slots) != tuple(returns):
