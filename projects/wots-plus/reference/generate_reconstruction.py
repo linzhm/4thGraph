@@ -1,10 +1,10 @@
-"""Build or verify the prebuilt WOTS+ cached-steps artifacts."""
+"""Build or verify the archived artifacts for a WOTS+ version."""
 import argparse
 from hashlib import sha256
 import json
 
 from script import _chain, _payment_script
-from fixed_template import TEMPLATE_DIRECTORY
+from fixed_template import TEMPLATE_DIRECTORY, compact_pattern
 from payment import COMPRESSIBLE_OTDA_TYPES
 from fourthgraph.bsv.script import asm, push
 from wots import CHAINS, N
@@ -29,12 +29,24 @@ def build_artifacts():
             program.extend(push(suffix) + asm("OP_CAT"))
     program.extend(asm("OP_2SWAP OP_2DROP") + push(last))
 
-    raw = first + bytes(N) + middle + bytes(N) + last
+    return _template_artifacts((first, middle, last), program, "cached-steps.hex",
+                               "otda-all-reconstruct.hex", "cached-steps-layout.json")
+
+
+def build_compact_artifacts(profile):
+    pattern = compact_pattern(profile)
+    return _template_artifacts(pattern.fixed_parts, pattern.program, "template.hex",
+                               "otda-reconstruct.hex", "layout.json")
+
+
+def _template_artifacts(parts, program, lock_file, program_file, layout_file):
+    first, middle, _ = parts
+    raw = bytes(N).join(parts)
     layout = {
-        "script": {"file": "cached-steps.hex", "bytes": len(raw), "sha256": sha256(raw).hexdigest()},
+        "script": {"file": lock_file, "bytes": len(raw), "sha256": sha256(raw).hexdigest()},
         "key_offsets": [len(first), len(first) + N + len(middle)],
         "reconstruction": {
-            "file": "otda-all-reconstruct.hex", "bytes": len(program), "sha256": sha256(program).hexdigest(),
+            "file": program_file, "bytes": len(program), "sha256": sha256(program).hexdigest(),
             "spend_transaction_version": 2,
             "sighash_types": [f"{flag:02x}" for flag in sorted(COMPRESSIBLE_OTDA_TYPES)],
         },
@@ -42,16 +54,27 @@ def build_artifacts():
     return {
         layout["script"]["file"]: raw.hex() + "\n",
         layout["reconstruction"]["file"]: program.hex() + "\n",
-        "cached-steps-layout.json": json.dumps(layout, indent=2) + "\n",
+        layout_file: json.dumps(layout, indent=2) + "\n",
     }
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
+    versions = TEMPLATE_DIRECTORY.parent
+    catalog = json.loads((versions / "index.json").read_text(encoding="ascii"))
+    parser.add_argument("--version", type=lambda value: value.removeprefix("v"),
+                        choices=catalog["versions"], default=TEMPLATE_DIRECTORY.name[1:],
+                        help="Project version to build or verify")
     parser.add_argument("--check", action="store_true")
     args = parser.parse_args()
-    for name, content in build_artifacts().items():
-        file = TEMPLATE_DIRECTORY / name
+    directory = versions / f"v{args.version}"
+    if directory == TEMPLATE_DIRECTORY:
+        generated = build_artifacts()
+    else:
+        manifest = json.loads((directory / "manifest.json").read_text(encoding="ascii"))
+        generated = build_compact_artifacts(manifest["template"])
+    for name, content in generated.items():
+        file = directory / name
         if args.check:
             if file.read_text(encoding="ascii") != content:
                 parser.exit(1, f"artifact differs: {file}\n")

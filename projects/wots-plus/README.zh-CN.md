@@ -10,7 +10,7 @@
 
 [协议规范](docs/developer.zh-CN.md#protocol) · [安全分析](docs/developer.zh-CN.md#security) · [复现与验证](#开发和钱包接入) · [交易成本](#完整交易与栈测量)
 
-WOTS+ 是 v0.1.0 开发基线，按 RFC 8391 的 `WOTSP-SHA2_256` 哈希链验证一次性签名。项目定义 64 字节的 BSV 公钥编码，原始签名为 2,144 字节。付款锁将证明绑定到实际花费的交易输入。 [编码规范](docs/spec.md) · [RFC 8391](https://www.rfc-editor.org/rfc/rfc8391)
+当前开发版本为 v0.12.0。WOTS+ 按 RFC 8391 的 `WOTSP-SHA2_256` 哈希链验证一次性签名。项目定义 64 字节的 BSV 公钥编码，原始签名为 2,144 字节。付款锁将证明绑定到实际花费的交易输入。[版本产物](versions/v0.12.0/manifest.json) · [编码规范](docs/spec.md) · [RFC 8391](https://www.rfc-editor.org/rfc/rfc8391)
 
 ## 使用场景与取舍
 
@@ -54,6 +54,8 @@ bash projects/wots-plus/reference/verify.sh
 
 [验证记录](docs/validation.md)包含 1,230 项支付矩阵、67 条签名链的变更测试和已支持的重放环境。栈调度与重建产物见[模板布局](versions/v0.1.0/cached-steps-layout.json)。
 
+在生成命令上加 `--version v0.12.0` 可检查当前版本的 Compact 产物。[版本索引](versions/index.json)
+
 可选用 [Lean Script 求值器](https://github.com/Calhooon/bsv-script-lean#try-it)重放同一批合成输入。
 
 ```sh
@@ -88,13 +90,14 @@ python projects/wots-plus/reference/test_lean.py --compact-v11 /path/to/bsv-scri
 
 | 实测项目 | `cached-steps` | `compact` | `compact-v2` | `compact-v3` | `compact-v4` | `compact-v5` | `compact-v6` | `compact-v7` | `compact-v8` | `compact-v9` | `compact-v10` | `compact-v11` |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 版本 | [v0.1.0](versions/v0.1.0/manifest.json) | [v0.2.0](versions/v0.2.0/manifest.json) | [v0.3.0](versions/v0.3.0/manifest.json) | [v0.4.0](versions/v0.4.0/manifest.json) | [v0.5.0](versions/v0.5.0/manifest.json) | [v0.6.0](versions/v0.6.0/manifest.json) | [v0.7.0](versions/v0.7.0/manifest.json) | [v0.8.0](versions/v0.8.0/manifest.json) | [v0.9.0](versions/v0.9.0/manifest.json) | [v0.10.0](versions/v0.10.0/manifest.json) | [v0.11.0](versions/v0.11.0/manifest.json) | [v0.12.0](versions/v0.12.0/manifest.json) |
 | 锁定脚本 | 33,956 B | 29,217 B | 27,070 B | 25,965 B | 23,296 B | 22,494 B | 21,982 B | 21,774 B | 21,540 B | 21,332 B | 21,320 B | 21,272 B |
 | OTDA 重建程序 | 3,097 B | 2,395 B | 2,358 B | 1,979 B | 1,884 B | 1,126 B | 1,076 B | 957 B | 952 B | 910 B | 795 B | 732 B |
 | 两进两出 BIP143 ALL | 72,650 B | 63,172 B | 58,878 B | 56,668 B | 51,330 B | 49,726 B | 48,702 B | 48,286 B | 47,818 B | 47,402 B | 47,378 B | 47,282 B |
 | 两进两出 OTDA ALL，启用重建 | 79,090 B | 68,208 B | 63,840 B | 60,872 B | 55,344 B | 52,224 B | 51,100 B | 50,446 B | 49,968 B | 49,468 B | 49,214 B | 48,992 B |
 | 两进两出配对 OTDA SINGLE，启用重建 | 78,921 B | 68,039 B | 63,671 B | 60,703 B | 55,175 B | 52,055 B | 50,931 B | 50,277 B | 49,799 B | 49,299 B | 49,045 B | 48,823 B |
 
-钱包 SDK 用 `template: "compact-v11"` 选择此模板。[接入示例](docs/sdk.zh-CN.md#quickstart)
+钱包 SDK 用 `template: "compact-v11"` 选择 v0.12.0 的付款锁。各版清单记录了 SDK 模板、Git 标签和源码提交。[接入示例](docs/sdk.zh-CN.md#quickstart)
 
 ### 缓存步骤模板实测
 

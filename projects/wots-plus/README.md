@@ -10,7 +10,7 @@ Choose a receive template and connect a durable one-time signer. The compact pro
 
 [Protocol](docs/developer.en.md#protocol) · [Security](docs/developer.en.md#security) · [Verify](#run-the-checks) · [Transaction costs](#complete-transactions-and-stack-measurements)
 
-**Status** · v0.1.0 development baseline.
+**Current development version** · v0.12.0. [Version artifacts](versions/v0.12.0/manifest.json)
 
 This experiment verifies a WOTS+ one-time signature in Bitcoin Script and binds
 it to the current BSV transaction input. It uses the RFC 8391
@@ -183,13 +183,14 @@ payload of 2,891 bytes.
 
 | Measured bytes | `cached-steps` | `compact` | `compact-v2` | `compact-v3` | `compact-v4` | `compact-v5` | `compact-v6` | `compact-v7` | `compact-v8` | `compact-v9` | `compact-v10` | `compact-v11` |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Version | [v0.1.0](versions/v0.1.0/manifest.json) | [v0.2.0](versions/v0.2.0/manifest.json) | [v0.3.0](versions/v0.3.0/manifest.json) | [v0.4.0](versions/v0.4.0/manifest.json) | [v0.5.0](versions/v0.5.0/manifest.json) | [v0.6.0](versions/v0.6.0/manifest.json) | [v0.7.0](versions/v0.7.0/manifest.json) | [v0.8.0](versions/v0.8.0/manifest.json) | [v0.9.0](versions/v0.9.0/manifest.json) | [v0.10.0](versions/v0.10.0/manifest.json) | [v0.11.0](versions/v0.11.0/manifest.json) | [v0.12.0](versions/v0.12.0/manifest.json) |
 | Payment lock | 33,956 | 29,217 | 27,070 | 25,965 | 23,296 | 22,494 | 21,982 | 21,774 | 21,540 | 21,332 | 21,320 | 21,272 |
 | OTDA reconstruction program | 3,097 | 2,395 | 2,358 | 1,979 | 1,884 | 1,126 | 1,076 | 957 | 952 | 910 | 795 | 732 |
 | 2×2 BIP143 ALL payment | 72,650 | 63,172 | 58,878 | 56,668 | 51,330 | 49,726 | 48,702 | 48,286 | 47,818 | 47,402 | 47,378 | 47,282 |
 | 2×2 OTDA ALL, reconstructed | 79,090 | 68,208 | 63,840 | 60,872 | 55,344 | 52,224 | 51,100 | 50,446 | 49,968 | 49,468 | 49,214 | 48,992 |
 | 2×2 paired OTDA SINGLE, reconstructed | 78,921 | 68,039 | 63,671 | 60,703 | 55,175 | 52,055 | 50,931 | 50,277 | 49,799 | 49,299 | 49,045 | 48,823 |
 
-The wallet SDK selects the smaller lock with `template: "compact-v11"`. [SDK quickstart](docs/sdk.en.md#quickstart)
+Select the v0.12.0 lock in the wallet SDK with `template: "compact-v11"`. Each version manifest records its SDK template, Git tag and source commit. [SDK quickstart](docs/sdk.en.md#quickstart) · [Version index](versions/index.json)
 
 ### OTDA output reconstruction
 
@@ -219,6 +220,7 @@ The full-input tests verify both ANYONECANPAY settings, mixed outputs,
 byte-for-byte witness stack equivalence and the literal fallback.
 From the repository root, check the checked-in artifacts with
 `python projects/wots-plus/reference/generate_reconstruction.py --check`.
+Use `--version v0.12.0` to check the current Compact artifacts.
 
 ### Lean conformance
 
