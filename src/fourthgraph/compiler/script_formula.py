@@ -1,7 +1,7 @@
 """Compile straight-line Forth formulas over bounded Script integers."""
 
 from collections import Counter
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from fourthgraph.bsv.script import asm, number
 
@@ -34,10 +34,23 @@ class Step:
 
 
 @dataclass(frozen=True)
+class Origin:
+    word: str
+    line: int
+    column: int
+    module: str | None
+
+    @classmethod
+    def at(cls, token):
+        return cls(token.text, token.line, token.column, token.module)
+
+
+@dataclass(frozen=True)
 class Formula:
     input_count: int
     steps: tuple[Step, ...]
     returns: tuple[int, ...]
+    origins: tuple[tuple[Origin, ...], ...] = field(default=(), compare=False, repr=False)
 
     def bind_input(self, index, value):
         """Substitute a proven constant and remove its runtime stack slot."""
@@ -58,7 +71,11 @@ class Formula:
                 step = Step(step.operation, bounds, args)
             slots.append(len(steps))
             steps.append(step)
-        return Formula(inputs, tuple(steps), tuple(slots[index] for index in self.returns))
+        origins = self.origins
+        if origins:
+            origins = (*origins[:index], *origins[index+1:self.input_count], origins[index],
+                       *origins[self.input_count:])
+        return Formula(inputs, tuple(steps), tuple(slots[index] for index in self.returns), origins)
 
     def lower(self, *, optimize=False, specialized=False, passes=None):
         args = self.input_count, self.steps, self.returns
@@ -185,12 +202,14 @@ def read_formula(tokens, at, ranges):
     if required(tokens, entry, "'{:'").name != "{:":
         raise entry.error("expected '{:' before formula input names")
     locals_ = {}
+    origins = []
     steps = [Step("input", ranges[kind].slot) for kind in inputs]
     for index in range(len(inputs)):
         local = named_token(tokens, entry, "formula input")
         if local.name in locals_ or local.name in SYNTAX:
             raise local.error(f"invalid or duplicate formula input {local.text!r}")
         locals_[local.name] = index
+        origins.append([Origin.at(local)])
     if required(tokens, entry, "':}'").name != ":}":
         raise entry.error("formula input names must match the stack effect")
     stack = []
@@ -204,6 +223,7 @@ def read_formula(tokens, at, ranges):
             if local.name in locals_ or local.name in SYNTAX or not stack:
                 raise local.error("LET needs a stack value and a new local name")
             locals_[local.name] = stack.pop()
+            origins[locals_[local.name]].append(Origin.at(local))
             unused[local.name] = local
             continue
         if name in locals_:
@@ -237,6 +257,7 @@ def read_formula(tokens, at, ranges):
             step = Step("literal", Slot("script-int", (literal.value, literal.value)), immediate=literal.value)
         stack.append(len(steps))
         steps.append(step)
+        origins.append([Origin.at(token)])
     else:
         raise entry.error("unterminated formula")
     if unused:
@@ -247,4 +268,4 @@ def read_formula(tokens, at, ranges):
         raise entry.error("formula results do not fit the declared stack effect and ranges")
     if magnitude_bits(steps) >= GENESIS_NUM_BYTES * 8:
         raise entry.error("formula integers may exceed the BSV Genesis ScriptNum limit")
-    return entry, Formula(len(inputs), tuple(steps), tuple(stack))
+    return entry, Formula(len(inputs), tuple(steps), tuple(stack), tuple(map(tuple, origins)))

@@ -42,11 +42,16 @@ SCRIPT_WORDS = {
 
 
 class ScriptBuilder(SourceCompiler):
-    def __init__(self, source, *, source_path=None, vocabulary=None, optimize=False, formula_passes=None):
+    def __init__(self, source, *, source_path=None, vocabulary=None, optimize=False, formula_passes=None,
+                 experimental_rules=(), trace_formulas=False):
         if optimize and formula_passes is not None:
             raise ValueError("choose automatic formula optimization or explicit passes")
         self.optimize = optimize
         self.formula_passes = None if formula_passes is None else validate_formula_passes(formula_passes)
+        if experimental_rules and formula_passes is None:
+            raise ValueError("ordered rules require an explicit terminal pass plan")
+        self.experimental_rules = tuple(experimental_rules)
+        self.formula_snapshots = {} if trace_formulas else None
         self.formulas = {}
         self.formula_ir = {}
         super().__init__(source, vocabulary=SCRIPT_WORDS | (vocabulary or {}), backend=WALLET_BACKEND,
@@ -64,6 +69,15 @@ class ScriptBuilder(SourceCompiler):
         name, formula = read_formula(self.tokens, token, self.ranges)
         if name.name.startswith("bsv-") or name.name in self.words:
             raise name.error(f"invalid or duplicate formula name {name.text!r}")
+        if self.experimental_rules or self.formula_snapshots is not None:
+            from .formula_experiment import snapshot, transform, validate_rules
+            states = [snapshot(formula)] if self.formula_snapshots is not None else None
+            for rule in validate_rules(self.experimental_rules):
+                formula = transform(formula, rule)
+                if states is not None:
+                    states.append(snapshot(formula))
+            if states is not None:
+                self.formula_snapshots[name.name] = states
         code, report = formula.lower(optimize=self.optimize, passes=self.formula_passes)
         append = build_word("script", "script", lambda prefix: prefix + code)
         self.words[name.name] = Word(("script",), ("script",), (Located(append, name),), "build", name=name.name)
