@@ -1,0 +1,105 @@
+{
+  "version": "0.3.0",
+  "previous": "0.2.0",
+  "compiler_revision": "2a9d079d50933703c2293974d42a8a34892fe4ea",
+  "fixture_sha256": "d8eee6da5ed5780fb71dc91fa08744d1644ff1db7f53974aafb48bb26c2dd10c",
+  "runar_revision": "dbcc4269f8e0895c4738cf86948b05b7d62a2010",
+  "runar_extension_sha256": {
+    "compact_groth16.go": "05d99aaac40efd7dbde553dc5d52dbe8b698b5cb3c70abbbe58effb6c9a9388a",
+    "compact_groth16.patch": "638054986762faf8008fb13391d561bd32ac143384be318ac0b74859697f2270"
+  },
+  "forth_entry": "verify-bn254-proof",
+  "source_sha256": "ebb33784d14f5d47600b5543aacb32a0424d2622aa20c3ae680e7b6e35b2cb2f",
+  "libraries": [
+    {
+      "name": "statement.fth",
+      "sha256": "2fd49a0fb75feeb27f855ad09d61daa839d7e5924102c4163f5c30491b126395",
+      "interface_sha256": null
+    }
+  ],
+  "witness_layout": "compact-fixed-statement",
+  "subgroup_schedule": "projective-naf",
+  "modulo_threshold": 64,
+  "node_version": 101020300,
+  "chain_gang": {
+    "version": "0.13.2",
+    "commit": "74676b9c002c452e7f21a9ed9265f4972bef03f6"
+  },
+  "activation_height": 2,
+  "funded_replays": {
+    "wrap": {
+      "lock_bytes": 539934,
+      "script_sha256": "bc90d178296c56d7044feb78e9eabbf9d0d66a16cc1c363a7b3c7bfbda08e749",
+      "artifact_sha256": "93a5ae44e59daf11bf21802d2b8b0931e326de1f62509a9fed45e43d33bde173",
+      "witness_prefix_bytes": 6765,
+      "witness_prefix_sha256": "c1483d42242f4545184abd5b9fffe90569bfebe50c2bd95a324520230b321f47",
+      "serialized_script_path_bytes": 546780,
+      "funded_path_bytes": 547006,
+      "owner_authorization": {
+        "sighash": 65,
+        "signing_preimage_bytes": 540095,
+        "preimage_in_unlock_bytes": 0
+      },
+      "deployment": {
+        "txid": "8d13f02a79a2ad7ea99a7bde5ff56011c6d9cee15b3e7acc80a02ffd0ced9fcd",
+        "bytes": 540071,
+        "mempool": true,
+        "mined": true,
+        "block": "1f84ab2bce04af8421ebc2ddd4540dbd840e66f86d4571596c87d4bd7ec5de73",
+        "height": 103
+      },
+      "valid_spend": {
+        "txid": "e48a2a431fd01d1604d274c32ec11e9eff9526af10c6c414dfc0f9bd28e3b76c",
+        "bytes": 6935,
+        "mempool": true,
+        "mined": true,
+        "block": "7ed1b409ac78de747c2a9a1f36f995283e869df8c8eaf9d4b2a4347e02957438",
+        "height": 104
+      },
+      "rejected_controls": [
+        "changed_output_with_stale_signature",
+        "g2_outside_subgroup",
+        "negated_proof_point",
+        "valid_proof_for_another_statement",
+        "wrong_sighash"
+      ]
+    },
+    "other": {
+      "lock_bytes": 539932,
+      "script_sha256": "b4d66f2621900ee38f5e157f6d07c9b03055666563c0c09380eee4e96836cf2c",
+      "artifact_sha256": "48dbdb440252b3c0546bc4a24c53ce7e7ac5f01c9a1fce6a786ff57b5935cb8d",
+      "witness_prefix_bytes": 6761,
+      "witness_prefix_sha256": "24109899b736c96c0c4e057dbadc2920aff3375bd041d36ecc3edad6a5ae39ad",
+      "serialized_script_path_bytes": 546774,
+      "funded_path_bytes": 547000,
+      "owner_authorization": {
+        "sighash": 65,
+        "signing_preimage_bytes": 540093,
+        "preimage_in_unlock_bytes": 0
+      },
+      "deployment": {
+        "txid": "6d8b962a9282e3ff9e16996db60832410afbe0c3a8cf0d9651f4a58c77856642",
+        "bytes": 540069,
+        "mempool": true,
+        "mined": true,
+        "block": "4711ff222056d2fe8c2b0b39b32c93a3489f83773f968e903759679deb6a2483",
+        "height": 103
+      },
+      "valid_spend": {
+        "txid": "316beb058a5f2836a3c630e900fd43ea6458c516a85c8fe916bda795d739d3c3",
+        "bytes": 6931,
+        "mempool": true,
+        "mined": true,
+        "block": "46513a439bc464edfdf24105f0084058f900a61549fb68ab39ef2de1fa02b2fc",
+        "height": 104
+      },
+      "rejected_controls": [
+        "changed_output_with_stale_signature",
+        "g2_outside_subgroup",
+        "negated_proof_point",
+        "valid_proof_for_another_statement",
+        "wrong_sighash"
+      ]
+    }
+  }
+}
