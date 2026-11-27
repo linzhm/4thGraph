@@ -17,7 +17,7 @@ from fourthgraph.bsv.transaction import CHRONICLE, FORKID, SIGHASH_ALL, Input, O
 from fourthgraph.compiler.ranges import NUMERIC_TYPES
 from fourthgraph.compiler.source import (
     GATE_BOUNDARIES, PROJECT_DESCRIPTION, PROJECT_NAME, PROJECT_VERSION, CompileError, ParentOutput, Plan,
-    SourceCompiler, Template, Workflow, WORKFLOW_MODES, availability, evaluate, fused_template, fusion_constraints, gate_constraints,
+    FUSED_PREFIX, SourceCompiler, Template, Workflow, WORKFLOW_CHOICES, availability, evaluate, fused_template, fusion_constraints, gate_constraints,
     schedule, split_templates,
 )
 from fourthgraph.compiler.lowering import BASELINE, OPTIMIZATIONS, compile_word
@@ -1029,7 +1029,7 @@ def main():
                      help="bind a declared byte parameter at compile time (repeatable)")
     cli.add_argument("--assume-input-ranges", action="store_true",
                      help="for --entry, rely on the caller to check numeric input types and ScriptNum encodings")
-    cli.add_argument("--mode", choices=("auto", "split", *WORKFLOW_MODES), default="auto")
+    cli.add_argument("--mode", choices=("auto", "split", *WORKFLOW_CHOICES), default="auto")
     cli.add_argument("--target", type=normalize_target, choices=TARGETS, default=DEFAULT_TARGET,
                      help="permitted transaction versions")
     cli.add_argument("--sighash-family", type=normalize_sighash_family, choices=(*SIGHASH_FAMILY_OPTIONS, "auto"),
@@ -1054,7 +1054,7 @@ def main():
     if args.max_tx_bytes is not None and not args.search:
         cli.error("--max-tx-bytes requires --search")
     if args.entry and (args.search or args.gate_boundary != "auto" or args.current is not None
-                       or args.mode in ("serial", "atomic")):
+                       or args.mode in ("serial", "atomic", FUSED_PREFIX)):
         cli.error("transaction search and boundaries require a transaction build")
     if args.assume_input_ranges and args.entry is None:
         cli.error("--assume-input-ranges requires --entry")
@@ -1067,7 +1067,7 @@ def main():
         print(json.dumps({"project": PROJECT_NAME, "compiler_version": PROJECT_VERSION, "description": PROJECT_DESCRIPTION,
                           **capabilities(), "libraries": library_capabilities(),
                           "optimizations": OPTIMIZATIONS, "join_witnesses": JOIN_WITNESSES,
-                          "topologies": ("parallel", "gated-parallel", "workflow"), "workflow_modes": WORKFLOW_MODES,
+                          "topologies": ("parallel", "gated-parallel", "workflow"), "workflow_modes": WORKFLOW_CHOICES,
                           "workflow_sighash_families": {**{name: f"{flag:02x}" for name, flag in SIGHASH_FAMILIES.items()},
                                                        "both": [f"{flag:02x}" for flag in SIGHASH_FAMILIES.values()]},
                           "pels_sighash_policies": (*SIGHASH_FAMILY_OPTIONS, "auto"),
@@ -1181,6 +1181,8 @@ def main():
                     result = build_artifact({**result, "schedule_explanation": report}, source_bytes)
                 display_build(result, args)
                 return
+            if args.mode == FUSED_PREFIX:
+                cli.error("fused-prefix requires a three-stage workflow")
             if args.task_id is None or args.current is not None:
                 cli.error("parallel builds require --task-id and take their u32 values at spend time")
             if args.sighash_family != "bip143":
