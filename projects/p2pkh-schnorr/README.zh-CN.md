@@ -1,4 +1,4 @@
-<!-- Generated from manifest.json by tools/project_readme.py. -->
+<!-- Generated from manifest.yaml with Copier. -->
 
 # P2PKH-Schnorr v0.16.0
 

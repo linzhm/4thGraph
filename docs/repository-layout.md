@@ -16,6 +16,7 @@
 │   │   ├── specification.md
 │   │   ├── syntax.md
 │   │   └── stdlib.md
+│   ├── templates/                # Protocol, SDK, and reproduction guide templates
 │   ├── install.md
 │   ├── toolchain.md
 │   ├── groth16-bls12-381.md
@@ -35,7 +36,7 @@
 │   ├── p2pkh-sm2/
 │   ├── pels-counter/
 │   ├── proof-counter/
-│   ├── template/                 # New project scaffold, schemas, and version examples
+│   ├── template/                 # Copier project template, schema, and version examples
 │   ├── workflow-examples/
 │   └── wots-plus/
 ├── sdk/                          # Go, Python, Rust and TypeScript adapters

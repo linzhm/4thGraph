@@ -98,3 +98,4 @@ PYTHONPATH=src:. python -m fourthgraph.reporting "$out/search-replay.json" \
 | 接入钱包和签名器 | [钱包 SDK](../sdk/README.zh-CN.md) |
 | 查阅或复现实测结果 | [项目成果](../showcase/README.md) · [完整交易基准](benchmark.zh-CN.md) |
 | 查找源码、夹具和工作区 | [仓库目录](repository-layout.md) |
+| 编写和维护项目文档 | [文档模板和维护约定](maintaining-docs.zh-CN.md) |

@@ -98,3 +98,4 @@ For another run, pass `--objective peak-validation` to change the ranking or `--
 | Connect a wallet and signer | [Wallet SDK](../sdk/README.md) |
 | Review or reproduce measurements | [Showcase](../showcase/README.md) · [Transaction benchmarks](benchmark.md) |
 | Find source, fixtures, and workspaces | [Repository layout](repository-layout.md) |
+| Write or update project documentation | [Documentation templates and maintenance](maintaining-docs.md) |

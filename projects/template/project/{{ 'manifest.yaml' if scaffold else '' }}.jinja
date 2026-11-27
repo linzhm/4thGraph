@@ -1,0 +1,9 @@
+{% set manifest = {
+    '$schema': '../template/manifest.schema.json',
+    'schema_version': schema_version,
+    'title': {'en': title_en or title.en, 'zh-CN': title_zh or title['zh-CN']},
+    'summary': summary,
+    'entry_points': entry_points,
+    'sections': sections,
+} -%}
+{{ (dict(manifest, setup=setup) if setup else manifest) | to_nice_yaml(sort_keys=false) -}}
