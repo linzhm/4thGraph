@@ -43,6 +43,12 @@ layout: joint-variable-with-order ( px:script-int py:script-int p:script-int s:s
     over int= IF 1 ELSE -1 THEN cell>int glv-beta map-row-coordinates
 ;
 
+( Input: p, Px, X2, Y2, X3, Y3, Qy, Py. Return Q2y, Q3y, Qx, Q2x, Q3x. )
+: map-row-components ( script-int script-int script-int script-int script-int script-int script-int script-int --
+                       script-int script-int script-int script-int script-int )
+    int= IF 1 ELSE -1 THEN cell>int glv-beta map-glv-components
+;
+
 ( A row consumes its affine P and projective jQ, and appends four projective entries. )
 layout: append-input ( p:script-int px:script-int py:script-int x:script-int y:script-int z:script-int --
                        x y z px py p x y z px py )
