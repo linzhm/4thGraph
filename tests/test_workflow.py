@@ -24,6 +24,24 @@ from fourthgraph.replay.typed_workflow import SOURCE
 
 
 class WorkflowTests(unittest.TestCase):
+    def test_auto_target_ranks_legal_families_after_layout_checks(self):
+        source = SOURCE.read_bytes()
+        program = SourceCompiler(source.decode(), source_path=SOURCE).workflow()
+        keys = TestKeys()
+        for target, families in (("bip143-v1", {"bip143"}), ("chronicle-v2", {"bip143", "otda"})):
+            artifact, report = compile_workflow(program, keys.public, 19, source_bytes=source, target=target,
+                                                mode="fused", search=True, sighash_family="auto")
+            selection = artifact["sighash_selection"]
+            self.assertEqual(set(selection["candidates"]), families)
+            family = selection["selected"]
+            self.assertEqual(family, min(families, key=lambda name: selection["candidates"][name]["rank"]))
+            self.assertEqual(artifact["artifact_sha256"], artifact_digest(artifact))
+            self.assertEqual(report["candidates"]["fused"]["sighash_selection"], selection)
+        atomic, _ = compile_workflow(program, keys.public, 19, source_bytes=source, target="chronicle-v2",
+                                     mode="atomic", sighash_family="auto")
+        self.assertEqual(atomic["sighash_selection"]["selected"], "bip143")
+        self.assertFalse(atomic["sighash_selection"]["candidates"]["otda"]["eligible"])
+
     def test_dual_linked_context_selects_mode_and_rejects_other_lengths(self):
         script_code = b"\x51"
         labels = ("terminal", "receipt")

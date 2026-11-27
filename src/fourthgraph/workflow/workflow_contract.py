@@ -12,7 +12,8 @@ from fourthgraph.compiler.lowering import BASELINE, compile_word
 from fourthgraph.workflow.protocol import (
     BINDING_CODE, CURRENT_OUTPOINT, DEFAULT_TARGET, FLAG, OBJECTIVES, OUTPUTS_HASH, PREVOUTS_HASH, REFUND_SEQUENCE,
     RESULT_WIDTH, ROOT_VALUE, SIGHASH_FAMILIES, SIGHASH_FAMILY_OPTIONS, TARGETS, TERMINAL_VALUE,
-    Draft, UTXO, authorize, begin, build_artifact, candidate_rank, check_field, check_version, copy_preimage, estimate_cost,
+    Draft, UTXO, authorize, begin, build_artifact, candidate_rank, candidate_sighash_families, check_field,
+    check_version, copy_preimage, estimate_cost,
     field, finish, input_value, is_compressed_public_key, p2pk, recoverable_lock, refund_output,
     single_input, validate_u32,
 )
@@ -464,16 +465,18 @@ def compile_workflow(workflow, keys, current, *, source_bytes, mode="auto", targ
         raise CompileError("workflow mode must be fused, serial or atomic")
     if max_tx_bytes is not None and (not search or type(max_tx_bytes) is not int or max_tx_bytes <= 0):
         raise CompileError("a positive transaction byte budget requires search")
-    check_sighash_target(sighash_family, target)
+    families = candidate_sighash_families(target, sighash_family)
+    for family in families:
+        check_sighash_target(family, target)
     roles = {stage.owner for stage in workflow.stages}
     available = roles if available_authorizers is None else set(available_authorizers)
     order = OBJECTIVES[objective]
     candidates, artifacts = {}, {}
     for layout in WORKFLOW_MODES:
         blockers = workflow_blockers(workflow, layout, available)
-        sighash_exclusion = sighash_blocker(workflow, layout, sighash_family)
-        if sighash_exclusion:
-            blockers.append(sighash_exclusion)
+        family_blockers = {family: sighash_blocker(workflow, layout, family) for family in families}
+        if all(family_blockers.values()):
+            blockers.extend(family_blockers.values())
         if blockers:
             plan = None if blockers[0]["code"] == "unsupported_stage_count" else workflow_layout(workflow, layout)
             candidates[layout] = {
@@ -483,10 +486,26 @@ def compile_workflow(workflow, keys, current, *, source_bytes, mode="auto", targ
                 "boundary_reasons": plan.boundary_reasons if plan else (),
             }
             continue
-        contract = WorkflowContracts(workflow, keys, current, mode=layout, target=target,
-                                     optimization=optimization, available_authorizers=available,
-                                     objective=objective, max_tx_bytes=max_tx_bytes, sighash_family=sighash_family)
-        spec = contract.artifact(source_bytes)
+        choices = {}
+        family_report = {}
+        for family, exclusion in family_blockers.items():
+            if exclusion is not None:
+                family_report[family] = {"eligible": False, "exclusions": [exclusion]}
+                continue
+            contract = WorkflowContracts(workflow, keys, current, mode=layout, target=target,
+                                         optimization=optimization, available_authorizers=available,
+                                         objective=objective, max_tx_bytes=max_tx_bytes, sighash_family=family)
+            spec = contract.artifact(source_bytes)
+            cost = spec["estimated_cost"]
+            within_budget = max_tx_bytes is None or cost["max_transaction_bytes"] <= max_tx_bytes
+            rank = candidate_rank(cost, order)
+            choices[family] = (not within_budget, rank, family), contract, spec
+            family_report[family] = {"eligible": within_budget, "cost": cost, "rank": rank}
+        _, contract, spec = min(choices.values(), key=lambda choice: choice[0])
+        if sighash_family == "auto":
+            spec = build_artifact({**spec, "sighash_selection": {
+                "requested": "auto", "selected": contract.sighash_family, "candidates": family_report,
+            }}, source_bytes)
         artifacts[layout] = spec
         cost = spec["estimated_cost"]
         if max_tx_bytes is not None and cost["max_transaction_bytes"] > max_tx_bytes:
@@ -506,6 +525,8 @@ def compile_workflow(workflow, keys, current, *, source_bytes, mode="auto", targ
             },
             "boundary_reasons": spec["boundary_reasons"], "cost": cost, "rank": candidate_rank(cost, order),
         }
+        if sighash_family == "auto":
+            candidates[layout]["sighash_selection"] = spec["sighash_selection"]
     eligible = [layout for layout, row in candidates.items() if row["eligible"]]
     if mode != "auto":
         selected, basis = mode, "explicit_request"

@@ -24,13 +24,14 @@ For ordinary file paths, `REQUIRE` searches relative to the source file containi
 | On-chain reconstruction | PELS and Workflow reconstruct preimages from known transaction structure, linked `scriptCode`, and outputs constructed by the contract. The sighash mode and contract constraints determine which fields can be omitted. [Reconstruction](../../src/fourthgraph/workflow/forkid_lowering.py) |
 | Authorization and spend binding | The wallet interface prepares ordinary and companion authorization paths. The lock uses native signature verification to bind the authorization to the actual spend. Unpaired OTDA SINGLE uses a special digest and has no serializable transaction preimage. [Authorization](../../src/fourthgraph/bsv/spend_authorization.py) · [Spend binding](../../src/fourthgraph/bsv/pushtx.py) |
 
-A shared Forth entry point could start with single-input BIP143 ALL transactions whose complete, ordered outputs can be constructed. Compare the reconstructed bytes with the existing off-chain serializer, then check that changing the outputs or locktime causes a stale witness to be rejected. An OTDA ALL extension needs to account for whether the contract depends on the previous output amount. Projects can explicitly opt into a new entry point.
+The shared PELS entry supports a single-input `lock:` with a complete output vector built in Forth. The compile target and sighash policy determine the implementation. A lock that asserts the previous output amount needs BIP143 coverage in this implementation. Validate the selected path against its actual parent. [Build and assembly commands](../pels-locks.md)
 
 ## Public interfaces
 
 | Module | Public interface | Example |
 | --- | --- | --- |
 | `std/bsv` | `REQUIRE BSV` loads `verify ( cell -- )` and supported native `OP_*` words | [P2PKH](../../projects/p2pk-p2pkh-baseline/forth/p2pkh.fth) |
+| `std/pels` | `tx-output` constructs an expected output. `inputs=` and `outputs=` commit to one input and all ordered outputs. `tx-locktime` and `tx-prevout-amount` can be compared with constants. | [PELS settlement](../../projects/workflow-examples/pels-settle.fth) |
 | `std/u32` | `u32-inc ( u32 -- u32 )`, wrapping at 32 bits | [PELS Counter](../../projects/pels-counter/pels-counter.fth) |
 | `std/p2pk` | `p2pk-lock ( bytes -- bytes )` takes a 33-byte compressed public key and returns a lock script | [Source](../../src/fourthgraph/stdlib/p2pk.fth) · [P2PK](../../projects/p2pk-p2pkh-baseline/forth/p2pk.fth) |
 | `std/p2pkh` | `p2pkh-lock ( bytes -- bytes )` takes a 20-byte public-key hash and returns a lock script | [Source](../../src/fourthgraph/stdlib/p2pkh.fth) · [P2PKH](../../projects/p2pk-p2pkh-baseline/forth/p2pkh.fth) |
