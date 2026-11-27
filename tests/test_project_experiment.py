@@ -11,7 +11,7 @@ from unittest.mock import patch
 from fourthgraph.benchmark.experiment import capabilities, digest, next_request, run
 from fourthgraph.benchmark.fixtures import FIXTURES, HashChainFixture
 from fourthgraph.benchmark.spend_fixture import CONTEXT, linked_spends
-from fourthgraph.benchmark.validation import CONTEXT_PIN, Node, chain_metadata
+from fourthgraph.benchmark.validation import CONTEXT_PIN, NODE_GENESIS_FLAGS, Node, chain_metadata
 from fourthgraph.bsv.evaluate import evaluate
 from fourthgraph.bsv.script import asm, encode_num, number
 from fourthgraph.compiler.formula_experiment import RULES, enumerate_orders, transform
@@ -21,6 +21,9 @@ from fourthgraph.compiler.ranges import Slot
 from fourthgraph.benchmark.point_add_fixture import PointAddFixture
 from fourthgraph.compiler.script_builder import ScriptBuilder
 from fourthgraph.compiler.script_formula import GENESIS_NUM_BYTES, Formula, Step
+
+
+EQUALVERIFY_REJECTION = "Script failed an OP_EQUALVERIFY operation"
 
 
 class FormulaExperiments(unittest.TestCase):
@@ -178,6 +181,21 @@ class FormulaExperiments(unittest.TestCase):
         self.assertEqual([(site["site"], site["offset"], site["bytes"]) for site in sites],
                          [(0, 1, 1), (0, 2, 1), (0, 3, 1)])
 
+    def test_node_negative_control_requires_the_expected_script_error(self):
+        fixture = HashChainFixture()
+        builder = fixture.builder(fixture.source(fixture.name))
+        script, _ = builder.emit_plan(fixture.entry, [])
+        _, parent, _, rejected = next(linked_spends(fixture, script))
+        node = Node.__new__(Node)
+        reply = {"result": "error", "flags": NODE_GENESIS_FLAGS,
+                 "description": "Operation not valid with the current stack size"}
+        with patch.object(node, "call", return_value=[reply]):
+            with self.assertRaisesRegex(ValueError, "current stack size"):
+                node.verdicts(rejected, (parent,), **CONTEXT, expected_rejection=EQUALVERIFY_REJECTION)
+            reply["description"] = EQUALVERIFY_REJECTION
+            self.assertEqual(node.verdicts(rejected, (parent,), **CONTEXT,
+                                           expected_rejection=EQUALVERIFY_REJECTION), [False])
+
     @unittest.skipUnless(os.environ.get("REGTEST_COOKIE"), "requires tools/verify_node.sh")
     def test_large_arithmetic_and_hash_spends_match_regtest(self):
         self._require_pinned_chain()
@@ -193,7 +211,8 @@ class FormulaExperiments(unittest.TestCase):
                 script = bytes.fromhex(row["artifact"]["hex"])
                 for case, parent, spend, rejected in linked_spends(fixture, script):
                     self.assertEqual(node.verdicts(spend, (parent,), **CONTEXT), [True], case)
-                    self.assertEqual(node.verdicts(rejected, (parent,), **CONTEXT), [False], case)
+                    self.assertEqual(node.verdicts(rejected, (parent,), **CONTEXT,
+                                                   expected_rejection=EQUALVERIFY_REJECTION), [False], case)
 
     def test_cross_axis_baseline_uses_the_same_compiler_plan(self):
         first = run({"fixture": "bezier", "plans": [{}, {"passes": ["stack"]}]})
