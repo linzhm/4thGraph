@@ -66,6 +66,8 @@ def malformed_witnesses(public, message, signature):
         ("off-curve public ordinate", detached_unlock(message, public, signature, y=(y + 2) % FIELD)),
         ("noncanonical public ordinate", detached_unlock(message, public, signature, y=FIELD)),
         ("odd nonce ordinate", detached_unlock(message, public, signature, nonce_y=FIELD - nonce_y)),
+        ("both ordinates odd",
+         detached_unlock(message, public, signature, y=FIELD - y, nonce_y=FIELD - nonce_y)),
         ("off-curve nonce ordinate", detached_unlock(message, public, signature, nonce_y=(nonce_y + 2) % FIELD)),
         ("noncanonical nonce ordinate", detached_unlock(message, public, signature, nonce_y=FIELD)),
         ("short signature", detached_unlock(message, public, signature[:-1])),
