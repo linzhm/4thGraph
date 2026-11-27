@@ -1,6 +1,7 @@
 """Complete ML-DSA-44 payments across Chronicle activation contexts."""
 
 from dataclasses import replace
+from hashlib import sha256
 from itertools import product
 import json
 import os
@@ -9,10 +10,13 @@ import subprocess
 from tempfile import TemporaryDirectory
 import unittest
 
-from fips204 import SIGNATURE_BYTES
+from fips204 import CHALLENGE_BYTES, GAMMA1, RESPONSE_BITS, RESPONSE_NORM_LIMIT, SIGNATURE_BYTES, _pack, _unpack
 from mldsa import test_only_vector as make_test_vector
 from payment import authorization, sign_spend
-from script import locking_script
+from script import _VerifierVersion, _historical_forth_lock, _historical_lock, locking_script
+from sdk_adapter import recognize
+from signature_script import HINT_ROWS, HINT_WEIGHT_LIMIT, RESPONSE_COUNT, RESPONSE_PACKED_BYTES
+from polynomial import DEGREE
 from fourthgraph.bsv.chain_gang import validate_at_heights
 from fourthgraph.bsv.transaction import SIGHASH_TYPES, Input, Output, Transaction
 
@@ -162,6 +166,75 @@ class PaymentTests(unittest.TestCase):
         unsigned = signed.with_script(1, b'')
         with self.assertRaisesRegex(ValueError, 'invalid ML-DSA-44 signature'):
             sign_spend(unsigned, 1, self.funding_raw, self.public_key, lambda digest: b'')
+
+    def test_signature_boundaries_in_complete_payments(self):
+        response_end = CHALLENGE_BYTES + RESPONSE_PACKED_BYTES
+        for flag, version, height, creation in ((0x41, 1, 2, (1, 1)), (0x61, 2, 4, (1, 3))):
+            spend = self.payment(flag, version, True)
+            auth = authorization(spend, 1, 10_000, flag)
+            signature = spend.inputs[1].script[-SIGNATURE_BYTES - 1:-1]
+            self.assertEqual(spend.inputs[1].script, auth.witness(signature))
+            values = _unpack(signature[CHALLENGE_BYTES:response_end], RESPONSE_COUNT * DEGREE, RESPONSE_BITS)
+            invalid = {
+                'short signature': signature[:-1],
+                'long signature': signature + b'\x00',
+                'hint weight over limit': signature[:-1] + bytes((HINT_WEIGHT_LIMIT + 1,)),
+                'nonzero hint padding': signature[:response_end] + bytes(HINT_WEIGHT_LIMIT - 1)
+                + b'\x80' + bytes(HINT_ROWS),
+            }
+            for position, value in product((0, len(values) - 1),
+                                           (GAMMA1 - RESPONSE_NORM_LIMIT, GAMMA1 + RESPONSE_NORM_LIMIT)):
+                changed = values.copy()
+                changed[position] = value
+                invalid[f'response norm at {position}, value {value}'] = (
+                    signature[:CHALLENGE_BYTES] + _pack(changed, RESPONSE_BITS) + signature[response_end:]
+                )
+            with self.subTest(sighash=hex(flag), case='valid control'):
+                self.check_spend(spend, True, height, creation)
+            for case, malformed in invalid.items():
+                with self.subTest(sighash=hex(flag), case=case):
+                    candidate = spend.with_script(1, auth.witness(malformed))
+                    self.check_spend(candidate, False, height, creation)
+
+    def test_historical_locks_remain_recognizable_and_spendable(self):
+        earlier = (
+            (_historical_lock(self.public_key, compact=False),
+             '3905094cfb41cad09a939cfe8c8264400faf264a6db0cb30851c7dbdefd93295'),
+            (_historical_lock(self.public_key, compact=True),
+             '899fc5fd435d593e37fe00af3c834d814d57af4abcd63bf632d0e7870c7fc77f'),
+            (_historical_forth_lock(self.public_key, version=_VerifierVersion.V02),
+             'f579d4c51555f5e5b7820250af52c091112827b8ae9daa2c6500b37fa3832a2e'),
+            (_historical_forth_lock(self.public_key, version=_VerifierVersion.V03),
+             '1be9cf198ad5fdb4ac6355ad6826b1eaca4390180f2d5b4d76510db34b2a4a8c'),
+            (_historical_forth_lock(self.public_key, version=_VerifierVersion.V04),
+             '5ce650cd40ac69c56016541b107328ff45e03d1bfbd9053ae499ecf5d9721799'),
+            (_historical_forth_lock(self.public_key, version=_VerifierVersion.V05),
+             '4d88ce30f46434e769bbd4ace945758079e881800f999c1b56e263706789bbce'),
+            (_historical_forth_lock(self.public_key, version=_VerifierVersion.V06),
+             '9a27ff151a0f078aa50d15597067a07aade2a61265b3b34cad86362b3b62beac'),
+            (_historical_forth_lock(self.public_key, version=_VerifierVersion.V07),
+             '45bb991c7cb90c80e8ce91ba2d58f8569a89dadd068107e14a058b55c1c43547'),
+            (_historical_forth_lock(self.public_key, version=_VerifierVersion.V08),
+             '7be7166abb197839427b20ba9115a63f4432cc581caff5d527d638abea6ada58'),
+            (_historical_forth_lock(self.public_key, version=_VerifierVersion.V09),
+             'b31c775465ff2767848e7ced89784f64d36d3146f4c66e3952c06d72bf491f59'),
+            (_historical_forth_lock(self.public_key, version=_VerifierVersion.V10),
+             '2588e18265ec05730b7b72db4eb73c426fde9112719fccb161ffa765ed465af9'),
+        )
+        for previous_lock, fingerprint in earlier:
+            self.assertEqual(sha256(previous_lock).hexdigest(), fingerprint)
+            self.assertLess(len(locking_script(self.public_key)), len(previous_lock))
+            self.assertEqual(recognize(previous_lock, self.public_key), {'template': 'pure-ml-dsa-44'})
+            funding = replace(self.parents[1], outputs=(Output(10_000, previous_lock),))
+            parents = self.parents[0], funding
+            inputs = tuple(Input(parent.txid_wire(), 0) for parent in parents)
+            tx = Transaction(inputs, (Output(10_900, b'\x51'),), version=2)
+            for flag in (0x41, 0x61, 0x63):
+                with self.subTest(previous_lock_bytes=len(previous_lock), sighash=hex(flag)):
+                    spend = sign_spend(tx, 1, funding.serialize(), self.public_key, self.signer, sighash=flag)
+                    validate_at_heights(spend, parents, spend_height=4, activation_height=3, utxo_heights=(1, 3))
+                    if cookie_path := os.environ.get('REGTEST_COOKIE'):
+                        self.check_node(cookie_path, spend, parents, True, 4, (1, 3))
 
     def test_unrecognized_lock_is_rejected_before_signing(self):
         funding = replace(self.parents[1], outputs=(Output(10_000, b'\x51'),))

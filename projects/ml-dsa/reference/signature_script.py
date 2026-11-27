@@ -11,29 +11,28 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "src"))
 
-from fips204 import SIGNATURE_BYTES
+from fips204 import GAMMA1, RESPONSE_BITS, RESPONSE_NORM_LIMIT, SIGNATURE_BYTES
 from ntt_script import COEFFICIENT_BYTES
 from polynomial import DEGREE, MODULUS
 from fourthgraph.bsv.script import asm, number, push
 
 CHALLENGE_BYTES = 32
 RESPONSE_COUNT = HINT_ROWS = 4
-RESPONSE_BITS = 18
 RESPONSE_PACKED_BYTES = RESPONSE_COUNT * DEGREE * RESPONSE_BITS // 8
 RESPONSE_RESIDUE_BYTES = RESPONSE_COUNT * DEGREE * COEFFICIENT_BYTES
 HINT_WEIGHT_LIMIT = 80
 HINT_PACKED_BYTES = HINT_WEIGHT_LIMIT + HINT_ROWS
 HINT_BITMAP_BYTES = HINT_ROWS * DEGREE // 8
-GAMMA1 = 1 << 17
-RESPONSE_NORM_LIMIT = GAMMA1 - 78
 
 _UNSIGNED = push(b'\x00') + asm('OP_CAT OP_BIN2NUM')
 
 
 @cache
-def response_decode_script():
-    """Replace packed z with four polynomials of three-byte LE residues."""
+def response_decode_script(*, signed=False, reuse_constants=False):
+    """Replace packed z with four range-checked polynomials of three-byte coefficients."""
     code = bytearray(asm('OP_SIZE') + number(RESPONSE_PACKED_BYTES) + asm('OP_NUMEQUALVERIFY'))
+    if signed and reuse_constants:
+        return bytes(code) + _signed_response_with_constants()
     code += asm('OP_0 OP_TOALTSTACK')
 
     radix = number(1 << RESPONSE_BITS)
@@ -41,7 +40,8 @@ def response_decode_script():
     begin_group = asm('OP_9 OP_SPLIT OP_SWAP') + _UNSIGNED
     residue = number(GAMMA1) + asm('OP_SWAP OP_SUB OP_DUP OP_ABS')
     residue += number(RESPONSE_NORM_LIMIT) + asm('OP_LESSTHAN OP_VERIFY')
-    residue += number(MODULUS) + asm('OP_ADD') + number(MODULUS) + asm('OP_MOD')
+    if not signed:
+        residue += number(MODULUS) + asm('OP_ADD') + number(MODULUS) + asm('OP_MOD')
     residue += number(COEFFICIENT_BYTES) + asm('OP_NUM2BIN')
     residue += asm('OP_FROMALTSTACK OP_SWAP OP_CAT OP_TOALTSTACK')
     coefficient = asm('OP_DUP') + radix + asm('OP_MOD') + residue + radix + asm('OP_DIV')
@@ -49,11 +49,60 @@ def response_decode_script():
     return bytes(code) + asm('OP_DROP OP_FROMALTSTACK')
 
 
+def _signed_response_with_constants():
+    # Keep gamma1, the strict norm bound and the input radix under the
+    # unread bytes. The accumulated output stays on the altstack.
+    code = asm('OP_TOALTSTACK') + number(GAMMA1) + number(RESPONSE_NORM_LIMIT)
+    code += number(1 << RESPONSE_BITS) + asm('OP_FROMALTSTACK OP_0 OP_TOALTSTACK')
+    begin = asm('OP_9 OP_SPLIT OP_SWAP') + _UNSIGNED
+
+    def checked_coefficient(depth):
+        # Duplicating z for ABS puts the norm bound at the old gamma1 depth.
+        copy_constant = number(depth) + asm('OP_PICK')
+        return (copy_constant + asm('OP_SWAP OP_SUB OP_DUP OP_ABS') + copy_constant
+                + asm('OP_LESSTHAN OP_VERIFY OP_3 OP_NUM2BIN OP_FROMALTSTACK OP_SWAP OP_CAT OP_TOALTSTACK'))
+
+    low = asm('OP_DUP OP_3 OP_PICK OP_MOD') + checked_coefficient(5) + asm('OP_2 OP_PICK OP_DIV')
+    group = begin + low * 3 + checked_coefficient(4)
+    code += group * (RESPONSE_COUNT * DEGREE // 4)
+    return code + asm('OP_2DROP OP_2DROP OP_FROMALTSTACK')
+
+
 @cache
-def hint_decode_script():
-    """Replace HintBitPack bytes with four 32-byte bitmaps, LSB-first per byte."""
+def packed_response_check_script():
+    """Verify the strict norm bound while preserving the wire encoding."""
+    coefficients = 64
+    width = coefficients * RESPONSE_BITS // 8
+    repeated_lane = sum(1 << (RESPONSE_BITS * i) for i in range(coefficients))
+    guard = push((GAMMA1 * repeated_lane).to_bytes(width, 'little'))
+    minimum = GAMMA1 - RESPONSE_NORM_LIMIT + 1
+    upper_exclusive = RESPONSE_NORM_LIMIT
+    trim = number(width + 1) + asm('OP_NUM2BIN') + number(width) + asm('OP_SPLIT OP_DROP')
+
+    code = asm('OP_SIZE') + number(RESPONSE_PACKED_BYTES) + asm('OP_NUMEQUALVERIFY OP_DUP OP_TOALTSTACK')
+    code += guard + number(minimum * repeated_lane) + number(upper_exclusive * repeated_lane)
+    code += asm('OP_FROMALTSTACK')
+
+    # [original response, guard bits, lower bound, upper bound, unread bytes].
+    # Setting bit 17 in every 18-bit lane prevents cross-lane borrows.
+    chunk = number(width) + asm('OP_SPLIT OP_SWAP OP_DUP OP_5 OP_PICK OP_OR') + _UNSIGNED
+    # A lane with bit 17 clear must have its low part at least minimum.
+    chunk += asm('OP_DUP OP_5 OP_PICK OP_SUB') + trim
+    chunk += asm('OP_2 OP_PICK OP_OR OP_6 OP_PICK OP_AND OP_6 OP_PICK OP_EQUALVERIFY')
+    # A lane with bit 17 set must have its low part below the upper bound.
+    chunk += asm('OP_3 OP_PICK OP_SUB') + trim + asm('OP_AND OP_4 OP_PICK OP_AND')
+    chunk += _UNSIGNED + asm('OP_0 OP_NUMEQUALVERIFY')
+    return code + chunk * (RESPONSE_PACKED_BYTES // width) + asm('OP_2DROP OP_2DROP')
+
+
+@cache
+def hint_decode_script(*, compact=True, sparse=False):
+    """Decode HintBitPack into bitmaps or ordered two-byte global indices."""
     code = bytearray(asm('OP_SIZE') + number(HINT_PACKED_BYTES) + asm('OP_NUMEQUALVERIFY'))
-    code += number(HINT_WEIGHT_LIMIT) + asm('OP_SPLIT OP_0')
+    code += number(HINT_WEIGHT_LIMIT) + asm('OP_SPLIT')
+    if compact or sparse:
+        return bytes(code) + _compact_hint_decode(sparse=sparse)
+    code += asm('OP_0')
 
     # [remaining indices, remaining endpoints, previous endpoint] enters each
     # row. Validate the next endpoint and split off the indices it covers.
@@ -86,13 +135,56 @@ def hint_decode_script():
     return bytes(code)
 
 
+def _compact_hint_decode(*, sparse):
+    # Check the four unsigned endpoints and the unused tail of the index array.
+    endpoint = asm('OP_1 OP_SPLIT OP_SWAP') + _UNSIGNED + asm('OP_SWAP')
+    code = endpoint * (HINT_ROWS - 1) + _UNSIGNED
+    code += asm('OP_DUP') + number(HINT_WEIGHT_LIMIT) + asm('OP_LESSTHANOREQUAL OP_VERIFY')
+    code += asm('OP_3 OP_PICK OP_3 OP_PICK OP_LESSTHANOREQUAL OP_VERIFY '
+                'OP_2 OP_PICK OP_2 OP_PICK OP_LESSTHANOREQUAL OP_VERIFY '
+                'OP_2DUP OP_LESSTHANOREQUAL OP_VERIFY OP_4 OP_ROLL OP_SWAP OP_SPLIT')
+    code += asm('OP_SIZE OP_0 OP_SWAP OP_NUM2BIN OP_EQUALVERIFY OP_TOALTSTACK')
+
+    # [end0, end1, end2, (msb), cursor, output, previous index, remaining].
+    # Global indices increase across row boundaries, including empty rows.
+    bitmap_bytes = HINT_ROWS * DEGREE // 8
+    if sparse:
+        code += asm('OP_0 OP_0')
+    else:
+        code += push(b'\x80' + bytes(bitmap_bytes - 1))
+        code += asm('OP_0 OP_0') + number(bitmap_bytes) + asm('OP_NUM2BIN')
+    code += asm('OP_1NEGATE OP_FROMALTSTACK')
+    index = asm('OP_SIZE OP_0NOTEQUAL OP_IF OP_1 OP_SPLIT OP_SWAP') + _UNSIGNED
+    mask_slots = 0 if sparse else 1
+    index += asm('OP_4 OP_PICK') + number(6 + mask_slots) + asm('OP_PICK OP_GREATERTHANOREQUAL')
+    for depth in (8, 9):
+        index += asm('OP_5 OP_PICK') + number(depth + mask_slots)
+        index += asm('OP_PICK OP_GREATERTHANOREQUAL OP_ADD')
+    index += number(DEGREE) + asm('OP_MUL OP_ADD OP_DUP OP_3 OP_PICK OP_GREATERTHAN OP_VERIFY OP_ROT OP_DROP')
+    index += asm('OP_DUP OP_2 OP_NUM2BIN')
+    if sparse:
+        index += asm('OP_3 OP_ROLL OP_SWAP OP_CAT')
+    else:
+        # Convert the global index to a big-endian shift count for a LSB-first bitmap.
+        index += push(b'\x07\x00') + asm('OP_XOR OP_BIN2NUM')
+        index += asm('OP_5 OP_PICK OP_SWAP OP_RSHIFT OP_3 OP_ROLL OP_OR')
+    index += asm('OP_ROT OP_ROT OP_SWAP')
+    index += asm('OP_TOALTSTACK OP_TOALTSTACK OP_SWAP OP_1ADD OP_SWAP '
+                 'OP_FROMALTSTACK OP_FROMALTSTACK OP_ENDIF')
+    code += index * HINT_WEIGHT_LIMIT
+    code += asm('OP_2DROP OP_TOALTSTACK OP_2DROP OP_2DROP')
+    if not sparse:
+        code += asm('OP_DROP')
+    return code + asm('OP_FROMALTSTACK')
+
+
 @cache
-def signature_decode_script():
-    """Replace a signature with [c-tilde, z residues, hint bitmaps]."""
+def signature_decode_script(*, compact=True, signed_response=False, sparse_hints=False, packed_response=False):
+    """Split a signature into c-tilde, checked z, and decoded hints."""
     code = asm('OP_SIZE') + number(SIGNATURE_BYTES) + asm('OP_NUMEQUALVERIFY')
     code += number(CHALLENGE_BYTES) + asm('OP_SPLIT')
     code += number(RESPONSE_PACKED_BYTES) + asm('OP_SPLIT')
-    return (
-        code + hint_decode_script() + asm('OP_TOALTSTACK')
-        + response_decode_script() + asm('OP_FROMALTSTACK')
-    )
+    response = (packed_response_check_script() if packed_response else
+                response_decode_script(signed=signed_response, reuse_constants=sparse_hints))
+    return (code + hint_decode_script(compact=compact, sparse=sparse_hints) + asm('OP_TOALTSTACK')
+            + response + asm('OP_FROMALTSTACK'))

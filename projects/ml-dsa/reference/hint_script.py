@@ -4,12 +4,14 @@ from functools import cache
 
 from ntt_script import COEFFICIENT_BYTES, POLYNOMIAL_BYTES
 from polynomial import DEGREE, MODULUS
+from signature_script import HINT_WEIGHT_LIMIT
 from fourthgraph.bsv.script import asm, number, push
 
 _ROWS = 4
 _HIGH_MODULUS = 44
 _LOW_MODULUS = (MODULUS - 1) // _HIGH_MODULUS
 _GAMMA2 = _LOW_MODULUS // 2
+_PACK_W1_GROUP = asm("OP_4 OP_NUM2BIN OP_3 OP_SPLIT OP_DROP")
 
 
 def _read_bytes(depth, offset, width):
@@ -26,8 +28,31 @@ def _decompose():
     return code + number(_LOW_MODULUS) + asm("OP_DIV OP_ENDIF")
 
 
+def _hint_is_clear(index):
+    return (_read_bytes(4, index // 8, 1) + push(bytes((1 << (index % 8),)))
+            + asm("OP_AND") + push(b"\0") + asm("OP_EQUAL"))
+
+
+def _unreduced_high():
+    return number(_GAMMA2 - 1) + asm("OP_ADD") + number(_LOW_MODULUS) + asm("OP_DIV")
+
+
+def _high_and_low_sign():
+    # Compute the unreduced high part in [0, 44] and whether the centered
+    # low part is positive. At high == 44 the low part is negative, including
+    # q-1, and reducing the high part modulo 44 gives the FIPS 204 wrap.
+    code = asm("OP_DUP") + _unreduced_high() + asm("OP_TUCK")
+    return code + number(_LOW_MODULUS) + asm("OP_MUL OP_GREATERTHAN")
+
+
+def _compact_use_hint(index):
+    code = _high_and_low_sign() + _hint_is_clear(index)
+    code += asm("OP_NOTIF OP_IF OP_1ADD OP_ELSE OP_1SUB OP_ENDIF OP_ELSE OP_DROP OP_ENDIF")
+    return code + number(_HIGH_MODULUS) + asm("OP_ADD") + number(_HIGH_MODULUS) + asm("OP_MOD")
+
+
 @cache
-def apply_hints_script():
+def apply_hints_script(*, compact=True):
     """Consume the packed four canonical residue rows and the 128-byte hint bitset.
 
     The hint bitset uses one LSB-first bit per coefficient, in row order. The
@@ -42,15 +67,142 @@ def apply_hints_script():
         for digit in range(4):
             index = first + digit
             code += _read_bytes(3, index * COEFFICIENT_BYTES, COEFFICIENT_BYTES)
-            code += asm("OP_BIN2NUM") + decompose
-            code += _read_bytes(4, index // 8, 1) + push(bytes((1 << (index % 8),)))
-            code += asm("OP_AND") + push(b"\0") + asm("OP_EQUAL OP_NOTIF")
-            code += asm("OP_SWAP OP_0 OP_GREATERTHAN OP_IF OP_1ADD OP_ELSE OP_1SUB OP_ENDIF")
-            code += number(_HIGH_MODULUS) + asm("OP_ADD") + number(_HIGH_MODULUS) + asm("OP_MOD")
-            code += asm("OP_ELSE OP_NIP OP_ENDIF")
+            code += asm("OP_BIN2NUM")
+            if compact:
+                code += _compact_use_hint(index)
+            else:
+                code += decompose + _hint_is_clear(index) + asm("OP_NOTIF")
+                code += asm("OP_SWAP OP_0 OP_GREATERTHAN OP_IF OP_1ADD OP_ELSE OP_1SUB OP_ENDIF")
+                code += number(_HIGH_MODULUS) + asm("OP_ADD") + number(_HIGH_MODULUS) + asm("OP_MOD")
+                code += asm("OP_ELSE OP_NIP OP_ENDIF")
             if digit:
                 code += number(1 << (6 * digit)) + asm("OP_MUL")
             code += asm("OP_ADD")
         # Script arithmetic needs a sign byte for 24-bit unsigned results.
-        code += asm("OP_4 OP_NUM2BIN OP_3 OP_SPLIT OP_DROP OP_CAT")
+        code += _PACK_W1_GROUP + asm("OP_CAT")
     return bytes(code) + asm("OP_ROT OP_DROP OP_NIP")
+
+
+@cache
+def apply_sparse_hints_script():
+    """Consume canonical residue rows and the signature decoder's sparse indices."""
+    # Form the unhinted w1 in one sequential scan of the residue bytes.
+    scales = b"".join((1 << (6 * digit)).to_bytes(3, "little") for digit in range(4))
+    code = push(scales) + asm("OP_ROT OP_ROT OP_OVER OP_SIZE")
+    code += number(_ROWS * POLYNOMIAL_BYTES) + asm("OP_NUMEQUALVERIFY OP_0 OP_SWAP")
+    high = _unreduced_high() + number(_HIGH_MODULUS) + asm("OP_MOD")
+    shift = number(64) + asm("OP_MUL OP_SWAP")
+    group = asm("OP_12 OP_SPLIT OP_SWAP OP_9 OP_SPLIT OP_BIN2NUM") + high
+    for offset in (6, 3):
+        group += shift + number(offset) + asm("OP_SPLIT OP_BIN2NUM") + high + asm("OP_ROT OP_ADD")
+    group += shift + asm("OP_BIN2NUM") + high + asm("OP_ADD")
+    group += _PACK_W1_GROUP + asm("OP_ROT OP_SWAP OP_CAT OP_SWAP")
+    code += group * (_ROWS * DEGREE // 4) + asm("OP_DROP OP_SWAP")
+
+    # [scales, residues, w1, indices]. For each checked index, find the
+    # signed change in that digit and add it at the matching six-bit place.
+    hint = asm("OP_SIZE OP_0NOTEQUAL OP_IF OP_2 OP_SPLIT OP_SWAP OP_BIN2NUM")
+    hint += asm("OP_DUP OP_4 OP_PICK OP_SWAP OP_3 OP_MUL OP_SPLIT OP_NIP "
+                "OP_3 OP_SPLIT OP_DROP OP_BIN2NUM")
+    hint += _high_and_low_sign()
+    modulus = number(_HIGH_MODULUS)
+    hint += asm("OP_OVER") + modulus + asm("OP_MOD OP_TOALTSTACK")
+    hint += asm("OP_IF OP_1ADD OP_ELSE OP_1SUB OP_ENDIF")
+    hint += modulus + asm("OP_ADD") + modulus + asm("OP_MOD OP_FROMALTSTACK OP_SUB")
+    hint += asm("OP_OVER OP_4 OP_MOD OP_3 OP_MUL OP_6 OP_PICK OP_SWAP OP_SPLIT OP_NIP "
+                "OP_3 OP_SPLIT OP_DROP OP_BIN2NUM OP_MUL OP_TOALTSTACK")
+    hint += asm("OP_4 OP_DIV OP_3 OP_MUL OP_ROT OP_SWAP OP_SPLIT OP_3 OP_SPLIT OP_SWAP")
+    hint += push(b"\x00") + asm("OP_CAT OP_BIN2NUM OP_FROMALTSTACK OP_ADD")
+    hint += _PACK_W1_GROUP + asm("OP_SWAP OP_CAT OP_CAT OP_SWAP OP_ENDIF")
+    code += hint * HINT_WEIGHT_LIMIT
+    return code + asm("OP_SIZE OP_0 OP_NUMEQUALVERIFY OP_DROP OP_NIP OP_NIP")
+
+
+def _patch_hinted_residues():
+    code = asm("OP_OVER OP_SIZE") + number(_ROWS * POLYNOMIAL_BYTES) + asm("OP_NUMEQUALVERIFY OP_DROP")
+    period = MODULUS - 1
+    # The high digit is periodic modulo q-1 and changes by one for a
+    # shift of 2*gamma2. The sign of the original low part selects the
+    # direction. At q-1 the special low part is -1, so the zero remainder
+    # correctly selects the downward shift.
+    hint = asm("OP_SIZE OP_0NOTEQUAL OP_IF OP_2 OP_SPLIT OP_SWAP OP_BIN2NUM")
+    hint += asm("OP_3 OP_MUL OP_ROT OP_SWAP OP_SPLIT OP_3 OP_SPLIT OP_SWAP OP_BIN2NUM OP_DUP")
+    hint += number(_LOW_MODULUS) + asm("OP_MOD OP_1") + number(_GAMMA2 + 1) + asm("OP_WITHIN OP_IF")
+    hint += number(_LOW_MODULUS) + asm("OP_ELSE") + number(period - _LOW_MODULUS) + asm("OP_ENDIF OP_ADD")
+    hint += number(period) + asm("OP_MOD OP_3 OP_NUM2BIN OP_SWAP OP_CAT OP_CAT OP_SWAP OP_ENDIF")
+    return code + hint * HINT_WEIGHT_LIMIT + asm("OP_SIZE OP_0 OP_NUMEQUALVERIFY OP_DROP")
+
+
+@cache
+def apply_hints_before_rounding_script():
+    """Patch the hinted residues, then round and encode all four rows."""
+    code = _patch_hinted_residues()
+
+    # Keep the rounding constants beneath the output buffer and input tail.
+    code += asm("OP_TOALTSTACK") + number(_GAMMA2 - 1) + number(_LOW_MODULUS) + number(_HIGH_MODULUS)
+    code += asm("OP_0 OP_FROMALTSTACK")
+
+    def rounded(depth):
+        return asm(f"OP_{depth} OP_PICK OP_ADD OP_{depth - 1} OP_PICK OP_DIV OP_{depth - 2} OP_PICK OP_MOD")
+
+    shift = number(64) + asm("OP_MUL OP_SWAP")
+    group = asm("OP_12 OP_SPLIT OP_SWAP OP_9 OP_SPLIT OP_BIN2NUM") + rounded(6)
+    for offset in (6, 3):
+        group += shift + number(offset) + asm("OP_SPLIT OP_BIN2NUM") + rounded(7) + asm("OP_ROT OP_ADD")
+    group += shift + asm("OP_BIN2NUM") + rounded(6) + asm("OP_ADD")
+    group += _PACK_W1_GROUP + asm("OP_ROT OP_SWAP OP_CAT OP_SWAP")
+    code += group * (_ROWS * DEGREE // 4)
+    return code + asm("OP_DROP OP_TOALTSTACK OP_2DROP OP_DROP OP_FROMALTSTACK")
+
+
+@cache
+def apply_hints_with_packed_rounding_script():
+    """Round checked, hint-adjusted residues in parallel and encode w1."""
+    lane_bits = 8 * COEFFICIENT_BYTES
+    coefficients = 64
+    width = coefficients * COEFFICIENT_BYTES
+    repeated_lane = sum(1 << (lane_bits * index) for index in range(coefficients))
+    shift = 11
+    scale = 1 << shift
+    divisor = _LOW_MODULUS // scale
+    reciprocal_scale = 1 << 18
+    reciprocal = (reciprocal_scale + divisor - 1) // divisor
+    max_biased = MODULUS - 1 + _GAMMA2 - 1
+    maximum = max_biased // scale
+    assert _LOW_MODULUS == scale * divisor
+    assert max_biased < 1 << lane_bits
+    assert maximum * reciprocal < 1 << lane_bits
+    assert all(value * reciprocal // reciprocal_scale == value // divisor for value in range(maximum + 1))
+
+    # [rounding bias, first mask, digit mask, wrap bias, wrap mask, packing
+    # factor, output, remaining residues]. All masks retain one field per lane.
+    code = _patch_hinted_residues() + asm("OP_TOALTSTACK")
+    code += number((_GAMMA2 - 1) * repeated_lane)
+    code += push((((1 << (lane_bits - shift)) - 1) * repeated_lane).to_bytes(width, "little"))
+    code += push((63 * repeated_lane).to_bytes(width, "little"))
+    code += number((64 - _HIGH_MODULUS) * repeated_lane)
+    code += push((64 * repeated_lane).to_bytes(width, "little"))
+    # The four desired products start at bits 56, 62, 68, and 74.
+    packing_factor = sum(1 << (2 + (lane_bits - 6) * index) for index in range(4))
+    code += number(packing_factor) + asm("OP_0 OP_FROMALTSTACK")
+
+    fit = number(width) + asm("OP_NUM2BIN")
+    chunk = number(width) + asm("OP_SPLIT OP_SWAP OP_BIN2NUM OP_8 OP_PICK OP_ADD")
+    # Numeric shifts move every lane. The masks clear bits shifted in from
+    # the neighboring lane. Before each shift the lane still fits in 24 bits.
+    chunk += number(scale) + asm("OP_DIV") + fit + asm("OP_7 OP_PICK OP_AND OP_BIN2NUM")
+    chunk += number(reciprocal) + asm("OP_MUL") + number(reciprocal_scale) + asm("OP_DIV")
+    chunk += fit + asm("OP_6 OP_PICK OP_AND")
+    # Isolate the lanes equal to 44 and subtract 44 from those lanes.
+    chunk += asm("OP_DUP OP_BIN2NUM OP_6 OP_PICK OP_ADD") + fit
+    chunk += asm("OP_5 OP_PICK OP_AND OP_BIN2NUM") + number(64) + asm("OP_DIV")
+    chunk += number(_HIGH_MODULUS) + asm("OP_MUL OP_SWAP OP_BIN2NUM OP_SWAP OP_SUB") + fit
+
+    # Multiplication moves four six-bit digits into bytes 7 through 9.
+    # The other products fall outside those 24 bits.
+    group = asm("OP_12 OP_SPLIT OP_SWAP OP_BIN2NUM OP_4 OP_PICK OP_MUL")
+    group += number(17) + asm("OP_NUM2BIN OP_7 OP_SPLIT OP_NIP OP_3 OP_SPLIT OP_DROP")
+    group += asm("OP_3 OP_ROLL OP_SWAP OP_CAT OP_ROT OP_ROT")
+    chunk += group * (coefficients // 4) + asm("OP_DROP")
+    code += chunk * (_ROWS * DEGREE // coefficients)
+    return code + asm("OP_DROP OP_TOALTSTACK OP_2DROP OP_2DROP OP_2DROP OP_FROMALTSTACK")
