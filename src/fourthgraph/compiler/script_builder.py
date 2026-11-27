@@ -89,9 +89,9 @@ class ScriptBuilder(SourceCompiler):
         self.formulas[name.name] = report
         self.formula_ir[name.name] = formula
 
-    def emit(self, entry, *args):
+    def emit(self, entry, *args, build_call=None):
         word = self.words.get(entry.casefold())
         if not isinstance(word, Word) or word.gives != ("script",):
             raise CompileError(f"{entry} must produce one Script")
-        result, = evaluate(word, *args)
+        result, = evaluate(word, *args, build_call=build_call)
         return result

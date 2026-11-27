@@ -153,6 +153,28 @@ done
 
 每种组合均有 625 个花费通过和 625 个花费拒绝。最短路径用 `bezier-linear` 的四 pass 计划。路径字节相同时，优先选择 pass 和有序规则合计较少的计划。实际编译耗时可从关闭追踪的运行或重放报告中读取 `metrics.compile_ns`。
 
+### 调用点选型
+
+标准库维护曲线内核及其输入范围、坐标表示和边界行为。编译器维护调用点的匹配和绑定方案，并计入转换、守卫与链接成本。用同一份 Forth 调用方和固定内核比较绑定，范围专用的内核也沿用相同的流程，调用点须先有对应的范围证据。
+
+```sh
+printf '%s\n' '{"fixture":"point-add","evaluation":"spend","enumerate":"bindings","workers":2}' |
+  python3 -m fourthgraph.workflow.protocol experiment run - > workspace/tuning/point-add.json
+python3 -m fourthgraph.workflow.protocol experiment replay workspace/tuning/point-add.json
+```
+
+点加夹具在调用点 0 使用构建期验证过的常量，可选完整射影点加或仿射右操作数点加。调用点 1 从运行时栈接收合法射影点，可选完整射影点加，或登记的 `secp256k1-add-affine-guarded` 调用方案。该方案只在右操作数的 `Z` 字节匹配规范 ScriptNum `1` 时使用仿射内核，其余输入走完整射影内核。调用方仍需满足合法曲线点契约。候选的链接大小计入检查与两个分支。夹具覆盖 `Z=0、1、2、11`，并用独立群运算和固定版 chain-gang 验收。[夹具源码](../src/fourthgraph/benchmark/fixtures/point-add.fth)
+
+可用 `"plans":[{"bindings":[{"site":1,"kernel":"secp256k1-add-affine-guarded"}]}]` 测单个显式绑定。报告在 `compile.lowering.call_sites` 给出证据、排除原因和选中实现，并分别记录守卫 `guard_bytes`、内核 `kernel_bytes` 和调用点链接字节 `bytes`。有守卫时，`adapter_bytes` 包含守卫开销。带守卫的绑定还记录两个内核的摘要和相对调用点的偏移。错曲线、重复绑定、未知调用点或前提不足的强制绑定均在编译期拒绝。
+
+| 常量调用点 | 运行时调用点 | 运行时守卫／内核／链接 | 完整路径 |
+| --- | --- | ---: | ---: |
+| 仿射 | 通用 | 0／97／97 B | 777 B |
+| 通用 | 通用 | 0／97／97 B | 789 B |
+| 通用 | 带守卫 | 7／183／190 B | 882 B |
+
+三套计划均通过同一组 13 个正例和 13 个拒绝用例。按字节数选择常量仿射加运行时通用，带守卫的运行时方案仍可重放。
+
 <a name="documentation-index"></a>
 
 ## 文档索引
