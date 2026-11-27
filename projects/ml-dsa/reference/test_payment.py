@@ -10,11 +10,13 @@ import subprocess
 from tempfile import TemporaryDirectory
 import unittest
 
-from fips204 import SIGNATURE_BYTES
+from fips204 import CHALLENGE_BYTES, GAMMA1, RESPONSE_BITS, RESPONSE_NORM_LIMIT, SIGNATURE_BYTES, _pack, _unpack
 from mldsa import test_only_vector as make_test_vector
 from payment import authorization, sign_spend
 from script import _VerifierVersion, _historical_forth_lock, _historical_lock, locking_script
 from sdk_adapter import recognize
+from signature_script import HINT_ROWS, HINT_WEIGHT_LIMIT, RESPONSE_COUNT, RESPONSE_PACKED_BYTES
+from polynomial import DEGREE
 from fourthgraph.bsv.chain_gang import validate_at_heights
 from fourthgraph.bsv.transaction import SIGHASH_TYPES, Input, Output, Transaction
 
@@ -165,6 +167,35 @@ class PaymentTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'invalid ML-DSA-44 signature'):
             sign_spend(unsigned, 1, self.funding_raw, self.public_key, lambda digest: b'')
 
+    def test_signature_boundaries_in_complete_payments(self):
+        response_end = CHALLENGE_BYTES + RESPONSE_PACKED_BYTES
+        for flag, version, height, creation in ((0x41, 1, 2, (1, 1)), (0x61, 2, 4, (1, 3))):
+            spend = self.payment(flag, version, True)
+            auth = authorization(spend, 1, 10_000, flag)
+            signature = spend.inputs[1].script[-SIGNATURE_BYTES - 1:-1]
+            self.assertEqual(spend.inputs[1].script, auth.witness(signature))
+            values = _unpack(signature[CHALLENGE_BYTES:response_end], RESPONSE_COUNT * DEGREE, RESPONSE_BITS)
+            invalid = {
+                'short signature': signature[:-1],
+                'long signature': signature + b'\x00',
+                'hint weight over limit': signature[:-1] + bytes((HINT_WEIGHT_LIMIT + 1,)),
+                'nonzero hint padding': signature[:response_end] + bytes(HINT_WEIGHT_LIMIT - 1)
+                + b'\x80' + bytes(HINT_ROWS),
+            }
+            for position, value in product((0, len(values) - 1),
+                                           (GAMMA1 - RESPONSE_NORM_LIMIT, GAMMA1 + RESPONSE_NORM_LIMIT)):
+                changed = values.copy()
+                changed[position] = value
+                invalid[f'response norm at {position}, value {value}'] = (
+                    signature[:CHALLENGE_BYTES] + _pack(changed, RESPONSE_BITS) + signature[response_end:]
+                )
+            with self.subTest(sighash=hex(flag), case='valid control'):
+                self.check_spend(spend, True, height, creation)
+            for case, malformed in invalid.items():
+                with self.subTest(sighash=hex(flag), case=case):
+                    candidate = spend.with_script(1, auth.witness(malformed))
+                    self.check_spend(candidate, False, height, creation)
+
     def test_historical_locks_remain_recognizable_and_spendable(self):
         earlier = (
             (_historical_lock(self.public_key, compact=False),
@@ -187,6 +218,8 @@ class PaymentTests(unittest.TestCase):
              '7be7166abb197839427b20ba9115a63f4432cc581caff5d527d638abea6ada58'),
             (_historical_forth_lock(self.public_key, version=_VerifierVersion.V09),
              'b31c775465ff2767848e7ced89784f64d36d3146f4c66e3952c06d72bf491f59'),
+            (_historical_forth_lock(self.public_key, version=_VerifierVersion.V10),
+             '2588e18265ec05730b7b72db4eb73c426fde9112719fccb161ffa765ed465af9'),
         )
         for previous_lock, fingerprint in earlier:
             self.assertEqual(sha256(previous_lock).hexdigest(), fingerprint)

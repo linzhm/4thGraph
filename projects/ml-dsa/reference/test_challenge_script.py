@@ -33,7 +33,8 @@ class ChallengeScriptTests(unittest.TestCase):
             validate_at_heights(spend, (parent,), **args)
 
     def test_challenge_matches_fips_204_across_chronicle(self):
-        script = sample_in_ball_script(signed=True, search=True, vector_bytes=True)
+        script = sample_in_ball_script(signed=True, search=True, vector_bytes=True,
+                                       direct_absorb=True, find_by_borrow=True)
         for challenge in (bytes(32), bytes(range(32)), b'\xff' * 32):
             expected = pack(sample_challenge(challenge), signed=True)
             for version in (1, 2):
@@ -44,10 +45,11 @@ class ChallengeScriptTests(unittest.TestCase):
     def test_appendix_c_limit_can_consume_the_last_byte(self):
         self.assertEqual(SAMPLE_IN_BALL_BYTES, 221)
         stream = b'\xff' * (SAMPLE_IN_BALL_BYTES - CHALLENGE_WEIGHT) + bytes(range(CHALLENGE_WEIGHT))
-        for signed, search in ((False, False), (True, False), (True, True)):
-            script = sample_from_stream_script(signed=signed, search=search)
+        for signed, search, find_by_borrow in ((False, False, False), (True, False, False),
+                                               (True, True, False), (True, True, True)):
+            script = sample_from_stream_script(signed=signed, search=search, find_by_borrow=find_by_borrow)
             expected = pack([-1] * CHALLENGE_WEIGHT + [0] * (256 - CHALLENGE_WEIGHT), signed=signed)
-            with self.subTest(signed=signed, search=search):
+            with self.subTest(signed=signed, search=search, find_by_borrow=find_by_borrow):
                 self.check(script, stream, expected)
                 self.check(script, b'\xff' + stream[:-1], None)
                 self.check(script, b'\xff' * SAMPLE_IN_BALL_BYTES, None)
@@ -58,7 +60,7 @@ class ChallengeScriptTests(unittest.TestCase):
         draws = b''.join(bytes((i + 1, i)) for i in range(first, DEGREE - 1)) + b'\xff'
         stream = (b'\x55' * CHALLENGE_SIGN_BYTES + draws).ljust(SAMPLE_IN_BALL_BYTES, b'\x00')
         coefficients = [0] * first + [(-1 if i % 2 == 0 else 1) for i in range(CHALLENGE_WEIGHT)]
-        code = push(stream) + sample_from_stream_script(signed=True, search=True)
+        code = push(stream) + sample_from_stream_script(signed=True, search=True, find_by_borrow=True)
         code += push(pack(coefficients, signed=True)) + asm('OP_EQUAL')
         script = Script()
         script.append_data(code)

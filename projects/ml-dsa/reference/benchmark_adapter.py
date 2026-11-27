@@ -57,7 +57,8 @@ def components(_samples):
         ("v0.7.0", _VerifierVersion.V07, _historical_forth_lock(payment_key, version=_VerifierVersion.V07)),
         ("v0.8.0", _VerifierVersion.V08, _historical_forth_lock(payment_key, version=_VerifierVersion.V08)),
         ("v0.9.0", _VerifierVersion.V09, _historical_forth_lock(payment_key, version=_VerifierVersion.V09)),
-        ("optimized", _VerifierVersion.V10, locking_script(payment_key)),
+        ("v0.10.0", _VerifierVersion.V10, _historical_forth_lock(payment_key, version=_VerifierVersion.V10)),
+        ("optimized", _VerifierVersion.V11, locking_script(payment_key)),
     )
     payment_sizes = {}
     for label, version, lock in profiles:
@@ -71,7 +72,8 @@ def components(_samples):
                                                    packed_rows=shake["packed_rows"])),
             "signature_decode": len(signature),
             "sample_in_ball": len(sample_in_ball_script(**shake, signed=version >= _VerifierVersion.V07,
-                                                       search=version >= _VerifierVersion.V10)),
+                                                       search=version >= _VerifierVersion.V10,
+                                                       find_by_borrow=version >= _VerifierVersion.V11)),
             "apply_hints": len(_hints_script(version)),
             "shake256_832_to_32": len(shake256_script(832, 32, **shake)),
             "input_binding": len(check_binding(COMPANION_CODE, compact=version >= _VerifierVersion.V05)),
@@ -102,7 +104,8 @@ def components(_samples):
         },
         "sampler_without_shake_bytes": {
             "v0.9.0": len(sample_from_stream_script(signed=True)),
-            "optimized": len(sample_from_stream_script(signed=True, search=True)),
+            "v0.10.0": len(sample_from_stream_script(signed=True, search=True)),
+            "optimized": len(sample_from_stream_script(signed=True, search=True, find_by_borrow=True)),
         },
         "payment_script_bytes": payment_sizes,
     }

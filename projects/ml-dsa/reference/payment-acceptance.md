@@ -51,12 +51,31 @@ checks unique group and case IDs and matching test ID sets against the answer
 file. The Wycheproof driver checks unique case IDs and the published case count.
 [NIST FIPS 204](https://csrc.nist.gov/pubs/fips/204/final)
 
+## Boundary rejection
+
+The boundary suite runs 92 vectors through each of three activation contexts.
+The vectors contain 15 valid controls and 77 expected rejections. They cover
+signed integers that fit or overflow the 3-, 26-, and 104-byte serialization
+widths, noncanonical NTT residues, packed response norms, hint lengths and
+ordering, negative and out-of-range hint indices, and exhausted or malformed
+sampler input. SHAKE cases check the exact message length at a rate boundary.
+Each rejection fixture ends in `OP_1` and requires script execution to fail
+before that point. The chain-gang assertions check the exact `OP_NUM2BIN`
+failure for numeric overflow and the `OP_SPLIT` failures for invalid indices.
+[Boundary suite](test_boundaries.py)
+
+The payment suite also checks one valid BIP143 ALL payment and one valid OTDA
+ALL payment, then tests eight malformed signature encodings against each.
+All 16 mutations must fail with their transaction and preimage held fixed.
+[Payment suite](test_payment.py)
+
 ## Replay
 
 ```sh
 python -m pip install -r tools/requirements-chronicle.txt
 PYTHONPATH=src:.:projects/ml-dsa/reference python -m unittest -v test_payment
 PYTHONPATH=src:.:projects/ml-dsa/reference bash tools/verify_node.sh test_payment
+REGTEST_CHRONICLE_HEIGHT=3 PYTHONPATH=src:.:projects/ml-dsa/reference bash tools/verify_node.sh test_boundaries
 ```
 
 Set `ML_DSA_BSVS` to the absolute path to the Lean `bsvs` executable to add
@@ -73,9 +92,10 @@ BSV Node 1.2.3 (`101020300`), and Lean `bsvs` from revision
 The pinned corpora also matched 15/15 ACVP cases in Python and Script and
 80/80 Wycheproof cases in Python.
 
-The compact lock and the Forth locks from v0.2.0 through v0.10.0 each matched
+The compact lock and the Forth locks from v0.2.0 through v0.11.0 each matched
 all 640 rows with the same chain-gang pin and BSV Node 1.2.3. The isolated node used
 `-maxstdtxvalidationduration=5000` and `-maxnonstdtxvalidationduration=7000`.
-The v0.10.0 suite reproduced all ten earlier locks' SHA-256 fingerprints and
+The v0.11.0 suite reproduced all eleven earlier locks' SHA-256 fingerprints and
 spent each in BIP143 ALL, OTDA ALL and unpaired OTDA SINGLE on both engines.
-[v0.10.0 measurements](../versions/v0.10.0/measurements.json)
+BSV Node and chain-gang matched all 276 boundary checks and the 18 additional
+payment checks. [v0.11.0 measurements](../versions/v0.11.0/measurements.json)

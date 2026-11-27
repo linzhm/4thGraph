@@ -315,8 +315,13 @@ def _reverse_rate_bytes(*, above):
     return code
 
 
+def _zero_bytes(size):
+    return asm('OP_0') + number(size) + asm('OP_NUM2BIN')
+
+
 def _shake_script(message_bytes, output_bytes, rate, *, compact=True, optimize=True,
-                  packed_rows=True, packed_state=True, stream_rows=True, vector_bytes=True):
+                  packed_rows=True, packed_state=True, stream_rows=True, vector_bytes=True,
+                  direct_absorb=True):
     if type(message_bytes) is not int or message_bytes < 0:
         raise ValueError('message length must be a nonnegative integer')
     if type(output_bytes) is not int or output_bytes < 1:
@@ -333,7 +338,12 @@ def _shake_script(message_bytes, output_bytes, rate, *, compact=True, optimize=T
     vector_bytes = vector_bytes and packed_state
     if vector_bytes:
         code += _byte_swap_masks(rate)
-    code += push(padding) + asm('OP_CAT') + push(bytes(_STATE_BYTES))
+    if direct_absorb and len(padding) >= 10:
+        code += push(padding[:1]) + _zero_bytes(len(padding) - 2) + asm('OP_CAT')
+        code += push(padding[-1:]) + asm('OP_CAT')
+    else:
+        code += push(padding)
+    code += asm('OP_CAT')
     # Keep all state lanes big-endian across permutations. Convert only the
     # bytes that cross the sponge boundary, in FIPS 202 little-endian order.
     if packed_state:
@@ -343,12 +353,18 @@ def _shake_script(message_bytes, output_bytes, rate, *, compact=True, optimize=T
     else:
         permutation = keccak_f1600_script(compact=compact, optimize=optimize, packed_rows=packed_rows)
         absorb_bytes = squeeze_bytes = b''
-    absorb = (
-        asm('OP_SWAP') + number(rate) + asm('OP_SPLIT OP_TOALTSTACK') + absorb_bytes
-        + push(bytes(_STATE_BYTES - rate)) + asm('OP_CAT OP_XOR')
-        + permutation + asm('OP_FROMALTSTACK OP_SWAP')
-    )
-    code += absorb * (blocks + 1) + asm('OP_NIP')
+    split_block = number(rate) + asm('OP_SPLIT OP_TOALTSTACK')
+    permute_block = permutation + asm('OP_FROMALTSTACK OP_SWAP')
+    capacity = (_zero_bytes(_STATE_BYTES - rate) if direct_absorb else push(bytes(_STATE_BYTES - rate)))
+    absorb = asm('OP_SWAP') + split_block + absorb_bytes + capacity + asm('OP_CAT OP_XOR') + permute_block
+    if direct_absorb:
+        # The first XOR would be against the all-zero state.
+        first_bytes = _reverse_rate_bytes(above=0) if vector_bytes else absorb_bytes
+        code += split_block + first_bytes + capacity + asm('OP_CAT') + permute_block
+        code += absorb * blocks
+    else:
+        code += push(bytes(_STATE_BYTES)) + absorb * (blocks + 1)
+    code += asm('OP_NIP')
 
     extra_blocks, final_index = divmod(output_bytes - 1, rate)
     # One accumulator concatenates successive rate blocks. Each permutation
@@ -385,8 +401,8 @@ def shake128_script(message_bytes, output_bytes):
 
 
 def shake256_script(message_bytes, output_bytes, *, compact=True, optimize=True, packed_rows=True,
-                    packed_state=True, stream_rows=True, vector_bytes=True):
+                    packed_state=True, stream_rows=True, vector_bytes=True, direct_absorb=True):
     """Replace a byte vector of the specified length with a SHAKE256 XOF."""
     return _shake_script(message_bytes, output_bytes, rate=136, compact=compact, optimize=optimize,
                          packed_rows=packed_rows, packed_state=packed_state, stream_rows=stream_rows,
-                         vector_bytes=vector_bytes)
+                         vector_bytes=vector_bytes, direct_absorb=direct_absorb)

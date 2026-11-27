@@ -22,7 +22,9 @@ from test_mldsa import (
 
 
 def _case(kernel, values, expected):
-    lock = kernel + push(expected) + asm("OP_EQUAL")
+    # For rejection fixtures the kernel must fail before the final OP_1.
+    finish = asm("OP_DROP OP_1") if expected is None else push(expected) + asm("OP_EQUAL")
+    lock = kernel + finish
     parent = Transaction((Input(b"\x3e" * 32, 0),), (Output(10_000, lock),))
     witness = b"".join(push(value) for value in values)
     spend = Transaction((Input(parent.txid_wire(), 0, witness),), (Output(9_900, asm("OP_1")),))

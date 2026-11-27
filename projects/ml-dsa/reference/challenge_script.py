@@ -38,12 +38,12 @@ def _sample_byte(width, *, signed):
 
 
 @cache
-def sample_from_stream_script(*, signed=False, search=False):
+def sample_from_stream_script(*, signed=False, search=False, find_by_borrow=False):
     """Decode a SHAKE256 prefix into three-byte residues or one-byte signed coefficients."""
     width = 1 if signed else _COEFFICIENT_BYTES
     shape = asm('OP_SIZE') + number(SAMPLE_IN_BALL_BYTES) + asm('OP_NUMEQUALVERIFY')
     if search and signed:
-        return shape + _search_sample_script()
+        return shape + _search_sample_script(find_by_borrow=find_by_borrow)
     shape += number(CHALLENGE_SIGN_BYTES) + asm('OP_SPLIT OP_SWAP')
     shape += _UNSIGNED + asm('OP_0')
     shape += number(DEGREE * width) + asm('OP_NUM2BIN') + number(DEGREE - CHALLENGE_WEIGHT)
@@ -54,7 +54,7 @@ def sample_from_stream_script(*, signed=False, search=False):
     return shape + draws + end
 
 
-def _search_sample_script():
+def _search_sample_script(*, find_by_borrow):
     """Find one acceptable byte per selection using parallel comparisons."""
     first = DEGREE - CHALLENGE_WEIGHT
     assert DEGREE == 256 and 128 <= first < DEGREE
@@ -75,14 +75,19 @@ def _search_sample_script():
     padded = asm('OP_DUP OP_4 OP_PICK OP_CAT') + width + asm('OP_SPLIT OP_DROP')
     test = asm('OP_DUP OP_7 OP_PICK OP_OR') + _UNSIGNED
     accepted_mask = fit + asm('OP_AND OP_6 OP_PICK OP_AND OP_6 OP_PICK OP_XOR OP_1 OP_RSHIFT')
-    # Move the indicators from 0x80 to 0x40 before testing numeric zero.
-    accepted_mask += asm('OP_DUP OP_BIN2NUM OP_0NOTEQUAL OP_VERIFY OP_0 OP_SWAP')
-    search = b''
-    for level in reversed(range(DEGREE.bit_length() - 1)):
-        half = number(1 << level)
-        search += half + asm('OP_SPLIT OP_SWAP OP_DUP OP_BIN2NUM OP_0NOTEQUAL OP_IF OP_NIP')
-        search += asm('OP_ELSE OP_DROP OP_SWAP') + half + asm('OP_ADD OP_SWAP OP_ENDIF')
-    search += asm('OP_DROP')
+    # Indicators are now 0x40 so their high bit cannot become a numeric sign.
+    if find_by_borrow:
+        # XORing x with x-1 leaves 0xff in every byte below the first hit,
+        # 0x7f at the hit and zero above it. Its minimal size is index + 1.
+        search = asm('OP_DUP OP_BIN2NUM OP_DUP OP_0NOTEQUAL OP_VERIFY OP_1SUB')
+        search += width + asm('OP_NUM2BIN OP_XOR OP_BIN2NUM OP_SIZE OP_NIP OP_1SUB')
+    else:
+        search = asm('OP_DUP OP_BIN2NUM OP_0NOTEQUAL OP_VERIFY OP_0 OP_SWAP')
+        for level in reversed(range(DEGREE.bit_length() - 1)):
+            half = number(1 << level)
+            search += half + asm('OP_SPLIT OP_SWAP OP_DUP OP_BIN2NUM OP_0NOTEQUAL OP_IF OP_NIP')
+            search += asm('OP_ELSE OP_DROP OP_SWAP') + half + asm('OP_ADD OP_SWAP OP_ENDIF')
+        search += asm('OP_DROP')
 
     # Consume up to and including the first acceptable byte. The last
     # selection accepts every byte, but still requires a remaining draw.
@@ -105,9 +110,10 @@ def _search_sample_script():
 
 @cache
 def sample_in_ball_script(*, compact=True, optimize=True, packed_rows=True, packed_state=True,
-                          stream_rows=True, vector_bytes=False, signed=False, search=False):
+                          stream_rows=True, vector_bytes=False, direct_absorb=False, signed=False,
+                          search=False, find_by_borrow=False):
     """Replace c-tilde32 with the packed coefficients of c."""
     shake = shake256_script(CHALLENGE_BYTES, SAMPLE_IN_BALL_BYTES, compact=compact, optimize=optimize,
                             packed_rows=packed_rows, packed_state=packed_state, stream_rows=stream_rows,
-                            vector_bytes=vector_bytes)
-    return shake + sample_from_stream_script(signed=signed, search=search)
+                            vector_bytes=vector_bytes, direct_absorb=direct_absorb)
+    return shake + sample_from_stream_script(signed=signed, search=search, find_by_borrow=find_by_borrow)
