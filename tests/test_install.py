@@ -69,6 +69,10 @@ class InstallTests(unittest.TestCase):
             self.assertTrue(p256["script_hex"].endswith(fragment["script_hex"]))
             self.assertEqual({library["name"] for library in p256["libraries"]}, {"std/bsv", "std/p256"})
 
+            joint = json.loads(run("4thgraph", "curve-multiply", "--curve", "secp256k1", "--operation", "joint"))
+            self.assertEqual(joint["selected"], "glv-joint-window-2")
+            self.assertEqual(len(bytes.fromhex(joint["script_hex"])), joint["candidates"][0]["script_bytes"])
+
             catalog = json.loads(run("4thgraph", "--capabilities"))["libraries"]
             wallet_probe = """
 from dataclasses import asdict

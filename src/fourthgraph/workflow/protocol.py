@@ -1011,6 +1011,9 @@ def compile_search(program, keys, task_id, *, source_bytes, mode="auto", gate_bo
 
 
 def main():
+    if sys.argv[1:2] == ["curve-multiply"]:
+        from fourthgraph.workflow.curve_cli import main as curve_main
+        return curve_main(sys.argv[2:])
     if sys.argv[1:2] == ["preimage-constructor"]:
         from fourthgraph.workflow.preimage_constructor import main as constructor_main
         return constructor_main(sys.argv[2:])
@@ -1018,7 +1021,7 @@ def main():
         from fourthgraph.workflow.pels import witness_main
         return witness_main(sys.argv[2:])
     cli = argparse.ArgumentParser(prog=PROJECT_NAME, description=PROJECT_DESCRIPTION,
-                                  epilog="Subcommands: experiment, pels-witness, preimage-constructor.")
+                                  epilog="Subcommands: experiment, pels-witness, preimage-constructor, curve-multiply.")
     if sys.argv[1:2] == ["experiment"]:
         from fourthgraph.benchmark.experiment import main as experiment_main
         return experiment_main(sys.argv[2:])
@@ -1068,6 +1071,8 @@ def main():
         if args.optimize != BASELINE or args.assume_input_ranges:
             cli.error("entry optimization and range options do not apply to PELS successor linking")
     if args.capabilities:
+        from fourthgraph.compiler.curve_windows import CURVES, scalar_plans
+
         print(json.dumps({"project": PROJECT_NAME, "compiler_version": PROJECT_VERSION, "description": PROJECT_DESCRIPTION,
                           **capabilities(), "libraries": library_capabilities(),
                           "optimizations": OPTIMIZATIONS, "join_witnesses": JOIN_WITNESSES,
@@ -1080,6 +1085,11 @@ def main():
                                              "sighash_policies": ("bip143", "auto")},
                           "preimage_constructor": {"command": "preimage-constructor", "modes": ("auto", "literal"),
                                                    "prepared_wasm_receipt": True},
+                          "curve_multiply": {"command": "curve-multiply", "curves": {
+                              name: {"generator": [plan.name for plan in scalar_plans(curve) if plan.eligible],
+                                     "joint": [plan.name for plan in scalar_plans(curve, joint=True) if plan.eligible]}
+                              for name, curve in CURVES.items()
+                          }},
                           "search_objectives": OBJECTIVES,
                           "gate_boundaries": GATE_BOUNDARIES, "targets": {
             name: {"transaction_versions": versions, "era": era} for name, (versions, era) in TARGETS.items()

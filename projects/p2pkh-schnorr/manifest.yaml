@@ -136,8 +136,9 @@ sections:
         The curve tests compare scaled point operations and GLV rounding with independent references and
         replay correct and incorrect results in both engines. [Payment tests](reference/test_schnorr.py)
         · [Curve tests](../../tests/test_secp256k1_library.py)
-      - The high-level Forth experiment compares a plain binary verifier with automatic compiler passes
+      - The high-level Forth experiment compares the plain binary verifier, the automatic 64-window GLV verifier,
         and the v0.17.0 hand-tuned build. [Build and replay](docs/high-level-forth.en.md)
+        · [64-window results](docs/high-level-forth.en.md#64-window-lowering)
     zh-CN:
       - |-
         ```sh
@@ -149,7 +150,8 @@ sections:
         OTDA 有同索引输出时的全部 12 种签名模式，使用交易版本 1 和 2。测试覆盖过时的锁定时间、ALL/NONE/SINGLE 的输出承诺、错误坐标、所有者校验、手续费平衡和 Chronicle
         激活。验签器测试覆盖两张查表及无穷远点。曲线测试用独立参考实现核对缩放点运算及 GLV 舍入，并在双引擎上复放正确和错误的结果。[付款测试](reference/test_schnorr.py)
         · [曲线测试](../../tests/test_secp256k1_library.py)
-      - 高阶 Forth 实验对比普通二进制验签器的基线、同源自动优化结果和 v0.17.0 手工版本。[构建与复放](docs/high-level-forth.zh-CN.md)
+      - 高阶 Forth 实验对比普通二进制验签器、自动编译的 64 窗口 GLV 验签器和 v0.17.0 手工版本。[构建与复放](docs/high-level-forth.zh-CN.md)
+        · [64 窗口结果](docs/high-level-forth.zh-CN.md#64-window-lowering)
   script_sizes:
     en:
       - |-
