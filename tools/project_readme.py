@@ -9,7 +9,7 @@ from tempfile import TemporaryDirectory
 
 
 ROOT = Path(__file__).resolve().parents[1]
-TEMPLATES = ROOT / "tools" / "templates" / "project-readme"
+TEMPLATES = ROOT / "projects" / "template"
 PROJECT_SLUG = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*")
 VERSION = re.compile(r"[0-9]+\.[0-9]+\.[0-9]+")
 LINE = re.compile(r"[^\r\n]*\S[^\r\n]*")
@@ -217,12 +217,36 @@ def check(project, expected=None):
     print(f"Checked {project.relative_to(ROOT)} README pair")
 
 
+def scaffold_project(project, data):
+    if project.exists():
+        raise FileExistsError(f"{project.relative_to(ROOT)} already exists")
+    rendered = render_pair(project, data, generated=True)
+    with TemporaryDirectory(dir=project.parent) as temporary:
+        staging = Path(temporary) / project.name
+        staging.mkdir()
+        for name in ("docs", "reference", "versions"):
+            (staging / name).mkdir()
+        (staging / "manifest.json").write_text(
+            json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8",
+        )
+        for filename, content in rendered.items():
+            (staging / filename).write_text(content, encoding="utf-8", newline="\n")
+        project.mkdir()
+        try:
+            staging.replace(project)
+        except OSError:
+            project.rmdir()
+            raise
+    print(f"Created {project.relative_to(ROOT)}. Edit manifest.json, then run with --write.")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("project", help="project directory name under projects/")
     parser.add_argument("--title", help="English draft title (defaults to the project name)")
     parser.add_argument("--title-zh", help="Chinese draft title (defaults to the English title)")
     mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--scaffold", action="store_true", help="create a new project with docs, source, and version directories")
     mode.add_argument("--init", action="store_true", help="create an editable project manifest")
     mode.add_argument("--write", action="store_true", help="regenerate both READMEs from the project manifest")
     mode.add_argument("--check", action="store_true", help="check the README pair and any manifest drift")
@@ -230,6 +254,8 @@ def main():
     if not PROJECT_SLUG.fullmatch(args.project):
         parser.error("use a lowercase project directory name, for example my-project")
     project = ROOT / "projects" / args.project
+    if project == TEMPLATES:
+        parser.error("projects/template is reserved for the shared README templates")
     if project.is_symlink():
         parser.error("the project directory must be under projects/")
     manifest = project / "manifest.json"
@@ -239,14 +265,18 @@ def main():
         if args.check and not manifest.is_file():
             check(project)
             return
-        if args.init or not manifest.is_file():
+        if args.init or args.scaffold or not manifest.is_file():
             data = read_json(TEMPLATES / "manifest.example.json")
             title = args.title or args.project
             data["title"] = {"en": title, "zh-CN": args.title_zh or title}
         else:
             data = read_json(manifest)
+        if args.init or args.scaffold:
+            data["$schema"] = f"../{TEMPLATES.name}/manifest.schema.json"
+        if args.scaffold:
+            scaffold_project(project, data)
+            return
         if args.init:
-            data["$schema"] = "../../tools/templates/project-readme/manifest.schema.json"
             validate_manifest(data)
             project.mkdir(exist_ok=True)
             with manifest.open("x", encoding="utf-8", newline="\n") as output:

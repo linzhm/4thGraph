@@ -17,16 +17,16 @@ SOURCE_DIRECTORIES = ('.github', 'docs', 'projects', 'sdk', 'showcase', 'skills'
 BUILD_DIRECTORIES = {'.git', '.venv', '__pycache__', 'node_modules', 'target', 'workspace'}
 
 
+def tracked_files(root, pathspec):
+    tracked = subprocess.run(
+        ['git', 'ls-files', '-z', '--', pathspec], cwd=root, check=True, capture_output=True,
+    ).stdout
+    return (root / os.fsdecode(name) for name in tracked.split(b'\0') if name)
+
+
 def markdown_files(root):
     if (root / '.git').exists() and which('git'):
-        tracked = subprocess.run(
-            ['git', 'ls-files', '-z', '--', '*.md'], cwd=root, check=True, capture_output=True,
-        ).stdout
-        for name in tracked.split(b'\0'):
-            if name:
-                path = root / os.fsdecode(name)
-                if path.is_file():
-                    yield path
+        yield from (path for path in tracked_files(root, '*.md') if path.is_file())
         return
 
     # Source exports have no index. Walk the repository's documentation roots
@@ -40,6 +40,19 @@ def markdown_files(root):
                     yield Path(current) / name
 
 
+def project_directories(root):
+    projects = root / "projects"
+    if (root / ".git").exists() and which("git"):
+        candidates = {path.parent.parent for path in projects.glob("*/versions/index.json")}
+        for path in tracked_files(root, "projects"):
+            relative = path.relative_to(projects)
+            if len(relative.parts) > 1:
+                candidates.add(projects / relative.parts[0])
+    else:
+        candidates = {path for path in projects.iterdir() if path.is_dir()}
+    return sorted(candidates - {projects / "template"})
+
+
 def write_markdown(root, relative, target):
     path = root / relative
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -48,9 +61,9 @@ def write_markdown(root, relative, target):
 
 
 def readme_tool_fixture(root):
-    (root / "projects").mkdir()
-    copytree(ROOT / "tools/templates/project-readme", root / "tools/templates/project-readme")
+    copytree(ROOT / "projects/template", root / "projects/template")
     tool = root / "tools/project_readme.py"
+    tool.parent.mkdir()
     copy2(ROOT / "tools/project_readme.py", tool)
     return tool
 
@@ -73,7 +86,7 @@ class LayoutTests(unittest.TestCase):
         self.check_local_links(ROOT)
 
     def test_project_version_catalogs(self):
-        for project in sorted(path for path in (ROOT / "projects").iterdir() if path.is_dir()):
+        for project in project_directories(ROOT):
             with self.subTest(project=project.name):
                 versions = project / "versions"
                 index = json.loads((versions / "index.json").read_text())
@@ -182,6 +195,12 @@ class LayoutTests(unittest.TestCase):
             data = json.loads(manifest.read_text(encoding="utf-8"))
             self.assertEqual(data["schema_version"], 1)
             self.assertEqual(data["title"], {"en": "Example", "zh-CN": "示例"})
+            self.assertEqual((project / data["$schema"]).resolve(),
+                             root.resolve() / "projects/template/manifest.schema.json")
+            reserved = subprocess.run([sys.executable, tool, "template", "--init"],
+                                      cwd=root, capture_output=True, text=True)
+            self.assertNotEqual(reserved.returncode, 0)
+            self.assertFalse((root / "projects/template/manifest.json").exists())
 
             data["summary"] = {"en": "Overview.", "zh-CN": "项目介绍。"}
             data["entry_points"] = []
@@ -224,11 +243,34 @@ class LayoutTests(unittest.TestCase):
 
     def test_generated_project_readmes_match_their_manifests(self):
         tool = ROOT / "tools/project_readme.py"
-        for manifest in sorted((ROOT / "projects").glob("*/manifest.json")):
-            with self.subTest(project=manifest.parent.name):
-                checked = subprocess.run([sys.executable, tool, manifest.parent.name, "--check"],
+        for project in project_directories(ROOT):
+            if not (project / "manifest.json").is_file():
+                continue
+            with self.subTest(project=project.name):
+                checked = subprocess.run([sys.executable, tool, project.name, "--check"],
                                          cwd=ROOT, capture_output=True, text=True)
                 self.assertEqual(checked.returncode, 0, checked.stderr)
+
+    def test_new_project_scaffold_creates_a_draft_without_claiming_a_version(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            tool = readme_tool_fixture(root)
+            command = [sys.executable, tool, "demo", "--scaffold", "--title", "Demo", "--title-zh", "示例"]
+            created = subprocess.run(command, cwd=root, capture_output=True, text=True)
+            self.assertEqual(created.returncode, 0, created.stderr)
+            project = root / "projects/demo"
+            self.assertEqual({path.name for path in project.iterdir()},
+                             {"manifest.json", "README.md", "README.zh-CN.md", "docs", "reference", "versions"})
+            for name in ("docs", "reference", "versions"):
+                self.assertTrue((project / name).is_dir())
+            self.assertFalse((project / "versions/index.json").exists())
+            self.assertIn("# Demo", (project / "README.md").read_text(encoding="utf-8"))
+            self.assertIn("# 示例", (project / "README.zh-CN.md").read_text(encoding="utf-8"))
+            project_readme = project / "README.md"
+            project_readme.write_text("Existing project content.\n", encoding="utf-8")
+            duplicate = subprocess.run(command, cwd=root, capture_output=True, text=True)
+            self.assertNotEqual(duplicate.returncode, 0)
+            self.assertEqual(project_readme.read_text(encoding="utf-8"), "Existing project content.\n")
 
     def check_local_links(self, root):
         for path in markdown_files(root):

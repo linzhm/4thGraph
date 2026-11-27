@@ -1,5 +1,5 @@
 {
-  "$schema": "../../tools/templates/project-readme/manifest.schema.json",
+  "$schema": "../template/manifest.schema.json",
   "schema_version": 1,
   "title": {
     "en": "P2PKH-Schnorr",
