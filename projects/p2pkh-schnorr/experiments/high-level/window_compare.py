@@ -55,8 +55,9 @@ def compare_output_regions(builds, base):
     """The model adapters may move across the linked call, so use the loop as the boundary."""
     loop = manual_window_sequence(ScriptBuilder("REQUIRE stdlib/bip340.fth"))
     regions = {}
-    for name in (base, base + "/fused", base + "/paired", base + "/tuned"):
-        detached, _ = builds[name]
+    for name, (detached, _) in builds.items():
+        if name != base and not name.startswith(base + "/"):
+            continue
         offset = detached.find(loop)
         if offset < 0:
             regions[name] = {"identical_window_script": False}
@@ -72,7 +73,10 @@ def main():
     parser.add_argument("--samples", type=int, default=12)
     parser.add_argument("--matrix-only", action="store_true", help="replay the eight automatic transaction shapes")
     parser.add_argument("--joint-lowerings", action="store_true", help="compare the joint lowering candidates")
+    parser.add_argument("--forth-tuning", action="store_true", help="include the tuned Forth verifier")
     args = parser.parse_args()
+    if args.forth_tuning and not args.joint_lowerings:
+        parser.error("--forth-tuning requires --joint-lowerings")
     engine = chain_metadata()
     if not os.environ.get("REGTEST_URL") or engine["commit"] != CONTEXT_PIN or args.samples < 1:
         parser.error("use pinned chain-gang, positive --samples, and tools/verify_node.sh")
@@ -100,7 +104,8 @@ def main():
             variants[label] = detached, lock
             scaled_joint_codes[label] = joint_code[0]
             rewrites[label] = info["runtime_rewrites"]
-        for comparison in ("fused", "paired", "tuned"):
+        comparisons = ("fused", "paired", "tuned") if args.forth_tuning else ("fused", "paired")
+        for comparison in comparisons:
             label = f"{batch_label}/{comparison}"
             joint_code = []
             detached, lock, info, _ = compile_window_candidate(dataflow, linked=True, strategy=GLV_SCALED,

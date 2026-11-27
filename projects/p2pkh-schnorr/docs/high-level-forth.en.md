@@ -233,8 +233,8 @@ The joint word and its 18,379 B window sequence are byte-identical between the a
 ```sh
 PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
   "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/experiments/high-level/window_compare.py \
-  --joint-lowerings --output workspace/schnorr-high-level/forth-tuning-measurements.json
+  --joint-lowerings --forth-tuning --output workspace/schnorr-high-level/forth-tuning-measurements.json
 REGTEST_CHRONICLE_HEIGHT=5 PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
   "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/experiments/high-level/window_compare.py \
-  --joint-lowerings --matrix-only --output workspace/schnorr-high-level/forth-tuning-matrix.json
+  --joint-lowerings --forth-tuning --matrix-only --output workspace/schnorr-high-level/forth-tuning-matrix.json
 ```
