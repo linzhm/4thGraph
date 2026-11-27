@@ -27,6 +27,17 @@ const en = [
   "Recorded replay", "Recorded transactions; chain state is not live.", "Previous", "Next", "Reset",
   "Before deployment", "Step", "Consumed", "Produced", "Transaction ID", "Recorded block height",
   "Graph and recorded outpoint differ", "Funding input", "Recorded transaction bytes",
+  "Fixture snapshot", "Provided parents only · chain admission and UTXO status not established",
+  "Copy to draft", "Return to snapshot", "Copied draft · no verification applies to edits",
+  "Recorded BSV Node Script verdicts", "chain-gang rechecked at export", "Passed", "Rejected", "Not run",
+  "Transaction", "Token quantity", "Owner public key", "Fixture model metadata", "Download fixture model",
+  "Resume draft", "Input", "Output", "Download verification bundle",
+  "Declared", "Built", "Recorded replay", "Unavailable", "Assertion", "Proof", "Recursion", "State",
+  "Declared requirements · not compiled", "Compiled stage", "Proof backend", "Statement digest",
+  "Verification key digest", "Recursion statement · verifier unavailable", "Public inputs", "Base requirements",
+  "Step requirements", "Backend is unavailable", "Carrier", "Evidence requirements",
+  "Recursive statement",
+  "Edit structured recursion ports in Advanced metadata JSON.",
 ];
 const zh = [
   "比较 CPN 路径", "候选", "可构建", "已淘汰", "已复放", "全部", "搜索路径…", "CPN 图",
@@ -53,13 +64,27 @@ const zh = [
   "已记录复放", "展示已记录交易，链状态非实时。", "上一步", "下一步", "重置",
   "部署前", "步骤", "消耗", "生成", "交易 ID", "记录的区块高度",
   "图与记录的 outpoint 不一致", "入金输入", "记录的交易字节",
+  "夹具快照", "仅验证给定父交易 · 未确认入池、入块或 UTXO 状态",
+  "复制为草稿", "返回快照", "已复制为草稿 · 编辑后无验证结果",
+  "已记录的 BSV Node Script 结果", "导出时重新验证的 chain-gang 结果", "通过", "拒绝", "未运行",
+  "交易", "代币数量", "持有人公钥", "夹具模型元信息", "下载夹具模型",
+  "继续编辑草稿", "输入", "输出", "下载验证包",
+  "已声明", "已构建", "已记录复放", "不可用", "断言", "证明", "递归", "状态",
+  "声明的要求 · 尚未编译", "已编译阶段", "证明后端", "声明摘要",
+  "验证密钥摘要", "递归声明 · 验证器尚不可用", "公开输入", "初始条件",
+  "递归步条件", "后端不可用", "载体", "证明要求",
+  "递归声明",
+  "递归端口结构请在高级元信息 JSON 中编辑。",
 ];
 let lang = "en";
 let filter = "all";
-let view = model.editor_start ? "draft" : "logical";
+let view = model.fixture_mode ? "fixture" : model.editor_start ? "draft" : "logical";
 let selected = model.selected ?? model.candidates[0]?.id ?? null;
 let activeNode = null;
-let draft = model.draft ?? {schema_version: 1, places: [], transitions: []};
+const fixtureGraph = model.fixture_mode ? JSON.parse(JSON.stringify(model.draft)) : null;
+let draft = model.fixture_mode ? {schema_version: 1, places: [], transitions: []} :
+  model.draft ?? {schema_version: 1, places: [], transitions: []};
+let fixtureCopied = false;
 let draftError = "";
 let replayIndex = -1;
 const $ = id => document.getElementById(id);
@@ -98,16 +123,28 @@ function graphModel() {
     target.ports.push({direction: 23, name: input, peer: source.title, peerId: source.id, peerPort: output, facts});
     edges.push({source, output, target, input});
   }
-  if (view === "draft") {
-    for (const place of draft.places) node("draft:place:" + place.name, place.name, "place", place.type);
-    for (const transition of draft.transitions) {
-      node("draft:transition:" + transition.name, transition.name, "transition", transition.word || "Transition");
+  if (view === "draft" || view === "fixture") {
+    const net = view === "fixture" ? fixtureGraph : draft;
+    for (const place of net.places) {
+      const current = nodes.get(node(view + ":place:" + place.name, place.name, "place", place.type));
+      if (place.metadata?.carrier || place.metadata?.visibility) current.tags = [label(147)];
+      if (current.tags && view === "draft") current.tags.push(label(140));
+    }
+    for (const transition of net.transitions) {
+      const current = nodes.get(node(view + ":transition:" + transition.name, transition.name, "transition",
+        transition.word || "Transition"));
+      const meta = transition.metadata ?? {};
+      const tags = [];
+      if (Array.isArray(meta.constraints) && meta.constraints.length) tags.push(label(144));
+      if (Array.isArray(meta.evidence) && meta.evidence.length) tags.push(label(145));
+      if (meta.recursive_requirements || meta.recursion) tags.push(label(146));
+      if (tags.length) current.tags = [...tags, label(140)];
       for (const port of transition.inputs) {
-        link("draft:place:" + port.place, transition.name + " · " + port.name,
-          "draft:transition:" + transition.name, port.name, [[37, port.type]]);
+        link(view + ":place:" + port.place, transition.name + " · " + port.name,
+          view + ":transition:" + transition.name, port.name, [[37, port.type]]);
       }
       for (const port of transition.outputs) {
-        link("draft:transition:" + transition.name, port.name, "draft:place:" + port.place,
+        link(view + ":transition:" + transition.name, port.name, view + ":place:" + port.place,
           transition.name + " · " + port.name, [[37, port.type]]);
       }
     }
@@ -143,9 +180,13 @@ function graphModel() {
       external.push(...(row.external_inputs ?? []));
       transition.facts = [[40, related.map(stage => stage.stage + " → " + stage.word).join(" · ") || "—"],
         [41, row.guards?.join(" · ") || "—"], [42, external.join(" · ")]];
+      if (related.length) transition.tags = [label(144),
+        ...(related.some(stage => stage.backend !== "script") ? [label(145)] : []),
+        label(recorded ? 142 : 141)];
       for (const out of row.outputs) {
         const output = nodes.get(node(place(row.step, out.vout), out.place, "place", out.kind, out.spendable));
         output.facts = [[41, label(out.spendable ? 56 : 57)]];
+        if (out.kind === "state" || out.kind === "receipt") output.tags = [label(147), label(recorded ? 142 : 141)];
         if (out.kind === "state" || out.kind === "receipt") output.facts.push([45, label(out.kind === "state" ? 46 : 49)]);
         link(tx(row.step), "vout " + out.vout, place(row.step, out.vout), "produced",
           facts(row.step, out.vout, out.kind));
@@ -185,6 +226,9 @@ function graphModel() {
         nodes.get(id).facts.push([58, proof.statement.public.join(", ")]);
         if (proof.backend === "r1cs") nodes.get(id).facts.push([41, label(59)]);
       }
+      nodes.get(id).tags = [label(144), ...(proof ? [label(145)] : []),
+        label(model.packages[selected]?.receipt ? 142 : 141)];
+      nodes.get(id).proof = proof;
       if (role) nodes.get(id).facts.unshift([38, role]);
       for (const output of stage.outputs) {
         node(place(output.name), output.name, "place", output.type);
@@ -203,7 +247,9 @@ function graphModel() {
     }
   } else if (candidate.evidence_graph) {
     for (const item of candidate.evidence_graph.nodes) {
-      node("proof:" + item.id, item.id, "transition", item.backend);
+      const evidence = nodes.get(node("proof:" + item.id, item.id, "transition", item.backend));
+      evidence.tags = [label(145), label(143)];
+      evidence.facts = [[159, item.proves], [157, item.backend]];
       const claim = node("claim:" + item.id, item.proves, "place", "Statement");
       link("proof:" + item.id, item.proves, claim, "proved");
     }
@@ -240,7 +286,7 @@ function layout({nodes, edges}) {
     const height = Math.max(440, ordered.length * 46);
     ordered.forEach((node, index) => {
       const angle = 2 * Math.PI * index / ordered.length - Math.PI / 2;
-      node.height = Math.max(node.kind === "place" ? 58 : 73,
+      node.height = Math.max(node.tags?.length > 3 ? 112 : node.tags?.length ? 99 : node.kind === "place" ? 58 : 73,
         26 + 17 * Math.max(node.inputs.length, node.outputs.length));
       node.x = width / 2 + (width / 2 - 110) * Math.cos(angle) - 68;
       node.y = height / 2 + (height / 2 - 65) * Math.sin(angle) - node.height / 2;
@@ -251,7 +297,8 @@ function layout({nodes, edges}) {
   for (const node of queue) {
     if (!layers.has(node.layer)) layers.set(node.layer, []);
     layers.get(node.layer).push(node);
-    node.height = Math.max(node.kind === "place" ? 58 : 73, 26 + 17 * Math.max(node.inputs.length, node.outputs.length));
+    node.height = Math.max(node.tags?.length > 3 ? 112 : node.tags?.length ? 99 : node.kind === "place" ? 58 : 73,
+      26 + 17 * Math.max(node.inputs.length, node.outputs.length));
   }
   const totalHeight = rows => rows.reduce((height, node) => height + node.height + 32, -32);
   const height = Math.max(390, ...[...layers.values()].map(rows => totalHeight(rows) + 42));
@@ -395,10 +442,23 @@ function renderGraph(focus = false) {
       rx: node.kind === "place" ? 26 : 7}));
     group.append(svg("title", {}, node.title + " · " + node.detail));
     const cx = node.x + boxWidth / 2;
-    group.append(svg("text", {x: cx, y: node.y + 23, "text-anchor": "middle", class: "node-title"},
-      node.title.length > 16 ? node.title.slice(0, 15) + "…" : node.title));
+    const outpoint = /^([0-9a-f]{64}):(\d+)$/i.exec(node.title);
+    const shortTitle = outpoint ? outpoint[1].slice(0, 8) + "…:" + outpoint[2] :
+      node.title.length > 16 ? node.title.slice(0, 15) + "…" : node.title;
+    group.append(svg("text", {x: cx, y: node.y + 23, "text-anchor": "middle", class: "node-title"}, shortTitle));
     const detail = node.detail.length > 20 ? node.detail.slice(0, 19) + "…" : node.detail;
     group.append(svg("text", {x: cx, y: node.y + 42, "text-anchor": "middle", class: "node-detail"}, detail));
+    if (node.tags?.length) {
+      const statusLabels = [label(140), label(141), label(142), label(143)];
+      const status = statusLabels.includes(node.tags[node.tags.length - 1]) ? node.tags[node.tags.length - 1] : "";
+      const tags = node.tags.slice(0, status ? -1 : undefined);
+      group.append(svg("text", {x: cx, y: node.y + 63, "text-anchor": "middle", class: "node-tags"},
+        tags.slice(0, 2).join(" · ")));
+      if (tags.length > 2) group.append(svg("text", {x: cx, y: node.y + 77, "text-anchor": "middle", class: "node-tags"},
+        tags.slice(2).join(" · ")));
+      if (status) group.append(svg("text", {x: cx, y: node.y + (tags.length > 2 ? 92 : 79),
+        "text-anchor": "middle", class: "node-status"}, status));
+    }
     for (const [ports, x] of [[node.inputs, node.x], [node.outputs, node.x + boxWidth]]) {
       ports.forEach((name, index) => {
         const y = portY(node, index, ports.length);
@@ -456,6 +516,33 @@ function description(title, rows) {
     list.append(item);
   });
   return block;
+}
+
+function declarations(metadata) {
+  const fields = [
+    ["visibility", 89], ["carrier", 158], ["constraints", 92], ["authorization", 93],
+    ["witnesses", 94], ["evidence", 159], ["recursive_requirements", 97], ["recursion", 146],
+  ];
+  return fields.filter(([key]) => metadata?.[key] !== undefined).map(([key, name]) => {
+    const value = metadata[key];
+    return [label(name), typeof value === "string" ? value : JSON.stringify(value)];
+  });
+}
+
+function recursionStatements(panel, candidate) {
+  const report = model.report?.schedule_explanation ?? model.report;
+  const statements = report?.recursive_statements ?? [];
+  if (!statements.length) return;
+  const unavailable = candidate.exclusions?.some(item => item.code === "recursive_backend_unavailable");
+  for (const statement of statements) {
+    panel.append(description(label(unavailable ? 153 : 160), [
+      [statement.predicate, statement.edge],
+      [label(154), statement.public_inputs?.join(" · ")],
+      [label(155), statement.base?.join(" · ")],
+      [label(156), statement.step?.join(" · ")],
+      [label(151), statement.statement_sha256],
+    ]));
+  }
 }
 
 function draftItem() {
@@ -598,10 +685,28 @@ function setDraftNode(kind) {
 
 function draftTools() {
   const tools = $("draft-tools");
-  tools.hidden = view !== "draft";
+  tools.hidden = view !== "draft" && view !== "fixture";
   tools.replaceChildren();
   if (tools.hidden) return;
-  const note = element("span", label(61) + " · " + label(88), "draft-note");
+  if (view === "fixture") {
+    tools.append(element("span", label(122), "draft-note"), draftButton(label(fixtureCopied ? 136 : 123), () => {
+      if (!fixtureCopied) {
+        draft = JSON.parse(JSON.stringify(fixtureGraph));
+        for (const item of [...draft.places, ...draft.transitions]) {
+          if (!item.metadata) continue;
+          for (const field of ["verified", "verification", "archive_validation", "node_verdicts", "chain_gang", "status"]) {
+            delete item.metadata[field];
+          }
+        }
+        fixtureCopied = true;
+      }
+      activeNode = null;
+      view = "draft";
+      render();
+    }));
+    return;
+  }
+  const note = element("span", label(61) + " · " + (model.fixture_mode ? label(125) : label(88)), "draft-note");
   tools.append(note, draftButton(label(62), () => setDraftNode("place")),
     draftButton(label(63), () => setDraftNode("transition")));
   const input = element("input");
@@ -632,6 +737,8 @@ function draftInspector(panel) {
     panel.append(element("p", label(82), "hint"));
     return;
   }
+  const declared = declarations(item.metadata);
+  if (declared.length) panel.append(description(label(148), declared));
   const isPlace = draft.places.includes(item);
   const form = element("form", undefined, "draft-form");
   const name = field(form, label(66), item.name);
@@ -675,7 +782,9 @@ function draftInspector(panel) {
   metadataLabel.append(metadata);
   const advanced = element("details", undefined, "draft-advanced");
   advanced.append(element("summary", label(100)), metadataLabel);
-  form.append(advanced, element("small", label(101), "hint"));
+  form.append(advanced);
+  if (!isPlace && original.recursion) form.append(element("small", label(161), "hint"));
+  form.append(element("small", label(101), "hint"));
   const errorMessage = element("p", "", "draft-error");
   errorMessage.setAttribute("role", "alert");
   form.append(errorMessage);
@@ -796,8 +905,72 @@ function draftInspector(panel) {
   }
 }
 
+function fixtureInspector(panel) {
+  const fixture = model.fixture;
+  panel.replaceChildren(element("h2", label(121)), element("p", label(122), "draft-note"));
+  const verdict = value => value === true ? label(128) : value === false ? label(129) : label(130);
+  const checks = Array.isArray(fixture.node_verdicts) && fixture.node_verdicts.length
+    ? fixture.node_verdicts.map((value, index) => "vin " + index + " · " + verdict(value)).join(" / ")
+    : label(130);
+  panel.append(description(label(131), [
+    [label(116), fixture.txid], [label(120), bytes(fixture.bytes)],
+    [label(126), checks], [label(127), verdict(fixture.chain_gang)],
+  ]));
+  const node = graphModel().nodes.get(activeNode);
+  if (node) {
+    const collection = node.kind === "place" ? fixtureGraph.places : fixtureGraph.transitions;
+    const item = collection.find(entry => entry.name === node.title);
+    panel.append(description(label(29) + " · " + node.title, [
+      [node.kind === "place" ? "Place" : "Transition", node.detail],
+    ]));
+    const declared = declarations(item?.metadata);
+    if (declared.length) panel.append(description(label(140), declared));
+    if (item?.metadata) {
+      const section = element("section", undefined, "details");
+      section.append(element("h3", label(134)), element("pre", JSON.stringify(item.metadata, null, 2), "forth"));
+      panel.append(section);
+    }
+  }
+  for (const [heading, entries] of [[137, fixture.inputs], [138, fixture.outputs]]) {
+    const section = element("section", undefined, "details ports");
+    section.append(element("h3", label(heading) + " (" + entries.length + ")"));
+    entries.forEach((entry, index) => {
+      const place = fixtureGraph.places.find(item => item.metadata?.actual_outpoint === entry.outpoint ||
+        item.name === entry.outpoint);
+      if (node?.kind === "place" && node.title !== place?.name) return;
+      const detail = element("details");
+      detail.open = true;
+      detail.append(element("summary", (heading === 137 ? "vin " : "vout ") + index + " · " + entry.kind, "mono"));
+      const values = element("dl");
+      const outpoint = element("dd");
+      if (place) {
+        outpoint.append(draftButton(entry.outpoint, () => {
+          activeNode = "fixture:place:" + place.name;
+          renderGraph(true);
+          renderCandidates();
+          renderInspector();
+        }));
+      } else outpoint.textContent = entry.outpoint;
+      values.append(element("dt", label(34)), outpoint);
+      for (const [key, value] of [[35, entry.satoshis === undefined ? null : entry.satoshis + " sat"],
+        [132, entry.quantity], [133, entry.owner]]) {
+        if (value === undefined || value === null) continue;
+        values.append(element("dt", label(key)), element("dd", value, key === 133 ? "mono outpoint" : ""));
+      }
+      detail.append(values);
+      section.append(detail);
+    });
+    panel.append(section);
+  }
+  const actions = element("div", undefined, "actions");
+  actions.append(download(label(139), "cpn-fixture-bundle.json", model.bundle),
+    download(label(135), "cpn-fixture-model.json", fixtureGraph));
+  panel.append(actions);
+}
+
 function renderInspector() {
   if (view === "draft") { draftInspector($("inspector")); return; }
+  if (view === "fixture") { fixtureInspector($("inspector")); return; }
   const row = byId.get(selected), pkg = model.packages[selected] ?? {};
   const panel = $("inspector");
   panel.replaceChildren(element("h2", label(10)), element("p", selected, "path mono"));
@@ -812,6 +985,7 @@ function renderInspector() {
   if (row.exclusions?.length) {
     panel.append(description(label(25), row.exclusions.map(item => [item.code, [item.stage, item.message].filter(Boolean).join(" · ")])));
   }
+  recursionStatements(panel, row);
   const node = graphModel().nodes.get(activeNode);
   if (node) {
     panel.append(description(label(29) + " · " + node.title, [
@@ -822,6 +996,15 @@ function renderInspector() {
       const code = element("section", undefined, "details");
       code.append(element("h3", label(39)), element("pre", node.definition.source, "forth"));
       panel.append(code);
+    }
+    if (node.proof) {
+      panel.append(description(label(149), [
+        [label(150), node.proof.backend],
+        [label(154), node.proof.statement.public?.join(" · ")],
+        [label(151), node.proof.statement_sha256],
+        [label(152), node.proof.verification_key_sha256],
+        [label(model.packages[selected]?.receipt ? 142 : 141), ""],
+      ]));
     }
     for (const direction of [23, 24]) {
       const ports = node.ports.filter(port => port.direction === direction);
@@ -865,17 +1048,18 @@ function renderInspector() {
 
 function renderCandidates() {
   const query = $("search").value.trim().toLowerCase();
-  if (view === "draft") {
+  if (view === "draft" || view === "fixture") {
+    const net = view === "fixture" ? fixtureGraph : draft;
     const list = $("candidates");
     list.replaceChildren();
     const items = [
-      ...draft.places.map(item => ({kind: "place", item})),
-      ...draft.transitions.map(item => ({kind: "transition", item})),
+      ...net.places.map(item => ({kind: "place", item})),
+      ...net.transitions.map(item => ({kind: "transition", item})),
     ].filter(({item}) => item.name.toLowerCase().includes(query));
     if (!items.length) list.append(element("li", label(106), "empty"));
     for (const {kind, item} of items) {
       const li = element("li"), button = element("button", undefined, "candidate");
-      const identity = "draft:" + kind + ":" + item.name;
+      const identity = view + ":" + kind + ":" + item.name;
       button.setAttribute("aria-pressed", identity === activeNode);
       button.append(element("strong", item.name), element("small", kind === "place" ? "Place · " + item.type : "Transition"));
       button.addEventListener("click", () => {
@@ -939,14 +1123,15 @@ function render() {
   for (const [id, value] of [["heading", 0], ["rail-title", 1], ["diagram-title", 7], ["port-hint", 22]]) {
     $(id).textContent = label(value);
   }
-  if (view === "draft") {
-    $("heading").textContent = label(104);
+  if (view === "draft" || view === "fixture") {
+    $("heading").textContent = label(view === "fixture" ? 121 : 104);
     $("rail-title").textContent = label(105);
   }
-  $("stats").hidden = view === "draft";
-  $("filters").hidden = view === "draft";
+  $("stats").hidden = view === "draft" || view === "fixture";
+  $("filters").hidden = view === "draft" || view === "fixture";
   const contexts = {bip143: "BIP143 ALL", otda: "Chronicle OTDA ALL", both: "BIP143 / OTDA ALL"};
-  $("context").textContent = model.editor_start ? label(61) :
+  $("context").textContent = model.fixture_mode ? (view === "fixture" ? label(122) : label(125)) :
+    model.editor_start ? label(61) :
     model.title + " · " + (contexts[model.sighash] ?? model.sighash) + " · " + label(28) + " " + model.current;
   $("search").placeholder = label(6);
   $("search").setAttribute("aria-label", label(6));
@@ -959,7 +1144,8 @@ function render() {
     return stat;
   }));
   segments("filters", [["all", 5], ["eligible", 2], ["excluded", 3]], filter, key => { filter = key; render(); });
-  const choices = model.editor_start ? [["draft", 60]] : [["logical", 8], ["physical", 9], ["draft", 60]];
+  const choices = model.fixture_mode ? (fixtureCopied ? [["fixture", 124], ["draft", 60]] : [["fixture", 121]]) :
+    model.editor_start ? [["draft", 60]] : [["logical", 8], ["physical", 9], ["draft", 60]];
   segments("views", choices, view, key => { activeNode = null; replayIndex = -1; view = key; render(); });
   draftTools();
   for (const button of document.querySelectorAll("[data-lang]")) button.setAttribute("aria-pressed", button.dataset.lang === lang);

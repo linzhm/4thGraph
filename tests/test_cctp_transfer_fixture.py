@@ -2,8 +2,11 @@
 
 from dataclasses import replace
 from hashlib import sha256
+import json
 import os
 from pathlib import Path
+import re
+from tempfile import TemporaryDirectory
 import unittest
 
 from ecdsa import SECP256k1, SigningKey
@@ -12,8 +15,10 @@ from ecdsa.util import sigencode_der_canonize
 from fourthgraph.benchmark.validation import Node, chain_verdict
 from fourthgraph.bsv.script import push, script_operations
 from fourthgraph.bsv.transaction import hash256, preimage_all
+from fourthgraph.replay.cctp_fixture import build_fixture, inspect_bundle
 from fourthgraph.workflow.cctp_archive import OWNER_OFFSET, QUANTITY_OFFSET, inspect_archive, logical_model, read_archive
 from fourthgraph.workflow.cctp_transfer_fixture import COMPACT_SCRIPTCODE, construct_fixture_spend
+from fourthgraph.workflow.cpn_workbench import export_fixture
 
 ARCHIVE = os.environ.get("CCTP_ARCHIVE")
 
@@ -74,6 +79,27 @@ class FixedFixtureSpendTests(unittest.TestCase):
         model = {**self.model, "transitions": self.model["transitions"][:-1]}
         with self.assertRaisesRegex(ValueError, "logical CPN differs"):
             construct_fixture_spend(self.archive, model, ((276, self.bob), (224, self.owner)), self.signer)
+
+    def test_replay_bundle_rechecks_transaction_and_place_state(self):
+        bundle = build_fixture(self.archive)
+        observation = inspect_bundle(bundle)
+        self.assertEqual([entry["quantity"] for entry in observation["outputs"]], [276, 224])
+        self.assertTrue(observation["chain_gang"])
+        changed = {**bundle, "cpn": {**bundle["cpn"], "places": [
+            {**place, "metadata": {**place["metadata"], "satoshis": 999}}
+            if index == 3 else place for index, place in enumerate(bundle["cpn"]["places"])]}}
+        with self.assertRaisesRegex(ValueError, "differs from its locking output"):
+            inspect_bundle(changed)
+        with TemporaryDirectory() as directory:
+            source, html = Path(directory) / "bundle.json", Path(directory) / "fixture.html"
+            source.write_text(json.dumps(bundle))
+            export_fixture(source, output=html, title="test fixture")
+            (payload,) = re.findall(r'<script id="workbench-data" type="application/json">(.*?)</script>',
+                                    html.read_text())
+            model = json.loads(payload)
+            self.assertTrue(model["fixture_mode"])
+            self.assertEqual(model["fixture"]["txid"], observation["txid"])
+            self.assertEqual(model["fixture"]["verification_scope"], "provided-parents-only")
 
     @unittest.skipUnless(os.environ.get("REGTEST_URL"), "requires loopback BSV regtest RPC")
     def test_both_engines_accept_and_reject_resigned_inflation(self):

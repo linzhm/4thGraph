@@ -138,6 +138,18 @@ def export_designer(*, output, title, model_file=None):
     write_workbench(payload, output)
 
 
+def export_fixture(bundle_file, *, output, title):
+    """Verify a fixed-parent test transaction before displaying its CPN."""
+    from fourthgraph.replay.cctp_fixture import inspect_bundle
+
+    bundle = json.loads(bundle_file.read_bytes())
+    fixture = inspect_bundle(bundle)
+    payload = {"title": title, "current": None, "sighash": "", "selected": None,
+               "candidates": [], "packages": {}, "report": None, "words": {},
+               "fixture_mode": True, "draft": bundle["cpn"], "fixture": fixture, "bundle": bundle}
+    write_workbench(payload, output)
+
+
 def write_workbench(payload, output):
     # Treat report content as data, including names and paths supplied by the caller.
     data = json.dumps(payload, separators=(",", ":"), ensure_ascii=True).replace("<", "\\u003c")

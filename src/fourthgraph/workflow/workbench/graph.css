@@ -95,6 +95,8 @@ svg .node:focus-visible > rect { stroke: #00998b; stroke-width: 3; }
 svg .node text { fill: var(--ink); pointer-events: none; }
 .node-title { font: 700 15px system-ui, sans-serif; }
 .node-detail { font: 12px ui-monospace, monospace; }
+.node-tags { font: 10px system-ui, sans-serif; fill: #006d68 !important; }
+.node-status { font: 10px system-ui, sans-serif; fill: #607282 !important; }
 .node-port { font: 10px ui-monospace, monospace; }
 svg .socket { stroke: #fff; stroke-width: 1.2; fill: var(--teal); }
 .legend { display: flex; flex-wrap: wrap; align-items: center; gap: 0 7px; padding: 15px 18px; font-size: 13px; font-weight: 650; }

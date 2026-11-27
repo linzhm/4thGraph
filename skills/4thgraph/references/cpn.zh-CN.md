@@ -8,6 +8,8 @@
 
 新建逻辑模型时运行 `4thgraph cpn design --output workspace/cpn-draft.html`，打开生成的离线编辑器。添加 Place 和 Transition、连接类型化端口，并将模型导出为 JSON。节点元数据可记录 Forth 代码、断言、见证、授权、证明方式和状态载体。
 
+[递归溯源模型](../../../projects/workflow-examples/recursive-lineage-model.zh-CN.md)展示发行、延续 UTXO 和链下证明产物。运行 `4thgraph cpn inspect-evidence projects/workflow-examples/recursive-lineage-model.json` 可汇总声明，并检查递归端口和基例引用。这只是结构检查，不会编译或验证递归、交易、隐私或链上状态。
+
 运行 `4thgraph cpn check-model projects/workflow-examples/token-model.json` 可以检查双输入、双输出的 Token 数量循环，也可传入编辑器导出的模型。有界分析枚举标记中的 Token 数量，报告访问到的状态、迁移、死锁和触及的边界。分析结果是过近似，不求值 Token 内容、Forth、守卫、授权、时序、交易有效性或元数据。Token 模型用于描述设计要求。
 
 当前支持的线性子集可用 `4thgraph cpn lower-model MODEL --source WORDS.fth --output WORKFLOW.fth` 生成分阶段工作流，输出文件须与 Forth 源码位于同一目录。声明一个初始 Token、每个 Place 容量为 1、公开 `u32` 状态以 `route` 结尾、每个迁移一个输入和输出及一个授权角色。无法降级的图或要求会被拒绝。对生成的工作流运行 `4thgraph cpn plan` 或 `tune`，并与导入的 Forth 文件和报告一起保存。
@@ -40,6 +42,17 @@ git show 11c919a:projects/spv-token/fixtures/covenant-backtrace-2x2-regtest.json
 ```
 
 固定归档的 2→2 测试适配器 `construct_fixture_spend` 接收该归档、匹配的逻辑模型、两个新输出和外部签名回调，使用归档里的验证器资金、有序 Token 前序和父交易开封证明来构造交易及 CPN 端口。该夹具固定归档摘要，前序 outpoint 改变时不能复用证明。返回值描述待提交的交易。设置 `CCTP_ARCHIVE=workspace/cpn-dev/cctp.json.xz`，运行 `bash tools/verify_node.sh --profile long-script -- python -m unittest tests.test_cctp_transfer_fixture`，可用归档父交易作为上下文，在 BSV Node 的 `verifyscript` 和 chain-gang 上验证公开测试夹具。
+
+运行 `4thgraph cpn fixture-declaration workspace/cpn-dev/cctp.json.xz > workspace/cpn-dev/transfer.json` 可以得到显式 CPN，包含三个固定输入 Place、一个 Transition 和两个符号输出 Place。Python 入口 `construct_declared_fixture_spend` 在调用外部签名器前检查声明的端口、授权、证据和约束，返回待提交交易并将输出 Place 映射到结果 outpoint。调用方可在保留固定要求的同时重命名逻辑节点。
+
+下面的命令使用公开测试密钥生成夹具和可离线打开的只读图。`verify-fixture` 使用固定版本的 chain-gang，根据提供的父交易重新检查交易；包里的 Node 结果是记录的观察值。这些检查不证明当前 UTXO 状态、入池或确认。将快照复制为草稿会移除其验证关联。
+
+```sh
+bash tools/verify_node.sh --profile long-script -- python -m fourthgraph.replay.cctp_fixture \
+  workspace/cpn-dev/cctp.json.xz --output workspace/cpn-dev/fixture.json
+4thgraph cpn verify-fixture workspace/cpn-dev/fixture.json > workspace/cpn-dev/fixture-check.json
+4thgraph cpn fixture-workbench workspace/cpn-dev/fixture.json --output workspace/cpn-dev/fixture.html
+```
 
 装好下文的 regtest 依赖与 Node.js 后，从仓库根目录运行 `bash tools/cpn_demo.sh`，打开 `workspace/cpn-demo/index.html`。这条命令用同一份 Forth 编译、入金并验证三条路径，生成可单独离线打开的 HTML。源码、后端目录、原始报告和复放回执留在同一目录。
 

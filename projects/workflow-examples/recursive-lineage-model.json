@@ -1,0 +1,54 @@
+{
+  "schema_version": 1,
+  "places": [
+    {"name": "issuance-right", "type": "issuance", "initial": 1, "capacity": 1,
+     "metadata": {"carrier": "external-issuance-evidence", "fields": ["origin", "issuer"]}},
+    {"name": "state", "type": "token-state", "initial": 0, "capacity": 1,
+     "metadata": {"carrier": "continuation-utxo", "visibility": "public",
+                  "fields": ["origin", "owner", "quantity"]}},
+    {"name": "proof", "type": "proof-artifact", "initial": 0, "capacity": 1,
+     "metadata": {"carrier": "offchain-proof-artifact", "fields": ["origin", "state-commitment"]}}
+  ],
+  "transitions": [
+    {
+      "name": "issue",
+      "inputs": [{"name": "issuance", "place": "issuance-right", "type": "issuance"}],
+      "outputs": [
+        {"name": "issued-state", "place": "state", "type": "token-state"},
+        {"name": "base-proof", "place": "proof", "type": "proof-artifact"}
+      ],
+      "metadata": {
+        "constraints": ["Authenticate the configured issuance and bind its origin to the issued state."],
+        "authorization": ["issuer"],
+        "witnesses": ["issuance evidence"],
+        "evidence": [{"kind": "base-proof", "policy": "require-zk", "backend": "unselected"}]
+      }
+    },
+    {
+      "name": "transfer",
+      "inputs": [
+        {"name": "previous-state", "place": "state", "type": "token-state"},
+        {"name": "previous-proof", "place": "proof", "type": "proof-artifact"}
+      ],
+      "outputs": [
+        {"name": "next-state", "place": "state", "type": "token-state"},
+        {"name": "next-proof", "place": "proof", "type": "proof-artifact"}
+      ],
+      "metadata": {
+        "constraints": [
+          "Conserve quantity, preserve the authenticated origin, and enforce owner authorization.",
+          "Bind the previous state and origin to the previous proof, and the new state and origin to the new proof.",
+          "Bind the actual consumed outpoint and ordered transaction outputs to the asserted state transition."
+        ],
+        "authorization": ["previous owner"],
+        "witnesses": ["previous proof", "state opening", "owner signature", "transaction binding data"],
+        "evidence": [
+          {"kind": "transaction-assertion", "backend": "unselected"},
+          {"kind": "recursive-proof", "policy": "require-zk", "backend": "unselected"}
+        ],
+        "recursion": {"previous_proof": "previous-proof", "previous_state": "previous-state",
+                      "next_state": "next-state", "origin_field": "origin", "base_case": "issue"}
+      }
+    }
+  ]
+}

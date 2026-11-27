@@ -8,6 +8,8 @@ Keep the Forth relations, public state, private operands, signing roles and tran
 
 For a new logical model, run `4thgraph cpn design --output workspace/cpn-draft.html` and open the resulting offline editor. Add Places and Transitions, connect typed ports, and export the model as JSON. Node metadata can record Forth source, assertions, witness requirements, authorization, proof strategies and state carriers.
 
+The [recursive lineage model](../../../projects/workflow-examples/recursive-lineage-model.md) shows an issuance, a continuation UTXO and an off-chain proof artifact. Run `4thgraph cpn inspect-evidence projects/workflow-examples/recursive-lineage-model.json` to inventory declarations and check the named recursive ports and base-case reference. This structural inspection does not compile or verify recursion, a transaction, privacy or chain state.
+
 Run `4thgraph cpn check-model projects/workflow-examples/token-model.json` to check a two-input, two-output token-count cycle, or pass the exported model. The bounded analysis enumerates token counts and reports its explored markings, transitions, deadlocks and cutoffs. Its result is an overapproximation. Token values, Forth, guards, authorization, timing, transaction validity and metadata are not evaluated. The token model records proposed constraints and is a logical design fixture.
 
 For the currently supported linear subset, `4thgraph cpn lower-model MODEL --source WORDS.fth --output WORKFLOW.fth` generates a staged workflow in the same directory as the Forth source. Declare one initial token, capacity 1 on every Place, public `u32` states ending in a `route`, a single input and output per transition, and one authorizer per transition. The command rejects a graph or requirement it cannot lower. Feed the generated workflow into `4thgraph cpn plan` or `tune` and retain it with its imported Forth files and report.
@@ -40,6 +42,17 @@ git show 11c919a:projects/spv-token/fixtures/covenant-backtrace-2x2-regtest.json
 ```
 
 The fixed-archive 2-to-2 fixture adapter `construct_fixture_spend` accepts this exact archive, its matching logical model, two new payouts and an external signer callback. It constructs a transaction and CPN ports using the archive's verifier funding, ordered token parents and parent-opening proof. This fixture pins the archive digest and cannot reuse that proof for other parent outpoints. Its result describes a proposed transaction. To run the public test fixture against BSV Node `verifyscript` and chain-gang, pass `CCTP_ARCHIVE=workspace/cpn-dev/cctp.json.xz` to `bash tools/verify_node.sh --profile long-script -- python -m unittest tests.test_cctp_transfer_fixture`. The archived parents are supplied as validation context.
+
+Run `4thgraph cpn fixture-declaration workspace/cpn-dev/cctp.json.xz > workspace/cpn-dev/transfer.json` for an explicit CPN with three fixed input Places, one Transition and two symbolic output Places. The Python entry point `construct_declared_fixture_spend` checks all declared ports, authorization, evidence and constraints before invoking the external signer. It returns a proposed transaction and maps the output Places to the resulting outpoints. A caller can rename the logical nodes while retaining the pinned requirements.
+
+Generate a signed, test-key-only fixture and its portable read-only graph with the commands below. `verify-fixture` rechecks the transaction against the supplied parent transactions with pinned chain-gang. The Node verdicts in the bundle are recorded observations; neither check establishes current UTXO status, mempool admission or confirmation. Copying the snapshot to a draft removes its verification association.
+
+```sh
+bash tools/verify_node.sh --profile long-script -- python -m fourthgraph.replay.cctp_fixture \
+  workspace/cpn-dev/cctp.json.xz --output workspace/cpn-dev/fixture.json
+4thgraph cpn verify-fixture workspace/cpn-dev/fixture.json > workspace/cpn-dev/fixture-check.json
+4thgraph cpn fixture-workbench workspace/cpn-dev/fixture.json --output workspace/cpn-dev/fixture.html
+```
 
 With the regtest dependencies below and Node.js installed, run `bash tools/cpn_demo.sh` from the checkout root and open `workspace/cpn-demo/index.html`. The command compiles one Forth source, funds and verifies three paths, and creates a self-contained HTML file. It leaves the source, catalog, original report and replay receipts in the same directory.
 

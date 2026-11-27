@@ -17,6 +17,8 @@ def main(argv):
     check.add_argument("--max-states", type=int, default=1000, help="maximum number of token markings to explore")
     check.add_argument("--max-tokens-per-place", type=int, default=16,
                        help="maximum token count per place in explored markings")
+    inventory = commands.add_parser("inspect-evidence", help="inspect declared state, assertion and proof requirements")
+    inventory.add_argument("model", type=Path)
     lower = commands.add_parser("lower-model", help="lower a supported logical CPN to a staged Forth workflow")
     lower.add_argument("model", type=Path)
     lower.add_argument("--source", type=Path, required=True, help="Forth definitions used by the graph")
@@ -42,6 +44,14 @@ def main(argv):
     design.add_argument("--title", default="CPN draft")
     design.add_argument("--model", type=Path, help="start from a validated logical CPN model")
     design.add_argument("--output", type=Path, required=True)
+    fixture = commands.add_parser("fixture-workbench", help="inspect a verified fixed-parent CCTP test transaction")
+    fixture.add_argument("bundle", type=Path)
+    fixture.add_argument("--title", default="CCTP historical-parent fixture")
+    fixture.add_argument("--output", type=Path, required=True)
+    declaration = commands.add_parser("fixture-declaration", help="describe the pinned 2-to-2 CCTP fixture as a CPN")
+    declaration.add_argument("archive", type=Path)
+    verify_fixture = commands.add_parser("verify-fixture", help="revalidate a fixed-parent CCTP fixture bundle")
+    verify_fixture.add_argument("bundle", type=Path)
     if argv[:1] in (["plan"], ["tune"]):
         from fourthgraph.workflow.protocol import main as compiler_main
 
@@ -79,6 +89,13 @@ def main(argv):
             output.write_text(generated)
             print(output)
             return
+        elif args.command == "inspect-evidence":
+            from fourthgraph.workflow.logical_evidence import inventory
+
+            report = inventory(json.loads(args.model.read_bytes()))
+            if report["diagnostics"]:
+                print(json.dumps(report, indent=2, sort_keys=True))
+                raise SystemExit(1)
         elif args.command == "inspect-cctp":
             from fourthgraph.workflow.cctp_archive import flow_report, inspect_archive, logical_model, read_archive
 
@@ -89,6 +106,14 @@ def main(argv):
             else:
                 graph = inspect_archive(source, archive_sha256=digest, policy=policy)
                 report = logical_model(graph) if args.logical else graph
+        elif args.command == "fixture-declaration":
+            from fourthgraph.workflow.cctp_declared_fixture import fixture_declaration
+
+            report = fixture_declaration(args.archive)
+        elif args.command == "verify-fixture":
+            from fourthgraph.replay.cctp_fixture import inspect_bundle
+
+            report = inspect_bundle(json.loads(args.bundle.read_bytes()))
         elif args.command == "workbench":
             from fourthgraph.workflow.cpn_workbench import export_workbench
 
@@ -100,6 +125,12 @@ def main(argv):
             from fourthgraph.workflow.cpn_workbench import export_designer
 
             export_designer(output=args.output, title=args.title, model_file=args.model)
+            print(args.output)
+            return
+        elif args.command == "fixture-workbench":
+            from fourthgraph.workflow.cpn_workbench import export_fixture
+
+            export_fixture(args.bundle, output=args.output, title=args.title)
             print(args.output)
             return
         else:
