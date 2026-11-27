@@ -1,6 +1,6 @@
 <!-- Generated from manifest.yaml with Copier. -->
 
-# BN254 Groth16 verifier v0.5.0
+# BN254 Groth16 verifier v0.6.0
 
 [简体中文](README.zh-CN.md) · [4thGraph](../../README.md) · [Project index](../README.md) · [Versions](versions/index.json)
 
@@ -8,7 +8,7 @@
 
 Assemble an owner-authorized, fixed-statement BN254 Groth16 lock from typed Forth and replay it on Chronicle regtest.
 
-[Algorithm and execution](#algorithm-and-execution) · [Reproduce the checks](#reproduce-the-checks) · [Measurements data](versions/v0.5.0/measurements.json)
+[Algorithm and execution](#algorithm-and-execution) · [Reproduce the checks](#reproduce-the-checks) · [Measurements data](versions/v0.6.0/measurements.json)
 
 | Entry point | Purpose |
 | --- | --- |
@@ -16,7 +16,7 @@ Assemble an owner-authorized, fixed-statement BN254 Groth16 lock from typed Fort
 
 ## Algorithm and execution
 
-The Forth modules define the Jacobian formulas, subgroup and Miller schedules, and residue checks. The compiler combines stack moves. The wrap fixture uses a 492,007 B lock and a 6,765 B witness prefix, with 499,077 B for the full deployment and spend transactions. [Forth entry](forth/compact-stack-verifier.fth) · [Verification guide](docs/verification.en.md)
+The Forth modules define the Jacobian formulas, subgroup and Miller schedules, and residue checks. The compiler consumes Jacobian operands at their last use and combines stack moves. The wrap fixture uses a 470,781 B lock and a 6,765 B witness prefix, with 477,852 B for the full deployment and spend transactions. [Forth entry](forth/last-use-verifier.fth) · [Verification guide](docs/verification.en.md)
 
 ## Reproduce the checks
 
@@ -30,15 +30,15 @@ python3 -m pip install ecdsa -r tools/requirements-chronicle.txt
 
 ```sh
 bash projects/groth16-bn254/reference/build.sh workspace/runar \
-  projects/groth16-bn254/forth/compact-stack-verifier.fth
+  projects/groth16-bn254/forth/last-use-verifier.fth
 for fixture_case in wrap other; do
   REGTEST_CHRONICLE_HEIGHT=2 bash tools/verify_node.sh --profile long-script -- \
     python3 -m fourthgraph.replay.groth16_bn254 --runar workspace/runar \
-    --verifier-source projects/groth16-bn254/forth/compact-stack-verifier.fth \
+    --verifier-source projects/groth16-bn254/forth/last-use-verifier.fth \
     --fixture projects/groth16-bn254/versions/v0.1.0/fixture.json \
     --fixture-case "$fixture_case" \
-    --output "projects/groth16-bn254/workspace/build/replay-v0.5.0-${fixture_case}.json" || exit $?
+    --output "projects/groth16-bn254/workspace/build/replay-v0.6.0-${fixture_case}.json" || exit $?
 done
 ```
 
-The build writes the lock and proof witness prefix. For each fixture, the funded replay mines the valid spend and runs five rejection controls, including a G2 point outside the subgroup. [Measurements](versions/v0.5.0/measurements.json)
+The build writes the lock and proof witness prefix. For each fixture, the funded replay mines the valid spend and runs five rejection controls, including a G2 point outside the subgroup. [Measurements](versions/v0.6.0/measurements.json)

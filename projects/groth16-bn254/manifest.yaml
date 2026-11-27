@@ -31,11 +31,11 @@ setup:
 sections:
   algorithm:
     en:
-      - The Forth modules define the Jacobian formulas, subgroup and Miller schedules, and residue checks. The compiler combines stack moves. The wrap fixture uses a 492,007 B lock and a 6,765 B witness prefix, with 499,077 B for the full deployment and spend transactions. [Forth entry](forth/compact-stack-verifier.fth) · [Verification guide](docs/verification.en.md)
+      - The Forth modules define the Jacobian formulas, subgroup and Miller schedules, and residue checks. The compiler consumes Jacobian operands at their last use and combines stack moves. The wrap fixture uses a 470,781 B lock and a 6,765 B witness prefix, with 477,852 B for the full deployment and spend transactions. [Forth entry](forth/last-use-verifier.fth) · [Verification guide](docs/verification.en.md)
     zh-CN:
-      - Forth 模块定义 Jacobian 公式、子群与 Miller 轮次及余数检查。编译器合并栈操作。`wrap` 夹具的锁为 492,007 B，见证前缀为 6,765 B，完整部署和花费交易合计 499,077 B。[Forth 入口](forth/compact-stack-verifier.fth) · [验证指南](docs/verification.zh-CN.md)
+      - Forth 模块定义 Jacobian 公式、子群与 Miller 轮次及余数检查。编译器在最后一次使用时消费 Jacobian 操作数，并合并栈操作。`wrap` 夹具的锁为 470,781 B，见证前缀为 6,765 B，完整部署和花费交易合计 477,852 B。[Forth 入口](forth/last-use-verifier.fth) · [验证指南](docs/verification.zh-CN.md)
   reproduction:
     en:
-      - The build writes the lock and proof witness prefix. For each fixture, the funded replay mines the valid spend and runs five rejection controls, including a G2 point outside the subgroup. [Measurements](versions/v0.5.0/measurements.json)
+      - The build writes the lock and proof witness prefix. For each fixture, the funded replay mines the valid spend and runs five rejection controls, including a G2 point outside the subgroup. [Measurements](versions/v0.6.0/measurements.json)
     zh-CN:
-      - 构建输出锁定脚本和见证前缀。入金回放对两份夹具分别出块并检查五个反例，包括不在子群内的 G2 点。[实测](versions/v0.5.0/measurements.json)
+      - 构建输出锁定脚本和见证前缀。入金回放对两份夹具分别出块并检查五个反例，包括不在子群内的 G2 点。[实测](versions/v0.6.0/measurements.json)

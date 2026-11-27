@@ -210,6 +210,7 @@ BN254_WORDS.update(bn254_forth.WORDS)
 STACK_OPTIMIZATIONS = {
     bn254_forth.PLAN_ENTRY: ("paired-moves", compact_pair_moves),
     bn254_forth.COMPACT_STACK_ENTRY: ("compact-moves", compact_stack_moves),
+    bn254_forth.LAST_USE_ENTRY: ("compact-moves", compact_stack_moves),
 }
 BN254_TYPES = TYPES | {kind for word in BN254_WORDS.values() for kind in (*word.takes, *word.gives)}
 
@@ -262,9 +263,11 @@ class ForthVerifier(ScriptVerifier):
             document.update(subgroup_schedule=COMPACT_SUBGROUP, modulo_threshold=COMPACT_MODULO_THRESHOLD)
         if self.forth_plan is not None:
             document.update(forth_plan=self.forth_plan, stack_optimization=self.stack_optimization[0])
+            extensions = ("forth_groth16.go", "forth_groth16.patch")
+            if self.forth_plan.get("JacobianLastUse"):
+                extensions += ("forth_liveness.go", "forth_liveness.patch")
             document["runar_extension_sha256"].update({
-                name: sha256((RUNAR_EXTENSION / name).read_bytes()).hexdigest()
-                for name in ("forth_groth16.go", "forth_groth16.patch")
+                name: sha256((RUNAR_EXTENSION / name).read_bytes()).hexdigest() for name in extensions
             })
         return build_artifact(document, self.source)
 
