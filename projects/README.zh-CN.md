@@ -23,6 +23,19 @@
 | [WOTS+](wots-plus/README.zh-CN.md) | 对照 Winternitz 见证与锁定模板 | [一次性签名器](wots-plus/docs/sdk.zh-CN.md#quickstart) |
 | [纯模式 ML-DSA-44](ml-dsa/README.zh-CN.md) | 复放纯模式 ML-DSA-44 花费 | [FIPS 204 签名器](ml-dsa/docs/sdk.zh-CN.md#quickstart) |
 
+## 交易测试
+
+[交易测试入口](../tests/project_transactions.py) 构造并验证索引中每个项目的完整交易。付款例子覆盖入金、周转和退出，Deferred R1 另含带赞助输入的激活。PELS 计数器连续递增两次，串行工作流分别走 BIP143 ALL 与 OTDA ALL，证明计数器走直接 Script 后端。
+
+在仓库根目录运行。Python 环境需装有 chain-gang、`ecdsa`、`coincurve` 和 `cryptography`。ML-DSA 测试签名器需要 OpenSSL 3.5 或以上。命令末尾可加项目目录名，只执行该项目。
+
+```sh
+PYTHONPATH=src:. python tests/project_transactions.py
+bash tools/verify_node.sh -- python tests/project_transactions.py
+```
+
+第一条命令使用 chain-gang，第二条还会向 BSV Node 提供明确的上一输出并逐输入验证。每笔成功交易都会保留原见证、改动锁定时间并验证拒绝。两个计数器项目还会对错误后继或终端输出重新构造见证并验证拒绝。输出包含交易 ID 和序列化大小。入金出块复放、更多签名模式和证明后端见各项目指南。
+
 ## 项目工作区
 
 从仓库根目录执行 `bash tools/setup-workspaces.sh`，在每个项目的 `workspace/` 下创建 Git 忽略的构建、缓存和日志目录。项目首页链接协议和接入指南，参考实现、构建入口和测试脚本放在对应项目。 [安装 4thGraph](../docs/install.md) · [共享钱包 SDK](../sdk/README.zh-CN.md) · [项目成果](../showcase/README.md)
