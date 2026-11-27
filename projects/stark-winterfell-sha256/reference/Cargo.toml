@@ -1,0 +1,12 @@
+[package]
+name = "fourthgraph-stark-sha256"
+version = "0.2.0"
+edition = "2024"
+rust-version = "1.87"
+publish = false
+
+[dependencies]
+fourthgraph-stark-counter = { path = "../../stark-counter/reference" }
+sha2 = "=0.10.9"
+winterfell = "=0.13.1"
+winter-utils = "=0.13.1"

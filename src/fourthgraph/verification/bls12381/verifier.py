@@ -21,6 +21,8 @@ FIELD_BYTES = 48
 PACKET_BYTES = (8 + 12) * FIELD_BYTES
 SEED_BITS = bin(U)[3:]
 AFFINE_BYTES = 2 * FIELD_BYTES
+G1_PREIMAGE_BYTES = 2 * AFFINE_BYTES
+G1_EFFECTIVE_COFACTOR = U + 1  # RFC 9380, section 8.8.1.
 INFINITY = (0, 1, 0)
 _FIXED_WITNESS = object()
 
@@ -311,12 +313,13 @@ def prepare(key, signals):
     return fixed, delta
 
 
-def require_affine(tower, curve, jacobian, point):
-    x, y, z = jacobian
+def require_affine(tower, curve, projective, point, *, homogeneous=False):
+    x, y, z = projective
     ax, ay = point
-    zz = curve.square(z)
-    dx = curve.sub(x, curve.mul(ax, zz))
-    dy = curve.sub(y, curve.mul(ay, curve.mul(zz, z)))
+    x_scale = z if homogeneous else curve.square(z)
+    dx = curve.sub(x, curve.mul(ax, x_scale))
+    y_scale = z if homogeneous else curve.mul(x_scale, z)
+    dy = curve.sub(y, curve.mul(ay, y_scale))
     f = tower.fp
     if curve.twist:
         f.all((f.op("OP_BOOLOR", *(f.nonzero(limb) for limb in z)),
@@ -486,20 +489,22 @@ def proof_stack(inputs):
     a0, a1, b0, b1, b2, b3, c0, c1, *limbs = inputs
     a, b, c = (a0, a1), ((b0, b1), (b2, b3)), (c0, c1)
     z = tuple(tuple(zip(limbs[i:i + 6:2], limbs[i + 1:i + 6:2], strict=True)) for i in (0, 6))
-    return a, b, c, z
+    preimages = tuple(zip(limbs[12::2], limbs[13::2], strict=True))
+    return a, b, c, z, *preimages
 
 
 class VerifierStages:
     """Build the typed stages of one BLS12-381 Script predicate."""
 
     def __init__(self, key, sources, *, chronicle=False, optimize=False, extra_inputs=None, fp2_rules=FP2_RULES,
-                 fp2_selection="uniform", pair_g1_doubles=False, g1_z_batch=1, compact_booleans=False):
+                 fp2_selection="uniform", pair_g1_doubles=False, g1_z_batch=1, compact_booleans=False,
+                 proof_elements=PACKET_BYTES // FIELD_BYTES):
         self.pair_g1_doubles = pair_g1_doubles
         self.g1_z_batch = g1_z_batch
         self.key, self.sources = key, sources
         self.slots = dynamic_slots(sources)
         self.optimize = optimize
-        self.proof_elements = PACKET_BYTES // FIELD_BYTES
+        self.proof_elements = proof_elements
         if extra_inputs is None:
             extra_inputs = 2 if self.slots else 0  # Projective VK_x claim.
         self.field = ScriptField(self.proof_elements + len(self.slots) + extra_inputs,
@@ -514,7 +519,7 @@ class VerifierStages:
             self.setup = (asm("OP_TOALTSTACK") + unpack_packet(self.proof_elements + 2)
                           + asm("OP_FROMALTSTACK") + unpack_public(self.slots))
         else:
-            self.setup = unpack_packet()
+            self.setup = unpack_packet(self.proof_elements)
         inputs = self.field.graph.inputs
         return proof_stack(inputs[:self.proof_elements]), inputs[self.proof_elements:]
 
@@ -614,7 +619,7 @@ def verification_script(key, sources, *, compact=True):
     return stages.compile(compact=compact)
 
 
-def proof_packet(key, signals, proof):
+def proof_packet(key, signals, proof, *, cofactor_preimages=False):
     fixed, delta = prepare(key, signals)
     g1_host, g2_host = Curve(HOST), Curve(HOST, twist=True)
     g1_host.require_host(proof.a)
@@ -633,6 +638,9 @@ def proof_packet(key, signals, proof):
     if any(chain.from_iterable(check[1])) or not any(chain.from_iterable(check[0])):
         raise ValueError("Groth16 proof does not match the BLS12-381 statement")
     limbs = (*proof.a, *proof.b[0], *proof.b[1], *proof.c, *chain.from_iterable(chain.from_iterable(z)))
+    if cofactor_preimages:
+        inverse = pow(G1_EFFECTIVE_COFACTOR, -1, R)
+        limbs += (*g1_host.mul_host(proof.a, inverse), *g1_host.mul_host(proof.c, inverse))
     return b"".join(limb.to_bytes(FIELD_BYTES, "little") for limb in limbs)
 
 
@@ -665,10 +673,13 @@ class ScriptVerifier:
         return verification_script(self.key, sources, compact=compact)
 
     def witness(self, signals, proof, *, sources=_FIXED_WITNESS):
+        return self._projective_witness(signals, proof, sources)
+
+    def _projective_witness(self, signals, proof, sources, *, cofactor_preimages=False):
         signals = tuple(signals)
         config = self.sources(signals if sources is _FIXED_WITNESS else sources)
         public = public_packet(config, signals)
-        packet = proof_packet(self.key, signals, read_proof(proof))
+        packet = proof_packet(self.key, signals, read_proof(proof), cofactor_preimages=cofactor_preimages)
         if public:
             vk_x = fold_msm(self.key, signals) or (0, 0)
             packet += b"".join(coord.to_bytes(FIELD_BYTES, "little") for coord in vk_x)

@@ -1,6 +1,6 @@
 <!-- Generated from manifest.yaml with Copier. -->
 
-# BLS12-381 Groth16 verifier v0.13.0
+# BLS12-381 Groth16 verifier v0.13.0-affine-inline
 
 [简体中文](README.zh-CN.md) · [4thGraph](../../README.md) · [Project index](../README.md) · [Versions](versions/index.json)
 
@@ -52,7 +52,9 @@ The search also compares direct sparse line products, normalized G2 point update
 
 v0.12.0 groups consecutive G1 doublings under one reduction boundary. Genesis and Chronicle each save 1,282 bytes over v0.11.0 with the same witnesses. [v0.12.0 measurements](versions/v0.12.0/measurements.json)
 
-v0.13.0 batches the Jacobian Z scale and folds redundant Script numeric boolean conversions. The Genesis path drops by 897 bytes and the Chronicle path by 651 bytes. [v0.13.0 measurements](versions/v0.13.0/measurements.json)
+v0.13.0-affine-inline batches the Jacobian Z scale and folds redundant Script numeric boolean conversions. The Genesis path drops by 897 bytes and the Chronicle path by 651 bytes. [v0.13.0 measurements](versions/v0.13.0/measurements.json)
+
+The v0.14.0 candidates pin `projective-cofactor` and `affine-witness` against the same modular Forth verifier, verification key and public inputs. [Candidate layouts](docs/verification.en.md#v0140-layouts)
 
 ## Reproduce the checks
 
@@ -63,9 +65,9 @@ python3 -m pip install ecdsa -r tools/requirements-chronicle.txt
 ```
 
 ```sh
-PYTHONPATH=src:. python3 projects/groth16-bls12-381/reference/replay_plan.py --release 0.13.0
+PYTHONPATH=src:. python3 projects/groth16-bls12-381/reference/replay_plan.py --release v0.13.0-affine-inline
 REGTEST_CHRONICLE_HEIGHT=1000 bash tools/verify_node.sh --profile raised -- \
-  python3 projects/groth16-bls12-381/reference/replay_plan.py --release 0.13.0 --funded
+  python3 projects/groth16-bls12-381/reference/replay_plan.py --release v0.13.0-affine-inline --funded
 ```
 
 The current pinned plan checks the Forth module hashes, lock bytes and both witnesses before writing artifacts. The funded replay mines both valid spends and rejects swapped statements and G1 points outside the subgroup. [Verification guide](docs/verification.en.md) · [nChain and sCrypt comparison](docs/verification.en.md#nchain-and-scrypt-comparison)

@@ -2,7 +2,9 @@
 
 [简体中文](scrypt-comparison.zh-CN.md) · [Project README](../README.md)
 
-The measurements below use the v0.6.0 Forth verifier. The project README gives the current verifier and payment sizes. [v0.6.0 source](https://github.com/linzhm/4thGraph/tree/bc6fe95784cc810e96fc51806f6106f5207cdb9d/projects/p2pkh-schnorr) · [Current payment measurements](../README.md#measured-sizes)
+This page records two historical comparisons against the v0.6.0 Forth verifier. The first uses each verifier's signature format. The second holds the BIP340 format and witness layout fixed. Sizes and timings apply to their respective fixtures. The constructor guide covers the released template and the tuned Forth build. [Pinned v0.6.0 source](https://github.com/linzhm/4thGraph/tree/9cce0f0e72c9bfcbace6729ab6a6cfca38af9ead/projects/p2pkh-schnorr) · [Current constructor comparison](high-level-forth.en.md#otda-constructor)
+
+## Historical contracts and witness formats
 
 The 2021 article illustrates a witness-assisted approach. Its archived contract calls `isMul` three times with off-chain point multiplication data. Each auxiliary array group declares 512 points and 510 slopes, giving 4,602 integer fields across the three groups before the other arguments. The companion article's roughly 400-byte figure describes the check for one point addition. These historical figures come from the source. [Schnorr article](https://scryptplatform.medium.com/schnorr-signatures-on-bitcoin-397ca51d8bda) · [Archived contract](https://github.com/sCrypt-Inc/boilerplate/blob/2284e11c9aa22faccd266d85a992e8a91a5b70f3/contracts/schnorr.scrypt) · [Archived arithmetic](https://github.com/sCrypt-Inc/boilerplate/blob/2284e11c9aa22faccd266d85a992e8a91a5b70f3/contracts/ec.scrypt) · [Point arithmetic article](https://scryptplatform.medium.com/efficient-elliptic-curve-point-addition-and-multiplication-in-scrypt-script-f7e143a752e2)
 
@@ -48,7 +50,7 @@ The Forth verifier uses 93,295 fewer bytes than the optimized sCrypt port in thi
 
 ## Reproduce
 
-Run from the repository root after setting up the [project Python environment](../README.md#validate-the-baseline). The replay was tested with Node.js 22. The compiler and BSV Node binaries are for Linux x86-64. The runner checks the upstream source revision and compiler SHA-256.
+Run from the root of revision `9cce0f0` with `SCRIPT_LAB_SDK_PYTHON` set to the project interpreter. The historical replay uses Node.js 22 and Linux x86-64 compiler and BSV Node binaries. The runner checks the upstream revision and the compiler SHA-256. [Environment setup](../README.md#validate-the-baseline)
 
 ```sh
 scratch=$(mktemp -d)
@@ -60,9 +62,9 @@ gh release download v1.19.1 --repo sCrypt-Inc/compiler_dist \
 chmod +x "$scratch/scryptc-1.19.1-Linux-x86_64"
 export SCRYPTC="$scratch/scryptc-1.19.1-Linux-x86_64" GHCRTS=-N2
 PYTHONPATH=src:. bash tools/verify_node.sh -- \
-  projects/p2pkh-schnorr/workspace/p2pkh-schnorr/bin/python projects/p2pkh-schnorr/reference/compare_scrypt.py \
+  "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/reference/compare_scrypt.py \
   "$scratch/boilerplate" --compiler-study --samples 15
 PYTHONPATH=src:. bash tools/verify_node.sh -- \
-  projects/p2pkh-schnorr/workspace/p2pkh-schnorr/bin/python projects/p2pkh-schnorr/reference/compare_bip340.py \
+  "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/reference/compare_bip340.py \
   --compiler "$SCRYPTC" --samples 15
 ```

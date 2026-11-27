@@ -1,0 +1,11 @@
+{
+  "version": "0.1.0",
+  "previous": null,
+  "artifacts": [],
+  "fixtures": ["statements.json"],
+  "evidence": ["measurements.json"],
+  "requires": {"proof-counter": "0.1.0"},
+  "integration": "docs/verification.en.md",
+  "build": "cargo build --release --locked --manifest-path projects/stark-counter/reference/Cargo.toml --target-dir projects/stark-counter/workspace/target",
+  "verify": "PYTHONPATH=src:. python3 projects/stark-counter/reference/replay.py --binary projects/stark-counter/workspace/target/release/fourthgraph-stark-counter --check"
+}
