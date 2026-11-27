@@ -17,6 +17,12 @@
 
 类型化 AST 和依赖图记录结果怎样推导。源码快照、规范化约束、构建计划、精确 Script 和片段分别保存摘要。字节哈希定位产物，源码和构建记录说明它由哪些修改产生并支持重放。多个计划即使得到相同字节，也各自保留来历。
 
+## 构建与花费的交接
+
+每份锁的构建交付精确 Script 字节、指令清单、参数布局、签名锚点和选中的计划。钱包用途由同一项目构建配对 WASM、manifest、可执行夹具及回执。模块通过 `recognize`、`prepare_spend` 和 `assemble_unlock` 消费实际 prevout 与选定路径。宿主核对请求并按需签名。完整交易和实际父交易交给独立引擎验收。
+
+功能 Profile 标识所支持的模板族，模板版本标识获准的精确字节与见证布局，候选身份绑定一次拟议花费。旧输出继续由已认可的旧版本识别。清单按路径记录摘要算法、链上下文和 `scriptCode`。
+
 ## 独立验收项
 
 | 范围 | 基线证据 | 完成条件 |
@@ -34,3 +40,4 @@
 - 类型化 PELS 编译目标、字面量循环展开与字节追踪。独立结算夹具验收同一份锁的两条路径。[编译器 PR #87](https://github.com/linzhm/4thGraph/pull/87)
 - Agent 有界选候选、固定评估和公式报告重放。首页流程图与 skill 说明同一个循环。[调优 PR #88](https://github.com/linzhm/4thGraph/pull/88)
 - BIP143 ALL 项目 WASM 包，R1 和 PELS Counter 作为验收实例。[钱包示例 PR #89](https://github.com/linzhm/4thGraph/pull/89)
+- 将现有 BIP143 动态后继按原字节纳入标准库。非计数状态标签夹具复跑两步，R1 作为调用该库的组合示例。[动态后继 PR #90](https://github.com/linzhm/4thGraph/pull/90)

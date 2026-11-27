@@ -17,6 +17,12 @@ Start with the highest-level Forth and freeze its semantics, target, dependencie
 
 The typed AST and dependency graph record how a result arises. Record a separate hash for the source snapshot, normalized constraints, build plan, exact linked Script, and emitted fragments. A byte hash identifies an artifact. Its source and build records explain which changes produced it and permit replay. Keep multiple plans traceable even when they emit identical bytes.
 
+## Build and spend boundary
+
+Every lock build exposes exact Script bytes, a listing, parameter layout, signing anchors, and the selected plan. For wallet use the same project build pairs the Script with WASM, a manifest, executable fixtures, and the test receipt. The module consumes actual prevouts and the selected named path through `recognize`, `prepare_spend`, and `assemble_unlock`. The host checks the request and signs when required. Final independent validation uses the completed transaction and its real parents.
+
+The functional profile identifies a supported family. A template version identifies the exact accepted bytes and witness layout. The candidate identifies one proposed spend. Keep approved versions available for earlier outputs and record the applicable digest algorithm, chain context, and `scriptCode` per path.
+
 ## Acceptance by independent change
 
 | Area | Evidence at the baseline | What closes the remaining work |
@@ -34,3 +40,4 @@ Move an item to complete when its code, build command, and observed acceptance r
 - Typed PELS compile targets, literal-count unrolling, and byte provenance. The standalone settlement fixture verifies both paths of the same lock. [Compiler PR #87](https://github.com/linzhm/4thGraph/pull/87)
 - Bounded Agent selection and fixed evaluation with replayable formula reports. The homepage diagram and skill document the same loop. [Tuning PR #88](https://github.com/linzhm/4thGraph/pull/88)
 - BIP143 ALL project WASM packages, with R1 and PELS Counter as fixture examples. [Wallet examples PR #89](https://github.com/linzhm/4thGraph/pull/89)
+- Exact-byte promotion of the existing dynamic BIP143 successor into the standard library. The state-label fixture uses two linked spends. R1 consumes the same library as an integration example. [Dynamic successor PR #90](https://github.com/linzhm/4thGraph/pull/90)
