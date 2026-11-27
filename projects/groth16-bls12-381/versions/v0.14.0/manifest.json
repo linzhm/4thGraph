@@ -1,0 +1,25 @@
+{
+  "version": "0.14.0",
+  "previous": "0.13.0",
+  "witness_layout": "projective-cofactor",
+  "replay_plans": {
+    "projective-cofactor": "replay-plan-projective-cofactor.json",
+    "affine-witness": "replay-plan-affine-witness.json"
+  },
+  "artifacts": [],
+  "fixtures": [],
+  "evidence": [
+    "measurements.json",
+    "replay-plan-projective-cofactor.json",
+    "replay-plan-affine-witness.json"
+  ],
+  "shared_data": [
+    "versions/v0.1.0/input-sources.json"
+  ],
+  "requires": {
+    "proof-counter": "0.1.0"
+  },
+  "integration": "docs/verification.en.md#v0140-layouts",
+  "build": "PYTHONPATH=src:. python3 projects/groth16-bls12-381/reference/replay_plan.py --release v0.14.0-projective-cofactor\nPYTHONPATH=src:. python3 projects/groth16-bls12-381/reference/replay_plan.py --release v0.14.0-affine-witness",
+  "verify": "REGTEST_CHRONICLE_HEIGHT=1000 bash tools/verify_node.sh --profile raised -- \\\n  python3 projects/groth16-bls12-381/reference/replay_plan.py --release v0.14.0-projective-cofactor --funded\nREGTEST_CHRONICLE_HEIGHT=1000 bash tools/verify_node.sh --profile raised -- \\\n  python3 projects/groth16-bls12-381/reference/replay_plan.py --release v0.14.0-affine-witness --funded"
+}

@@ -46,7 +46,10 @@ def readme_context(project, manifest):
         commands = [metadata.get(key) for key in ("build", "verify")]
         if any(not isinstance(command, str) or not command.strip() for command in commands):
             raise ValueError(f"{project.name}/{release}/manifest.json needs build and verify commands")
-        data.update(version=version, commands=commands)
+        layout = metadata.get("witness_layout")
+        if layout is not None and (not isinstance(layout, str) or not re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", layout)):
+            raise ValueError(f"{project.name}/{release}/manifest.json needs a lowercase witness layout name")
+        data.update(version=version, version_label=f"{version}-{layout}" if layout else version, commands=commands)
         measurements = release / "measurements.json"
         if (project / measurements).is_file():
             data["measurements"] = measurements.as_posix()

@@ -1,0 +1,70 @@
+{
+  "version": "0.14.0",
+  "source_revision": "38a6f10e42836104ff6556562a5f52d759e3cefd",
+  "source": "forth/verifier.fth",
+  "source_sha256": "9117b329603338b96be824390c9a9b29246d2a9fe43035d5c83c40b467f36fcb",
+  "input_sources_sha256": "6df6df04c0072841cc6caafecc301adc8a5a70a630dafc0aa11e0f1643c50f53",
+  "fixture_sha256": "51f6524a32d8ec5d4eac1c97398dc97c1d0594caae0284b8faa36a02574c5cc6",
+  "verification_key_sha256": "b2a207af971ac1b35fb7dac203e029e22871970816297fdbc303dbf7d77045d1",
+  "entry": "verify-proof",
+  "witness_layout": "projective-cofactor",
+  "stack_schedule": "compact",
+  "transaction_version": 2,
+  "witnesses": {
+    "wrap": {
+      "bytes": 1263,
+      "sha256": "bd7b6cae497b26338be70c6983c759b8c7a799517478d0d41530fe6d6800ede0"
+    },
+    "other": {
+      "bytes": 1263,
+      "sha256": "b3be1eea927d77284b0720bb5ef2171dd3d365a6296c73c0530ac7fe4f742668"
+    }
+  },
+  "script_eras": {
+    "genesis": {
+      "chronicle_activation_height": 1000,
+      "lock_bytes": 227775,
+      "path_bytes": 229046,
+      "script_sha256": "4224154048518c22c7dac1a1baae9b2abb5d43322c69e7d3364275a3a5023812",
+      "artifact_sha256": "b8a013456ee95c901081436a5fb9562d30afbb65f47797cc21a3806166ca22c8",
+      "arithmetic_plan": {
+        "fp2_rules": [
+          "expand-cross-products"
+        ],
+        "residue_association": "accumulator-frobenius-first",
+        "fp2_selection": "callsite",
+        "msm": "signed-radix4",
+        "msm_table": "deferred-doubling-slopes",
+        "miller_reductions": "split-chord-residue",
+        "miller_kernel": "direct-projective",
+        "g1_reductions": "paired-doubles",
+        "compact_booleans": true
+      }
+    },
+    "chronicle": {
+      "chronicle_activation_height": 2,
+      "lock_bytes": 226996,
+      "path_bytes": 228267,
+      "script_sha256": "6ddb795230dcd8e8f6ab1af4a076b91c4a51510b0d6bc853c662816f8cf0fabc",
+      "artifact_sha256": "17498e50d65e9c5440d9661dc94bb1b9e5dc46470dffd7016c45796c5599e1d0",
+      "arithmetic_plan": {
+        "fp2_rules": [
+          "expand-cross-products"
+        ],
+        "residue_association": "accumulator-frobenius-first",
+        "fp2_selection": "callsite",
+        "msm": "signed-radix4",
+        "msm_table": "deferred-doubling-slopes",
+        "miller_reductions": "split-chord-residue",
+        "miller_kernel": "direct-projective",
+        "g1_reductions": "paired-doubles",
+        "compact_booleans": true
+      }
+    }
+  },
+  "source_modules": {
+    "miller.fth": "ee7d0e9562e0e1d636af814977742888d486c74696728df39b0823d1433cbc9a",
+    "public-inputs.fth": "96d36387417997beec7e1f5051c6eb161e683e8a14d54ffd421f30d62b78fd97",
+    "residue.fth": "bc86d5d4270e58f230bdf155f9eade088a0a33356c0bbfe425e3acdfcaa6122e"
+  }
+}

@@ -1,6 +1,6 @@
 <!-- Generated from manifest.yaml with Copier. -->
 
-# BLS12-381 Groth16 验证器 v0.13.0
+# BLS12-381 Groth16 验证器 v0.13.0-affine-inline
 
 [English](README.md) · [4thGraph](../../README.zh-CN.md) · [项目目录](../README.zh-CN.md) · [版本](versions/index.json)
 
@@ -52,7 +52,9 @@ REQUIRE residue.fth
 
 v0.12.0 对连续两次 G1 倍点统一归约。相同见证下，Genesis 与 Chronicle 均比 v0.11.0 少 1,282 B。[v0.12.0 实测](versions/v0.12.0/measurements.json)
 
-v0.13.0 批量处理 Jacobian Z 坐标的缩放，并省去布尔指令前的重复数值转换。Genesis 路径再减 897 B，Chronicle 再减 651 B。[v0.13.0 实测](versions/v0.13.0/measurements.json)
+v0.13.0-affine-inline 批量处理 Jacobian Z 坐标的缩放，并省去布尔指令前的重复数值转换。Genesis 路径再减 897 B，Chronicle 再减 651 B。[v0.13.0 实测](versions/v0.13.0/measurements.json)
+
+v0.14.0 候选版用同一份模块化 Forth 验证器、验证密钥和公开输入锁定 `projective-cofactor` 和 `affine-witness` 两种布局。[候选布局](docs/verification.zh-CN.md#v0140-布局)
 
 ## 复现方法
 
@@ -63,9 +65,9 @@ python3 -m pip install ecdsa -r tools/requirements-chronicle.txt
 ```
 
 ```sh
-PYTHONPATH=src:. python3 projects/groth16-bls12-381/reference/replay_plan.py --release 0.13.0
+PYTHONPATH=src:. python3 projects/groth16-bls12-381/reference/replay_plan.py --release v0.13.0-affine-inline
 REGTEST_CHRONICLE_HEIGHT=1000 bash tools/verify_node.sh --profile raised -- \
-  python3 projects/groth16-bls12-381/reference/replay_plan.py --release 0.13.0 --funded
+  python3 projects/groth16-bls12-381/reference/replay_plan.py --release v0.13.0-affine-inline --funded
 ```
 
 当前锁定计划在输出产物前校验 Forth 模块摘要、锁脚本和两份见证。入金回放将有效花费打包入块，并拒绝互换公开声明和 G1 点不在子群内的用例。[验证与复现指南](docs/verification.zh-CN.md) · [nChain 与 sCrypt 对照](docs/verification.zh-CN.md#nchain-与-scrypt-对照)
