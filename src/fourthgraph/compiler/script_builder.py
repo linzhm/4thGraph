@@ -52,6 +52,7 @@ class ScriptBuilder(SourceCompiler):
             raise ValueError("ordered rules require an explicit terminal pass plan")
         self.experimental_rules = tuple(experimental_rules)
         self.formula_snapshots = {} if trace_formulas else None
+        self.formula_stack_plans = {} if trace_formulas else None
         self.formulas = {}
         self.formula_ir = {}
         super().__init__(source, vocabulary=SCRIPT_WORDS | (vocabulary or {}), backend=WALLET_BACKEND,
@@ -78,16 +79,19 @@ class ScriptBuilder(SourceCompiler):
                     states.append(snapshot(formula))
             if states is not None:
                 self.formula_snapshots[name.name] = states
-        code, report = formula.lower(optimize=self.optimize, passes=self.formula_passes)
+        plan = {} if self.formula_stack_plans is not None else None
+        code, report = formula.lower(optimize=self.optimize, passes=self.formula_passes, trace=plan)
+        if plan is not None:
+            self.formula_stack_plans[name.name] = plan
         append = build_word("script", "script", lambda prefix: prefix + code)
         self.words[name.name] = Word(("script",), ("script",), (Located(append, name),), "build", name=name.name)
         self.definitions[name.name] = name
         self.formulas[name.name] = report
         self.formula_ir[name.name] = formula
 
-    def emit(self, entry, *args):
+    def emit(self, entry, *args, build_call=None):
         word = self.words.get(entry.casefold())
         if not isinstance(word, Word) or word.gives != ("script",):
             raise CompileError(f"{entry} must produce one Script")
-        result, = evaluate(word, *args)
+        result, = evaluate(word, *args, build_call=build_call)
         return result
