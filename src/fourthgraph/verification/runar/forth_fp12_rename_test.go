@@ -19,3 +19,23 @@ func TestForthFp12InPlaceRename(t *testing.T) {
 		t.Fatalf("rename emitted %d ops and left %v, want %v", len(ops), tracker.nm, b)
 	}
 }
+
+func TestForthFp12InPlaceRenameRejectsMissingSlot(t *testing.T) {
+	names := appendFp12SlotNames([]string{"_q"}, "before")
+	for i := 1; i < len(names); i++ {
+		remaining := slices.Delete(slices.Clone(names), i, i+1)
+		t.Run(names[i], func(t *testing.T) {
+			tracker := NewBN254Tracker(remaining, func(StackOp) { t.Fatal("rename emitted a stack operation") })
+			tracker.fp12RenameInPlace = true
+			defer func() {
+				if recover() == nil {
+					t.Fatal("rename accepted a missing coefficient")
+				}
+				if !slices.Equal(remaining, tracker.nm) {
+					t.Fatal("rename changed the stack before validating every coefficient")
+				}
+			}()
+			bn254Fp12RenamePrefix(tracker, "before", "after")
+		})
+	}
+}

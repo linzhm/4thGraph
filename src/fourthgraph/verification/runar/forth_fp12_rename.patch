@@ -5,10 +5,16 @@
 +	fp12RenameInPlace bool
 --- a/compilers/go/codegen/bn254_ext.go
 +++ b/compilers/go/codegen/bn254_ext.go
-@@ -1232,0 +1233,5 @@
+@@ -1232,0 +1233,11 @@
 +	if t.fp12RenameInPlace {
-+		bn254Fp6RenamePrefix(t, srcPrefix+"_a", dstPrefix+"_a")
-+		bn254Fp6RenamePrefix(t, srcPrefix+"_b", dstPrefix+"_b")
++		var slots [12]int
++		// Resolve every coefficient before updating the tracker.
++		for i, name := range appendFp12SlotNames(nil, srcPrefix) {
++			slots[i] = len(t.nm) - 1 - t.findDepth(name)
++		}
++		for i, name := range appendFp12SlotNames(nil, dstPrefix) {
++			t.nm[slots[i]] = name
++		}
 +		return
 +	}
 --- a/compilers/go/codegen/forth_groth16.go
