@@ -81,6 +81,8 @@
 
 `split-chord` 与 `split-chord-residue` 在一位为 1 的轮次中分别归约切线和割线阶段，后者在乘余数前也归约。两种调度共同减少大整数中间值，并共用原见证格式。[稀疏线与分段归约实测](../projects/groth16-verifier/versions/v0.11.0/measurements.json)
 
+`g1_reductions: paired-doubles` 用同一归约边界处理连续两次 Jacobian 倍点，在混合点加和最终子群断言前归约坐标。[模块化 Forth 与复现](../projects/groth16-verifier/docs/verification.zh-CN.md#当前-forth-入口)
+
 ## 构建和复放
 
 在仓库根目录执行，依赖见 [4thGraph 安装命令](toolchain.md#复放与编译)。示例从版本库自带的测试夹具导出一份验证密钥、证明和公开输入。

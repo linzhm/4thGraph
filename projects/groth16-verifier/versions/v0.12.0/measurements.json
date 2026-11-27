@@ -1,0 +1,348 @@
+{
+  "version": "0.12.0",
+  "previous": "0.11.0",
+  "baseline_revision": "7614c7598451122426752bfaefa65666b108742f",
+  "compiler_revision": "e27012a73ec1161c15f1fec292559cd5340abad2",
+  "source": "forth/verifier.fth",
+  "source_sha256": "9117b329603338b96be824390c9a9b29246d2a9fe43035d5c83c40b467f36fcb",
+  "source_modules": {
+    "miller.fth": "ee7d0e9562e0e1d636af814977742888d486c74696728df39b0823d1433cbc9a",
+    "public-inputs.fth": "96d36387417997beec7e1f5051c6eb161e683e8a14d54ffd421f30d62b78fd97",
+    "residue.fth": "bc86d5d4270e58f230bdf155f9eade088a0a33356c0bbfe425e3acdfcaa6122e"
+  },
+  "fixture_sha256": "51f6524a32d8ec5d4eac1c97398dc97c1d0594caae0284b8faa36a02574c5cc6",
+  "public_input_bits": [
+    32,
+    1,
+    32,
+    2,
+    2
+  ],
+  "node_version": 101020300,
+  "chain_gang": {
+    "version": "0.13.2",
+    "commit": "74676b9c002c452e7f21a9ed9265f4972bef03f6"
+  },
+  "objective": "path-bytes",
+  "max_fixture_stack_bytes": 32000,
+  "eras": {
+    "genesis": {
+      "baseline": {
+        "lock_bytes": 230018,
+        "path_bytes": 239404,
+        "script_sha256": "5fa804a3b8804b44b9bc5ad0789ab955feabfc88495f0839d2788e13bfa019c8",
+        "artifact_sha256": "89a2b4ee5f4e74a9ec737ae5c94336458f104442460606402c22c787c1e06b4a",
+        "witness_bytes": [
+          9378,
+          9378
+        ],
+        "witness_sha256": [
+          "dd56640a5b84fa2192c05a0726841e427b83a24170348e51ae875cecc3640a97",
+          "4a2827dc39dbfc88079a66b617f5d3d4b379758aaead61e3ab254e4ba2d9661f"
+        ],
+        "msm_slope_count": 39,
+        "local_verdicts": {
+          "accepted": 2,
+          "rejected": 4
+        },
+        "fp2_choices": [
+          {
+            "ordered_rules": [],
+            "calls": 3
+          },
+          {
+            "ordered_rules": [
+              "expand-cross-products"
+            ],
+            "calls": 3538
+          }
+        ],
+        "fixture_stack_payload_bytes": 29891,
+        "plan": {
+          "fp2_rules": [
+            "expand-cross-products"
+          ],
+          "residue_association": "accumulator-frobenius-first",
+          "fp2_selection": "callsite",
+          "msm": "signed-radix4",
+          "msm_table": "deferred-doubling-slopes",
+          "miller_reductions": "split-chord-residue",
+          "miller_kernel": "direct-normalized"
+        }
+      },
+      "selected": {
+        "lock_bytes": 228736,
+        "path_bytes": 238122,
+        "script_sha256": "82850a27ae510f8e6b9cfc162eb7bf09471027fe3afdb891178ead1c7497a34b",
+        "artifact_sha256": "92bdebdbe74bc1b9f3dd7ddb7cd277f734143d5ff58f5af3e316bd26671d6a8e",
+        "witness_bytes": [
+          9378,
+          9378
+        ],
+        "witness_sha256": [
+          "dd56640a5b84fa2192c05a0726841e427b83a24170348e51ae875cecc3640a97",
+          "4a2827dc39dbfc88079a66b617f5d3d4b379758aaead61e3ab254e4ba2d9661f"
+        ],
+        "msm_slope_count": 39,
+        "local_verdicts": {
+          "accepted": 2,
+          "rejected": 4
+        },
+        "fp2_choices": [
+          {
+            "ordered_rules": [],
+            "calls": 3
+          },
+          {
+            "ordered_rules": [
+              "expand-cross-products"
+            ],
+            "calls": 3538
+          }
+        ],
+        "fixture_stack_payload_bytes": 29891,
+        "plan": {
+          "fp2_rules": [
+            "expand-cross-products"
+          ],
+          "residue_association": "accumulator-frobenius-first",
+          "fp2_selection": "callsite",
+          "msm": "signed-radix4",
+          "msm_table": "deferred-doubling-slopes",
+          "miller_reductions": "split-chord-residue",
+          "miller_kernel": "direct-normalized",
+          "g1_reductions": "paired-doubles"
+        }
+      },
+      "native_replay": [
+        {
+          "fixture_case": "wrap",
+          "deployment_txid": "d680d2d332c7255bf78c5297049f999716d11b4dbc60a9d81ef60c41de641550",
+          "spend_txid": "ad32325f3fce2db187a7025f8833f31bb14eceb9099eb22629422008a014a5df",
+          "funded_path_bytes": 238348,
+          "stack_payload": {
+            "main_payload_bytes": 29891,
+            "alt_payload_bytes": 59,
+            "combined_payload_bytes": 29891
+          },
+          "rejected_controls": [
+            "crossed_statement",
+            "g1_outside_subgroup"
+          ]
+        },
+        {
+          "fixture_case": "other",
+          "deployment_txid": "a7ab878fd6e47d7475755288a060c6936185ba665018cfbcc5e63b465e5f5d5d",
+          "spend_txid": "177b907c3847dd368e54eddb0440252a324982666cec2009ad698d5b593d6a26",
+          "funded_path_bytes": 238348,
+          "stack_payload": {
+            "main_payload_bytes": 29868,
+            "alt_payload_bytes": 59,
+            "combined_payload_bytes": 29868
+          },
+          "rejected_controls": [
+            "crossed_statement",
+            "g1_outside_subgroup"
+          ]
+        }
+      ],
+      "valid_spend_timing_ms": {
+        "node_version": 101020300,
+        "chain_gang": {
+          "version": "0.13.2",
+          "commit": "74676b9c002c452e7f21a9ed9265f4972bef03f6"
+        },
+        "samples_per_case": 9,
+        "warmup_samples_per_case": 1,
+        "rotation": "baseline, optimized rotated by sample",
+        "results": [
+          {
+            "fixture": "wrap",
+            "median": {
+              "baseline": {
+                "node_rpc_ms": 114.952,
+                "chain_gang_ms": 38.306
+              },
+              "optimized": {
+                "node_rpc_ms": 124.747,
+                "chain_gang_ms": 42.902
+              }
+            }
+          },
+          {
+            "fixture": "other",
+            "median": {
+              "baseline": {
+                "node_rpc_ms": 114.861,
+                "chain_gang_ms": 39.644
+              },
+              "optimized": {
+                "node_rpc_ms": 121.466,
+                "chain_gang_ms": 41.456
+              }
+            }
+          }
+        ]
+      }
+    },
+    "chronicle": {
+      "baseline": {
+        "lock_bytes": 229113,
+        "path_bytes": 238499,
+        "script_sha256": "b882c889255bf2a194f96527bed7575d2f901a816ece3b8b4345b90bdae94b55",
+        "artifact_sha256": "e9cc36e9b7efdf43ef6fffaf908436736cba09eb1eb4fd945b718f0e227ae28f",
+        "witness_bytes": [
+          9378,
+          9378
+        ],
+        "witness_sha256": [
+          "dd56640a5b84fa2192c05a0726841e427b83a24170348e51ae875cecc3640a97",
+          "4a2827dc39dbfc88079a66b617f5d3d4b379758aaead61e3ab254e4ba2d9661f"
+        ],
+        "msm_slope_count": 39,
+        "local_verdicts": {
+          "accepted": 2,
+          "rejected": 4
+        },
+        "fp2_choices": [
+          {
+            "ordered_rules": [],
+            "calls": 3
+          },
+          {
+            "ordered_rules": [
+              "expand-cross-products"
+            ],
+            "calls": 3538
+          }
+        ],
+        "fixture_stack_payload_bytes": 29891,
+        "plan": {
+          "fp2_rules": [
+            "expand-cross-products"
+          ],
+          "residue_association": "accumulator-frobenius-first",
+          "fp2_selection": "callsite",
+          "msm": "signed-radix4",
+          "msm_table": "deferred-doubling-slopes",
+          "miller_reductions": "split-chord-residue",
+          "miller_kernel": "direct-normalized"
+        }
+      },
+      "selected": {
+        "lock_bytes": 227831,
+        "path_bytes": 237217,
+        "script_sha256": "5003eb787c5d7844b6e2df1480a8e89ca5c5691e9110347e5356f85d0097b9c3",
+        "artifact_sha256": "114fadc821a5c789f07ce1cd6052f7cee5a50f02c9fdd1b27940a9cc2738a4d4",
+        "witness_bytes": [
+          9378,
+          9378
+        ],
+        "witness_sha256": [
+          "dd56640a5b84fa2192c05a0726841e427b83a24170348e51ae875cecc3640a97",
+          "4a2827dc39dbfc88079a66b617f5d3d4b379758aaead61e3ab254e4ba2d9661f"
+        ],
+        "msm_slope_count": 39,
+        "local_verdicts": {
+          "accepted": 2,
+          "rejected": 4
+        },
+        "fp2_choices": [
+          {
+            "ordered_rules": [],
+            "calls": 3
+          },
+          {
+            "ordered_rules": [
+              "expand-cross-products"
+            ],
+            "calls": 3538
+          }
+        ],
+        "fixture_stack_payload_bytes": 29891,
+        "plan": {
+          "fp2_rules": [
+            "expand-cross-products"
+          ],
+          "residue_association": "accumulator-frobenius-first",
+          "fp2_selection": "callsite",
+          "msm": "signed-radix4",
+          "msm_table": "deferred-doubling-slopes",
+          "miller_reductions": "split-chord-residue",
+          "miller_kernel": "direct-normalized",
+          "g1_reductions": "paired-doubles"
+        }
+      },
+      "native_replay": [
+        {
+          "fixture_case": "wrap",
+          "deployment_txid": "1d8da1d9ce4e120c37f1c79116eab4e16b09dcc4332decb2d00c79f0df22ee3f",
+          "spend_txid": "5ffd242d2da5cb208b9330c01e8f2831329624e4d1f072540fda2257f2227234",
+          "funded_path_bytes": 237443,
+          "stack_payload": {
+            "main_payload_bytes": 29891,
+            "alt_payload_bytes": 59,
+            "combined_payload_bytes": 29891
+          },
+          "rejected_controls": [
+            "crossed_statement",
+            "g1_outside_subgroup"
+          ]
+        },
+        {
+          "fixture_case": "other",
+          "deployment_txid": "8153fd7495625c63583115e419a2a90df7cf22196cf0ba75aabc15f54c5158f0",
+          "spend_txid": "1a47f5f513bb8b0bc57eba2929bd29912e49db2c80b5c122f5f6fab98c09e2f8",
+          "funded_path_bytes": 237442,
+          "stack_payload": {
+            "main_payload_bytes": 29868,
+            "alt_payload_bytes": 59,
+            "combined_payload_bytes": 29868
+          },
+          "rejected_controls": [
+            "crossed_statement",
+            "g1_outside_subgroup"
+          ]
+        }
+      ],
+      "valid_spend_timing_ms": {
+        "node_version": 101020300,
+        "chain_gang": {
+          "version": "0.13.2",
+          "commit": "74676b9c002c452e7f21a9ed9265f4972bef03f6"
+        },
+        "samples_per_case": 9,
+        "warmup_samples_per_case": 1,
+        "rotation": "baseline, optimized rotated by sample",
+        "results": [
+          {
+            "fixture": "wrap",
+            "median": {
+              "baseline": {
+                "node_rpc_ms": 126.178,
+                "chain_gang_ms": 37.124
+              },
+              "optimized": {
+                "node_rpc_ms": 130.283,
+                "chain_gang_ms": 41.841
+              }
+            }
+          },
+          {
+            "fixture": "other",
+            "median": {
+              "baseline": {
+                "node_rpc_ms": 119.662,
+                "chain_gang_ms": 37.236
+              },
+              "optimized": {
+                "node_rpc_ms": 143.332,
+                "chain_gang_ms": 41.937
+              }
+            }
+          }
+        ]
+      }
+    }
+  }
+}

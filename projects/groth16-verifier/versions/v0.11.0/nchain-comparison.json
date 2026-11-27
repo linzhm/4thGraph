@@ -1,0 +1,730 @@
+{
+  "fixture_sha256": "51f6524a32d8ec5d4eac1c97398dc97c1d0594caae0284b8faa36a02574c5cc6",
+  "public_input_bits": [
+    32,
+    1,
+    32,
+    2,
+    2
+  ],
+  "bsv_node_version": 101020300,
+  "chain_gang": {
+    "version": "0.13.2",
+    "commit": "74676b9c002c452e7f21a9ed9265f4972bef03f6"
+  },
+  "nchain_revision": "fc20fb743edbc5bc5aba9d16625d50d1f50a3ef4",
+  "activation_height": 1000,
+  "samples_per_case": 5,
+  "sweep": {
+    "nchain-affine-lock-gradients-1600": {
+      "path_bytes": {
+        "wrap": 403195,
+        "other": 400772
+      },
+      "lock_bytes": 392160,
+      "witness_bytes": {
+        "wrap": 11027,
+        "other": 8604
+      }
+    },
+    "nchain-affine-lock-gradients-3200": {
+      "path_bytes": {
+        "wrap": 398545,
+        "other": 396122
+      },
+      "lock_bytes": 387510,
+      "witness_bytes": {
+        "wrap": 11027,
+        "other": 8604
+      }
+    },
+    "nchain-affine-lock-gradients-6400": {
+      "path_bytes": {
+        "wrap": 396635,
+        "other": 394212
+      },
+      "lock_bytes": 385600,
+      "witness_bytes": {
+        "wrap": 11027,
+        "other": 8604
+      }
+    },
+    "nchain-affine-witness-gradients-1600": {
+      "path_bytes": {
+        "wrap": 404272,
+        "other": 401849
+      },
+      "lock_bytes": 379915,
+      "witness_bytes": {
+        "wrap": 24349,
+        "other": 21926
+      }
+    },
+    "nchain-affine-witness-gradients-3200": {
+      "path_bytes": {
+        "wrap": 399622,
+        "other": 397199
+      },
+      "lock_bytes": 375265,
+      "witness_bytes": {
+        "wrap": 24349,
+        "other": 21926
+      }
+    },
+    "nchain-affine-witness-gradients-6400": {
+      "path_bytes": {
+        "wrap": 397712,
+        "other": 395289
+      },
+      "lock_bytes": 373355,
+      "witness_bytes": {
+        "wrap": 24349,
+        "other": 21926
+      }
+    },
+    "nchain-projective-1600": {
+      "path_bytes": {
+        "wrap": 454633,
+        "other": 454611
+      },
+      "lock_bytes": 453491,
+      "witness_bytes": {
+        "wrap": 1134,
+        "other": 1112
+      }
+    },
+    "nchain-projective-3200": {
+      "path_bytes": {
+        "wrap": 451758,
+        "other": 451736
+      },
+      "lock_bytes": 450616,
+      "witness_bytes": {
+        "wrap": 1134,
+        "other": 1112
+      }
+    },
+    "nchain-projective-6400": {
+      "path_bytes": {
+        "wrap": 449344,
+        "other": 449322
+      },
+      "lock_bytes": 448202,
+      "witness_bytes": {
+        "wrap": 1134,
+        "other": 1112
+      }
+    }
+  },
+  "replays": {
+    "4thgraph-v0.11.0": {
+      "wrap": {
+        "lock_bytes": 230018,
+        "witness_bytes": 9378,
+        "path_bytes": 239404,
+        "deployment_bytes": 230154,
+        "spend_bytes": 9475,
+        "deployment_txid": "eb1b1c9d7ab61d5456ae15e97bd486e9bce8a02a90c33de8fd07935b70016c9a",
+        "spend_txid": "6bfeb998d5e32d07f4c95184c6fd2123e9f1e9df549d1af2ad25fb7ad653aa00",
+        "node_scripts": [
+          true
+        ],
+        "chain_gang": true,
+        "valid_spend_mined": true,
+        "crossed_statement_rejected": true
+      },
+      "other": {
+        "lock_bytes": 230018,
+        "witness_bytes": 9378,
+        "path_bytes": 239404,
+        "deployment_bytes": 230154,
+        "spend_bytes": 9475,
+        "deployment_txid": "850650a7192d4dc1879960f239e48fd65bcd256ca2611914aadddd9626c486ad",
+        "spend_txid": "872b5ee3125c63b4f7f41219d6674a74f74293a9f82a95f881716d98991e0f0f",
+        "node_scripts": [
+          true
+        ],
+        "chain_gang": true,
+        "valid_spend_mined": true,
+        "crossed_statement_rejected": true
+      }
+    },
+    "nchain-affine-lock-gradients-6400": {
+      "wrap": {
+        "lock_bytes": 385600,
+        "witness_bytes": 11027,
+        "path_bytes": 396635,
+        "deployment_bytes": 385736,
+        "spend_bytes": 11124,
+        "deployment_txid": "21300867f3f24d322efc77c2757babceaa812785e7256bb5b311aeaf7d532e97",
+        "spend_txid": "2e7ca3d9ea846c365a2d447fc8b93ebcdac666302d5a5e25712e2ad9599fce7d",
+        "node_scripts": [
+          true
+        ],
+        "chain_gang": true,
+        "valid_spend_mined": true,
+        "crossed_statement_rejected": true
+      },
+      "other": {
+        "lock_bytes": 385600,
+        "witness_bytes": 8604,
+        "path_bytes": 394212,
+        "deployment_bytes": 385736,
+        "spend_bytes": 8701,
+        "deployment_txid": "1e6b0d13c8791a45d5a74738149536dd163d4579e769197c42c6914232b3b702",
+        "spend_txid": "00112138ad64b649c85e4557ef3bddf9eb4e08ba65353ed9cd9305e83778aa95",
+        "node_scripts": [
+          true
+        ],
+        "chain_gang": true,
+        "valid_spend_mined": true,
+        "crossed_statement_rejected": true
+      }
+    },
+    "nchain-affine-witness-gradients-6400": {
+      "wrap": {
+        "lock_bytes": 373355,
+        "witness_bytes": 24349,
+        "path_bytes": 397712,
+        "deployment_bytes": 373492,
+        "spend_bytes": 24446,
+        "deployment_txid": "9e99e525426cb278e1fb5e0b3f7afb44962e919bf26b890c4eab15556f3822cd",
+        "spend_txid": "4da1bf8d19483560ed88ed60cf8c336691eede9868cfcb0fc761824ba660a458",
+        "node_scripts": [
+          true
+        ],
+        "chain_gang": true,
+        "valid_spend_mined": true,
+        "crossed_statement_rejected": true
+      },
+      "other": {
+        "lock_bytes": 373355,
+        "witness_bytes": 21926,
+        "path_bytes": 395289,
+        "deployment_bytes": 373492,
+        "spend_bytes": 22023,
+        "deployment_txid": "a98c2e47b1c77f3693ac7fdfd91fa748746c18865095e301dc92ecd2505f0cb8",
+        "spend_txid": "b7c3cc634e08b6289967f113c9195288f2a628111567612a0e2abc2b2a6b3169",
+        "node_scripts": [
+          true
+        ],
+        "chain_gang": true,
+        "valid_spend_mined": true,
+        "crossed_statement_rejected": true
+      }
+    },
+    "nchain-projective-6400": {
+      "wrap": {
+        "lock_bytes": 448202,
+        "witness_bytes": 1134,
+        "path_bytes": 449344,
+        "deployment_bytes": 448338,
+        "spend_bytes": 1231,
+        "deployment_txid": "095a7100d97886be10436c3927671a10a1523a579042a4835aa575a580b906be",
+        "spend_txid": "bbd046b19cc496a87ef63ed84c2a6486b324ea0caa96dd035354bf1d80b016d2",
+        "node_scripts": [
+          true
+        ],
+        "chain_gang": true,
+        "valid_spend_mined": true,
+        "crossed_statement_rejected": true
+      },
+      "other": {
+        "lock_bytes": 448202,
+        "witness_bytes": 1112,
+        "path_bytes": 449322,
+        "deployment_bytes": 448339,
+        "spend_bytes": 1209,
+        "deployment_txid": "54b157637d64b26c25feb94ef71e0bed6fca5d3d15df63d7c5fba98f5988f4f7",
+        "spend_txid": "e4e68476f9af45fa3b4ed435120aa257e6f9db33e393941f7b72b6f5672230c6",
+        "node_scripts": [
+          true
+        ],
+        "chain_gang": true,
+        "valid_spend_mined": true,
+        "crossed_statement_rejected": true
+      }
+    }
+  },
+  "timing": {
+    "wrap": {
+      "4thgraph-v0.11.0": {
+        "median_ms": {
+          "bsv_node_rpc": 115.137,
+          "chain_gang": 37.675
+        },
+        "samples_ms": {
+          "bsv_node_rpc": [
+            116.570234,
+            115.13734,
+            129.994589,
+            109.371306,
+            106.315426
+          ],
+          "chain_gang": [
+            35.756066,
+            35.5188,
+            46.489407,
+            39.348735,
+            37.674533
+          ]
+        },
+        "funded": true
+      },
+      "nchain-affine-lock-gradients-6400": {
+        "median_ms": {
+          "bsv_node_rpc": 346.604,
+          "chain_gang": 178.46
+        },
+        "samples_ms": {
+          "bsv_node_rpc": [
+            351.89297,
+            354.415625,
+            340.335634,
+            346.603815,
+            334.655689
+          ],
+          "chain_gang": [
+            173.532579,
+            180.240701,
+            183.782536,
+            178.459942,
+            173.058093
+          ]
+        },
+        "funded": true
+      },
+      "nchain-affine-witness-gradients-6400": {
+        "median_ms": {
+          "bsv_node_rpc": 357.682,
+          "chain_gang": 183.285
+        },
+        "samples_ms": {
+          "bsv_node_rpc": [
+            362.388301,
+            356.744089,
+            356.227247,
+            370.238271,
+            357.682143
+          ],
+          "chain_gang": [
+            175.830386,
+            183.285406,
+            187.683894,
+            184.767707,
+            167.418869
+          ]
+        },
+        "funded": true
+      },
+      "nchain-projective-6400": {
+        "median_ms": {
+          "bsv_node_rpc": 351.287,
+          "chain_gang": 159.47
+        },
+        "samples_ms": {
+          "bsv_node_rpc": [
+            349.135836,
+            355.01799,
+            360.172654,
+            351.286956,
+            345.441474
+          ],
+          "chain_gang": [
+            159.470394,
+            157.436972,
+            206.651672,
+            170.911501,
+            157.622175
+          ]
+        },
+        "funded": true
+      },
+      "nchain-affine-lock-gradients-1600": {
+        "median_ms": {
+          "bsv_node_rpc": 213.929,
+          "chain_gang": 83.443
+        },
+        "samples_ms": {
+          "bsv_node_rpc": [
+            260.554556,
+            206.436351,
+            213.929289,
+            200.347166,
+            237.020079
+          ],
+          "chain_gang": [
+            74.24445,
+            88.146196,
+            83.442678,
+            80.877136,
+            92.438714
+          ]
+        },
+        "funded": false
+      },
+      "nchain-affine-lock-gradients-3200": {
+        "median_ms": {
+          "bsv_node_rpc": 257.869,
+          "chain_gang": 111.817
+        },
+        "samples_ms": {
+          "bsv_node_rpc": [
+            253.249591,
+            285.207522,
+            255.029771,
+            257.869215,
+            266.102691
+          ],
+          "chain_gang": [
+            105.915596,
+            119.463693,
+            111.817396,
+            113.503918,
+            104.788412
+          ]
+        },
+        "funded": false
+      },
+      "nchain-affine-witness-gradients-1600": {
+        "median_ms": {
+          "bsv_node_rpc": 201.918,
+          "chain_gang": 81.137
+        },
+        "samples_ms": {
+          "bsv_node_rpc": [
+            197.804944,
+            215.802242,
+            203.111789,
+            201.917587,
+            201.536416
+          ],
+          "chain_gang": [
+            80.917393,
+            92.274733,
+            81.137257,
+            93.154289,
+            76.380812
+          ]
+        },
+        "funded": false
+      },
+      "nchain-affine-witness-gradients-3200": {
+        "median_ms": {
+          "bsv_node_rpc": 271.717,
+          "chain_gang": 112.114
+        },
+        "samples_ms": {
+          "bsv_node_rpc": [
+            271.716738,
+            315.694096,
+            249.994477,
+            268.583829,
+            282.039189
+          ],
+          "chain_gang": [
+            105.350227,
+            120.416451,
+            112.114043,
+            125.566434,
+            110.200564
+          ]
+        },
+        "funded": false
+      },
+      "nchain-projective-1600": {
+        "median_ms": {
+          "bsv_node_rpc": 288.616,
+          "chain_gang": 127.53
+        },
+        "samples_ms": {
+          "bsv_node_rpc": [
+            278.34617,
+            313.051106,
+            288.616232,
+            296.860738,
+            285.997076
+          ],
+          "chain_gang": [
+            120.483935,
+            127.529608,
+            128.782826,
+            139.726823,
+            123.376573
+          ]
+        },
+        "funded": false
+      },
+      "nchain-projective-3200": {
+        "median_ms": {
+          "bsv_node_rpc": 352.45,
+          "chain_gang": 137.352
+        },
+        "samples_ms": {
+          "bsv_node_rpc": [
+            390.872364,
+            312.324316,
+            358.902089,
+            352.449607,
+            301.644745
+          ],
+          "chain_gang": [
+            136.903381,
+            137.352338,
+            225.855737,
+            148.638756,
+            131.425501
+          ]
+        },
+        "funded": false
+      }
+    },
+    "other": {
+      "4thgraph-v0.11.0": {
+        "median_ms": {
+          "bsv_node_rpc": 111.761,
+          "chain_gang": 36.321
+        },
+        "samples_ms": {
+          "bsv_node_rpc": [
+            126.399523,
+            108.669416,
+            111.091893,
+            114.854237,
+            111.760934
+          ],
+          "chain_gang": [
+            72.468669,
+            36.321046,
+            35.737149,
+            37.185994,
+            35.265571
+          ]
+        },
+        "funded": true
+      },
+      "nchain-affine-lock-gradients-6400": {
+        "median_ms": {
+          "bsv_node_rpc": 342.822,
+          "chain_gang": 175.763
+        },
+        "samples_ms": {
+          "bsv_node_rpc": [
+            502.203322,
+            335.238839,
+            329.438665,
+            347.378187,
+            342.821617
+          ],
+          "chain_gang": [
+            164.597462,
+            173.56265,
+            211.219592,
+            176.89509,
+            175.763331
+          ]
+        },
+        "funded": true
+      },
+      "nchain-affine-witness-gradients-6400": {
+        "median_ms": {
+          "bsv_node_rpc": 343.626,
+          "chain_gang": 169.653
+        },
+        "samples_ms": {
+          "bsv_node_rpc": [
+            364.382118,
+            341.680579,
+            355.433677,
+            338.115414,
+            343.626282
+          ],
+          "chain_gang": [
+            164.878855,
+            169.652648,
+            168.509169,
+            170.2293,
+            169.992879
+          ]
+        },
+        "funded": true
+      },
+      "nchain-projective-6400": {
+        "median_ms": {
+          "bsv_node_rpc": 352.879,
+          "chain_gang": 156.563
+        },
+        "samples_ms": {
+          "bsv_node_rpc": [
+            354.95434,
+            358.601314,
+            334.97018,
+            346.498677,
+            352.879443
+          ],
+          "chain_gang": [
+            245.903945,
+            156.563078,
+            157.4415,
+            156.494476,
+            154.242372
+          ]
+        },
+        "funded": true
+      },
+      "nchain-affine-lock-gradients-1600": {
+        "median_ms": {
+          "bsv_node_rpc": 197.439,
+          "chain_gang": 71.926
+        },
+        "samples_ms": {
+          "bsv_node_rpc": [
+            212.53049,
+            193.399367,
+            191.905871,
+            197.439135,
+            199.717888
+          ],
+          "chain_gang": [
+            74.066665,
+            71.778341,
+            73.713234,
+            71.072171,
+            71.926125
+          ]
+        },
+        "funded": false
+      },
+      "nchain-affine-lock-gradients-3200": {
+        "median_ms": {
+          "bsv_node_rpc": 253.025,
+          "chain_gang": 108.395
+        },
+        "samples_ms": {
+          "bsv_node_rpc": [
+            263.889872,
+            250.953251,
+            246.786014,
+            265.472981,
+            253.025291
+          ],
+          "chain_gang": [
+            108.394868,
+            100.915942,
+            101.497242,
+            113.284293,
+            108.490956
+          ]
+        },
+        "funded": false
+      },
+      "nchain-affine-witness-gradients-1600": {
+        "median_ms": {
+          "bsv_node_rpc": 199.966,
+          "chain_gang": 74.62
+        },
+        "samples_ms": {
+          "bsv_node_rpc": [
+            199.573303,
+            190.810685,
+            219.042334,
+            199.966305,
+            200.542806
+          ],
+          "chain_gang": [
+            74.130463,
+            74.619723,
+            76.792247,
+            98.172875,
+            74.045962
+          ]
+        },
+        "funded": false
+      },
+      "nchain-affine-witness-gradients-3200": {
+        "median_ms": {
+          "bsv_node_rpc": 253.936,
+          "chain_gang": 105.087
+        },
+        "samples_ms": {
+          "bsv_node_rpc": [
+            248.126677,
+            253.935788,
+            254.822902,
+            282.17968,
+            245.84765
+          ],
+          "chain_gang": [
+            103.813451,
+            103.135866,
+            123.752466,
+            123.718915,
+            105.08674
+          ]
+        },
+        "funded": false
+      },
+      "nchain-projective-1600": {
+        "median_ms": {
+          "bsv_node_rpc": 297.68,
+          "chain_gang": 129.256
+        },
+        "samples_ms": {
+          "bsv_node_rpc": [
+            380.749543,
+            283.105999,
+            284.547073,
+            299.834675,
+            297.679867
+          ],
+          "chain_gang": [
+            136.700915,
+            119.656794,
+            130.962581,
+            129.255831,
+            119.090754
+          ]
+        },
+        "funded": false
+      },
+      "nchain-projective-3200": {
+        "median_ms": {
+          "bsv_node_rpc": 309.391,
+          "chain_gang": 131.102
+        },
+        "samples_ms": {
+          "bsv_node_rpc": [
+            325.486856,
+            307.538596,
+            309.391338,
+            344.763566,
+            297.447777
+          ],
+          "chain_gang": [
+            139.376736,
+            128.542331,
+            126.712188,
+            131.102411,
+            134.843236
+          ]
+        },
+        "funded": false
+      }
+    }
+  },
+  "historical_mainnet": {
+    "network": "main",
+    "curve": "BLS12-381",
+    "lock_txid": "79a5281c9ea718c2a6be4e8d0e48b27855969d780c50393c01ad6267a9e24940",
+    "output": 0,
+    "deployment_tx_bytes": 482772,
+    "lock_bytes": 482601,
+    "spend_txid": "e4cd00c1fa7dd6931dd1e45034e9d9f732e6d7d38f7826341715f488a146514c",
+    "input": 0,
+    "spend_tx_bytes": 39963,
+    "unlock_bytes": 39876,
+    "path_bytes": 522485,
+    "funded_path_bytes": 522735,
+    "lock_sha256": "9ab0b8e457a50f15550a0d0939cd15c5c0910d8a38d2c6378e89fbd2ee4c5734"
+  }
+}

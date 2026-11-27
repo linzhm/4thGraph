@@ -28,6 +28,32 @@ v0.5.0 沿用相同的公开输入配置和证明夹具，比较自动操作数�
 
 复现 Chronicle 回放时，设置 `REGTEST_CHRONICLE_HEIGHT=2`，传入 `--script-era chronicle` 并使用单独的输出文件。在任一 Script 时代指定回放布局时，将 `--objective path-bytes` 改为 `--witness-layout affine-witness` 或 `--witness-layout projective`。
 
+## 当前 Forth 入口
+
+[`forth/verifier.fth`](../forth/verifier.fth) 用 `REQUIRE` 引入三个模块，由 `verify-proof ( -- groth16-verified )` 串起验证流程。根目录的 [`verifier.fth`](../verifier.fth) 演示最简的标准库调用。这个项目使用 BLS12-381。
+
+| 模块 | Forth 中的带类型流程 | 对应计算 |
+| --- | --- | --- |
+| [`public-inputs.fth`](../forth/public-inputs.fth) | 读取见证，检查证明点 A、C，准备配对密钥。 | 后端检查公开输入范围及 G1 点，计算 (VK_x=IC_0+\sum_i s_iIC_i)。选中的仿射计划核验有符号 radix-4 MSM 的斜率。[仿射发码](../../../src/fourthgraph/verification/bls12381/affine_witness.py) |
+| [`miller.fth`](../forth/miller.fth) | 构建并执行 BLS12-381 种子首位之后的 63 轮。 | 零位累入切线，置位还累入割线与余数因子。后端逐步核验 B 的斜率和子群关系。[Miller 发码](../../../src/fourthgraph/verification/bls12381/affine_witness.py) |
+| [`residue.fth`](../forth/residue.fth) | 将累积器、验证密钥因子和见证余数的 Frobenius 像相乘，断言结果属于 Fp6 且非零。 | 编译器通过扩域塔展开 Fp12 乘法与两项断言。[剩余式发码](../../../src/fourthgraph/verification/bls12381/verifier.py) |
+
+Forth 定义验证流程和栈效应。[带类型的词表](../../../src/fourthgraph/verification/bls12381/build.py) 把这些词接到群运算与域运算后端。扩域塔通过公式编译器加载 [Fp2 乘法公式](../../../src/fourthgraph/stdlib/bls12-381-fp2.fth)。产物记录根源码、导入模块及 Fp2 公式的摘要和所用算术计划。[扩域塔实现](../../../src/fourthgraph/verification/bls12381/field.py)
+
+从仓库根目录构建当前版本，并可回放两份证明的入金花费。
+
+```sh
+PYTHONPATH=src:. python3 projects/groth16-verifier/reference/replay_plan.py --release current
+REGTEST_CHRONICLE_HEIGHT=1000 bash tools/verify_node.sh --profile raised -- \
+  python3 projects/groth16-verifier/reference/replay_plan.py --release current --funded
+```
+
+Chronicle 回放使用激活高度 `2`，并加 `--script-era chronicle`。构建器校验文件、锁和见证摘要，产物写入 `projects/groth16-verifier/workspace/build/pinned-v0.12.0/`。入金回放另外输出交易验证报告。[v0.12.0 锁定计划](../versions/v0.12.0/replay-plan.json)
+
+v0.12.0 沿用 v0.11.0 的 MSM 和 Miller 计划，比较每次 G1 倍点归约与连续两次倍点后归约。合并后两个时代均减少 1,282 B。对夹具的五个有界动态输入，锁加见证为 Genesis 238,122 B、Chronicle 237,217 B。 实测栈峰值为 29,891 B，配对测量的验证耗时有所上升。[v0.12.0 实测](../versions/v0.12.0/measurements.json)
+
+nChain 对照使用相同的 BLS12-381 验证密钥、两份证明和五个有界动态输入。v0.11.0 路径为 239,404 B，nChain `fc20fb7` 三种布局、三档取模阈值中最短的路径为 394,212–396,635 B。nChain 投影布局的见证为 1,112–1,134 B。[同夹具对照实测](../versions/v0.11.0/nchain-comparison.json)
+
 ## 高层 Forth 实验
 
 v0.6.0 实验在 Forth 中定义证明预处理、种子首位之后的 63 轮 Miller 循环，以及 Miller 累积器、验证密钥因子和见证余数的 Frobenius 像三者相乘的剩余式。最后两个词分别断言乘积属于 Fp6 且非零。后端核对轮次与 BLS12-381 种子一致，并提供见证、群和域运算原语。[高层 Forth 源码](../experiments/high-level/verifier.fth)

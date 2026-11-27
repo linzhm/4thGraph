@@ -1,21 +1,36 @@
 <!-- Generated from manifest.yaml with Copier. -->
 
-# BLS12-381 Groth16 verifier v0.11.0
+# BLS12-381 Groth16 verifier v0.12.0
 
 [简体中文](README.zh-CN.md) · [4thGraph](../../README.md) · [Project index](../README.md) · [Versions](versions/index.json)
 
 ## Developer resources
 
-Import the 4thGraph Groth16 standard library in Forth, build a proof lock and witness, and replay funded BSV spends.
+Compile a modular BLS12-381 Groth16 verifier from Forth and reproduce pinned Genesis and Chronicle locks and witnesses.
 
-[Algorithm and execution](#algorithm-and-execution) · [Reproduce the checks](#reproduce-the-checks) · [Measurements data](versions/v0.11.0/measurements.json)
+[Algorithm and execution](#algorithm-and-execution) · [Reproduce the checks](#reproduce-the-checks) · [Measurements data](versions/v0.12.0/measurements.json)
 
 | Entry point | Purpose |
 | --- | --- |
-| `verify-proof` | Project word that calls the standard-library verifier. |
+| `verify-proof` | Current modular entry in `forth/verifier.fth`. The root `verifier.fth` demonstrates the standard-library call. |
 | `groth16-bls12-381-verify` | Standard-library word that verifies a BLS12-381 Groth16 proof and its public signals. |
 
 ## Algorithm and execution
+
+The current entry imports the public-input checks, Miller schedule, and the final residue predicate as separate Forth modules. The compiler resolves the typed words and lowers them for the selected verification key and input policy. [Modular entry](forth/verifier.fth) · [Forth and arithmetic map](docs/verification.en.md#current-forth-entry)
+
+```forth
+REQUIRE BSV
+REQUIRE public-inputs.fth
+REQUIRE miller.fth
+REQUIRE residue.fth
+
+: verify-proof ( -- groth16-verified )
+    prepare-pairing
+    miller-pairing
+    verify-residue
+;
+```
 
 The project word imports the verifier with `REQUIRE` and calls its public entry. The shared backend compiles that call to BSV Script for the selected verification key and public-input configuration. [Project Forth](verifier.fth) · [Standard-library source](../../src/fourthgraph/stdlib/groth16-bls12-381.fth) · [Verifier layouts and ABI](../../docs/groth16-bls12-381.md)
 
@@ -35,6 +50,8 @@ The same high-level Forth source compiles with deferred MSM table reductions and
 
 The search also compares direct sparse line products, normalized G2 point updates, and split Miller rounds. It can select the shortest path within a measured stack-payload budget. [Miller kernel and stack measurements](versions/v0.11.0/measurements.json)
 
+v0.12.0 groups consecutive G1 doublings under one reduction boundary. Genesis and Chronicle each save 1,282 bytes over v0.11.0 with the same witnesses. [v0.12.0 measurements](versions/v0.12.0/measurements.json)
+
 ## Reproduce the checks
 
 Run from the repository root with Python 3.11 or later. The build uses the Python standard library. Funded replay uses the pinned chain-gang binding and an isolated Linux BSV Node 1.2.3.
@@ -44,15 +61,9 @@ python3 -m pip install ecdsa -r tools/requirements-chronicle.txt
 ```
 
 ```sh
-PYTHONPATH=src:. python3 projects/groth16-verifier/experiments/high-level/optimize.py \
-  --residue-association accumulator-frobenius-first --fp2-selection callsite --msm signed-radix4 \
-  --msm-table deferred-doubling-slopes --max-fixture-stack-bytes 32000
+PYTHONPATH=src:. python3 projects/groth16-verifier/reference/replay_plan.py --release 0.12.0
 REGTEST_CHRONICLE_HEIGHT=1000 bash tools/verify_node.sh --profile raised -- \
-  python3 -m fourthgraph.replay.bls12381_verifier \
-  --source projects/groth16-verifier/experiments/high-level/verifier.fth \
-  --entry verify-proof --witness-layout affine-inline --script-era genesis \
-  --arithmetic-plan projects/groth16-verifier/workspace/build/high-level/genesis-plan.json \
-  --output projects/groth16-verifier/workspace/build/high-level/genesis-replay.json
+  python3 projects/groth16-verifier/reference/replay_plan.py --release 0.12.0 --funded
 ```
 
-The high-level experiment writes `search.json`, the winning locks and plans, and the funded replay under `projects/groth16-verifier/workspace/build/high-level/`. The replay mines two valid spends and checks rejection of swapped statements and G1 points outside the subgroup. [Verification guide](docs/verification.en.md)
+The current pinned plan checks the Forth module hashes, lock bytes and both witnesses before writing artifacts. The funded replay mines both valid spends and rejects swapped statements and G1 points outside the subgroup. [Verification guide](docs/verification.en.md) · [nChain comparison](versions/v0.11.0/nchain-comparison.json)

@@ -4,7 +4,8 @@
   "artifacts": [],
   "fixtures": [],
   "evidence": [
-    "measurements.json"
+    "measurements.json",
+    "nchain-comparison.json"
   ],
   "shared_data": [
     "versions/v0.1.0/input-sources.json"

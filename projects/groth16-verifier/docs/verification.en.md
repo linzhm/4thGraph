@@ -28,6 +28,32 @@ The v0.5.0 records compare automatic operand scheduling with the v0.4.0 build us
 
 To reproduce the Chronicle replay, set `REGTEST_CHRONICLE_HEIGHT=2`, pass `--script-era chronicle`, and use a separate output file. To replay a specific layout in either era, replace `--objective path-bytes` with `--witness-layout affine-witness` or `--witness-layout projective`.
 
+## Current Forth entry
+
+[`forth/verifier.fth`](../forth/verifier.fth) imports three modules with `REQUIRE` and calls them from `verify-proof ( -- groth16-verified )`. The root [`verifier.fth`](../verifier.fth) is the minimal example that imports the standard-library verifier. This project targets BLS12-381.
+
+| Module | Typed Forth flow | Arithmetic |
+| --- | --- | --- |
+| [`public-inputs.fth`](../forth/public-inputs.fth) | Read the witness, check proof points A and C, and prepare the pairing key. | The backend enforces the public-input bounds, checks the G1 points, and computes (VK_x=IC_0+\sum_i s_iIC_i). The selected affine plan checks the signed radix-4 MSM slopes. [Affine lowering](../../../src/fourthgraph/verification/bls12381/affine_witness.py) |
+| [`miller.fth`](../forth/miller.fth) | Build and execute the 63-round schedule after the leading BLS12-381 seed bit. | A zero bit applies the tangent lines. A one bit also applies the chord lines and the residue factor. The backend checks every B slope and its subgroup relation. [Miller lowering](../../../src/fourthgraph/verification/bls12381/affine_witness.py) |
+| [`residue.fth`](../forth/residue.fth) | Combine the accumulator, verification-key factor and Frobenius image of the witness residue. Require membership in Fp6 and nonzero. | The compiler lowers the Fp12 product and both assertions through the field tower. [Residue lowering](../../../src/fourthgraph/verification/bls12381/verifier.py) |
+
+The definitions describe the control flow and stack effects. The [typed stage vocabulary](../../../src/fourthgraph/verification/bls12381/build.py) connects these words to the group and field backend. The field tower loads the [Fp2 multiplication formula](../../../src/fourthgraph/stdlib/bls12-381-fp2.fth) through the formula compiler. The artifact records the root source, imported modules, Fp2 formula and arithmetic plan by digest. [Field tower](../../../src/fourthgraph/verification/bls12381/field.py)
+
+Build the selected release and optionally fund both proofs from the repository root.
+
+```sh
+PYTHONPATH=src:. python3 projects/groth16-verifier/reference/replay_plan.py --release current
+REGTEST_CHRONICLE_HEIGHT=1000 bash tools/verify_node.sh --profile raised -- \
+  python3 projects/groth16-verifier/reference/replay_plan.py --release current --funded
+```
+
+For Chronicle set the activation height to `2` and add `--script-era chronicle`. The runner writes the checked lock and both witnesses under `projects/groth16-verifier/workspace/build/pinned-v0.12.0/`, with a replay report for funded runs. The pinned plan verifies file and bytecode digests. [v0.12.0 replay plan](../versions/v0.12.0/replay-plan.json)
+
+v0.12.0 retains the v0.11.0 MSM and Miller plan and compares G1 reduction after each doubling against reduction after a pair of consecutive doublings. Pairing these reductions saves 1,282 bytes in either era. The serialized lock and witness total 238,122 bytes on Genesis and 237,217 bytes on Chronicle for the five bounded dynamic inputs in the fixture. The measured stack peak stays at 29,891 bytes and verification takes longer in the paired timing samples. [v0.12.0 measurements](../versions/v0.12.0/measurements.json)
+
+The nChain rerun uses the same BLS12-381 key, two proofs and five bounded dynamic inputs. It measures v0.11.0 against three layouts and three reduction thresholds from upstream `fc20fb7`. The best nChain path in that sweep was 394,212–396,635 bytes, and the v0.11.0 path was 239,404 bytes. The nChain projective path has a 1,112–1,134 byte witness. [Same-fixture comparison](../versions/v0.11.0/nchain-comparison.json)
+
 ## High-level Forth experiment
 
 The v0.6.0 experiment defines proof preparation, the 63 Miller rounds after the leading seed bit, and the terminal product of the Miller accumulator, verification-key factor, and Frobenius of the witness residue. The two terminal words require that the product lies in Fp6 and is nonzero. The backend checks the round sequence against the BLS12-381 seed and supplies the witness, group, and field arithmetic primitives. [High-level Forth](../experiments/high-level/verifier.fth)
