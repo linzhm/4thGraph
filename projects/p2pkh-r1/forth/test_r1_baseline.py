@@ -1,19 +1,22 @@
 """Check the Forth reference arithmetic and both complete baseline lock entries."""
 
 from dataclasses import replace
+from hashlib import sha256
+from importlib.metadata import PackageNotFoundError
 import os
 from pathlib import Path
 import unittest
 
 from ecdsa import NIST256p, ellipticcurve
 
-from compile_r1 import COUNTER_ENTRY, ENTRY_SOURCES, PAYMENT_ENTRY, compile_source, emit_lock
+from compile_r1 import (COUNTER_ENTRY, ENTRY_SOURCES, PAYMENT_ENTRY, baseline_plans, compile_auto, compile_source,
+                        emit_lock, select_baseline_plan)
 from curve_compiler import B3, FIELD
 from signature import SpendAuthorization, authorization, current_input_unlock
 from test_payment import fixture_signature, signer
 
 from fourthgraph.benchmark.cases import seed
-from fourthgraph.benchmark.validation import Node, chain_verdict
+from fourthgraph.benchmark.validation import CONTEXT_PIN, Node, chain_metadata, chain_verdict
 from fourthgraph.bsv.chain_gang import engine_transaction
 from fourthgraph.bsv.differential import require_chain_gang_pin
 from fourthgraph.bsv.evaluate import ScriptError, evaluate
@@ -97,6 +100,54 @@ class BaselineTests(unittest.TestCase):
         for state in (None, -1, 2**32):
             with self.assertRaisesRegex(ValueError, "unsigned 32-bit"):
                 emit_lock(compiled, COUNTER_ENTRY, state)
+
+
+class BaselineAutoTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.source_path = ENTRY_SOURCES[PAYMENT_ENTRY]
+        cls.source = cls.source_path.read_bytes()
+        cls.key, cls.public, cls.owner = signer(7)
+        cls.raw, cls.optimized, cls.candidates, cls.region = baseline_plans(cls.source, cls.owner)
+
+    def test_automatic_selection_preserves_the_payment_boundaries(self):
+        self.assertEqual(self.region["status"], "matched")
+        self.assertEqual((len(self.candidates["baseline"]), len(self.candidates["formula"])), (415058, 139333))
+        self.assertEqual(self.candidates["baseline"], emit_lock(self.raw, PAYMENT_ENTRY))
+        self.assertEqual(self.candidates["formula"], emit_lock(self.optimized, PAYMENT_ENTRY))
+        self.assertEqual(select_baseline_plan(self.candidates), "split-5x4-affine-g-ifdup")
+        before = self.optimized.emit("r1-prepare-scalars", self.optimized.emit("r1-prepare-lock", b""))
+        after = self.optimized.emit("r1-bind-transaction", self.optimized.emit("r1-baseline-check-x", b""))
+        for name, span in self.region["fragments"].items():
+            with self.subTest(plan=name):
+                script = self.candidates[name]
+                start, end = span["offset"], span["offset"] + span["bytes"]
+                self.assertEqual(script[:start], before)
+                self.assertEqual(script[end:], after)
+                self.assertEqual(sha256(script[start:end]).hexdigest(), span["sha256"])
+
+    def test_distinct_source_uses_the_existing_formula_path(self):
+        _, script, report = compile_auto(self.source + b"\n( local revision )\n", self.owner)
+        self.assertEqual(report["window_region"]["status"], "ineligible")
+        self.assertEqual(report["selected"], "formula")
+        self.assertEqual(script, self.candidates["formula"])
+
+    def test_complete_spends_under_chain_gang(self):
+        try:
+            engine = chain_metadata()
+        except PackageNotFoundError:
+            self.skipTest("requires pinned chain-gang")
+        if engine["commit"] != CONTEXT_PIN:
+            self.skipTest("requires pinned chain-gang")
+        for name, script in self.candidates.items():
+            previous = parent(script, "baseline-payment")
+            unsigned = Transaction((Input(previous.txid_wire(), 0),), (Output(9_000, asm("OP_1")),))
+            for flag in (0x41, 0x61, 0x63):
+                with self.subTest(plan=name, flag=flag):
+                    auth = authorization(engine_transaction(unsigned), 0, 10_000, flag)
+                    tx = sign(unsigned, 0, auth, self.key, self.public)
+                    self.assertTrue(chain_verdict(tx, (previous,)))
+                    self.assertFalse(chain_verdict(replace(tx, locktime=1), (previous,)))
 
 
 @unittest.skipUnless(os.environ.get("REGTEST_COOKIE"), "requires the isolated regtest launcher")

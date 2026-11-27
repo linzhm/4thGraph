@@ -41,6 +41,29 @@ PYTHONPATH=src:.:projects/p2pkh-r1/forth:projects/p2pkh-r1/reference \
 
 前两条命令输出锁十六进制、字节数和源码依赖摘要。测试用合成父输出验证 BIP143、OTDA、无配对 SINGLE、连续计数及重新签名的错误后继。结果覆盖脚本验证。两种锁都是实验参考入口，发布钱包模板继续使用版本清单。
 
+### 同一份 baseline-lock 的自动选型
+
+默认、`--optimize` 和 `--auto` 读取同一份 `r1-baseline.fth` 及其依赖。
+`--auto` 比较原样构建、已有公式优化和四种窗口方案，按链接后的锁字节数选型。
+只有源文件与导入摘要匹配已验证的版本时才尝试窗口实现。编译器保留原入口
+的准备、结果检查和交易绑定，并在结果检查前清理窗口表。JSON 记录选中的
+计划、所有候选的锁摘要以及替换片段在最终 Script 中的范围。
+[实测与边界（中）](../../../docs/optimization-paths.zh-CN.md#r1-同源自动选型) ·
+[Measurements and scope (EN)](../../../docs/optimization-paths.md#r1-same-source-automatic-selection)
+
+```sh
+project=projects/p2pkh-r1
+export PYTHONPATH="src:.:$project/reference:$project/forth"
+python "$project/forth/compile_r1.py" --entry r1-baseline-lock > /tmp/r1-baseline.json
+python "$project/forth/compile_r1.py" --entry r1-baseline-lock --optimize > /tmp/r1-formula.json
+python "$project/forth/compile_r1.py" --entry r1-baseline-lock --auto > /tmp/r1-auto.json
+python -m unittest -v test_r1_baseline.BaselineAutoTests
+```
+
+花费测试使用固定版 chain-gang，覆盖 BIP143 ALL、OTDA ALL 和配对的
+OTDA SINGLE。正例使用测试签名和实际夹具父输出；改动花费的锁定时间后应拒绝。
+这个入口供编译实验使用，钱包继续使用版本清单。
+
 `msm.fth` 用显式的 P‑256 双标量乘法表达窗口计算。编译器扫描固定生成元、标量范围和曲线点校验，比较各构造的实际锁与付款字节数，并逐字节核对 OTDA 重建。
 
 `compare --candidate v0.6.0` 直接读取并核对冻结的锁和 OTDA 重建程序，占用一个本地候选名额和一个付款复放名额。传入构造名时从 Forth 编译。v0.6.0 和 v0.7.0 使用同一份两进两出夹具。 [v0.6.0 清单](../versions/v0.6.0/manifest.json) · [v0.7.0 清单](../versions/v0.7.0/manifest.json)

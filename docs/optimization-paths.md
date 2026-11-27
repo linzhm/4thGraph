@@ -16,6 +16,18 @@ The matrix comparison fixes the input domain and the four result slots. `stack` 
 
 The hash fixture returns both its intermediate and final digest. The compiler selects the paired kernel only for a build-time region of at least two rounds. It records the round count, bundled kernel digest, linked byte range, and the cost of a trailing odd round. The single-round checkpoint and any kernel for a different operation are rejected as paired bindings. [Matrix sources](../src/fourthgraph/benchmark/formulas/matrix-mul.fth) · [Hash caller](../src/fourthgraph/benchmark/fixtures/hash-chain.fth) · [Hash kernels](../src/fourthgraph/stdlib/hash-chain.fth)
 
+## R1 same-source automatic selection
+
+Freeze `r1-baseline-lock` and its imports, then measure the current compiler before selecting a window plan. The experimental `--auto` entry ranks six linked Scripts by lock size. It can replace the verified P-256 multiplication region only when the input and dependency digests match. It preserves the original result check and transaction binding. Other input snapshots use the existing formula plans.
+
+| Compile mode | Lock bytes | BIP143 funding + spend bytes | Main / alternate stack peak items |
+| --- | ---: | ---: | ---: |
+| Baseline | 415,058 | 415,511 | 71 / 39 |
+| Existing `--optimize` | 139,333 | 139,786 | 24 / 39 |
+| `--auto`, selected `split-5x4-affine-g-ifdup` | 41,264 | 41,715 | 161 / 119 |
+
+The transaction metric is for one synthetic input spending into one output. The development evaluator observes the stack peaks. All six candidates pass the complete spend with pinned chain-gang under BIP143 ALL, OTDA ALL and paired OTDA SINGLE, and reject the stale witness after a locktime change. The result shows a size and stack tradeoff, with this opt-in compiler entry and fixture providing review evidence. [Build and replay](../projects/p2pkh-r1/forth/README.md)
+
 ## Ordered formula rules
 
 Use these rules on closed formulas whose caller establishes canonical ScriptNum encodings and the declared input intervals.
