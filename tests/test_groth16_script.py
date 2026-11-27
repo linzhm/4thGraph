@@ -3,6 +3,8 @@
 import json
 import unittest
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import redirect_stderr
+from io import StringIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from threading import Barrier
@@ -10,12 +12,30 @@ from unittest.mock import patch
 
 from fourthgraph.bsv.script import asm
 from fourthgraph.compiler.source import CompileError
+from fourthgraph.replay import groth16_bn254 as replay
 from fourthgraph.verification.groth16_bn254 import (
     BASE_FIELD, FIELD, ForthVerifier, ScriptVerifier, g2, public_signals, runar_key, runar_proof,
 )
 
 
 class Groth16EncodingTests(unittest.TestCase):
+    def test_funded_replay_rejects_a_different_fixture_owner(self):
+        with TemporaryDirectory() as directory:
+            fixture = Path(directory) / "fixture.json"
+            owner = "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798"
+            fixture.write_text(json.dumps({"owner_public_key": owner}), encoding="utf-8")
+            args = ["replay", "--runar", directory, "--fixture", str(fixture),
+                    "--output", str(Path(directory) / "replay.json")]
+            stderr = StringIO()
+            with (patch("sys.argv", args), redirect_stderr(stderr), patch.object(replay, "TestKeys") as keys,
+                  patch.object(replay, "chain_metadata", side_effect=AssertionError("started regtest setup"))):
+                keys.return_value.public = {"operator": bytes.fromhex(
+                    "022bd7c7bf29f7ac8fdcf65a05cb6449e65fbeb5dca591acdc1249ca7ba1537488")}
+                with self.assertRaises(SystemExit) as error:
+                    replay.main()
+            self.assertEqual(error.exception.code, 2)
+            self.assertIn("fixture owner_public_key must match the regtest operator key", stderr.getvalue())
+
     def test_adapter_reads_each_instances_key_from_a_shared_working_directory(self):
         g1 = ["1", "2", "1"]
         g2_point = [["11", "22"], ["33", "44"], ["1", "0"]]
