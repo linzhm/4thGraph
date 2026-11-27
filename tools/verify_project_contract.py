@@ -473,7 +473,9 @@ def verify_settlement(manifest, host, engine, node, *, include_io=False):
             try:
                 validate_at_heights(signed, (parent,), spend_height=SPEND_HEIGHT,
                                     activation_height=SPEND_HEIGHT + 1, utxo_heights=(UTXO_HEIGHT,))
-            except (RuntimeError, ValueError):
+            except ValueError as error:
+                if str(error) != "Error evaluating the script `SIGHASH_CHRONICLE before activation`":
+                    raise
                 expect("otda.before_activation", "Rejected", "Rejected")
             else:
                 raise ValueError("chain-gang accepted OTDA before activation")

@@ -7,10 +7,12 @@ import subprocess
 import sys
 from tempfile import TemporaryDirectory
 import unittest
+from unittest.mock import patch
 
 from fourthgraph.bsv.artifacts import describe_script
 from fourthgraph.bsv.transaction import Input, Output, Transaction
 from fourthgraph.workflow.project_contract import ContractError, ProjectContract
+from tools.verify_project_contract import verify_bundle
 
 
 ROOT=Path(__file__).resolve().parents[1]
@@ -35,6 +37,11 @@ class ProjectContractTests(unittest.TestCase):
             self.assertEqual([step["path"] for step in saved["steps"]], ["bip143", "otda"])
             self.assertEqual([step["unlock_bytes"] for step in saved["steps"]], [57, 49])
             self.assertIn("otda.before_activation", {case["id"] for case in saved["cases"]})
+            for error in (RuntimeError("engine unavailable"), ValueError("unexpected validation error")):
+                with self.subTest(error=error):
+                    with patch("fourthgraph.bsv.chain_gang.validate_at_heights", side_effect=error):
+                        with self.assertRaisesRegex(type(error), str(error)):
+                            verify_bundle(output / "manifest.json", host.digest)
             receipt = output / "replay.json"
             cmd = [sys.executable, "tools/verify_project_contract.py", str(output/"manifest.json"),
                    "--approved-sha256", host.digest, "--output", str(receipt), "--replay"]
