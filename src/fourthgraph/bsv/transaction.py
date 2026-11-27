@@ -20,6 +20,15 @@ def amount(n):
 
 
 @dataclass(frozen=True)
+class Outpoint:
+    txid: bytes  # Transaction hash in wire order.
+    vout: int
+
+    def text(self):
+        return f"{self.txid[::-1].hex()}:{self.vout}"
+
+
+@dataclass(frozen=True)
 class Input:
     txid: bytes  # 32 bytes in wire (little-endian) order
     vout: int

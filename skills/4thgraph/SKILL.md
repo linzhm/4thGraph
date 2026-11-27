@@ -1,6 +1,6 @@
 ---
 name: 4thgraph
-description: Develop and tune 4thGraph contracts from high-level Forth. Select reproducible source, compiler, and transaction candidates, run fixed fixtures, and preserve validation and artifact hashes. Use for PELS, BSV Script, and multi-transaction UTXO workflows.
+description: Develop and tune 4thGraph contracts from high-level Forth. Select reproducible Script and proof-backed CPN candidates, run fixed fixtures, and preserve validation and artifact hashes. Use for PELS, BSV Script, and multi-transaction UTXO workflows.
 ---
 
 # 4thGraph
@@ -58,6 +58,8 @@ Transaction layout determines how the work is staged. The verification backend d
 
 ## Use the CPN transaction plan
 
+- For a staged `workflow-input:` and `stage:` source, start with `4thgraph cpn plan`. It compares direct Script and available proof backends under the same disclosure, authorization and transaction constraints. Use `4thgraph cpn tune` to add compiler lowering profiles. For a staged workflow with multiple roles, read [the reproducible CPN workflow](references/cpn.md) or [简体中文](references/cpn.zh-CN.md) before choosing a candidate. It covers mixed proof setup, exact selection, funded replay and offline verification.
+- Keep the original report, setup catalog, and candidate ID together. Use `--select-candidate REPORT ID --cpn-plan` to export the exact plan. Replay that ID with `4thgraph cpn replay --report REPORT --candidate ID` and check the saved receipt with `4thgraph cpn verify`. Record actual signed bytes, engine verdicts, stack payload and the exercised controls separately from static estimates.
 - Export the selected workflow with `--cpn-plan` and retain the build's `plan_sha256`. Use `--cpn` to render the same canonical plan for review. For a fused or split candidate, check ordered input and output slots, state carried by intermediate UTXOs, authorizers, field constraints and recovery transitions. See `src/fourthgraph/cpn.md` where present.
 - Use the plan with real outpoints, available witnesses and signers, and the next block height. Check which transactions are enabled, which need a predecessor, and which spend the same UTXO. Use plan-aware signing to check the draft before calling a signer. Where available, use `graph_replay.py` and `cpn_replay.py` with the supported fixtures to check confirmed state changes, independent step ordering and refund conflicts against the recorded engine verdicts.
 - Workflow layout search ranks eligible candidates by its static cost objective. Verify availability, state continuity and recovery on the exercised paths with the checkout's replay tools. For a single `relation:`, use the `4thgraph-verify` report to compare Script and proof backends.

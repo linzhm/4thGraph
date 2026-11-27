@@ -33,10 +33,14 @@ sections:
       - '[The public relation](verify-state.fth) imports shared [counter rules](counter.fth). Use the
         same rules for direct Script and Circom. The [Forth workflow](workflow.fth) uses the counter as
         a stage.'
+      - The [workflow planner](../../docs/design/README.md#build-select-and-replay) compares layouts
+        and per-stage backends. The [private-witness variant](workflow-private.fth) requires zero knowledge
+        for its terminal stage.
     zh-CN:
       - '**[生成电路](#generate-a-circuit)** · [可用的验证路径](../../docs/language/stdlib.zh-CN.md#验证路径) · [Groth16
         固定声明对照](reference/fixed-statement/README.md)'
       - '[公开关系](verify-state.fth)导入同一份[计数规则](counter.fth)，供直接 Script 验证和 Circom 后端使用。[工作流示例](workflow.fth)把计数器用作一个交易阶段。'
+      - '[工作流规划器](../../docs/design/README.zh-CN.md#构建选择与复放)比较交易布局和各阶段后端。[私有见证示例](workflow-private.fth)要求末段使用零知识证明。'
   reproduction:
     en:
       - '### Generate a circuit'

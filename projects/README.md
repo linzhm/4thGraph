@@ -7,7 +7,7 @@
 | Project | Build and verify |
 | --- | --- |
 | [PELS Counter](pels-counter/README.md) | Compile a state transition and replay an incrementing covenant |
-| [Transaction workflows](workflow-examples/README.md) | Compare parallel, joined, and serial transaction plans, including Gforth input |
+| [CPN workflow examples](workflow-examples/README.md) | Compile Forth to a CPN, compare transaction plans, and replay funded examples |
 | [Proof counter](proof-counter/README.md) | Build a public state transition with Script, Circom, or a proof backend |
 | [BLS12-381 Groth16](groth16-bls12-381/README.md) | Compile the modular Forth verifier and replay funded proof spends |
 | [BN254 Groth16](groth16-bn254/README.md) | Build the fixed-statement Forth verifier and replay on Chronicle |

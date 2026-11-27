@@ -380,9 +380,14 @@ def from_build(artifact):
         checks = tuple((guard,) for guard in item.get("guards", ()))
         if allowed and any(roles for _, roles in inputs):
             checks += (("sighash", allowed),)
-        append(name, inputs, item["outputs"], item["executes"], fields,
-               tuple((name, "u32") for name in item["external_inputs"]),
-               checks, Recipe(name, outputs))
+        witnesses = tuple((operand, "u32") for operand in item["external_inputs"])
+        for evidence in artifact.get("stage_evidence", ()):
+            stage = evidence["statement"]["stage"]
+            if stage in item["executes"]:
+                witnesses += ((f"{stage}:proof", evidence["backend"]),)
+                checks += (("stage-proof", stage, evidence["statement_sha256"],
+                            evidence["verification_key_sha256"]),)
+        append(name, inputs, item["outputs"], item["executes"], fields, witnesses, checks, Recipe(name, outputs))
 
     recovery = artifact.get("recovery")
     for item in sorted(graph["refunds"], key=lambda refund: refund["step"]):

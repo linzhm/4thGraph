@@ -13,14 +13,16 @@ PUBLIC_WIRES = ("main.next", "main.current", "main.bindLo", "main.bindHi")
 
 
 class CircuitBuild:
-    def __init__(self, source, directory, *, has_route=False, prime="bn128"):
+    def __init__(self, source, directory, *, has_route=False, prime="bn128", public_wires=None):
         self.directory = Path(directory).resolve()
         self.prime = prime
         self.source = self.directory / "counter.circom"
         self.source_sha256 = sha256(source).hexdigest()
         self.source.write_bytes(source)
         self.run(CIRCOM_PACKAGE, "circom2", self.source.name, "--r1cs", "--sym", "--wasm", "--O1", "--prime", prime)
-        self.public_wires = ("main.next", "main.route", *PUBLIC_WIRES[1:]) if has_route else PUBLIC_WIRES
+        self.public_wires = public_wires
+        if self.public_wires is None:
+            self.public_wires = ("main.next", "main.route", *PUBLIC_WIRES[1:]) if has_route else PUBLIC_WIRES
         rows = [line.split(",") for line in (self.directory / "counter.sym").read_text().splitlines()]
         public = tuple((int(row[1]), row[3]) for row in rows[:len(self.public_wires)])
         if public != tuple(enumerate(self.public_wires, 1)):

@@ -73,9 +73,11 @@ def stack_peaks(tx, previous):
 
 
 class Replay:
-    def __init__(self, node, samples, target, activation_height, optimization=BASELINE, join_witness="full"):
+    def __init__(self, node, samples, target, activation_height, optimization=BASELINE, join_witness="full",
+                 *, script_timeout_us=50_000):
         self.node = node
         self.samples = samples
+        self.script_timeout_us = script_timeout_us
         target = normalize_target(target)
         self.target = target
         self.optimization = optimization
@@ -164,7 +166,7 @@ class Replay:
             return True, None
 
         samples = self.samples if expected else 0
-        node, node_ms = timed(lambda: self.node.verdicts(tx, parents, timeout_us=50_000, **context), samples)
+        node, node_ms = timed(lambda: self.node.verdicts(tx, parents, timeout_us=self.script_timeout_us, **context), samples)
         (chain, chain_error), chain_ms = timed(chain_check, samples)
         mined = bool(host_call("bsv-submit", self.host, tx))
         admission = self.traces[tx.txid()]

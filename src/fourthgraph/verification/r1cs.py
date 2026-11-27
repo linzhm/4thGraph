@@ -31,17 +31,19 @@ class VerificationKey:
         return self.current_wire + 1, self.current_wire + 2
 
     @classmethod
-    def load(cls, raw):
+    def load(cls, raw, *, stage_inputs=None):
         document = json.loads(raw)
         signals = document["nVars"]
         outputs = document["nOutputs"]
+        inputs = 3 if stage_inputs is None else stage_inputs
+        limit = 256 if stage_inputs is None else 1024
         if (document["prime"] != str(FIELD) or document["useCustomGates"]
                 or type(outputs) is not int or outputs not in (1, 2)
-                or (document["nPubInputs"], document["nPrvInputs"]) != (3, 0)
-                or type(signals) is not int or not outputs + 4 <= signals <= 256):
-            raise ValueError("expected a bounded BN254 R1CS with one or two outputs and three public inputs")
+                or (document["nPubInputs"], document["nPrvInputs"]) != (inputs, 0)
+                or type(signals) is not int or not outputs + inputs + 1 <= signals <= limit):
+            raise ValueError("unexpected dimensions for the bounded BN254 R1CS")
         constraints = document["constraints"]
-        if not 1 <= len(constraints) <= 256 or len(constraints) != document["nConstraints"]:
+        if not 1 <= len(constraints) <= limit or len(constraints) != document["nConstraints"]:
             raise ValueError("invalid R1CS constraint count")
 
         def terms(linear):

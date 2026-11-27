@@ -12,7 +12,7 @@ from types import MappingProxyType
 
 from fourthgraph.bsv.pushtx import PUBLIC, binding_der
 from fourthgraph.bsv.script import asm, encode_num, is_compressed_public_key, number, push, without_codeseparators
-from fourthgraph.bsv.transaction import CHRONICLE, FORKID, SIGHASH_ALL, Input, Output, Transaction, hash256, preimage_forkid, preimage_otda
+from fourthgraph.bsv.transaction import CHRONICLE, FORKID, SIGHASH_ALL, Input, Outpoint, Output, Transaction, hash256, preimage_forkid, preimage_otda
 
 from fourthgraph.compiler.ranges import NUMERIC_TYPES
 from fourthgraph.compiler.source import (
@@ -249,15 +249,6 @@ def work_lock(index, code, owner, join_code, data_prefix, versions):
                      + push(join_code) + asm("OP_CAT OP_SWAP OP_CAT OP_HASH256"))
     return (begin(versions) + single_input() + push(index.to_bytes(4, "little")) + check_field(CURRENT_OUTPOINT + 32, 4)
             + authorize(owner) + validate_u32() + code + output_vector + check_field(OUTPUTS_HASH) + finish())
-
-
-@dataclass(frozen=True)
-class Outpoint:
-    txid: bytes  # Transaction hash in wire order.
-    vout: int
-
-    def text(self):
-        return f"{self.txid[::-1].hex()}:{self.vout}"
 
 
 @dataclass(frozen=True)
@@ -769,7 +760,7 @@ def estimate_cost(contracts):
     if not workflow and program.gate is not None:
         data[program.gate.input] = 0
     for step in contracts.plan.templates:
-        draft = contracts.prepare(step.name, done) if workflow else contracts._prepare(step.name, done, data, estimate=True)
+        draft = contracts.estimate_draft(step.name, done) if workflow else contracts._prepare(step.name, done, data, estimate=True)
         tx = draft.seal(lambda _: fake_der)
         done[step.name] = tx
         depths[step.name] = 1 + max(depths[ref.step] for ref in step.inputs)
@@ -1010,21 +1001,27 @@ def compile_search(program, keys, task_id, *, source_bytes, mode="auto", gate_bo
     }
 
 
-def main():
-    if sys.argv[1:2] == ["curve-multiply"]:
+def main(argv=None, *, cpn_action=None):
+    argv = sys.argv[1:] if argv is None else argv
+    if argv[:1] == ["cpn"] and cpn_action is None:
+        from fourthgraph.workflow.cpn_cli import main as cpn_main
+        return cpn_main(argv[1:])
+    if argv[:1] == ["curve-multiply"] and cpn_action is None:
         from fourthgraph.workflow.curve_cli import main as curve_main
-        return curve_main(sys.argv[2:])
-    if sys.argv[1:2] == ["preimage-constructor"]:
+        return curve_main(argv[1:])
+    if argv[:1] == ["preimage-constructor"] and cpn_action is None:
         from fourthgraph.workflow.preimage_constructor import main as constructor_main
-        return constructor_main(sys.argv[2:])
-    if sys.argv[1:2] == ["pels-witness"]:
+        return constructor_main(argv[1:])
+    if argv[:1] == ["pels-witness"] and cpn_action is None:
         from fourthgraph.workflow.pels import witness_main
-        return witness_main(sys.argv[2:])
-    cli = argparse.ArgumentParser(prog=PROJECT_NAME, description=PROJECT_DESCRIPTION,
-                                  epilog="Subcommands: experiment, pels-witness, preimage-constructor, curve-multiply.")
-    if sys.argv[1:2] == ["experiment"]:
+        return witness_main(argv[1:])
+    if argv[:1] == ["experiment"] and cpn_action is None:
         from fourthgraph.benchmark.experiment import main as experiment_main
-        return experiment_main(sys.argv[2:])
+        return experiment_main(argv[1:])
+    cli = argparse.ArgumentParser(prog=f"{PROJECT_NAME} cpn {cpn_action}" if cpn_action else PROJECT_NAME,
+                                  description=PROJECT_DESCRIPTION,
+                                  epilog="Subcommands: cpn, experiment, pels-witness, preimage-constructor, curve-multiply."
+                                  if not cpn_action else None)
     cli.add_argument("source", type=Path, nargs="?")
     action = cli.add_mutually_exclusive_group()
     action.add_argument("--capabilities", action="store_true", help="list the supported Forth and BSV words")
@@ -1043,19 +1040,30 @@ def main():
                      default="bip143", help="preimage policy for staged workflows and PELS locks")
     cli.add_argument("--pels-successor-state", metavar="HEX",
                      help="link an --entry state/amount rule to the PELS successor template with this initial state")
-    cli.add_argument("--optimize", choices=OPTIMIZATIONS, default=BASELINE)
+    if cpn_action == "tune":
+        cli.set_defaults(optimize=BASELINE)
+        cli.add_argument("--optimizations", nargs="+", choices=OPTIMIZATIONS, default=(BASELINE, "safe", "stack"),
+                         help="compiler lowering profiles to compare (defaults to baseline, safe, stack)")
+    else:
+        cli.add_argument("--optimize", choices=OPTIMIZATIONS, default=BASELINE)
     cli.add_argument("--join-witness", choices=JOIN_WITNESSES)
     cli.add_argument("--gate-boundary", choices=GATE_BOUNDARIES, default="auto")
     cli.add_argument("--search", action="store_true", help="enumerate permitted transaction boundaries and witness layouts")
     cli.add_argument("--objective", choices=OBJECTIVES)
     cli.add_argument("--max-tx-bytes", type=int, help="maximum estimated serialized transaction size in a staged workflow")
     cli.add_argument("--explain", action="store_true", help="show the candidates and how the plan was chosen")
+    cli.add_argument("--backend-catalog", type=Path, help="stage proof setups and evidence compositions")
+    cli.add_argument("--select-candidate", nargs=2, metavar=("REPORT", "ID"), help="rebuild an exact candidate")
+    cli.add_argument("--max-lock-bytes", type=int, help="maximum deployment or continuation lock in evidence search")
+    cli.add_argument("--max-constraints", type=int, help="maximum constraints per stage circuit")
     cli.add_argument("--keys", type=Path, help="JSON map of role to compressed public key hex")
     cli.add_argument("--task-id", help="32-byte hex data identifier")
     cli.add_argument("--current", type=int, help="initial deployed u32 for a staged workflow")
     cli.add_argument("--available-data", nargs="*")
     cli.add_argument("--available-authorizers", nargs="*")
-    args = cli.parse_args()
+    if cpn_action:
+        cli.set_defaults(search=True, explain=True)
+    args = cli.parse_args(argv)
     if args.objective and not args.search:
         cli.error("--objective requires --search")
     if args.max_tx_bytes is not None and not args.search:
@@ -1072,11 +1080,15 @@ def main():
             cli.error("entry optimization and range options do not apply to PELS successor linking")
     if args.capabilities:
         from fourthgraph.compiler.curve_windows import CURVES, scalar_plans
+        from fourthgraph.workflow.proof_planner import STAGE_BACKENDS
 
         print(json.dumps({"project": PROJECT_NAME, "compiler_version": PROJECT_VERSION, "description": PROJECT_DESCRIPTION,
                           **capabilities(), "libraries": library_capabilities(),
                           "optimizations": OPTIMIZATIONS, "join_witnesses": JOIN_WITNESSES,
                           "topologies": ("parallel", "gated-parallel", "workflow"), "workflow_modes": WORKFLOW_CHOICES,
+                          "cpn": {"commands": ("plan", "tune", "test-keys", "replay", "verify"),
+                                  "stage_backends": STAGE_BACKENDS,
+                                  "nested_proofs": "planning-only", "recursive_lineage": "statement-only"},
                           "workflow_sighash_families": {**{name: f"{flag:02x}" for name, flag in SIGHASH_FAMILIES.items()},
                                                        "both": [f"{flag:02x}" for flag in SIGHASH_FAMILIES.values()]},
                           "pels_sighash_policies": (*SIGHASH_FAMILY_OPTIONS, "auto"),
@@ -1127,6 +1139,26 @@ def main():
             display_build(build_artifact(result, source_bytes), args)
             return
         source = SourceCompiler(source_bytes.decode(), source_path=args.source, bindings=bindings)
+        evidence_options = (cpn_action is not None or args.backend_catalog is not None or args.select_candidate is not None or
+                            args.max_lock_bytes is not None or args.max_constraints is not None)
+        if any(limit is not None and limit <= 0 for limit in (args.max_tx_bytes, args.max_lock_bytes,
+                                                             args.max_constraints)):
+            cli.error("evidence budgets must be positive")
+        if evidence_options and (args.entry or not source.stages):
+            cli.error("evidence options require a staged workflow")
+        if source.stage_verification_declared and (source.relation or not source.stages):
+            cli.error("stage verification declarations require a staged workflow")
+        if args.select_candidate:
+            from fourthgraph.workflow.proof_planner import rebuild_candidate
+
+            report, identity = args.select_candidate
+            with TemporaryDirectory(prefix="4thgraph-evidence-") as scratch:
+                _, result = rebuild_candidate(source, json.loads(Path(report).read_text()),
+                                              identity, scratch, args.backend_catalog)
+            display_build(result, args)
+            return
+        if source.recursions and not source.stages and not args.entry:
+            cli.error("recursive predicates require a registered workflow verifier")
         if args.entry is not None:
             entry = args.entry.casefold()
             word = source.words.get(entry)
@@ -1185,10 +1217,29 @@ def main():
                 if (args.task_id is not None or args.join_witness or args.gate_boundary != "auto"
                         or args.available_data is not None):
                     cli.error("staged workflows do not accept parallel workflow options")
+                workflow = source.workflow()
+                if workflow.proof_declared or evidence_options:
+                    from fourthgraph.workflow.proof_planner import compile_evidence_plans
+
+                    with TemporaryDirectory(prefix="4thgraph-evidence-") as scratch:
+                        chosen, result = compile_evidence_plans(
+                            source, keys, args.current, scratch, mode=args.mode, target=args.target,
+                            optimization=args.optimize, objective=args.objective or "path-bytes",
+                            available_authorizers=args.available_authorizers, sighash_family=args.sighash_family,
+                            catalog=args.backend_catalog, max_tx_bytes=args.max_tx_bytes,
+                            max_lock_bytes=args.max_lock_bytes, max_constraints=args.max_constraints,
+                            optimizations=getattr(args, "optimizations", None),
+                        )
+                    if chosen is None:
+                        if args.explain and not (args.cpn or args.cpn_plan):
+                            print(json.dumps(result, indent=2, sort_keys=True))
+                        cli.error("no workflow evidence candidate is eligible")
+                    display_build(result, args)
+                    return
                 from fourthgraph.workflow.workflow_contract import compile_workflow
 
                 result, report = compile_workflow(
-                    source.workflow(), keys, args.current, source_bytes=source_bytes, mode=args.mode,
+                    workflow, keys, args.current, source_bytes=source_bytes, mode=args.mode,
                     target=args.target, optimization=args.optimize, available_authorizers=args.available_authorizers,
                     search=args.search, objective=args.objective or "path-bytes", max_tx_bytes=args.max_tx_bytes,
                     sighash_family=args.sighash_family,
@@ -1223,7 +1274,7 @@ def main():
             result = build_artifact(result, source_bytes)
     except CompileError as error:
         cli.error(f"{args.source}: {error}")
-    except (OSError, ValueError) as error:
+    except (KeyError, OSError, ValueError) as error:
         cli.error(str(error))
     display_build(result, args)
 

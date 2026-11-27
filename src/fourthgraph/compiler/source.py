@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from bisect import bisect_right
-from dataclasses import InitVar, dataclass, field
+from dataclasses import InitVar, dataclass, field, replace
 from hashlib import sha256
 from os.path import relpath
 from pathlib import Path
@@ -228,6 +228,13 @@ class Stage:
     result: Token
     owner: str
     declaration: Token
+    witnesses: tuple[tuple[Token, bool], ...] = ()
+    policy: str = "allow-direct"
+    assignment_disclosure: bool = False
+
+    @property
+    def private(self):
+        return any(private for _, private in self.witnesses)
 
 
 @dataclass(frozen=True)
@@ -238,11 +245,19 @@ class Workflow:
     recovery: Recovery | None = None
     libraries: tuple[LibraryImport, ...] = ()
 
+    atomic: tuple[tuple[Token, Token], ...] = ()
+    places: tuple[tuple[Token, Token, Token], ...] = ()
+    proof_declared: bool = False
+    recursive: tuple[tuple[Token, Token], ...] = ()
+
     def stage_graph(self):
         source = Port(self.input.name, "u32", self.input, linear=True)
-        return StageGraph.build((source,), [
+        operands = tuple(Port(f"{stage.name}:{name.name}", "u32", name)
+                         for stage in self.stages for name, _ in stage.witnesses)
+        return StageGraph.build((source, *operands), [
             StageNode(stage.name, stage.word.name, stage.owner,
-                      (Port(stage.source.name, stage.word.takes[0], stage.source),),
+                      (Port(stage.source.name, stage.word.takes[0], stage.source),
+                       *(Port(f"{stage.name}:{name.name}", "u32", name) for name, _ in stage.witnesses)),
                       (Port(stage.result.name, stage.word.gives[0], stage.result, linear=True),), stage.declaration)
             for stage in self.stages
         ])
@@ -484,6 +499,7 @@ class SourceCompiler:
         self.source_path = None
         self.active_files = []
         self.loaded_files = set()
+        self.source_imports = {}
         self.imported_words = {}
         self.libraries = {}
         self.stack_types = stack_types
@@ -498,6 +514,12 @@ class SourceCompiler:
         self.independent = []
         self.workflow_input = None
         self.stages = []
+        self.stage_policies = {}
+        self.stage_witnesses = {}
+        self.stage_disclosures = {}
+        self.atomic_stages = []
+        self.places = {}
+        self.recursions = {}
         self.relation = None
         self.read_source(source, self.root_source)
         if self.bindings:
@@ -559,6 +581,7 @@ class SourceCompiler:
             name = Path(relpath(path, base)).as_posix()
             if name in LIBRARIES:
                 name = f"./{name}"
+        self.source_imports[name] = sha256(raw).hexdigest()
         backend_words = ({word: primitive for word, primitive in numeric_stack_vocabulary().items() if word not in self.words}
                          if name in ("std/p256", "std/weierstrass") else {})
         self.words.update(backend_words)
@@ -839,6 +862,50 @@ class SourceCompiler:
                 labels = ("stage name", "Script word", "input value", "output value", "signer role")
                 self.stages.append(tuple(named_token(tokens, token, label) for label in labels))
                 end_declaration(tokens, token)
+            case "witness:" | "private-witness:":
+                stage = named_token(tokens, token, "stage name")
+                name = named_token(tokens, token, "witness name")
+                kind = required(tokens, token, "witness type")
+                if kind.name != "u32":
+                    raise kind.error("workflow witness must be u32")
+                operands = self.stage_witnesses.setdefault(stage.name, (stage, {}))[1]
+                if name.name in operands:
+                    raise name.error("duplicate stage witness")
+                operands[name.name] = (name, token.name == "private-witness:")
+                end_declaration(tokens, token)
+            case "policy:" | "assignment-disclosure:":
+                stage = named_token(tokens, token, "stage name")
+                policy = required(tokens, token, "stage policy")
+                table, permitted = ((self.stage_policies, ("allow-direct", "require-proof", "require-zk"))
+                                    if token.name == "policy:" else (self.stage_disclosures, ("allow",)))
+                if policy.name not in permitted or stage.name in table:
+                    raise policy.error(f"expected a unique stage policy from {', '.join(permitted)}")
+                table[stage.name] = stage, policy
+                end_declaration(tokens, token)
+            case "atomic:":
+                first = named_token(tokens, token, "first stage")
+                second = named_token(tokens, token, "second stage")
+                if first.name == second.name:
+                    raise second.error("atomic stages must be distinct")
+                self.atomic_stages.append((first, second))
+                end_declaration(tokens, token)
+            case "place:":
+                name = named_token(tokens, token, "state name")
+                kind = required(tokens, token, "state type")
+                visibility = required(tokens, token, "state visibility")
+                if kind.name not in ("u32", "route") or visibility.name not in ("public", "private"):
+                    raise name.error("expected u32 or route and public or private")
+                if name.name in self.places:
+                    raise name.error("duplicate place")
+                self.places[name.name] = name, kind, visibility
+                end_declaration(tokens, token)
+            case "recursive:":
+                name = named_token(tokens, token, "recursive relation")
+                word = named_token(tokens, token, "edge word")
+                if name.name in self.recursions:
+                    raise name.error("duplicate recursive relation")
+                self.recursions[name.name] = name, word
+                end_declaration(tokens, token)
             case "relation:" | "verify:":
                 if "std/verify" not in self.libraries:
                     raise token.error("relation: requires 'REQUIRE stdlib/verify.fth'")
@@ -867,9 +934,14 @@ class SourceCompiler:
         if self.relation:
             raise self.relation[0].error("use the relation compiler for a relation: declaration")
 
+    @property
+    def stage_verification_declared(self):
+        return bool(self.stage_policies or self.stage_witnesses or self.stage_disclosures or self.places or
+                    self.atomic_stages)
+
     def program(self):
         self.require_workflow_declarations()
-        if self.workflow_input is not None or self.stages:
+        if self.workflow_input is not None or self.stages or self.stage_verification_declared or self.recursions:
             raise CompileError("stage workflows require the workflow planner")
         if len(self.work) != 2 or self.join is None or self.operator is None:
             raise CompileError("expected two work declarations, one join and one split authority")
@@ -917,11 +989,24 @@ class SourceCompiler:
                 require_script(word)
             except CompileError as error:
                 raise entry.error(str(error)) from error
-            if len(word.takes) != 1 or len(word.gives) != 1:
-                raise entry.error("workflow words must consume and produce exactly one value")
-            stages[name.name] = Stage(name.name, word, source, result, owner.name, name)
+            witnesses = tuple(self.stage_witnesses.get(name.name, (None, {}))[1].values())
+            if word.takes != ("u32",) * (1 + len(witnesses)) or len(word.gives) != 1:
+                raise entry.error("workflow words must take their u32 state followed by declared u32 witnesses and return one value")
+            policy = self.stage_policies[name.name][1].name if name.name in self.stage_policies else "allow-direct"
+            stages[name.name] = Stage(name.name, word, source, result, owner.name, name, witnesses, policy,
+                                      name.name in self.stage_disclosures)
+        for table in (self.stage_policies, self.stage_witnesses, self.stage_disclosures):
+            for name, (at, _) in table.items():
+                if name not in stages:
+                    raise at.error(f"unknown workflow stage {name!r}")
+        for pair in self.atomic_stages:
+            for at in pair:
+                if at.name not in stages:
+                    raise at.error(f"unknown workflow stage {at.text!r}")
+        proof_declared = self.stage_verification_declared or bool(self.recursions)
         workflow = Workflow(self.workflow_input, tuple(stages.values()), tuple(self.independent), self.recovery,
-                            self.library_imports)
+                            self.library_imports, tuple(self.atomic_stages), tuple(self.places.values()), proof_declared,
+                            tuple(self.recursions.values()))
         ordered = tuple(stages[stage.name] for stage in workflow.stage_graph().stages)
         for stage, expected in zip(ordered, (*("u32" for _ in ordered[:-1]), "route"), strict=True):
             if stage.word.gives != (expected,):
@@ -929,7 +1014,12 @@ class SourceCompiler:
         for step, line in self.independent:
             if step not in stages:
                 raise CompileError(f"line {line}: unknown workflow stage {step!r}")
-        return Workflow(self.workflow_input, ordered, workflow.independent, workflow.recovery, workflow.libraries)
+        types = {self.workflow_input.name: "u32",
+                 **{stage.result.name: stage.word.gives[0] for stage in ordered}}
+        for label, kind, _ in workflow.places:
+            if types.get(label.name) != kind.name:
+                raise label.error("place does not match the type of a workflow value")
+        return replace(workflow, stages=ordered)
 
 
 def end_declaration(tokens, at):
@@ -951,6 +1041,18 @@ def workflow_blockers(program, mode, available_authorizers):
         stage = program.stages[min(len(program.stages) - 1, required_count)].declaration
         return [{"code": "unsupported_stage_count", "line": stage.line,
                  "message": f"{stage.location}: {mode} requires {required_count} stages"}]
+    if program.atomic and mode == "serial":
+        return [{"code": "atomicity_required", "line": first.line,
+                 "message": f"{first.location}: {first.name} and {second.name} must share a transaction"}
+                for first, second in program.atomic]
+    if program.atomic and mode == FUSED_PREFIX:
+        fused = {stage.name for stage in program.stages[:2]}
+        split = [(first, second) for first, second in program.atomic
+                 if first.name not in fused or second.name not in fused]
+        if split:
+            return [{"code": "atomicity_required", "line": first.line,
+                     "message": f"{first.location}: {first.name} and {second.name} must share a transaction"}
+                    for first, second in split]
     if mode == FUSED_PREFIX and program.recovery:
         return [{"code": "unsupported_recovery_layout",
                  "message": "fused-prefix requires a workflow without a recovery branch"}]
