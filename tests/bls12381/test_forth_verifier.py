@@ -87,6 +87,26 @@ class ForthVerifierTests(unittest.TestCase):
         with self.assertRaisesRegex(CompileError, r"line 5, column 3: body leaves .*groth16-checked-g1"):
             ForthVerifier(self.key, invalid)
 
+    def test_modular_forth_reuses_the_same_script_and_can_pair_g1_doublings(self):
+        modular = HIGH_LEVEL.parents[2] / "forth/verifier.fth"
+        plan = ArithmeticPlan(residue_association="accumulator-frobenius-first",
+                              msm="signed-radix4", msm_table="deferred-doubling-slopes",
+                              miller_reductions="split-chord-residue", miller_kernel="direct-normalized")
+        old = ForthVerifier(self.key, HIGH_LEVEL.read_bytes(), source_path=HIGH_LEVEL, entry="verify-proof",
+                            witness_layout="affine-inline", plan=plan)
+        new = ForthVerifier(self.key, modular.read_bytes(), source_path=modular, entry="verify-proof",
+                            witness_layout="affine-inline", plan=plan)
+        lock = new.compile(SOURCES)
+        self.assertEqual(lock, old.compile(SOURCES))
+        self.assertEqual({library.name for library in new.libraries},
+                         {"miller.fth", "public-inputs.fth", "residue.fth", "std/bsv"})
+        paired = ForthVerifier(self.key, modular.read_bytes(), source_path=modular, entry="verify-proof",
+                               witness_layout="affine-inline", plan=replace(plan, g1_reductions="paired-doubles"))
+        compact = paired.compile(SOURCES)
+        self.assertLess(len(compact), len(lock))
+        for signals, proof in self.cases:
+            check_spend(*spend_fixture(compact, paired.witness(signals, proof, sources=SOURCES)))
+
     def test_high_level_requires_the_complete_miller_plan(self):
         source = HIGH_LEVEL.read_bytes()
         for before, after in ((b"16 0 DO", b"15 0 DO"), (b"16 0 DO", b"17 0 DO")):

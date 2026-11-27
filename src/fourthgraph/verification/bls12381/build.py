@@ -33,6 +33,7 @@ OBJECTIVES = {
 }
 WITNESS_PACKETS = ("pairing_line_packet_bytes", "slope_packet_bytes", "proof_packet_bytes", "public_packet_bytes")
 RESIDUE_ASSOCIATIONS = ("left", "right", "accumulator-frobenius-first")
+G1_REDUCTIONS = ("per-double", "paired-doubles")
 
 
 @dataclass(frozen=True)
@@ -44,6 +45,7 @@ class ArithmeticPlan:
     msm_table: str = MSM_TABLES[0]
     miller_reductions: str = MILLER_REDUCTIONS[0]
     miller_kernel: str = MILLER_KERNELS[0]
+    g1_reductions: str = G1_REDUCTIONS[0]
 
     def __post_init__(self):
         object.__setattr__(self, "fp2_rules", validate_rules(self.fp2_rules))
@@ -61,6 +63,8 @@ class ArithmeticPlan:
             raise ValueError(f"Miller reductions must be one of {', '.join(MILLER_REDUCTIONS)}")
         if self.miller_kernel not in MILLER_KERNELS:
             raise ValueError(f"Miller kernel must be one of {', '.join(MILLER_KERNELS)}")
+        if self.g1_reductions not in G1_REDUCTIONS:
+            raise ValueError(f"G1 reductions must be one of {', '.join(G1_REDUCTIONS)}")
 
     @property
     def uses_affine_miller(self):
@@ -78,13 +82,15 @@ class ArithmeticPlan:
             del document["miller_reductions"]
         if self.miller_kernel == MILLER_KERNELS[0]:
             del document["miller_kernel"]
+        if self.g1_reductions == G1_REDUCTIONS[0]:
+            del document["g1_reductions"]
         return document
 
     @classmethod
     def read(cls, path):
         plan = json.loads(path.read_bytes())
         required = {"fp2_rules", "residue_association"}
-        optional = {"fp2_selection", "msm", "msm_table", "miller_reductions", "miller_kernel"}
+        optional = {"fp2_selection", "msm", "msm_table", "miller_reductions", "miller_kernel", "g1_reductions"}
         if not isinstance(plan, dict) or not required <= plan.keys() <= required | optional:
             raise ValueError("arithmetic plan requires fp2_rules and residue_association")
         return cls(**plan)
@@ -217,7 +223,7 @@ class ForthVerifier(ScriptVerifier):
         chronicle = self.script_era == "chronicle"
         plan = self.plan if self.plan is not None else ArithmeticPlan()
         options = dict(chronicle=chronicle, optimize=compact, fp2_rules=plan.fp2_rules,
-                       fp2_selection=plan.fp2_selection)
+                       fp2_selection=plan.fp2_selection, pair_g1_doubles=plan.g1_reductions == "paired-doubles")
         if self.witness_layout == "projective":
             stages = VerifierStages(self.key, sources, **options)
         else:

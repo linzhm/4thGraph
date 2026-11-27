@@ -1,4 +1,4 @@
-"""Rebuild the selected Groth16 v0.9.0 plan and optionally replay its funded spends."""
+"""Rebuild a pinned BLS12-381 Groth16 release and optionally replay its funded spends."""
 
 import argparse
 from hashlib import sha256
@@ -14,7 +14,7 @@ from fourthgraph.verification.bls12381.build import ArithmeticPlan, ForthVerifie
 from fourthgraph.verification.bls12381.verifier import input_sources, public_signals
 
 PROJECT = Path(__file__).resolve().parents[1]
-PLAN = PROJECT / "versions/v0.9.0/replay-plan.json"
+VERSIONS = PROJECT / "versions"
 FIXTURE = PROJECT.parent / "proof-counter/versions/v0.1.0/bls12381-counter.json"
 INPUTS = PROJECT / "versions/v0.1.0/input-sources.json"
 
@@ -32,6 +32,8 @@ def build(plan, era):
     source_path = PROJECT / plan["source"]
     source, inputs, fixture_bytes = source_path.read_bytes(), INPUTS.read_bytes(), FIXTURE.read_bytes()
     check("Forth source SHA-256", digest(source), plan["source_sha256"])
+    for module, expected in plan.get("source_modules", {}).items():
+        check(f"{module} SHA-256", digest((source_path.parent / module).read_bytes()), expected)
     check("public input configuration SHA-256", digest(inputs), plan["input_sources_sha256"])
     check("fixture SHA-256", digest(fixture_bytes), plan["fixture_sha256"])
     fixture = json.loads(fixture_bytes)
@@ -92,19 +94,26 @@ def replay_funded(plan, era, lock, witnesses, plan_digest):
 
 def main():
     cli = argparse.ArgumentParser(description=__doc__)
+    cli.add_argument("--release", default="0.9.0", help="a release number or 'current' (default: 0.9.0)")
+    cli.add_argument("--output", type=Path, help="output directory")
     cli.add_argument("--script-era", choices=SCRIPT_ERAS, default="genesis")
     cli.add_argument("--funded", action="store_true", help="also run the funded replay in an isolated regtest")
     args = cli.parse_args()
     try:
-        raw_plan = PLAN.read_bytes()
+        index = json.loads((VERSIONS / "index.json").read_bytes())
+        release = index["current"] if args.release == "current" else args.release
+        if release not in index["versions"]:
+            raise ValueError(f"unknown release {release!r}")
+        raw_plan = (VERSIONS / f"v{release}" / "replay-plan.json").read_bytes()
         plan = json.loads(raw_plan)
+        check("plan release", plan["version"], release)
         artifact, witnesses = build(plan, args.script_era)
         report = (replay_funded(plan, args.script_era, bytes.fromhex(artifact["script_hex"]), witnesses, digest(raw_plan))
                   if args.funded else None)
     except (OSError, ValueError, subprocess.CalledProcessError) as error:
         cli.error(str(error))
 
-    output = PROJECT / "workspace/build/pinned-v0.9.0" / args.script_era
+    output = args.output or PROJECT / "workspace/build" / f"pinned-v{release}" / args.script_era
     output.mkdir(parents=True, exist_ok=True)
     (output / "lock.json").write_text(json.dumps(artifact, indent=2) + "\n", encoding="utf-8")
     for name, witness in witnesses.items():

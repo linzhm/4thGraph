@@ -189,7 +189,7 @@ class Curve:
         x, y = point
         return self.sub(self.square(y), self.add(self.mul(self.square(x), x), self.b))
 
-    def double(self, point):
+    def double(self, point, *, reduce_coordinates=True):
         x, y, z = point
         xx, yy = self.square(x), self.square(y)
         slope = self.scale(xx, 3)
@@ -197,7 +197,8 @@ class Curve:
         x3 = self.sub(self.square(slope), self.scale(s, 2))
         y3 = self.sub(self.mul(slope, self.sub(s, x3)), self.scale(self.square(yy), 8))
         z3 = self.scale(self.mul(y, z), 2)
-        return (self.reduce(x3), self.reduce(y3), self.reduce(z3)), slope, yy
+        doubled = x3, y3, z3
+        return (tuple(map(self.reduce, doubled)) if reduce_coordinates else doubled), slope, yy
 
     def add_mixed(self, point, affine):
         x, y, z = point
@@ -324,15 +325,22 @@ def require_affine(tower, curve, jacobian, point):
         f.all((f.nonzero(z), f.equal(dx, 0), f.equal(dy, 0)))
 
 
-def check_g1(tower, point):
+def check_g1(tower, point, *, pair_doubles=False):
     # The BLS12-381 G1 endomorphism (x, y) -> (BETA*x, y) acts as -U² on G1.
     curve = Curve(tower)
     x, y = point
     f = tower.fp
     f.all((f.equal(curve.equation(point), 0),))
     current = (*point, 1)
-    for bit in bin(U**2)[3:]:
-        current, _, _ = curve.double(current)
+    bits = bin(U**2)[3:]
+    unreduced = False
+    for i, bit in enumerate(bits):
+        # A pair starts with reduced X and Y. The two Jacobian
+        # doublings are polynomial, with degree at most 24 in these
+        # inputs. Reduce before every mixed addition and the final test.
+        normalize = not pair_doubles or unreduced or bit == "1" or i == len(bits) - 1
+        current, _, _ = curve.double(current, reduce_coordinates=normalize)
+        unreduced = not normalize
         if bit == "1":
             current, _ = curve.add_mixed(current, point)
     require_affine(tower, curve, current, (f.mul(BETA, x), f.sub(0, y)))
@@ -471,7 +479,8 @@ class VerifierStages:
     """Build the typed stages of one BLS12-381 Script predicate."""
 
     def __init__(self, key, sources, *, chronicle=False, optimize=False, extra_inputs=None, fp2_rules=FP2_RULES,
-                 fp2_selection="uniform"):
+                 fp2_selection="uniform", pair_g1_doubles=False):
+        self.pair_g1_doubles = pair_g1_doubles
         self.key, self.sources = key, sources
         self.slots = dynamic_slots(sources)
         self.optimize = optimize
@@ -509,11 +518,11 @@ class VerifierStages:
         return self.check_g1_c(self.check_g1_a(proof))
 
     def check_g1_a(self, proof):
-        check_g1(self.tower, proof[0])
+        check_g1(self.tower, proof[0], pair_doubles=self.pair_g1_doubles)
         return proof
 
     def check_g1_c(self, proof):
-        check_g1(self.tower, proof[2])
+        check_g1(self.tower, proof[2], pair_doubles=self.pair_g1_doubles)
         return proof
 
     @staticmethod
