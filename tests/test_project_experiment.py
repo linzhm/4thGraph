@@ -106,6 +106,42 @@ class FormulaExperiments(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,"parent run"):
             run(next_plan,first)
 
+    def test_stack_trace_describes_only_the_selected_schedule_and_is_replayed(self):
+        request = {"fixture": "bezier", "workers": 2, "trace": True,
+                   "plans": [{}, {"passes": ["stack"]}, {"passes": ["rewrite", "share", "stack"]}]}
+        first = run(request)
+        follow = next_request(first)
+        self.assertTrue(follow["trace"])
+        second = run(follow, first)
+        rows = first["candidates"] + second["candidates"]
+        plans = [row["trace"]["target_stack_plan"] for row in rows]
+        self.assertEqual([p["order"] for p in plans], ["source", "source", "source", "source", "beam"])
+        self.assertEqual(plans[-2]["steps"], plans[1]["steps"])
+        self.assertNotEqual(plans[-1]["steps"], plans[2]["steps"])
+        for row, plan in zip(rows, plans, strict=True):
+            state = plan["inputs"]
+            offset = 0
+            for step in plan["steps"]:
+                self.assertEqual(step["before"], state)
+                self.assertEqual(step["offset"], offset)
+                self.assertCountEqual(step["args"], step["operands"])
+                self.assertGreaterEqual(step["operation_offset"], step["offset"])
+                self.assertLess(step["operation_offset"], offset + step["bytes"])
+                state = step["after"]
+                self.assertEqual(state[-1], step["slot"])
+                offset += step["bytes"]
+            finish = plan["finish"]
+            self.assertEqual(finish["before"], state)
+            self.assertEqual(finish["after"], plan["returns"])
+            self.assertEqual(finish["offset"], offset)
+            self.assertEqual(offset + finish["bytes"], row["artifact"]["bytes"])
+            formula = row["trace"]["formula_snapshots"][-1]
+            self.assertEqual([plan["formula_slots"][i] for i in formula["returns"]], plan["returns"])
+        self.assertEqual(run(second["request"], first)["run_id"], second["run_id"])
+        first["candidates"][1]["trace"]["target_stack_plan"]["steps"][0]["offset"] += 1
+        with self.assertRaisesRegex(ValueError, "parent run"):
+            run(follow, first)
+
     def test_cli_agent_and_fixed_square_replay(self):
         def call(cmd,data):
             result=subprocess.run([sys.executable,"-m","fourthgraph.workflow.protocol","experiment",cmd,"-"],

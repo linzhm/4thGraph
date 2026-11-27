@@ -130,6 +130,8 @@ python3 -m fourthgraph.workflow.protocol experiment replay workspace/tuning/spen
 
 要把上面的两轮 Bézier 实验接到完整花费上，在第一轮请求中加 `"evaluation":"spend"`。各候选固定同一份 Forth 和交易上下文，跑同一组 625 个向量。链接后的锁同时检查位置和切向量。拒绝用例分别覆盖只改变位置和只改变切向量的情况。花费回执随报告进入 `next` 和 `replay`。
 
+比较终端栈调度时加 `"trace":true`。报告用 `formula_slots` 把最后一份公式快照的节点关联到图槽位。在 `trace.target_stack_plan` 中，`steps` 记录实际选中的执行顺序、操作数排布、每步前后的抽象栈槽和 Script 字节范围。经过栈调整后，`operation_offset` 指向实际操作的起始字节。最后的 `finish` 记录返回值排布和清理。报告标明选中源码顺序还是束搜索顺序。后续请求沿用追踪开关，重放会核对追踪、Script 和测试判定。开启追踪会增加所测的编译耗时。
+
 <a name="documentation-index"></a>
 
 ## 文档索引

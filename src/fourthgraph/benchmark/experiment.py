@@ -87,7 +87,8 @@ def compile_row(raw, fixture, sources, frozen, trace):
         row.update(compile={"status": "passed", "lowering": lowering},
                    artifact=describe_script(code, listing=trace), source_sha256=frozen["sources"][spec["implementation"]])
         if trace:
-            row["trace"] = {"formula_snapshots": builder.formula_snapshots[fixture.entry], "target_stack_plan": "not_instrumented"}
+            row["trace"] = {"formula_snapshots": builder.formula_snapshots[fixture.entry],
+                            "target_stack_plan": builder.formula_stack_plans[fixture.entry]}
     except (ValueError, TypeError, KeyError) as exc:
         elapsed = perf_counter_ns() - started
         row["compile"]["diagnostic"] = str(exc)
@@ -310,6 +311,7 @@ def next_request(report):
         return {"stop": "no_improving_expansion"}
     return {"fixture": report["frozen"]["fixture"], "plans": plans[:LIMIT],
             "snapshot": report["snapshot"], "parent_run": report["run_id"],
+            **({"trace": True} if report["request"].get("trace") else {}),
             **({"evaluation": "spend"} if spend else {})}
 
 
