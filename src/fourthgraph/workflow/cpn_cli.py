@@ -10,6 +10,7 @@ def main(argv):
     commands = cli.add_subparsers(dest="command", required=True)
     commands.add_parser("plan", help="build and compare staged Script and proof candidates")
     commands.add_parser("tune", help="compare compiler lowering profiles across the same candidate plans")
+    commands.add_parser("tune-model", help="lower a logical CPN and explore transaction and proof candidates")
     commands.add_parser("replay", help="fund, validate and mine a fixed candidate on loopback regtest")
     commands.add_parser("test-keys", help="print the deterministic regtest fixture public keys")
     check = commands.add_parser("check-model", help="validate and explore a logical CPN model")
@@ -56,6 +57,10 @@ def main(argv):
         from fourthgraph.workflow.protocol import main as compiler_main
 
         return compiler_main(argv[1:], cpn_action=argv[0])
+    if argv[:1] == ["tune-model"]:
+        from fourthgraph.workflow.tune_model import main as tune_model_main
+
+        return tune_model_main(argv[1:])
     if argv[:1] == ["replay"]:
         from fourthgraph.replay.proof_workflow import main as replay_main
 

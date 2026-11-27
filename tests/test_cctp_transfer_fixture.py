@@ -1,6 +1,7 @@
 """Tests of the pinned CCTP parent-opening adapter with public fixture keys."""
 
 from dataclasses import replace
+from copy import deepcopy
 from hashlib import sha256
 import json
 import os
@@ -15,9 +16,11 @@ from ecdsa.util import sigencode_der_canonize
 from fourthgraph.benchmark.validation import Node, chain_verdict
 from fourthgraph.bsv.script import push, script_operations
 from fourthgraph.bsv.transaction import hash256, preimage_all
-from fourthgraph.replay.cctp_fixture import build_fixture, inspect_bundle
+from fourthgraph.replay.cctp_fixture import FIXTURE_DECLARATION_SHA256, build_fixture, inspect_bundle
 from fourthgraph.workflow.cctp_archive import OWNER_OFFSET, QUANTITY_OFFSET, inspect_archive, logical_model, read_archive
+from fourthgraph.workflow.cctp_declared_fixture import fixture_declaration
 from fourthgraph.workflow.cctp_transfer_fixture import COMPACT_SCRIPTCODE, construct_fixture_spend
+from fourthgraph.workflow.cpn import canonical
 from fourthgraph.workflow.cpn_workbench import export_fixture
 
 ARCHIVE = os.environ.get("CCTP_ARCHIVE")
@@ -100,6 +103,69 @@ class FixedFixtureSpendTests(unittest.TestCase):
             self.assertTrue(model["fixture_mode"])
             self.assertEqual(model["fixture"]["txid"], observation["txid"])
             self.assertEqual(model["fixture"]["verification_scope"], "provided-parents-only")
+
+    def test_bundle_pins_declaration_and_accepts_symbolic_renames(self):
+        self.assertEqual(sha256(canonical(fixture_declaration(self.archive))).hexdigest(),
+                         FIXTURE_DECLARATION_SHA256)
+        bundle = build_fixture(self.archive)
+        renamed = deepcopy(bundle)
+        mapping = {name: "renamed-" + str(i) for i, name in
+                   enumerate(place["name"] for place in renamed["cpn"]["places"])}
+        for place in renamed["cpn"]["places"]:
+            place["name"] = mapping[place["name"]]
+        transition = renamed["cpn"]["transitions"][0]
+        transition["name"] = "renamed-transfer"
+        for arc in transition["inputs"] + transition["outputs"]:
+            arc["place"] = mapping[arc["place"]]
+        self.assertTrue(inspect_bundle(renamed)["chain_gang"])
+
+        def changed(path, value):
+            item = deepcopy(bundle)
+            node = item
+            for key in path[:-1]:
+                node = node[key]
+            node[path[-1]] = value
+            return item
+
+        meta = ["cpn", "transitions", 0, "metadata"]
+        cases = [
+            (["archive_sha256"], "00" * 32),
+            (meta + ["actual_txid"], "00" * 32),
+            (meta + ["status"], "confirmed"),
+            (meta + ["constraints"], [{"kind": "anything"}]),
+            (meta + ["authorization", 0, "owner_compressed"], "02" + "11" * 32),
+            (meta + ["witnesses"], []),
+            (meta + ["evidence", 0, "issuance_root"], "00" * 32),
+            (meta + ["evidence", 0, "verifying_key_sha256"], "00" * 32),
+            (meta + ["evidence", 0, "verifier_lock_sha256"], "00" * 32),
+            (meta + ["evidence", 0, "proof_sha256"], "00" * 32),
+            (meta + ["evidence", 0, "proof_inputs_sha256"], "00" * 32),
+            (["cpn", "transitions", 0, "inputs", 1, "name"], "other-port"),
+            (["cpn", "transitions", 0, "inputs", 1, "count"], 2),
+            (["cpn", "places", 3, "metadata", "carrier"], "confirmed-utxo"),
+        ]
+        for path, value in cases:
+            with self.subTest(path=path), self.assertRaises(ValueError):
+                inspect_bundle(changed(path, value))
+        extra = deepcopy(bundle)
+        extra["cpn"]["places"][3]["metadata"]["verified"] = True
+        with self.assertRaises(ValueError):
+            inspect_bundle(extra)
+
+    def test_bundle_checks_actual_proof_and_public_input_bytes(self):
+        bundle = build_fixture(self.archive)
+        for position in (0, -3):
+            altered = deepcopy(bundle)
+            tx = self.spend().transaction
+            operations = list(script_operations(tx.inputs[0].script))
+            operations[position] = operations[position][:-1] + bytes([operations[position][-1] ^ 1])
+            tx = tx.with_script(0, b"".join(operations))
+            altered["transaction"] = tx.serialize().hex()
+            altered["cpn"]["transitions"][0]["metadata"]["actual_txid"] = tx.txid()
+            for slot, place in enumerate(altered["cpn"]["places"][-2:]):
+                place["metadata"]["actual_outpoint"] = f"{tx.txid()}:{slot}"
+            with self.subTest(position=position), self.assertRaisesRegex(ValueError, "pinned evidence"):
+                inspect_bundle(altered)
 
     @unittest.skipUnless(os.environ.get("REGTEST_URL"), "requires loopback BSV regtest RPC")
     def test_both_engines_accept_and_reject_resigned_inflation(self):

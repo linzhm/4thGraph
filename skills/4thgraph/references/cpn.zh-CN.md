@@ -14,6 +14,10 @@
 
 当前支持的线性子集可用 `4thgraph cpn lower-model MODEL --source WORDS.fth --output WORKFLOW.fth` 生成分阶段工作流，输出文件须与 Forth 源码位于同一目录。声明一个初始 Token、每个 Place 容量为 1、公开 `u32` 状态以 `route` 结尾、每个迁移一个输入和输出及一个授权角色。无法降级的图或要求会被拒绝。对生成的工作流运行 `4thgraph cpn plan` 或 `tune`，并与导入的 Forth 文件和报告一起保存。
 
+可以用 `4thgraph cpn tune-model MODEL --source WORDS.fth --output WORKFLOW.fth --keys KEYS.json --current 19 > report.json` 一步完成降级和探索。它接受 `cpn tune` 的搜索预算和后端目录，不会覆盖已有工作流；生成的 Forth 注释包含原始模型的 SHA-256，并受到编译器源码摘要保护。请保存模型、生成的工作流、导入和报告；重新运行降级可核对它们的关系。没有合格候选时仍会输出淘汰报告，并以非零状态退出。
+
+迁移可声明 `"atomic_with": ["other-transition"]`，要求两阶段在同一笔交易执行；也可声明 `"independent_submit": true`，要求该阶段能够独立提交。降级器将要求转换为工作流声明，规划器淘汰不符合要求的布局。要求冲突时可能没有合格候选。这些声明适用于当前支持的线性子集，并不代表已支持任意 CPN 拓扑的编译。
+
 可以在独立目录中运行[线性模型](../../../projects/proof-counter/cpn-linear.json)和 [Forth 导入](../../../projects/proof-counter/cpn-words.fth)：
 
 ```sh
@@ -45,7 +49,7 @@ git show 11c919a:projects/spv-token/fixtures/covenant-backtrace-2x2-regtest.json
 
 运行 `4thgraph cpn fixture-declaration workspace/cpn-dev/cctp.json.xz > workspace/cpn-dev/transfer.json` 可以得到显式 CPN，包含三个固定输入 Place、一个 Transition 和两个符号输出 Place。Python 入口 `construct_declared_fixture_spend` 在调用外部签名器前检查声明的端口、授权、证据和约束，返回待提交交易并将输出 Place 映射到结果 outpoint。调用方可在保留固定要求的同时重命名逻辑节点。
 
-下面的命令使用公开测试密钥生成夹具和可离线打开的只读图。`verify-fixture` 使用固定版本的 chain-gang，根据提供的父交易重新检查交易；包里的 Node 结果是记录的观察值。这些检查不证明当前 UTXO 状态、入池或确认。将快照复制为草稿会移除其验证关联。
+下面的命令使用公开测试密钥生成夹具和可离线打开的只读图。`verify-fixture` 将 CPN 声明（包括有序父 outpoint、授权和证据标签）与代码中固定的归档声明摘要比较；核对实际证明和公开输入字节的摘要，以及交易和 Place 的实际数据，并使用固定版本的 chain-gang 根据提供的父交易重新检查花费。发行点和验证密钥标签来自固定归档，不能独立证明发行授权或区块包含。包里的 Node 结果是未经认证的历史记录。这些检查不证明当前 UTXO 状态、入池或确认。将快照复制为草稿会移除其验证关联。
 
 ```sh
 bash tools/verify_node.sh --profile long-script -- python -m fourthgraph.replay.cctp_fixture \

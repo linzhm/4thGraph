@@ -16,7 +16,9 @@ def _identifier(value, path):
 
 
 def _metadata(metadata, path, *, place):
-    supported = {"visibility"} if place else {"authorization", "constraints", "evidence", "witnesses"}
+    supported = {"visibility"} if place else {
+        "authorization", "constraints", "evidence", "witnesses", "atomic_with", "independent_submit"
+    }
     for key, value in metadata.items():
         if key not in supported and value not in (None, [], {}):
             raise CPNError("unsupported_requirement", path + "." + key,
@@ -31,6 +33,33 @@ def _metadata(metadata, path, *, place):
         raise CPNError("unsupported_authorization", path + ".authorization",
                        "each transition requires exactly one role name")
     return _identifier(authorization[0], path + ".authorization[0]")
+
+
+def _transaction_requirements(transitions, positions):
+    """Preserve logical transaction grouping as existing workflow directives."""
+    by_name = {transition.name.casefold(): transition.name for transition in transitions}
+    pairs, independent = set(), []
+    for transition in transitions:
+        path = positions[transition.name] + ".metadata"
+        metadata = transition.metadata
+        atomic = metadata.get("atomic_with", [])
+        if not isinstance(atomic, list):
+            raise CPNError("unsupported_atomicity", path + ".atomic_with", "expected an array of transition names")
+        for index, reference in enumerate(atomic):
+            location = f"{path}.atomic_with[{index}]"
+            name = _identifier(reference, location).casefold()
+            if name not in by_name:
+                raise CPNError("unsupported_atomicity", location, "unknown transition")
+            if name == transition.name.casefold():
+                raise CPNError("unsupported_atomicity", location, "a transition cannot be atomic with itself")
+            pairs.add(tuple(sorted((transition.name.casefold(), name))))
+        separate = metadata.get("independent_submit", False)
+        if type(separate) is not bool:
+            raise CPNError("unsupported_independence", path + ".independent_submit", "expected a boolean")
+        if separate:
+            independent.append(transition.name)
+    result = "".join(f"atomic: {by_name[first]} {by_name[second]} ;\n" for first, second in sorted(pairs))
+    return result + "".join(f"independent-submit: {name} ;\n" for name in independent)
 
 
 def _evidence(transition, path, *, terminal):
@@ -173,7 +202,7 @@ def lower_linear(document, source, *, source_path=None):
         frontend = SourceCompiler(source, source_path=source_path)
         if (frontend.workflow_input is not None or frontend.stages or frontend.work or frontend.join or
                 frontend.operator or frontend.gate or frontend.relation or frontend.recovery or frontend.independent or
-                frontend.stage_verification_declared or frontend.recursions):
+                frontend.atomic_stages or frontend.stage_verification_declared or frontend.recursions):
             raise CPNError("unsupported_source", "$.source",
                            "the Forth source must not contain transaction declarations")
         generated = source + "\nworkflow-input: " + root.name + " u32 ;\n"
@@ -183,6 +212,7 @@ def lower_linear(document, source, *, source_path=None):
         )
         generated += "".join(_evidence(item, positions[item.name] + ".metadata", terminal=item is ordered[-1])
                              for item in ordered)
+        generated += _transaction_requirements(ordered, positions)
         lowered = SourceCompiler(generated, source_path=source_path)
         workflow = lowered.workflow()
         for transition, stage in zip(ordered, workflow.stages, strict=True):

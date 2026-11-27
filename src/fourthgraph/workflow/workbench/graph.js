@@ -37,7 +37,14 @@ const en = [
   "Verification key digest", "Recursion statement · verifier unavailable", "Public inputs", "Base requirements",
   "Step requirements", "Backend is unavailable", "Carrier", "Evidence requirements",
   "Recursive statement",
-  "Edit structured recursion ports in Advanced metadata JSON.",
+  "Advanced metadata JSON also supports extension fields.",
+  "Recursion ports", "Previous proof input", "Previous state input", "Next state output",
+  "Origin field", "Base-case transition", "Unresolved reference", "Leave fields blank to remove the declaration.",
+  "Select a port", "Select a transition", "Declaration only · proof and origin binding are not verified.",
+  "Transaction layout requirements", "Atomic with", "Independent submission",
+  "The compiler checks whether these requirements can be satisfied.",
+  "Edit the malformed requirement in Advanced metadata JSON.", "No other transitions",
+  "A transition cannot be atomic with itself", "Unknown transition",
 ];
 const zh = [
   "比较 CPN 路径", "候选", "可构建", "已淘汰", "已复放", "全部", "搜索路径…", "CPN 图",
@@ -74,7 +81,14 @@ const zh = [
   "验证密钥摘要", "递归声明 · 验证器尚不可用", "公开输入", "初始条件",
   "递归步条件", "后端不可用", "载体", "证明要求",
   "递归声明",
-  "递归端口结构请在高级元信息 JSON 中编辑。",
+  "高级元信息 JSON 也可编辑扩展字段。",
+  "递归端口", "前序证明输入", "前序状态输入", "新状态输出",
+  "发行根字段", "基础迁移", "引用未解析", "清空字段可移除该声明。",
+  "选择端口", "选择迁移", "仅声明 · 前序证明及发行根绑定尚未验证。",
+  "交易布局要求", "与以下迁移原子执行", "独立提交",
+  "编译器会检查这些要求能否同时满足。",
+  "请在高级元信息 JSON 中修正格式错误的要求。", "没有其他迁移",
+  "迁移不能与自身声明原子执行", "未知迁移",
 ];
 let lang = "en";
 let filter = "all";
@@ -522,6 +536,7 @@ function declarations(metadata) {
   const fields = [
     ["visibility", 89], ["carrier", 158], ["constraints", 92], ["authorization", 93],
     ["witnesses", 94], ["evidence", 159], ["recursive_requirements", 97], ["recursion", 146],
+    ["atomic_with", 174], ["independent_submit", 175],
   ];
   return fields.filter(([key]) => metadata?.[key] !== undefined).map(([key, name]) => {
     const value = metadata[key];
@@ -620,6 +635,164 @@ function textArea(form, name, value) {
   wrap.append(input);
   form.append(wrap);
   return input;
+}
+
+function recursionEditor(form, item, original) {
+  const before = original.recursion;
+  const value = before && typeof before === "object" && !Array.isArray(before) ? before : {};
+  const group = element("details", undefined, "draft-advanced recursion-editor");
+  group.open = Boolean(before);
+  group.append(element("summary", label(162)), element("p", label(172), "hint"));
+  const inputs = {};
+
+  function select(key, title, values, placeholder) {
+    const wrap = element("label", title);
+    const input = element("select");
+    input.setAttribute("aria-label", title);
+    const empty = element("option", placeholder);
+    empty.value = "";
+    input.append(empty);
+    const old = typeof value[key] === "string" ? value[key] : "";
+    if (old && !values.includes(old)) {
+      const missing = element("option", old + " · " + label(168));
+      missing.value = old;
+      input.append(missing);
+    }
+    for (const optionValue of values) {
+      const option = element("option", optionValue);
+      option.value = optionValue;
+      input.append(option);
+    }
+    input.value = old;
+    wrap.append(input);
+    group.append(wrap);
+    inputs[key] = input;
+  }
+
+  select("previous_proof", label(163), item.inputs.map(port => port.name), label(170));
+  select("previous_state", label(164), item.inputs.map(port => port.name), label(170));
+  select("next_state", label(165), item.outputs.map(port => port.name), label(170));
+  inputs.origin_field = field(group, label(166), typeof value.origin_field === "string" ? value.origin_field : "");
+  select("base_case", label(167), draft.transitions.map(transition => transition.name), label(171));
+  group.append(element("p", label(169), "hint"));
+  const feedback = element("p", "", "draft-error");
+  feedback.setAttribute("role", "status");
+  group.append(feedback);
+  function showUnresolved() {
+    const values = Object.fromEntries(Object.entries(inputs).map(([key, input]) => [key, input.value.trim()]));
+    if (!Object.values(values).some(Boolean)) {
+      feedback.textContent = "";
+      return;
+    }
+    const available = {
+      previous_proof: item.inputs.map(port => port.name),
+      previous_state: item.inputs.map(port => port.name),
+      next_state: item.outputs.map(port => port.name),
+      base_case: draft.transitions.map(transition => transition.name),
+    };
+    const names = {previous_proof: 163, previous_state: 164, next_state: 165, origin_field: 166, base_case: 167};
+    const missing = Object.keys(values).filter(key => !values[key] || available[key] && !available[key].includes(values[key]));
+    feedback.textContent = missing.length ? label(168) + ": " + missing.map(key => label(names[key])).join(", ") : "";
+  }
+  group.addEventListener("input", showUnresolved);
+  group.addEventListener("change", showUnresolved);
+  showUnresolved();
+  form.append(group);
+
+  return () => {
+    const values = Object.fromEntries(Object.entries(inputs).map(([key, input]) => [key, input.value.trim()]));
+    const unchanged = Object.entries(values).every(([key, input]) =>
+      input === (typeof value[key] === "string" ? value[key] : ""));
+    if (unchanged) return ["recursion", before, before];
+    const next = {...value};
+    for (const [key, input] of Object.entries(values)) {
+      if (input) next[key] = input;
+      else delete next[key];
+    }
+    return ["recursion", Object.keys(next).length ? next : "", before];
+  };
+}
+
+function transactionRequirements(form, item, original) {
+  const group = element("fieldset", undefined, "draft-list");
+  group.append(element("legend", label(173)), element("p", label(176), "hint"));
+  const originalAtomic = original.atomic_with;
+  const validAtomic = originalAtomic === undefined ||
+    Array.isArray(originalAtomic) && originalAtomic.every(value => typeof value === "string" && value.trim());
+  const before = validAtomic && Array.isArray(originalAtomic) ? originalAtomic : [];
+  const currentNames = new Map(draft.transitions.map(transition => [transition.name.toLowerCase(), transition.name]));
+  const choices = new Map();
+  for (const reference of before) choices.set(reference.toLowerCase(), reference);
+  for (const transition of draft.transitions) {
+    const key = transition.name.toLowerCase();
+    if (key !== item.name.toLowerCase() && !choices.has(key)) choices.set(key, transition.name);
+  }
+  const heading = element("strong", label(174));
+  heading.style.display = "block";
+  heading.style.fontSize = "13px";
+  group.append(heading);
+  const checks = [];
+  for (const [key, reference] of choices) {
+    const self = key === item.name.toLowerCase();
+    const missing = !currentNames.has(key);
+    const container = element("label");
+    container.style.display = "flex";
+    container.style.alignItems = "start";
+    container.style.gap = "6px";
+    const input = element("input");
+    input.type = "checkbox";
+    input.style.width = "auto";
+    input.style.marginTop = "3px";
+    input.checked = before.some(value => value.toLowerCase() === key);
+    input.disabled = !validAtomic;
+    const suffix = self ? label(179) : missing ? label(180) : "";
+    const description = currentNames.get(key) ?? reference;
+    container.append(input, element("span", suffix ? description + " · " + suffix : description));
+    group.append(container);
+    checks.push({key, reference, input, self, missing});
+  }
+  if (!choices.size) group.append(element("p", label(178), "hint"));
+  const unresolved = element("p", "", "draft-error");
+  unresolved.setAttribute("role", "status");
+  const update = () => {
+    const invalid = checks.filter(check => check.input.checked && (check.self || check.missing));
+    unresolved.textContent = invalid.length ? label(168) + ": " + invalid.map(check => check.reference).join(", ") : "";
+  };
+  group.addEventListener("change", update);
+  update();
+  group.append(unresolved);
+  const isBoolean = original.independent_submit === undefined || typeof original.independent_submit === "boolean";
+  const separateLabel = element("label");
+  separateLabel.style.display = "flex";
+  separateLabel.style.alignItems = "start";
+  separateLabel.style.gap = "6px";
+  const separate = element("input");
+  separate.type = "checkbox";
+  separate.style.width = "auto";
+  separate.style.marginTop = "3px";
+  separate.checked = original.independent_submit === true;
+  separate.disabled = !isBoolean;
+  separateLabel.append(separate, element("span", label(175)));
+  group.append(separateLabel);
+  if (!validAtomic || !isBoolean) group.append(element("p", label(177), "draft-error"));
+  form.append(group);
+
+  return () => {
+    let atomic = originalAtomic;
+    if (validAtomic) {
+      const enabled = new Set(checks.filter(check => check.input.checked).map(check => check.key));
+      const selected = before.filter(reference => enabled.has(reference.toLowerCase()));
+      for (const check of checks) {
+        if (check.input.checked && !before.some(reference => reference.toLowerCase() === check.key)) {
+          selected.push(check.reference);
+        }
+      }
+      if (JSON.stringify(selected) !== JSON.stringify(before)) atomic = selected;
+    }
+    const independent = separate.checked === (original.independent_submit === true)
+      ? original.independent_submit : separate.checked;
+    return [["atomic_with", atomic, originalAtomic], ["independent_submit", independent, original.independent_submit]];
+  };
 }
 
 function metadataList(form, title, values) {
@@ -750,6 +923,7 @@ function draftInspector(panel) {
   const word = !isPlace ? field(form, label(70), item.word) : null;
   const original = item.metadata ?? {};
   const edits = [];
+  let requirements;
   const textEdit = (key, title, multiline = false) => {
     const before = typeof original[key] === "string" ? original[key] : "";
     const input = multiline ? textArea(form, title, before) : field(form, title, before);
@@ -770,6 +944,8 @@ function draftInspector(panel) {
     listEdit("witnesses", label(94));
     listEdit("evidence", label(95));
     textEdit("recursive_requirements", label(97), true);
+    edits.push(recursionEditor(form, item, original));
+    requirements = transactionRequirements(form, item, original);
   }
   const policyBefore = !isPlace && Array.isArray(original.evidence)
     ? original.evidence.find(entry => entry && typeof entry === "object" && typeof entry.policy === "string")?.policy ?? ""
@@ -783,7 +959,6 @@ function draftInspector(panel) {
   const advanced = element("details", undefined, "draft-advanced");
   advanced.append(element("summary", label(100)), metadataLabel);
   form.append(advanced);
-  if (!isPlace && original.recursion) form.append(element("small", label(161), "hint"));
   form.append(element("small", label(101), "hint"));
   const errorMessage = element("p", "", "draft-error");
   errorMessage.setAttribute("role", "alert");
@@ -794,7 +969,9 @@ function draftInspector(panel) {
   form.addEventListener("submit", event => {
     event.preventDefault();
     try {
-      const value = mergeDraftMetadata(metadata.value, original, edits.map(read => read()));
+      const changes = edits.map(read => read());
+      if (requirements) changes.push(...requirements());
+      const value = mergeDraftMetadata(metadata.value, original, changes);
       if (policy && policy.value !== policyBefore) {
         if (value.evidence !== undefined && !Array.isArray(value.evidence)) throw new Error(label(95));
         const evidence = value.evidence ?? [];
@@ -826,8 +1003,18 @@ function draftInspector(panel) {
         item.initial = nextInitial;
         item.capacity = nextCapacity;
       } else item.word = word.value.trim() || null;
+      const oldName = item.name;
       item.metadata = value;
       item.name = nextName;
+      if (!isPlace && oldName !== nextName) {
+        for (const transition of draft.transitions) {
+          if (transition.metadata?.recursion?.base_case === oldName) transition.metadata.recursion.base_case = nextName;
+          if (Array.isArray(transition.metadata?.atomic_with)) {
+            transition.metadata.atomic_with = transition.metadata.atomic_with.map(reference =>
+              typeof reference === "string" && reference.toLowerCase() === oldName.toLowerCase() ? nextName : reference);
+          }
+        }
+      }
       activeNode = "draft:" + (isPlace ? "place:" : "transition:") + nextName;
       draftError = "";
       render();

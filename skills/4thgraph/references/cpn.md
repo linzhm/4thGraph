@@ -14,6 +14,10 @@ Run `4thgraph cpn check-model projects/workflow-examples/token-model.json` to ch
 
 For the currently supported linear subset, `4thgraph cpn lower-model MODEL --source WORDS.fth --output WORKFLOW.fth` generates a staged workflow in the same directory as the Forth source. Declare one initial token, capacity 1 on every Place, public `u32` states ending in a `route`, a single input and output per transition, and one authorizer per transition. The command rejects a graph or requirement it cannot lower. Feed the generated workflow into `4thgraph cpn plan` or `tune` and retain it with its imported Forth files and report.
 
+To lower and explore in one command, use `4thgraph cpn tune-model MODEL --source WORDS.fth --output WORKFLOW.fth --keys KEYS.json --current 19 > report.json`. It accepts the same search budgets and backend catalog as `cpn tune`, refuses to overwrite the generated workflow, and includes the exact model's SHA-256 as a Forth comment covered by the compiler's source digest. Retain the model, generated workflow, imports and report; rerun lowering to check their relationship. A no-candidate result still outputs the exclusion report and exits nonzero.
+
+A transition may declare `"atomic_with": ["other-transition"]` to require both stages in one transaction, or `"independent_submit": true` to require the stage to be independently submitted. The lowerer emits the corresponding workflow requirements; planning excludes layouts that violate them. Conflicting requirements can leave no eligible candidate. These declarations apply to the supported linear subset, not arbitrary CPN topology.
+
 The [linear example](../../../projects/proof-counter/cpn-linear.json) and [Forth imports](../../../projects/proof-counter/cpn-words.fth) can be tried in an isolated directory:
 
 ```sh
@@ -45,7 +49,7 @@ The fixed-archive 2-to-2 fixture adapter `construct_fixture_spend` accepts this 
 
 Run `4thgraph cpn fixture-declaration workspace/cpn-dev/cctp.json.xz > workspace/cpn-dev/transfer.json` for an explicit CPN with three fixed input Places, one Transition and two symbolic output Places. The Python entry point `construct_declared_fixture_spend` checks all declared ports, authorization, evidence and constraints before invoking the external signer. It returns a proposed transaction and maps the output Places to the resulting outpoints. A caller can rename the logical nodes while retaining the pinned requirements.
 
-Generate a signed, test-key-only fixture and its portable read-only graph with the commands below. `verify-fixture` rechecks the transaction against the supplied parent transactions with pinned chain-gang. The Node verdicts in the bundle are recorded observations; neither check establishes current UTXO status, mempool admission or confirmation. Copying the snapshot to a draft removes its verification association.
+Generate a signed, test-key-only fixture and its portable read-only graph with the commands below. `verify-fixture` compares the CPN declaration, including its ordered parent outpoints, authorization and evidence labels, with a code-pinned digest of the fixed archive's declaration. It checks the proof and public-input bytes against their pinned hashes, checks the stated transaction and Place data against the actual bytes, and rechecks the spend against the supplied parent transactions with pinned chain-gang. The issuance and verification-key labels are pinned archive metadata, not independent proofs of issuance authorization or chain inclusion. The Node verdicts in the bundle are unauthenticated recorded observations; neither check establishes current UTXO status, mempool admission or confirmation. Copying the snapshot to a draft removes its verification association.
 
 ```sh
 bash tools/verify_node.sh --profile long-script -- python -m fourthgraph.replay.cctp_fixture \

@@ -47,6 +47,61 @@ def document():
 
 
 class LogicalCPNLoweringTests(unittest.TestCase):
+    def plan(self, document):
+        frontend, generated = lower_linear(document, SOURCE, source_path=SOURCE_PATH)
+        with TemporaryDirectory() as directory:
+            contract, artifact = compile_evidence_plans(
+                frontend, TestKeys().public, 19, directory, mode="auto", target="both",
+                optimization="stack", objective="path-bytes", available_authorizers=None,
+                sighash_family="bip143",
+            )
+        return generated, contract, artifact.get("schedule_explanation", artifact)
+
+    def test_transaction_grouping_reaches_planner(self):
+        doc = document()
+        doc["transitions"][0]["metadata"]["atomic_with"] = ["decide"]
+        doc["transitions"][1]["metadata"]["atomic_with"] = ["ADVANCE"]
+        generated, contract, report = self.plan(doc)
+        self.assertEqual(generated.count("atomic: advance decide ;"), 1)
+        self.assertIsNotNone(contract)
+        self.assertIn("atomicity_required", [item["code"] for item in
+                                             report["candidates"]["serial/script"]["exclusions"]])
+        self.assertTrue(report["candidates"]["fused/script"]["eligible"])
+        self.assertTrue(report["candidates"]["atomic/script"]["eligible"])
+
+        independent = document()
+        independent["transitions"][1]["metadata"]["independent_submit"] = True
+        generated, contract, report = self.plan(independent)
+        self.assertIn("independent-submit: decide ;", generated)
+        self.assertIsNotNone(contract)
+        self.assertTrue(report["candidates"]["serial/script"]["eligible"])
+        for mode in ("fused", "atomic"):
+            self.assertIn("independent_submit", [item["code"] for item in
+                                                 report["candidates"][f"{mode}/script"]["exclusions"]])
+
+        doc["transitions"][1]["metadata"]["independent_submit"] = True
+        _, contract, report = self.plan(doc)
+        self.assertIsNone(contract)
+        self.assertIsNone(report["selected"])
+        self.assertIn("atomicity_required", [item["code"] for item in
+                                             report["candidates"]["serial/script"]["exclusions"]])
+        self.assertIn("independent_submit", [item["code"] for item in
+                                             report["candidates"]["fused/script"]["exclusions"]])
+
+    def test_transaction_grouping_rejects_bad_requirements(self):
+        for value in ("decide", ["missing"], ["advance"], [None], [""]):
+            doc = document()
+            doc["transitions"][0]["metadata"]["atomic_with"] = value
+            with self.subTest(atomic_with=value), self.assertRaises(CPNError):
+                lower_linear(doc, SOURCE, source_path=SOURCE_PATH)
+        for value in ("true", 1, None, []):
+            doc = document()
+            doc["transitions"][0]["metadata"]["independent_submit"] = value
+            with self.subTest(independent_submit=value), self.assertRaises(CPNError):
+                lower_linear(doc, SOURCE, source_path=SOURCE_PATH)
+        with self.assertRaisesRegex(CPNError, "must not contain transaction declarations"):
+            lower_linear(document(), SOURCE + "atomic: advance decide ;\n", source_path=SOURCE_PATH)
+
     def test_generated_workflow_compiles_fused_and_serial(self):
         frontend, generated = lower_linear(document(), SOURCE, source_path=SOURCE_PATH)
         self.assertIn("stage: advance advance current next operator ;", generated)
