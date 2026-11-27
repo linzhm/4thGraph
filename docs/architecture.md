@@ -53,7 +53,22 @@ The functional profile identifies a supported family. A template version identif
 
 Move an item to complete when its code, build command, and observed acceptance result are linked. Compiler changes can be reviewed with neutral fixtures. Project-specific payment code and WASM releases have their own review and verification.
 
-## Changes under review
+## Combined acceptance and review status
+
+The baseline dependencies in PRs #86 through #90 are on main. The following reviews have separate acceptance gates. After they merge, rebuild and replay from one commit. Land the experiment runner before retargeting call-site selection to main.
+
+| Acceptance area | Review and evidence |
+| --- | --- |
+| Forth baseline and build identity | The bilingual baseline and wheel replay receipt record the commit, artifact digest, and capability list. |
+| Call-site selection | The same point-addition caller covers constant bindings, the guarded path, and incompatible choices. [#93](https://github.com/linzhm/4thGraph/pull/93) |
+| PELS compile targets | A non-counter static lock covers single, dual, and automatic selection. A dynamic state-label fixture replays two spends against their actual parents. [#87](https://github.com/linzhm/4thGraph/pull/87) · [#95](https://github.com/linzhm/4thGraph/pull/95) |
+| Transaction plans | A three-stage source compares serial and prefix fusion, verifies parents and authorization, and checks the same terminal state. [#92](https://github.com/linzhm/4thGraph/pull/92) |
+| Agent exploration and provenance | Fixed vectors verify source and pass comparisons, complete spends, stack plans, and replay. [#94](https://github.com/linzhm/4thGraph/pull/94) |
+| Wallets and examples | The neutral dual-mode bundle replays both paths. The existing R1 bundle exercises host signing. [#91](https://github.com/linzhm/4thGraph/pull/91) · [#89](https://github.com/linzhm/4thGraph/pull/89) |
+
+Run `bash tools/verify_architecture_acceptance.sh workspace/architecture-acceptance` in a clean checkout that contains the reviewed implementations. Use the existing Python, Go, Node.js WASI, and pinned chain-gang environment. The `PYTHON`, `WHEEL_PYTHON`, and `GO` variables select executables. The installed wheel takes precedence over any additional modules supplied in `PYTHONPATH`. The script replays outside the checkout and writes `acceptance.json` with evidence and wheel digests. [Combined replay runner](../tools/verify_architecture_acceptance.sh)
+
+### Baseline reviews
 
 - Typed PELS compile targets, literal-count unrolling, and byte provenance. The standalone settlement fixture verifies both paths of the same lock. [Compiler PR #87](https://github.com/linzhm/4thGraph/pull/87)
 - Bounded Agent selection and fixed evaluation with replayable formula reports. The homepage diagram and skill document the same loop. [Tuning PR #88](https://github.com/linzhm/4thGraph/pull/88)
