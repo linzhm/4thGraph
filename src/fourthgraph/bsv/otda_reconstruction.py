@@ -68,12 +68,12 @@ class Reconstruction:
             position += width
         return tuple(fields) if script[position:] == self.fixed_parts[-1] and position <= len(script) else None
 
-    def build(self, preimage, outputs):
+    def build(self, preimage, outputs, *, encode_prefix=push):
         """Replace a contiguous suffix of real outputs; preserve all preceding bytes."""
         slots = [(output, self.match(output.script), 0) for output in outputs]
         if not any(fields is not None for _, fields, _ in slots):
             return None
-        return _build(preimage, slots, (self,))
+        return _build(preimage, slots, (self,), encode_prefix=encode_prefix)
 
 
 def reconstruct_mixed(preimage, outputs, patterns, *, combine_programs=None):
@@ -118,7 +118,7 @@ def shorter_reconstruction(preimage, outputs, patterns):
     return min((code for code in programs if code is not None and len(code) < literal_size), key=len, default=None)
 
 
-def _build(preimage, slots, patterns, *, constructor=None):
+def _build(preimage, slots, patterns, *, constructor=None, encode_prefix=push):
     encoded = b"".join(output.serialize() for output, _, _ in slots)
     if not preimage.endswith(encoded, 0, len(preimage) - 8):
         raise ValueError("OTDA outputs differ from the signing preimage")
@@ -134,7 +134,7 @@ def _build(preimage, slots, patterns, *, constructor=None):
     program = bytearray(
         b"".join(pattern.program for pattern in patterns) if constructor is None else constructor
     )
-    program.extend(push(preimage[:-len(encoded) - 8]))
+    program.extend(encode_prefix(preimage[:-len(encoded) - 8]))
     for output, fields, index in slots:
         raw = output.serialize()
         if fields is None:

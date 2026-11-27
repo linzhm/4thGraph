@@ -19,13 +19,17 @@ from fourthgraph.compiler.lowering import DATAFLOW
 from fourthgraph.compiler.script_builder import ScriptBuilder
 
 
+def manual_window_sequence(library):
+    return library.emit("bip340-first-window", b"") + 63 * library.emit("bip340-joint-window-step", b"")
+
+
 def compare_scaled_regions(manual, automatic, joint_code):
     """Measure the regions around the identical first and repeated window scripts."""
     hand, hand_lock = manual
     auto, auto_lock = automatic
     library = ScriptBuilder("REQUIRE stdlib/bip340.fth")
     manual_setup = library.emit("bip340-joint-window-table", b"")
-    loop = library.emit("bip340-first-window", b"") + 63 * library.emit("bip340-joint-window-step", b"")
+    loop = manual_window_sequence(library)
     if loop not in auto:
         return {"identical_window_script": False}
     manual_start, automatic_start = hand.index(loop), auto.index(loop)
@@ -47,13 +51,32 @@ def compare_scaled_regions(manual, automatic, joint_code):
     }
 
 
+def compare_output_regions(builds, base):
+    """The model adapters may move across the linked call, so use the loop as the boundary."""
+    loop = manual_window_sequence(ScriptBuilder("REQUIRE stdlib/bip340.fth"))
+    regions = {}
+    for name, (detached, _) in builds.items():
+        if name != base and not name.startswith(base + "/"):
+            continue
+        offset = detached.find(loop)
+        if offset < 0:
+            regions[name] = {"identical_window_script": False}
+        else:
+            regions[name] = {"identical_window_script": True, "before_windows": offset, "windows": len(loop),
+                             "after_windows": len(detached) - offset - len(loop)}
+    return regions
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--samples", type=int, default=12)
     parser.add_argument("--matrix-only", action="store_true", help="replay the eight automatic transaction shapes")
     parser.add_argument("--joint-lowerings", action="store_true", help="compare the joint lowering candidates")
+    parser.add_argument("--forth-tuning", action="store_true", help="include the tuned Forth verifier")
     args = parser.parse_args()
+    if args.forth_tuning and not args.joint_lowerings:
+        parser.error("--forth-tuning requires --joint-lowerings")
     engine = chain_metadata()
     if not os.environ.get("REGTEST_URL") or engine["commit"] != CONTEXT_PIN or args.samples < 1:
         parser.error("use pinned chain-gang, positive --samples, and tools/verify_node.sh")
@@ -63,6 +86,7 @@ def main():
     manual, offset = compiled_template(bytes(20))
     args.output.parent.mkdir(parents=True, exist_ok=True)
     variants, scaled_joint_codes, rewrites = {}, {}, {}
+    batch_label = f"{GLV_SCALED}/dataflow/batch"
     if args.joint_lowerings:
         for strategy in JOINT_STRATEGIES:
             code_trace = [] if strategy == GLV_SCALED else None
@@ -77,6 +101,16 @@ def main():
             joint_code = []
             detached, lock, info, _ = compile_window_candidate(dataflow, linked=True, strategy=GLV_SCALED,
                                                                joint_code=joint_code, batch=batch)
+            variants[label] = detached, lock
+            scaled_joint_codes[label] = joint_code[0]
+            rewrites[label] = info["runtime_rewrites"]
+        comparisons = ("fused", "paired", "tuned") if args.forth_tuning else ("fused", "paired")
+        for comparison in comparisons:
+            label = f"{batch_label}/{comparison}"
+            joint_code = []
+            detached, lock, info, _ = compile_window_candidate(dataflow, linked=True, strategy=GLV_SCALED,
+                                                               joint_code=joint_code, batch=True,
+                                                               comparison=comparison)
             variants[label] = detached, lock
             scaled_joint_codes[label] = joint_code[0]
             rewrites[label] = info["runtime_rewrites"]
@@ -138,6 +172,7 @@ def main():
     if variants:
         selected = report["selected_automatic"]
         report["compiler_rewrites"] = rewrites
+        report["output_model_regions"] = compare_output_regions(builds, batch_label)
         if selected in scaled_joint_codes:
             report["scaled_vs_manual_regions"] = compare_scaled_regions(
                 builds["manual-v0.17.0"], builds[selected], scaled_joint_codes[selected],

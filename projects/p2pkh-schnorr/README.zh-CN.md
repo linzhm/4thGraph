@@ -71,7 +71,7 @@ bash tools/verify_node.sh -- bash sdk/verify_wallet.sh p2pkh-schnorr
 
 验收在 libsecp256k1 和两套脚本引擎上核对全部 19 条 BIP340 官方验签向量，并用公开测试数据复算 8 条签名向量。付款用例覆盖 BIP143 与 Chronicle OTDA 有同索引输出时的全部 12 种签名模式，使用交易版本 1 和 2。测试覆盖过时的锁定时间、ALL/NONE/SINGLE 的输出承诺、错误坐标、所有者校验、手续费平衡和 Chronicle 激活。验签器测试覆盖两张查表及无穷远点。曲线测试用独立参考实现核对缩放点运算及 GLV 舍入，并在双引擎上复放正确和错误的结果。[付款测试](reference/test_schnorr.py) · [曲线测试](../../tests/test_secp256k1_library.py)
 
-高阶 Forth 实验对比普通二进制验签器、自动编译的 64 窗口 GLV 验签器和 v0.17.0 手工版本。[构建与复放](docs/high-level-forth.zh-CN.md) · [64 窗口结果](docs/high-level-forth.zh-CN.md#64-window-lowering) · [联合点乘候选](docs/high-level-forth.zh-CN.md#joint-lowering-candidates) · [数据流优化迭代](docs/high-level-forth.zh-CN.md#dataflow-iteration)
+高阶 Forth 实验对比普通二进制验签器、自动编译的 64 窗口 GLV 验签器和 v0.17.0 手工版本。[构建与复放](docs/high-level-forth.zh-CN.md) · [64 窗口结果](docs/high-level-forth.zh-CN.md#64-window-lowering) · [联合点乘候选](docs/high-level-forth.zh-CN.md#joint-lowering-candidates) · [数据流优化迭代](docs/high-level-forth.zh-CN.md#dataflow-iteration) · [栈和坐标模型边界](docs/high-level-forth.zh-CN.md#stack-and-model-boundaries) · [点比较的坐标模型](docs/high-level-forth.zh-CN.md#point-comparison-models)
 
 ## 脚本尺寸
 

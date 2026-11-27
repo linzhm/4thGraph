@@ -72,11 +72,14 @@ REQUIRE BSV
     curve-residual 0 cell>int int= verify
 ;
 
-: check-nonce ( script-int script-int script-int script-int script-int script-int -- )
-    nonce-residuals
+: require-nonce-residues ( script-int script-int script-int -- )
     0 cell>int int= verify
     0 cell>int int= verify
     0 cell>int int= IF 0 ELSE 1 THEN verify
+;
+
+: check-nonce ( script-int script-int script-int script-int script-int script-int -- )
+    nonce-residuals require-nonce-residues
 ;
 
 lock: reference-bip340 ( message:bytes public-x:bytes public-y:bytes signature:bytes nonce-y:bytes )

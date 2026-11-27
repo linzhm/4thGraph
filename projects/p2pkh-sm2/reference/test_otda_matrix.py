@@ -7,7 +7,7 @@ import os
 import unittest
 from unittest.mock import Mock, patch
 
-from assemble import SIGNED_WINDOW_TEMPLATE_VERSION, TEMPLATE_PROFILES, TEMPLATE_VERSIONS
+from assemble import CARRIED_FIELD_TEMPLATE_VERSION, SIGNED_WINDOW_TEMPLATE_VERSION, TEMPLATE_PROFILES, TEMPLATE_VERSIONS
 from fourthgraph.benchmark.cases import allocations, native_coin, seed
 from fourthgraph.benchmark.validation import ACTIVATION_HEIGHT, SPEND_HEIGHT, UTXO_HEIGHT
 from fourthgraph.benchmark.validation import Node, chain_metadata, chain_verdict
@@ -36,9 +36,10 @@ class Case:
     chronicle_active: bool = True
     compress_otda: bool | None = None
     same_parent: bool = False
+    common_sequence: bool = False
 
 
-def construction_cases():
+def construction_cases(template_version):
     shapes = ((1, 1), (1, 2), (2, 1), (2, 2), (3, 2), (2, 3), (4, 4), (6, 2), (1, 8))
     for inputs, outputs in shapes:
         for mode, flag in (("all", 0x61), ("acp-all", 0xe1)):
@@ -62,6 +63,12 @@ def construction_cases():
         Case("pre-chronicle-bip143", (0x41, 0xc1), 2, (), version=1, chronicle_active=False),
         Case("compactsize-output-count", (0x61,), 253, (0,), native_outputs=tuple(range(1, 253))),
     )
+    if template_version >= CARRIED_FIELD_TEMPLATE_VERSION:
+        for inputs in (12, 24):
+            yield Case(f"all-{inputs}x1", (0x61,) * inputs, 1, tuple(range(inputs)))
+        yield Case("otda-all-common-input-tails", (0x41,) + (0x61,) * 7, 2, tuple(range(1, 8)),
+                   native_inputs=(0,), common_sequence=True)
+        yield Case("otda-single-common-input-tails", (0x63,) * 8, 8, tuple(range(8)))
 
 
 def fixture(case, template_version):
@@ -80,7 +87,7 @@ def fixture(case, template_version):
         parents = tuple(Transaction((Input(seed(f"{case.name}/{index}"), 0),), (output,))
                         for index, output in enumerate(funding))
         vouts = (0,) * len(locks)
-    inputs = tuple(Input(parent.txid_wire(), vout, sequence=10 + index)
+    inputs = tuple(Input(parent.txid_wire(), vout, sequence=0xffffffff if case.common_sequence else 10 + index)
                    for index, (parent, vout) in enumerate(zip(parents, vouts, strict=True)))
     outputs = []
     amounts = allocations(len(inputs) * INPUT_VALUE - FEE, case.output_count)
@@ -133,7 +140,7 @@ class LatestTemplateMatrixTests(unittest.TestCase):
         self.results = []
         with patch('p2pkh_sm2._combine_otda_programs', create=True,
                    side_effect=AssertionError('unexpected mixed SM2 constructor')):
-            for case in construction_cases():
+            for case in construction_cases(self.template_version):
                 with self.subTest(case=case.name):
                     tx, parents, keys, scalars, native = fixture(case, self.template_version)
                     compact, literal = self.sign_variants(case, tx, parents, keys, scalars, native)
@@ -150,6 +157,10 @@ class LatestTemplateMatrixTests(unittest.TestCase):
                         self.assertEqual(self.node.verdicts(signed, parents, spend_height=spend_height,
                                                             utxo_heights=(utxo_height,) * len(parents)),
                                          [True] * len(parents))
+                        if case.common_sequence:
+                            mixed_heights = (utxo_height, 1) + (utxo_height,) * (len(parents) - 2)
+                            self.assertEqual(self.node.verdicts(signed, parents, utxo_heights=mixed_heights),
+                                             [True] * len(parents))
                     self.results.append({
                         'case': case.name,
                         'shape': [len(tx.inputs), len(tx.outputs)],

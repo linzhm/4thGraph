@@ -73,6 +73,8 @@ isolate the effect of the activation flags.
 
 ## Reproduce the point kernels
 
+Run the byte-for-byte point-kernel comparisons in the pinned SM2 source snapshot with compiler revision `64624db`. The later stack scheduler can emit different code for the same formulas. The acceptance suite checks both the current compiler output and the frozen kernels against the signed-coordinate vectors, and checks the complete locks against their layout fingerprints. [Pinned source snapshot](https://github.com/linzhm/4thGraph/tree/1462b96d8ba2bf9edf365857d8785f342a91b227)
+
 Template `5` compiles the homogeneous point formulas with the optimizing Forth compiler. The compiled kernels preserve the signed residues and infinity handling of templates `3` and `4`. Rebuild the frozen kernels from the repository root.
 
 ```sh
@@ -96,11 +98,47 @@ cmp /tmp/sm2-affine-kernel.json projects/p2pkh-sm2/versions/v1.10.0/affine-kerne
 
 [Point formulas](point-formulas.fth) · [Kernel compiler](point_kernels.py)
 
+<a name="window-tuning"></a>
+
+## Reproduce the template 10 compiler tuning
+
+Template `10` carries `3b` and the field prime below the scalar accumulator. The lock inserts its own constants before the window and before the projective add used to build the public-key table. Each arithmetic kernel returns signed residues, so its coordinate bounds hold at the next call. Fixed generator pairs supply the affine right operand. The five-doubling group checks infinity before entering the finite formula.
+
+The fixed comparison uses 4thGraph `0.2.7` at `64624db`, with explicit terminal passes and bounded ordered rules. It accepts a candidate after exact comparison against the template `9` kernels on 16 cases covering infinity, equal and inverse points, negative projective scale, and signed residue endpoints. The selected `rewrite`, `share`, `stack`, `search` plan minimizes emitted window kernel bytes. Adding `common-values` ties, and the other tested rule orders are larger. Run the comparison commands in the pinned source snapshot to reproduce the recorded kernel and stack schedule digests. [Pinned source snapshot](https://github.com/linzhm/4thGraph/tree/1462b96d8ba2bf9edf365857d8785f342a91b227)
+
+```sh
+export PYTHONPATH=src:.
+python -m fourthgraph.workflow.protocol --version
+python projects/p2pkh-sm2/reference/tune_window.py /tmp/sm2-window-tuning.json
+cmp /tmp/sm2-window-tuning.json projects/p2pkh-sm2/versions/v1.11.0/window-tuning.json
+python projects/p2pkh-sm2/reference/point_kernels.py --carried /tmp/sm2-window-kernels.json
+cmp /tmp/sm2-window-kernels.json projects/p2pkh-sm2/versions/v1.11.0/window-kernels.json
+```
+
+[Window formulas](point-window.fth) · [4thGraph skill](../../../skills/4thgraph/SKILL.md) · [Complete-transaction measurements](../versions/v1.11.0/measurements.json)
+
+<a name="byte-tuning"></a>
+
+## Reproduce the fixed-width byte bindings
+
+The lock packs the two signature scalars, two public-key coordinates, SM2 message digest, and transaction hash. The compiler links a 149-byte packed reversal with an exact 192-byte width guard. The six individually reversed fields take 779 bytes in the compiler fixture. The packed path preserves the order of the six fields and converts each into an unsigned Script number. The PUSHTX DER encoder uses the same reversal by replicating its one 32-byte value and taking the first result. Sharing the kernel lowers the size of the OTDA constructor. The special SINGLE path builds its 32-byte zero field from an exact repeated seed.
+
+```sh
+PYTHONPATH=src:. python projects/p2pkh-sm2/reference/byte_fields.py /tmp/sm2-byte-kernels.json \
+  --report /tmp/sm2-byte-tuning.json
+cmp /tmp/sm2-byte-kernels.json projects/p2pkh-sm2/versions/v1.11.0/byte-kernels.json
+cmp /tmp/sm2-byte-tuning.json projects/p2pkh-sm2/versions/v1.11.0/byte-tuning.json
+```
+
+[Forth caller](byte-fields.fth) · [Compiler binding evidence](../versions/v1.11.0/byte-tuning.json) · [Byte layout library](../../../docs/optimization-paths.md#fixed-width-fields-and-repeating-constants)
+
 <a name="otda-constructor"></a>
 
 ## Reproduce the OTDA constructor
 
-The wallet loads the frozen program and checks its byte length and SHA-256 against the layout manifest. The offline generator starts with point arithmetic blocks and discovers reusable spans in the template. Templates `1` through `5` also seed named SM3 ranges. For templates `2` through `9` it evaluates which copied fragments are worth caching, tries a dictionary ordered by reuse frequency and selects the smallest serialized encoding. Rebuild the programs from the repository root and compare them with the checked-in files.
+The wallet loads the frozen program and checks its byte length and SHA-256 against the layout manifest. The offline generator starts with point arithmetic blocks and discovers reusable spans in the template. Templates `1` through `5` also seed named SM3 ranges. For templates `2` through `10` it evaluates which copied fragments are worth caching and tries a dictionary ordered by reuse frequency. Template `10` also compiles cache initialization from slices of earlier entries using the standard library's `script-pick-depth`. A bounded follow-up tries dropping one entry or adding short lists of candidates from literal runs and earlier copies. The search compares ordinary doubling, main-stack repetition, and doubling followed by trimming when the temporary fits inside the suffix size. Each final plan must reconstruct the same canonical lock before ranking by serialized bytes.
+
+Direct Chronicle slicing reduced the constructor to 7,340 bytes in an earlier probe. BSV Node rejected the input whose prevout the test marked as created before Chronicle activation. The selected 7,417-byte plan uses `OP_SPLIT` and passes the mixed-age replay as well as the current-template transaction matrix. Rebuild the programs from the repository root and compare them with the checked-in files.
 
 ```sh
 python projects/p2pkh-sm2/reference/generate_otda_constructor.py /tmp/sm2-otda.hex
@@ -121,9 +159,15 @@ python projects/p2pkh-sm2/reference/generate_otda_constructor.py --version 8 /tm
 cmp /tmp/sm2-otda-v8.hex projects/p2pkh-sm2/versions/v1.9.0/otda-constructor.hex
 python projects/p2pkh-sm2/reference/generate_otda_constructor.py --version 9 /tmp/sm2-otda-v9.hex
 cmp /tmp/sm2-otda-v9.hex projects/p2pkh-sm2/versions/v1.10.0/otda-constructor.hex
+python projects/p2pkh-sm2/reference/generate_otda_constructor.py --version 10 /tmp/sm2-otda-v10.hex \
+  --report /tmp/sm2-constructor-tuning.json
+cmp /tmp/sm2-otda-v10.hex projects/p2pkh-sm2/versions/v1.11.0/otda-constructor.hex
+cmp /tmp/sm2-constructor-tuning.json projects/p2pkh-sm2/versions/v1.11.0/constructor-tuning.json
 ```
 
 The constructor tests compare exact preimage, public key, and signature stack values, then verify complete spends against BSV Node and chain-gang. [Layout and fingerprint](../versions/v1.1.0/layout.json) · [Wallet integration](../docs/sdk.en.md)
+
+For a reconstructed template `10` payment with four or more committed inputs, the compiler also compares literal input bytes with a prefix program that caches one repeated byte string after each input's 32-byte transaction ID. It uses the same committed inputs as the OTDA serializer. The retained plan has to be smaller after counting its pushes, copies, and cleanup. The latest matrix exercises repeated tails with a native P2PKH input, different input sequences, and paired SINGLE. [Prefix compiler](../../../src/fourthgraph/compiler/preimage.py) · [Size comparison](../versions/v1.11.0/measurements.json)
 
 <a name="mixed-otda-constructor"></a>
 
@@ -146,11 +190,19 @@ Run the matrix from the repository root with the pinned SM2 Python environment. 
 
 ```sh
 bash tools/verify_node.sh -- python projects/p2pkh-sm2/reference/test_otda_matrix.py \
-  --template 9 --report /tmp/sm2-latest-template-coverage.json
-cmp /tmp/sm2-latest-template-coverage.json projects/p2pkh-sm2/versions/v1.10.0/latest-template-coverage.json
+  --template 10 --report /tmp/sm2-latest-template-coverage.json
+cmp /tmp/sm2-latest-template-coverage.json projects/p2pkh-sm2/versions/v1.11.0/latest-template-coverage.json
 ```
 
-Run the same command with `--template 8` or `--template 7` to reproduce the earlier reports. Each run uses one SM2 template for all SM2 prevouts and all recognized SM2 destinations. [Template 9 coverage](../versions/v1.10.0/latest-template-coverage.json) · [Template 8 coverage](../versions/v1.9.0/latest-template-coverage.json) · [Template 7 coverage](../versions/v1.8.0/latest-template-coverage.json)
+Run the same command with `--template 9`, `--template 8`, or `--template 7` to reproduce the earlier reports. Each run uses one SM2 template for all SM2 prevouts and all recognized SM2 destinations. The 38-case template `10` matrix includes OTDA ALL with 12 or 24 inputs and covers repeated input tails in ALL and SINGLE. [Template 9 coverage](../versions/v1.10.0/latest-template-coverage.json) · [Template 8 coverage](../versions/v1.9.0/latest-template-coverage.json) · [Template 7 coverage](../versions/v1.8.0/latest-template-coverage.json)
+
+The size comparison also replays 40-input OTDA ALL. Each template pays outputs of its own version. The compiler revision identifies the compiler used for both builds.
+
+```sh
+bash tools/verify_node.sh -- python projects/p2pkh-sm2/reference/measure_template_sizes.py \
+  --compiler-commit a003c4f2e20b3ad53a46c378568531dd4b6c5856 --report /tmp/sm2-template-sizes.json
+cmp /tmp/sm2-template-sizes.json projects/p2pkh-sm2/versions/v1.11.0/measurements.json
+```
 
 <a name="p2pkh-sponsorship"></a>
 
@@ -160,9 +212,9 @@ Run each policy profile on a fresh isolated regtest node. Both reports record me
 
 ```sh
 bash tools/verify_node.sh --profile default -- python projects/p2pkh-sm2/reference/verify_fee_sponsorship.py \
-  --template 9 --report /tmp/sm2-p2pkh-default.json
+  --template 10 --report /tmp/sm2-p2pkh-default.json
 bash tools/verify_node.sh --profile raised -- python projects/p2pkh-sm2/reference/verify_fee_sponsorship.py \
-  --template 9 --report /tmp/sm2-p2pkh-raised.json
+  --template 10 --report /tmp/sm2-p2pkh-raised.json
 ```
 
 Funding transaction IDs and signatures depend on the generated regtest blocks. Compare the outcomes and sizes.

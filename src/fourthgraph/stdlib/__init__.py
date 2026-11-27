@@ -84,6 +84,37 @@ def p256_export(name, inputs):
                   "Invalid numeric operations, including division by zero, abort evaluation.")
 
 
+def weierstrass_export(*, affine, root):
+    name = "weierstrass-scale" + ("-affine" if affine else "") + ("-root" if root else "")
+    descriptions = [("p", "Positive field prime"), ("X", "X coordinate"), ("Y", "Y coordinate")]
+    if not affine:
+        descriptions.append(("Z", "Homogeneous Z coordinate"))
+    outputs = ("script-int",) * len(descriptions)
+    if root:
+        descriptions.append(("u", "Nonzero scale in the field"))
+    else:
+        descriptions.extend((("u2", "Square of the scale"), ("u3", "Cube of the scale")))
+    inputs = tuple(Parameter(label, "script-int", text) for label, text in descriptions)
+    requirements = ("Supply reduced coordinates, a positive modulus and a nonzero scale. Full powers are used."
+                    if root else "Supply a positive modulus and consistent scale factors.")
+    return Export(name, ("script-int",) * len(inputs), outputs, ("host", "script"), inputs,
+                  requirements + " A zero modulus or oversized ScriptNum aborts.")
+
+
+def weierstrass_model_exports():
+    factor = Parameter("factors", "field-elements", "Square and cube of the scale into the reference model")
+    root = Parameter("root", "field-element", "Scale into the reference model")
+    shapes = (
+        ("weierstrass-scaled-residuals", "Affine reference, field, and homogeneous X, Y, Z",
+         "Returns Z and two signed residues for modular zero tests."),
+        ("weierstrass-scale-pair", "Field followed by two affine points",
+         "Returns the field and both points in the same new model."),
+    )
+    return tuple(script_fragment(name + suffix, (Parameter("points", "coordinates", shape), parameter),
+                                 failure="Supply a positive field and bounded coordinates. " + result)
+                 for name, shape, result in shapes for suffix, parameter in (("", factor), ("-root", root)))
+
+
 def wallet_library(module, entries, *, accumulator="bytes", parameters=()):
     exports = tuple(Export(entry, (accumulator,), (accumulator,), (WALLET_BACKEND,),
                            (Parameter("prefix", accumulator, "Serialized Script to extend"),),
@@ -160,16 +191,10 @@ LIBRARIES = {
         p256_export("p256-add", ("p", "b3", "x1", "y1", "z1", "x2", "y2", "z2")),
         p256_export("p256-double", ("p", "b3", "x", "y", "z")),
     )),
-    "std/weierstrass": Library(ROOT / "stdlib/weierstrass.fth", (
-        Export("weierstrass-scale", ("script-int",) * 6, ("script-int",) * 4, ("host", "script"), (
-            Parameter("p", "script-int", "Positive field prime"),
-            Parameter("X", "script-int", "Homogeneous X coordinate"),
-            Parameter("Y", "script-int", "Homogeneous Y coordinate"),
-            Parameter("Z", "script-int", "Homogeneous Z coordinate"),
-            Parameter("u2", "script-int", "The square of the nonzero scale"),
-            Parameter("u3", "script-int", "The cube of the nonzero scale"),
-        ), "The caller provides a positive modulus and consistent scale factors. A zero modulus aborts."),
+    "std/weierstrass": Library(ROOT / "stdlib/weierstrass.fth", tuple(
+        weierstrass_export(affine=affine, root=root) for affine in (False, True) for root in (False, True)
     )),
+    "std/weierstrass-model": Library(ROOT / "stdlib/weierstrass-model.fth", weierstrass_model_exports(), WALLET_BACKEND),
     "std/hash-chain": Library(ROOT / "stdlib/hash-chain.fth", tuple(
         script_fragment(name, (Parameter("data", "bytes", "Initial byte string"),), takes=("script", "cell"),
                         build_parameters=(Parameter("count", "cell", count),),

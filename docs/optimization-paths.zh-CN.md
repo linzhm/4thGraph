@@ -165,3 +165,15 @@ P-256 使用同一套坐标模型接口及原 `a=-3` 内核。它的六次幂判
 返回边界有一段连续的活值位于栈顶时，调度器比较逐项移除死值和暂存活值后成对丢弃的两种写法，再按原顺序恢复活值和调用方的备用栈。标准 Forth 前端也支持 `layout:`，可用名称和类型声明栈重排。
 
 共享 Script 库可解码单个 32 字节大端字段，也可解码编译期定数量的连续字段。它与窗口索引打包共享掩码和位组交换词。批量解码保留字段顺序和无符号语义。[共享实现](../src/fourthgraph/stdlib/script-fragments.fth) · [Schnorr 对照](../projects/p2pkh-schnorr/docs/high-level-forth.zh-CN.md#dataflow-iteration)
+
+数据流调度器也会比较连续操作数成组搬运和逐项搬运。移动时保留已就位操作数的顺序，并检查被移动值的剩余用途。返回值已按顺序排好时，可直接移除夹在其中的死值。比较结果只供 `verify` 消费时，可使用脚本引擎提供的融合指令。[边界复放](../projects/p2pkh-schnorr/docs/high-level-forth.zh-CN.md#stack-and-model-boundaries)
+
+`weierstrass-scale-affine` 将 `p X Y u2 u3` 映射成 `p X' Y'`。仿射及齐次坐标各有 `-root` 形式，接收一个非零域元素并计算完整的平方和立方。编译器对登记曲线的已约减坐标比较两种写法。256 位内核把 `-root` 路径的最大中间值限制在 129 个 ScriptNum 字节。批量解码用 `bsv-tile-top` 将运行时的掩码通过倍增和拼接重复。[缩放词](../src/fourthgraph/stdlib/weierstrass.fth) · [解码库](../src/fourthgraph/stdlib/script-fragments.fth)
+
+`dataflow` 会识别将同一个值连续拼接的 `bytes-cat` 序列。它要求输入字节宽度已知，而且每个中间结果都只在这一段中使用。编译器比较替换前后整个 Script 的字节数，把搬栈成本一并计算。六份拼接用例从 `stack` 的 21 B 降到 16 B。直接构造 Script 片段时也可调用 `bsv-tile-top`。[回归用例](../tests/test_dataflow.py)
+
+链接调用若声明某个输出与输入是同一个值，调度器可把原值移入调用，即使返回后仍要使用它。模缩放 lowering 根据已登记的根、模数、坐标范围和 ScriptNum 预算比较预计算因子与运行时求幂。证据不足或中间值超出预算时，使用预计算因子的实现。Schnorr 建表会比较保留模数和复制模数两种调度，选较短的脚本。[模缩放 lowering](../src/fourthgraph/compiler/modular_scale.py)
+
+### 跨模型的点比较
+
+共享 Weierstrass 公式提供两种比较缩放齐次点与仿射参考点的办法。其一是把逆缩放直接并入模等式，省去坐标恢复时的中间约减。这样可能改变有符号余数的正负，是否为零保持等价。其二是用同一份正向缩放因子映射两个仿射点，再在缩放模型中比较。公式编译器绑定已知因子、验证中间值的 ScriptNum 上界，并比较生成字节数。两条路径都检查 `Z` 非零。[共享公式](../src/fourthgraph/stdlib/weierstrass-model.fth) · [Schnorr 对照](../projects/p2pkh-schnorr/docs/high-level-forth.zh-CN.md#point-comparison-models)

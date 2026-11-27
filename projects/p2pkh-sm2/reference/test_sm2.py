@@ -14,11 +14,16 @@ from assemble import PACKED_SM3_TEMPLATE_VERSION, SIGNED_RESIDUE_TEMPLATE_VERSIO
 from assemble import POINT_KERNEL_FILE, TEMPLATE_VERSION, TEMPLATE_VERSIONS
 from assemble import WINDOW_DOUBLING_TEMPLATE_VERSION, WINDOW_KERNEL_FILE
 from assemble import AFFINE_GENERATOR_TEMPLATE_VERSION, AFFINE_KERNEL_FILE
+from assemble import CARRIED_FIELD_TEMPLATE_VERSION, CARRIED_KERNEL_FILE
+from assemble import BYTE_KERNEL_FILE
 from assemble import assemble, forth_compiler, sm3_blocks
+from byte_fields import BYTE_KERNEL_NAMES, compile_byte_kernels
 from point_kernels import AFFINE_KERNEL_NAME, WINDOW_KERNEL_NAME, compile_kernels, load_kernels
+from point_kernels import CARRIED_KERNEL_NAMES, compile_carried_kernels
 from p2pkh_sm2 import *
 from sm2 import *
 from sm3_script import hash_script,compress,IV
+from tune_window import evaluate_kernels, window_vectors
 from fourthgraph.bsv.evaluate import evaluate,ScriptError
 from fourthgraph.bsv.script import asm, decode_num, encode_num, push, number, assemble as assemble_blocks
 from fourthgraph.bsv.transaction import *
@@ -183,15 +188,10 @@ class SM2Tests(unittest.TestCase):
                 with self.subTest(version=version,d=d): self.assertTrue(valid_script(lock,[pre,key,sig],tx))
 
     def test_point_kernels_reproduce_signed_coordinates(self):
-        kernels = compile_kernels()
-        self.assertEqual(kernels, load_kernels(POINT_KERNEL_FILE))
+        candidates = (compile_kernels(), load_kernels(POINT_KERNEL_FILE))
         previous = forth_compiler(bytes(20), PACKED_SM3_TEMPLATE_VERSION)
         old_add = previous.emit("sm2-add-points", b"")
         old_double = previous.emit("sm2-double-point", b"")
-        new_add = kernels["sm2-add-kernel"]
-        new_double = kernels["sm2-double-kernel"]
-        self.assertLess(len(new_add), len(old_add))
-        self.assertLess(len(new_double), len(old_double))
 
         infinity = (0, -7, 0)
         x, y = mul(7)
@@ -204,27 +204,32 @@ class SM2Tests(unittest.TestCase):
             with self.subTest(left=left, right=right):
                 add_stack = [encode_num(value) for value in (*cached, *left, *right)]
                 double_stack = [encode_num(value) for value in (*cached, *left)]
-                self.assertEqual(evaluate(new_add, add_stack), evaluate(old_add, add_stack))
-                self.assertEqual(evaluate(new_double, double_stack), evaluate(old_double, double_stack))
+                for kernels in candidates:
+                    new_add = kernels["sm2-add-kernel"]
+                    new_double = kernels["sm2-double-kernel"]
+                    self.assertLess(len(new_add), len(old_add))
+                    self.assertLess(len(new_double), len(old_double))
+                    self.assertEqual(evaluate(new_add, add_stack), evaluate(old_add, add_stack))
+                    self.assertEqual(evaluate(new_double, double_stack), evaluate(old_double, double_stack))
 
     def test_window_kernel_reproduces_five_doublings(self):
         names = (WINDOW_KERNEL_NAME,)
-        kernels = compile_kernels(names)
-        self.assertEqual(kernels, load_kernels(WINDOW_KERNEL_FILE, names))
-        grouped = kernels[WINDOW_KERNEL_NAME]
+        candidates = (compile_kernels(names), load_kernels(WINDOW_KERNEL_FILE, names))
         previous = 5 * load_kernels(POINT_KERNEL_FILE)["sm2-double-kernel"]
-        self.assertLess(len(grouped), len(previous))
         x, y = mul(19)
         scaled = (-(2*x % P), -(2*y % P), -2)
         prefix = (P, 3*B % P, 17)
         for point in ((0, 1, 0), (0, -7, 0), (x, y, 1), scaled):
             with self.subTest(point=point):
                 stack = [encode_num(value) for value in (*prefix, *point)]
-                self.assertEqual(evaluate(grouped, stack), evaluate(previous, stack))
+                for kernels in candidates:
+                    grouped = kernels[WINDOW_KERNEL_NAME]
+                    self.assertLess(len(grouped), len(previous))
+                    self.assertEqual(evaluate(grouped, stack), evaluate(previous, stack))
 
     def test_signed_windows_match_scalar_multiplication(self):
         for version in (SIGNED_WINDOW_TEMPLATE_VERSION, WINDOW_DOUBLING_TEMPLATE_VERSION,
-                        AFFINE_GENERATOR_TEMPLATE_VERSION):
+                        AFFINE_GENERATOR_TEMPLATE_VERSION, CARRIED_FIELD_TEMPLATE_VERSION):
             with self.subTest(version=version):
                 self.check_signed_windows(version)
 
@@ -252,13 +257,31 @@ class SM2Tests(unittest.TestCase):
                 actual = (x*inverse_z % P, y*inverse_z % P) if z else None
                 self.assertEqual(actual, add(mul(s), mul(t, (qx, qy))))
 
+    def test_carried_window_kernels_reproduce_template_9(self):
+        vectors = list(window_vectors())
+        evaluate_kernels(compile_carried_kernels(), vectors)
+        evaluate_kernels(load_kernels(CARRIED_KERNEL_FILE, CARRIED_KERNEL_NAMES), vectors)
+
+    def test_packed_fields_preserve_unsigned_values_and_stack_order(self):
+        kernels, _ = compile_byte_kernels()
+        self.assertEqual(kernels, load_kernels(BYTE_KERNEL_FILE, BYTE_KERNEL_NAMES))
+        compiler = forth_compiler(bytes(20), CARRIED_FIELD_TEMPLATE_VERSION)
+        unpack = compiler.emit("sm2-unpack-packed-fields", b"")
+        fields = (bytes(192), bytes(range(192)), b"\xff"*192)
+        for data in fields:
+            r, s, x, y, e, digest = (data[index:index+32] for index in range(0, len(data), 32))
+            setup = push(b"flag") + asm("OP_TOALTSTACK") + push(digest) + asm("OP_TOALTSTACK")
+            stack = [b"preimage", b"\x04"+x+y, r+s, e]
+            expected = [encode_num(int.from_bytes(part, "big")) for part in (digest, e, y, x, s, r)]
+            self.assertEqual(evaluate(setup+unpack, stack), ([b"preimage"], [b"flag", *expected]))
+            stack[1] = b"\x02"+x+y
+            with self.assertRaises(ScriptError):
+                evaluate(setup+unpack, stack)
+
     def test_affine_kernel_reproduces_projective_addition(self):
         names = (AFFINE_KERNEL_NAME,)
-        kernels = compile_kernels(names)
-        self.assertEqual(kernels, load_kernels(AFFINE_KERNEL_FILE, names))
+        candidates = (compile_kernels(names), load_kernels(AFFINE_KERNEL_FILE, names))
         general = load_kernels(POINT_KERNEL_FILE)["sm2-add-kernel"]
-        affine = kernels[AFFINE_KERNEL_NAME]
-        self.assertLess(len(affine), len(general))
         x, y = mul(19)
         scaled = (-(2*x % P), -(2*y % P), -2)
         prefix = (P, 3*B % P, 17)
@@ -266,7 +289,10 @@ class SM2Tests(unittest.TestCase):
                             ((x, y, 1), (x, -y)), (scaled, mul(7))):
             with self.subTest(left=left, right=right):
                 stack = [encode_num(value) for value in (*prefix, *left, *right)]
-                self.assertEqual(evaluate(affine, stack), evaluate(general, [*stack, b'\x01']))
+                for kernels in candidates:
+                    affine = kernels[AFFINE_KERNEL_NAME]
+                    self.assertLess(len(affine), len(general))
+                    self.assertEqual(evaluate(affine, stack), evaluate(general, [*stack, b'\x01']))
 
     def test_compact_byte_reversal_matches_legacy(self):
         previous = forth_compiler(bytes(20), WINDOW_DOUBLING_TEMPLATE_VERSION).emit("sm2-reverse32", b"")
@@ -368,7 +394,7 @@ class SM2Tests(unittest.TestCase):
         for version in TEMPLATE_VERSIONS[1:]:
             candidate = assemble(base_owner, version)
             self.assertEqual(subprocess.check_output([*cli, '--version', str(version), '--format', 'raw']), candidate)
-        for version in (0, 10, 11):
+        for version in (0, TEMPLATE_VERSIONS[-1] + 1, TEMPLATE_VERSIONS[-1] + 2):
             with self.subTest(version=version):
                 for construct in (assemble, locking_script_from_owner_hash):
                     with self.assertRaisesRegex(ValueError, 'unsupported P2PKH-SM2 template'):

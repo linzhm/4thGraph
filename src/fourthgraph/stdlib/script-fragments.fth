@@ -41,17 +41,10 @@ REQUIRE BSV
 ;
 : script-uint256be ( script -- script ) script-reverse32 script-le-unsigned ;
 
-: script-tile-mask ( script cell -- script )
-    ( Retain one seed while extending the tile by one field at a time. )
-    dup 1 = if drop else
-        1 - swap op-dup bsv-empty op-over op-cat rot script-append-repeated op-nip
-    then
-;
-
 : script-field-byte-swap ( script cell cell cell -- script cell )
     ( Prefix, field count, group width, mask doublings. Preserve the field count. )
     over 8 * swap rot swap script-block-mask
-    rot dup rot swap script-tile-mask
+    rot dup rot swap bsv-tile-top
     rot swap 2swap swap 2swap script-swap-bit-groups swap
 ;
 
