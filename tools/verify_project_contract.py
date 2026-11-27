@@ -10,8 +10,9 @@ import sys
 
 from fourthgraph.benchmark.validation import (ACTIVATION_HEIGHT, CONTEXT_PIN, NODE_FLAGS, SPEND_HEIGHT, UTXO_HEIGHT,
                                               Node, chain_metadata, chain_verdict)
-from fourthgraph.bsv.script import push
-from fourthgraph.bsv.transaction import Input, Output, Transaction, hash256, preimage_forkid
+from fourthgraph.bsv.script import push, without_codeseparators
+from fourthgraph.bsv.transaction import Input, Output, Transaction, hash256, preimage_forkid, preimage_otda
+from fourthgraph.workflow.forkid_lowering import LinkedContext
 from fourthgraph.workflow.project_contract import ContractError, ProjectContract, wire_tx
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -188,6 +189,8 @@ def verify_bundle(manifest, approval, node=None, *, ephemeral=False, include_io=
     engine = pinned_chain()
     host = ProjectContract(manifest, approval)
     package = host.package
+    if package["fixture"] == "pels-settlement":
+        return verify_settlement(manifest, host, engine, node, include_io=include_io)
     cases, is_r1, path, slot = fixture_spec(manifest, host)
     pub, other, sign = test_keys(ephemeral)
     parent = initial_parent(host.template, slot, pub if is_r1 else b"")
@@ -305,6 +308,10 @@ def replay_receipt(manifest, approval, receipt, node=None, *, public_key=None):
     do not contribute to acceptance. No key generation, signing or assembly is performed.
     """
     host = ProjectContract(manifest, approval)
+    if host.package["fixture"] == "pels-settlement":
+        if public_key is not None:
+            raise ContractError("UnexpectedPublicKey", "settlement has no wallet owner key")
+        return replay_settlement(manifest, host, receipt, node)
     cases, is_r1, path, slot = fixture_spec(manifest, host)
     package = host.package
     bindings = {"schema": RECEIPT_SCHEMA, "manifest_sha256": approval, "profile": package["profile"],
@@ -383,6 +390,125 @@ def replay_receipt(manifest, approval, receipt, node=None, *, public_key=None):
             "local_public_key_checked": public_key is not None,
             "node_version": node.version if node is not None else None, "chain_gang": engine,
             "flags": NODE_FLAGS, "utxo_height": UTXO_HEIGHT, "spend_height": SPEND_HEIGHT, "activation_height": ACTIVATION_HEIGHT}
+
+
+def settlement_inputs(manifest, host):
+    package = host.package
+    raw = (Path(manifest).resolve().parent / package["fixtures"]["file"]).read_bytes()
+    if sha256(raw).hexdigest() != package["fixtures"]["sha256"]:
+        raise ContractError("UnapprovedArtifact", "fixture bytes differ from local approval")
+    config = json.loads(raw)
+    paths = tuple(config["paths"])
+    if paths != ("bip143", "otda") or set(package["paths"]) != set(paths) or config["fixture"] != "pels-settlement":
+        raise ValueError("settlement fixture requires both approved paths")
+    constraints = package["forth_inputs"]["settlement_policy"]["constraints"]
+    parent = Transaction((FIXTURE_FUNDING,), (Output(config["previous_amount"], host.template),), version=2)
+    outputs = tuple(Output(row["satoshis"], bytes.fromhex(row["script_hex"])) for row in constraints["outputs"])
+    candidate = Transaction((Input(parent.txid_wire(), 0),), outputs, version=2, locktime=constraints["locktime"])
+    return paths, parent, candidate
+
+
+def settlement_witness(host, path, parent, candidate):
+    rule = host.package["paths"][path]
+    prev = parent.outputs[0]
+    code = prev.script[rule["script_code_offset"]:]
+    mode = {"bip143": 0x41, "otda": 0x61}[path]
+    if rule["mode"] != mode:
+        raise ContractError("InvalidManifest", "settlement path does not bind its sighash family")
+    if mode == 0x61:
+        code = without_codeseparators(code)
+        preimage = preimage_otda(candidate, 0, code, mode)
+    else:
+        preimage = preimage_forkid(candidate, 0, prev.value, code, mode)
+    return push(LinkedContext(code, mode, len(candidate.outputs)).pack(preimage))
+
+
+def settlement_identity(host):
+    package = host.package
+    return {"manifest_sha256": host.digest, "profile": package["profile"], "template": package["template_version"],
+            **{key + "_sha256": package[name]["sha256"] for key, name in (
+                ("module", "module"), ("template", "script"), ("fixture", "fixtures"))}}
+
+
+def verify_settlement(manifest, host, engine, node, *, include_io=False):
+    from fourthgraph.bsv.chain_gang import validate_at_heights
+
+    paths, parent, candidate = settlement_inputs(manifest, host)
+    prepared = {path: host.prepare(parent, candidate, 0, path) for path in paths}
+    cases = []
+
+    def expect(label, actual, required):
+        if actual != required:
+            raise ValueError(f"{label}: expected {required}, got {actual}")
+        cases.append({"id": label, "actual_status": actual, "expected_status": required, "passed": True})
+
+    expect("recognized", host.recognize(parent, 0)["status"], "Match")
+    other = replace(parent, outputs=(replace(parent.outputs[0], script=b"\x51"),))
+    expect("wrong_template", host.recognize(other, 0)["status"], "NoMatch")
+    try:
+        host.prepare(other, candidate, 0, paths[0])
+    except ContractError as exc:
+        expect("wrong_parent", exc.status, "CandidateMismatch")
+    else:
+        raise ValueError("host accepted a different parent")
+    steps = []
+    for path, other_path in zip(paths, paths[::-1], strict=True):
+        request = host.request(parent, candidate, 0, path)
+        for label, changes, expected in (
+            ("swapped_path", {"prepared": prepared[other_path], "authorizations": []}, "CandidateMismatch"),
+            ("changed_coverage", {"prepared": {**prepared[path], "mode": prepared[other_path]["mode"]},
+                                  "authorizations": []}, "CandidateMismatch"),
+            ("unexpected_authorization", {"prepared": prepared[path], "authorizations": ["01"]}, "InvalidAuthorization"),
+        ):
+            expect(f"{path}.{label}", host.call("assemble_unlock", {**request, **changes})["status"], expected)
+        invalid = replace(candidate, outputs=candidate.outputs[::-1])
+        expect(f"{path}.wrong_outputs", host.call("prepare_spend", host.request(parent, invalid, 0, path))["status"],
+               "InvalidSuccessor")
+        expected = settlement_witness(host, path, parent, candidate)
+        signed = host.spend(parent, candidate, 0, path, b"", None,
+                           lambda tx: all(v is not False for v in check_engines(tx, parent, node).values()))
+        if signed.inputs[0].script != expected:
+            raise ValueError("settlement witness differs from independent assembly")
+        if path == "otda":
+            try:
+                validate_at_heights(signed, (parent,), spend_height=SPEND_HEIGHT,
+                                    activation_height=SPEND_HEIGHT + 1, utxo_heights=(UTXO_HEIGHT,))
+            except (RuntimeError, ValueError):
+                expect("otda.before_activation", "Rejected", "Rejected")
+            else:
+                raise ValueError("chain-gang accepted OTDA before activation")
+        step = {"path": path, **spend_summary(parent, signed), "parent_tx": parent.serialize().hex(),
+                "raw_tx": signed.serialize().hex()}
+        if include_io:
+            step["prepared"] = prepared[path]
+        steps.append(step)
+    return {"schema": RECEIPT_SCHEMA, "status": "passed", **settlement_identity(host),
+            "steps": steps, "cases": cases, "public_key": None, "chain_gang": engine,
+            "verification_level": "dual-engine" if node else "chain-only"}
+
+
+def replay_settlement(manifest, host, receipt, node):
+    expected = {"schema": RECEIPT_SCHEMA, **settlement_identity(host)}
+    require_fields(receipt, expected, "receipt_binding_mismatch")
+    paths, parent, candidate = settlement_inputs(manifest, host)
+    steps = receipt["steps"]
+    if tuple(step["path"] for step in steps) != paths:
+        raise ValueError("receipt must contain each approved path in order")
+    engine = pinned_chain()
+    observed = []
+    for path, step in zip(paths, steps, strict=True):
+        signed = receipt_tx(step, "raw_tx", path)
+        actual_parent = receipt_tx(step, "parent_tx", path)
+        if actual_parent != parent or signed.with_script(0, b"") != candidate:
+            raise ValueError("settlement receipt does not spend the approved fixture parent and candidate")
+        if signed.inputs[0].script != settlement_witness(host, path, parent, candidate):
+            raise ValueError("settlement receipt witness does not bind its path")
+        verdicts = check_engines(signed, parent, node)
+        if any(verdict is False for verdict in verdicts.values()):
+            raise ValueError("independent verification rejected settlement")
+        observed.append({"path": path, **spend_summary(parent, signed), "engines": verdicts})
+    return {**expected, "schema": REPLAY_SCHEMA, "status": "passed", "steps": observed,
+            "chain_gang": engine, "verification_level": "dual-engine" if node else "chain-only"}
 
 
 def main(argv=None):

@@ -1,7 +1,10 @@
 from hashlib import sha256
 import json
+import os
 from pathlib import Path
 import shutil
+import subprocess
+import sys
 from tempfile import TemporaryDirectory
 import unittest
 
@@ -21,6 +24,27 @@ def approved(directory):
 
 
 class ProjectContractTests(unittest.TestCase):
+    @unittest.skipUnless(os.environ.get("GO") and shutil.which("node"), "requires GO and the WASI runtime")
+    def test_settlement_bundle_replays_both_paths(self):
+        with TemporaryDirectory() as scratch:
+            output = Path(scratch) / "settlement"
+            subprocess.run([sys.executable, "tools/build_project_contract.py", "workflow-examples",
+                            str(output), "--verify"], cwd=ROOT, check=True, capture_output=True)
+            host = approved(output)
+            saved = json.loads((output/"receipt.json").read_text())
+            self.assertEqual([step["path"] for step in saved["steps"]], ["bip143", "otda"])
+            self.assertEqual([step["unlock_bytes"] for step in saved["steps"]], [57, 49])
+            self.assertIn("otda.before_activation", {case["id"] for case in saved["cases"]})
+            receipt = output / "replay.json"
+            cmd = [sys.executable, "tools/verify_project_contract.py", str(output/"manifest.json"),
+                   "--approved-sha256", host.digest, "--output", str(receipt), "--replay"]
+            subprocess.run(cmd + [str(output/"receipt.json")], cwd=ROOT, check=True, capture_output=True)
+            self.assertTrue(all(step["engines"]["chain_gang"] for step in json.loads(receipt.read_text())["steps"]))
+            saved["steps"][0]["raw_tx"] = saved["steps"][1]["raw_tx"]
+            bad = output / "wrong-path.json"
+            bad.write_text(json.dumps(saved))
+            self.assertEqual(subprocess.run(cmd + [str(bad)], cwd=ROOT, capture_output=True).returncode, 1)
+
     def test_push_payload_is_not_a_signature_anchor(self):
         self.assertEqual(describe_script(bytes.fromhex("02abacabac"))["anchors"],
                          [{"offset":3,"op":"OP_CODESEPARATOR","bytes":1},{"offset":4,"op":"OP_CHECKSIG","bytes":1}])
