@@ -412,10 +412,10 @@
       "release_id": "v0.14.0-projective-cofactor",
       "era": "genesis",
       "chronicle_activation_height": 1000,
-      "lock_bytes": 235788,
-      "path_bytes": 237059,
-      "script_sha256": "43b4348f8fcdf57bf4571fa3c27b4e79a9f61c41c96904557224ec3c46674703",
-      "artifact_sha256": "1d59ce0cf80b09737883733702498373eb874e95aeb394dee0e17d8e562b8d70",
+      "lock_bytes": 227775,
+      "path_bytes": 229046,
+      "script_sha256": "4224154048518c22c7dac1a1baae9b2abb5d43322c69e7d3364275a3a5023812",
+      "artifact_sha256": "b8a013456ee95c901081436a5fb9562d30afbb65f47797cc21a3806166ca22c8",
       "arithmetic_plan": {
         "fp2_rules": [
           "expand-cross-products"
@@ -426,6 +426,7 @@
         "msm_table": "deferred-doubling-slopes",
         "miller_reductions": "split-chord-residue",
         "miller_kernel": "direct-projective",
+        "g1_reductions": "paired-doubles",
         "compact_booleans": true
       },
       "witness_bytes": 1263,
@@ -444,15 +445,15 @@
             "1",
             "2"
           ],
-          "deployment_txid": "a0f3dc49505da37b745e8016aec71f8fcc24b6b0cbd0ca08454f8a96d8bfb7c1",
-          "spend_txid": "d42f04ee15d0861d75f13de2f5d6b219f08f27ede003e1924207fc75d223543d",
+          "deployment_txid": "e891788eff9ea3cbfc6130a3bc196488682b3c5f58356d5bd5fa79ce2c78e079",
+          "spend_txid": "c557de98ed033aa8539610a008f30e9a707b2d8932cec11abd78ef28e66127f3",
           "deployment_height": 103,
           "spend_height": 104,
-          "deployment_bytes": 235924,
+          "deployment_bytes": 227912,
           "spend_bytes": 1360,
-          "total_bytes": 237284,
+          "total_bytes": 229272,
           "witness_sha256": "bd7b6cae497b26338be70c6983c759b8c7a799517478d0d41530fe6d6800ede0",
-          "combined_stack_payload_bytes": 35690,
+          "combined_stack_payload_bytes": 35924,
           "node": true,
           "chain_gang": true,
           "mined": true,
@@ -473,15 +474,15 @@
             "1",
             "2"
           ],
-          "deployment_txid": "2aa24a3109022774ef57d88a5a390335d163a886e2f4a8f3b3a70233c51f5b40",
-          "spend_txid": "3b545c915e5233a7a0c024648bfa0dd4adc30b71d4227596022f05278f9b3581",
+          "deployment_txid": "0559d31dd8be5c026b2cd89968d01a1312057116a2a41eb11d0d5a449797fc0e",
+          "spend_txid": "b1a1dd951c783db9f59af9bf93f0c107aa89a4e491913f40368c30f0ee3ac96b",
           "deployment_height": 207,
           "spend_height": 208,
-          "deployment_bytes": 235924,
+          "deployment_bytes": 227912,
           "spend_bytes": 1360,
-          "total_bytes": 237284,
+          "total_bytes": 229272,
           "witness_sha256": "b3be1eea927d77284b0720bb5ef2171dd3d365a6296c73c0530ac7fe4f742668",
-          "combined_stack_payload_bytes": 35670,
+          "combined_stack_payload_bytes": 35906,
           "node": true,
           "chain_gang": true,
           "mined": true,
@@ -499,10 +500,10 @@
       "release_id": "v0.14.0-projective-cofactor",
       "era": "chronicle",
       "chronicle_activation_height": 2,
-      "lock_bytes": 235009,
-      "path_bytes": 236280,
-      "script_sha256": "f9b3fcf0722991f14f2028c79ecbf9d0ff4a8a1e4ab945c7672e22cf9d856787",
-      "artifact_sha256": "46c90449f3361709c3934764f7bb9500737c5dd05ab15020a1fe15e404f56f66",
+      "lock_bytes": 226996,
+      "path_bytes": 228267,
+      "script_sha256": "6ddb795230dcd8e8f6ab1af4a076b91c4a51510b0d6bc853c662816f8cf0fabc",
+      "artifact_sha256": "17498e50d65e9c5440d9661dc94bb1b9e5dc46470dffd7016c45796c5599e1d0",
       "arithmetic_plan": {
         "fp2_rules": [
           "expand-cross-products"
@@ -513,6 +514,7 @@
         "msm_table": "deferred-doubling-slopes",
         "miller_reductions": "split-chord-residue",
         "miller_kernel": "direct-projective",
+        "g1_reductions": "paired-doubles",
         "compact_booleans": true
       },
       "witness_bytes": 1263,
@@ -531,15 +533,15 @@
             "1",
             "2"
           ],
-          "deployment_txid": "459c49f2d80ceab5c24a403c66b78d937c92aae5e87b85e5b40bda8b45c9e9b0",
-          "spend_txid": "41ac2d1756eee602c393b831866563e955efde09e79aaea8601c26a674d8b6b7",
+          "deployment_txid": "d6d797a0132936a58ea6abf0ba34d4c65d805c863843e0689ba84d380c35def2",
+          "spend_txid": "eb4a5f89a53ddfce6cf20d4c7fe3813fbdd3f6bf88e426cd47e90ba0f12c2fe0",
           "deployment_height": 103,
           "spend_height": 104,
-          "deployment_bytes": 235145,
+          "deployment_bytes": 227133,
           "spend_bytes": 1360,
-          "total_bytes": 236505,
+          "total_bytes": 228493,
           "witness_sha256": "bd7b6cae497b26338be70c6983c759b8c7a799517478d0d41530fe6d6800ede0",
-          "combined_stack_payload_bytes": 35690,
+          "combined_stack_payload_bytes": 35924,
           "node": true,
           "chain_gang": true,
           "mined": true,
@@ -560,15 +562,15 @@
             "1",
             "2"
           ],
-          "deployment_txid": "33f907ad9402b3b996d43efcd8b4c130e35fd95649f1dcd26b313a5b0fe54f15",
-          "spend_txid": "a2bf73542a65c2ed60885cd20f2973d8133784c6de92a0fb54a5c98c245c1450",
+          "deployment_txid": "6e22a42bf9128bf678b78c38eb2d0b740f256a8585e6a3e8f86579f557e2cecf",
+          "spend_txid": "a53a5c02d3e9c2b256da53c557bb3de2e10aec4c42cc98781e7301a2e8a3a4f7",
           "deployment_height": 207,
           "spend_height": 208,
-          "deployment_bytes": 235145,
+          "deployment_bytes": 227132,
           "spend_bytes": 1360,
-          "total_bytes": 236505,
+          "total_bytes": 228492,
           "witness_sha256": "b3be1eea927d77284b0720bb5ef2171dd3d365a6296c73c0530ac7fe4f742668",
-          "combined_stack_payload_bytes": 35670,
+          "combined_stack_payload_bytes": 35906,
           "node": true,
           "chain_gang": true,
           "mined": true,
@@ -752,5 +754,119 @@
         }
       ]
     }
-  ]
+  ],
+  "projective_cofactor_tuning": {
+    "previous_candidate_revision": "e8c4333a3c400847ce43164536cf6d4272586974",
+    "previous_candidate_eras": {
+      "genesis": {
+        "lock_bytes": 235788,
+        "path_bytes": 237059,
+        "witness_bytes": 1263,
+        "script_sha256": "43b4348f8fcdf57bf4571fa3c27b4e79a9f61c41c96904557224ec3c46674703",
+        "combined_stack_payload_bytes": 35690
+      },
+      "chronicle": {
+        "lock_bytes": 235009,
+        "path_bytes": 236280,
+        "witness_bytes": 1263,
+        "script_sha256": "f9b3fcf0722991f14f2028c79ecbf9d0ff4a8a1e4ab945c7672e22cf9d856787",
+        "combined_stack_payload_bytes": 35690
+      }
+    },
+    "trial_era": "genesis",
+    "trial_validation": "both fixtures checked by chain-gang; peak from the development evaluator",
+    "selection": "Normalize the imaginary intercept limb, share G1 doubling factors and pair G1 doublings. The smaller paired-zero schedule increases peak stack payload by over 17 KB.",
+    "trials": [
+      {
+        "variant": "previous candidate",
+        "lock_bytes": 235788,
+        "witness_bytes": 1263,
+        "combined_stack_payload_bytes": 35690
+      },
+      {
+        "variant": "unit Fp2 intercept",
+        "lock_bytes": 230160,
+        "witness_bytes": 1263,
+        "combined_stack_payload_bytes": 37550
+      },
+      {
+        "variant": "unit real intercept limb",
+        "lock_bytes": 229165,
+        "witness_bytes": 1263,
+        "combined_stack_payload_bytes": 35923
+      },
+      {
+        "variant": "unit Fp2 slope",
+        "lock_bytes": 235586,
+        "witness_bytes": 1263,
+        "combined_stack_payload_bytes": 35211
+      },
+      {
+        "variant": "Jacobian cofactor check with batched Z",
+        "lock_bytes": 235762,
+        "witness_bytes": 1263,
+        "combined_stack_payload_bytes": 35690
+      },
+      {
+        "variant": "unit Fp2 intercept and Jacobian cofactor check",
+        "lock_bytes": 230134,
+        "witness_bytes": 1263,
+        "combined_stack_payload_bytes": 37550
+      },
+      {
+        "variant": "unit real limb and paired G1 doublings",
+        "lock_bytes": 228493,
+        "witness_bytes": 1263,
+        "combined_stack_payload_bytes": 35923
+      },
+      {
+        "variant": "unit real limb and paired G1 doublings with shared factors",
+        "lock_bytes": 228170,
+        "witness_bytes": 1263,
+        "combined_stack_payload_bytes": 35923
+      },
+      {
+        "variant": "unit imaginary limb and paired G1 doublings with shared factors",
+        "lock_bytes": 227775,
+        "witness_bytes": 1263,
+        "combined_stack_payload_bytes": 35924
+      },
+      {
+        "variant": "unit imaginary limb and paired Miller zero rounds",
+        "lock_bytes": 226163,
+        "witness_bytes": 1263,
+        "combined_stack_payload_bytes": 53232
+      },
+      {
+        "variant": "unit imaginary limb and paired MSM windows",
+        "lock_bytes": 227577,
+        "witness_bytes": 1263,
+        "combined_stack_payload_bytes": 35924
+      },
+      {
+        "variant": "unit imaginary limb and triple MSM windows",
+        "lock_bytes": 227516,
+        "witness_bytes": 1263,
+        "combined_stack_payload_bytes": 35924
+      },
+      {
+        "variant": "unit imaginary limb and tangent split after first line",
+        "lock_bytes": 231419,
+        "witness_bytes": 1263,
+        "combined_stack_payload_bytes": 33636
+      },
+      {
+        "variant": "unit imaginary limb and tangent split after second line",
+        "lock_bytes": 231418,
+        "witness_bytes": 1263,
+        "combined_stack_payload_bytes": 33636
+      },
+      {
+        "variant": "unit real limb with per-operation reductions",
+        "lock_bytes": 239701,
+        "witness_bytes": 1263,
+        "combined_stack_payload_bytes": 30753
+      }
+    ]
+  }
 }

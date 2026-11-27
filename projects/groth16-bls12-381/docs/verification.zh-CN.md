@@ -63,8 +63,10 @@ v0.13.0 比较 1、4、8、16 次 G1 倍点的 Z 坐标分批方案，每种分�
 | 版本标签 | Genesis 锁 | Chronicle 锁 | 单次见证 | 栈数据峰值 |
 | --- | ---: | ---: | ---: | ---: |
 | `v0.13.0-affine-inline` | 227,839 B | 227,180 B | 9,378 B | 29,891 B |
-| `v0.14.0-projective-cofactor` | 235,788 B | 235,009 B | 1,263 B | 35,690 B |
+| `v0.14.0-projective-cofactor` | 227,775 B | 226,996 B | 1,263 B | 35,924 B |
 | `v0.14.0-affine-witness` | 206,463 B | 205,803 B | 35,493 B | 61,595 B |
+
+固定线截距归一化和成对 G1 倍点归约让两个时代的 `projective-cofactor` 锁各减少 8,013 B。两份夹具的见证都逐字节复现，实测栈数据峰值从 35,690 B 升到 35,924 B。Genesis 对照中，合并连续两个 Miller 零位还能进一步缩锁，峰值升到 53,232 B。[射影布局优化对照](../versions/v0.14.0/measurements.json)
 
 
 ## nChain 与 sCrypt 对照

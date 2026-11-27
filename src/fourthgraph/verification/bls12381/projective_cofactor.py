@@ -3,7 +3,7 @@
 from itertools import chain
 
 from .affine_witness import msm_windows, signed_msm_points
-from .field import PSI_X, PSI_Y
+from .field import HOST, PSI_X, PSI_Y, Q
 from .verifier import (
     FIELD_BYTES, G1_EFFECTIVE_COFACTOR, G1_PREIMAGE_BYTES, INFINITY, PACKET_BYTES, SEED_BITS,
     Curve, VerifierStages, choose_point, evaluated_line, fold_msm, prepare_key, require_affine,
@@ -26,25 +26,35 @@ def g1_add(curve, point, affine):
     return tuple(map(curve.reduce, (nx, ny, nz)))
 
 
-def g1_double(curve, point):
+def g1_double(curve, point, *, reduce_coordinates):
     # Renes–Costello–Batina Algorithm 9. The output is homogeneous.
     x, y, z = point
     yy, zz = curve.square(y), curve.square(z)
-    lower = curve.sub(yy, curve.scale(zz, 36))
-    upper = curve.add(yy, curve.scale(zz, 12))
+    bz = curve.scale(zz, 12)
+    yy8 = curve.scale(yy, 8)
+    lower = curve.sub(yy, curve.scale(bz, 3))
+    upper = curve.add(yy, bz)
     nx = curve.scale(curve.mul(curve.mul(x, y), lower), 2)
-    ny = curve.add(curve.mul(lower, upper), curve.scale(curve.mul(yy, zz), 96))
-    nz = curve.scale(curve.mul(curve.mul(yy, y), z), 8)
-    return tuple(map(curve.reduce, (nx, ny, nz)))
+    ny = curve.add(curve.mul(lower, upper), curve.mul(yy8, bz))
+    nz = curve.mul(yy8, curve.mul(y, z))
+    doubled = nx, ny, nz
+    return tuple(map(curve.reduce, doubled)) if reduce_coordinates else doubled
 
 
-def require_g1_image(tower, target, preimage):
+def require_g1_image(tower, target, preimage, *, pair_doubles):
     # Multiplication by h_eff maps every curve point into G1 (RFC 9380 §7).
     field, curve = tower.fp, Curve(tower)
     field.all((field.equal(curve.equation(preimage), 0),))
     current = (*preimage, 1)
-    for bit in bin(G1_EFFECTIVE_COFACTOR)[3:]:
-        current = g1_double(curve, current)
+    bits = bin(G1_EFFECTIVE_COFACTOR)[3:]
+    unreduced = False
+    for index, bit in enumerate(bits):
+        # A homogeneous double is degree four. A pair starts with reduced
+        # coordinates and stops before every addition and the finite test.
+        boundary = bit == "1" or index == len(bits) - 1
+        normalize = not pair_doubles or unreduced or boundary
+        current = g1_double(curve, current, reduce_coordinates=normalize)
+        unreduced = not normalize
         if bit == "1":
             current = g1_add(curve, current, preimage)
     require_affine(tower, curve, current, target, homogeneous=True)
@@ -79,6 +89,23 @@ def g2_add_line(curve, point, affine):
     return (nx, ny, nz), intercept, theta, lam
 
 
+def evaluated_fixed_line(tower, point, line):
+    intercept, slope = line
+    imaginary = intercept[1]
+    if imaginary == 0:
+        return evaluated_line(tower, point, line)
+    # The residue predicate is in Fp12*/Fp6*. A fixed line can be scaled by
+    # a nonzero Fp scalar. Make the imaginary intercept limb one while the
+    # third coefficient stays real, omitting a field product in each Fp2 use.
+    inverse = pow(imaginary, -1, Q)
+    x, y = point
+    return (
+        HOST.scale2(intercept, inverse),
+        tower.scale2(HOST.scale2(slope, inverse), tower.fp.sub(0, x)),
+        (tower.fp.mul(y, inverse), 0),
+    )
+
+
 class CofactorStages(VerifierStages):
     def __init__(self, key, sources, *, msm, msm_table, miller_reductions, **options):
         super().__init__(key, sources, proof_elements=(PACKET_BYTES + G1_PREIMAGE_BYTES) // FIELD_BYTES, **options)
@@ -88,11 +115,11 @@ class CofactorStages(VerifierStages):
         self.tower.direct_lines = True
 
     def check_g1_a(self, proof):
-        require_g1_image(self.tower, proof[0], proof[4])
+        require_g1_image(self.tower, proof[0], proof[4], pair_doubles=self.pair_g1_doubles)
         return proof
 
     def check_g1_c(self, proof):
-        require_g1_image(self.tower, proof[2], proof[5])
+        require_g1_image(self.tower, proof[2], proof[5], pair_doubles=self.pair_g1_doubles)
         return proof
 
     def check_public_inputs(self, public):
@@ -135,10 +162,10 @@ class CofactorStages(VerifierStages):
                 # The scaled tangent and chord coefficients are at most a
                 # small multiple of Q², within the Miller round's bound.
                 line = (intercept, tower.scale2(slope, field.sub(0, a[0])), tower.scale2(factor, a[1]))
-                evaluated = [line, evaluated_line(tower, minus_c, delta_line)]
+                evaluated = [line, evaluated_fixed_line(tower, minus_c, delta_line)]
                 if gamma is not None:
                     point, coefficients, finite = gamma
-                    gamma_line = evaluated_line(tower, point, coefficients[step][index])
+                    gamma_line = evaluated_fixed_line(tower, point, coefficients[step][index])
                     if coefficients[step][index][0] == curve.zero:
                         gamma_line = (field.select(finite, gamma_line[0][0], 1), gamma_line[0][1]), *gamma_line[1:]
                     evaluated.append(gamma_line)

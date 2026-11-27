@@ -70,6 +70,8 @@
 
 `projective-cofactor` 在证明包的 Fp12 余数之后、可选 `VK_x` 之前依次编码两个仿射原像点，共 192 B。Script 检查原像在曲线上，计算 `[h_eff]T_A` 和 `[h_eff]T_C`，并要求两个像有限且分别等于 A 和 C。BLS12-381 的 `h_eff = |u| + 1` 将曲线点映射到 G1 素数阶子群，且在该子群上可逆。见证生成器用 `h_eff⁻¹ mod r` 生成原像。该布局使用 `direct-projective` Miller 内核，沿用分段归约以及有界的有符号 MSM 表。[RFC 9380 §7](https://www.rfc-editor.org/rfc/rfc9380.html#section-7) · [RFC 9380 §8.8.1](https://www.rfc-editor.org/rfc/rfc9380.html#section-8.8.1) · [候选版回放](../projects/groth16-bls12-381/docs/verification.zh-CN.md#v0140-布局)
 
+对 Γ、Δ 的固定线，`direct-projective` 用 Fp 中的非零标量把截距的非零虚部缩放为 1，并同比缩放另外两个系数。标量在 Fp6 中，因而在 Fp12*/Fp6* 剩余式判定中消去。固定线虚部为零时沿用原系数。`paired-doubles` 也可用于齐次 G1 余因子倍点，在点加和最终等式前归约坐标。
+
 仿射解锁栈从底到顶依次是可选的固定线表包、斜率包、证明包和公开输入包。算术包用 48 字节小端 Fp 元素，斜率包先列 MSM 窗口，再按 Miller 顺序列 B 的 Fp2 斜率。固定线表每步依次编码 Δ 和 Γ 的截距、斜率，整包在解码前核对承诺。证明包含 A、B、C 和 Fp12 余数。应用层可继续使用最后一项公开输入包做交易绑定。
 
 仿射算术计划可选 `msm: signed-radix4`。完整窗口用 `-1、0、1、2` 四个数位，只存基点和二倍点，负数位由基点取负。编译器与见证生成器按同一份有界进位计划生成数位和对应斜率。每个额外窗口增加 48 B 见证，需按所选计划重新生成斜率包。[MSM 实测](../projects/groth16-bls12-381/versions/v0.8.0/measurements.json)

@@ -63,8 +63,10 @@ Use `--release v0.14.0-projective-cofactor` or `--release v0.14.0-affine-witness
 | Release label | Genesis lock | Chronicle lock | Witness per spend | Peak stack payload |
 | --- | ---: | ---: | ---: | ---: |
 | `v0.13.0-affine-inline` | 227,839 B | 227,180 B | 9,378 B | 29,891 B |
-| `v0.14.0-projective-cofactor` | 235,788 B | 235,009 B | 1,263 B | 35,690 B |
+| `v0.14.0-projective-cofactor` | 227,775 B | 226,996 B | 1,263 B | 35,924 B |
 | `v0.14.0-affine-witness` | 206,463 B | 205,803 B | 35,493 B | 61,595 B |
+
+Normalizing the fixed line intercepts and pairing G1 doublings cut 8,013 B from each projective-cofactor lock. Both fixture witnesses reproduce byte-for-byte. The measured stack payload rises from 35,690 B to 35,924 B. Pairing zero rounds also shrinks the lock and raises the peak to 53,232 B in the Genesis trial. [Projective-cofactor comparison](../versions/v0.14.0/measurements.json)
 
 ## nChain and sCrypt comparison
 

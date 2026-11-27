@@ -23,10 +23,10 @@
   "script_eras": {
     "genesis": {
       "chronicle_activation_height": 1000,
-      "lock_bytes": 235788,
-      "path_bytes": 237059,
-      "script_sha256": "43b4348f8fcdf57bf4571fa3c27b4e79a9f61c41c96904557224ec3c46674703",
-      "artifact_sha256": "1d59ce0cf80b09737883733702498373eb874e95aeb394dee0e17d8e562b8d70",
+      "lock_bytes": 227775,
+      "path_bytes": 229046,
+      "script_sha256": "4224154048518c22c7dac1a1baae9b2abb5d43322c69e7d3364275a3a5023812",
+      "artifact_sha256": "b8a013456ee95c901081436a5fb9562d30afbb65f47797cc21a3806166ca22c8",
       "arithmetic_plan": {
         "fp2_rules": [
           "expand-cross-products"
@@ -37,15 +37,16 @@
         "msm_table": "deferred-doubling-slopes",
         "miller_reductions": "split-chord-residue",
         "miller_kernel": "direct-projective",
+        "g1_reductions": "paired-doubles",
         "compact_booleans": true
       }
     },
     "chronicle": {
       "chronicle_activation_height": 2,
-      "lock_bytes": 235009,
-      "path_bytes": 236280,
-      "script_sha256": "f9b3fcf0722991f14f2028c79ecbf9d0ff4a8a1e4ab945c7672e22cf9d856787",
-      "artifact_sha256": "46c90449f3361709c3934764f7bb9500737c5dd05ab15020a1fe15e404f56f66",
+      "lock_bytes": 226996,
+      "path_bytes": 228267,
+      "script_sha256": "6ddb795230dcd8e8f6ab1af4a076b91c4a51510b0d6bc853c662816f8cf0fabc",
+      "artifact_sha256": "17498e50d65e9c5440d9661dc94bb1b9e5dc46470dffd7016c45796c5599e1d0",
       "arithmetic_plan": {
         "fp2_rules": [
           "expand-cross-products"
@@ -56,6 +57,7 @@
         "msm_table": "deferred-doubling-slopes",
         "miller_reductions": "split-chord-residue",
         "miller_kernel": "direct-projective",
+        "g1_reductions": "paired-doubles",
         "compact_booleans": true
       }
     }

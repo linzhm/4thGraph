@@ -201,11 +201,12 @@ class ForthVerifier(ScriptVerifier):
             plan = plan or ArithmeticPlan(
                 fp2_selection="callsite", msm="signed-radix4", msm_table="deferred-doubling-slopes",
                 miller_reductions="split-chord-residue", miller_kernel=PROJECTIVE_MILLER_KERNEL, compact_booleans=True,
+                g1_reductions="paired-doubles",
             )
             if plan.miller_kernel != PROJECTIVE_MILLER_KERNEL:
                 raise ValueError("projective-cofactor requires the direct-projective Miller kernel")
-            if plan.g1_reductions != G1_REDUCTIONS[0] or plan.g1_z_batch != 1:
-                raise ValueError("Jacobian G1 reduction options do not apply to projective-cofactor")
+            if plan.g1_z_batch != 1:
+                raise ValueError("Jacobian G1 Z batching does not apply to projective-cofactor")
         elif plan is not None and plan.miller_kernel == PROJECTIVE_MILLER_KERNEL:
             raise ValueError("the direct-projective Miller kernel requires projective-cofactor")
         if plan is not None and plan.msm == "signed-radix4" and witness_layout == "projective":
