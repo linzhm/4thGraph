@@ -117,6 +117,28 @@ cmp /tmp/sm2-window-kernels.json projects/p2pkh-sm2/versions/v1.11.0/window-kern
 
 [Window formulas](point-window.fth) · [4thGraph skill](../../../skills/4thgraph/SKILL.md) · [Complete-transaction measurements](../versions/v1.11.0/measurements.json)
 
+<a name="public-table-tuning"></a>
+
+## Reproduce public-key table tuning
+
+Template `11` compares 24 stack schedules over named values on 4thGraph `0.2.7` at `1c44d28`. The plans vary binary or linear chains, affine or projective base points, operand grouping, and removal of dead suffix slots. Binary chains also compare a fresh doubling kernel with the 67-byte fragment shared by template `10`. The caller checks that Q is a finite point on the curve. SM2 has cofactor 1, so all 16 generated multiples are finite. The unit tests check every generated point against independent scalar multiplication.
+
+```sh
+export PYTHONPATH=src:.
+python projects/p2pkh-sm2/reference/compile_public_table.py /tmp/sm2-public-table.json \
+  --report /tmp/sm2-public-table-tuning.json
+cmp /tmp/sm2-public-table.json projects/p2pkh-sm2/versions/v1.12.0/public-table.json
+cmp /tmp/sm2-public-table-tuning.json projects/p2pkh-sm2/versions/v1.12.0/public-table-tuning.json
+python projects/p2pkh-sm2/reference/generate_lock.py --version 11 \
+  --owner-hash160 0000000000000000000000000000000000000000
+python projects/p2pkh-sm2/reference/generate_otda_constructor.py --version 11 /tmp/sm2-otda-v11.hex \
+  --report /tmp/sm2-point-cache-tuning.json
+cmp /tmp/sm2-otda-v11.hex projects/p2pkh-sm2/versions/v1.12.0/otda-constructor.hex
+cmp /tmp/sm2-point-cache-tuning.json projects/p2pkh-sm2/versions/v1.12.0/constructor-tuning.json
+```
+
+[Table compiler](compile_public_table.py) · [Table candidates](../versions/v1.12.0/public-table-tuning.json) · [Constructor candidates](../versions/v1.12.0/constructor-tuning.json)
+
 <a name="byte-tuning"></a>
 
 ## Reproduce the fixed-width byte bindings
@@ -167,7 +189,7 @@ cmp /tmp/sm2-constructor-tuning.json projects/p2pkh-sm2/versions/v1.11.0/constru
 
 The constructor tests compare exact preimage, public key, and signature stack values, then verify complete spends against BSV Node and chain-gang. [Layout and fingerprint](../versions/v1.1.0/layout.json) · [Wallet integration](../docs/sdk.en.md)
 
-For a reconstructed template `10` payment with four or more committed inputs, the compiler also compares literal input bytes with a prefix program that caches one repeated byte string after each input's 32-byte transaction ID. It uses the same committed inputs as the OTDA serializer. The retained plan has to be smaller after counting its pushes, copies, and cleanup. The latest matrix exercises repeated tails with a native P2PKH input, different input sequences, and paired SINGLE. [Prefix compiler](../../../src/fourthgraph/compiler/preimage.py) · [Size comparison](../versions/v1.11.0/measurements.json)
+For reconstructed payments using template `10` or `11` with four or more committed inputs, the compiler also compares literal input bytes with a prefix program that caches one repeated byte string after each input's 32-byte transaction ID. It uses the same committed inputs as the OTDA serializer. The retained plan has to be smaller after counting its pushes, copies, and cleanup. The latest matrix exercises repeated tails with a native P2PKH input, different input sequences, and paired SINGLE. [Prefix compiler](../../../src/fourthgraph/compiler/preimage.py) · [Size comparison](../versions/v1.11.0/measurements.json)
 
 <a name="mixed-otda-constructor"></a>
 
@@ -190,18 +212,19 @@ Run the matrix from the repository root with the pinned SM2 Python environment. 
 
 ```sh
 bash tools/verify_node.sh -- python projects/p2pkh-sm2/reference/test_otda_matrix.py \
-  --template 10 --report /tmp/sm2-latest-template-coverage.json
-cmp /tmp/sm2-latest-template-coverage.json projects/p2pkh-sm2/versions/v1.11.0/latest-template-coverage.json
+  --template 11 --report /tmp/sm2-latest-template-coverage.json
+cmp /tmp/sm2-latest-template-coverage.json projects/p2pkh-sm2/versions/v1.12.0/latest-template-coverage.json
 ```
 
-Run the same command with `--template 9`, `--template 8`, or `--template 7` to reproduce the earlier reports. Each run uses one SM2 template for all SM2 prevouts and all recognized SM2 destinations. The 38-case template `10` matrix includes OTDA ALL with 12 or 24 inputs and covers repeated input tails in ALL and SINGLE. [Template 9 coverage](../versions/v1.10.0/latest-template-coverage.json) · [Template 8 coverage](../versions/v1.9.0/latest-template-coverage.json) · [Template 7 coverage](../versions/v1.8.0/latest-template-coverage.json)
+Run the same command with `--template 10`, `--template 9`, `--template 8`, or `--template 7` to reproduce the earlier reports. Each run uses one SM2 template for all SM2 prevouts and all recognized SM2 destinations. The 38-case template `11` matrix includes OTDA ALL with 12 or 24 inputs and covers repeated input tails in ALL and SINGLE. [Template 9 coverage](../versions/v1.10.0/latest-template-coverage.json) · [Template 8 coverage](../versions/v1.9.0/latest-template-coverage.json) · [Template 7 coverage](../versions/v1.8.0/latest-template-coverage.json)
 
-The size comparison also replays 40-input OTDA ALL. Each template pays outputs of its own version. The compiler revision identifies the compiler used for both builds.
+The size comparison also replays 40-input OTDA ALL. Both runs use the same fixture keys and amounts. Each template pays outputs of its own version. The compiler revision identifies the compiler used for both builds.
 
 ```sh
 bash tools/verify_node.sh -- python projects/p2pkh-sm2/reference/measure_template_sizes.py \
-  --compiler-commit a003c4f2e20b3ad53a46c378568531dd4b6c5856 --report /tmp/sm2-template-sizes.json
-cmp /tmp/sm2-template-sizes.json projects/p2pkh-sm2/versions/v1.11.0/measurements.json
+  --baseline 10 --candidate 11 --compiler-commit 1c44d2882e37d3f46e4b861e83063d630db66555 \
+  --report /tmp/sm2-template-sizes.json
+cmp /tmp/sm2-template-sizes.json projects/p2pkh-sm2/versions/v1.12.0/measurements.json
 ```
 
 <a name="p2pkh-sponsorship"></a>
@@ -212,9 +235,9 @@ Run each policy profile on a fresh isolated regtest node. Both reports record me
 
 ```sh
 bash tools/verify_node.sh --profile default -- python projects/p2pkh-sm2/reference/verify_fee_sponsorship.py \
-  --template 10 --report /tmp/sm2-p2pkh-default.json
+  --template 11 --report /tmp/sm2-p2pkh-default.json
 bash tools/verify_node.sh --profile raised -- python projects/p2pkh-sm2/reference/verify_fee_sponsorship.py \
-  --template 10 --report /tmp/sm2-p2pkh-raised.json
+  --template 11 --report /tmp/sm2-p2pkh-raised.json
 ```
 
 Funding transaction IDs and signatures depend on the generated regtest blocks. Compare the outcomes and sizes.
