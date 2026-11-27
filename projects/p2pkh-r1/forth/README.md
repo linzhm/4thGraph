@@ -82,8 +82,7 @@ done
 
 [BIP143 ALL](plans/bip143-all.json) · [OTDA ALL](plans/otda-all.json) · [OTDA SINGLE](plans/otda-single.json)
 
-这些计划以 `c02df4a` 上的编译器验收。初版固定计划及早期矩阵数据可以从原始提交复跑。
-同一工具链版本号下，编译器源码变化也会产生新的计划身份。[初版方案与编译器](https://github.com/linzhm/4thGraph/tree/9b13dfbbd50487ca868831788f653e2b75f9cd5a)
+回放时使用各计划记录的 `compiler_sha256` 校验编译器源码。同一工具链版本号下，源码变化也会产生新的指纹。更新指纹前，按原计划重建锁和构造器并核对已记录的产物哈希。初版固定计划及早期矩阵数据可以从原始提交复跑。[初版方案与编译器](https://github.com/linzhm/4thGraph/tree/9b13dfbbd50487ca868831788f653e2b75f9cd5a)
 
 花费测试使用固定版 chain-gang，覆盖 BIP143 ALL、OTDA ALL、配对和无配对的
 OTDA SINGLE。正例使用测试签名和实际夹具父输出。改动花费的锁定时间后，测试必须观察到
