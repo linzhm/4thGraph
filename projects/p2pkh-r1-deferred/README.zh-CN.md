@@ -57,7 +57,7 @@ bash projects/p2pkh-r1-deferred/reference/verify.sh
 
 ### 4thGraph Forth 对照
 
-高阶 Forth 源码覆盖完整启用检查，包括 BIP143 SINGLE 同索引输出承诺、可选的 BIP143 或 OTDA 摘要、固定密钥签名构造和两处原生签名检查。三种构建使用同一份有栈类型声明的源码，编译器为 `3133da7` 基线上的 4thGraph 0.2.7。[Forth 源码](reference/deferred-activation.fth) · [编译报告](versions/v0.3.0/forth-results.json)
+高阶 Forth 源码覆盖完整启用检查，包括 BIP143 SINGLE 同索引输出承诺、可选的 BIP143 或 OTDA 摘要、固定密钥签名构造和两处原生签名检查。三种构建使用同一份有栈类型声明的源码，编译器为 `3133da7` 基线上的 4thGraph 0.2.7。[Forth 源码](forth/deferred-activation.fth) · [编译报告](versions/v0.3.0/forth-results.json)
 
 | 构建 | 入金短锁 | 入金交易 | 入金及 BIP143 ALL 启用 | 首个启用输入主栈 / 备用栈峰值项数 |
 | --- | ---: | ---: | ---: | ---: |

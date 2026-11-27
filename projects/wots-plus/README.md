@@ -8,7 +8,7 @@
 
 **[Wallet SDK quickstart](docs/sdk.en.md#quickstart)** · [Unified wallet SDK](../../sdk/README.md#quickstart)
 
-WOTS+ v0.12.0 uses the `compact-v11` template. The lock is 21,272 bytes and its OTDA reconstruction program is 732 bytes. Connect a durable one-time signer to use the payment lock. [Version artifacts](versions/v0.12.0/manifest.json)
+WOTS+ v0.12.0 uses the `compact-v11` template. The lock is 21,272 bytes and its OTDA reconstruction program is 732 bytes. Connect a durable one-time signer to use the payment lock. [Forth source](forth/payment-lock.fth) · [Version artifacts](versions/v0.12.0/manifest.json)
 
 [Protocol](docs/developer.en.md) · [Algorithm and execution](#algorithm-and-execution) · [Reproduce the checks](#reproduce-the-checks) · [Complete transactions and stack measurements](#complete-transactions-and-stack-measurements) · [Measurements data](versions/v0.12.0/measurements.json)
 
@@ -171,7 +171,7 @@ Run `python projects/wots-plus/reference/generate_reconstruction.py --version v0
 
 `locking_script(key, cached_constants="compact")` builds a 29,217-byte
 lock, 4,739 bytes smaller than `cached-steps`. The verifier compiles a
-single [Forth chain body](reference/compact.fth) for all 67 chains. It
+single [Forth chain body](forth/compact.fth) for all 67 chains. It
 uses a running chain index and a cached bit to form both key-and-mask
 addresses. The BIP143 unlocking script is 2,310 bytes.
 

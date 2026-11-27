@@ -1,6 +1,6 @@
 # 4thGraph projects
 
-[简体中文](README.zh-CN.md) · [4thGraph](../README.md) · [Documentation](../docs/README.md)
+[简体中文](README.zh-CN.md) · [4thGraph](../README.md) · [Documentation](../docs/README.md) · [Forth sources](../docs/repository-layout.md#project-compiler-inputs)
 
 ## Contracts and proofs
 

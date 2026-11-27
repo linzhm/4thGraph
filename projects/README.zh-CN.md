@@ -1,6 +1,6 @@
 # 4thGraph 项目
 
-[English](README.md) · [4thGraph](../README.zh-CN.md) · [文档](../docs/README.zh-CN.md)
+[English](README.md) · [4thGraph](../README.zh-CN.md) · [文档](../docs/README.zh-CN.md) · [各项目 Forth 源码](../docs/repository-layout.md#project-compiler-inputs)
 
 ## 合约与证明
 

@@ -47,6 +47,8 @@ PYTHONPATH=src:.:projects/ml-dsa/reference python -c 'from benchmark_adapter imp
 PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- python -m unittest discover -s projects/ml-dsa/reference
 ```
 
+付款锁和独立消息验证器从 [payment-lock.fth](forth/payment-lock.fth) 和 [challenge.fth](forth/challenge.fth) 编译。宿主提供公钥、消息长度、上下文和算术内核。
+
 OpenSSL 夹具使用公开测试种子。
 
 ```sh
@@ -92,7 +94,7 @@ PYTHONPATH=src:. python projects/ml-dsa/reference/check_acvp.py "$ACVP_PROMPT" "
 | 完整付款锁 | 926,403 | 663,284 | 586,981 | 467,733 | 424,757 | 345,095 | 322,447 | 308,992 | 289,802 | 272,993 | 257,662 | **251,704** |
 | 单输入 BIP143 ALL 解锁 | 2,588 | 2,588 | 2,588 | 2,588 | 2,588 | 2,588 | 2,588 | 2,588 | 2,588 | 2,588 | 2,588 | 2,588 |
 
-Forth 付款入口用上游 `889ff6e` 以 `stack` 模式编译。v0.5.0 按五个 lane 一行执行 Keccak 的 θ 和 χ。θ 用位掩码隔离跨 lane 的移位，ρ 和 π 按单个 lane 执行。付款锁的十次置换共省 79,450 字节，共享紧凑输入绑定再省 212 字节。[Forth 入口](reference/payment-lock.fth) · [v0.4.0 测量](versions/v0.4.0/measurements.json) · [v0.5.0 测量](versions/v0.5.0/measurements.json)
+Forth 付款入口用上游 `889ff6e` 以 `stack` 模式编译。v0.5.0 按五个 lane 一行执行 Keccak 的 θ 和 χ。θ 用位掩码隔离跨 lane 的移位，ρ 和 π 按单个 lane 执行。付款锁的十次置换共省 79,450 字节，共享紧凑输入绑定再省 212 字节。[Forth 入口](forth/payment-lock.fth) · [v0.4.0 测量](versions/v0.4.0/measurements.json) · [v0.5.0 测量](versions/v0.5.0/measurements.json)
 
 v0.6.0 把每组四个系数保留在栈顶，连续执行相邻两层 NTT 蝶形。根据变换的幅值上界选取模数的整数倍作为偏移，使每个打包系数的符号位保持为零。这两项共省 13,025 字节。SHAKE 在多次置换之间保持内部 lane 为大端，只在吸收和挤出时转换字节序，再省 9,623 字节。[v0.6.0 测量](versions/v0.6.0/measurements.json)
 

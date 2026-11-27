@@ -45,7 +45,7 @@ def compile_source(source, owner, *, optimize=False, source_path=SOURCE):
 
 
 def previous_build(owner, *, optimize):
-    return ScriptBuilder("REQUIRE stdlib/wallet/r1.fth", vocabulary={
+    return ScriptBuilder.from_file(SOURCE.with_name("legacy-r1.fth"), vocabulary={
         "bsv-owner": build_word("", "bytes", lambda: owner),
         "bsv-optimize?": build_word("", "cell", lambda: -int(optimize)),
     })

@@ -6,7 +6,7 @@
 
 ## 统一钱包接口
 
-使用版本 0.2.0 创建新收款输出。统一客户端用同一套调用识别已核验的旧版输出和新版输出。公钥为 65 字节未压缩 P-256 编码，也可以用 `ownerHash160` 创建收款脚本。运行时使用项目参考环境，在仓库根目录安装以下依赖。
+选用 `v0.8.0` 可使用当前编译版的 41,114 字节收款脚本。收款参数接受 65 字节未压缩 P-256 公钥或 `ownerHash160`。运行时使用项目参考环境，在仓库根目录安装以下依赖。[v0.8.0 布局](../versions/v0.8.0/layout.json)
 
 ```sh
 python3.12 -m venv projects/p2pkh-r1/workspace/venv
@@ -19,7 +19,7 @@ projects/p2pkh-r1/workspace/venv/bin/python -m pip install -r projects/p2pkh-r1/
 import { resolve } from "node:path";
 import { WalletClient } from "./sdk/typescript/index.ts";
 
-const wallet = new WalletClient("p2pkh-r1", { ...config, template: "v0.2.0" });
+const wallet = new WalletClient("p2pkh-r1", { ...config, template: "v0.8.0" });
 const receiveScript = wallet.createLock({ publicKey: receiveKeyHex });
 const prevout = wallet.prevoutFromFunding(fundingTxHex, fundingVout);
 if (!wallet.recognize({ script: prevout.script, publicKey: spendKeyHex })) {
@@ -51,7 +51,7 @@ SCRIPT_LAB_SDK_PYTHON="$PWD/projects/p2pkh-r1/workspace/venv/bin/python" \
 
 [签名随机数历史与钱包行为](../reference/README.md)
 
-## 正则与完整指纹
+## v0.2.0 正则与完整指纹
 
 1. 检查原始脚本恰为 **46,302 字节**。
 2. 将前 **228 字节**编码为小写 hex，用以下正则匹配整个头部。捕获组 1 解码后是候选的 20 字节收款哈希。
@@ -68,9 +68,9 @@ SCRIPT_LAB_SDK_PYTHON="$PWD/projects/p2pkh-r1/workspace/venv/bin/python" \
 
 混合输入或逐输入指定签名方式时使用 `signInput`。钱包在收集签名前固定交易并核对上一输出和手续费。父交易确认后如果 txid 有变化，核对实际 outpoint 并重建子交易。[R1 签名和摘要向量](../versions/v0.2.0/spend-all.json) · [恢复子交易](chronicle.md#恢复子交易)
 
-## 当前开发版本
+## 模板选择与 OTDA
 
-新建输出使用 v0.2.0。Python 默认选择这一版本。已有 UTXO 按 v0.1.0 原有布局核对。统一客户端可识别两个版本，并支持普通 BIP143 ALL 付款。 [v0.1.0 布局](../versions/v0.1.0/layout.json)
+钱包默认模板为 v0.2.0。识别和花费按实际上一输出使用的模板处理，支持 v0.1.0、早期编译模板、v0.2.0 和 v0.8.0。符合条件的 OTDA ALL 和配对 SINGLE 花费可用 `compressOtda: true` 启用 v0.8.0 的重建程序。[v0.1.0 布局](../versions/v0.1.0/layout.json) · [v0.8.0 布局](../versions/v0.8.0/layout.json)
 
 Python 的 `sign_spend(..., compress_otda="paired")` 在支持 Chronicle
 功能解锁的版本 2 交易中重建 OTDA ALL 输出和有配对输出的 OTDA SINGLE。

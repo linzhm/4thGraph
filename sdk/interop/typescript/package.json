@@ -1,0 +1,12 @@
+{
+  "name": "fourthgraph-bsv-wallet-interop",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "dependencies": {
+    "@bsv/sdk": "4.1.2",
+    "@bsv/wallet-toolbox": "2.18.0",
+    "@bsv/wallet-toolbox-client": "2.18.0",
+    "@bsv/wallet-toolbox-mobile": "2.18.0"
+  }
+}

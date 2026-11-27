@@ -1,9 +1,9 @@
 """Replay the unified wallet API against public reference vectors."""
+import argparse
 from dataclasses import replace
 from hashlib import sha256
 import json
 from pathlib import Path
-import sys
 
 from vector import Node, adapter_for, chain_verdict, generate
 from sdk.python.client import WalletClient
@@ -21,7 +21,7 @@ CALLBACKS = {
 }
 
 
-def r1_vectors(project, directory, node):
+def r1_vectors(project, directory, node, profiles=()):
     from cryptography.hazmat.primitives import serialization
     from cryptography.hazmat.primitives.asymmetric import ec
 
@@ -35,9 +35,12 @@ def r1_vectors(project, directory, node):
     if deferred:
         layouts.insert(0, ("v0.3.0", False))
         layouts.append(("v0.1.0", True))
+    else:
+        layouts.insert(0, (adapter.OPTIMIZED_PROFILE, False))
     for profile, embedded_key in layouts:
-        yield from r1_layout_vectors(project, directory, node, adapter, private, public_key,
-                                     profile, embedded_key)
+        if not profiles or profile in profiles:
+            yield from r1_layout_vectors(project, directory, node, adapter, private, public_key,
+                                         profile, embedded_key)
 
 
 def r1_layout_vectors(project, directory, node, adapter, private, public_key, profile, embedded_key):
@@ -68,8 +71,10 @@ def r1_layout_vectors(project, directory, node, adapter, private, public_key, pr
         modes = [(flag, False) for flag in flags]
     else:
         modes = ((0x41, False), (0x41, True), (0x61, False))
+        if profile == adapter.OPTIMIZED_PROFILE:
+            modes += ((0x63, False),)
     for sighash, sign_message in modes:
-        compress = sighash == 0x61
+        compress = sighash in (0x61, 0x63)
         if deferred:
             from deferred import activate_input, target_output
             target_profile = "v0.2.0" if profile == "v0.3.0" else profile
@@ -101,6 +106,9 @@ def r1_layout_vectors(project, directory, node, adapter, private, public_key, pr
                 auth, public_key, signature, compress_otda_for=raw_tx if compress else None,
                 shared_kernels=compress, paired_single_index=0 if compress else None,
             )
+            if compress and profile == adapter.OPTIMIZED_PROFILE:
+                literal = current_input_unlock(auth, public_key, signature)
+                assert len(witness.raw_serialize()) < len(literal.raw_serialize())
             signed = tx.with_script(0, bytes(witness.raw_serialize()))
             request.update(historyPath=str(directory / "r1-history.sqlite"), signMessage=sign_message,
                            compressOtda=compress)
@@ -203,11 +211,17 @@ def replay(project, rows):
 if __name__ == "__main__":
     import os
 
-    project, file = sys.argv[1:]
-    path = Path(file).resolve()
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("project")
+    parser.add_argument("file", type=Path)
+    parser.add_argument("--profile", action="append", default=[])
+    args = parser.parse_args()
+    project, path, profiles = args.project, args.file.resolve(), args.profile
     node = Node(os.environ["REGTEST_URL"], os.environ["REGTEST_COOKIE"]) if "REGTEST_COOKIE" in os.environ else None
-    rows = (list(r1_vectors(project, path.parent, node)) if project.startswith("p2pkh-r1")
-            else generate(project, node))
+    rows = (list(r1_vectors(project, path.parent, node, profiles)) if project.startswith("p2pkh-r1")
+            else generate(project, node, profiles))
+    if not rows or set(profiles).difference(row["profile"] for row in rows):
+        parser.error(f"{project} has no vectors for one or more requested profiles")
     replay(project, rows)
     path.write_text(json.dumps(rows), encoding="utf-8")
     print(f"{project}: {len(rows)} unified Python SDK vectors passed, {'both engines' if node else 'chain-gang'}")

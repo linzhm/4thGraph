@@ -70,6 +70,8 @@ PYTHONPATH=src:.:projects/ml-dsa/reference python -c 'from benchmark_adapter imp
 PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- python -m unittest discover -s projects/ml-dsa/reference
 ```
 
+The compiler reads [payment-lock.fth](forth/payment-lock.fth) and [challenge.fth](forth/challenge.fth) for the payment and detached verification flows. The host supplies the public key, message length, context and arithmetic kernels.
+
 The OpenSSL fixture uses a public test seed and deterministic signing.
 
 ```sh
@@ -132,7 +134,7 @@ These are Script bytes for identical fixtures, before transaction serialization.
 | Complete payment lock | 926,403 | 663,284 | 586,981 | 467,733 | 424,757 | 345,095 | 322,447 | 308,992 | 289,802 | 272,993 | 257,662 | **251,704** |
 | One-input BIP143 `ALL` unlock | 2,588 | 2,588 | 2,588 | 2,588 | 2,588 | 2,588 | 2,588 | 2,588 | 2,588 | 2,588 | 2,588 | 2,588 |
 
-The Forth payment entry uses `stack` optimization on upstream revision `889ff6e`. v0.5.0 emits Keccak's theta and chi over five-lane rows. Theta masks the one-bit shifts at lane boundaries, and rho and pi operate on individual lanes. Ten permutations in the payment lock save 79,450 bytes. The shared compact input binding saves another 212 bytes. [Forth entry](reference/payment-lock.fth) · [v0.4.0 measurements](versions/v0.4.0/measurements.json) · [v0.5.0 measurements](versions/v0.5.0/measurements.json)
+The Forth payment entry uses `stack` optimization on upstream revision `889ff6e`. v0.5.0 emits Keccak's theta and chi over five-lane rows. Theta masks the one-bit shifts at lane boundaries, and rho and pi operate on individual lanes. Ten permutations in the payment lock save 79,450 bytes. The shared compact input binding saves another 212 bytes. [Forth entry](forth/payment-lock.fth) · [v0.4.0 measurements](versions/v0.4.0/measurements.json) · [v0.5.0 measurements](versions/v0.5.0/measurements.json)
 
 v0.6.0 applies two adjacent NTT butterfly stages to each four-coefficient group at the top of the stack. Bounds on the centered transforms allow a modulus-aligned offset that keeps each packed lane below its sign bit, saving 13,025 bytes together with the paired butterflies. SHAKE keeps its internal lanes big-endian across permutations and converts only absorbed and squeezed bytes, saving another 9,623 bytes in the lock. [v0.6.0 measurements](versions/v0.6.0/measurements.json)
 

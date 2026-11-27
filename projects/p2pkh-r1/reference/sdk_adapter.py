@@ -5,15 +5,20 @@ from cryptography.exceptions import InvalidSignature
 from tx_engine import Tx
 
 import p2pkh_r1
+from fixed_templates import OPTIMIZED_TEMPLATE_VERSION, compiled_template
 from wallet import previous_output_unlock
 
-PROFILES = {59582: "v0.1.0", 47510: "compiled", 46302: "v0.2.0"}
+OPTIMIZED_PROFILE = f"v{OPTIMIZED_TEMPLATE_VERSION}"
+PROFILES = {
+    59582: "v0.1.0", 47510: "compiled", 46302: "v0.2.0",
+    len(compiled_template(template_version=OPTIMIZED_TEMPLATE_VERSION).script): OPTIMIZED_PROFILE,
+}
 
 
 def lock_owner(owner, profile=None):
     if profile == "compiled":
         return p2pkh_r1.locking_script_from_owner_hash(owner, compiled_curve=True)
-    if profile not in (None, "v0.1.0", "v0.2.0"):
+    if profile not in (None, "v0.1.0", "v0.2.0", OPTIMIZED_PROFILE):
         raise ValueError("unsupported R1 template")
     return p2pkh_r1.locking_script_from_owner_hash(
         owner, template_version=profile[1:] if profile is not None else None,

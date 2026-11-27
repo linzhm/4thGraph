@@ -43,6 +43,8 @@ bash projects/lamport-ots/reference/verify.sh
 
 ### Run
 
+The full-key and commitment payment builds start from [payment-lock.fth](forth/payment-lock.fth). The compact commitment layouts also compile [the committed verifier](forth/committed-verifier.fth) or [the fixed-weight verifier](forth/subset-verifier.fth).
+
 From the repository root, use an isolated Python 3.12 environment. The vectors use public test keys.
 
 ```sh

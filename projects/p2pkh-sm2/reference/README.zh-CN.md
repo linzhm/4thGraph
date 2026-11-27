@@ -88,7 +88,7 @@ PYTHONPATH=src:. python projects/p2pkh-sm2/reference/point_kernels.py --affine /
 cmp /tmp/sm2-affine-kernel.json projects/p2pkh-sm2/versions/v1.10.0/affine-kernel.json
 ```
 
-[点运算公式](point-formulas.fth) · [编译入口](point_kernels.py)
+[点运算公式](../forth/point-formulas.fth) · [编译入口](point_kernels.py)
 
 <a name="window-tuning"></a>
 
@@ -107,7 +107,18 @@ python projects/p2pkh-sm2/reference/point_kernels.py --carried /tmp/sm2-window-k
 cmp /tmp/sm2-window-kernels.json projects/p2pkh-sm2/versions/v1.11.0/window-kernels.json
 ```
 
-[窗口公式](point-window.fth) · [4thGraph skill](../../../skills/4thgraph/SKILL.md) · [整笔交易实测](../versions/v1.11.0/measurements.json)
+[窗口公式](../forth/point-window.fth) · [4thGraph skill](../../../skills/4thgraph/SKILL.md) · [整笔交易实测](../versions/v1.11.0/measurements.json)
+
+用当前检出的 Forth 文件复现发布版窗口内核时，可从独立目录加载记录的编译器。
+
+```sh
+compiler=projects/p2pkh-sm2/workspace/compiler-v1.11.0
+mkdir -p "$compiler"
+git archive 64624db src | tar -x -C "$compiler"
+PYTHONPATH="$compiler/src:." python projects/p2pkh-sm2/reference/point_kernels.py \
+  --carried "$compiler/window-kernels.json"
+cmp "$compiler/window-kernels.json" projects/p2pkh-sm2/versions/v1.11.0/window-kernels.json
+```
 
 <a name="public-table-tuning"></a>
 
@@ -144,7 +155,7 @@ cmp /tmp/sm2-byte-kernels.json projects/p2pkh-sm2/versions/v1.11.0/byte-kernels.
 cmp /tmp/sm2-byte-tuning.json projects/p2pkh-sm2/versions/v1.11.0/byte-tuning.json
 ```
 
-[Forth 调用](byte-fields.fth) · [编译绑定记录](../versions/v1.11.0/byte-tuning.json) · [字节布局库](../../../docs/optimization-paths.zh-CN.md#批量换序与重复常量)
+[Forth 调用](../forth/byte-fields.fth) · [编译绑定记录](../versions/v1.11.0/byte-tuning.json) · [字节布局库](../../../docs/optimization-paths.zh-CN.md#批量换序与重复常量)
 
 <a name="otda-constructor"></a>
 

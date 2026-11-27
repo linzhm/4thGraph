@@ -6,7 +6,7 @@
 
 ## Unified wallet API
 
-Create new outputs with v0.2.0. The unified client can recognize existing and current templates. Use an uncompressed 65-byte P-256 key or pass `ownerHash160` for receiving. From the repository root, set up the project's reference environment.
+Select `v0.8.0` to receive with the current 41,114-byte compiler template. Use an uncompressed 65-byte P-256 key or pass `ownerHash160`. From the repository root, set up the project's reference environment. [v0.8.0 layout](../versions/v0.8.0/layout.json)
 
 ```sh
 python3.12 -m venv projects/p2pkh-r1/workspace/venv
@@ -19,7 +19,7 @@ Use authenticated transaction data. Set `config.python` to the absolute path of 
 import { resolve } from "node:path";
 import { WalletClient } from "./sdk/typescript/index.ts";
 
-const wallet = new WalletClient("p2pkh-r1", { ...config, template: "v0.2.0" });
+const wallet = new WalletClient("p2pkh-r1", { ...config, template: "v0.8.0" });
 const receiveScript = wallet.createLock({ publicKey: receiveKeyHex });
 const prevout = wallet.prevoutFromFunding(fundingTxHex, fundingVout);
 if (!wallet.recognize({ script: prevout.script, publicKey: spendKeyHex })) {
@@ -51,7 +51,7 @@ SCRIPT_LAB_SDK_PYTHON="$PWD/projects/p2pkh-r1/workspace/venv/bin/python" \
 
 [Nonce history and wallet behavior](../reference/README.md)
 
-## Regex and complete fingerprint
+## v0.2.0 regex and complete fingerprint
 
 1. Require exactly **46,302 bytes** of binary script.
 2. Encode the first **228 bytes** as lowercase hex. Match the entire resulting string against the following pattern. Capture 1 decodes to the candidate 20-byte owner hash.
@@ -68,9 +68,9 @@ A digest signer receives `SHA256d(P)`. Set `signMessage: true` for a device that
 
 Use `signInput` for mixed inputs and explicit sighash modes. The wallet assembles the intended transaction and verifies the previous output and fee before collecting signatures. If a different parent txid confirms, reconcile the outpoint and rebuild the child. [R1 signature and digest vector](../versions/v0.2.0/spend-all.json) · [Recover a child payment](chronicle.md#recovering-a-child-payment)
 
-## Current development version
+## Template selection and OTDA
 
-Use v0.2.0 for new outputs. Python uses it by default. For older UTXOs, use the original v0.1.0 layout. The shared client recognizes both versions and supports ordinary BIP143 ALL payments. [v0.1.0 layout](../versions/v0.1.0/layout.json)
+The default wallet template is v0.2.0. Recognition and spending use the template of the actual previous output, including v0.1.0, the earlier compiled template, v0.2.0 and v0.8.0. Set `compressOtda: true` to use the v0.8.0 reconstruction program for eligible OTDA ALL and paired SINGLE spends. [v0.1.0 layout](../versions/v0.1.0/layout.json) · [v0.8.0 layout](../versions/v0.8.0/layout.json)
 
 In the Python reference, `sign_spend(..., compress_otda="paired")` enables
 output reconstruction in version 2 Chronicle OTDA transactions using ALL

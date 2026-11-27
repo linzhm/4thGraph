@@ -12,7 +12,7 @@
 
 ## Forth 优化
 
-`forth_committed_locking_script(public_key)` 编译带类型的 Forth 重建片段。每个摘要字节使用八个位掩码决定公钥对的顺序。位判断比较的是字节值，即使最高位掩码为 `80`，传给分支的也是规范布尔值。该模板沿用原有的证明布局和交易模式，SDK 可用 `committed-key-forth` 显式选择。[栈状态与字节拆解（英文）](optimization.md) · [Forth 源码](../reference/committed-verifier.fth)
+`forth_committed_locking_script(public_key)` 编译带类型的 Forth 重建片段。每个摘要字节使用八个位掩码决定公钥对的顺序。位判断比较的是字节值，即使最高位掩码为 `80`，传给分支的也是规范布尔值。该模板沿用原有的证明布局和交易模式，SDK 可用 `committed-key-forth` 显式选择。[栈状态与字节拆解（英文）](optimization.md) · [Forth 源码](../forth/committed-verifier.fth)
 
 相较原承诺模板，每个输出锁减少 704 字节。BIP143 ALL 的解锁尺寸相同，OTDA ALL 的解锁会随同笔交易的输出一起缩短。相较全公钥模板，每个 Forth 承诺输出节省 15,738 字节，每个普通 BIP143 输入多 8,192 字节。在费率及其他编码相同的前提下，输出数除以输入数超过约 0.521 时，Forth 承诺模板占用的交易字节更少。入金和花费费率不同时，按两阶段分别计费。[边际及生命周期测量（英文）](optimization.md#transaction-and-lifecycle-costs)
 

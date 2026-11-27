@@ -4,7 +4,7 @@ from hashlib import sha256
 
 from tx_engine import Script, sig_hash_preimage
 
-from fixed_templates import otda_pattern
+from fixed_templates import COMPILED_TEMPLATE_VERSIONS, otda_pattern
 from fourthgraph.bsv.otda_reconstruction import reconstruct_mixed
 from fourthgraph.bsv.script import push
 from fourthgraph.bsv.transaction import Output
@@ -57,9 +57,9 @@ def _compressed_otda_preimage(tx, preimage, *, selected_index, shared_kernels):
     engine_outputs = tx.tx_outs if selected_index is None else (tx.tx_outs[selected_index],)
     outputs = tuple(Output(item.amount, item.script_pubkey.raw_serialize()) for item in engine_outputs)
     patterns = []
-    for scheduled in (False, True):
-        version, pattern = otda_pattern(shared_kernels=shared_kernels, scheduled=scheduled)
-        if tx.version == version:
+    for template_version in COMPILED_TEMPLATE_VERSIONS:
+        spend_version, pattern = otda_pattern(shared_kernels=shared_kernels, template_version=template_version)
+        if tx.version == spend_version:
             patterns.append(pattern)
     candidates = [pattern.build(preimage, outputs) for pattern in patterns]
     candidates.append(reconstruct_mixed(preimage, outputs, patterns))

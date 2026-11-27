@@ -5,8 +5,10 @@ import re
 
 from cryptography.hazmat.primitives.asymmetric import ec
 
-from fixed_templates import LEGACY_TEMPLATE_VERSION, TEMPLATE_VERSION, VERSIONS_DIRECTORY
-from fixed_templates import compiled_owner, compiled_template
+from fixed_templates import (
+    LEGACY_TEMPLATE_VERSION, OPTIMIZED_TEMPLATE_VERSION, TEMPLATE_VERSION, VERSIONS_DIRECTORY,
+    compiled_owner, compiled_template,
+)
 
 
 SCRIPT_SIZE = 59582
@@ -52,6 +54,8 @@ def locking_script_from_owner_hash(owner_hash160: bytes, *, template_version=Non
             raise ValueError("unknown curve compiler profile")
     if template_version in (None, TEMPLATE_VERSION):
         return compiled_template(scheduled=True).lock(owner_hash160)
+    if template_version == OPTIMIZED_TEMPLATE_VERSION:
+        return compiled_template(template_version=template_version).lock(owner_hash160)
     if template_version != LEGACY_TEMPLATE_VERSION:
         raise ValueError("unknown P2PKH-R1 template version")
     raw = _base_program()

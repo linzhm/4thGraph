@@ -8,7 +8,7 @@
 
 Select project `p2pkh-schnorr` in the unified SDK. The client uses template `v0.17.0` by default. Supply a 32-byte x-only public key or its 20-byte HASH160. The client fills the owner slot in the frozen Forth build and checks all fixed script bytes when recognizing an output. You can also supply the expected public key. The SDK identifies and spends UTXOs of all twelve versions from their prevout scripts. Set the wallet's `template` to an earlier supported version to create that output format. [Version catalog](../versions/index.json)
 
-The signing request identifies the algorithm as `schnorr-secp256k1`, the payload kind as `message`, and the signature format as `bip340`. Give the 32-byte payload to the BIP340 signer as the message. Return the signer's original 64 bytes. The SDK verifies the signature, derives the public witness coordinates, and runs the Forth `schnorr-unlock` word to generate the input script. [Forth source](../reference/schnorr.fth)
+The signing request identifies the algorithm as `schnorr-secp256k1`, the payload kind as `message`, and the signature format as `bip340`. Give the 32-byte payload to the BIP340 signer as the message. Return the signer's original 64 bytes. The SDK verifies the signature, derives the public witness coordinates, and runs the Forth `schnorr-unlock` word to generate the input script. [Forth source](../forth/schnorr.fth)
 
 Use authenticated transaction data. Set `config.python` to the absolute path of `projects/p2pkh-schnorr/workspace/p2pkh-schnorr/bin/python` and `config.bridge` to this checkout’s `sdk/python/bridge.py`. [Shared integration example](../../../sdk/docs/integration.md#first-payment) · [Project Python environment](../README.md#validate-the-baseline)
 

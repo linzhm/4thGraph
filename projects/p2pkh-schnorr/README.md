@@ -32,7 +32,7 @@ The high-level 64-window Forth experiment records the current automatic build an
 2. Hash the original `r`, x-only public key and message with the BIP340 tag, then reduce the hash modulo the group order to obtain `e`.
 3. Evaluate `sG − eP` with 64 two-bit windows. Require a nonzero projective Z and compare both coordinates with the even nonce point.
 
-The payment wrapper checks the public-key hash and binds the verified message to the actual input. The released verifier uses coordinate scaling, paired doubling and secp256k1 GLV. [Payment protocol and curve formulas](docs/spec.en.md) · [Forth payment source](reference/schnorr.fth)
+The payment wrapper checks the public-key hash and binds the verified message to the actual input. The released verifier uses coordinate scaling, paired doubling and secp256k1 GLV. [Payment protocol and curve formulas](docs/spec.en.md) · [Forth payment source](forth/schnorr.fth)
 
 <a name="secp256k1-arithmetic"></a>
 
@@ -82,7 +82,7 @@ Use `createLock` with the x-only key or its HASH160. Verify the funding outpoint
 
 <a name="build-from-forth"></a>
 
-Load `REQUIRE stdlib/bip340.fth` for the detached verifier. The reference payment code adds ownership and transaction binding. [Forth source](reference/schnorr.fth) · [Version index](versions/index.json)
+Load `REQUIRE stdlib/bip340.fth` for the detached verifier. The reference payment code adds ownership and transaction binding. [Forth source](forth/schnorr.fth) · [Version index](versions/index.json)
 
 ## Complete transactions and stack measurements
 

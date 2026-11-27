@@ -32,7 +32,7 @@
 2. 用原始 `r`、x-only 公钥和消息计算 BIP340 标签哈希，再对群阶取模得到 `e`。
 3. 用 64 个两位窗口计算 `sG − eP`。检查射影坐标 Z 非零，再比对偶数 nonce 点的两个坐标。
 
-付款封装校验公钥哈希，并把已验证的消息绑定到实际输入。发布版验签器使用坐标缩放、连续倍点和 secp256k1 GLV。[付款协议与曲线公式](docs/spec.zh-CN.md) · [Forth 付款源码](reference/schnorr.fth)
+付款封装校验公钥哈希，并把已验证的消息绑定到实际输入。发布版验签器使用坐标缩放、连续倍点和 secp256k1 GLV。[付款协议与曲线公式](docs/spec.zh-CN.md) · [Forth 付款源码](forth/schnorr.fth)
 
 <a name="secp256k1-运算"></a>
 
@@ -82,7 +82,7 @@ bash tools/verify_node.sh -- bash sdk/verify_wallet.sh p2pkh-schnorr
 
 <a name="从-forth-构建"></a>
 
-用 `REQUIRE stdlib/bip340.fth` 加载独立验签器。参考付款代码加入所有者校验和交易绑定。[Forth 源码](reference/schnorr.fth) · [版本目录](versions/index.json)
+用 `REQUIRE stdlib/bip340.fth` 加载独立验签器。参考付款代码加入所有者校验和交易绑定。[Forth 源码](forth/schnorr.fth) · [版本目录](versions/index.json)
 
 ## 完整交易与栈测量
 

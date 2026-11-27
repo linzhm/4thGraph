@@ -2,7 +2,7 @@
 
 [简体中文](integration.zh-CN.md) · [SDK overview](../README.md) · [API reference](reference.md)
 
-[Bridge setup](#bridge-setup) · [Wallet workflow](#wallet-workflow) · [External signer](#first-payment) · [Prepared transactions](#prepared-payments)
+[Bridge setup](#bridge-setup) · [BSV SDK and Wallet Toolbox](#bsv-toolbox) · [Wallet workflow](#wallet-workflow) · [External signer](#first-payment) · [Prepared transactions](#prepared-payments)
 
 <a name="bridge-setup"></a>
 
@@ -22,6 +22,28 @@ Keep a specific 4thGraph checkout available to the application and its local bri
 Use the project guide's Python requirements for native P2PK/P2PKH, R1, Deferred R1, Schnorr, and SM2. The Lamport, WOTS+, and ML-DSA payment SDK paths use the standard library. The fixture signer for ML-DSA also needs OpenSSL with Pure ML-DSA-44 support. Node and chain-gang replays have additional dependencies. Use separate Python environments for replays that require different chain-gang revisions. [Scheme integrations](../README.md#scheme-integrations)
 
 Set `python` to the interpreter with your project’s dependencies and `bridge` to the checkout’s `sdk/python/bridge.py`. The following examples use the native payment environment from the offline quickstart.
+
+<a name="bsv-toolbox"></a>
+
+## Use the BSV SDKs and Wallet Toolbox
+
+Run the interoperability suite from the repository root with Python 3.11+, Node.js 22+, Go 1.27.4 or automatic Go toolchain selection, and Rust 1.88+. The ML-DSA fixture signer requires OpenSSL 3.5 or later. The suite installs its dependencies and uses public test keys and synthetic funding outputs.
+
+```sh
+bash sdk/verify.sh --interop
+bash sdk/verify.sh --interop p2pkh-r1 p2pkh-sm2
+```
+
+| Language | BSV SDK | Wallet Toolbox |
+| --- | --- | --- |
+| TypeScript | `@bsv/sdk` 4.1.2 | `@bsv/wallet-toolbox`, `@bsv/wallet-toolbox-client`, `@bsv/wallet-toolbox-mobile` 2.18.0 |
+| Go | `go-sdk` v1.7.8 | `go-wallet-toolbox` v0.192.1 |
+| Python | `bsv-sdk` 2.5.0 | `bsv-wallet-toolbox` 2.0.2 |
+| Rust | `bsv-rs` 0.8.13 | — |
+
+The Toolbox implementations derive the same BRC-29 P2PKH locking script. 4thGraph prepares the signing request and the callback signs it with the recipient’s derived key. Each BSV SDK validates that input against the synthetic funding output. The browser and mobile packages are exercised in Node.js. [BRC-29 payment example](../interop/python/payment.py)
+
+The suite reads the `current` release and any `next` candidate from each wallet project's `versions/index.json` in this checkout. It uses the 4thGraph wallet API to replay payments or Deferred activations. Chain-gang validates the resulting inputs, and the four BSV SDKs round-trip the transaction bytes and check the outpoints and transaction IDs. For an additional BSV Node check, run `bash tools/verify_node.sh --profile raised -- bash sdk/verify.sh --interop`. [Project replay](../interop/python/projects.py) · [Verification launcher](../verify.sh)
 
 <a name="wallet-workflow"></a>
 
