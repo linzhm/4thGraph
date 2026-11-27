@@ -21,9 +21,19 @@
 | `bls12-381-miller-loop` | 检查 B 点，计算 Miller 乘积并复用循环验证 B 的子群 |
 | `bls12-381-check-residue` | 检查配对余数条件 |
 
-`groth16-bls12-381-verify` 的静态输出 `groth16-verified` 代表完整验证路径。失败立即终止 Script，成功留下一个真值。生成器在原有谓词后加上 `OP_VERIFY OP_1`，共 2 B。`groth16-verify` 为兼容别名。当前入口支持 BSV 验证词、Forth 词定义及栈排列词。应用可在锁外层组合签名和交易绑定。 [公开输入及绑定接口](toolchain.md#bls12-381)
+`groth16-bls12-381-verify` 的静态输出 `groth16-verified` 代表完整验证路径。验证失败会终止 Script，成功留下一个真值。默认的 `--stack-schedule compact` 对稀疏配对线乘法做特化，并在检查结果可用时发出 `OP_VERIFY`。Fp12 乘法和平方在系数重组后统一取模，每次运算完成时将十二个系数约减到绝对值小于 Fp 模数的有符号余数。`--stack-schedule baseline` 使用通用域乘法和汇总验证谓词。两种模式共用见证编码。`groth16-verify` 为兼容别名。当前入口支持 BSV 验证词、Forth 词定义及栈排列词。应用可在锁外层组合签名和交易绑定。 [公开输入及绑定接口](toolchain.md#bls12-381)
 
-调用方可先写 `REQUIRE stdlib/groth16-bls12-381.fth`，再在定义体中调用验证词。构建和复放工具支持 `--entry <word>` 来选择栈效果为 `-- groth16-verified` 的入口。构建清单记录入口、导出接口及验证密钥摘要。 [语法书](language/syntax.md#4-公开导出)
+编译器的余数块只接受多项式运算和同一正模数的取模。余数块的输出按模数相等，具体的有符号代表元可以不同。Verifier 在写回配对累积器或检查余数前完成约减。 [编译器实现](../src/fourthgraph/compiler/stack_schedule.py)
+
+`compact` 模式用 `ScriptBuilder` 读取带范围的 Fp2 乘法公式，再用 `expand-cross-products` 展开虚部的交叉项。改写后的公式内联到整个验证器的算术图，由共享栈调度器安排操作数。构建清单的 `fp2_kernel` 记录公式入口、源码摘要和有序规则。 [Fp2 公式](../src/fourthgraph/stdlib/bls12-381-fp2.fth)
+
+对只依赖显式操作数的算术图，`compact` 还比较源码顺序和按断言依赖发码的两种布局，选用序列化字节数较小的一种。两种布局按相同顺序执行断言。按依赖发码时，编译器只在断言需要某个值时发出该值的计算。 [共享栈调度器](../src/fourthgraph/compiler/stack_schedule.py)
+
+仿射布局把斜率包定长读取交给共享调度器，`affine-witness` 也用同样的方式读取通过哈希承诺校验的配对线包。调度器把符合条件的读取改为逐次切分未读后缀，减少整包复制和偏移指令。[v0.4.0 实测记录](../projects/groth16-verifier/versions/v0.4.0/measurements.json)
+
+紧凑发码从栈位置和剩余引用数判断何时用 `OP_TUCK` 保留二元运算的右操作数，并从单字节数字推入识别可在使用处重新推入的常量。项目和标准库入口使用同一套规则。[v0.5.0 实测记录](../projects/groth16-verifier/versions/v0.5.0/measurements.json)
+
+调用方可先写 `REQUIRE stdlib/groth16-bls12-381.fth`，再在定义体中调用验证词。构建和复放工具支持 `--entry <word>` 来选择栈效果为 `-- groth16-verified` 的入口。构建清单记录入口、导出接口及验证密钥摘要。[项目调用演示](../projects/groth16-verifier/README.zh-CN.md) · [语法书](language/syntax.md#4-公开导出)
 
 ## 调用方选择
 

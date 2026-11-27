@@ -3,10 +3,11 @@
 from dataclasses import asdict, replace
 
 from .ranges import Slot, primitive_outputs, remainder_is_identity
-from .script_formula import ARITHMETIC, GENESIS_NUM_BYTES, Formula, Step, magnitude_bits
+from .script_formula import ARITHMETIC, GENESIS_NUM_BYTES, Formula, Step, cross_products, magnitude_bits
 from .wordsets import PRIMITIVES
 
-RULES = ("double-as-add", "common-values", "fold-literals", "factor-products", "elide-redundant-remainder")
+RULES = ("double-as-add", "common-values", "expand-cross-products", "fold-literals", "factor-products",
+         "elide-redundant-remainder")
 MAX_DEPTH = 3
 
 
@@ -97,6 +98,17 @@ def transform(formula, rule, *, diagnostics=None):
                 origin = tuple(dict.fromkeys((*origin, *(loc for arg in args for loc in origins[arg]))))
                 steps.append(combined)
                 origins.append(origin)
+                applications += 1
+        elif rule == "expand-cross-products":
+            pairs = cross_products(step, steps)
+            if pairs is not None:
+                origin = tuple(dict.fromkeys((*origin, *(loc for arg in args for loc in origins[arg]))))
+                first = len(steps)
+                for pair in pairs:
+                    bounds, = primitive_outputs(PRIMITIVES["int*"], tuple(steps[arg].bounds for arg in pair))
+                    steps.append(Step("int*", bounds, pair))
+                    origins.append(origin)
+                step = replace(step, operation="int+", args=(first, first + 1))
                 applications += 1
         elif rule == "elide-redundant-remainder" and redundant_remainder(step, steps):
             value, divisor = args

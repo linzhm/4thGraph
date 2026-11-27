@@ -1,6 +1,7 @@
 """Same-source differential checks for the formula builder's public pass options."""
 
 from itertools import product
+from operator import add, mul, sub
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
@@ -29,6 +30,35 @@ def coordinate_and_tangent(p0, p1, p2, t):
 
 
 class FormulaPassTests(unittest.TestCase):
+    def test_ordered_cross_products_inline_a_closed_formula(self):
+        source = """REQUIRE BSV
+range: limb script-int -9 10 ;
+range: wide script-int -500 501 ;
+formula: product ( limb limb limb limb -- wide wide )
+    {: a b c d :}
+    a c int* let ac
+    b d int* let bd
+    ac bd int-
+    a b int+ c d int+ int* ac int- bd int-
+;
+"""
+        baseline = ScriptBuilder(source, formula_passes=("stack",))
+        optimized = ScriptBuilder(source, formula_passes=("stack",), experimental_rules=("expand-cross-products",))
+        kernel = optimized.formula_ir["product"]
+        operations = {"int+": add, "int-": sub, "int*": mul}
+        for args in product((-9, 0, 9), repeat=4):
+            calls = []
+
+            def lower(name, *operands):
+                calls.append(name)
+                return operations[name](*operands)
+
+            expected = baseline.formula_ir["product"].inline(args, lambda name, *args: operations[name](*args))
+            self.assertEqual(kernel.inline(args, lower), expected)
+            self.assertEqual(calls, ["int*", "int*", "int-", "int*", "int*", "int+"])
+        with self.assertRaisesRegex(ValueError, "outside its input interval"):
+            kernel.inline((10, 0, 0, 0), lower)
+
     def test_passes_preserve_exact_signed_results_and_both_stacks(self):
         values = (-128, -1, 0, 1, 127)
         prefix = b"\x81"
@@ -76,3 +106,25 @@ class FormulaPassTests(unittest.TestCase):
                 ScriptBuilder(SOURCE, formula_passes=names)
         with self.assertRaisesRegex(ValueError, "automatic formula optimization"):
             ScriptBuilder(SOURCE, optimize=True, formula_passes=())
+
+    def test_reuse_remainder_only_for_the_same_divisor(self):
+        source = """REQUIRE BSV
+range: coordinate script-int -100 101 ;
+range: modulus script-int 1 8 ;
+range: residue script-int -6 7 ;
+formula: repeated ( coordinate modulus -- residue )
+    {: n d :} n d int-rem d int-rem ;
+formula: different ( coordinate modulus modulus -- residue )
+    {: n first second :} n first int-rem second int-rem ;
+"""
+        baseline = ScriptBuilder(source, formula_passes=())
+        optimized = ScriptBuilder(source, formula_passes=("rewrite", "share", "stack"))
+        rule = "reuse-same-divisor-remainder"
+        self.assertEqual(optimized.formulas["repeated"]["rewrites"][rule], 1)
+        self.assertNotIn(rule, optimized.formulas["different"]["rewrites"])
+        self.assertLess(len(optimized.emit("repeated", b"")), len(baseline.emit("repeated", b"")))
+        for entry, operands in (("repeated", (-19, 7)), ("repeated", (19, 7)), ("different", (-19, 7, 3))):
+            with self.subTest(entry=entry, operands=operands):
+                stack = list(map(encode_num, operands))
+                self.assertEqual(evaluate(optimized.emit(entry, b""), stack),
+                                 evaluate(baseline.emit(entry, b""), stack))

@@ -1,0 +1,124 @@
+{
+  "version": "0.1.0",
+  "compiler_revision": "cde00690c65dd26992717c1bc2a844fa5e113214",
+  "compiler_version": "0.2.7",
+  "fixture": "projects/proof-counter/versions/v0.1.0/bls12381-counter.json",
+  "fixture_sha256": "51f6524a32d8ec5d4eac1c97398dc97c1d0594caae0284b8faa36a02574c5cc6",
+  "forth_entry": "verify-proof",
+  "source_sha256": "54b838af0d58ada466eb209c9450be7c793db6dc2e4477793b7faaa60535cee6",
+  "library": {
+    "name": "std/groth16-bls12-381",
+    "sha256": "cbd89f41f2ad6c7e13b2dbd9e0836c94df5dbf3f6e9141dcef106cd6f36e0f4a",
+    "interface_sha256": "cdc05e0cb0139816837a030acd65d4ca93a2f71443639672f6f6dfb9bd078995"
+  },
+  "script_era": "genesis",
+  "stack_schedule": "compact",
+  "layout_selection": {
+    "objective": "path-bytes",
+    "scope": "one_lock_and_one_proof_witness_with_compact_size",
+    "candidates": [
+      {
+        "witness_layout": "projective",
+        "lock_bytes": 337126,
+        "witness_bytes": 1071,
+        "path_bytes": 338205
+      },
+      {
+        "witness_layout": "affine-inline",
+        "lock_bytes": 314501,
+        "witness_bytes": 9186,
+        "path_bytes": 323695
+      },
+      {
+        "witness_layout": "affine-witness",
+        "lock_bytes": 289864,
+        "witness_bytes": 35301,
+        "path_bytes": 325173
+      }
+    ]
+  },
+  "selected": {
+    "witness_layout": "affine-inline",
+    "lock_bytes": 314501,
+    "witness_bytes": 9186,
+    "path_bytes": 323695
+  },
+  "artifact_sha256": "6f45b35f58386185b94ff96f997594af29e9ea1bdcec4ecd433bfb560bb24c9b",
+  "script_sha256": "c5f654b8061a99eb148844fdf70a365d687876da93d44f6bc1092a97b5852e02",
+  "wrap_witness_sha256": "3089913fce520cf16c798cae57731a22fd57c04d1de3842e1c142eb1ec6ceb8e",
+  "node_version": 101020300,
+  "chain_gang": {
+    "version": "0.13.2",
+    "commit": "74676b9c002c452e7f21a9ed9265f4972bef03f6"
+  },
+  "transaction_version": 2,
+  "chronicle_activation_height": 1000,
+  "statements": [
+    {
+      "fixture_case": "wrap",
+      "public_signals": [
+        "0",
+        "0",
+        "4294967295",
+        "1",
+        "2"
+      ],
+      "deployment_txid": "eb92c36aac50abf78af59954447eaf2403fbf01ca34bb8ae42597077a7df5077",
+      "spend_txid": "10e0c99b902acbfb22cdeca6d9002e8bb0662d2f3654a11a70b9e03a22271755",
+      "deployment_bytes": 314638,
+      "spend_bytes": 9283,
+      "total_bytes": 323921,
+      "stack_payload": {
+        "main_payload_bytes": 20501,
+        "alt_payload_bytes": 59,
+        "combined_payload_bytes": 20501
+      },
+      "node": true,
+      "chain_gang": true,
+      "mined": true,
+      "controls": {
+        "crossed_statement": {
+          "node": false,
+          "chain_gang": false
+        },
+        "g1_outside_subgroup": {
+          "node": false,
+          "chain_gang": false
+        }
+      }
+    },
+    {
+      "fixture_case": "other",
+      "public_signals": [
+        "20",
+        "1",
+        "19",
+        "1",
+        "2"
+      ],
+      "deployment_txid": "01d59a79a3262c8a49cfd093184ce8b393675433328b7b8986ee4dd9bd32250b",
+      "spend_txid": "652c5951e2df0ee3a35066955341dc803326491432fc178bc58fde9794a764c2",
+      "deployment_bytes": 314637,
+      "spend_bytes": 9283,
+      "total_bytes": 323920,
+      "stack_payload": {
+        "main_payload_bytes": 20500,
+        "alt_payload_bytes": 59,
+        "combined_payload_bytes": 20500
+      },
+      "node": true,
+      "chain_gang": true,
+      "mined": true,
+      "controls": {
+        "crossed_statement": {
+          "node": false,
+          "chain_gang": false
+        },
+        "g1_outside_subgroup": {
+          "node": false,
+          "chain_gang": false
+        }
+      }
+    }
+  ]
+}
