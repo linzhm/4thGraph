@@ -25,10 +25,18 @@ from fourthgraph.benchmark.cases import native_coin
 from fourthgraph.benchmark.validation import CONTEXT_PIN, Node, chain_metadata
 from fourthgraph.bsv.chain_gang import validate_at_heights
 from fourthgraph.bsv.script import number, push
-from fourthgraph.bsv.transaction import FORKID, SIGHASH_NONE, Input, Output, Transaction, hash256, preimage_forkid
+from fourthgraph.bsv.spend_authorization import prepare_authorization
+from fourthgraph.bsv.transaction import FORKID, SIGHASH_NONE, Input, Output, Transaction
 
 SOURCE = CHECKOUT / "projects/proof-counter/workflow.fth"
 FUNDING_VALUE, LOCK_VALUE, SPEND_FEE = 4_000_000, 2_000_000, 100_000
+# gnark-crypto v0.14.0 MapToCurve2(1 + 3u) without cofactor clearing.
+OUTSIDE_G2 = (
+    12607666168883001589765070440112739681954578777599593820918040296956030535958,
+    5464160493475790513763376931430610309575896743666349185713990768523591514131,
+    9321508106285440934005708051435257831781891348124952145391832450992595407283,
+    17196288197818021705011411144143247207503981931201127351767292997328480333170,
+)
 
 
 def demo_keys(circuit):
@@ -77,9 +85,14 @@ def fund(node, version):
     return native, tx
 
 
+def owner_authorization(tx, parent, flag=FLAG):
+    prev = parent.outputs[0]
+    return prepare_authorization(tx, 0, prev.value, flag, ordinary_code=prev.script, companion_code=b"")
+
+
 def sign_spend(tx, parent, witness, keys, *, flag=FLAG):
     prev = parent.outputs[0]
-    digest = hash256(preimage_forkid(tx, 0, prev.value, prev.script, flag))
+    digest = owner_authorization(tx, parent, flag).digest()
     request = SignRequest("groth16", Outpoint(parent.txid_wire(), 0), "operator", keys.public["operator"],
                           flag, digest, tx, prev, ())
     return tx.with_script(0, witness + push(keys.sign(request) + bytes([flag])))
@@ -113,12 +126,15 @@ def main():
     inputs = cli.add_mutually_exclusive_group()
     inputs.add_argument("--source", type=Path, default=SOURCE, help="Forth source for the generated circuit")
     inputs.add_argument("--fixture", type=Path, help="a test-only key and two proofs instead of a fresh setup")
+    cli.add_argument("--fixture-case", choices=("wrap", "other"), help="choose which fixture statement to pin")
     cli.add_argument("--entries", nargs=2, metavar=("TRANSITION", "ROUTE"), help="select two Forth words")
     cli.add_argument("--verifier-source", type=Path, help="typed BN254 verifier Forth, separate from the circuit")
     cli.add_argument("--go", default="go")
     cli.add_argument("--tx-version", type=int, choices=(1, 2), default=2)
     cli.add_argument("--output", type=Path, required=True)
     args = cli.parse_args()
+    if args.fixture_case and not args.fixture:
+        cli.error("--fixture-case requires --fixture")
     keys = TestKeys()
     owner = keys.public["operator"]
     try:
@@ -150,10 +166,12 @@ def main():
         build_adapter(args.runar, adapter, go=args.go)
         if args.fixture:
             key = json.dumps(fixture["verification_key"]).encode()
-            signals = public_signals(json.dumps(fixture["wrap"]["public"]))
-            proof = json.dumps(fixture["wrap"]["proof"]).encode()
-            other_signals = public_signals(json.dumps(fixture["other"]["public"]))
-            other_proof = json.dumps(fixture["other"]["proof"]).encode()
+            case = args.fixture_case or "wrap"
+            other_case = "other" if case == "wrap" else "wrap"
+            signals = public_signals(json.dumps(fixture[case]["public"]))
+            proof = json.dumps(fixture[case]["proof"]).encode()
+            other_signals = public_signals(json.dumps(fixture[other_case]["public"]))
+            other_proof = json.dumps(fixture[other_case]["proof"]).encode()
         else:
             circuit = CircuitFixture(circuit_source, temporary, has_route=True)
             key = demo_keys(circuit)
@@ -190,6 +208,14 @@ def main():
                 valid, outputs=(replace(valid.outputs[0], value=tx.outputs[0].value - 1),),
             ),
         }
+        if isinstance(verifier, ForthVerifier) and verifier.compact_statement:
+            points = runar_proof(proof)
+            b = b"".join(number(int(value)) for value in points["B"])
+            c = b"".join(number(int(value)) for value in points["C"])
+            if not witness.endswith(b + c):
+                raise ValueError("unexpected B or C coordinate layout in compact witness")
+            outside = b"".join(number(value) for value in OUTSIDE_G2)
+            invalid["g2_outside_subgroup"] = sign_spend(tx, deployment, witness[:-len(b+c)] + outside + c, keys)
         controls = {name: verify_spend(node, activation, spend, deployment, deploy["height"], expected=False)
                     for name, spend in invalid.items()}
         active = deploy["height"] >= activation
@@ -204,6 +230,8 @@ def main():
             "verification_key": json.loads(key), "artifact": verifier.artifact(signals, owner, lock),
             "proof": json.loads(proof), "other_proof": json.loads(other_proof), "other_public_signals": other_signals,
             "witness_bytes": len(witness), "bootstrap_raw": bootstrap.serialize().hex(),
+            "owner_authorization": {"sighash": FLAG, "signing_preimage_bytes": len(owner_authorization(tx, deployment).preimage),
+                                    "preimage_in_unlock_bytes": 0},
             "deployment_raw": deployment.serialize().hex(), "deployment": deploy, "spend": result, "controls": controls,
         }
     args.output.parent.mkdir(parents=True, exist_ok=True)

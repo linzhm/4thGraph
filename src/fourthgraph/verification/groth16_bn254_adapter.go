@@ -13,9 +13,12 @@ import (
 )
 
 type request struct {
-	VK     string
-	Public []string
-	Proof  *struct {
+	VK               string
+	Public           []string
+	CompactStatement bool
+	CompactSubgroup  string
+	ModuloThreshold  int
+	Proof            *struct {
 		A []string
 		B []string
 		C []string
@@ -47,7 +50,10 @@ func run() error {
 		return err
 	}
 	if req.Proof == nil {
-		artifact, err := compiler.CompileGroth16WA(req.VK, compiler.Groth16WAOpts{PublicInputs: pub})
+		artifact, err := compiler.CompileGroth16WA(req.VK, compiler.Groth16WAOpts{
+			PublicInputs: pub, CompactStatement: req.CompactStatement, CompactSubgroup: req.CompactSubgroup,
+			ModuloThreshold: req.ModuloThreshold,
+		})
 		if err != nil {
 			return err
 		}
@@ -74,7 +80,25 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	encoded, err := codegen.Emit([]codegen.StackMethod{{Name: "witness", Ops: witness.ToStackOps()}})
+	ops := witness.ToStackOps()
+	if req.CompactStatement {
+		const residueSlots, statementSlots, proofSlots = 25, 7, 8
+		millerEnd := 1 + len(witness.MillerGradients)
+		if len(witness.MillerGradients)%6 != 0 ||
+			len(ops) != millerEnd+residueSlots+statementSlots+len(witness.ProofBSubgroupGradients)+proofSlots {
+			return fmt.Errorf("unexpected Rúnar witness layout")
+		}
+		compact := []codegen.StackOp{ops[0]} // Field modulus.
+		for i := 1; i < millerEnd; i += 6 {
+			compact = append(compact, ops[i:i+2]...) // Only proof.B has witness slopes.
+		}
+		compact = append(compact, ops[millerEnd:millerEnd+residueSlots]...)
+		if req.CompactSubgroup == "affine" {
+			compact = append(compact, ops[millerEnd+residueSlots+statementSlots:len(ops)-proofSlots]...)
+		}
+		ops = append(compact, ops[len(ops)-proofSlots:]...)
+	}
+	encoded, err := codegen.Emit([]codegen.StackMethod{{Name: "witness", Ops: ops}})
 	if err != nil {
 		return err
 	}
