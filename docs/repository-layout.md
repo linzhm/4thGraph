@@ -35,6 +35,7 @@
 │   ├── p2pkh-sm2/
 │   ├── pels-counter/
 │   ├── proof-counter/
+│   ├── template/                 # New project scaffold, schemas, and version examples
 │   ├── workflow-examples/
 │   └── wots-plus/
 ├── sdk/                          # Go, Python, Rust and TypeScript adapters
@@ -59,6 +60,6 @@
 └── pyproject.toml                # Python package and four installed commands
 ```
 
-[Projects](../projects/README.md) are the runnable examples. They keep their own reference code, templates, experiments and verified results. `bash tools/setup-workspaces.sh` creates local workspaces at the root and inside each project. It is safe to rerun. Git ignores the directories.
+[Projects](../projects/README.md) are the runnable examples. They keep their own reference code, templates, experiments and verified results. `bash tools/setup-workspaces.sh` creates Git-ignored local workspaces at the root and inside each project. Start new projects with the shared scaffold. [New project scaffold](../projects/template/README.md)
 
 The [SDL documentation](language/README.md) describes code shipped with 4thGraph. The [Codex skill](../skills/4thgraph/SKILL.md) has its own installation and uses the toolchain through documented inputs and commands. The [showcase](../showcase/README.md) links measurements to the project that produced them.

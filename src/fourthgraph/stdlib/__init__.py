@@ -162,6 +162,10 @@ LIBRARIES = {
                         failure="The caller places the field prime at the bottom of the main stack."),
         script_fragment("secp256k1-lambda-split", (Parameter("k", "script-int", "Scalar in [0, n]"),),
                         failure="The caller supplies a scalar in range. Leaves the two signed components."),
+        script_fragment("secp256k1-lambda-split-with-order", (
+            Parameter("k", "script-int", "Scalar in [0, n]"),
+            Parameter("n", "script-int", "The secp256k1 group order"),
+        ), failure="The caller supplies a scalar in range and the fixed group order. Leaves the two signed components."),
         script_fragment("secp256k1-add", (
             Parameter("left", "projective-point", "Three homogeneous ScriptNum coordinates"),
             Parameter("right", "projective-point", "Three homogeneous ScriptNum coordinates"),
@@ -173,6 +177,28 @@ LIBRARIES = {
         script_fragment("secp256k1-double", (
             Parameter("point", "projective-point", "Three homogeneous ScriptNum coordinates"),
         ), failure="The caller supplies a valid point and the field prime at the bottom of the main stack."),
+        script_fragment("secp256k1-scale-affine-pair", (
+            Parameter("left", "affine-point", "Two secp256k1 coordinates"),
+            Parameter("right", "affine-point", "Two secp256k1 coordinates"),
+        ), failure="The caller places the field prime at the bottom. Returns both points on the curve with 3*b = 1."),
+        script_fragment("secp256k1-scaled-add-with-field", (
+            Parameter("left", "projective-point", "Three homogeneous coordinates on the scaled curve"),
+            Parameter("right", "projective-point", "Three homogeneous coordinates on the scaled curve"),
+        ), takes=("script", "cell"),
+                        failure="Supply valid points on the scaled curve. Field placement 0 uses stack bottom and 1 uses the slot below the points."),
+        script_fragment("secp256k1-scaled-add-affine-with-field", (
+            Parameter("left", "projective-point", "Three homogeneous coordinates on the scaled curve"),
+            Parameter("right", "affine-point", "Two affine coordinates on the scaled curve"),
+        ), takes=("script", "cell"),
+                        failure="Supply valid points on the scaled curve. Field placement 0 uses stack bottom and 1 uses the slot below the points."),
+        script_fragment("secp256k1-scaled-double-with-field", (
+            Parameter("point", "projective-point", "Three homogeneous coordinates on the scaled curve"),
+        ), takes=("script", "cell"),
+                        failure="Supply a valid point on the scaled curve. Field placement 0 uses stack bottom and 1 uses the slot below the point."),
+        script_fragment("secp256k1-scaled-double-pair-with-field", (
+            Parameter("point", "projective-point", "Three reduced homogeneous coordinates on the scaled curve"),
+        ), takes=("script", "cell"),
+                        failure="Supply a valid point on the scaled curve. Field placement 0 uses stack bottom and 1 uses the slot below the point."),
     ), WALLET_BACKEND),
     "std/bip340": Library(ROOT / "stdlib/bip340.fth", (
         script_fragment("bip340-verify", (

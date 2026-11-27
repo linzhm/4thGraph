@@ -1,6 +1,7 @@
 # Working on 4thGraph
 
 - Keep script projects self-contained under `projects/<name>/`. Put reusable compiler code and Forth libraries under `src/fourthgraph/`, SDK clients under `sdk/`, and developer launchers under `tools/`.
+- Start new projects with `python3 tools/project_readme.py <project> --scaffold`. Fill the manifest and add the first runnable version using the [project scaffold](projects/template/README.md). Generate and check the bilingual READMEs with `--write` and `--check`.
 - Use the local `workspace/` directories for dependencies, builds and logs. Keep selected artifacts, fixtures and evidence with their version under `projects/<name>/versions/` and link to them from the project and showcase pages.
 - Preserve existing script bytes and vectors when moving directories. Update documentation links, SDK module paths and test working directories.
 - Prefer a cloud Linux environment or Apple Container for full node validation. Do not start Docker.

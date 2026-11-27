@@ -40,6 +40,27 @@ bash tools/verify_node.sh -- python tests/project_transactions.py
 
 从仓库根目录执行 `bash tools/setup-workspaces.sh`，在每个项目的 `workspace/` 下创建 Git 忽略的构建、缓存和日志目录。项目首页链接协议和接入指南，参考实现、构建入口和测试脚本放在对应项目。 [安装 4thGraph](../docs/install.md) · [共享钱包 SDK](../sdk/README.zh-CN.md) · [项目成果](../showcase/README.md)
 
+## 项目 README 模板
+
+新项目脚手架创建目录、起始清单和双语 README 草稿。项目级 `projects/<name>/manifest.json` 是两份 README 的共同来源。填入项目介绍和复放证据，再生成并检查两份 README。[项目脚手架](template/README.zh-CN.md)
+
+```sh
+python3 tools/project_readme.py my-project --scaffold --title "My project" --title-zh "我的项目"
+# 编辑 projects/my-project/manifest.json
+python3 tools/project_readme.py my-project --write
+python3 tools/project_readme.py my-project --check
+```
+
+| 字段 | 内容 |
+| --- | --- |
+| `schema_version` | 格式版本，当前为 `1`。 |
+| `title`、`summary` | `en` 和 `zh-CN` 各一行。 |
+| `entry_points` | 共用的入口名称及中英文说明。 |
+| `sections` | 按固定键组织的中英文 Markdown 内容块。保留 `algorithm` 和 `reproduction`，其余按项目需要填写。 |
+| `setup` | 可选的双语准备步骤，放在构建和验证命令之前。 |
+
+段落、表格和代码块可分别写入一个内容块，相对链接从项目目录解析。生成器从 `versions/index.json` 读取当前版本，从该版本清单取得构建和验证命令，并链接已有的协议、SDK 和实测文件。`--check` 报告未处理的模板提示和 README 与生成结果的差异。现有项目可在采用清单前继续直接维护 README。[JSON Schema](template/manifest.schema.json) · [起始清单](template/manifest.example.json) · [Schnorr 清单](p2pkh-schnorr/manifest.json) · [生成的 README](p2pkh-schnorr/README.zh-CN.md)
+
 ## 版本数据
 
 每个项目用 `versions/index.json` 按顺序列出版本。`current` 指向当前版本，已有下一轮数据时用 `next` 指向它。SDK 有版本选择参数的项目用 `sdk_default` 记录钱包默认模板。
