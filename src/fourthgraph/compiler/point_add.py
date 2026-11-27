@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from hashlib import sha256
 
 from fourthgraph.bsv.script import SECP256K1_FIELD as FIELD, asm, number
-from .script_builder import ScriptBuilder, build_word
+from .script_builder import SCRIPT_WORDS, ScriptBuilder, build_word
 
 
 @dataclass(frozen=True)
@@ -58,6 +58,31 @@ def unbound(*_):
 POINT_ADD = build_word("script bytes", "script", unbound)
 
 
+class _LinkedScript(bytes):
+    """Carry call-site offsets as Script fragments are composed at build time."""
+
+    def __new__(cls, code, sites):
+        value = super().__new__(cls, code)
+        value.sites = sites
+        return value
+
+    @classmethod
+    def concatenate(cls, left, right):
+        sites = getattr(left, "sites", ())
+        sites += tuple((site, len(left) + offset) for site, offset in getattr(right, "sites", ()))
+        return cls(bytes(left) + bytes(right), sites)
+
+    def __add__(self, other):
+        return self.concatenate(self, other)
+
+    def __radd__(self, other):
+        return self.concatenate(other, self)
+
+    def __mul__(self, count):
+        sites = tuple((site, i * len(self) + offset) for i in range(count) for site, offset in self.sites)
+        return _LinkedScript(bytes(self) * count, sites)
+
+
 class PointAddBuilder(ScriptBuilder):
     def __init__(self, source):
         super().__init__(source, vocabulary={"secp256k1-point-add": POINT_ADD,
@@ -98,6 +123,9 @@ class PointAddBuilder(ScriptBuilder):
         sites = []
 
         def bind(instruction, token, args):
+            if instruction is SCRIPT_WORDS["bsv-cat-code"]:
+                left, right = args
+                return (left + right,)
             if instruction is not POINT_ADD:
                 return instruction.run(*args)
             prefix, encoded = args
@@ -126,11 +154,11 @@ class PointAddBuilder(ScriptBuilder):
                           "evidence": {"kind": "checked-constant", "finite": True, "z": 1, "coordinates": encoded.hex()}
                           if constant else {"kind": "runtime-projective"},
                           "candidates": choices, **selected,
-                          "offset": len(prefix), "bytes": len(snippet),
+                          "bytes": len(snippet),
                           "linked_sha256": sha256(snippet).hexdigest()})
-            return (prefix + snippet,)
+            return (prefix + _LinkedScript(snippet, ((site, 0),)),)
 
         result = self.emit(entry, b"", build_call=bind)
         if requested:
             raise ValueError(f"unknown call site {min(requested)} in {entry!r}")
-        return result, sites
+        return bytes(result), [{**sites[site], "offset": offset} for site, offset in getattr(result, "sites", ())]

@@ -316,6 +316,21 @@ class FormulaExperiments(unittest.TestCase):
         self.assertEqual(receipt["diagnostic"], "engine unavailable")
         self.assertEqual(report["ranking"], [])
 
+    def test_point_add_spans_follow_composed_and_repeated_fragments(self):
+        fixture = PointAddFixture()
+        source = fixture.source(fixture.name).decode() + (
+            "\n: outer ( script -- script ) op-nop bsv-empty add-two 2 bsv-repeat-code bsv-cat-code ;\n"
+        )
+        builder = PointAddBuilder(source)
+        fragment, original = builder.emit_plan(fixture.entry, [])
+        code, sites = builder.emit_plan("outer", [])
+        self.assertEqual(code, asm("OP_NOP") + fragment * 2)
+        self.assertEqual([site["offset"] for site in sites],
+                         [1 + copy * len(fragment) + site["offset"] for copy in range(2) for site in original])
+        for site in sites:
+            offset = site["offset"]
+            self.assertEqual(sha256(code[offset:offset + site["bytes"]]).hexdigest(), site["linked_sha256"])
+
     def test_point_add_enumerates_only_eligible_call_site_bindings(self):
         self._require_pinned_chain()
         self.assertEqual(capabilities()["call_site_fixtures"]["point-add"]["enumerate"], "bindings")
