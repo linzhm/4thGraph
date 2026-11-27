@@ -10,15 +10,15 @@ import subprocess
 import sys
 import tempfile
 import unittest
-from assemble import PACKED_SM3_TEMPLATE_VERSION, SIGNED_RESIDUE_TEMPLATE_VERSION
-from assemble import COMPILED_POINT_TEMPLATE_VERSION, POINT_KERNEL_FILE, TEMPLATE_VERSION, TEMPLATE_VERSIONS
+from assemble import PACKED_SM3_TEMPLATE_VERSION, SIGNED_RESIDUE_TEMPLATE_VERSION, SIGNED_WINDOW_TEMPLATE_VERSION
+from assemble import POINT_KERNEL_FILE, TEMPLATE_VERSION, TEMPLATE_VERSIONS
 from assemble import assemble, forth_compiler, sm3_blocks
 from point_kernels import compile_kernels, load_kernels
 from p2pkh_sm2 import *
 from sm2 import *
 from sm3_script import hash_script,compress,IV
 from fourthgraph.bsv.evaluate import evaluate,ScriptError
-from fourthgraph.bsv.script import push,number,assemble as assemble_blocks
+from fourthgraph.bsv.script import asm, decode_num, encode_num, push, number, assemble as assemble_blocks
 from fourthgraph.bsv.transaction import *
 
 ROOT=Path(__file__).resolve().parents[1]
@@ -200,10 +200,33 @@ class SM2Tests(unittest.TestCase):
         for left, right in ((infinity, infinity), (infinity, point), (point, infinity),
                             (point, point), (point, inverse), (scaled, point), (scaled, scaled)):
             with self.subTest(left=left, right=right):
-                add_stack = [number(value) for value in (*cached, *left, *right)]
-                double_stack = [number(value) for value in (*cached, *left)]
+                add_stack = [encode_num(value) for value in (*cached, *left, *right)]
+                double_stack = [encode_num(value) for value in (*cached, *left)]
                 self.assertEqual(evaluate(new_add, add_stack), evaluate(old_add, add_stack))
                 self.assertEqual(evaluate(new_double, double_stack), evaluate(old_double, double_stack))
+
+    def test_signed_windows_match_scalar_multiplication(self):
+        compiler = forth_compiler(bytes(20), SIGNED_WINDOW_TEMPLATE_VERSION)
+        window = compiler.emit("sm2-window", b"")
+        qx, qy = mul(7)
+        cached = [encode_num(value) for value in (P, 3*B % P, 17)]
+        cases = (
+            (0, 0), (1, 0), (0, 1), (15, 16), (16, 31), (31, 32),
+            (N-7, 1), (N-1, N-1), (1 << 255, N-2), (N-2, 1 << 255),
+            ((1 << 256)-1, (1 << 256)-1),
+        )
+        for s, t in cases:
+            with self.subTest(s=s, t=t):
+                setup = b"".join(number(value) + asm("OP_TOALTSTACK") for value in (s, t, qy, qx))
+                stack, alt = evaluate(setup + window, cached)
+                self.assertEqual(alt, [])
+                self.assertEqual(stack[:len(cached)], cached)
+                self.assertEqual(len(stack), len(cached) + 2*17*3 + 3)
+                x, y, z = (decode_num(value) % P for value in stack[-3:])
+                self.assertTrue(x or y or z)
+                inverse_z = pow(z, -1, P) if z else None
+                actual = (x*inverse_z % P, y*inverse_z % P) if z else None
+                self.assertEqual(actual, add(mul(s), mul(t, (qx, qy))))
 
     def test_script_rejects_invalid_signature_and_key(self):
         key,lock,parent,tx,pre,sig=fixture()
@@ -234,7 +257,7 @@ class SM2Tests(unittest.TestCase):
         key=encode_public(mul(N-pow(2,-1,N)))
         self.assertFalse(verify_digest(key,bytes(32),be32(1)+be32(1)))
         inputs=b''.join(number(x) for x in (P,1,1,*parse_public(key),0))
-        for version in (TEMPLATE_VERSION, SIGNED_RESIDUE_TEMPLATE_VERSION, COMPILED_POINT_TEMPLATE_VERSION):
+        for version in TEMPLATE_VERSIONS:
             point_code=forth_compiler(bytes(20), version).emit("sm2-verify-sm2-point", b"")
             with self.subTest(version=version), self.assertRaises(ScriptError):
                 evaluate(inputs+point_code)
@@ -250,7 +273,7 @@ class SM2Tests(unittest.TestCase):
         q=mul(pow(t,-1,N),add((x,y),mul(N-s)))
         self.assertTrue(verify_digest(encode_public(q),be32(e),be32(r)+be32(s)))
         inputs=b''.join(number(v) for v in (P,r,s,*q,e))
-        for version in (TEMPLATE_VERSION, SIGNED_RESIDUE_TEMPLATE_VERSION, COMPILED_POINT_TEMPLATE_VERSION):
+        for version in TEMPLATE_VERSIONS:
             point_code=forth_compiler(bytes(20), version).emit("sm2-verify-sm2-point", b"")
             with self.subTest(version=version):
                 self.assertEqual(evaluate(inputs+point_code),([],[]))
@@ -297,7 +320,7 @@ class SM2Tests(unittest.TestCase):
         for version in TEMPLATE_VERSIONS[1:]:
             candidate = assemble(base_owner, version)
             self.assertEqual(subprocess.check_output([*cli, '--version', str(version), '--format', 'raw']), candidate)
-        for version in (0, 7, 8):
+        for version in (0, 8, 9):
             with self.subTest(version=version):
                 for construct in (assemble, locking_script_from_owner_hash):
                     with self.assertRaisesRegex(ValueError, 'unsupported P2PKH-SM2 template'):

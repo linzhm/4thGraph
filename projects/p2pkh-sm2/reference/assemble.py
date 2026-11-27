@@ -17,6 +17,7 @@ SIGNED_RESIDUE_TEMPLATE_VERSION = 3
 PACKED_SM3_TEMPLATE_VERSION = 4
 COMPILED_POINT_TEMPLATE_VERSION = 5
 SPLIT_ROTATION_TEMPLATE_VERSION = 6
+SIGNED_WINDOW_TEMPLATE_VERSION = 7
 TEMPLATE_PROFILES = {
     TEMPLATE_VERSION: "v1.0.0",
     SCHEDULED_TEMPLATE_VERSION: "v1.2.0",
@@ -24,6 +25,7 @@ TEMPLATE_PROFILES = {
     PACKED_SM3_TEMPLATE_VERSION: "v1.4.0",
     COMPILED_POINT_TEMPLATE_VERSION: "v1.5.0",
     SPLIT_ROTATION_TEMPLATE_VERSION: "v1.6.0",
+    SIGNED_WINDOW_TEMPLATE_VERSION: "v1.7.0",
 }
 TEMPLATE_VERSIONS = tuple(TEMPLATE_PROFILES)
 FORTH_LIBRARY = "std/wallet/p2pkh-sm2"
@@ -43,6 +45,7 @@ def forth_compiler(owner, version=TEMPLATE_VERSION):
         "owner-hash": build_word("", "bytes", lambda: owner),
         "signed-residues?": build_word("", "cell", lambda: -int(version >= SIGNED_RESIDUE_TEMPLATE_VERSION)),
         "compiled-points?": build_word("", "cell", lambda: -int(compiled_points)),
+        "signed-windows?": build_word("", "cell", lambda: -int(version >= SIGNED_WINDOW_TEMPLATE_VERSION)),
     }
     for name, code in blocks.items():
         vocabulary[name.lower().replace("_", "-")] = build_word("", "script", lambda code=code: code)

@@ -151,6 +151,10 @@ REQUIRE BSV
 : sm2-gy15 ( script -- script )
     bytes-hex 32ec7722695dc7cf5ee9fab985c12455dc2e788fb170aa144c3533771db0955e bsv-num-be ;
 
+: sm2-g16 ( script -- script )
+    bytes-hex 35648233f554ae51bbce44ef5db3e419ea133cd248a93e2555645bbc8704fb68 bsv-num-be
+    bytes-hex 04d7ac60f6d975ef6117bca9ce885dd6154b1870a6a651664411a9a30eca2046 bsv-num-be op-1 ;
+
 : sm2-drop-two ( script -- script )
     op-2drop ;
 
@@ -202,11 +206,34 @@ REQUIRE BSV
     bsv-empty sm2-double-point 4 bsv-repeat-code bsv-cat-code op-fromaltstack 3 bsv-num op-mul 50 bsv-num
     sm2-add-selected op-fromaltstack 3 bsv-num op-mul 98 bsv-num sm2-add-selected ;
 
-: sm2-window ( script -- script )
+: sm2-signed-digit ( script -- script )
+    ( Add 16 to the scalar, then divide by 32 and save the remainder minus 16. )
+    16 bsv-num op-add 32 bsv-num op-2dup op-mod 16 bsv-num op-sub op-toaltstack op-div ;
+
+: sm2-digits-split5 ( script -- script )
+    op-swap sm2-signed-digit op-swap sm2-signed-digit ;
+
+: sm2-add-signed-selected ( script cell -- script )
+    ( The build-time depth includes the index held on the stack while copying X and Y. )
+    swap op-fromaltstack op-dup op-0 op-lessthan op-toaltstack op-abs op-3 op-mul
+    swap bsv-num op-swap op-sub
+    op-dup op-pick op-over op-pick op-fromaltstack op-if op-negate op-endif
+    op-rot op-1sub op-pick sm2-add-points ;
+
+: sm2-add-split5 ( script -- script )
+    ( The Q and G tables hold triples for magnitudes 0 through 16. )
+    54 sm2-add-signed-selected 105 sm2-add-signed-selected ;
+
+: sm2-step-split5 ( script -- script )
+    bsv-empty sm2-double-point 5 bsv-repeat-code bsv-cat-code sm2-add-split5 ;
+
+: sm2-window-table ( script -- script )
     op-0 op-1 op-0 sm2-gx sm2-gy op-1 sm2-gx2 sm2-gy2 op-1 sm2-gx3 sm2-gy3 op-1 sm2-gx4 sm2-gy4
     op-1 sm2-gx5 sm2-gy5 op-1 sm2-gx6 sm2-gy6 op-1 sm2-gx7 sm2-gy7 op-1 sm2-gx8 sm2-gy8 op-1
     sm2-gx9 sm2-gy9 op-1 sm2-gx10 sm2-gy10 op-1 sm2-gx11 sm2-gy11 op-1 sm2-gx12 sm2-gy12 op-1
-    sm2-gx13 sm2-gy13 op-1 sm2-gx14 sm2-gy14 op-1 sm2-gx15 sm2-gy15 op-1 op-0 op-1 op-0
+    sm2-gx13 sm2-gy13 op-1 sm2-gx14 sm2-gy14 op-1 sm2-gx15 sm2-gy15 op-1
+    signed-windows? if sm2-g16 then
+    op-0 op-1 op-0
     op-fromaltstack op-fromaltstack op-1 op-3dup sm2-double-point op-3dup 8 bsv-num op-pick
     8 bsv-num op-pick 8 bsv-num op-pick sm2-add-points 5 bsv-num op-pick 5 bsv-num op-pick 5 bsv-num
     op-pick sm2-double-point op-3dup 14 bsv-num op-pick 14 bsv-num op-pick 14 bsv-num op-pick
@@ -218,17 +245,32 @@ REQUIRE BSV
     17 bsv-num op-pick 17 bsv-num op-pick sm2-double-point op-3dup 38 bsv-num op-pick 38 bsv-num op-pick
     38 bsv-num op-pick sm2-add-points 20 bsv-num op-pick 20 bsv-num op-pick 20 bsv-num op-pick
     sm2-double-point op-3dup 44 bsv-num op-pick 44 bsv-num op-pick 44 bsv-num op-pick sm2-add-points
+    signed-windows? if
+        ( Copy 8Q to add the final magnitude, 16Q. )
+        23 bsv-num op-pick 23 bsv-num op-pick 23 bsv-num op-pick sm2-double-point
+    then ;
+
+: sm2-window-split4 ( script -- script )
     op-fromaltstack op-fromaltstack op-swap bsv-empty sm2-digits-split4 64 bsv-repeat-code bsv-cat-code
     op-2drop op-0 op-1 op-0 bsv-empty sm2-step-split4 64 bsv-repeat-code bsv-cat-code ;
 
+: sm2-window-split5 ( script -- script )
+    op-fromaltstack op-fromaltstack op-swap bsv-empty sm2-digits-split5 51 bsv-repeat-code bsv-cat-code
+    ( The residual scalars are the leading digits, at most 2. Start without doubling infinity. )
+    op-swap op-toaltstack op-toaltstack op-0 op-1 op-0 sm2-add-split5
+    bsv-empty sm2-step-split5 51 bsv-repeat-code bsv-cat-code ;
+
+: sm2-window ( script -- script )
+    sm2-window-table signed-windows? if sm2-window-split5 else sm2-window-split4 then ;
+
 : sm2-copy-r-low ( script -- script )
-    100 bsv-num op-pick ;
+    signed-windows? if 106 else 100 then bsv-num op-pick ;
 
 : sm2-copy-r-high ( script -- script )
-    99 bsv-num op-pick ;
+    signed-windows? if 105 else 99 then bsv-num op-pick ;
 
 : sm2-clear-points ( script -- script )
-    bsv-empty sm2-drop-two 51 bsv-repeat-code bsv-cat-code ;
+    bsv-empty sm2-drop-two signed-windows? if 54 else 51 then bsv-repeat-code bsv-cat-code ;
 
 ( Canonicalize X and Z before comparing X to a nonnegative multiple of Z modulo p. )
 : sm2-normalize-result ( script -- script )
