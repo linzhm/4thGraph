@@ -24,11 +24,11 @@
 | 链上重建 | PELS 和 Workflow 使用已知交易形状、链接的 `scriptCode` 和合约构造的输出恢复原像。可省字段由签名模式和合约约束共同决定。[重建实现](../../src/fourthgraph/workflow/forkid_lowering.py) |
 | 授权与绑定 | 钱包接口处理普通和 companion 路径，交易锁使用原生验签绑定实际花费。未配对 OTDA SINGLE 使用特殊摘要，该分支没有可序列化的交易原像。[授权接口](../../src/fourthgraph/bsv/spend_authorization.py) · [绑定实现](../../src/fourthgraph/bsv/pushtx.py) |
 
-Forth 共用入口从单输入、完整有序输出的 BIP143 ALL 起步。OTDA ALL 可用于无前序金额依赖的同类规则。需要前序金额时，OTDA 路径须独立认证金额来源。同一锁的双模式入口要求两路都履行该成员的公开契约。各项目按输入形状、需认证的字段和输出约束选择成员。[模式及约束表](../optimizer-integration-review.zh-CN.md#用什么模板验证什么内容)
+Forth 公共入口表达输入形状、要认证的字段及输出约束。编译器结合编译目标的签名规则匹配原语。首个成员覆盖单输入及完整有序输出的 BIP143 ALL。OTDA 路径须为业务所需的前序金额另行认证来源。同一锁的多模式要求各路径都履行公开契约。[模式及约束表](../optimizer-integration-review.zh-CN.md#用什么模板验证什么内容)
 
 ## 公开接口
 
-PELS 在架构上归属标准库模板族，成员声明可验证的交易与后继约束，应用提供状态和金额规则。项目 `pels-counter` 演示其中一种用法。主线已有可独立加载的项目内 PELS 词；评审稿给出了 `REQUIRE stdlib/pels/bip143-all-1in-1out.fth` 的可运行试验，用于约定唯一输出并断言当前交易原像中的字段。公开安装路径仍待登记，下面的表只列已登记模块。[模板族及公开接口评审](../optimizer-integration-review.zh-CN.md)
+PELS 在架构上归属标准库模板族，应用提供状态和金额规则，编译器按编译目标选择实现。主线已有可独立加载的项目内 PELS 词。评审稿给出了约定唯一输出和原像字段的低层试验，以及统一的应用引用 `REQUIRE stdlib/pels.fth` 的拟议写法。下面的表列出已登记模块。[模板族及公开接口评审](../optimizer-integration-review.zh-CN.md)
 
 | 模块 | 公开接口 | 现有项目 |
 | --- | --- | --- |

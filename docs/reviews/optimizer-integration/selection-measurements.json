@@ -1,0 +1,497 @@
+{
+  "chain_gang": {
+    "version": "0.13.2",
+    "commit": "74676b9c002c452e7f21a9ed9265f4972bef03f6"
+  },
+  "source_sha256": "333daade1c9f4d2c3099092468feea95e2719ed19ba344ba9ba250d88f1be332",
+  "target": "chronicle-v2",
+  "optimization": "baseline",
+  "stack_source": "development evaluator; native CHECKSIG modeled as true",
+  "scope": "Offline Workflow fixture with public test keys and actual parents, including synthetic funding. Each path is tested independently.",
+  "candidates": [
+    {
+      "schedule": "fused",
+      "family_policy": "bip143",
+      "layout": "full",
+      "workflow_auto_layout": "reconstructed",
+      "artifact_sha256": "e060c72a2e25390358673bfba0a9a2978e4ea2dce4dfa9b06d33aeb2886e6608",
+      "root_script_sha256": "97212cf49023bd2f79df2c3247ca41b32c48c6e496bc8ffb050e6d3929b1c976",
+      "root_script_bytes": 933,
+      "root_tx_bytes": 995,
+      "paths": [
+        {
+          "families": [
+            "bip143"
+          ],
+          "steps": [
+            {
+              "stage": "fused",
+              "family": "bip143",
+              "sighash": "41",
+              "parent_txid": "463385d1b0dbef3c9c8508029883a4de688bbf1f1e08d8ab6e94f44598bfe1c5",
+              "txid": "21e1f8529d5c81d85005bc4665874f53940ebef3ace9cabb5abe6b16cfda3203",
+              "bytes": 451,
+              "unlock_bytes": 304,
+              "stack_payload_peaks": {
+                "main_payload_bytes": 490,
+                "alt_payload_bytes": 202,
+                "combined_payload_bytes": 617
+              },
+              "chain_gang": true
+            }
+          ],
+          "path_bytes": 1446
+        }
+      ]
+    },
+    {
+      "schedule": "fused",
+      "family_policy": "bip143",
+      "layout": "reconstructed",
+      "workflow_auto_layout": "reconstructed",
+      "artifact_sha256": "dff94e12e5b2442d0dc243ac27713b851812a15bd4dfcd2348f374f7ef133c80",
+      "root_script_sha256": "b025e5eb0df264d860b6c14181de792c2c1a65c17435e8dfbd5be77b3aee975e",
+      "root_script_bytes": 927,
+      "root_tx_bytes": 989,
+      "paths": [
+        {
+          "families": [
+            "bip143"
+          ],
+          "steps": [
+            {
+              "stage": "fused",
+              "family": "bip143",
+              "sighash": "41",
+              "parent_txid": "4971d99553c589b8b0f90eaab3df514ca44e9dd4b1daa96ac5b98a60b31bc7cb",
+              "txid": "8387a527841b0c64c349bb8c1bf9548dc02e1e61fc44a6a5567b378b28752b4d",
+              "bytes": 346,
+              "unlock_bytes": 201,
+              "stack_payload_peaks": {
+                "main_payload_bytes": 258,
+                "alt_payload_bytes": 158,
+                "combined_payload_bytes": 259
+              },
+              "chain_gang": true
+            }
+          ],
+          "path_bytes": 1335
+        }
+      ]
+    },
+    {
+      "schedule": "fused",
+      "family_policy": "otda",
+      "layout": "reconstructed",
+      "workflow_auto_layout": "reconstructed",
+      "artifact_sha256": "194a727dd06dd5b87841a8514bc8203f3f42dc7cf29a1dd1aa2311b3d1ab7ddb",
+      "root_script_sha256": "5d3c5b3b26ded9723ca93aedf8733913858b3e36f484d697d68324bb1418df60",
+      "root_script_bytes": 912,
+      "root_tx_bytes": 974,
+      "paths": [
+        {
+          "families": [
+            "otda"
+          ],
+          "steps": [
+            {
+              "stage": "fused",
+              "family": "otda",
+              "sighash": "61",
+              "parent_txid": "2e33978fb31c2ee1341d2452827ea7859ea55407725ce404a99553f797f810e7",
+              "txid": "c5eccd35531b6be869f2722837b362ab9c6d50f5ce2d1551172720265b7b8a4d",
+              "bytes": 339,
+              "unlock_bytes": 194,
+              "stack_payload_peaks": {
+                "main_payload_bytes": 243,
+                "alt_payload_bytes": 150,
+                "combined_payload_bytes": 244
+              },
+              "chain_gang": true
+            }
+          ],
+          "path_bytes": 1313
+        }
+      ]
+    },
+    {
+      "schedule": "fused",
+      "family_policy": "both",
+      "layout": "reconstructed",
+      "workflow_auto_layout": "reconstructed",
+      "artifact_sha256": "d797f916cc487c18f366febf2153bd7a5111d1fa97207ab011217c648a75b9ba",
+      "root_script_sha256": "c52a3b69848eb64323c92978265c155c09e1d3b247d23f1f7402a083716d3d27",
+      "root_script_bytes": 990,
+      "root_tx_bytes": 1052,
+      "paths": [
+        {
+          "families": [
+            "bip143"
+          ],
+          "steps": [
+            {
+              "stage": "fused",
+              "family": "bip143",
+              "sighash": "41",
+              "parent_txid": "8b38777f21c7e96769495ac22337452127ec8be80bf53173ad2be9118756ab61",
+              "txid": "0399efc77b7a13db97ea227d519d7d8b0076d14c8bba2a9324d016754faf1613",
+              "bytes": 347,
+              "unlock_bytes": 202,
+              "stack_payload_peaks": {
+                "main_payload_bytes": 259,
+                "alt_payload_bytes": 159,
+                "combined_payload_bytes": 261
+              },
+              "chain_gang": true
+            }
+          ],
+          "path_bytes": 1399
+        },
+        {
+          "families": [
+            "otda"
+          ],
+          "steps": [
+            {
+              "stage": "fused",
+              "family": "otda",
+              "sighash": "61",
+              "parent_txid": "8b38777f21c7e96769495ac22337452127ec8be80bf53173ad2be9118756ab61",
+              "txid": "5a5284e2692b5432ebcd390af9b70b5dcb27328dda4e5a1fe8a80f8f162554b3",
+              "bytes": 339,
+              "unlock_bytes": 194,
+              "stack_payload_peaks": {
+                "main_payload_bytes": 243,
+                "alt_payload_bytes": 151,
+                "combined_payload_bytes": 245
+              },
+              "chain_gang": true
+            }
+          ],
+          "path_bytes": 1391
+        }
+      ]
+    },
+    {
+      "schedule": "serial",
+      "family_policy": "bip143",
+      "layout": "full",
+      "workflow_auto_layout": "reconstructed",
+      "artifact_sha256": "f3c8a4e3adcecfb84813b4fe2d130d53a7fb1f6878751a4935f3bd94a45343a7",
+      "root_script_sha256": "f7929c4d3cd63b07e7bdde2ec2f855f181aa7411198d9ca48e26366dfe072d90",
+      "root_script_bytes": 1683,
+      "root_tx_bytes": 1745,
+      "paths": [
+        {
+          "families": [
+            "bip143",
+            "bip143"
+          ],
+          "steps": [
+            {
+              "stage": "prepare",
+              "family": "bip143",
+              "sighash": "41",
+              "parent_txid": "eaf2508110e315dc72225bcbb28bb4f09f97c5ab96ade902417a4086931a9724",
+              "txid": "1387802e5ad0096f3139c15675e26bf5f3af3cd629c5a63038072894c11f844a",
+              "bytes": 1233,
+              "unlock_bytes": 233,
+              "stack_payload_peaks": {
+                "main_payload_bytes": 949,
+                "alt_payload_bytes": 158,
+                "combined_payload_bytes": 1107
+              },
+              "chain_gang": true
+            },
+            {
+              "stage": "finish",
+              "family": "bip143",
+              "sighash": "41",
+              "parent_txid": "1387802e5ad0096f3139c15675e26bf5f3af3cd629c5a63038072894c11f844a",
+              "txid": "26352039f6e17213be84ab6b3f146f898b4bbbd4459f869a73070c19e19e4061",
+              "bytes": 1616,
+              "unlock_bytes": 1469,
+              "stack_payload_peaks": {
+                "main_payload_bytes": 3809,
+                "alt_payload_bytes": 202,
+                "combined_payload_bytes": 3967
+              },
+              "chain_gang": true
+            }
+          ],
+          "path_bytes": 4594
+        }
+      ]
+    },
+    {
+      "schedule": "serial",
+      "family_policy": "bip143",
+      "layout": "reconstructed",
+      "workflow_auto_layout": "reconstructed",
+      "artifact_sha256": "1c2230ab6f924a5067bf1a64b21549cc0ad7538fec7208da78dbd75a21eae088",
+      "root_script_sha256": "2c8a6e6faf5d74463935cf9c5850d3d8f0e9036a697d331c7ebab3a6f0be9bb4",
+      "root_script_bytes": 1671,
+      "root_tx_bytes": 1733,
+      "paths": [
+        {
+          "families": [
+            "bip143",
+            "bip143"
+          ],
+          "steps": [
+            {
+              "stage": "prepare",
+              "family": "bip143",
+              "sighash": "41",
+              "parent_txid": "0435f45063618a072663913ae76bde9b5c0460c0af083ad7d3fde1c0684a3dae",
+              "txid": "c98bfc6a0b2eb8133babd1971d9c057519db8bd5a1af552287a1f4b829fa49cf",
+              "bytes": 1123,
+              "unlock_bytes": 129,
+              "stack_payload_peaks": {
+                "main_payload_bytes": 943,
+                "alt_payload_bytes": 158,
+                "combined_payload_bytes": 999
+              },
+              "chain_gang": true
+            },
+            {
+              "stage": "finish",
+              "family": "bip143",
+              "sighash": "41",
+              "parent_txid": "c98bfc6a0b2eb8133babd1971d9c057519db8bd5a1af552287a1f4b829fa49cf",
+              "txid": "dfed26786799c1f29d8e710f4c2d2b1ebc32d19bf3af1fb1f54c043d1e9b3a8f",
+              "bytes": 1403,
+              "unlock_bytes": 1256,
+              "stack_payload_peaks": {
+                "main_payload_bytes": 3479,
+                "alt_payload_bytes": 158,
+                "combined_payload_bytes": 3535
+              },
+              "chain_gang": true
+            }
+          ],
+          "path_bytes": 4259
+        }
+      ]
+    },
+    {
+      "schedule": "serial",
+      "family_policy": "otda",
+      "layout": "reconstructed",
+      "workflow_auto_layout": "reconstructed",
+      "artifact_sha256": "8e1b38167bccbcb331b5fe9f1358bf65c72ac451a1c0cd03ecd88c377720635b",
+      "root_script_sha256": "166b5a3be9a0b9efabb342a3cde347cf8d549dd7136f21c2d634071ff6c986cc",
+      "root_script_bytes": 1643,
+      "root_tx_bytes": 1705,
+      "paths": [
+        {
+          "families": [
+            "otda",
+            "otda"
+          ],
+          "steps": [
+            {
+              "stage": "prepare",
+              "family": "otda",
+              "sighash": "61",
+              "parent_txid": "6d422484e162558173c173c1e2d475fcbf21b8d3ed42ffb1520fe530795321fc",
+              "txid": "7566e5c8401423cdc91a10001c7a0a6e01c596eb3a29e986edbd5934569227cb",
+              "bytes": 1102,
+              "unlock_bytes": 122,
+              "stack_payload_peaks": {
+                "main_payload_bytes": 985,
+                "alt_payload_bytes": 985,
+                "combined_payload_bytes": 985
+              },
+              "chain_gang": true
+            },
+            {
+              "stage": "finish",
+              "family": "otda",
+              "sighash": "61",
+              "parent_txid": "7566e5c8401423cdc91a10001c7a0a6e01c596eb3a29e986edbd5934569227cb",
+              "txid": "021c05fab30db8299225c8e3eb457b0571be406c6b8fea62c7103b7a06aea295",
+              "bytes": 1373,
+              "unlock_bytes": 1226,
+              "stack_payload_peaks": {
+                "main_payload_bytes": 3415,
+                "alt_payload_bytes": 150,
+                "combined_payload_bytes": 3463
+              },
+              "chain_gang": true
+            }
+          ],
+          "path_bytes": 4180
+        }
+      ]
+    },
+    {
+      "schedule": "serial",
+      "family_policy": "both",
+      "layout": "reconstructed",
+      "workflow_auto_layout": "reconstructed",
+      "artifact_sha256": "6dd0e97a027e668e7c355aa5712f394e0b61d1d183a5ed8e5d637a332991325a",
+      "root_script_sha256": "d47b0cb2dc9c79f7cdfb9d0ddb277adb1f8dd21031d9ba786617106fce555737",
+      "root_script_bytes": 1791,
+      "root_tx_bytes": 1853,
+      "paths": [
+        {
+          "families": [
+            "bip143",
+            "bip143"
+          ],
+          "steps": [
+            {
+              "stage": "prepare",
+              "family": "bip143",
+              "sighash": "41",
+              "parent_txid": "e8cc25d7213ca1994aff25507c6f48f91ef91f40fe22d337985ac47bbec1bfef",
+              "txid": "9eb2d2096c8fbe44bcd257bb15ff9e749175c372275ad764214b2e45974b7dc6",
+              "bytes": 1183,
+              "unlock_bytes": 129,
+              "stack_payload_peaks": {
+                "main_payload_bytes": 1061,
+                "alt_payload_bytes": 159,
+                "combined_payload_bytes": 1062
+              },
+              "chain_gang": true
+            },
+            {
+              "stage": "finish",
+              "family": "bip143",
+              "sighash": "41",
+              "parent_txid": "9eb2d2096c8fbe44bcd257bb15ff9e749175c372275ad764214b2e45974b7dc6",
+              "txid": "0124c30b5f262adcff690884be9e0184f77d51864dd3137c12229006ea8da0e6",
+              "bytes": 1462,
+              "unlock_bytes": 1315,
+              "stack_payload_peaks": {
+                "main_payload_bytes": 3658,
+                "alt_payload_bytes": 159,
+                "combined_payload_bytes": 3715
+              },
+              "chain_gang": true
+            }
+          ],
+          "path_bytes": 4498
+        },
+        {
+          "families": [
+            "bip143",
+            "otda"
+          ],
+          "steps": [
+            {
+              "stage": "prepare",
+              "family": "bip143",
+              "sighash": "41",
+              "parent_txid": "e8cc25d7213ca1994aff25507c6f48f91ef91f40fe22d337985ac47bbec1bfef",
+              "txid": "9eb2d2096c8fbe44bcd257bb15ff9e749175c372275ad764214b2e45974b7dc6",
+              "bytes": 1183,
+              "unlock_bytes": 129,
+              "stack_payload_peaks": {
+                "main_payload_bytes": 1061,
+                "alt_payload_bytes": 159,
+                "combined_payload_bytes": 1062
+              },
+              "chain_gang": true
+            },
+            {
+              "stage": "finish",
+              "family": "otda",
+              "sighash": "61",
+              "parent_txid": "9eb2d2096c8fbe44bcd257bb15ff9e749175c372275ad764214b2e45974b7dc6",
+              "txid": "e6177f51b54ebf7b4367e408c82ae1c3ae3f32fd3f1326df7bef07b72de13ddb",
+              "bytes": 1455,
+              "unlock_bytes": 1308,
+              "stack_payload_peaks": {
+                "main_payload_bytes": 3659,
+                "alt_payload_bytes": 151,
+                "combined_payload_bytes": 3708
+              },
+              "chain_gang": true
+            }
+          ],
+          "path_bytes": 4491
+        },
+        {
+          "families": [
+            "otda",
+            "bip143"
+          ],
+          "steps": [
+            {
+              "stage": "prepare",
+              "family": "otda",
+              "sighash": "61",
+              "parent_txid": "e8cc25d7213ca1994aff25507c6f48f91ef91f40fe22d337985ac47bbec1bfef",
+              "txid": "c06607e6ed7902f9ed7467045a6fc5ac6640af1eb21ff4932ad6931570776a25",
+              "bytes": 1175,
+              "unlock_bytes": 121,
+              "stack_payload_peaks": {
+                "main_payload_bytes": 1059,
+                "alt_payload_bytes": 1060,
+                "combined_payload_bytes": 1060
+              },
+              "chain_gang": true
+            },
+            {
+              "stage": "finish",
+              "family": "bip143",
+              "sighash": "41",
+              "parent_txid": "c06607e6ed7902f9ed7467045a6fc5ac6640af1eb21ff4932ad6931570776a25",
+              "txid": "a2dcb83f08999c8a0ff4f7b33d2c90d4cebf66e119778fdb136f3750e8e84022",
+              "bytes": 1454,
+              "unlock_bytes": 1307,
+              "stack_payload_peaks": {
+                "main_payload_bytes": 3634,
+                "alt_payload_bytes": 159,
+                "combined_payload_bytes": 3691
+              },
+              "chain_gang": true
+            }
+          ],
+          "path_bytes": 4482
+        },
+        {
+          "families": [
+            "otda",
+            "otda"
+          ],
+          "steps": [
+            {
+              "stage": "prepare",
+              "family": "otda",
+              "sighash": "61",
+              "parent_txid": "e8cc25d7213ca1994aff25507c6f48f91ef91f40fe22d337985ac47bbec1bfef",
+              "txid": "c06607e6ed7902f9ed7467045a6fc5ac6640af1eb21ff4932ad6931570776a25",
+              "bytes": 1175,
+              "unlock_bytes": 121,
+              "stack_payload_peaks": {
+                "main_payload_bytes": 1059,
+                "alt_payload_bytes": 1060,
+                "combined_payload_bytes": 1060
+              },
+              "chain_gang": true
+            },
+            {
+              "stage": "finish",
+              "family": "otda",
+              "sighash": "61",
+              "parent_txid": "c06607e6ed7902f9ed7467045a6fc5ac6640af1eb21ff4932ad6931570776a25",
+              "txid": "27dd2d43ddfc94b49052c9f0ab862a4e15916b2eee5a161b2f42b76070ab095c",
+              "bytes": 1447,
+              "unlock_bytes": 1300,
+              "stack_payload_peaks": {
+                "main_payload_bytes": 3635,
+                "alt_payload_bytes": 151,
+                "combined_payload_bytes": 3684
+              },
+              "chain_gang": true
+            }
+          ],
+          "path_bytes": 4475
+        }
+      ]
+    }
+  ]
+}
