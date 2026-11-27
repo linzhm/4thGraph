@@ -36,6 +36,14 @@ def replay(node, activation, lock, witness, crossed):
                 valid_spend_mined=True, crossed_statement_rejected_by_both_engines=True)
 
 
+def upstream_variants(upstream, recorded):
+    check("nChain revision", upstream["revision"], recorded["nchain_revision"])
+    expected = {name for name in recorded["replays"] if name.startswith("nchain-")}
+    actual = {f"nchain-{name}-{upstream['threshold']}": variant for name, variant in upstream["variants"].items()}
+    check("nChain layout inventory", sorted(actual), sorted(expected))
+    return actual
+
+
 def main():
     cli = argparse.ArgumentParser(description=__doc__)
     cli.add_argument("scripts", type=Path, help="output from prepare_nchain.py")
@@ -52,8 +60,8 @@ def main():
     check("activation height", activation, plan["script_eras"]["genesis"]["chronicle_activation_height"])
     upstream = json.loads(args.scripts.read_bytes())
     check("fixture SHA-256", upstream["fixture_sha256"], digest(FIXTURE.read_bytes()))
-    previous = json.loads((VERSIONS / "v0.11.0/nchain-comparison.json").read_bytes())
-    check("nChain revision", upstream["revision"], previous["nchain_revision"])
+    recorded = json.loads((VERSIONS / "v0.13.0/nchain-comparison.json").read_bytes())
+    variants = upstream_variants(upstream, recorded)
 
     artifact, witnesses = build(plan, "genesis")
     _, cases = fixture()
@@ -66,16 +74,19 @@ def main():
                                    layout=plan["witness_layout"])
         project_results[label] = replay(node, activation, lock, witness, controls["crossed_statement"])
     replays = {"4thgraph-v0.13.0": project_results}
-    for name, variant in upstream["variants"].items():
-        label = f"nchain-{name}-{upstream['threshold']}"
+    for label, variant in variants.items():
         lock = bytes.fromhex(variant["lock"])
         replays[label] = results = {}
         for case, row in zip(witnesses, variant["statements"], strict=True):
-            result = replay(node, activation, lock, bytes.fromhex(row["witness"]), bytes.fromhex(row["crossed"]))
-            check(f"{label}/{case} path bytes", result["path_bytes"], previous["sweep"][label]["path_bytes"][case])
+            witness = bytes.fromhex(row["witness"])
+            expected = recorded["replays"][label][case]
+            check(f"{label}/{case} lock SHA-256", digest(lock), expected["lock_sha256"])
+            check(f"{label}/{case} witness SHA-256", digest(witness), expected["witness_sha256"])
+            result = replay(node, activation, lock, witness, bytes.fromhex(row["crossed"]))
+            check(f"{label}/{case} path bytes", result["path_bytes"], expected["path_bytes"])
             results[case] = result
 
-    evidence = dict(fixture_sha256=plan["fixture_sha256"], public_input_bits=previous["public_input_bits"],
+    evidence = dict(fixture_sha256=plan["fixture_sha256"], public_input_bits=recorded["public_input_bits"],
                     bsv_node_version=node.version, chain_gang=chain, activation_height=activation,
                     nchain_revision=upstream["revision"], replays=replays)
     args.output.parent.mkdir(parents=True, exist_ok=True)
