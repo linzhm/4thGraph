@@ -1034,6 +1034,8 @@ def main():
                      help="permitted transaction versions")
     cli.add_argument("--sighash-family", type=normalize_sighash_family, choices=(*SIGHASH_FAMILY_OPTIONS, "auto"),
                      default="bip143", help="preimage policy for staged workflows and PELS locks")
+    cli.add_argument("--pels-successor-state", metavar="HEX",
+                     help="link an --entry state/amount rule to the PELS successor template with this initial state")
     cli.add_argument("--optimize", choices=OPTIMIZATIONS, default=BASELINE)
     cli.add_argument("--join-witness", choices=JOIN_WITNESSES)
     cli.add_argument("--gate-boundary", choices=GATE_BOUNDARIES, default="auto")
@@ -1056,6 +1058,11 @@ def main():
         cli.error("transaction search and boundaries require a transaction build")
     if args.assume_input_ranges and args.entry is None:
         cli.error("--assume-input-ranges requires --entry")
+    if args.pels_successor_state is not None:
+        if args.entry is None:
+            cli.error("--pels-successor-state requires --entry")
+        if args.optimize != BASELINE or args.assume_input_ranges:
+            cli.error("entry optimization and range options do not apply to PELS successor linking")
     if args.capabilities:
         print(json.dumps({"project": PROJECT_NAME, "compiler_version": PROJECT_VERSION, "description": PROJECT_DESCRIPTION,
                           **capabilities(), "libraries": library_capabilities(),
@@ -1065,6 +1072,8 @@ def main():
                                                        "both": [f"{flag:02x}" for flag in SIGHASH_FAMILIES.values()]},
                           "pels_sighash_policies": (*SIGHASH_FAMILY_OPTIONS, "auto"),
                           "pels_words": tuple(PELS_WORDS),
+                          "pels_successor": {"state_option": "--pels-successor-state",
+                                             "sighash_policies": ("bip143", "auto")},
                           "search_objectives": OBJECTIVES,
                           "gate_boundaries": GATE_BOUNDARIES, "targets": {
             name: {"transaction_versions": versions, "era": era} for name, (versions, era) in TARGETS.items()
@@ -1086,6 +1095,21 @@ def main():
                 bindings[name] = bytes.fromhex(hexadecimal)
             except ValueError:
                 cli.error(f"byte binding {name!r} requires hexadecimal byte pairs")
+        if args.pels_successor_state is not None:
+            from fourthgraph.compiler.script_builder import ScriptBuilder
+            from fourthgraph.workflow.pels import compile_successor
+
+            try:
+                state = bytes.fromhex(args.pels_successor_state)
+            except ValueError:
+                cli.error("--pels-successor-state requires hexadecimal byte pairs")
+            source = ScriptBuilder(source_bytes.decode(), source_path=args.source, bindings=bindings)
+            entry = args.entry.casefold()
+            result = compile_successor(source, entry, state, args.target, args.sighash_family, explain=args.explain)
+            result.update(project=PROJECT_NAME, compiler_version=PROJECT_VERSION, schema_version=1,
+                          entry=entry, libraries=tuple(map(asdict, source.library_imports)))
+            display_build(build_artifact(result, source_bytes), args)
+            return
         source = SourceCompiler(source_bytes.decode(), source_path=args.source, bindings=bindings)
         if args.entry is not None:
             entry = args.entry.casefold()
