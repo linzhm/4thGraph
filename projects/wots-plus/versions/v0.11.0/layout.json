@@ -1,0 +1,23 @@
+{
+  "script": {
+    "file": "template.hex",
+    "bytes": 21320,
+    "sha256": "90429e54c47edca287f4dc28d986b22a1727274f817a9493ea40b354fdc030ad"
+  },
+  "key_offsets": [
+    292,
+    20825
+  ],
+  "reconstruction": {
+    "file": "otda-reconstruct.hex",
+    "bytes": 795,
+    "sha256": "af10de540d008c41fcbbc6069e57246324f314ffcd9913c7a7e02a0f333cacdf",
+    "spend_transaction_version": 2,
+    "sighash_types": [
+      "61",
+      "63",
+      "e1",
+      "e3"
+    ]
+  }
+}
