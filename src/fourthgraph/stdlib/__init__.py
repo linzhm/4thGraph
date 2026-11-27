@@ -215,6 +215,17 @@ LIBRARIES = {
         script_fragment("secp256k1-double", (
             Parameter("point", "projective-point", "Three homogeneous ScriptNum coordinates"),
         ), failure="The caller supplies a valid point and the field prime at the bottom of the main stack."),
+        script_fragment("secp256k1-double-with-field", (
+            Parameter("point", "projective-point", "Three homogeneous ScriptNum coordinates"),
+        ), takes=("script", "cell"), failure="Supply a valid point and the secp256k1 field prime. Placement 0 uses "
+                            "the bottom of the main stack and placement 1 uses the slot below the point."),
+        script_fragment("secp256k1-double-pair", (
+            Parameter("point", "projective-point", "Three reduced homogeneous ScriptNum coordinates"),
+        ), failure="Supply a valid point with coordinate magnitudes below the field prime at the bottom of the main stack."),
+        script_fragment("secp256k1-double-pair-with-field", (
+            Parameter("point", "projective-point", "Three reduced homogeneous ScriptNum coordinates"),
+        ), takes=("script", "cell"), failure="Supply a valid point with coordinate magnitudes below the field prime. "
+                                "Placement 0 uses the stack bottom and placement 1 uses the slot below the point."),
         script_fragment("secp256k1-scale-affine-pair", (
             Parameter("left", "affine-point", "Two secp256k1 coordinates"),
             Parameter("right", "affine-point", "Two secp256k1 coordinates"),
