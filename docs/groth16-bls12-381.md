@@ -77,6 +77,10 @@
 
 `miller_reductions` 在两种仿射布局中选择 Fp12 累加器的归约时机。`per-operation` 分别归约平方和各乘法，`per-step` 在三次稀疏线乘法后统一归约，`per-round` 在一轮的平方、切线、可选割线和余数因子全部合并后归约。斜率核验和最终剩余式断言独立执行。后两项可用更多栈内字节换取更短的锁。[归约调度实测](../projects/groth16-verifier/versions/v0.10.0/measurements.json)
 
+`miller_kernel: direct-normalized` 直接展开稀疏线在 Fp6 和 Fp12 的乘积，缩短中间值的栈上存活范围。它在 B 的每次仿射更新后归约坐标，并复用线截距计算下一点的 y 坐标。斜率等式及分母非零条件仍逐步核验。
+
+`split-chord` 与 `split-chord-residue` 在一位为 1 的轮次中分别归约切线和割线阶段，后者在乘余数前也归约。两种调度共同减少大整数中间值，并共用原见证格式。[稀疏线与分段归约实测](../projects/groth16-verifier/versions/v0.11.0/measurements.json)
+
 ## 构建和复放
 
 在仓库根目录执行，依赖见 [4thGraph 安装命令](toolchain.md#复放与编译)。示例从版本库自带的测试夹具导出一份验证密钥、证明和公开输入。

@@ -36,17 +36,20 @@ v0.6.0 实验在 Forth 中定义证明预处理、种子首位之后的 63 轮 M
 
 v0.7.0 固定剩余式的乘法顺序，对同一份 Forth 文件做两轮改动，测量原顺序、两个 G1 检查都在公开输入 MSM 前，以及 MSM 在 A、C 两项检查之间。复现某一轮时，从报告记录的 Git 提交提取 `experiments/high-level/verifier.fth`，再用 `--source` 将副本传给搜索和回放。当前源码先检查两个 G1 点，再执行 MSM。[v0.7.0 实测记录](../versions/v0.7.0/measurements.json)
 
-v0.8.0 在这份 Forth 上比较无符号和有符号 radix-4 MSM，并为每种方案生成对应的见证。负数位复用正倍点，末尾进位可能增加斜率窗口。搜索按序列化锁与见证的合计字节数排名。复现之前的无符号对照时可加 `--msm unsigned-radix4 --miller-reductions per-operation`。有符号计划适用于两种仿射布局。[v0.8.0 MSM 实测](../versions/v0.8.0/measurements.json)
+v0.8.0 在这份 Forth 上比较无符号和有符号 radix-4 MSM，并为每种方案生成对应的见证。负数位复用正倍点，末尾进位可能增加斜率窗口。搜索按序列化锁与见证的合计字节数排名。复现之前的无符号对照时可加 `--msm unsigned-radix4 --miller-reductions per-operation --miller-kernel cross-products`。有符号计划适用于两种仿射布局。[v0.8.0 MSM 实测](../versions/v0.8.0/measurements.json)
 
-v0.9.0 固定有符号 radix-4，比较直接存点与从验证密钥的倍点切线恢复点这两种表表示。两种表示共用同一份见证。源码试验在高层 Forth 中把 C 的检查提前到 A 之前，再编译两份源码并记录完整锁和见证的大小。复现 v0.8.0 点表对照时可加 `--msm-table points --miller-reductions per-operation`。[v0.9.0 点表与源码实测](../versions/v0.9.0/measurements.json)
+v0.9.0 固定有符号 radix-4，比较直接存点与从验证密钥的倍点切线恢复点这两种表表示。两种表示共用同一份见证。源码试验在高层 Forth 中把 C 的检查提前到 A 之前，再编译两份源码并记录完整锁和见证的大小。复现 v0.8.0 点表对照时可加 `--msm-table points --miller-reductions per-operation --miller-kernel cross-products`。[v0.9.0 点表与源码实测](../versions/v0.9.0/measurements.json)
 
-v0.10.0 沿用同一份 Forth 源码、证明夹具和 Fp2 策略，比较三种有符号 MSM 表表示与三种 Miller 取模调度。胜出方案在 MSM 选点后归约累加坐标，并在每轮 Miller 结束时归约 Fp12 累加器。序列化见证与 v0.9.0 一致。加 `--miller-reductions per-step` 可测更短的取模分组。一起指定 `--msm-table doubling-slopes` 和 `--miller-reductions per-operation` 可复现 v0.9.0 对照。[v0.10.0 实测](../versions/v0.10.0/measurements.json)
+v0.10.0 沿用同一份 Forth 源码、证明夹具和 Fp2 策略，比较三种有符号 MSM 表表示与三种 Miller 取模调度。胜出方案在 MSM 选点后归约累加坐标，并在每轮 Miller 结束时归约 Fp12 累加器。序列化见证与 v0.9.0 一致。复测 v0.10.0 调度时，省略栈预算并指定 `--miller-kernel cross-products`。加 `--miller-reductions per-step` 可测更短的取模分组。一起指定 `--msm-table doubling-slopes` 和 `--miller-reductions per-operation` 可复现 v0.9.0 对照。[v0.10.0 实测](../versions/v0.10.0/measurements.json)
+
+v0.11.0 固定 v0.10.0 选中的 MSM 表，比较原 Miller 内核与直接展开稀疏乘积、归约 G2 点坐标的新内核。两种新增调度在含割线的轮次拆开归约，另可在乘余数前再归约一次。复现命令从两份有效开发用例在 `affine-inline` 布局下的主栈与备用栈合计数据峰值不超过 32,000 B 的候选中选最短路径。省略栈预算时按体积选版。复现 v0.10.0 胜出方案时，省略栈预算并加 `--miller-kernel cross-products --miller-reductions per-round`。[v0.11.0 实测](../versions/v0.11.0/measurements.json)
 
 从仓库根目录运行搜索，再回放选出的 Genesis 计划。
 
 ```sh
 PYTHONPATH=src:. python3 projects/groth16-verifier/experiments/high-level/optimize.py \
-  --residue-association accumulator-frobenius-first --fp2-selection callsite --msm signed-radix4
+  --residue-association accumulator-frobenius-first --fp2-selection callsite --msm signed-radix4 \
+  --msm-table deferred-doubling-slopes --max-fixture-stack-bytes 32000
 out=projects/groth16-verifier/workspace/build/high-level
 REGTEST_CHRONICLE_HEIGHT=1000 bash tools/verify_node.sh --profile raised -- \
   python3 -m fourthgraph.replay.bls12381_verifier \
