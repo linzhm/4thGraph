@@ -6,8 +6,11 @@ import unittest
 from comparison_report import read_report
 from fixed_templates import VERSIONS_DIRECTORY
 from fourthgraph.benchmark.validation import CONTEXT_PIN, chain_metadata
+from fourthgraph.bsv.evaluate import evaluate
+from fourthgraph.bsv.script import asm, push
 from msm_compiler import CALIBRATION, SOURCE, R1MSMCompiler
 from msm_experiment import frozen_build, local_build
+from msm_lowering import repeat_prefix, repeated
 from r1_method_matrix import run_experiment
 
 
@@ -85,6 +88,14 @@ class R1MSMTests(unittest.TestCase):
         self.assertEqual((next_lock, next_pattern), (lock, pattern))
         self.assertEqual(len(baseline.script) - len(lock.script), 102)
         self.assertEqual(opportunity["estimated"]["window_loop_bytes_saved"], 102)
+
+    def test_repeat_prefix_keeps_the_exact_bytes_and_altstack(self):
+        for chunk in (b"", b"x", b"\x00value\xff"):
+            for count in (1, 2, 3, 5, 7, 15, 63, 127, 128, 255):
+                with self.subTest(chunk=chunk, count=count):
+                    code = asm("OP_TOALTSTACK") + push(chunk) + repeat_prefix(count)
+                    self.assertEqual(evaluate(code, [b"sentinel"]), ([chunk * count], [b"sentinel"]))
+        self.assertEqual(len(repeated(127)) - len(repeat_prefix(127)), 19)
 
     def test_ordered_method_matrix_verifies_pairs_and_ranks_each_target(self):
         try:

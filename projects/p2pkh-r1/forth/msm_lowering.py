@@ -325,7 +325,17 @@ def repeated(count):
     return save + b"".join(double + (restore + save + CAT if bit == "1" else b"") for bit in bits) + restore + asm("OP_DROP")
 
 
-def reconstruction(prefix, before, pieces, after, kernels):
+def repeat_prefix(count):
+    """For a near-power-of-two count, drop one copy after doubling."""
+    standard = repeated(count)
+    if count <= 1 or count & (count + 1):
+        return standard
+    sliced = (asm("OP_SIZE OP_TOALTSTACK") + repeated(count + 1)
+              + asm("OP_SIZE OP_FROMALTSTACK OP_SUB OP_SPLIT OP_DROP"))
+    return min(standard, sliced, key=len)
+
+
+def reconstruction(prefix, before, pieces, after, kernels, *, prefix_repeat=False):
     matches = re.compile(b"|".join(re.escape(kernel) for kernel in sorted(kernels, key=len, reverse=True)))
 
     def append(raw, staged):
@@ -341,13 +351,19 @@ def reconstruction(prefix, before, pieces, after, kernels):
             encoded.extend(push(raw[position:]) + CAT)
         return min(push(raw) + CAT, bytes(encoded), key=len)
 
+    suffix_size = 0
+    if prefix_repeat:
+        pieces = tuple(pieces)
+        suffix_size = len(before) + sum(len(raw) * count for raw, count in pieces) + len(after)
     code = bytearray(b"".join(push(kernel) for kernel in kernels) + push(prefix) + asm("0"))
     code.extend(append(before, 0))
     for raw, count in pieces:
         literal = push(raw)
         compact = asm("0") + append(raw, 1)
         assembled = min(literal, compact, key=len)
-        code.extend(min(append(raw * count, 0), assembled + repeated(count) + CAT, key=len))
+        # An extra copy must fit within the size of the suffix already built.
+        repeat = repeat_prefix if prefix_repeat and len(raw) * (count + 1) <= suffix_size else repeated
+        code.extend(min(append(raw * count, 0), assembled + repeat(count) + CAT, key=len))
     code.extend(append(after, 0))
     if len(kernels) == 2:
         code.extend(asm("OP_2SWAP OP_2DROP"))

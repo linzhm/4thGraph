@@ -22,7 +22,8 @@ from fourthgraph.bsv.otda_reconstruction import Reconstruction
 from fourthgraph.bsv.transaction import Input, Output, Transaction
 from fourthgraph.workflow.protocol import FLAG
 from msm_compiler import OWNER, R1MSMCompiler
-from msm_lowering import Strategy, clear_window_table, reconstruction, verify_window, window_program
+from msm_lowering import (Strategy, clear_window_table, reconstruction, repeat_prefix, repeated, verify_window,
+                          window_program)
 from replay_r1 import FIXTURE, FIXTURE_PATH, MODES, signer, spend
 
 
@@ -38,6 +39,7 @@ METHODS = {
 SEARCH_METHODS = {
     **METHODS,
     "widen-g-window": ("fixed G digit extraction, table and call schedule", "separate G table with sufficient slots"),
+    "pack-prefix-repeat": ("OTDA reconstruction of repeated Script fragments", "a shorter repetition program"),
 }
 TERMINAL = ("rewrite", "share", "stack", "search")
 STALE_ERROR = "Error evaluating the script `Top of stack is false`"
@@ -48,13 +50,14 @@ class State:
     strategy: Strategy
     projective: bytes
     affine: bytes | None = None
+    prefix_repeat: bool = False
 
 
 def digest(code):
     return sha256(code).hexdigest()
 
 
-def apply(method, state, *, backend, scheduled):
+def apply(method, state, *, backend, scheduled, program_for):
     strategy = state.strategy
     if method == "joint-window":
         if strategy.affine_g:
@@ -83,6 +86,13 @@ def apply(method, state, *, backend, scheduled):
         except ValueError as error:
             raise IneligibleMethod(str(error)) from error
         return replace(state, strategy=wider)
+    if method == "pack-prefix-repeat":
+        if state.prefix_repeat:
+            return state
+        program = program_for(strategy, state.projective, state.affine)
+        if not any(len(repeat_prefix(count)) < len(repeated(count)) for _, count in program.pieces):
+            raise IneligibleMethod("no repeated region benefits from prefix slicing")
+        return replace(state, prefix_repeat=True)
     if method != "point-add-stack-search":
         raise ValueError(f"unknown R1 method {method!r}")
     return replace(state, projective=scheduled["projective"],
@@ -90,7 +100,7 @@ def apply(method, state, *, backend, scheduled):
 
 
 def info(state):
-    return {"window": state.strategy.name,
+    return {"window": state.strategy.name, "prefix_repeat": state.prefix_repeat,
             "projective_kernel": {"bytes": len(state.projective), "sha256": digest(state.projective)},
             "affine_kernel": None if state.affine is None else
                 {"bytes": len(state.affine), "sha256": digest(state.affine)}}
@@ -164,14 +174,18 @@ def run_experiment(*, search_budget=None):
     receipts = {}
 
     @cache
+    def program_for(strategy, projective, affine):
+        return window_program(backend.plan(strategy.name), projective, double, affine=affine)
+
+    @cache
     def build(state):
         try:
-            plan = backend.plan(state.strategy.name)
-            program = window_program(plan, state.projective, double, affine=state.affine)
+            program = program_for(state.strategy, state.projective, state.affine)
             after = clear_window_table(program.table_slots) + epilogue
             suffix = before + program.emit() + after
             lock = replace(backend.reference, script=prefix + bytes(len(OWNER)) + suffix, owner_start=len(prefix))
-            compressed = reconstruction(prefix, before, program.pieces, after, program.kernels)
+            compressed = reconstruction(prefix, before, program.pieces, after, program.kernels,
+                                        prefix_repeat=state.prefix_repeat)
             if evaluate(compressed) != ([prefix, suffix], []):
                 raise ValueError("OTDA reconstructed different lock bytes")
             pattern = Reconstruction(compressed, (prefix, suffix), (len(OWNER),))
@@ -197,8 +211,10 @@ def run_experiment(*, search_budget=None):
         return {"status": status, "artifact": key}
 
     registry = METHODS if search_budget is None else SEARCH_METHODS
-    methods = {name: Method(region, requires, partial(apply, name, backend=backend, scheduled=scheduled))
-               for name, (region, requires) in registry.items()}
+    methods = {
+        name: Method(region, requires, partial(apply, name, backend=backend, scheduled=scheduled, program_for=program_for))
+        for name, (region, requires) in registry.items()
+    }
     if search_budget is None:
         seeds = {"from_split": start, "from_affine": methods["affine-g"].apply(start)}
         matrices = explore_pairs(seeds, methods, describe=info, evaluate=build)

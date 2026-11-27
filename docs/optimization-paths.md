@@ -40,6 +40,8 @@ The run records all 50 ordered pairs. The 25 eligible cells link to nine distinc
 
 The `method-search` command starts from the generic split state and expands every applicable method, including independent G-window widening. The measured run on six registered methods exhausted the reachable graph after 19 compiler states and 114 attempted transitions. The longest discovered prefix had five methods. BIP143 ALL selected affine G, compact G and the shortened guard in sequence, while both OTDA modes selected the single joint-window step. `--replay` uses the original budget.
 
+The next method-search revision adds an OTDA packing choice for repeated fragments. For `joint-2`, the constructor can build 128 copies of a window by doubling and remove the final copy. It tries the alternative only when it uses fewer bytes and its temporary fits within the suffix being reconstructed. The 42,382 B lock is byte-identical. The constructor falls from 3,062 B to 3,043 B. With two signed inputs, the complete fixture path falls from 176,617 B to 176,579 B under OTDA ALL and from 176,546 B to 176,508 B under paired OTDA SINGLE. The BIP143 paths and the observed stack peaks are unchanged.
+
 ## Ordered formula rules
 
 Use these rules on closed formulas whose caller establishes canonical ScriptNum encodings and the declared input intervals.
