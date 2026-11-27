@@ -162,6 +162,8 @@ REGTEST_CHRONICLE_HEIGHT=5 PYTHONPATH=src:. bash tools/verify_node.sh --profile 
 | Forth 批量解码 | 23,484 B | 58,822 B |
 | 手工 v0.17.0 | 22,435 B | 54,626 B |
 
+本节记录提交 70d7ec8 的快照，以下命令在该提交上复现对应字节数。[固定源码](https://github.com/linzhm/4thGraph/tree/70d7ec80ea4694c7d373f3a2368bb56303907dd1)
+
 最短候选的 18,379 B 窗口循环与手工版逐字节相同。每锁剩余的 1,049 B 包括见证与挑战值处理 392 B、联合点乘准备 549 B、清栈与 nonce 点比较 108 B。每个候选复放 27 个向量与错误见证用例、12 种成对付款模式和两种普通输出退出。选中的候选还复放构造器矩阵的八个场景。[实测](../experiments/high-level/dataflow-measurements.json) · [交易矩阵](../experiments/high-level/dataflow-matrix.json)
 
 ```sh
@@ -171,4 +173,27 @@ PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
 REGTEST_CHRONICLE_HEIGHT=5 PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
   "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/experiments/high-level/window_compare.py \
   --joint-lowerings --matrix-only --output workspace/schnorr-high-level/dataflow-matrix.json
+```
+
+<a name="stack-and-model-boundaries"></a>
+
+## 栈和坐标模型边界
+
+栈候选让域模数从仿射映射一直保留到联合建表之后。仿射和齐次坐标转换比较预计算因子与在运行时从单个缩放因子求幂的写法。数据流调度器成组搬运相邻操作数，清理返回序列中夹杂的死值，并融合仅由 `verify` 消费的比较。共享解码库通过倍增和拼接生成重复掩码。[编译器和基础库](../../../docs/optimization-paths.zh-CN.md#数据流和返回边界)
+
+| 构建 | 付款锁 | 两进两出 OTDA ALL，使用模板构造器 |
+| --- | ---: | ---: |
+| 上轮数据流与批量解码 | 23,484 B | 58,822 B |
+| 栈与坐标模型边界优化 | 23,190 B | 57,646 B |
+| 手工 v0.17.0 | 22,435 B | 54,626 B |
+
+18,379 B 的窗口循环与冻结手工版逐字节相同。每锁剩余 755 B，分布在联合点乘准备 441 B、见证和挑战值处理 250 B、清栈和 nonce 点比较 64 B。验签器复放 BIP340 向量、错误见证、12 种成对付款模式和两种普通输出退出。选中候选也通过构造器矩阵的八个场景。[实测](../experiments/high-level/boundary-measurements.json) · [交易矩阵](../experiments/high-level/boundary-matrix.json)
+
+```sh
+PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
+  "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/experiments/high-level/window_compare.py \
+  --joint-lowerings --output workspace/schnorr-high-level/boundary-measurements.json
+REGTEST_CHRONICLE_HEIGHT=5 PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
+  "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/experiments/high-level/window_compare.py \
+  --joint-lowerings --matrix-only --output workspace/schnorr-high-level/boundary-matrix.json
 ```

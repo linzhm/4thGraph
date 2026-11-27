@@ -40,6 +40,45 @@ class DataflowTests(unittest.TestCase):
         code = emit_steps(inputs, (), returns, trim_suffix=True)
         self.assertEqual(evaluate(code, list(map(encode_num, inputs))), (list(map(encode_num, returns)), []))
 
+    def test_trim_interleaved_dead_slots_preserves_a_return_subsequence(self):
+        inputs = (0, 1, 2, 3, 4, 5)
+        returns = (0, 2, 4, 5)
+        compact = emit_steps(inputs, (), returns, trim_suffix=True)
+        self.assertLess(len(compact), len(emit_steps(inputs, (), returns)))
+        output, alt = evaluate(asm("17 OP_TOALTSTACK") + compact, [b"caller", *map(encode_num, inputs)])
+        self.assertEqual((output, alt), ([b"caller", *map(encode_num, returns)], [encode_num(17)]))
+
+    def test_grouped_operands_preserve_copies_and_last_uses(self):
+        cases = (
+            ((0, 1, 2, 3, 4, 5), (0, 1, 2, 3), (4, 5), "OP_2ROT"),
+            ((0, 1, 2), (0, 1, 2), (0, 1, 2), "OP_3DUP"),
+        )
+        for inputs, args, kept, opcode in cases:
+            outputs = tuple(range(len(inputs), len(inputs) + len(args)))
+            steps = ((b"", args, outputs),)  # The called kernel returns each input unchanged.
+            returns = (*kept, *outputs)
+            grouped = emit_steps(inputs, steps, returns, compact=True, group_operands=True)
+            self.assertIn(asm(opcode), grouped)
+            self.assertLess(len(grouped), len(emit_steps(inputs, steps, returns, compact=True)))
+            values = [b"caller", *map(encode_num, inputs)]
+            self.assertEqual(evaluate(grouped, values), ([b"caller", *map(encode_num, (*kept, *args))], []))
+
+    def test_assertion_fusion_requires_an_unobserved_flag(self):
+        source = SourceCompiler("""
+            REQUIRE BSV
+            lock: checked ( a:cell b:cell ) a b = verify 1 ;
+            lock: observed ( a:cell b:cell ) a b = dup verify ;
+        """)
+        checks = compile_word(source.words["checked"], DATAFLOW)
+        self.assertIn("comparison-feeds-verify", [rewrite.rule for rewrite in checks.rewrites])
+        self.assertIn(asm("OP_NUMEQUALVERIFY"), checks.script)
+        self.assertEqual(evaluate(checks.script, [encode_num(2)] * 2), ([encode_num(1)], []))
+        with self.assertRaises(ScriptError):
+            evaluate(checks.script, [encode_num(2), encode_num(3)])
+        observed = compile_word(source.words["observed"], DATAFLOW)
+        self.assertNotIn("comparison-feeds-verify", [rewrite.rule for rewrite in observed.rewrites])
+        self.assertEqual(evaluate(observed.script, [encode_num(2)] * 2), ([encode_num(-1)], []))
+
     def test_width_proof_controls_library_replacement_and_sharing(self):
         library = ScriptBuilder("REQUIRE stdlib/script-fragments.fth")
         decode = script_word("bytes", "script-int", library.emit("script-uint256be", b""),
@@ -91,3 +130,13 @@ class DataflowTests(unittest.TestCase):
                 self.assertEqual(list(map(decode_num, result[1:])), [int.from_bytes(value, "big") for value in values])
             with self.assertRaises(ScriptError):
                 evaluate(script, [bytes(count * 32 + 1)])
+
+    def test_build_time_tiling_transforms_only_the_runtime_top_item(self):
+        builder = ScriptBuilder(": tile ( script cell -- script ) bsv-tile-top ;")
+        for count in (1, 2, 3, 6, 9, 31, 256, 257):
+            code = builder.emit("tile", b"", count)
+            self.assertEqual(evaluate(code, [b"outer", b"seed"]), ([b"outer", b"seed" * count], []))
+        self.assertEqual(len(builder.emit("tile", b"", 6)), 6)
+        for bad in (0, -1):
+            with self.assertRaisesRegex(CompileError, "requires a positive count"):
+                builder.emit("tile", b"", bad)

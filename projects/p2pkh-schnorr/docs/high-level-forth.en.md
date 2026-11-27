@@ -158,6 +158,8 @@ The stack plan now builds the variable table directly. The Forth row code uses m
 | Forth batch decoding | 23,484 B | 58,822 B |
 | Handwritten v0.17.0 | 22,435 B | 54,626 B |
 
+This table records commit 70d7ec8. The commands in this section reproduce that snapshot from the pinned revision. [Pinned source](https://github.com/linzhm/4thGraph/tree/70d7ec80ea4694c7d373f3a2368bb56303907dd1)
+
 The shortest build retains the identical 18,379 B window script. The remaining 1,049 B per lock comprises 392 B of witness and challenge handling, 549 B of joint preparation, and 108 B of cleanup and nonce comparison. Each candidate replays 27 vector and malformed-witness cases, 12 paired payment modes, and both native exits. The selected build replays eight constructor matrix cases. [Measurements](../experiments/high-level/dataflow-measurements.json) · [Transaction matrix](../experiments/high-level/dataflow-matrix.json)
 
 ```sh
@@ -167,4 +169,25 @@ PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
 REGTEST_CHRONICLE_HEIGHT=5 PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
   "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/experiments/high-level/window_compare.py \
   --joint-lowerings --matrix-only --output workspace/schnorr-high-level/dataflow-matrix.json
+```
+
+## Stack and model boundaries
+
+The stack plan retains the field modulus from affine mapping through joint table preparation. The affine and homogeneous coordinate adapters compare precomputed factors with computing the powers from one root. The dataflow scheduler groups adjacent operands, removes dead slots in an already ordered return sequence, and fuses comparisons consumed only by `verify`. The shared decoder generates repeated masks by doubling and appending. [Compiler and libraries](../../../docs/optimization-paths.md#dataflow-and-return-boundaries)
+
+| Build | Payment lock | 2×2 OTDA ALL with reconstruction |
+| --- | ---: | ---: |
+| Previous dataflow and batch build | 23,484 B | 58,822 B |
+| Optimized stack and model boundaries | 23,190 B | 57,646 B |
+| Handwritten v0.17.0 | 22,435 B | 54,626 B |
+
+The 18,379 B window loop matches the frozen manual implementation byte for byte. The remaining 755 B per lock is split into 441 B of joint preparation, 250 B of witness and challenge handling, and 64 B of cleanup and nonce comparison. The verifier replays the BIP340 vectors, malformed witnesses, 12 paired payment modes and two native exits. The selected build also passes the eight-case constructor matrix. [Measurements](../experiments/high-level/boundary-measurements.json) · [Transaction matrix](../experiments/high-level/boundary-matrix.json)
+
+```sh
+PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
+  "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/experiments/high-level/window_compare.py \
+  --joint-lowerings --output workspace/schnorr-high-level/boundary-measurements.json
+REGTEST_CHRONICLE_HEIGHT=5 PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
+  "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/experiments/high-level/window_compare.py \
+  --joint-lowerings --matrix-only --output workspace/schnorr-high-level/boundary-matrix.json
 ```

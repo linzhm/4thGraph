@@ -120,6 +120,8 @@ TypeScript 的 JSDoc 类型是工具读取注解的例子。Rust 属性提供显
 
 `over` 和 `2dup` 用于复制已有的栈项。`swap`、`rot` 和 `nip` 用于调整主栈。Gforth 工作流可以用 `DO … LOOP` 在宿主上迭代。Script 构造词可用 `bsv-repeat-code` 展开固定次数的指令片段。 [Forth 2012 Core](https://forth-standard.org/standard/core) · [Forth 2012 DO](https://forth-standard.org/standard/core/DO)
 
+`bsv-tile-top ( script cell -- script )` 追加代码，将运行时栈顶字节项替换为若干份拼接结果。构造时传入正数份数，生成的代码通过倍增和拼接完成重复。
+
 运算采用后缀写法（RPN）。`2 3 +` 先压入两个值，再由 `+` 消耗它们并留下 `5`。`+`、`-` 和 `*` 使用 64 位 `cell` 的回绕语义。`=`、`<` 和 `>` 产生 Forth flag。使用 `u32+` 进行无符号 32 位加法，使用 `int+`、`int-` 和 `int*` 进行 ScriptNum 运算。字节串使用 `bytes-cat` 和 `bytes=` 拼接或比较，`OP_SIZE` 保留输入并产生长度，`OP_SPLIT` 消耗输入和偏移并留下两段。 [语言语义](specification.md)
 
 如果唯一的解锁条件是两个见证值相等，就把 `OP_EQUAL` 的结果交给末尾的 `verify`。值不等时，结果为 `0`，解锁失败。这个锁只编译出一条 `OP_EQUAL`。

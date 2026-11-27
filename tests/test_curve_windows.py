@@ -89,6 +89,21 @@ class CurveWindowsTests(unittest.TestCase):
         self.assertNotEqual(pow(3 * P256.b, (P256.field - 1) // 6, P256.field), 1)
         self.assertIsNone(P256.normalized_a0())
 
+    def test_root_and_precomputed_scales_emit_identical_signed_residues(self):
+        source = SourceCompiler("REQUIRE stdlib/weierstrass.fth")
+        for curve in CURVES.values():
+            roots = (2, curve.field - 1, curve.field // 2)
+            for name, coordinates in (("weierstrass-scale-affine", (-1, curve.field - 1)),
+                                      ("weierstrass-scale", (1 - curve.field, -711, 3)),
+                                      ("weierstrass-scale", (0, -1, 0))):
+                powers = compile_word(source.words[name], DATAFLOW).script
+                rooted = compile_word(source.words[name + "-root"], DATAFLOW).script
+                inputs = [b"caller", *map(encode_num, (curve.field, *coordinates))]
+                for root in roots:
+                    scale = CoordinateScale(curve.field, root)
+                    expected = evaluate(powers, [*inputs, *map(encode_num, scale.factors())])
+                    self.assertEqual(evaluate(rooted, [*inputs, encode_num(root)]), expected)
+
     @unittest.skipUnless(which("openssl"), "requires OpenSSL for independent point multiplication")
     def test_curve_registry_and_fixed_tables(self):
         for curve in CURVES.values():

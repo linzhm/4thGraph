@@ -112,3 +112,7 @@ P-256 使用同一套坐标模型接口及原 `a=-3` 内核。它的六次幂判
 返回边界有一段连续的活值位于栈顶时，调度器比较逐项移除死值和暂存活值后成对丢弃的两种写法，再按原顺序恢复活值和调用方的备用栈。标准 Forth 前端也支持 `layout:`，可用名称和类型声明栈重排。
 
 共享 Script 库可解码单个 32 字节大端字段，也可解码编译期定数量的连续字段。它与窗口索引打包共享掩码和位组交换词。批量解码保留字段顺序和无符号语义。[共享实现](../src/fourthgraph/stdlib/script-fragments.fth) · [Schnorr 对照](../projects/p2pkh-schnorr/docs/high-level-forth.zh-CN.md#dataflow-iteration)
+
+数据流调度器也会比较连续操作数成组搬运和逐项搬运。移动时保留已就位操作数的顺序，并检查被移动值的剩余用途。返回值已按顺序排好时，可直接移除夹在其中的死值。比较结果只供 `verify` 消费时，可使用脚本引擎提供的融合指令。[边界复放](../projects/p2pkh-schnorr/docs/high-level-forth.zh-CN.md#stack-and-model-boundaries)
+
+`weierstrass-scale-affine` 将 `p X Y u2 u3` 映射成 `p X' Y'`。仿射及齐次坐标各有 `-root` 形式，接收一个非零域元素并计算完整的平方和立方。编译器对登记曲线的已约减坐标比较两种写法。256 位内核把 `-root` 路径的最大中间值限制在 129 个 ScriptNum 字节。批量解码用 `bsv-tile-top` 将运行时的掩码通过倍增和拼接重复。[缩放词](../src/fourthgraph/stdlib/weierstrass.fth) · [解码库](../src/fourthgraph/stdlib/script-fragments.fth)

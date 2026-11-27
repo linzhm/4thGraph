@@ -206,9 +206,20 @@ def _joint_library():
 
 
 @cache
-def _scale_script(optimization):
+def _scale_script(name, optimization):
     source = SourceCompiler("REQUIRE stdlib/weierstrass.fth")
-    return compile_word(source.words["weierstrass-scale"], optimization).script
+    return compile_word(source.words[name], optimization).script
+
+
+def _scaled_coordinates(model, optimization, *, affine=False, inverse=False):
+    name = "weierstrass-scale-affine" if affine else "weierstrass-scale"
+    factors = b"".join(map(number, model.factors(inverse=inverse)))
+    reduced = factors + _scale_script(name, optimization)
+    # u^3 times a reduced coordinate takes at most four field widths. This
+    # alternative fits within 129 ScriptNum bytes on the supported 256-bit field.
+    root = number(pow(model.root, -1, model.field) if inverse else model.root)
+    from_root = root + _scale_script(name + "-root", optimization)
+    return min((reduced, from_root), key=len)
 
 
 def _pack_windows(*lanes):
@@ -230,14 +241,11 @@ def _optimized_joint_words(vocabulary, optimization, *, scaled):
     scale_public = restore = b""
     if scaled:
         model = SECP256K1.normalized_a0()
-        transform = _scale_script(optimization)
-        forward = b"".join(map(number, model.factors()))
-        scale_public = (number(model.field) + asm("OP_ROT OP_ROT OP_1") + forward + transform
-                        + asm("OP_DROP OP_ROT OP_DROP"))
-        restore = b"".join(map(number, model.factors(inverse=True))) + transform
+        scale_public = _scaled_coordinates(model, optimization, affine=True)
+        restore = _scaled_coordinates(model, optimization, inverse=True)
         words["add-points"] = numeric_fragment(library.emit(prefix + "add-with-field", b"", 1), 7, 4)
         points = tuple(model.affine(point) for point in points)
-    words["map-public"] = numeric_fragment(scale_public, 2, 2)
+    words["map-affine-in-field"] = numeric_fragment(scale_public, 3, 3)
     words["restore-model"] = numeric_fragment(restore, 4, 4)
     table = b"".join(padded(coord, 33) for point in points for coord in (point or (0, 0)))
     words.update((_constant("fixed-affine-table", "bytes", table),))
@@ -266,8 +274,8 @@ def _variable_stack_table(frontend, words, optimization):
     row = compile_word(frontend.words["stack-table-row"], optimization).script
     Q2, Q3 = (emit(map_row, (p, py, qy, *point), 3) for point in (P2, P3))
     rows = [emit(row, (p, px, py, *point), 12) for point in (Q, Q2, Q3)]
-    return emit_steps(inputs, steps, (*P, *P2, *P3, *(slot for row in rows for slot in row)), compact=True,
-                      trim_suffix=optimization == DATAFLOW)
+    return emit_steps(inputs, steps, (p, *P, *P2, *P3, *(slot for row in rows for slot in row)), compact=True,
+                      trim_suffix=optimization == DATAFLOW, group_operands=optimization == DATAFLOW)
 
 
 def _stack_joint_script(frontend, words, points, optimization):
@@ -277,10 +285,11 @@ def _stack_joint_script(frontend, words, points, optimization):
     # The common depth encoder targets this exact stack layout. The runtime variable
     # table is in ascending order, the fixed table descending, both without index 0.
     entries = len(points) - 1
+    point_slots = entries * (3 + 2)
     prepare += library.emit("secp-window-window-depths", b"") + asm("OP_TOALTSTACK")
     prepare += _variable_stack_table(frontend, words, optimization)
     prepare += b"".join(number(coordinate) for point in reversed(points[1:]) for coordinate in point)
-    prepare += number(SECP256K1.field) + asm("OP_0 OP_1 OP_0")
+    prepare += number(point_slots) + asm("OP_ROLL OP_0 OP_1 OP_0")
 
     read = library.emit("secp-window-read-window", b"")
     variable = library.emit("secp-window-pick-variable-point", b"")
@@ -290,7 +299,6 @@ def _stack_joint_script(frontend, words, points, optimization):
     initial = read + asm("OP_IFDUP OP_IF") + variable + asm("OP_2ROT OP_2DROP 3 OP_ROLL OP_DROP OP_ENDIF") + fixed
     step = words["double-pair"].code + read + asm("OP_IFDUP OP_IF")
     step += variable + words["add-points"].code + asm("OP_ENDIF") + fixed
-    point_slots = entries * (3 + 2)
     state = tuple(range(point_slots + 4))
     cleanup = asm("OP_FROMALTSTACK OP_DROP") + emit_steps(state, (), state[point_slots:], compact=True,
                                                           trim_suffix=optimization == DATAFLOW)
