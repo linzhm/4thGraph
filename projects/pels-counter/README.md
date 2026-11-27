@@ -6,7 +6,7 @@
 
 ## Developer resources
 
-4thGraph compiles `advance` into a covenant that requires one successor with the incremented `u32` and the same covenant code. The [core PELS source](pels-counter-core.fth) takes the successor's amount from the witness and binds that amount to the actual successor. Its spends use different fees chosen by the transaction builder. The [original tutorial](pels-counter.fth) adds a 1,000 sat fee rule.
+This counter is one example of the [PELS template family](../../docs/optimizer-integration-review.zh-CN.md). 4thGraph compiles `advance` into a covenant that requires one successor with the incremented `u32` and the same covenant code. The [core PELS source](pels-counter-core.fth) takes the successor's amount from the witness and binds that amount to the actual successor. Its spends use different fees chosen by the transaction builder. The [original tutorial](pels-counter.fth) adds a 1,000 sat fee rule.
 
 [Algorithm and execution](#algorithm-and-execution) · [Reproduce the checks](#reproduce-the-checks)
 

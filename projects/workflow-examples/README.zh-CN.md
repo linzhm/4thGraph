@@ -20,6 +20,8 @@
 
 [并行分支](example.fth)、[带前置条件的分支](gated.fth)、[分叉与汇合](fork-join-graph.fth)和[串行状态](serial-graph.fth)展示了不同的交易依赖。[标准库示例](library-composition.fth)展示如何导入公共词。
 
+[PELS 结算示例](pels-settle.fth)约定一个输入和两个有序输出。用 [Agent 调优循环](../../docs/README.zh-CN.md#agent-tuning-loop)比较构建候选并验证结果。
+
 ## 复现方法
 
 使用 Python 3.11 或更新版本及工作流测试依赖，从仓库根目录运行版本命令。[Gforth 测试环境](gforth/README.md)

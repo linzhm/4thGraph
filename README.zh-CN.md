@@ -6,7 +6,7 @@
 
 4thGraph 是面向 BSV 的合约描述语言（SDL）和工具链。你可以在同一个项目里定义花费条件、管理 UTXO 状态、构建相互依赖的交易，并为适合在链下完成的计算生成零知识证明，在链上验证结果。
 
-**[用 Agent 开始](#start-with-agent)** · [可运行项目](#project-index) · [钱包 SDK](sdk/README.zh-CN.md) · [文档](docs/README.zh-CN.md) · [实测结果](#results)
+**[用 Agent 开始](#start-with-agent)** · [开发与调优](#develop-and-tune) · [可运行项目](#project-index) · [钱包 SDK](sdk/README.zh-CN.md) · [文档](docs/README.zh-CN.md) · [实测结果](#results)
 
 ---
 
@@ -71,6 +71,37 @@ flowchart LR
 <a name="4thg-quickstart"></a>
 
 [手工配置 CLI 与 Agent skill](docs/install.md)
+
+<a name="develop-and-tune"></a>
+
+## 用 Agent 开发和调优
+
+先用高层 Forth 写合约的花费条件和状态转换，固定基线及验收夹具。工具把可复跑的调优路径并列展示，Agent 选择本轮值得比较的候选。
+
+```mermaid
+flowchart TD
+    forth["高层 Forth · 输出、状态和授权"] --> baseline["冻结基线、夹具和目标"]
+    baseline --> source["Forth 实现 · 固定编译计划"]
+    baseline --> passes["编译 pass 和顺序 · 固定源码"]
+    baseline --> layout["合法的交易与见证布局 · 固定合约"]
+    source --> agent["Agent 选择候选批次和预算"]
+    passes --> agent
+    layout --> agent
+    agent --> evaluate["编译候选并用固定评估器验证"]
+    evaluate --> report["输出判定、成本和产物哈希"]
+    report --> agent
+    report --> selected["保存选定计划并复跑结果"]
+```
+
+下面从同一份 PELS 源码按目标自动选签名摘要格式。报告给出选中的 Script、候选字节数和各片段哈希。
+
+```sh
+PYTHONPATH=src:. python3 -m fourthgraph.workflow.protocol \
+  projects/workflow-examples/pels-settle.fth --entry settle \
+  --bind-bytes recipient-lock=51 --target chronicle-v2 --sighash-family auto --explain
+```
+
+示例使用离线测试输出。操作指南包含如何比较候选、用实际父交易验证完整花费，以及复跑选中的构建。[开发与调优指南](docs/README.zh-CN.md#agent-tuning-loop) · [Agent skill](skills/4thgraph/SKILL.md)
 
 <a name="capabilities"></a><a name="project-index"></a><a name="p2pkh-example"></a><a name="p2pk-example"></a>
 

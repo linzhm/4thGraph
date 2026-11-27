@@ -85,6 +85,33 @@ In this regtest replay, all five candidates passed both settlement and review, f
 
 For another run, pass `--objective peak-validation` to change the ranking or `--available-authorizers operator` to model a first step where only the operator can sign. Save a separate replay and report for each run so you can compare exclusions, successful paths, and rejections. The next step for scaffolding is to let more projects generate the same artifacts from their stage declarations and test fixtures. [Gated example source](../projects/workflow-examples/gated.fth)
 
+<a name="agent-tuning-loop"></a>
+
+## The Agent development and tuning loop
+
+1. **Write and freeze the high-level Forth.** Specify the required outputs, state transition, authorization, and failure cases. Keep the baseline Script and pin the compiler, dependencies, target, and fixtures.
+2. **List the available paths side by side.** Compare Forth implementations with the compiler plan fixed, or compare compiler pass sets and bounded orders with the Forth source fixed. For transaction-level changes, compare eligible transaction cuts and witness layouts under the same contract and required coverage. Use `4thgraph experiment capabilities` for the formula fixture catalog, `--explain` for PELS candidates, and `--search --explain` for transaction workflow candidates.
+3. **Let the Agent pick a bounded batch.** Submit registered choices and a budget. The formula runner compiles in parallel up to the requested worker limit and evaluates the outputs against fixed vectors. Keep each variant in its own artifact or report.
+4. **Read the evaluation and choose again.** Check compile and test verdicts before ranking. Formula reports contain Script bytes, stack peaks, timings, and candidate hashes. Full-path comparisons require independently validating each spend against its actual parent and measuring serialized transaction bytes. Keep unavailable measurements marked as such.
+5. **Record the chosen plan and replay.** Retain source and dependency identity, target, selected plan, linked Script and fragment hashes, and the validation receipt. An Agent can use the machine report to choose the next batch. Another run can reproduce the recorded result without an Agent.
+
+Try a baseline and two formula plans. Both rounds use the same Bézier fixture and fixed evaluator. The `next` command produces a sample follow-up request that an Agent can inspect and select from.
+
+```sh
+export PYTHONPATH=src:.
+mkdir -p workspace/tuning
+python3 -m fourthgraph.workflow.protocol experiment capabilities
+printf '%s\n' '{"fixture":"bezier","workers":2,"plans":[{},{"passes":["stack"]},{"passes":["rewrite","share","stack"]}]}' |
+  python3 -m fourthgraph.workflow.protocol experiment run - > workspace/tuning/first.json
+python3 -m fourthgraph.workflow.protocol experiment next workspace/tuning/first.json > workspace/tuning/next.json
+python3 -m fourthgraph.workflow.protocol experiment run workspace/tuning/next.json \
+  --parent workspace/tuning/first.json > workspace/tuning/second.json
+python3 -m fourthgraph.workflow.protocol experiment replay workspace/tuning/second.json \
+  --parent workspace/tuning/first.json
+```
+
+The formula batch measures the registered function fixture. For a PELS lock, build with `--sighash-family auto --explain` and use `pels-witness` with the exact artifact, parent, and unsigned transaction. The pinned chain-gang is the default independent engine for project contract fixtures. BSV Node is an optional second check. [PELS build and project package commands](project-contracts.zh-CN.md#按编译目标构建-pels-锁) · [Agent skill](../skills/4thgraph/SKILL.md)
+
 <a name="documentation-index"></a>
 
 ## Documentation index
@@ -92,6 +119,7 @@ For another run, pass `--objective peak-validation` to change the ranking or `--
 | What you want to do | Where to go |
 | --- | --- |
 | Build a first contract | [Start with an Agent](../README.md#start-with-agent) · [Install the CLI and skill](install.md) · [Runnable projects](../projects/README.md) |
+| Compare and replay optimization candidates | [Agent development and tuning loop](#agent-tuning-loop) |
 | Write Forth for BSV | [SDL specification, syntax, and standard library](language/README.md) |
 | Compile and replay a transaction workflow | [Toolchain guide](toolchain.md) · [Regtest infrastructure](infrastructure.md) · [Chronicle regression](chronicle-regression.md) |
 | Generate or verify a proof | [Proof counter](../projects/proof-counter/README.md) · [BLS12-381 Groth16](groth16-bls12-381.md) |

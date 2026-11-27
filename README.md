@@ -6,7 +6,7 @@
 
 4thGraph is a contract description language (SDL) and toolchain for BSV. Use it to define spending conditions, carry state in UTXOs, build transactions that depend on one another, and verify an off-chain computation with a zero-knowledge proof.
 
-**[Start with an Agent](#start-with-agent)** · [Runnable projects](#project-index) · [Wallet SDK](sdk/README.md) · [Docs](docs/README.md) · [Results](#results)
+**[Start with an Agent](#start-with-agent)** · [Develop and tune](#develop-and-tune) · [Runnable projects](#project-index) · [Wallet SDK](sdk/README.md) · [Docs](docs/README.md) · [Results](#results)
 
 ---
 
@@ -71,6 +71,37 @@ If regtest is available, demonstrate 0 → 1 → 2, then try jumping directly fr
 <a name="4thg-quickstart"></a>
 
 [Manual setup for the CLI and Agent skill](docs/install.md)
+
+<a name="develop-and-tune"></a>
+
+## Develop and tune with an Agent
+
+Start with high-level Forth that describes the contract's spending rules and state transitions. Freeze the reference build and its acceptance fixtures. The Agent can then choose which of the available, reproducible paths to explore.
+
+```mermaid
+flowchart TD
+    forth["High-level Forth · outputs, state and authorization"] --> baseline["Freeze the baseline, fixtures and target"]
+    baseline --> source["Forth implementations · fixed compiler plan"]
+    baseline --> passes["Compiler passes and pass orders · fixed source"]
+    baseline --> layout["Eligible transaction and witness layouts · fixed contract"]
+    source --> agent["Agent selects a bounded batch"]
+    passes --> agent
+    layout --> agent
+    agent --> evaluate["Build candidates and run fixed evaluators"]
+    evaluate --> report["Report verdicts, costs and artifact hashes"]
+    report --> agent
+    report --> selected["Record the selected plan and replay its result"]
+```
+
+Run the same PELS source under an automatic sighash policy. The report gives the selected Script, candidate byte counts, and fragment hashes.
+
+```sh
+PYTHONPATH=src:. python3 -m fourthgraph.workflow.protocol \
+  projects/workflow-examples/pels-settle.fth --entry settle \
+  --bind-bytes recipient-lock=51 --target chronicle-v2 --sighash-family auto --explain
+```
+
+The example uses an offline test output. Follow the guide to compare a batch, verify a complete spend against its parent, and replay the selected result. [Development and tuning guide](docs/README.md#agent-tuning-loop) · [Agent skill](skills/4thgraph/SKILL.md)
 
 <a name="capabilities"></a><a name="project-index"></a><a name="p2pkh-example"></a><a name="p2pk-example"></a>
 

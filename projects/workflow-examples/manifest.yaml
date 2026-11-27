@@ -34,9 +34,12 @@ sections:
         and [a serial graph](serial-graph.fth) show different transaction dependencies. [Library composition](library-composition.fth)
         imports public Forth words. The [Gforth frontend](gforth/README.md) builds a transaction plan
         from Forth definitions.'
+      - '[PELS settlement](pels-settle.fth) declares one input and two ordered outputs. Use the
+        [Agent tuning loop](../../docs/README.md#agent-tuning-loop) to compare build choices and verify their results.'
     zh-CN:
       - '**[编译一个词](#compile-a-word)** · [构建交易计划](../../docs/toolchain.md#交易与验证) · [Gforth 前端](gforth/README.md)'
       - '[并行分支](example.fth)、[带前置条件的分支](gated.fth)、[分叉与汇合](fork-join-graph.fth)和[串行状态](serial-graph.fth)展示了不同的交易依赖。[标准库示例](library-composition.fth)展示如何导入公共词。'
+      - '[PELS 结算示例](pels-settle.fth)约定一个输入和两个有序输出。用 [Agent 调优循环](../../docs/README.zh-CN.md#agent-tuning-loop)比较构建候选并验证结果。'
   reproduction:
     en:
       - '### Compile a word'

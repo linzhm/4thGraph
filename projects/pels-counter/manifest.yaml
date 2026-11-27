@@ -4,11 +4,12 @@ title:
   en: PELS Counter
   zh-CN: PELS 计数器
 summary:
-  en: 4thGraph compiles `advance` into a covenant that requires one successor with the incremented `u32`
+  en: This counter is one example of the [PELS template family](../../docs/optimizer-integration-review.zh-CN.md).
+    4thGraph compiles `advance` into a covenant that requires one successor with the incremented `u32`
     and the same covenant code. The [core PELS source](pels-counter-core.fth) takes the successor's amount
     from the witness and binds that amount to the actual successor. Its spends use different fees chosen
     by the transaction builder. The [original tutorial](pels-counter.fth) adds a 1,000 sat fee rule.
-  zh-CN: 4thGraph 把 `advance` 编译到完整合约锁。每次花费只允许一个后继输出，后继的 `u32` 计数加一，并沿用同一段合约代码。[入门版](pels-counter.fth)固定每笔花费的手续费为
+  zh-CN: 这是 [PELS 标准库模板族](../../docs/optimizer-integration-review.zh-CN.md)的一个计数示例。4thGraph 把 `advance` 编译到完整合约锁。每次花费只允许一个后继输出，后继的 `u32` 计数加一，并沿用同一段合约代码。[入门版](pels-counter.fth)固定每笔花费的手续费为
     1,000 聪。[核心版](pels-counter-core.fth)由花费见证提供后继金额，锁再把金额绑定到实际输出。
 entry_points:
   - name: pels_counter.py build
