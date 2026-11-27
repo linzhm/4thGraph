@@ -359,3 +359,17 @@ The row mapping returns only the three transformed X coordinates and the two sig
 BSV Node 1.2.3 and pinned chain-gang replayed the tuned verifier and the eight constructor shapes. The default wallet still recognizes the published lock. The compiled lock uses the experimental constructor. [Replay summary](../experiments/high-level/row-start-layout.json)
 
 The layout-aware control comes from commit `5f72078`. Run the same benchmark commands above on the current checkout, writing the new results to separate files.
+
+<a name="paired-witness-ordinate-check"></a>
+
+## Checking both witness ordinates together
+
+The batch decoder supplies two unsigned ordinates. The tuned Forth checks that the sum of their individual remainders modulo 2 is zero. Each remainder is 0 or 1, so the sum is zero exactly when both ordinates are even. The compiler keeps the existing decoded field order and the four field bounds.
+
+| Build | Payment lock | 2-input, 2-output OTDA ALL with constructor |
+| --- | ---: | ---: |
+| Shared row coordinates | 22,436 B | 54,630 B |
+| Paired ordinate check | 22,434 B | 54,622 B |
+| Manual v0.17.0 | 22,435 B | 54,626 B |
+
+BSV Node 1.2.3 and pinned chain-gang reject the added witness with both ordinates odd. An isolated replay also checks all four parity combinations at small values and near the field bound. The constructor matrix retains the verdicts from commit `e52283a`. Reproduce the lock and transaction measurements with the commands above. [Forth source](../experiments/high-level/window-verifier-tuned.fth) · [Replay summary](../experiments/high-level/witness-ordinate-check.json)

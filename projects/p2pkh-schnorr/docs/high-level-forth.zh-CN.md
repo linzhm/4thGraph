@@ -379,3 +379,17 @@ REGTEST_CHRONICLE_HEIGHT=5 PYTHONPATH=src:. bash tools/verify_node.sh --profile 
 BSV Node 1.2.3 和固定版本的 chain-gang 复放了调优验证器与八种构造器场景。默认钱包仍识别已发布的付款锁，编译版通过实验构造器复放。[复放摘要](../experiments/high-level/row-start-layout.json)
 
 布局调度基线对应提交 `5f72078`。在当前版本运行上节相同的基准命令，将结果写入新的文件即可复现。
+
+<a name="paired-witness-ordinate-check"></a>
+
+## 合并见证纵坐标的偶性检查
+
+批量解码器输出两个无符号纵坐标。调优的 Forth 分别对两个值取模 2，再检查余数之和是否为零。每个余数都是 0 或 1，因此和为零等价于两个纵坐标都为偶数。编译沿用原有的解码字段顺序和四项域边界检查。
+
+| 构建 | 付款锁 | 两进两出 OTDA ALL，使用构造器 |
+| --- | ---: | ---: |
+| 复用行起点坐标 | 22,436 B | 54,630 B |
+| 合并纵坐标偶性检查 | 22,434 B | 54,622 B |
+| 手工 v0.17.0 | 22,435 B | 54,626 B |
+
+BSV Node 1.2.3 和固定版本的 chain-gang 均拒绝新增的双奇数见证。单独复放还在小值和接近域上界的输入上覆盖了四种奇偶组合。构造器矩阵的判定与提交 `e52283a` 一致。锁脚本和交易大小可用上面的命令复现。[Forth 源码](../experiments/high-level/window-verifier-tuned.fth) · [复放摘要](../experiments/high-level/witness-ordinate-check.json)
