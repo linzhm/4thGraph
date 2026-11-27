@@ -886,15 +886,22 @@ def end_declaration(tokens, at):
 
 
 WORKFLOW_MODES = ("fused", "serial", "atomic")
+FUSED_PREFIX = "fused-prefix"
+WORKFLOW_CHOICES = (*WORKFLOW_MODES, FUSED_PREFIX)
 
 
 def workflow_blockers(program, mode, available_authorizers):
-    if mode != "serial" and len(program.stages) != 2:
-        stage = program.stages[2].declaration
+    required_count = 3 if mode == FUSED_PREFIX else 2
+    if mode != "serial" and len(program.stages) != required_count:
+        stage = program.stages[min(len(program.stages) - 1, required_count)].declaration
         return [{"code": "unsupported_stage_count", "line": stage.line,
-                 "message": f"{stage.location}: {mode} supports two stages; use serial for a longer chain"}]
+                 "message": f"{stage.location}: {mode} requires {required_count} stages"}]
+    if mode == FUSED_PREFIX and program.recovery:
+        return [{"code": "unsupported_recovery_layout",
+                 "message": "fused-prefix requires a workflow without a recovery branch"}]
+    first_spend = program.stages[:2] if mode == FUSED_PREFIX else program.stages
     required_roles = ((program.stages[0].owner,) if mode == "serial"
-                      else tuple(dict.fromkeys(stage.owner for stage in program.stages)))
+                      else tuple(dict.fromkeys(stage.owner for stage in first_spend)))
     reasons = [
         {"code": "unavailable_authorizer", "role": role,
          "message": f"{role} must be available for the first spend in the {mode} layout"}
@@ -905,6 +912,7 @@ def workflow_blockers(program, mode, available_authorizers):
             {"code": "independent_submit", "stage": step, "line": line,
              "message": f"line {line}: independent-submit {step} requires a separate transaction"}
             for step, line in program.independent
+            if mode != FUSED_PREFIX or step in {stage.name for stage in first_spend}
         )
     return reasons
 
@@ -913,8 +921,8 @@ def plan_workflow(program, mode, *, available_authorizers=None):
     available = {stage.owner for stage in program.stages} if available_authorizers is None else set(available_authorizers)
     if mode == "auto":
         mode = "serial" if workflow_blockers(program, "fused", available) else "fused"
-    if mode not in WORKFLOW_MODES:
-        raise CompileError("workflow mode must be fused, serial or atomic")
+    if mode not in WORKFLOW_CHOICES:
+        raise CompileError("unknown workflow layout")
     blockers = workflow_blockers(program, mode, available)
     if blockers:
         raise CompileError("; ".join(reason["message"] for reason in blockers))
@@ -930,6 +938,15 @@ def workflow_layout(program, mode):
                      ("terminal", "receipt"), (first.name, second.name)),
         )
         deployment, reasons = ("state-lock",), ()
+    if mode == FUSED_PREFIX:
+        last = graph.stages[-1]
+        templates = (
+            Template(second.name, (ParentOutput("deploy", 0),), tuple(dict.fromkeys((first.authorizer, second.authorizer))),
+                     ("state",), (first.name, second.name)),
+            Template(last.name, (ParentOutput(second.name, 0),), (last.authorizer,),
+                     ("terminal", "receipt"), (last.name,)),
+        )
+        deployment, reasons = ("state-lock",), ("fuse the first two stages and commit their result for the terminal spend",)
     if mode == "serial":
         templates = tuple(
             Template(stage.name, (ParentOutput(parent, 0),), (stage.authorizer,),

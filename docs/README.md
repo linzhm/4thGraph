@@ -85,6 +85,8 @@ In this regtest replay, all five candidates passed both settlement and review, f
 
 For another run, pass `--objective peak-validation` to change the ranking or `--available-authorizers operator` to model a first step where only the operator can sign. Save a separate replay and report for each run so you can compare exclusions, successful paths, and rejections. The next step for scaffolding is to let more projects generate the same artifacts from their stage declarations and test fixtures. [Gated example source](../projects/workflow-examples/gated.fth)
 
+For a three-stage linear BIP143 workflow, use `--mode fused-prefix` to combine the first two stages while retaining a separately authorized terminal spend. The first two authorizers must be available at the first spend, and either stage's independent-submission requirement excludes fusion. This layout requires a workflow without recovery. The three-stage default is serial. Use `--search --explain` to compare both and the offline replay to check actual parents and compare serialized sizes. [Replay command](toolchain.md#可执行交易图)
+
 <a name="agent-tuning-loop"></a>
 
 ## The Agent development and tuning loop
