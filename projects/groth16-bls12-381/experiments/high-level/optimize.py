@@ -15,7 +15,7 @@ from fourthgraph.verification.bls12381.affine_witness import (
     MILLER_KERNELS, MILLER_REDUCTIONS, MSM_STRATEGIES, MSM_TABLES,
 )
 from fourthgraph.verification.bls12381.build import (
-    G1_REDUCTIONS, RESIDUE_ASSOCIATIONS, SCRIPT_ERAS, ArithmeticPlan, ForthVerifier,
+    G1_REDUCTIONS, MAX_G1_Z_BATCH, RESIDUE_ASSOCIATIONS, SCRIPT_ERAS, ArithmeticPlan, ForthVerifier,
 )
 from fourthgraph.verification.bls12381.field import FP2_RULES, fp2_kernel
 from fourthgraph.verification.bls12381.verifier import public_packet
@@ -93,8 +93,14 @@ def main():
     cli.add_argument("--msm-table", choices=MSM_TABLES, help="restrict the MSM point table representation")
     cli.add_argument("--miller-reductions", choices=MILLER_REDUCTIONS, help="restrict the Miller reduction schedule")
     cli.add_argument("--miller-kernel", choices=MILLER_KERNELS, help="restrict the affine Miller arithmetic")
-    cli.add_argument("--try-paired-g1-doubles", action="store_true",
-                     help="also compare deferring reductions across two consecutive G1 doublings")
+    g1 = cli.add_mutually_exclusive_group()
+    g1.add_argument("--try-paired-g1-doubles", action="store_true",
+                    help="also compare deferring reductions across two consecutive G1 doublings")
+    g1.add_argument("--g1-reductions", choices=G1_REDUCTIONS, help="restrict the G1 reduction schedule")
+    cli.add_argument("--g1-z-batch", type=int, action="append", choices=range(1, MAX_G1_Z_BATCH + 1),
+                     help="compare this G1 Z batch size, repeat for multiple sizes (default: 1)")
+    cli.add_argument("--try-compact-booleans", action="store_true",
+                     help="also compare folding nonzero tests into numeric boolean operations")
     cli.add_argument("--max-fixture-stack-bytes", type=int,
                      help="limit the measured stack payload on the two valid development proofs")
     cli.add_argument("--fp2-selection", choices=("uniform", "callsite"), help="restrict the Fp2 kernel selection")
@@ -127,8 +133,11 @@ def main():
              if msm == "signed-radix4" or table == "points"]
     if not plans:
         cli.error("doubling-slope tables require signed radix-4 MSM")
-    if args.try_paired_g1_doubles:
-        plans.extend(replace(plan, g1_reductions=G1_REDUCTIONS[1]) for plan in tuple(plans))
+    g1_reductions = G1_REDUCTIONS if args.try_paired_g1_doubles else (args.g1_reductions or G1_REDUCTIONS[0],)
+    z_batches = tuple(dict.fromkeys(args.g1_z_batch or (1,)))
+    booleans = (False, True) if args.try_compact_booleans else (False,)
+    plans = [replace(plan, g1_reductions=g1, g1_z_batch=z, compact_booleans=compact)
+             for g1, z, compact, plan in product(g1_reductions, z_batches, booleans, plans)]
     packets = [public_packet(SOURCES, signals) for signals, _ in cases]
     report = {
         "objective": "path-bytes",

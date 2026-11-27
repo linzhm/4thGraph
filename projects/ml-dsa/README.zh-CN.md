@@ -1,6 +1,6 @@
 <!-- Generated from manifest.yaml with Copier. -->
 
-# 纯模式 ML-DSA-44 v0.1.0
+# 纯模式 ML-DSA-44 v0.11.0
 
 [English](README.md) · [4thGraph](../../README.zh-CN.md) · [项目目录](../README.zh-CN.md) · [版本](versions/index.json)
 
@@ -10,7 +10,7 @@
 
 用原始 ML-DSA-44 公钥生成付款锁，再用纯模式和空上下文签署付款消息。
 
-[协议](docs/developer.zh-CN.md) · [算法与执行](#算法与执行) · [复现方法](#复现方法) · [完整交易与栈测量](#完整交易与栈测量)
+[协议](docs/developer.zh-CN.md) · [算法与执行](#算法与执行) · [复现方法](#复现方法) · [完整交易与栈测量](#完整交易与栈测量) · [实测数据](versions/v0.11.0/measurements.json)
 
 | 入口 | 用途 |
 | --- | --- |
@@ -22,13 +22,15 @@
 
 验证 FIPS 204 签名器互操作，或测量大脚本资源限制时，可以评估纯模式 ML‑DSA‑44。实验可先跑独立的算法合规向量，再用相同类型的公钥及专用付款签名器验证付款封装。付款封装把 32 字节的付款消息交给纯模式 ML‑DSA‑44，使用空上下文。公钥和签名校验、交易绑定，以及节点接收策略应各自核验。[复现与验证](#复现方法)
 
-实测夹具的固定公钥付款锁约为 926 kB。如果计划对这种输出实际入金，应先在目标节点或矿工环境验证脚本大小、整笔交易上限及验证策略。[出块测量方法](../../docs/benchmark.zh-CN.md)
+实测夹具的固定公钥付款锁约为 252 kB。如果计划对这种输出实际入金，应先在目标节点或矿工环境验证脚本大小、整笔交易上限及验证策略。[出块测量方法](../../docs/benchmark.zh-CN.md)
 
 ## 算法与执行
 
 [协议规范](docs/developer.zh-CN.md#protocol) · [安全分析](docs/developer.zh-CN.md#security) · [复现与验证](#复现方法) · [交易成本](#完整交易与栈测量)
 
-ML-DSA-44 是 v0.1.0 开发基线，采用 FIPS 204 纯模式编码。公钥为 1,312 字节，签名为 2,420 字节。编译器预计算与公钥相关的矩阵和多项式，执行时校验签名编码、响应范数和提示值，再计算挑战和验证方程。 [FIPS 204](https://csrc.nist.gov/pubs/fips/204/final)
+ML-DSA 是 NIST 在 FIPS 204 中标准化的后量子数字签名算法，源自 CRYSTALS-Dilithium，安全性基于模格问题的计算困难性。ML-DSA-44 面向 NIST 第 2 类安全目标，在三套标准参数中公钥和签名最小，分别为 1,312 和 2,420 字节。名称中的两个 4 对应 4 × 4 的公开矩阵。[NIST FIPS 204](https://csrc.nist.gov/pubs/fips/204/final)
+
+验签先检查签名编码、响应范数和提示值，再用数论变换（NTT）进行多项式运算，并用 SHAKE256 重算并核对挑战。本项目在生成 BSV 付款锁时，会为固定公钥预计算矩阵和变换后的公钥多项式。[Script 验签实现](reference/script.py)
 
 挑战采样遵循 FIPS 204 附录 C 表 3 的 221 字节上限，耗尽时验签失败。消息验签和付款绑定分别有测试向量。 [采样实现](reference/challenge_script.py) · [确定性向量](versions/v0.1.0/deterministic.json)
 
@@ -41,20 +43,24 @@ python -m pip install -r tools/requirements-chronicle.txt
 ```
 
 ```sh
-PYTHONPATH=src:. python -m unittest discover -s projects/ml-dsa/reference -p test_signature_script.py
-PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- python -m unittest discover -s projects/ml-dsa/reference -p test_payment.py
+PYTHONPATH=src:.:projects/ml-dsa/reference python -c 'from benchmark_adapter import components; print(components(None))'
+PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- python -m unittest discover -s projects/ml-dsa/reference
 ```
 
-在仓库根目录使用 Python 3.12 和 OpenSSL 3.5 或以上版本。OpenSSL 夹具使用公开测试种子。
+OpenSSL 夹具使用公开测试种子。
 
 ```sh
+python -m pip install -r tools/requirements-chronicle.txt
 python -m unittest discover -s projects/ml-dsa/reference -p test_mldsa.py -v
 python projects/ml-dsa/reference/check_chain_gang.py -v
 python projects/ml-dsa/reference/test_shake_script.py -v
 python projects/ml-dsa/reference/test_signature_script.py -v
 python projects/ml-dsa/reference/test_challenge_script.py -v
+python projects/ml-dsa/reference/test_boundaries.py -v
 python projects/ml-dsa/reference/test_payment.py -v
 ```
+
+两个引擎均通过 276 项组件边界判定和 18 项完整付款边界判定。[边界测试](reference/payment-acceptance.md#boundary-rejection)
 
 测试覆盖 80 条 Wycheproof 标准验签用例、15 条 NIST ACVP 外部纯模式向量及 640 个付款判定组合。详见[统一节点回归](../../docs/chronicle-regression.md)。Linux 节点重放使用统一入口的脚本策略配置。
 
@@ -70,19 +76,39 @@ PYTHONPATH=src:. python projects/ml-dsa/reference/check_acvp.py "$ACVP_PROMPT" "
 
 ## 脚本尺寸
 
-### 输入输出取舍
+<a name="脚本大小"></a>
 
-单独的确定性样本的付款锁是 926,403 字节，BIP143 ALL 解锁是 2,588 字节。公钥的固定值参与脚本编译，不同交易样本的锁定长度可略有变化。两进两出时，OTDA ALL 每个输入都带本笔的输出字节，整笔达到 5,563,725 字节。有符号余数 NTT 实验把固定公钥验证方程从 500,794 缩到 452,154 字节。这个值是运算组件的尺寸，付款脚本的实测值见下表。
+下表用相同夹具比较编译后的 Script 字节数。公钥内容会使锁的长度略有变化，OTDA ALL 的每个输入还会携带整笔交易的输出。
 
-| 运算组件 | 规范实现 | 有符号余数实验 |
-|---|---:|---:|
-| NTT | 46,134 字节 | 38,454 字节 |
-| 逆 NTT | 43,500 字节 | 40,940 字节 |
-| 固定公钥验证方程 | 500,794 字节 | 452,154 字节 |
+| 组件 | PR #68 基线 | 紧凑版 `879b52c` | v0.2.0 | v0.3.0 | v0.4.0 | v0.5.0 | v0.6.0 | v0.7.0 | v0.8.0 | v0.9.0 | v0.10.0 | v0.11.0 |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| 固定公钥验证方程 | 500,794 | 310,198 | 257,122 | 137,874 | 137,874 | 137,874 | 124,849 | 124,849 | 127,876 | 122,627 | 122,627 | 122,627 |
+| 签名解码 | 62,723 | 46,392 | 36,152 | 36,152 | 28,224 | 28,224 | 28,224 | 28,224 | 6,007 | 6,007 | 6,007 | 6,007 |
+| SampleInBall（221 字节预算） | 70,229 | 63,701 | 61,101 | 61,101 | 61,101 | 45,211 | 43,512 | 40,827 | 40,827 | 40,827 | 30,638 | 25,717 |
+| 应用提示并编码高位 | 89,687 | 66,135 | 66,135 | 66,135 | 31,087 | 31,087 | 31,087 | 23,389 | 23,389 | 11,829 | 11,829 | 11,829 |
+| 独立 Keccak-f[1600] 置换（小端 lane） | 25,097 | 21,833 | 20,533 | 20,533 | 20,533 | 12,588 | 12,588 | 12,588 | 12,588 | 12,588 | 12,588 | 12,588 |
+| SHAKE256（832 字节输入、32 字节输出） | 176,542 | 153,694 | 144,594 | 144,594 | 144,594 | 88,979 | 81,821 | 79,133 | 79,133 | 79,133 | 74,766 | 74,023 |
+| 当前输入绑定 | 718 | 718 | 718 | 718 | 718 | 506 | 506 | 506 | 506 | 506 | 506 | 506 |
+| 完整付款锁 | 926,403 | 663,284 | 586,981 | 467,733 | 424,757 | 345,095 | 322,447 | 308,992 | 289,802 | 272,993 | 257,662 | **251,704** |
+| 单输入 BIP143 ALL 解锁 | 2,588 | 2,588 | 2,588 | 2,588 | 2,588 | 2,588 | 2,588 | 2,588 | 2,588 | 2,588 | 2,588 | 2,588 |
+
+Forth 付款入口用上游 `889ff6e` 以 `stack` 模式编译。v0.5.0 按五个 lane 一行执行 Keccak 的 θ 和 χ。θ 用位掩码隔离跨 lane 的移位，ρ 和 π 按单个 lane 执行。付款锁的十次置换共省 79,450 字节，共享紧凑输入绑定再省 212 字节。[Forth 入口](reference/payment-lock.fth) · [v0.4.0 测量](versions/v0.4.0/measurements.json) · [v0.5.0 测量](versions/v0.5.0/measurements.json)
+
+v0.6.0 把每组四个系数保留在栈顶，连续执行相邻两层 NTT 蝶形。根据变换的幅值上界选取模数的整数倍作为偏移，使每个打包系数的符号位保持为零。这两项共省 13,025 字节。SHAKE 在多次置换之间保持内部 lane 为大端，只在吸收和挤出时转换字节序，再省 9,623 字节。[v0.6.0 测量](versions/v0.6.0/measurements.json)
+
+v0.7.0 先按模 q−1 将稀疏提示对应的系数移动一个舍入区间，再共用常量，一次扫描完成高位编码，节省 7,698 字节。挑战系数改用单字节带符号编码，节省 1,917 字节。Keccak 每生成一行 ρ/π 的结果就执行 χ，再将该行移出主栈，每次置换节省 384 字节，整锁节省 3,840 字节。[v0.7.0 测量](versions/v0.7.0/measurements.json)
+
+v0.8.0 在原始 18 位响应编码上每 64 个系数批量检查严格范数上限。每个系数的保护位阻止跨系数借位。NTT 直接读取已检查的响应，点积阶段复用模数，并拼接定宽数据作为逆变换输入。签名解码缩小 22,217 字节，验证方程增加 3,027 字节，整锁净减 19,190 字节。[v0.8.0 测量](versions/v0.8.0/measurements.json)
+
+v0.9.0 对响应编码按位取反，再一次性扣除四个打包响应系数的偏移。NTT 在固定栈深复用正变换偏移、模数和逆变换偏移，验证方程共省 5,249 字节。提示修正后，每 64 个系数同时用倒数乘法舍入，再用乘法把每四个六位值收拢成 FIPS 204 编码，提示和编码共省 11,560 字节。[v0.9.0 测量](versions/v0.9.0/measurements.json)
+
+v0.10.0 并行比较候选字节，再二分定位每次 SampleInBall 选取时第一个可接受的字节。含符号位在内的预算仍是 221 字节，采样本身节省 8,683 字节。SHAKE 并行交换各 lane 内的字节组，并用更短的移位指令完成部分 Keccak 旋转，整锁再省 6,648 字节。[v0.10.0 测量](versions/v0.10.0/measurements.json)
+
+v0.11.0 将非零接受掩码减一后与原掩码异或，利用结果的最短字节长度定位首个合格候选，采样节省 4,560 字节。SHAKE 在 Script 中生成填充和容量区的零字节，并将首块直接吸收到空状态，再省 1,398 字节。[v0.11.0 测量](versions/v0.11.0/measurements.json)
 
 ## 开发和钱包接入
 
-1. 调用 `locking_script(public_key)` 生成付款输出。钱包保存经认证的完整公钥，并用该公钥重新生成锁来核对实际上一输出。签名前核对 outpoint、金额、确认数和预期收款输出。
+1. 调用 `locking_script(public_key)` 生成新版付款输出，并保存经认证的完整公钥。钱包可用同一公钥识别和花费此前十一版锁。用 `locking_script(public_key, legacy=True)` 可复现最初的 v0.1.0 锁。签名前核对 outpoint、金额、确认数和预期收款输出。
 2. 单输入付款用 `sign_payment`，已排好输入输出的交易逐输入调用 `sign_spend`。付款支持 BIP143 与 Chronicle OTDA 的十二种签名模式，无配对 OTDA SINGLE 使用伴随绑定。
 3. 外部签名器把收到的 32 字节作为纯模式的消息，使用空上下文并返回 2,420 字节签名。钱包验签后构造解锁脚本。通用消息验签可另行指定上下文和消息长度。
 
@@ -90,12 +116,12 @@ PYTHONPATH=src:. python projects/ml-dsa/reference/check_acvp.py "$ACVP_PROMPT" "
 
 ## 完整交易与栈测量
 
-下表取自提交 `beeb4dd` 的确定性交易夹具，所有完整输入由 BSV Node 1.2.3 和项目固定的 chain-gang 版本验证。节点通过显式提供上一输出执行脚本，默认策略下的入内存池及出块另有复放记录。脚本和交易以字节计。表中按索引列出每个输入或输出的大小，`× n` 表示同样大小重复 n 次。栈数据取第一个输入的成功路径。主栈项数、备用栈项数和两栈载荷分别记录各自达到的峰值，单位为项或字节。栈开销由开发求值器估计，统计栈上数据的字节数。ML-DSA-44 的两行暂无栈值，求值器在 `OP_GREATERTHANOREQUAL` 处停止。
+BSV Node 1.2.3 和项目固定的 chain-gang 版本用显式提供的上一输出验证了新版锁的完整交易。表中大小以字节计，按输入和输出顺序排列，`× n` 表示相同大小重复 n 次。开发求值器缺少所需的比较指令，暂无栈峰值。v0.10.0 的两进两出夹具在 BIP143 ALL 和 OTDA ALL 下分别为 520,616 和 1,551,168 字节。
 
 | 模板与模式 | 输入×输出 | 上一输出锁定 | 解锁 | 新输出锁定 | 整笔 | 主栈 / 备用栈 | 两栈载荷 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| `pure-ml-dsa-44` · `0x41` | 2×2 | 926,412 × 2 | 2,588 × 2 | 926,410 / 926,414 | 1,858,122 | — / — | — |
-| `pure-ml-dsa-44` · `0x61` | 2×2 | 926,421 / 926,413 | 1,855,385 × 2 | 926,416 / 926,413 | 5,563,725 | — / — | — |
+| `pure-ml-dsa-44` · `0x41` | 2×2 | 251,702 / 251,704 | 2,588 × 2 | 251,701 × 2 | 508,700 | — / — | — |
+| `pure-ml-dsa-44` · `0x61` | 2×2 | 251,708 / 251,700 | 505,950 × 2 | 251,694 / 251,700 | 1,515,420 | — / — | — |
 
 ## 输入输出边际与生命周期
 
@@ -103,7 +129,7 @@ PYTHONPATH=src:. python projects/ml-dsa/reference/check_acvp.py "$ACVP_PROMPT" "
 
 | 模板与模式 | 加输入后 | 加输入成本 | 加输出后 | 加输出成本 | 入金与直接退出 | 含一次周转 |
 | --- | --- | --- | --- | --- | --- | --- |
-| `pure-ml-dsa-44` · `0x41` | 3×2 | 2,627 (-4 / 2,588 / 43) | 2×3 | 926,418 (926,405 / 0 / 13) | 1,858,346 | 3,716,464 |
-| `pure-ml-dsa-44` · `0x61` | 3×2 | 1,855,545 (-2 / 1,855,502 / 45) | 2×3 | 2,779,266 (926,409 / 1,852,844 / 13) | 1,858,363 | 7,422,076 |
+| `pure-ml-dsa-44` · `0x41` | 3×2 | 2,635 (4 / 2,588 / 43) | 2×3 | 251,708 (251,695 / 0 / 13) | 508,934 | 1,017,626 |
+| `pure-ml-dsa-44` · `0x61` | 3×2 | 506,102 (-4 / 506,061 / 45) | 2×3 | 755,130 (251,697 / 503,420 / 13) | 508,946 | 2,024,357 |
 
 [统一测量入口与复现口径](../../docs/benchmark.zh-CN.md)

@@ -1,0 +1,22 @@
+{
+  "version": "0.8.0",
+  "previous": "0.7.0",
+  "template": "compact-v7",
+  "git_tag": "wots-plus-v0.8.0",
+  "source_commit": "85647fe7c2bd9eae855dd9a33f5d9c1f61a9a46c",
+  "artifacts": [
+    "layout.json",
+    "template.hex",
+    "otda-reconstruct.hex"
+  ],
+  "fixtures": [],
+  "evidence": [
+    "measurements.json"
+  ],
+  "integration": "docs/sdk.en.md",
+  "build": "python projects/wots-plus/reference/generate_reconstruction.py --version v0.8.0",
+  "verify": "bash projects/wots-plus/reference/verify.sh",
+  "shared_data": [
+    "versions/v0.1.0/vectors.json"
+  ]
+}

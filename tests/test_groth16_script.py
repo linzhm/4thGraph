@@ -19,6 +19,34 @@ from fourthgraph.verification.groth16_bn254 import (
 
 
 class Groth16EncodingTests(unittest.TestCase):
+    def test_fixed_msm_forth_pins_the_deployment_inputs_only_in_the_lock(self):
+        project = Path(__file__).resolve().parents[1] / "projects/groth16-bn254"
+        fixture = json.loads((project / "versions/v0.1.0/fixture.json").read_bytes())
+        source = project / "forth/fixed-verifier.fth"
+        signals = tuple(fixture["wrap"]["public"])
+        other = tuple(fixture["other"]["public"])
+        owner = bytes.fromhex(fixture["owner_public_key"])
+        requests = []
+
+        def adapter(_command, *, stdin):
+            request = json.loads(stdin)
+            key = json.loads(Path(request["VK"]).read_bytes())
+            requests.append((key.get("pinnedPublicInputs"), request["Public"]))
+            output = asm("OP_1" if request["Proof"] else "OP_0 OP_CHECKSIGVERIFY OP_1")
+            return json.dumps(output.hex())
+
+        with TemporaryDirectory() as directory, patch("fourthgraph.verification.groth16_bn254.checked", side_effect=adapter):
+            key = json.dumps(fixture["verification_key"]).encode()
+            verifier = ForthVerifier("adapter", key, directory, source.read_bytes(), source_path=source)
+            self.assertEqual(verifier.compile(signals, owner), verifier.owner_guard(owner) + asm("OP_1"))
+            verifier.witness(other, json.dumps(fixture["other"]["proof"]))
+            verifier.compile(other, owner)
+        self.assertEqual(requests, [
+            ({str(i): value for i, value in enumerate(signals)}, list(signals)),
+            (None, list(other)),
+            ({str(i): value for i, value in enumerate(other)}, list(other)),
+        ])
+
     def test_funded_replay_rejects_a_different_fixture_owner(self):
         with TemporaryDirectory() as directory:
             fixture = Path(directory) / "fixture.json"

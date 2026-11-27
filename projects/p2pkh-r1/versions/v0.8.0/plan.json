@@ -1,0 +1,29 @@
+{
+  "schema": "4thgraph.r1-optimization-plan/2",
+  "snapshot": {
+    "compiler_version": "0.2.7",
+    "entry": "r1-baseline-lock",
+    "compiler_sha256": "d4e921862eae0a984d0db4f908180368e446feef843de58defffaa26bad0df23",
+    "source_sha256": "877f30ef15d05758d30aefc0d2666dc338d118d802492e795cb0400b44f3a3c6",
+    "window_backend": {
+      "source_sha256": "08df84282d5624ff8a010a9a24631a974322d75c72b3634ff6c6306c2d6451d5",
+      "dependencies": {
+        "r1.fth": "c79cf9ba9a20d9a9c01274ae6676e2ae51b0de2de365266ebe3467c706ba13e3",
+        "std/bsv": "92f4510c9d3e8e0371d9b41d08f9f7e639324c9795e6d0a1c3f9779e9179b404"
+      }
+    }
+  },
+  "objective": "otda-all",
+  "order": [
+    "affine-g",
+    "compact-g",
+    "ifdup",
+    "pack-stack-repeat",
+    "pack-adjacent-kernels",
+    "share-otda-fragments"
+  ],
+  "expected": {
+    "lock_template_sha256": "71ad4d2bb0a2b0e059094ec18b3aa9f866d47df08fa76b7ceb720b322171642a",
+    "otda_program_sha256": "d14d7eca5109df33ad8e5102b2a4537278fc493333978c7c1efe10d3b6b87a0b"
+  }
+}

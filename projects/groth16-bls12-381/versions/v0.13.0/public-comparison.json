@@ -1,0 +1,44 @@
+{
+  "nchain-2024-mainnet": {
+    "source": "https://github.com/nchain-innovation/zkscript_package/blob/fc20fb743edbc5bc5aba9d16625d50d1f50a3ef4/README.md#script-size",
+    "network": "main",
+    "curve": "BLS12-381",
+    "lock_txid": "79a5281c9ea718c2a6be4e8d0e48b27855969d780c50393c01ad6267a9e24940",
+    "output": 0,
+    "deployment_tx_bytes": 482772,
+    "lock_bytes": 482601,
+    "spend_txid": "e4cd00c1fa7dd6931dd1e45034e9d9f732e6d7d38f7826341715f488a146514c",
+    "input": 0,
+    "spend_tx_bytes": 39963,
+    "unlock_bytes": 39876,
+    "path_bytes": 522485,
+    "funded_path_bytes": 522735,
+    "lock_sha256": "9ab0b8e457a50f15550a0d0939cd15c5c0910d8a38d2c6378e89fbd2ee4c5734"
+  },
+  "scrypt-bls12381-testnet": {
+    "source": "https://scryptplatform.medium.com/guest-post-elliptic-curve-bls12-381-support-on-bitcoin-bc7bfa605135",
+    "network": "test",
+    "curve": "BLS12-381",
+    "lock_txid": "eba34263bbede27fd1e08a84459066fba7eb10510a3bb1d92d735c067b8309dd",
+    "output": 0,
+    "deployment_tx_bytes": 27549724,
+    "lock_bytes": 27549371,
+    "lock_sha256": "f632e8b25944eff38ae41163330a65b13f3eab1651313cfc90464b55a93196cd"
+  },
+  "scrypt-tutorial-testnet": {
+    "source": "https://docs.scrypt.io/bsv-docs/tutorials/zkp/",
+    "network": "test",
+    "curve": "BN254",
+    "lock_txid": "2396a4e52555cdc29795db281d17de423697bd5cbabbcb756cb14cea8e947235",
+    "output": 0,
+    "deployment_tx_bytes": 1515536,
+    "lock_bytes": 1515332,
+    "spend_txid": "30127e0c340878d3fb7c165e2d082267eef2c8df79b5cf750896ef565ca7651d",
+    "input": 0,
+    "spend_tx_bytes": 351,
+    "unlock_bytes": 264,
+    "path_bytes": 1515604,
+    "funded_path_bytes": 1515887,
+    "lock_sha256": "889556284a2da5c643a1e155c03b9d5c66f6f0929d07b84c2e668b3103c985cc"
+  }
+}

@@ -1,18 +1,19 @@
-"""Rebuild the approved ordinary-path template and cross-check the frozen bytes."""
-from dataclasses import asdict
+"""Use the frozen v0.6.0 ordinary-path lock for its approved wallet bundle."""
 from hashlib import sha256
+import json
 from pathlib import Path
 import sys
 
 PROJECT = Path(__file__).resolve().parents[1]
-sys.path[:0] = [str(PROJECT/"forth"), str(PROJECT/"reference")]
-from msm_compiler import R1MSMCompiler
+sys.path.insert(0, str(PROJECT / "reference"))
+from fixed_templates import read_compiled_template
 
 
 def build():
-    compiler = R1MSMCompiler()
-    lock, _ = compiler.link(compiler.lower(compiler.plan("split-5x4-affine-g")))
-    if lock.script != bytes.fromhex((PROJECT/"versions/v0.6.0/template.hex").read_text()):
-        raise ValueError("rebuilt lock differs from v0.6.0")
-    return lock.script, {"source_sha256": sha256(compiler.source).hexdigest(),
-                         "dependencies": [asdict(dep) for dep in compiler.frontend.library_imports]}
+    release = PROJECT / "versions/v0.6.0"
+    layout = json.loads((release / "layout.json").read_bytes())
+    approved = json.loads((release / "contract/manifest.json").read_bytes())
+    lock = read_compiled_template(release, layout).script
+    if sha256(lock).hexdigest() != approved["script"]["sha256"]:
+        raise ValueError("frozen v0.6.0 lock differs from the approved wallet bundle")
+    return lock, approved["forth_inputs"]

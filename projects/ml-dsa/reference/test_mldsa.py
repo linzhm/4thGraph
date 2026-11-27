@@ -6,11 +6,18 @@ from pathlib import Path
 import random
 import unittest
 
-from fips204 import PUBLIC_KEY_BYTES, _use_hint, verification_equation, verify
-from hint_script import apply_hints_script
+from fips204 import GAMMA1, PUBLIC_KEY_BYTES, RESPONSE_BITS, _GAMMA2, _pack, _use_hint, verification_equation, verify
+from hint_script import (
+    apply_hints_before_rounding_script, apply_hints_script, apply_hints_with_packed_rounding_script,
+    apply_sparse_hints_script,
+)
 from mldsa import authorize_digest, test_only_vector as deterministic_test_vector, verify_openssl
-from ntt_script import ring_product_script, transform_script, verification_equation_script
+from ntt_script import (
+    checked_equation_script, packed_response_equation_script, ring_product_script, transform_script,
+    verification_equation_script,
+)
 from polynomial import DEGREE, MODULUS, ROOT_OF_UNITY, inverse_ntt, ntt
+from signature_script import RESPONSE_NORM_LIMIT
 from fourthgraph.bsv.evaluate import ScriptError, evaluate
 
 _FIXTURES = Path(__file__).resolve().parents[1] / "versions/v0.1.0"
@@ -37,9 +44,17 @@ def equation_fixture():
 
 def hint_fixture():
     random_source = random.Random(206)
-    values = [0, 1, 95_231, 95_232, 95_233, 8_380_415, 8_380_416]
+    boundaries = sorted({
+        boundary + delta
+        for center in range(0, MODULUS, 2 * _GAMMA2)
+        for boundary in (center, center + _GAMMA2)
+        for delta in (-1, 0, 1)
+        if 0 <= boundary + delta < MODULUS
+    })
+    values = [value for boundary in boundaries for value in (boundary, boundary)]
     values.extend(random_source.randrange(MODULUS) for _ in range(4 * DEGREE - len(values)))
-    hint_indices = frozenset(range(0, 4 * DEGREE, 3))
+    boundary_count = 2 * len(boundaries)
+    hint_indices = frozenset((*range(1, boundary_count, 2), *range(boundary_count, 4 * DEGREE, 3)))
     hints = bytes(sum(1 << bit for bit in range(8) if offset + bit in hint_indices)
                   for offset in range(0, 4 * DEGREE, 8))
     high = [_use_hint(value, index in hint_indices) for index, value in enumerate(values)]
@@ -81,12 +96,46 @@ class ArithmeticTests(unittest.TestCase):
         with self.assertRaises(ScriptError):
             evaluate(kernel, [rows, hints[:-1]])
 
+    def test_sparse_hints_patch_shared_groups_and_wrap_high_bits(self):
+        alpha = 2 * _GAMMA2
+        boundary = (0, 43 * alpha + 1, MODULUS - 1, 43 * alpha, _GAMMA2, _GAMMA2 + 1)
+        residues = [boundary[index % len(boundary)] for index in range(4 * DEGREE)]
+        rows = pack(residues)
+        kept = b"caller stack item"
+        full_weight = (*range(70), 254, 255, 256, 257, 510, 511, 512, 513, 1022, 1023)
+        for hints in ((), full_weight):
+            with self.subTest(weight=len(hints)):
+                sparse = b"".join(index.to_bytes(2, "little") for index in hints)
+                expected = _pack([_use_hint(value, index in hints)
+                                  for index, value in enumerate(residues)], 6)
+                for compiler in (apply_sparse_hints_script, apply_hints_before_rounding_script,
+                                 apply_hints_with_packed_rounding_script):
+                    self.assertEqual(evaluate(compiler(), [kept, rows, sparse]), ([kept, expected], []))
+
     def test_fixed_key_verification_equation(self):
         key, witness, expected = equation_fixture()
-        kernel = verification_equation_script(key)
-        self.assertEqual(evaluate(kernel, [witness]), ([expected], []))
-        with self.assertRaises(ScriptError):
-            evaluate(kernel, [witness[:-1]])
+        for compact in (False, True):
+            with self.subTest(compact=compact):
+                kernel = verification_equation_script(key, compact=compact)
+                self.assertEqual(evaluate(kernel, [witness]), ([expected], []))
+                with self.assertRaises(ScriptError):
+                    evaluate(kernel, [witness[:-1]])
+
+    def test_checked_equation_with_signed_response_boundaries(self):
+        public_key, _, _ = equation_fixture()
+        limit = RESPONSE_NORM_LIMIT - 1
+        challenge = [-1, 1] + [0] * (DEGREE - 2)
+        response = ([limit] * DEGREE, [-limit] * DEGREE, [0] * DEGREE, [1, -1] * (DEGREE // 2))
+        responses = b"".join(pack([abs(value) | (0x800000 if value < 0 else 0) for value in row])
+                             for row in response)
+        signed_challenge = bytes(abs(value) | (0x80 if value < 0 else 0) for value in challenge)
+        expected = b"".join(pack(row) for row in verification_equation(public_key, challenge, response))
+        kept = b"caller stack item"
+        kernel = checked_equation_script(public_key, signed_challenge=True)
+        self.assertEqual(evaluate(kernel, [kept, signed_challenge + responses]), ([kept, expected], []))
+        packed = _pack([GAMMA1 - value for row in response for value in row], RESPONSE_BITS)
+        kernel = packed_response_equation_script(public_key)
+        self.assertEqual(evaluate(kernel, [kept, signed_challenge + packed]), ([kept, expected], []))
 
     def test_forward_and_inverse_ntt(self):
         batch = ([0] * DEGREE, [0] * (DEGREE - 1) + [MODULUS - 1], *synthetic_polynomials())
@@ -111,9 +160,10 @@ class ArithmeticTests(unittest.TestCase):
         for malformed in (bytes(length - 1), bytes(length + 1),
                           MODULUS.to_bytes(3, "little") + bytes(length - 3),
                           bytes.fromhex("000080") + bytes(length - 3)):
-            with self.subTest(prefix=malformed[:3].hex(), length=len(malformed)):
-                with self.assertRaises(ScriptError):
-                    evaluate(transform_script(), [malformed])
+            for compact in (False, True):
+                with self.subTest(prefix=malformed[:3].hex(), length=len(malformed), compact=compact):
+                    with self.assertRaises(ScriptError):
+                        evaluate(transform_script(compact=compact), [malformed])
 
 
 class FipsTests(unittest.TestCase):

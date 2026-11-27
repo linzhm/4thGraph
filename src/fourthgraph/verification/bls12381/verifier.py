@@ -189,14 +189,14 @@ class Curve:
         x, y = point
         return self.sub(self.square(y), self.add(self.mul(self.square(x), x), self.b))
 
-    def double(self, point, *, reduce_coordinates=True):
+    def double(self, point, *, reduce_coordinates=True, z_scale=2):
         x, y, z = point
         xx, yy = self.square(x), self.square(y)
         slope = self.scale(xx, 3)
         s = self.scale(self.mul(x, yy), 4)
         x3 = self.sub(self.square(slope), self.scale(s, 2))
         y3 = self.sub(self.mul(slope, self.sub(s, x3)), self.scale(self.square(yy), 8))
-        z3 = self.scale(self.mul(y, z), 2)
+        z3 = self.scale(self.mul(y, z), z_scale)
         doubled = x3, y3, z3
         return (tuple(map(self.reduce, doubled)) if reduce_coordinates else doubled), slope, yy
 
@@ -325,7 +325,7 @@ def require_affine(tower, curve, jacobian, point):
         f.all((f.nonzero(z), f.equal(dx, 0), f.equal(dy, 0)))
 
 
-def check_g1(tower, point, *, pair_doubles=False):
+def check_g1(tower, point, *, pair_doubles=False, z_batch=1):
     # The BLS12-381 G1 endomorphism (x, y) -> (BETA*x, y) acts as -U² on G1.
     curve = Curve(tower)
     x, y = point
@@ -334,12 +334,26 @@ def check_g1(tower, point, *, pair_doubles=False):
     current = (*point, 1)
     bits = bin(U**2)[3:]
     unreduced = False
+    z_steps = 0
     for i, bit in enumerate(bits):
-        # A pair starts with reduced X and Y. The two Jacobian
-        # doublings are polynomial, with degree at most 24 in these
-        # inputs. Reduce before every mixed addition and the final test.
-        normalize = not pair_doubles or unreduced or bit == "1" or i == len(bits) - 1
-        current, _, _ = curve.double(current, reduce_coordinates=normalize)
+        # A pair starts with reduced X and Y. Reduce before every mixed
+        # addition and the final test.
+        boundary = bit == "1" or i == len(bits) - 1
+        normalize = not pair_doubles or unreduced or boundary
+        if z_batch == 1:
+            current, _, _ = curve.double(current, reduce_coordinates=normalize)
+        else:
+            # X and Y are independent of Z in a=0 doubling. Accumulate
+            # the Y factors, then restore the powers of two and reduce
+            # before the point leaves this run of doublings.
+            (nx, ny, nz), _, _ = curve.double(current, reduce_coordinates=False, z_scale=1)
+            z_steps += 1
+            if normalize:
+                nx, ny = f.reduce(nx), f.reduce(ny)
+            if boundary or z_steps == z_batch:
+                nz = f.reduce(f.mul(1 << z_steps, nz))
+                z_steps = 0
+            current = nx, ny, nz
         unreduced = not normalize
         if bit == "1":
             current, _ = curve.add_mixed(current, point)
@@ -479,8 +493,9 @@ class VerifierStages:
     """Build the typed stages of one BLS12-381 Script predicate."""
 
     def __init__(self, key, sources, *, chronicle=False, optimize=False, extra_inputs=None, fp2_rules=FP2_RULES,
-                 fp2_selection="uniform", pair_g1_doubles=False):
+                 fp2_selection="uniform", pair_g1_doubles=False, g1_z_batch=1, compact_booleans=False):
         self.pair_g1_doubles = pair_g1_doubles
+        self.g1_z_batch = g1_z_batch
         self.key, self.sources = key, sources
         self.slots = dynamic_slots(sources)
         self.optimize = optimize
@@ -489,7 +504,7 @@ class VerifierStages:
             extra_inputs = 2 if self.slots else 0  # Projective VK_x claim.
         self.field = ScriptField(self.proof_elements + len(self.slots) + extra_inputs,
                                  chronicle=chronicle, assert_checks=optimize, fp2_rules=fp2_rules,
-                                 fp2_selection=fp2_selection)
+                                 fp2_selection=fp2_selection, compact_booleans=compact_booleans)
         self.tower = Tower(self.field, sparse=optimize, defer_reductions=optimize,
                            mul2_kernel=self.field.multiply2 if optimize else None)
         self.setup = b""
@@ -518,11 +533,11 @@ class VerifierStages:
         return self.check_g1_c(self.check_g1_a(proof))
 
     def check_g1_a(self, proof):
-        check_g1(self.tower, proof[0], pair_doubles=self.pair_g1_doubles)
+        check_g1(self.tower, proof[0], pair_doubles=self.pair_g1_doubles, z_batch=self.g1_z_batch)
         return proof
 
     def check_g1_c(self, proof):
-        check_g1(self.tower, proof[2], pair_doubles=self.pair_g1_doubles)
+        check_g1(self.tower, proof[2], pair_doubles=self.pair_g1_doubles, z_batch=self.g1_z_batch)
         return proof
 
     @staticmethod

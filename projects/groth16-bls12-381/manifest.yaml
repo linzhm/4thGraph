@@ -55,6 +55,7 @@ sections:
       - The same high-level Forth source compiles with deferred MSM table reductions and compares three Miller reduction schedules. [MSM and Miller measurements](versions/v0.10.0/measurements.json)
       - The search also compares direct sparse line products, normalized G2 point updates, and split Miller rounds. It can select the shortest path within a measured stack-payload budget. [Miller kernel and stack measurements](versions/v0.11.0/measurements.json)
       - v0.12.0 groups consecutive G1 doublings under one reduction boundary. Genesis and Chronicle each save 1,282 bytes over v0.11.0 with the same witnesses. [v0.12.0 measurements](versions/v0.12.0/measurements.json)
+      - v0.13.0 batches the Jacobian Z scale and folds redundant Script numeric boolean conversions. The Genesis path drops by 897 bytes and the Chronicle path by 651 bytes. [v0.13.0 measurements](versions/v0.13.0/measurements.json)
     zh-CN:
       - 当前入口分别引用公开输入检查、Miller 轮次和最终剩余式三个 Forth 模块。编译器解析带类型的词，并按验证密钥和公开输入配置发码。[模块化入口](forth/verifier.fth) · [Forth 及算术引用](docs/verification.zh-CN.md#当前-forth-入口)
       - |-
@@ -80,8 +81,9 @@ sections:
       - 编译同一份高层 Forth 时，MSM 可延后倍点表取模，Miller 循环可比较三种取模调度。[MSM 和 Miller 实测](versions/v0.10.0/measurements.json)
       - 搜索比较直接展开稀疏线乘法、归约 G2 点坐标和拆分 Miller 轮次，并可在实测栈数据预算内选择最短路径。[Miller 内核与栈用量实测](versions/v0.11.0/measurements.json)
       - v0.12.0 对连续两次 G1 倍点统一归约。相同见证下，Genesis 与 Chronicle 均比 v0.11.0 少 1,282 B。[v0.12.0 实测](versions/v0.12.0/measurements.json)
+      - v0.13.0 批量处理 Jacobian Z 坐标的缩放，并省去布尔指令前的重复数值转换。Genesis 路径再减 897 B，Chronicle 再减 651 B。[v0.13.0 实测](versions/v0.13.0/measurements.json)
   reproduction:
     en:
-      - The current pinned plan checks the Forth module hashes, lock bytes and both witnesses before writing artifacts. The funded replay mines both valid spends and rejects swapped statements and G1 points outside the subgroup. [Verification guide](docs/verification.en.md) · [nChain comparison](versions/v0.11.0/nchain-comparison.json)
+      - The current pinned plan checks the Forth module hashes, lock bytes and both witnesses before writing artifacts. The funded replay mines both valid spends and rejects swapped statements and G1 points outside the subgroup. [Verification guide](docs/verification.en.md) · [nChain and sCrypt comparison](docs/verification.en.md#nchain-and-scrypt-comparison)
     zh-CN:
-      - 当前锁定计划在输出产物前校验 Forth 模块摘要、锁脚本和两份见证。入金回放将有效花费打包入块，并拒绝互换公开声明和 G1 点不在子群内的用例。[验证与复现指南](docs/verification.zh-CN.md) · [nChain 同夹具对照](versions/v0.11.0/nchain-comparison.json)
+      - 当前锁定计划在输出产物前校验 Forth 模块摘要、锁脚本和两份见证。入金回放将有效花费打包入块，并拒绝互换公开声明和 G1 点不在子群内的用例。[验证与复现指南](docs/verification.zh-CN.md) · [nChain 与 sCrypt 对照](docs/verification.zh-CN.md#nchain-与-scrypt-对照)

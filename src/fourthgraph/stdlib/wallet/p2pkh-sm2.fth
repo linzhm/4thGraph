@@ -308,19 +308,8 @@ REQUIRE BSV
 : sm2-generator-z ( script -- script )
     affine-generator? if else op-1 then ;
 
-: sm2-window-table ( script -- script )
-    affine-generator? if else op-0 op-1 op-0 then
-    sm2-gx sm2-gy sm2-generator-z sm2-gx2 sm2-gy2 sm2-generator-z
-    sm2-gx3 sm2-gy3 sm2-generator-z sm2-gx4 sm2-gy4 sm2-generator-z
-    sm2-gx5 sm2-gy5 sm2-generator-z sm2-gx6 sm2-gy6 sm2-generator-z
-    sm2-gx7 sm2-gy7 sm2-generator-z sm2-gx8 sm2-gy8 sm2-generator-z
-    sm2-gx9 sm2-gy9 sm2-generator-z sm2-gx10 sm2-gy10 sm2-generator-z
-    sm2-gx11 sm2-gy11 sm2-generator-z sm2-gx12 sm2-gy12 sm2-generator-z
-    sm2-gx13 sm2-gy13 sm2-generator-z sm2-gx14 sm2-gy14 sm2-generator-z
-    sm2-gx15 sm2-gy15 sm2-generator-z
-    signed-windows? if sm2-g16 sm2-generator-z then
-    op-0 op-1 op-0
-    op-fromaltstack op-fromaltstack op-1 op-3dup sm2-double-point op-3dup 8 bsv-num op-pick
+: sm2-historical-public-table ( script -- script )
+    op-1 op-3dup sm2-double-point op-3dup 8 bsv-num op-pick
     8 bsv-num op-pick 8 bsv-num op-pick sm2-add-points 5 bsv-num op-pick 5 bsv-num op-pick 5 bsv-num
     op-pick sm2-double-point op-3dup 14 bsv-num op-pick 14 bsv-num op-pick 14 bsv-num op-pick
     sm2-add-points 8 bsv-num op-pick 8 bsv-num op-pick 8 bsv-num op-pick sm2-double-point op-3dup
@@ -334,6 +323,26 @@ REQUIRE BSV
     signed-windows? if
         ( Copy 8Q to add the final magnitude, 16Q. )
         23 bsv-num op-pick 23 bsv-num op-pick 23 bsv-num op-pick sm2-double-point
+    then ;
+
+: sm2-window-table ( script -- script )
+    affine-generator? if else op-0 op-1 op-0 then
+    sm2-gx sm2-gy sm2-generator-z sm2-gx2 sm2-gy2 sm2-generator-z
+    sm2-gx3 sm2-gy3 sm2-generator-z sm2-gx4 sm2-gy4 sm2-generator-z
+    sm2-gx5 sm2-gy5 sm2-generator-z sm2-gx6 sm2-gy6 sm2-generator-z
+    sm2-gx7 sm2-gy7 sm2-generator-z sm2-gx8 sm2-gy8 sm2-generator-z
+    sm2-gx9 sm2-gy9 sm2-generator-z sm2-gx10 sm2-gy10 sm2-generator-z
+    sm2-gx11 sm2-gy11 sm2-generator-z sm2-gx12 sm2-gy12 sm2-generator-z
+    sm2-gx13 sm2-gy13 sm2-generator-z sm2-gx14 sm2-gy14 sm2-generator-z
+    sm2-gx15 sm2-gy15 sm2-generator-z
+    signed-windows? if sm2-g16 sm2-generator-z then
+    op-0 op-1 op-0
+    op-fromaltstack op-fromaltstack
+    compiled-public-table? if
+        ( Checked affine Q and copied 3b, p leave 16 homogeneous point triples in magnitude order. )
+        sm2-load-field sm2-public-table-kernel bsv-cat-code
+    else
+        sm2-historical-public-table
     then ;
 
 : sm2-window-split4 ( script -- script )

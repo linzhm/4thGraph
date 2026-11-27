@@ -59,8 +59,9 @@ def opcode(name):
 class ScriptField:
     """Signed residues are sufficient at arithmetic boundaries inside Script."""
 
-    def __init__(self, inputs, *, chronicle=False, assert_checks=False, fp2_rules=FP2_RULES, fp2_selection="uniform"):
-        self.graph = Graph(inputs)
+    def __init__(self, inputs, *, chronicle=False, assert_checks=False, fp2_rules=FP2_RULES, fp2_selection="uniform",
+                 compact_booleans=False):
+        self.graph = Graph(inputs, compact_booleans=compact_booleans)
         self.valid = 1
         self.checks = set() if assert_checks else None
         self.chronicle = chronicle

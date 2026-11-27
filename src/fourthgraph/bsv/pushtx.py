@@ -1,6 +1,6 @@
 """Fixed-r PUSHTX transaction binding for signature verifiers."""
 from fourthgraph.bsv.script import asm, number, push
-from fourthgraph.bsv.transaction import SIGHASH_TYPES
+from fourthgraph.bsv.transaction import ANYONECANPAY, CHRONICLE, FORKID, SIGHASH_ALL, SIGHASH_SINGLE, SIGHASH_TYPES
 
 N = 0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141
 R = 0x79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798
@@ -84,7 +84,8 @@ def _sighash_check(*, compact):
     return code + asm('OP_VERIFY')
 
 
-def authorization_checks(ordinary_code, companion_code, *, compact_types=False):
+def authorization_checks(ordinary_code, companion_code, *, compact_types=False,
+                         compact=False, compact_shape=False):
     """Check the signed preimage shape and preserve its mode and type on altstack."""
     # Entry P S mode; alt: mode, then actual base binding's one-byte type.
     code = asm('OP_DEPTH OP_3 OP_NUMEQUALVERIFY OP_DUP OP_0 OP_EQUAL OP_OVER OP_1 OP_EQUAL OP_BOOLOR OP_VERIFY')
@@ -92,33 +93,53 @@ def authorization_checks(ordinary_code, companion_code, *, compact_types=False):
     code += asm('OP_2 OP_PICK OP_SIZE OP_4 OP_SUB OP_SPLIT OP_NIP')
     # Check trailing three bytes are zero and validate the exact one-byte type.
     code += asm('OP_1 OP_SPLIT') + push(bytes(3)) + asm('OP_EQUALVERIFY')
-    code += _sighash_check(compact=compact_types) + asm('OP_TOALTSTACK OP_IF')
+    if compact:
+        # The Compact WOTS+ templates use a single range check after masking
+        # the two optional bits. Keep their published Script encodings.
+        mask = 0xff ^ (ANYONECANPAY | CHRONICLE)
+        code += asm('OP_DUP') + push(bytes([mask])) + asm('OP_AND OP_BIN2NUM')
+        code += number(FORKID | SIGHASH_ALL) + number((FORKID | SIGHASH_SINGLE) + 1) + asm('OP_WITHIN OP_VERIFY')
+    else:
+        code += _sighash_check(compact=compact_types)
+    code += asm('OP_TOALTSTACK OP_IF')
     # Reuse the authenticated type via altstack; only 0x43/c3 may take the companion branch.
     code += asm('OP_FROMALTSTACK OP_DUP OP_TOALTSTACK')
-    if compact_types:
+    if compact_types or compact_shape:
         code += push(b'\x7f') + asm('OP_AND') + push(b'\x43') + asm('OP_EQUALVERIFY')
     else:
         code += asm('OP_DUP') + push(b'\x43') + asm('OP_EQUAL OP_SWAP')
         code += push(b'\xc3') + asm('OP_EQUAL OP_BOOLOR OP_VERIFY')
     code += _check_bip143_shape(companion_code)
     code += asm('OP_OVER') + number(117 + len(companion_code)) + asm('OP_SPLIT OP_NIP') + number(32) + asm('OP_SPLIT OP_DROP')
-    code += push(bytes(32)) + asm('OP_EQUALVERIFY OP_ELSE')
+    code += asm('OP_0 32 OP_NUM2BIN') if compact_shape else push(bytes(32))
+    code += asm('OP_EQUALVERIFY OP_ELSE')
     code += asm('OP_FROMALTSTACK OP_DUP OP_TOALTSTACK') + push(b'\x20') + asm('OP_AND')
     code += push(b'\x20') + asm('OP_EQUAL OP_NOTIF') + _check_bip143_shape(ordinary_code)
     return code + asm('OP_ENDIF OP_ENDIF')
 
 
-def check_binding(companion_code, *, compact=False):
+def _companion_der_from_public():
+    # The fixed companion S shares its final 31 bytes with the X coordinate.
+    return (asm('OP_OVER OP_1 OP_SPLIT OP_NIP OP_DUP OP_1 OP_SPLIT OP_NIP')
+            + push(ONE_DER[36:39]) + asm('OP_SWAP OP_CAT OP_CAT')
+            + push(ONE_DER[:4]) + asm('OP_SWAP OP_CAT'))
+
+
+def check_binding(companion_code, *, compact=False, reuse_r=None, compact_companion=False):
     """Consume the authorized digest and enforce the native current-input relation."""
     # Entry H; alt bottom-to-top mode, type. Both signatures are derived on chain.
     code = binding_der(compact=compact)
-    if compact:
+    if reuse_r is None and compact:
         code += _copy_public_from_der() + asm('OP_SWAP OP_FROMALTSTACK OP_CAT OP_SWAP')
     else:
-        code += asm('OP_FROMALTSTACK OP_CAT') + push(PUBLIC)
+        code += asm('OP_FROMALTSTACK OP_CAT')
+        code += _copy_public_from_der() if reuse_r else push(PUBLIC)
     code += asm('OP_FROMALTSTACK OP_DUP OP_IF OP_TOALTSTACK OP_OVER OP_SIZE OP_1SUB OP_SPLIT OP_NIP')
-    code += push(b'\x20') + asm('OP_OR') + push(ONE_DER) + asm('OP_SWAP OP_CAT')
+    code += push(b'\x20') + asm('OP_OR')
+    code += _companion_der_from_public() if compact_companion else push(ONE_DER)
+    code += asm('OP_SWAP OP_CAT')
     # The companion check uses the same fixed public key that is already on stack.
-    code += asm('OP_OVER') if compact else push(PUBLIC)
+    reuse_key = compact if reuse_r is None else reuse_r
+    code += asm('OP_OVER') if reuse_key else push(PUBLIC)
     code += asm('OP_FROMALTSTACK OP_ENDIF OP_CODESEPARATOR') + companion_code
     return code

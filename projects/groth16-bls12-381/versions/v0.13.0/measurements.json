@@ -1,0 +1,1217 @@
+{
+  "version": "0.13.0",
+  "previous": "0.12.0",
+  "baseline_revision": "50deff16f4b92aa2a8f93b6ceab89cba9cc473d6",
+  "compiler_revision": "38a6f10e42836104ff6556562a5f52d759e3cefd",
+  "source": "forth/verifier.fth",
+  "source_sha256": "9117b329603338b96be824390c9a9b29246d2a9fe43035d5c83c40b467f36fcb",
+  "source_modules": {
+    "miller.fth": "ee7d0e9562e0e1d636af814977742888d486c74696728df39b0823d1433cbc9a",
+    "public-inputs.fth": "96d36387417997beec7e1f5051c6eb161e683e8a14d54ffd421f30d62b78fd97",
+    "residue.fth": "bc86d5d4270e58f230bdf155f9eade088a0a33356c0bbfe425e3acdfcaa6122e"
+  },
+  "fixture_sha256": "51f6524a32d8ec5d4eac1c97398dc97c1d0594caae0284b8faa36a02574c5cc6",
+  "public_input_bits": [
+    32,
+    1,
+    32,
+    2,
+    2
+  ],
+  "node_version": 101020300,
+  "chain_gang": {
+    "version": "0.13.2",
+    "commit": "74676b9c002c452e7f21a9ed9265f4972bef03f6"
+  },
+  "objective": "path-bytes",
+  "search": {
+    "g1_z_batches": [
+      1,
+      4,
+      8,
+      16
+    ],
+    "compare_numeric_boolean_lowering": true,
+    "max_fixture_stack_bytes": 32000
+  },
+  "eras": {
+    "genesis": {
+      "baseline_path_bytes": 238122,
+      "selected_path_bytes": 237225,
+      "path_bytes_saved": 897,
+      "selected_plan": {
+        "fp2_rules": [
+          "expand-cross-products"
+        ],
+        "residue_association": "accumulator-frobenius-first",
+        "fp2_selection": "callsite",
+        "msm": "signed-radix4",
+        "msm_table": "deferred-doubling-slopes",
+        "miller_reductions": "split-chord-residue",
+        "miller_kernel": "direct-normalized",
+        "g1_reductions": "paired-doubles",
+        "g1_z_batch": 16,
+        "compact_booleans": true
+      },
+      "candidates": [
+        {
+          "lock_bytes": 228736,
+          "path_bytes": 238122,
+          "script_sha256": "82850a27ae510f8e6b9cfc162eb7bf09471027fe3afdb891178ead1c7497a34b",
+          "artifact_sha256": "92bdebdbe74bc1b9f3dd7ddb7cd277f734143d5ff58f5af3e316bd26671d6a8e",
+          "witness_bytes": [
+            9378,
+            9378
+          ],
+          "witness_sha256": [
+            "dd56640a5b84fa2192c05a0726841e427b83a24170348e51ae875cecc3640a97",
+            "4a2827dc39dbfc88079a66b617f5d3d4b379758aaead61e3ab254e4ba2d9661f"
+          ],
+          "msm_slope_count": 39,
+          "local_verdicts": {
+            "accepted": 2,
+            "rejected": 4
+          },
+          "fp2_choices": [
+            {
+              "ordered_rules": [],
+              "calls": 3
+            },
+            {
+              "ordered_rules": [
+                "expand-cross-products"
+              ],
+              "calls": 3538
+            }
+          ],
+          "fixture_stack_payload_bytes": 29891,
+          "plan": {
+            "fp2_rules": [
+              "expand-cross-products"
+            ],
+            "residue_association": "accumulator-frobenius-first",
+            "fp2_selection": "callsite",
+            "msm": "signed-radix4",
+            "msm_table": "deferred-doubling-slopes",
+            "miller_reductions": "split-chord-residue",
+            "miller_kernel": "direct-normalized",
+            "g1_reductions": "paired-doubles"
+          }
+        },
+        {
+          "lock_bytes": 228535,
+          "path_bytes": 237921,
+          "script_sha256": "a4bb290e037f131304c80e6c6afdeb274d33f0a210d6073fa973fffb3bf3d8af",
+          "artifact_sha256": "c748d535a30df0999f5914c622139fd0482efd949c3c25da13bfcda29e7734e6",
+          "witness_bytes": [
+            9378,
+            9378
+          ],
+          "witness_sha256": [
+            "dd56640a5b84fa2192c05a0726841e427b83a24170348e51ae875cecc3640a97",
+            "4a2827dc39dbfc88079a66b617f5d3d4b379758aaead61e3ab254e4ba2d9661f"
+          ],
+          "msm_slope_count": 39,
+          "local_verdicts": {
+            "accepted": 2,
+            "rejected": 4
+          },
+          "fp2_choices": [
+            {
+              "ordered_rules": [],
+              "calls": 3
+            },
+            {
+              "ordered_rules": [
+                "expand-cross-products"
+              ],
+              "calls": 3538
+            }
+          ],
+          "fixture_stack_payload_bytes": 29891,
+          "plan": {
+            "fp2_rules": [
+              "expand-cross-products"
+            ],
+            "residue_association": "accumulator-frobenius-first",
+            "fp2_selection": "callsite",
+            "msm": "signed-radix4",
+            "msm_table": "deferred-doubling-slopes",
+            "miller_reductions": "split-chord-residue",
+            "miller_kernel": "direct-normalized",
+            "g1_reductions": "paired-doubles",
+            "compact_booleans": true
+          }
+        },
+        {
+          "lock_bytes": 228196,
+          "path_bytes": 237582,
+          "script_sha256": "93885604109df09ec263007248a151603d63bd07e0fe285ae91f29c0e4e0e043",
+          "artifact_sha256": "a161f2e185a5a316ae0bc9fb68f97859ecf903eca47a61a40756c37794b3eaf0",
+          "witness_bytes": [
+            9378,
+            9378
+          ],
+          "witness_sha256": [
+            "dd56640a5b84fa2192c05a0726841e427b83a24170348e51ae875cecc3640a97",
+            "4a2827dc39dbfc88079a66b617f5d3d4b379758aaead61e3ab254e4ba2d9661f"
+          ],
+          "msm_slope_count": 39,
+          "local_verdicts": {
+            "accepted": 2,
+            "rejected": 4
+          },
+          "fp2_choices": [
+            {
+              "ordered_rules": [],
+              "calls": 3
+            },
+            {
+              "ordered_rules": [
+                "expand-cross-products"
+              ],
+              "calls": 3538
+            }
+          ],
+          "fixture_stack_payload_bytes": 29891,
+          "plan": {
+            "fp2_rules": [
+              "expand-cross-products"
+            ],
+            "residue_association": "accumulator-frobenius-first",
+            "fp2_selection": "callsite",
+            "msm": "signed-radix4",
+            "msm_table": "deferred-doubling-slopes",
+            "miller_reductions": "split-chord-residue",
+            "miller_kernel": "direct-normalized",
+            "g1_reductions": "paired-doubles",
+            "g1_z_batch": 4
+          }
+        },
+        {
+          "lock_bytes": 227995,
+          "path_bytes": 237381,
+          "script_sha256": "bf264bbcfb99ebbc8a8f736eddcd2893225c83e1e6ed72cc3ba5490ecfc9e2dd",
+          "artifact_sha256": "7d561f444253e110f7cee04ea0a1c9d6d42740ef869eb9a05a5eea2194e60e10",
+          "witness_bytes": [
+            9378,
+            9378
+          ],
+          "witness_sha256": [
+            "dd56640a5b84fa2192c05a0726841e427b83a24170348e51ae875cecc3640a97",
+            "4a2827dc39dbfc88079a66b617f5d3d4b379758aaead61e3ab254e4ba2d9661f"
+          ],
+          "msm_slope_count": 39,
+          "local_verdicts": {
+            "accepted": 2,
+            "rejected": 4
+          },
+          "fp2_choices": [
+            {
+              "ordered_rules": [],
+              "calls": 3
+            },
+            {
+              "ordered_rules": [
+                "expand-cross-products"
+              ],
+              "calls": 3538
+            }
+          ],
+          "fixture_stack_payload_bytes": 29891,
+          "plan": {
+            "fp2_rules": [
+              "expand-cross-products"
+            ],
+            "residue_association": "accumulator-frobenius-first",
+            "fp2_selection": "callsite",
+            "msm": "signed-radix4",
+            "msm_table": "deferred-doubling-slopes",
+            "miller_reductions": "split-chord-residue",
+            "miller_kernel": "direct-normalized",
+            "g1_reductions": "paired-doubles",
+            "g1_z_batch": 4,
+            "compact_booleans": true
+          }
+        },
+        {
+          "lock_bytes": 228110,
+          "path_bytes": 237496,
+          "script_sha256": "11b9776f87eeba610f6c6d0a66ea374f7a9e346a61dd09abc206c8ff33d6657c",
+          "artifact_sha256": "117e36546d9dc6c00a4240e9405945b1785528618d6afdfd24c65c5781fd8d5b",
+          "witness_bytes": [
+            9378,
+            9378
+          ],
+          "witness_sha256": [
+            "dd56640a5b84fa2192c05a0726841e427b83a24170348e51ae875cecc3640a97",
+            "4a2827dc39dbfc88079a66b617f5d3d4b379758aaead61e3ab254e4ba2d9661f"
+          ],
+          "msm_slope_count": 39,
+          "local_verdicts": {
+            "accepted": 2,
+            "rejected": 4
+          },
+          "fp2_choices": [
+            {
+              "ordered_rules": [],
+              "calls": 3
+            },
+            {
+              "ordered_rules": [
+                "expand-cross-products"
+              ],
+              "calls": 3538
+            }
+          ],
+          "fixture_stack_payload_bytes": 29891,
+          "plan": {
+            "fp2_rules": [
+              "expand-cross-products"
+            ],
+            "residue_association": "accumulator-frobenius-first",
+            "fp2_selection": "callsite",
+            "msm": "signed-radix4",
+            "msm_table": "deferred-doubling-slopes",
+            "miller_reductions": "split-chord-residue",
+            "miller_kernel": "direct-normalized",
+            "g1_reductions": "paired-doubles",
+            "g1_z_batch": 8
+          }
+        },
+        {
+          "lock_bytes": 227909,
+          "path_bytes": 237295,
+          "script_sha256": "098a4a0953e7c8721d8d029e1cc448c1cd1dcfff590f2a6bf8643fa3c37613e5",
+          "artifact_sha256": "d809c0390b6d9417321818d6584970a250b9127c8c873b9a3dff7d60cd1817e9",
+          "witness_bytes": [
+            9378,
+            9378
+          ],
+          "witness_sha256": [
+            "dd56640a5b84fa2192c05a0726841e427b83a24170348e51ae875cecc3640a97",
+            "4a2827dc39dbfc88079a66b617f5d3d4b379758aaead61e3ab254e4ba2d9661f"
+          ],
+          "msm_slope_count": 39,
+          "local_verdicts": {
+            "accepted": 2,
+            "rejected": 4
+          },
+          "fp2_choices": [
+            {
+              "ordered_rules": [],
+              "calls": 3
+            },
+            {
+              "ordered_rules": [
+                "expand-cross-products"
+              ],
+              "calls": 3538
+            }
+          ],
+          "fixture_stack_payload_bytes": 29891,
+          "plan": {
+            "fp2_rules": [
+              "expand-cross-products"
+            ],
+            "residue_association": "accumulator-frobenius-first",
+            "fp2_selection": "callsite",
+            "msm": "signed-radix4",
+            "msm_table": "deferred-doubling-slopes",
+            "miller_reductions": "split-chord-residue",
+            "miller_kernel": "direct-normalized",
+            "g1_reductions": "paired-doubles",
+            "g1_z_batch": 8,
+            "compact_booleans": true
+          }
+        },
+        {
+          "lock_bytes": 228040,
+          "path_bytes": 237426,
+          "script_sha256": "11ca25e0ddb620d7a37118c1370cdab6358090af81a0ba45e169abe509d4c410",
+          "artifact_sha256": "627dfc0e4ec8d5e5f054afa0ea38d33bea7a4889d8e70535bf0bba848be47016",
+          "witness_bytes": [
+            9378,
+            9378
+          ],
+          "witness_sha256": [
+            "dd56640a5b84fa2192c05a0726841e427b83a24170348e51ae875cecc3640a97",
+            "4a2827dc39dbfc88079a66b617f5d3d4b379758aaead61e3ab254e4ba2d9661f"
+          ],
+          "msm_slope_count": 39,
+          "local_verdicts": {
+            "accepted": 2,
+            "rejected": 4
+          },
+          "fp2_choices": [
+            {
+              "ordered_rules": [],
+              "calls": 3
+            },
+            {
+              "ordered_rules": [
+                "expand-cross-products"
+              ],
+              "calls": 3538
+            }
+          ],
+          "fixture_stack_payload_bytes": 29891,
+          "plan": {
+            "fp2_rules": [
+              "expand-cross-products"
+            ],
+            "residue_association": "accumulator-frobenius-first",
+            "fp2_selection": "callsite",
+            "msm": "signed-radix4",
+            "msm_table": "deferred-doubling-slopes",
+            "miller_reductions": "split-chord-residue",
+            "miller_kernel": "direct-normalized",
+            "g1_reductions": "paired-doubles",
+            "g1_z_batch": 16
+          }
+        },
+        {
+          "lock_bytes": 227839,
+          "path_bytes": 237225,
+          "script_sha256": "8b5aca03c041c492527f8980006306a334dbf3538ebc00176bdde8580c3bae67",
+          "artifact_sha256": "e4b2c14ab54cb6cf782cdeceba1dea074b41b5ad07260cfb0b919a26abaa12c7",
+          "witness_bytes": [
+            9378,
+            9378
+          ],
+          "witness_sha256": [
+            "dd56640a5b84fa2192c05a0726841e427b83a24170348e51ae875cecc3640a97",
+            "4a2827dc39dbfc88079a66b617f5d3d4b379758aaead61e3ab254e4ba2d9661f"
+          ],
+          "msm_slope_count": 39,
+          "local_verdicts": {
+            "accepted": 2,
+            "rejected": 4
+          },
+          "fp2_choices": [
+            {
+              "ordered_rules": [],
+              "calls": 3
+            },
+            {
+              "ordered_rules": [
+                "expand-cross-products"
+              ],
+              "calls": 3538
+            }
+          ],
+          "fixture_stack_payload_bytes": 29891,
+          "plan": {
+            "fp2_rules": [
+              "expand-cross-products"
+            ],
+            "residue_association": "accumulator-frobenius-first",
+            "fp2_selection": "callsite",
+            "msm": "signed-radix4",
+            "msm_table": "deferred-doubling-slopes",
+            "miller_reductions": "split-chord-residue",
+            "miller_kernel": "direct-normalized",
+            "g1_reductions": "paired-doubles",
+            "g1_z_batch": 16,
+            "compact_booleans": true
+          }
+        }
+      ],
+      "native_replays": {
+        "batch4": {
+          "arithmetic_plan": {
+            "fp2_rules": [
+              "expand-cross-products"
+            ],
+            "residue_association": "accumulator-frobenius-first",
+            "fp2_selection": "callsite",
+            "msm": "signed-radix4",
+            "msm_table": "deferred-doubling-slopes",
+            "miller_reductions": "split-chord-residue",
+            "miller_kernel": "direct-normalized",
+            "g1_reductions": "paired-doubles",
+            "g1_z_batch": 4,
+            "compact_booleans": true
+          },
+          "lock_bytes": 227995,
+          "path_bytes": 237381,
+          "script_sha256": "bf264bbcfb99ebbc8a8f736eddcd2893225c83e1e6ed72cc3ba5490ecfc9e2dd",
+          "cases": [
+            {
+              "fixture_case": "wrap",
+              "deployment_txid": "79babd2714e24f9a8ad19f8808d20672a57a78623d7cce24bf284bb9eb1b07f8",
+              "spend_txid": "4603cc70cb74fcf4bf6740b09e64ecd26ca4ec6c541b8ebd387c7afbdd289828",
+              "funded_path_bytes": 237606,
+              "stack_payload": {
+                "main_payload_bytes": 29891,
+                "alt_payload_bytes": 59,
+                "combined_payload_bytes": 29891
+              },
+              "rejected_controls": [
+                "crossed_statement",
+                "g1_outside_subgroup"
+              ]
+            },
+            {
+              "fixture_case": "other",
+              "deployment_txid": "e8f78f7e6ce906d8b13f5ab31c3cacd38d9b13e59315bff171701744efd53e1c",
+              "spend_txid": "04935954eae54d8ebe9d6a2f5fa1d630cde4eca8b2e0bba1c7d25ab817591619",
+              "funded_path_bytes": 237607,
+              "stack_payload": {
+                "main_payload_bytes": 29868,
+                "alt_payload_bytes": 59,
+                "combined_payload_bytes": 29868
+              },
+              "rejected_controls": [
+                "crossed_statement",
+                "g1_outside_subgroup"
+              ]
+            }
+          ]
+        },
+        "batch8": {
+          "arithmetic_plan": {
+            "fp2_rules": [
+              "expand-cross-products"
+            ],
+            "residue_association": "accumulator-frobenius-first",
+            "fp2_selection": "callsite",
+            "msm": "signed-radix4",
+            "msm_table": "deferred-doubling-slopes",
+            "miller_reductions": "split-chord-residue",
+            "miller_kernel": "direct-normalized",
+            "g1_reductions": "paired-doubles",
+            "g1_z_batch": 8,
+            "compact_booleans": true
+          },
+          "lock_bytes": 227909,
+          "path_bytes": 237295,
+          "script_sha256": "098a4a0953e7c8721d8d029e1cc448c1cd1dcfff590f2a6bf8643fa3c37613e5",
+          "cases": [
+            {
+              "fixture_case": "wrap",
+              "deployment_txid": "b749c314a843e5ca67a021a8fb711ec2952d27396b30209df45114ff0275feab",
+              "spend_txid": "45edfeb1188d49e8e9b50c8b8d5ed28999a417f47e4ff09b243a9abb32ee0afe",
+              "funded_path_bytes": 237520,
+              "stack_payload": {
+                "main_payload_bytes": 29891,
+                "alt_payload_bytes": 59,
+                "combined_payload_bytes": 29891
+              },
+              "rejected_controls": [
+                "crossed_statement",
+                "g1_outside_subgroup"
+              ]
+            },
+            {
+              "fixture_case": "other",
+              "deployment_txid": "a8ca44f4a1a19fb51021e3799879881f90fc7c68997a95481cb9e88a32b15f5c",
+              "spend_txid": "bfd731fdba215feb6a3f7b81b2da323ecf46b80445938d1875623041c877e45d",
+              "funded_path_bytes": 237521,
+              "stack_payload": {
+                "main_payload_bytes": 29868,
+                "alt_payload_bytes": 59,
+                "combined_payload_bytes": 29868
+              },
+              "rejected_controls": [
+                "crossed_statement",
+                "g1_outside_subgroup"
+              ]
+            }
+          ]
+        },
+        "batch16": {
+          "arithmetic_plan": {
+            "fp2_rules": [
+              "expand-cross-products"
+            ],
+            "residue_association": "accumulator-frobenius-first",
+            "fp2_selection": "callsite",
+            "msm": "signed-radix4",
+            "msm_table": "deferred-doubling-slopes",
+            "miller_reductions": "split-chord-residue",
+            "miller_kernel": "direct-normalized",
+            "g1_reductions": "paired-doubles",
+            "g1_z_batch": 16,
+            "compact_booleans": true
+          },
+          "lock_bytes": 227839,
+          "path_bytes": 237225,
+          "script_sha256": "8b5aca03c041c492527f8980006306a334dbf3538ebc00176bdde8580c3bae67",
+          "cases": [
+            {
+              "fixture_case": "wrap",
+              "deployment_txid": "ab2b48ac1a506989d8019932b6f8f03f4f67a2d5a03a8da10f279789296cdd2a",
+              "spend_txid": "96006ea8760362466200444113a1e28c39e6ba8a7aeb88d28f82908d1ee4b41f",
+              "funded_path_bytes": 237451,
+              "stack_payload": {
+                "main_payload_bytes": 29891,
+                "alt_payload_bytes": 59,
+                "combined_payload_bytes": 29891
+              },
+              "rejected_controls": [
+                "crossed_statement",
+                "g1_outside_subgroup"
+              ]
+            },
+            {
+              "fixture_case": "other",
+              "deployment_txid": "e21d34d42ca7c0e66ac6863928bbb21f96db7a0e7250ce836a266b4cc234c136",
+              "spend_txid": "b8a6ec8a172a6ecde946a3eb4b34662d8c81eccf6ada3b37456addcc37c48156",
+              "funded_path_bytes": 237450,
+              "stack_payload": {
+                "main_payload_bytes": 29868,
+                "alt_payload_bytes": 59,
+                "combined_payload_bytes": 29868
+              },
+              "rejected_controls": [
+                "crossed_statement",
+                "g1_outside_subgroup"
+              ]
+            }
+          ]
+        }
+      },
+      "valid_spend_timing_ms": {
+        "samples_per_case": 9,
+        "warmup_samples_per_case": 1,
+        "rotation": "baseline, batch4, batch8, batch16 rotated by sample",
+        "results": [
+          {
+            "fixture": "wrap",
+            "median": {
+              "baseline": {
+                "node_rpc_ms": 121.697,
+                "chain_gang_ms": 41.166
+              },
+              "batch4": {
+                "node_rpc_ms": 122.293,
+                "chain_gang_ms": 42.879
+              },
+              "batch8": {
+                "node_rpc_ms": 127.283,
+                "chain_gang_ms": 43.327
+              },
+              "batch16": {
+                "node_rpc_ms": 120.049,
+                "chain_gang_ms": 42.817
+              }
+            }
+          },
+          {
+            "fixture": "other",
+            "median": {
+              "baseline": {
+                "node_rpc_ms": 122.93,
+                "chain_gang_ms": 40.91
+              },
+              "batch4": {
+                "node_rpc_ms": 126.389,
+                "chain_gang_ms": 42.905
+              },
+              "batch8": {
+                "node_rpc_ms": 121.367,
+                "chain_gang_ms": 42.265
+              },
+              "batch16": {
+                "node_rpc_ms": 120.959,
+                "chain_gang_ms": 42.371
+              }
+            }
+          }
+        ]
+      }
+    },
+    "chronicle": {
+      "baseline_path_bytes": 237217,
+      "selected_path_bytes": 236566,
+      "path_bytes_saved": 651,
+      "selected_plan": {
+        "fp2_rules": [
+          "expand-cross-products"
+        ],
+        "residue_association": "accumulator-frobenius-first",
+        "fp2_selection": "callsite",
+        "msm": "signed-radix4",
+        "msm_table": "deferred-doubling-slopes",
+        "miller_reductions": "split-chord-residue",
+        "miller_kernel": "direct-normalized",
+        "g1_reductions": "paired-doubles",
+        "g1_z_batch": 16,
+        "compact_booleans": true
+      },
+      "candidates": [
+        {
+          "lock_bytes": 227831,
+          "path_bytes": 237217,
+          "script_sha256": "5003eb787c5d7844b6e2df1480a8e89ca5c5691e9110347e5356f85d0097b9c3",
+          "artifact_sha256": "114fadc821a5c789f07ce1cd6052f7cee5a50f02c9fdd1b27940a9cc2738a4d4",
+          "witness_bytes": [
+            9378,
+            9378
+          ],
+          "witness_sha256": [
+            "dd56640a5b84fa2192c05a0726841e427b83a24170348e51ae875cecc3640a97",
+            "4a2827dc39dbfc88079a66b617f5d3d4b379758aaead61e3ab254e4ba2d9661f"
+          ],
+          "msm_slope_count": 39,
+          "local_verdicts": {
+            "accepted": 2,
+            "rejected": 4
+          },
+          "fp2_choices": [
+            {
+              "ordered_rules": [],
+              "calls": 3
+            },
+            {
+              "ordered_rules": [
+                "expand-cross-products"
+              ],
+              "calls": 3538
+            }
+          ],
+          "fixture_stack_payload_bytes": 29891,
+          "plan": {
+            "fp2_rules": [
+              "expand-cross-products"
+            ],
+            "residue_association": "accumulator-frobenius-first",
+            "fp2_selection": "callsite",
+            "msm": "signed-radix4",
+            "msm_table": "deferred-doubling-slopes",
+            "miller_reductions": "split-chord-residue",
+            "miller_kernel": "direct-normalized",
+            "g1_reductions": "paired-doubles"
+          }
+        },
+        {
+          "lock_bytes": 227630,
+          "path_bytes": 237016,
+          "script_sha256": "1075cd7efb6cb37b625768ffc9689ef4e3e1f7a66f56622e3e2f6f564c7b707e",
+          "artifact_sha256": "84f7072f68cb380a2b548f6a0a27b27521cc3f533f0d81e175a4e7f34dc7e659",
+          "witness_bytes": [
+            9378,
+            9378
+          ],
+          "witness_sha256": [
+            "dd56640a5b84fa2192c05a0726841e427b83a24170348e51ae875cecc3640a97",
+            "4a2827dc39dbfc88079a66b617f5d3d4b379758aaead61e3ab254e4ba2d9661f"
+          ],
+          "msm_slope_count": 39,
+          "local_verdicts": {
+            "accepted": 2,
+            "rejected": 4
+          },
+          "fp2_choices": [
+            {
+              "ordered_rules": [],
+              "calls": 3
+            },
+            {
+              "ordered_rules": [
+                "expand-cross-products"
+              ],
+              "calls": 3538
+            }
+          ],
+          "fixture_stack_payload_bytes": 29891,
+          "plan": {
+            "fp2_rules": [
+              "expand-cross-products"
+            ],
+            "residue_association": "accumulator-frobenius-first",
+            "fp2_selection": "callsite",
+            "msm": "signed-radix4",
+            "msm_table": "deferred-doubling-slopes",
+            "miller_reductions": "split-chord-residue",
+            "miller_kernel": "direct-normalized",
+            "g1_reductions": "paired-doubles",
+            "compact_booleans": true
+          }
+        },
+        {
+          "lock_bytes": 227535,
+          "path_bytes": 236921,
+          "script_sha256": "d68b5a13162fdf201d46f93ca20fa9875985f296140b289850fd4c604db6a808",
+          "artifact_sha256": "bddf77b9508e25f464f279731e86f6d1bdf1c2dd2bb44fa69cdf8efe78342971",
+          "witness_bytes": [
+            9378,
+            9378
+          ],
+          "witness_sha256": [
+            "dd56640a5b84fa2192c05a0726841e427b83a24170348e51ae875cecc3640a97",
+            "4a2827dc39dbfc88079a66b617f5d3d4b379758aaead61e3ab254e4ba2d9661f"
+          ],
+          "msm_slope_count": 39,
+          "local_verdicts": {
+            "accepted": 2,
+            "rejected": 4
+          },
+          "fp2_choices": [
+            {
+              "ordered_rules": [],
+              "calls": 3
+            },
+            {
+              "ordered_rules": [
+                "expand-cross-products"
+              ],
+              "calls": 3538
+            }
+          ],
+          "fixture_stack_payload_bytes": 29891,
+          "plan": {
+            "fp2_rules": [
+              "expand-cross-products"
+            ],
+            "residue_association": "accumulator-frobenius-first",
+            "fp2_selection": "callsite",
+            "msm": "signed-radix4",
+            "msm_table": "deferred-doubling-slopes",
+            "miller_reductions": "split-chord-residue",
+            "miller_kernel": "direct-normalized",
+            "g1_reductions": "paired-doubles",
+            "g1_z_batch": 4
+          }
+        },
+        {
+          "lock_bytes": 227334,
+          "path_bytes": 236720,
+          "script_sha256": "ca99ab1839de91efd187bd56896f76b60e4d6323e46ce2c2f3dcfe0a58275a59",
+          "artifact_sha256": "a62a2b46f81100d2368c4bbfc10d5babb2ebedad7b2fb269c3a563094de9fd59",
+          "witness_bytes": [
+            9378,
+            9378
+          ],
+          "witness_sha256": [
+            "dd56640a5b84fa2192c05a0726841e427b83a24170348e51ae875cecc3640a97",
+            "4a2827dc39dbfc88079a66b617f5d3d4b379758aaead61e3ab254e4ba2d9661f"
+          ],
+          "msm_slope_count": 39,
+          "local_verdicts": {
+            "accepted": 2,
+            "rejected": 4
+          },
+          "fp2_choices": [
+            {
+              "ordered_rules": [],
+              "calls": 3
+            },
+            {
+              "ordered_rules": [
+                "expand-cross-products"
+              ],
+              "calls": 3538
+            }
+          ],
+          "fixture_stack_payload_bytes": 29891,
+          "plan": {
+            "fp2_rules": [
+              "expand-cross-products"
+            ],
+            "residue_association": "accumulator-frobenius-first",
+            "fp2_selection": "callsite",
+            "msm": "signed-radix4",
+            "msm_table": "deferred-doubling-slopes",
+            "miller_reductions": "split-chord-residue",
+            "miller_kernel": "direct-normalized",
+            "g1_reductions": "paired-doubles",
+            "g1_z_batch": 4,
+            "compact_booleans": true
+          }
+        },
+        {
+          "lock_bytes": 227449,
+          "path_bytes": 236835,
+          "script_sha256": "a8ce3245044c8114f2e071767e83e51da760f498bb5e17e7facf474261df5024",
+          "artifact_sha256": "0d92c0b9428a605efd697df98a7c7b5cd2842a05912d5ced2c98df1bd17ebd3c",
+          "witness_bytes": [
+            9378,
+            9378
+          ],
+          "witness_sha256": [
+            "dd56640a5b84fa2192c05a0726841e427b83a24170348e51ae875cecc3640a97",
+            "4a2827dc39dbfc88079a66b617f5d3d4b379758aaead61e3ab254e4ba2d9661f"
+          ],
+          "msm_slope_count": 39,
+          "local_verdicts": {
+            "accepted": 2,
+            "rejected": 4
+          },
+          "fp2_choices": [
+            {
+              "ordered_rules": [],
+              "calls": 3
+            },
+            {
+              "ordered_rules": [
+                "expand-cross-products"
+              ],
+              "calls": 3538
+            }
+          ],
+          "fixture_stack_payload_bytes": 29891,
+          "plan": {
+            "fp2_rules": [
+              "expand-cross-products"
+            ],
+            "residue_association": "accumulator-frobenius-first",
+            "fp2_selection": "callsite",
+            "msm": "signed-radix4",
+            "msm_table": "deferred-doubling-slopes",
+            "miller_reductions": "split-chord-residue",
+            "miller_kernel": "direct-normalized",
+            "g1_reductions": "paired-doubles",
+            "g1_z_batch": 8
+          }
+        },
+        {
+          "lock_bytes": 227248,
+          "path_bytes": 236634,
+          "script_sha256": "2ed4e76018064259ebda220122c34821ff33ed5d7da43854c498db8740fa594e",
+          "artifact_sha256": "37dfa86d51e12630a8756a178beb6792d1fce1ea5c9e408d1189b7b26e98f2c1",
+          "witness_bytes": [
+            9378,
+            9378
+          ],
+          "witness_sha256": [
+            "dd56640a5b84fa2192c05a0726841e427b83a24170348e51ae875cecc3640a97",
+            "4a2827dc39dbfc88079a66b617f5d3d4b379758aaead61e3ab254e4ba2d9661f"
+          ],
+          "msm_slope_count": 39,
+          "local_verdicts": {
+            "accepted": 2,
+            "rejected": 4
+          },
+          "fp2_choices": [
+            {
+              "ordered_rules": [],
+              "calls": 3
+            },
+            {
+              "ordered_rules": [
+                "expand-cross-products"
+              ],
+              "calls": 3538
+            }
+          ],
+          "fixture_stack_payload_bytes": 29891,
+          "plan": {
+            "fp2_rules": [
+              "expand-cross-products"
+            ],
+            "residue_association": "accumulator-frobenius-first",
+            "fp2_selection": "callsite",
+            "msm": "signed-radix4",
+            "msm_table": "deferred-doubling-slopes",
+            "miller_reductions": "split-chord-residue",
+            "miller_kernel": "direct-normalized",
+            "g1_reductions": "paired-doubles",
+            "g1_z_batch": 8,
+            "compact_booleans": true
+          }
+        },
+        {
+          "lock_bytes": 227381,
+          "path_bytes": 236767,
+          "script_sha256": "a47a7f375fd2e46bf8d4f7d50913cc9c2d4e588698babea5d23e1c277f6c56d5",
+          "artifact_sha256": "6582db4277eb98bf7a3744c0dfbb8544fd98a1a31fdebb5b632abe8d47af78bc",
+          "witness_bytes": [
+            9378,
+            9378
+          ],
+          "witness_sha256": [
+            "dd56640a5b84fa2192c05a0726841e427b83a24170348e51ae875cecc3640a97",
+            "4a2827dc39dbfc88079a66b617f5d3d4b379758aaead61e3ab254e4ba2d9661f"
+          ],
+          "msm_slope_count": 39,
+          "local_verdicts": {
+            "accepted": 2,
+            "rejected": 4
+          },
+          "fp2_choices": [
+            {
+              "ordered_rules": [],
+              "calls": 3
+            },
+            {
+              "ordered_rules": [
+                "expand-cross-products"
+              ],
+              "calls": 3538
+            }
+          ],
+          "fixture_stack_payload_bytes": 29891,
+          "plan": {
+            "fp2_rules": [
+              "expand-cross-products"
+            ],
+            "residue_association": "accumulator-frobenius-first",
+            "fp2_selection": "callsite",
+            "msm": "signed-radix4",
+            "msm_table": "deferred-doubling-slopes",
+            "miller_reductions": "split-chord-residue",
+            "miller_kernel": "direct-normalized",
+            "g1_reductions": "paired-doubles",
+            "g1_z_batch": 16
+          }
+        },
+        {
+          "lock_bytes": 227180,
+          "path_bytes": 236566,
+          "script_sha256": "a57317f67d07f3b0708cfa331f0ba37dd1864e67ea620dad533b558f65528847",
+          "artifact_sha256": "5849e866475ea31bc0e93d22e5fe00e2d0c7fa208db5cdc32a11db48ef11af73",
+          "witness_bytes": [
+            9378,
+            9378
+          ],
+          "witness_sha256": [
+            "dd56640a5b84fa2192c05a0726841e427b83a24170348e51ae875cecc3640a97",
+            "4a2827dc39dbfc88079a66b617f5d3d4b379758aaead61e3ab254e4ba2d9661f"
+          ],
+          "msm_slope_count": 39,
+          "local_verdicts": {
+            "accepted": 2,
+            "rejected": 4
+          },
+          "fp2_choices": [
+            {
+              "ordered_rules": [],
+              "calls": 3
+            },
+            {
+              "ordered_rules": [
+                "expand-cross-products"
+              ],
+              "calls": 3538
+            }
+          ],
+          "fixture_stack_payload_bytes": 29891,
+          "plan": {
+            "fp2_rules": [
+              "expand-cross-products"
+            ],
+            "residue_association": "accumulator-frobenius-first",
+            "fp2_selection": "callsite",
+            "msm": "signed-radix4",
+            "msm_table": "deferred-doubling-slopes",
+            "miller_reductions": "split-chord-residue",
+            "miller_kernel": "direct-normalized",
+            "g1_reductions": "paired-doubles",
+            "g1_z_batch": 16,
+            "compact_booleans": true
+          }
+        }
+      ],
+      "native_replays": {
+        "batch4": {
+          "arithmetic_plan": {
+            "fp2_rules": [
+              "expand-cross-products"
+            ],
+            "residue_association": "accumulator-frobenius-first",
+            "fp2_selection": "callsite",
+            "msm": "signed-radix4",
+            "msm_table": "deferred-doubling-slopes",
+            "miller_reductions": "split-chord-residue",
+            "miller_kernel": "direct-normalized",
+            "g1_reductions": "paired-doubles",
+            "g1_z_batch": 4,
+            "compact_booleans": true
+          },
+          "lock_bytes": 227334,
+          "path_bytes": 236720,
+          "script_sha256": "ca99ab1839de91efd187bd56896f76b60e4d6323e46ce2c2f3dcfe0a58275a59",
+          "cases": [
+            {
+              "fixture_case": "wrap",
+              "deployment_txid": "7336083c198cf3d4c1e4c485865203da86867345a182712b09ff03418b528f0e",
+              "spend_txid": "7df9c3bee4d98ec34cc734830a8b513f92c482e38bed6d21c677225cff39f722",
+              "funded_path_bytes": 236946,
+              "stack_payload": {
+                "main_payload_bytes": 29891,
+                "alt_payload_bytes": 59,
+                "combined_payload_bytes": 29891
+              },
+              "rejected_controls": [
+                "crossed_statement",
+                "g1_outside_subgroup"
+              ]
+            },
+            {
+              "fixture_case": "other",
+              "deployment_txid": "da5b00273618ec71dc2d550baaf664005c9dd45476e5165b972d990fbe13db2d",
+              "spend_txid": "f6cef36d9b205f1530d91f56e55d7d961cb3080f21ff11d25ac0c435136953fe",
+              "funded_path_bytes": 236946,
+              "stack_payload": {
+                "main_payload_bytes": 29868,
+                "alt_payload_bytes": 59,
+                "combined_payload_bytes": 29868
+              },
+              "rejected_controls": [
+                "crossed_statement",
+                "g1_outside_subgroup"
+              ]
+            }
+          ]
+        },
+        "batch8": {
+          "arithmetic_plan": {
+            "fp2_rules": [
+              "expand-cross-products"
+            ],
+            "residue_association": "accumulator-frobenius-first",
+            "fp2_selection": "callsite",
+            "msm": "signed-radix4",
+            "msm_table": "deferred-doubling-slopes",
+            "miller_reductions": "split-chord-residue",
+            "miller_kernel": "direct-normalized",
+            "g1_reductions": "paired-doubles",
+            "g1_z_batch": 8,
+            "compact_booleans": true
+          },
+          "lock_bytes": 227248,
+          "path_bytes": 236634,
+          "script_sha256": "2ed4e76018064259ebda220122c34821ff33ed5d7da43854c498db8740fa594e",
+          "cases": [
+            {
+              "fixture_case": "wrap",
+              "deployment_txid": "5b4c6bc595ec0d2fa1e9cbae39825cd2c43b29a0e0e545c361c9099c18068c9c",
+              "spend_txid": "bf754ef30f0a6fe66a96cf8d9f7afa60c5482b3fc8fe44652b65337b0d675221",
+              "funded_path_bytes": 236860,
+              "stack_payload": {
+                "main_payload_bytes": 29891,
+                "alt_payload_bytes": 59,
+                "combined_payload_bytes": 29891
+              },
+              "rejected_controls": [
+                "crossed_statement",
+                "g1_outside_subgroup"
+              ]
+            },
+            {
+              "fixture_case": "other",
+              "deployment_txid": "c2f39984950a46cad76116410f35294819e854edb8fe59c8c5b404b8217ce073",
+              "spend_txid": "620802bd0c6e83f3ca8f217214eaea35f74adbc8bb32aaf810fc0104bb417439",
+              "funded_path_bytes": 236859,
+              "stack_payload": {
+                "main_payload_bytes": 29868,
+                "alt_payload_bytes": 59,
+                "combined_payload_bytes": 29868
+              },
+              "rejected_controls": [
+                "crossed_statement",
+                "g1_outside_subgroup"
+              ]
+            }
+          ]
+        },
+        "batch16": {
+          "arithmetic_plan": {
+            "fp2_rules": [
+              "expand-cross-products"
+            ],
+            "residue_association": "accumulator-frobenius-first",
+            "fp2_selection": "callsite",
+            "msm": "signed-radix4",
+            "msm_table": "deferred-doubling-slopes",
+            "miller_reductions": "split-chord-residue",
+            "miller_kernel": "direct-normalized",
+            "g1_reductions": "paired-doubles",
+            "g1_z_batch": 16,
+            "compact_booleans": true
+          },
+          "lock_bytes": 227180,
+          "path_bytes": 236566,
+          "script_sha256": "a57317f67d07f3b0708cfa331f0ba37dd1864e67ea620dad533b558f65528847",
+          "cases": [
+            {
+              "fixture_case": "wrap",
+              "deployment_txid": "22761229ebe732fc94d02f3ac3a5a5f66c06009c319c689ee327f5129b8a70ce",
+              "spend_txid": "0e6eefe57abcc364f52c46e4bee06ffd8dd6737998a4edee168749735502df17",
+              "funded_path_bytes": 236791,
+              "stack_payload": {
+                "main_payload_bytes": 29891,
+                "alt_payload_bytes": 59,
+                "combined_payload_bytes": 29891
+              },
+              "rejected_controls": [
+                "crossed_statement",
+                "g1_outside_subgroup"
+              ]
+            },
+            {
+              "fixture_case": "other",
+              "deployment_txid": "f374c9c0103339bce496c8676ee45d36d764d231da383e0723980dedf7cf923b",
+              "spend_txid": "5f5c6924b05a8049df1d6138ee8cec53b38c4121c80ad92ed0c3dcc1981782f8",
+              "funded_path_bytes": 236791,
+              "stack_payload": {
+                "main_payload_bytes": 29868,
+                "alt_payload_bytes": 59,
+                "combined_payload_bytes": 29868
+              },
+              "rejected_controls": [
+                "crossed_statement",
+                "g1_outside_subgroup"
+              ]
+            }
+          ]
+        }
+      },
+      "valid_spend_timing_ms": {
+        "samples_per_case": 9,
+        "warmup_samples_per_case": 1,
+        "rotation": "baseline, batch4, batch8, batch16 rotated by sample",
+        "results": [
+          {
+            "fixture": "wrap",
+            "median": {
+              "baseline": {
+                "node_rpc_ms": 124.2,
+                "chain_gang_ms": 42.332
+              },
+              "batch4": {
+                "node_rpc_ms": 125.002,
+                "chain_gang_ms": 44.011
+              },
+              "batch8": {
+                "node_rpc_ms": 128.711,
+                "chain_gang_ms": 43.133
+              },
+              "batch16": {
+                "node_rpc_ms": 131.537,
+                "chain_gang_ms": 43.06
+              }
+            }
+          },
+          {
+            "fixture": "other",
+            "median": {
+              "baseline": {
+                "node_rpc_ms": 130.081,
+                "chain_gang_ms": 46.69
+              },
+              "batch4": {
+                "node_rpc_ms": 124.629,
+                "chain_gang_ms": 44.243
+              },
+              "batch8": {
+                "node_rpc_ms": 123.981,
+                "chain_gang_ms": 42.291
+              },
+              "batch16": {
+                "node_rpc_ms": 124.693,
+                "chain_gang_ms": 46.457
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "native_validation": {
+    "valid_spends_mined": 12,
+    "invalid_spends_rejected": 24
+  }
+}

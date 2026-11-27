@@ -83,6 +83,8 @@
 
 `g1_reductions: paired-doubles` 用同一归约边界处理连续两次 Jacobian 倍点，在混合点加和最终子群断言前归约坐标。[模块化 Forth 与复现](../projects/groth16-bls12-381/docs/verification.zh-CN.md#当前-forth-入口)
 
+`g1_z_batch` 按所选批大小累计 G1 倍点的 Y 因子，在混合点加和子群断言前补齐 Z 坐标的 2 的幂次缩放并归约。`compact_booleans` 让数值布尔指令直接读取 Script 整数，栈调度器可以交换这类操作的两个操作数。[分批归约与布尔发码实测](../projects/groth16-bls12-381/versions/v0.13.0/measurements.json)
+
 ## 构建和复放
 
 在仓库根目录执行，依赖见 [4thGraph 安装命令](toolchain.md#复放与编译)。示例从版本库自带的测试夹具导出一份验证密钥、证明和公开输入。
