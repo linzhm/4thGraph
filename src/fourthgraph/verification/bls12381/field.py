@@ -2,8 +2,11 @@
 
 from contextlib import contextmanager
 from functools import cache
+from hashlib import sha256
+from importlib.resources import files
 
 from fourthgraph.bsv.script import asm
+from fourthgraph.compiler.script_builder import ScriptBuilder
 from fourthgraph.compiler.stack_schedule import Graph
 
 U = 0xd201000000010000  # Absolute value of the negative BLS12-381 seed.
@@ -11,6 +14,15 @@ R = U**4 - U**2 + 1
 Q = (U + 1)**2 * R // 3 - U
 ZERO2, ONE2 = (0, 0), (1, 0)
 ONE12 = ((ONE2, ZERO2, ZERO2), (ZERO2, ZERO2, ZERO2))
+FP2_ENTRY = "bls-fp2-product"
+FP2_RULES = ("expand-cross-products",)
+
+
+@cache
+def fp2_kernel():
+    source = files("fourthgraph.stdlib").joinpath("bls12-381-fp2.fth").read_bytes()
+    builder = ScriptBuilder(source.decode("utf-8"), formula_passes=("stack",), experimental_rules=FP2_RULES)
+    return builder.formula_ir[FP2_ENTRY], sha256(source).hexdigest()
 
 
 class HostField:
@@ -86,6 +98,11 @@ class ScriptField:
             return self.op("OP_2MUL", a)
         return self.op("OP_MUL", a, b)
 
+    def multiply2(self, *limbs):
+        formula, _ = fp2_kernel()
+        operations = {"int+": self.add, "int-": self.sub, "int*": self.mul}
+        return formula.inline(limbs, lambda name, *args: operations[name](*args))
+
     def half_digit(self, digit):
         # MSM digits are nonnegative and occupy at most two bits.
         return self.op("OP_2DIV", digit) if self.chronicle else self.op("OP_DIV", digit, 2)
@@ -133,10 +150,11 @@ class ScriptField:
 class Tower:
     """Fp2 = Fp[i], i² = -1, Fp6 = Fp2[v], v³ = 1+i, Fp12 = Fp6[w], w² = v."""
 
-    def __init__(self, field, *, sparse=False, defer_reductions=False):
+    def __init__(self, field, *, sparse=False, defer_reductions=False, mul2_kernel=None):
         self.fp = field
         self.sparse = sparse
         self.defer_reductions = defer_reductions
+        self.mul2_kernel = mul2_kernel
 
     def add2(self, a, b):
         return self.fp.add(a[0], b[0]), self.fp.add(a[1], b[1])
@@ -156,6 +174,8 @@ class Tower:
                 return self.reduce2(self.scale2(a, b[0]))
             if a[1] == 0:
                 return self.reduce2(self.scale2(b, a[0]))
+        if self.mul2_kernel is not None:
+            return self.reduce2(self.mul2_kernel(*a, *b))
         f = self.fp
         ac, bd = f.mul(a[0], b[0]), f.mul(a[1], b[1])
         cross = f.mul(f.add(*a), f.add(*b))

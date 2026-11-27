@@ -55,7 +55,7 @@ class BLS12381Tests(unittest.TestCase):
             return tuple(chain.from_iterable(chain.from_iterable(value)))
 
         field = ScriptField(18, assert_checks=True)
-        tower = Tower(field, sparse=True, defer_reductions=True)
+        tower = Tower(field, sparse=True, defer_reductions=True, mul2_kernel=field.multiply2)
         inputs = field.graph.inputs
         element = fp12(inputs)
         squared = tower.square12(element)

@@ -32,8 +32,10 @@ sections:
   algorithm:
     en:
       - The project word imports the verifier with `REQUIRE` and calls its public entry. The shared backend compiles that call to BSV Script for the selected verification key and public-input configuration. [Project Forth](verifier.fth) · [Standard-library source](../../src/fourthgraph/stdlib/groth16-bls12-381.fth) · [Verifier layouts and ABI](../../docs/groth16-bls12-381.md)
+      - The compact verifier constructs its Fp2 kernel with `ScriptBuilder` and inlines the cross-product rewrite. The lock manifest records the formula hash and ordered rule. [Fp2 formula](../../src/fourthgraph/stdlib/bls12-381-fp2.fth)
     zh-CN:
       - 项目词通过 `REQUIRE` 导入并调用验证器。共享后端根据验证密钥和公开输入配置，将该调用编译为 BSV Script。[项目 Forth](verifier.fth) · [标准库源码](../../src/fourthgraph/stdlib/groth16-bls12-381.fth) · [见证布局与接口](../../docs/groth16-bls12-381.md)
+      - 紧凑模式用 `ScriptBuilder` 构造 Fp2 内核，并内联交叉项改写。锁定脚本清单记录公式摘要和有序规则。[Fp2 公式](../../src/fourthgraph/stdlib/bls12-381-fp2.fth)
   reproduction:
     en:
       - Look in `projects/groth16-verifier/workspace/build/` for `lock.json`, `witness.hex`, and `replay.json`. The replay mines two valid spends and checks rejection of swapped statements and G1 points outside the subgroup. [Verification guide](docs/verification.en.md)

@@ -24,4 +24,4 @@ The funded replay uses BSV Node 1.2.3 and the pinned chain-gang binding. It depl
 
 ## Measurements and evidence
 
-The v0.1.0 records identify the fixture, lock and witness hashes, candidate byte counts, and actual transaction replays. The layout selection counts the serialized lock and witness script fields. The replay totals count a complete deployment and spend, including the funding signature and transaction framing. [Versioned measurements](../versions/v0.1.0/measurements.json)
+The v0.2.0 records compare the original and rewritten Fp2 products under the same public input configurations. The layout selection counts the serialized lock and witness script fields. The replay totals count a complete deployment and spend, including the funding signature and transaction framing. To reproduce the Chronicle replay, set `REGTEST_CHRONICLE_HEIGHT=2`, pass `--script-era chronicle`, and use a separate output file. [v0.2.0 measurements](../versions/v0.2.0/measurements.json) · [v0.1.0 measurements](../versions/v0.1.0/measurements.json)

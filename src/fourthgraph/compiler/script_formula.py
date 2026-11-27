@@ -2,6 +2,7 @@
 
 from collections import Counter
 from dataclasses import dataclass, field
+from functools import cached_property
 
 from fourthgraph.bsv.script import asm, number
 
@@ -51,6 +52,39 @@ class Formula:
     steps: tuple[Step, ...]
     returns: tuple[int, ...]
     origins: tuple[tuple[Origin, ...], ...] = field(default=(), compare=False, repr=False)
+
+    @cached_property
+    def _inline_steps(self):
+        if any(step.operation == "int-from-bottom" for step in self.steps):
+            raise ValueError("inlining requires a formula without stack-relative inputs")
+        live = set(self.returns)
+        ordered = []
+        for index in reversed(range(self.input_count, len(self.steps))):
+            if index in live:
+                step = self.steps[index]
+                live.update(step.args)
+                ordered.append((index, step))
+        return tuple(reversed(ordered))
+
+    def inline(self, operands, lower):
+        """Instantiate a closed formula in a caller's arithmetic graph.
+
+        The caller supplies operands that satisfy the declared intervals and
+        preserves their stack representation in its arithmetic lowering.
+        """
+        operands = tuple(operands)
+        if len(operands) != self.input_count:
+            raise ValueError("formula operand count does not match its stack effect")
+        for step, value in zip(self.steps[:self.input_count], operands, strict=True):
+            if type(value) is int and not step.bounds.bounds[0] <= value <= step.bounds.bounds[1]:
+                raise ValueError("formula constant is outside its input interval")
+        values = dict(enumerate(operands))
+        for index, step in self._inline_steps:
+            if step.operation == "literal":
+                values[index] = step.immediate
+            else:
+                values[index] = lower(step.operation, *(values[arg] for arg in step.args))
+        return tuple(values[index] for index in self.returns)
 
     def bind_input(self, index, value):
         """Substitute a proven constant and remove its runtime stack slot."""

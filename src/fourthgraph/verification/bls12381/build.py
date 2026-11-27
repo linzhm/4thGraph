@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 
 from fourthgraph.verification.bls12381.affine_witness import AffineStages, LAYOUTS, affine_witness, line_packet, msm_windows, slope_packet_bytes
+from fourthgraph.verification.bls12381.field import FP2_ENTRY, FP2_RULES, fp2_kernel
 from fourthgraph.verification.bls12381.verifier import (
     PACKET_BYTES, ScriptVerifier, VerifierStages, _FIXED_WITNESS, dynamic_slots, input_sources, public_signals,
 )
@@ -131,6 +132,10 @@ class ForthVerifier(ScriptVerifier):
         result = super().artifact(signals, owner, script, compact=compact)
         result["compiler_version"] = PROJECT_VERSION
         result["stack_schedule"] = "compact" if compact else "baseline"
+        if compact:
+            _, kernel_digest = fp2_kernel()
+            result["fp2_kernel"] = {"entry": FP2_ENTRY, "source_sha256": kernel_digest,
+                                    "ordered_rules": FP2_RULES}
         result["forth_entry"] = self.entry
         result["entry_interface"] = describe_export(MODULE, GROTH16_VERIFY)
         result["entry_interface_sha256"] = interface_digest(MODULE, LIBRARIES[MODULE])
