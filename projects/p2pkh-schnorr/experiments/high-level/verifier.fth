@@ -17,11 +17,15 @@ REQUIRE BSV
     64 bytes-check-size 32 op_split
 ;
 
-: challenge ( bytes bytes bytes -- script-int )
+: challenge-digest ( bytes bytes bytes -- bytes )
     ( Input order: message, public x, nonce x. )
     bytes-hex 7bb52d7a9fef58323eb1bf7a407db382d2f3f2d81bb1224f49fe518f6d48d37c
     dup bytes-cat swap bytes-cat swap bytes-cat swap bytes-cat
-    bytes-sha256 uint256be group-order int-rem
+    bytes-sha256
+;
+
+: challenge ( bytes bytes bytes -- script-int )
+    challenge-digest uint256be group-order int-rem
 ;
 
 : next-bit ( script-int script-int -- script-int cell )

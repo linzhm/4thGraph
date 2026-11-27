@@ -106,3 +106,11 @@ PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
 `REQUIRE stdlib/weierstrass.fth` 提供 `weierstrass-scale ( p X Y Z u2 u3 -- p X' Y' Z )`。它对短 Weierstrass 曲线的齐次坐标应用 `(u²X, u³Y, Z)`，对应系数为 `a' = a·u⁴` 和 `b' = b·u⁶`，均在模 `p` 下计算。编译器验证 secp256k1 登记的缩放因子后，才使用 `a=0, 3*b=1` 内核。固定表在编译期转换，输入点在执行时映射，输出恢复为原始模型。[基础库 Forth 词](../src/fourthgraph/stdlib/weierstrass.fth)
 
 P-256 使用同一套坐标模型接口及原 `a=-3` 内核。它的六次幂判定为 `(3b)^((p-1)/6) ≠ 1 mod p`，所以没有 `3*b=1` 的缩放模型。该域中保持 `a=-3` 的缩放也会保持 `b`。
+
+## 数据流和返回边界
+
+`--optimize dataflow` 会把通用等价改写和现有栈编译一起比较，保留较小的结果。同一控制流块中，标明只依赖显式操作数的运算若已经成功执行，可以复用结果。字节宽度来自长度检查、常量分割、拼接和哈希输出。编译器只有证明宽度匹配，才会选用已登记的定宽实现。条件分支分别分析，依赖交易上下文的操作保留调用。
+
+返回边界有一段连续的活值位于栈顶时，调度器比较逐项移除死值和暂存活值后成对丢弃的两种写法，再按原顺序恢复活值和调用方的备用栈。标准 Forth 前端也支持 `layout:`，可用名称和类型声明栈重排。
+
+共享 Script 库可解码单个 32 字节大端字段，也可解码编译期定数量的连续字段。它与窗口索引打包共享掩码和位组交换词。批量解码保留字段顺序和无符号语义。[共享实现](../src/fourthgraph/stdlib/script-fragments.fth) · [Schnorr 对照](../projects/p2pkh-schnorr/docs/high-level-forth.zh-CN.md#dataflow-iteration)

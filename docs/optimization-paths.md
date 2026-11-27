@@ -106,3 +106,11 @@ PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
 `REQUIRE stdlib/weierstrass.fth` exposes `weierstrass-scale ( p X Y Z u2 u3 -- p X' Y' Z )`. It applies the homogeneous map `(u²X, u³Y, Z)` to short Weierstrass points. The matching coefficients are `a' = a·u⁴` and `b' = b·u⁶` modulo `p`. The compiler verifies the registered secp256k1 scale before selecting the `a=0, 3*b=1` kernels, pre-scales the fixed table, maps the input point, and restores the original model at the output. [Shared Forth word](../src/fourthgraph/stdlib/weierstrass.fth)
 
 P-256 uses the shared point-model interface and the original `a=-3` kernels. The sixth-power test gives `(3b)^((p-1)/6) ≠ 1 mod p`, so the `3*b=1` model is unavailable for P-256. A scale that preserves `a=-3` in this field also preserves `b`.
+
+## Dataflow and return boundaries
+
+`--optimize dataflow` evaluates reusable Script rewrites alongside the existing stack compilation and retains the smaller result. In a typed lock block it reuses marked deterministic operations with identical operands after their first execution. Exact byte widths come from size checks, literal splits, concatenation and hash results. A registered width-specific lowering is selected only when its input width is proven. Conditional arms have their own dataflow analysis, and transaction-dependent operations retain their calls.
+
+At an eligible return boundary, liveness identifies a contiguous suffix of live values above dead slots. The scheduler compares moving each dead value with saving the live suffix, dropping the dead slots in pairs and restoring the suffix. The second option preserves the caller's alternate stack. The standard frontend also accepts `layout:` for named typed stack permutations, so Forth library algorithms can express their stacks without encoding depths by hand.
+
+The shared Script library can decode one fixed 32-byte big-endian field or a build-time count of consecutive fields. It uses the same mask and group-swap words as the window code. The batch decoder preserves field order and unsigned values. [Shared fragments](../src/fourthgraph/stdlib/script-fragments.fth) · [Schnorr comparison](../projects/p2pkh-schnorr/docs/high-level-forth.en.md#dataflow-iteration)

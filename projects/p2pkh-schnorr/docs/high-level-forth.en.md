@@ -135,6 +135,8 @@ The scaled plan and v0.17.0 emit the same 18,379 bytes for the first window and 
 
 Variable table construction and unpacking account for 2,531 B of the gap. The generated plan builds a packed projective table, then unpacks it onto the stack. The handwritten plan constructs the stack entries directly and uses the endomorphism for the `2Q` and `3Q` row starts. The generated BIP340 wrapper also repeats coordinate decoding and signature splitting. Each 2×2 OTDA transaction has two locks and two template constructors that are each 4,204 B larger, for a total of 16,816 B.
 
+This table records commit 7ea588c. The commands in this section reproduce that snapshot from the pinned revision. [Pinned source](https://github.com/linzhm/4thGraph/tree/7ea588cbcfba39ce1099e0034d0b196768c1d1fd)
+
 The replay checks the pinned vectors, malformed witnesses, 12 paired payment modes, two native exits and changed locktime for each candidate. The selected scaled plan also runs all eight automatic cases from the constructor matrix. [Measurements](../experiments/high-level/joint-lowerings.json) · [Transaction matrix](../experiments/high-level/joint-lowerings-matrix.json)
 
 ```sh
@@ -144,4 +146,29 @@ PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
 REGTEST_CHRONICLE_HEIGHT=5 PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
   "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/experiments/high-level/window_compare.py \
   --joint-lowerings --matrix-only --output workspace/schnorr-high-level/joint-lowerings-matrix.json
+```
+
+## Dataflow iteration
+
+The stack plan now builds the variable table directly. The Forth row code uses mixed addition, and the endomorphism maps `2P` and `3P` to the starts of the last two rows. The compiler schedules the typed layouts and chooses how to clear dead stack slots. In the batched verifier, the Forth computes the challenge from the original encodings and decodes the six checked-width fields together through the shared library. [Compiler dataflow](../../../docs/optimization-paths.md#dataflow-and-return-boundaries) · [Forth row construction](../../../src/fourthgraph/compiler/secp256k1-joint-stack.fth)
+
+| Stage | Payment lock | 2×2 OTDA ALL with reconstruction |
+| --- | ---: | ---: |
+| Previous scaled stack plan | 26,639 B | 71,442 B |
+| Direct variable table | 24,465 B | 62,746 B |
+| Dataflow and shorter return cleanup | 23,870 B | 60,366 B |
+| Forth batch decoding | 23,484 B | 58,822 B |
+| Handwritten v0.17.0 | 22,435 B | 54,626 B |
+
+The table and measurement file record the dataflow builds at `70d7ec8`. Run the replay commands from that checkout to reproduce those Script bytes. With the shared scheduler from #109, the dataflow build emits a 23,869 B payment lock and a 60,362 B reconstructed payment. The batch build emits a 23,482 B lock and a 58,814 B payment. [Measurement checkout](https://github.com/linzhm/4thGraph/tree/70d7ec80ea4694c7d373f3a2368bb56303907dd1)
+
+The shortest build retains the identical 18,379 B window script. The remaining 1,049 B per lock comprises 392 B of witness and challenge handling, 549 B of joint preparation, and 108 B of cleanup and nonce comparison. Each candidate replays 27 vector and malformed-witness cases, 12 paired payment modes, and both native exits. The selected build replays eight constructor matrix cases. [Measurements](../experiments/high-level/dataflow-measurements.json) · [Transaction matrix](../experiments/high-level/dataflow-matrix.json)
+
+```sh
+PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
+  "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/experiments/high-level/window_compare.py \
+  --joint-lowerings --output workspace/schnorr-high-level/dataflow-measurements.json
+REGTEST_CHRONICLE_HEIGHT=5 PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
+  "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/experiments/high-level/window_compare.py \
+  --joint-lowerings --matrix-only --output workspace/schnorr-high-level/dataflow-matrix.json
 ```

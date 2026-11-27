@@ -12,11 +12,11 @@ REQUIRE stdlib/secp256k1-window.fth
 
 : bip340-reverse-challenge-fields ( script -- script )
     ( Reverse the bytes within each 32-byte field while preserving field order. )
-    8 bytes-hex 00ff 4 secp-window-repeat-mask bip340-six-field-mask secp-window-swap-bit-groups
-    16 bytes-hex 0000ffff 3 secp-window-repeat-mask bip340-six-field-mask secp-window-swap-bit-groups
-    32 4 2 secp-window-block-mask bip340-six-field-mask secp-window-swap-bit-groups
-    64 8 1 secp-window-block-mask bip340-six-field-mask secp-window-swap-bit-groups
-    128 16 0 secp-window-block-mask bip340-six-field-mask secp-window-swap-bit-groups
+    8 bytes-hex 00ff 4 script-repeat-mask bip340-six-field-mask script-swap-bit-groups
+    16 bytes-hex 0000ffff 3 script-repeat-mask bip340-six-field-mask script-swap-bit-groups
+    32 4 2 script-block-mask bip340-six-field-mask script-swap-bit-groups
+    64 8 1 script-block-mask bip340-six-field-mask script-swap-bit-groups
+    128 16 0 script-block-mask bip340-six-field-mask script-swap-bit-groups
 ;
 
 : bip340-challenge-tag ( script -- script )

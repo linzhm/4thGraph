@@ -5,6 +5,7 @@ from dataclasses import asdict, dataclass, replace
 
 from fourthgraph.bsv.script import asm
 
+from fourthgraph.compiler.lock_reuse import reuse_values
 from fourthgraph.compiler.source import (
     MAX_EXPANSION, CompileError, Conditional, LockBranch, Shuffle, Token, check_word_expansion,
     entry_range_checks, expanded, lower, require_script,
@@ -14,7 +15,9 @@ from fourthgraph.compiler.stack_schedule import Graph, emit_steps
 from fourthgraph.compiler.wordsets import NUMERIC_RANGES, PRIMITIVES, SHUFFLES, U32, WRAP_CELL, WRAP_U32, Literal, Primitive
 
 BASELINE = "baseline"
-OPTIMIZATIONS = (BASELINE, "safe", "stack")
+DATAFLOW = "dataflow"
+STACK_OPTIMIZATIONS = ("stack", DATAFLOW)
+OPTIMIZATIONS = (BASELINE, "safe", *STACK_OPTIMIZATIONS)
 NORMALIZE_FLAG = asm("OP_0NOTEQUAL")
 
 
@@ -207,7 +210,13 @@ def emit(operations):
     return b"".join(op.script for op in operations)
 
 
-def emit_lock_block(block, inputs, rewrites, *, optimize):
+def emit_lock_block(block, inputs, rewrites, *, optimize, dataflow=False):
+    if dataflow:
+        block, reused = reuse_values(block)
+        for step, rule, basis, sizes in reused:
+            at = step.source
+            rewrites.append(Rewrite(rule, at.line if at else None, at.column if at else None, (), sizes,
+                                    basis=basis, module=at.module if at else None))
     uses = Counter(block.returns)
     uses.update(value for step in block.steps for value in step.args)
     steps = []
@@ -228,14 +237,14 @@ def emit_lock_block(block, inputs, rewrites, *, optimize):
                 prefix = b""
                 rewrites.append(Rewrite("comparison-feeds-if", line, column, (Slot.of("cell"),),
                                         (before, len(code)), module=module))
-            yes = emit_lock_block(node.yes, node.inputs, rewrites, optimize=optimize)
-            no = emit_lock_block(node.no, node.inputs, rewrites, optimize=optimize)
+            yes = emit_lock_block(node.yes, node.inputs, rewrites, optimize=optimize, dataflow=dataflow)
+            no = emit_lock_block(node.no, node.inputs, rewrites, optimize=optimize, dataflow=dataflow)
             script = prefix + asm("OP_IF") + yes + asm("OP_ELSE") + no + asm("OP_ENDIF")
         else:
             script = node.lower() if isinstance(node, Literal) else node.code
         steps.append((script, step.args, step.results))
         previous = step
-    return emit_steps(inputs, steps, block.returns, compact=True)
+    return emit_steps(inputs, steps, block.returns, compact=True, trim_suffix=dataflow)
 
 
 def compile_word(word, optimization=BASELINE, *, check_input_ranges=True, spend_entry=False,
@@ -253,9 +262,15 @@ def compile_word(word, optimization=BASELINE, *, check_input_ranges=True, spend_
         if word.lock is not None:
             script = emit_lock_block(word.lock, tuple(range(len(word.takes))), rewrites,
                                      optimize=optimization != BASELINE)
+            if optimization == DATAFLOW:
+                candidate_rewrites = []
+                candidate = emit_lock_block(word.lock, tuple(range(len(word.takes))), candidate_rewrites,
+                                            optimize=True, dataflow=True)
+                if len(candidate) < len(script):
+                    script, rewrites = candidate, candidate_rewrites
             return CompiledWord(prefix + script, rewrites=tuple(rewrites))
         operations = build_block(word.body, list(word.slots(word.takes)), rewrites,
-                                 schedule=optimization == "stack")
+                                 schedule=optimization in STACK_OPTIMIZATIONS)
     except RecursionError as error:
         raise CompileError("expanded conditional nesting exceeds the compiler's recursion limit") from error
     return CompiledWord(prefix + emit(operations), operations, tuple(rewrites))

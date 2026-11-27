@@ -137,6 +137,8 @@ REGTEST_CHRONICLE_HEIGHT=5 PYTHONPATH=src:. bash tools/verify_node.sh --profile 
 
 变基表构建和解包占其中 2,531 B。编译器候选先建齐次坐标字节表，再把点解包到栈上。手工版直接建立栈条目，并用自同态得到 `2Q` 和 `3Q` 两个行首。高阶 BIP340 封装还会重复解码坐标和拆分签名。两进两出 OTDA 交易里，两份锁和两份构造器各多 4,204 B，整笔交易多 16,816 B。
 
+本节记录提交 7ea588c 的快照，以下命令在该提交上复现对应字节数。[固定源码](https://github.com/linzhm/4thGraph/tree/7ea588cbcfba39ce1099e0034d0b196768c1d1fd)
+
 每个候选均复放固定验签向量、错误见证、12 种成对付款模式、两种普通输出退出及锁定时间篡改。选中的缩放候选也复放构造器矩阵的八个自动场景。[实测](../experiments/high-level/joint-lowerings.json) · [交易矩阵](../experiments/high-level/joint-lowerings-matrix.json)
 
 ```sh
@@ -146,4 +148,31 @@ PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
 REGTEST_CHRONICLE_HEIGHT=5 PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
   "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/experiments/high-level/window_compare.py \
   --joint-lowerings --matrix-only --output workspace/schnorr-high-level/joint-lowerings-matrix.json
+```
+
+<a name="dataflow-iteration"></a>
+
+## 数据流优化迭代
+
+栈候选直接构建变基表。Forth 用混合点加构建各行，再用自同态把 `2P` 和 `3P` 映射成最后两行的行首。编译器调度类型化的栈布局并选择死值清理方式。批量验签版用原始编码计算挑战值，再通过基础库一起解码六个已验证宽度的字段。[编译器数据流](../../../docs/optimization-paths.zh-CN.md#数据流和返回边界) · [Forth 建表源码](../../../src/fourthgraph/compiler/secp256k1-joint-stack.fth)
+
+| 阶段 | 付款锁 | 两进两出 OTDA ALL，使用模板构造器 |
+| --- | ---: | ---: |
+| 上轮缩放栈版 | 26,639 B | 71,442 B |
+| 直接构建变基表 | 24,465 B | 62,746 B |
+| 数据流改写和返回边界清理 | 23,870 B | 60,366 B |
+| Forth 批量解码 | 23,484 B | 58,822 B |
+| 手工 v0.17.0 | 22,435 B | 54,626 B |
+
+本轮表格和实测文件对应提交 `70d7ec8`。从该提交的检出目录运行下列命令，可复现记录中的脚本字节。引入 #109 的共享栈调度后，数据流构建的付款锁为 23,869 B，重建付款为 60,362 B。批量解码构建的付款锁为 23,482 B，重建付款为 58,814 B。 [实测提交](https://github.com/linzhm/4thGraph/tree/70d7ec80ea4694c7d373f3a2368bb56303907dd1)
+
+最短候选的 18,379 B 窗口循环与手工版逐字节相同。每锁剩余的 1,049 B 包括见证与挑战值处理 392 B、联合点乘准备 549 B、清栈与 nonce 点比较 108 B。每个候选复放 27 个向量与错误见证用例、12 种成对付款模式和两种普通输出退出。选中的候选还复放构造器矩阵的八个场景。[实测](../experiments/high-level/dataflow-measurements.json) · [交易矩阵](../experiments/high-level/dataflow-matrix.json)
+
+```sh
+PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
+  "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/experiments/high-level/window_compare.py \
+  --joint-lowerings --output workspace/schnorr-high-level/dataflow-measurements.json
+REGTEST_CHRONICLE_HEIGHT=5 PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
+  "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/experiments/high-level/window_compare.py \
+  --joint-lowerings --matrix-only --output workspace/schnorr-high-level/dataflow-matrix.json
 ```

@@ -6,36 +6,11 @@ from hashlib import sha256
 from fourthgraph.bsv.evaluate import evaluate
 from fourthgraph.bsv.script import asm, decode_num, encode_num, number, push
 from .curve_windows import CURVES, GLV_PACKED, GLV_REFERENCE, GLV_SCALED, JOINT_STRATEGIES, SECP256K1, fixed_table, scalar_plans
-from .lowering import compile_word
+from .lowering import DATAFLOW, compile_word
 from .script_builder import ScriptBuilder
-from .source import SourceCompiler, named_token
+from .source import SourceCompiler
 from .stack_schedule import emit_steps
 from .wordsets import NATIVE_PRIMITIVES, Primitive, script_word
-
-
-class LayoutCompiler(SourceCompiler):
-    """Lower a layout declaration as a typed permutation of named inputs."""
-
-    def declaration(self, token):
-        if token.name != "layout:":
-            return super().declaration(token)
-        name = named_token(self.tokens, token, "layout name")
-        terms = self.tokens.stack_effect()
-        if not terms or terms.count("--") != 1 or name.name in self.words:
-            raise token.error("expected a new layout name and a named stack effect")
-        split = terms.index("--")
-        inputs = [term.split(":") for term in terms[:split]]
-        if any(len(pair) != 2 or pair[1] not in self.stack_types for pair in inputs):
-            raise token.error("layout inputs require names and declared types")
-        labels = {label: i for i, (label, _) in enumerate(inputs)}
-        if len(labels) != len(inputs) or not all(value in labels for value in terms[split + 1:]):
-            raise token.error("layout result must name an input")
-        takes = tuple(kind for _, kind in inputs)
-        order = tuple(labels[value] for value in terms[split + 1:])
-        gives = tuple(takes[i] for i in order)
-        code = emit_steps(tuple(range(len(takes))), (), order, compact=True)
-        self.words[name.name] = Primitive(takes, gives, code, lambda *items: tuple(items[i] for i in order),
-                                          "typed layout permutation")
 
 
 def numeric_fragment(code, inputs, outputs, *, may_fail=False):
@@ -173,7 +148,7 @@ def compile_fixed_generator(curve, mode="auto", *, optimization="stack"):
                                      width=plan.window_bits, windows=plan.windows,
                                      doubles="curve-double " * plan.window_bits)
         words = vocabulary | dict((_constant("generator-table", "bytes", table),))
-        frontend = LayoutCompiler(source, vocabulary=words)
+        frontend = SourceCompiler(source, vocabulary=words)
         code = compile_word(frontend.words["generator-multiply"], optimization).script
         scripts[plan.name] = code
         scores.append({"algorithm": plan.name, "window_bits": plan.window_bits, "windows": plan.windows,
@@ -193,6 +168,13 @@ def packed_joint_source():
     from importlib.resources import files
     packed = files("fourthgraph.compiler").joinpath("secp256k1-joint-packed.fth").read_text(encoding="utf-8")
     return joint_source() + "\n" + packed
+
+
+@cache
+def stack_joint_source():
+    from importlib.resources import files
+    stack = files("fourthgraph.compiler").joinpath("secp256k1-joint-stack.fth").read_text(encoding="utf-8")
+    return packed_joint_source() + "\n" + stack
 
 
 def joint_vocabulary(library):
@@ -241,6 +223,7 @@ def _optimized_joint_words(vocabulary, optimization, *, scaled):
         "pack-windows": script_word("script-int script-int script-int script-int", "bytes",
                                     library.emit("secp-window-pack-windows", b""), _pack_windows),
         "double-pair": numeric_fragment(library.emit(prefix + "double-pair-with-field", b"", 1), 4, 4),
+        "double-point": numeric_fragment(library.emit(prefix + "double-with-field", b"", 1), 4, 4),
         "add-fixed-affine": numeric_fragment(library.emit(prefix + "add-affine-with-field", b"", 1), 6, 4),
     }
     points = fixed_table(SECP256K1, split_bits=128)
@@ -261,15 +244,41 @@ def _optimized_joint_words(vocabulary, optimization, *, scaled):
     return words, points
 
 
+def _variable_stack_table(frontend, words, optimization):
+    """Schedule the three nonzero rows around the shared P, 2P and 3P."""
+    p, px, py, qx, qy = inputs = (0, 1, 2, 3, 4)
+    steps = []
+    next_slot = len(inputs)
+
+    def emit(code, args, count):
+        nonlocal next_slot
+        outputs = tuple(range(next_slot, next_slot + count))
+        steps.append((code, args, outputs))
+        next_slot += count
+        return outputs
+
+    one, = emit(number(1), (), 1)
+    P, Q = (px, py, one), (qx, qy, one)
+    drop_field = asm("3 OP_ROLL OP_DROP")
+    P2 = emit(words["double-point"].code + drop_field, (p, *P), 3)
+    P3 = emit(words["add-fixed-affine"].code + drop_field, (p, *P2, px, py), 3)
+    map_row = compile_word(frontend.words["map-row-start"], optimization).script
+    row = compile_word(frontend.words["stack-table-row"], optimization).script
+    Q2, Q3 = (emit(map_row, (p, py, qy, *point), 3) for point in (P2, P3))
+    rows = [emit(row, (p, px, py, *point), 12) for point in (Q, Q2, Q3)]
+    return emit_steps(inputs, steps, (*P, *P2, *P3, *(slot for row in rows for slot in row)), compact=True,
+                      trim_suffix=optimization == DATAFLOW)
+
+
 def _stack_joint_script(frontend, words, points, optimization):
     """Compile a loop whose immutable prefix is 15 projective and 15 affine entries."""
     library = _joint_library()
-    prepare = compile_word(frontend.words["prepare-windows"], optimization).script
+    prepare = compile_word(frontend.words["prepare-stack-windows"], optimization).script
     # The common depth encoder targets this exact stack layout. The runtime variable
     # table is in ascending order, the fixed table descending, both without index 0.
     entries = len(points) - 1
-    prepare += library.emit("secp-window-window-depths", b"") + asm("OP_TOALTSTACK 99 OP_SPLIT OP_NIP")
-    prepare += asm("33 OP_SPLIT OP_SWAP OP_BIN2NUM OP_SWAP") * (entries * 3) + asm("OP_DROP")
+    prepare += library.emit("secp-window-window-depths", b"") + asm("OP_TOALTSTACK")
+    prepare += _variable_stack_table(frontend, words, optimization)
     prepare += b"".join(number(coordinate) for point in reversed(points[1:]) for coordinate in point)
     prepare += number(SECP256K1.field) + asm("OP_0 OP_1 OP_0")
 
@@ -283,7 +292,8 @@ def _stack_joint_script(frontend, words, points, optimization):
     step += variable + words["add-points"].code + asm("OP_ENDIF") + fixed
     point_slots = entries * (3 + 2)
     state = tuple(range(point_slots + 4))
-    cleanup = asm("OP_FROMALTSTACK OP_DROP") + emit_steps(state, (), state[point_slots:], compact=True)
+    cleanup = asm("OP_FROMALTSTACK OP_DROP") + emit_steps(state, (), state[point_slots:], compact=True,
+                                                          trim_suffix=optimization == DATAFLOW)
     return prepare + initial + step * 63 + cleanup + words["restore-model"].code
 
 
@@ -291,16 +301,17 @@ def link_joint_word(vocabulary, optimization, *, strategy=GLV_REFERENCE):
     """Link the GLV word when the caller has validated its point and scalars."""
     name = "secp256k1-joint-window-2"
     if strategy == GLV_REFERENCE:
-        frontend = LayoutCompiler(joint_source(), vocabulary=vocabulary)
+        frontend = SourceCompiler(joint_source(), vocabulary=vocabulary)
         kernel = compile_word(frontend.words[name], optimization).script
     else:
         if strategy not in JOINT_STRATEGIES:
             raise ValueError("unknown secp256k1 joint lowering")
         words, points = _optimized_joint_words(vocabulary, optimization, scaled=strategy == GLV_SCALED)
-        frontend = LayoutCompiler(packed_joint_source(), vocabulary=words)
         if strategy == GLV_PACKED:
+            frontend = SourceCompiler(packed_joint_source(), vocabulary=words)
             kernel = compile_word(frontend.words["packed-joint"], optimization).script
         else:
+            frontend = SourceCompiler(stack_joint_source(), vocabulary=words)
             kernel = _stack_joint_script(frontend, words, points, optimization)
     return {name: numeric_fragment(kernel, 4, 4)}
 
@@ -340,10 +351,10 @@ def compile_joint_generator_point(curve, strategy="auto", *, optimization="stack
         if strategy != "auto" and plan.name != strategy:
             continue
         if plan.name == GLV_REFERENCE:
-            frontend = LayoutCompiler(joint_source() + checks, vocabulary=vocabulary)
+            frontend = SourceCompiler(joint_source() + checks, vocabulary=vocabulary)
         else:
             linked = link_joint_word(vocabulary, optimization, strategy=plan.name)
-            frontend = LayoutCompiler("REQUIRE BSV\n" + checks, vocabulary=vocabulary | linked)
+            frontend = SourceCompiler("REQUIRE BSV\n" + checks, vocabulary=vocabulary | linked)
         script = compile_word(frontend.words["joint-multiply"], optimization).script
         scripts[plan.name] = script
         scores.append({"algorithm": plan.name, "window_bits": plan.window_bits, "windows": plan.windows,
