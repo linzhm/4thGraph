@@ -98,6 +98,8 @@ REGTEST_CHRONICLE_HEIGHT=5 PYTHONPATH=src:. bash tools/verify_node.sh --profile 
 
 在自动编译下，切换算法使每个锁少 162,287 B。同一个联合点乘词独立编译后链接，又少 12,415 B。链接版用类型化布局查表和通用点加；手工版用栈上查表、专用倍点和混合点加。这些是同属 64 窗算法的两种实现之间的进一步差别。
 
+表格和实测文件记录了提交 `7882fb7` 中的编译器结果。从该提交的检出目录运行下列命令，可以复现记录中的脚本字节。引入 #109 的共享栈调度改动后，同一复放中禁用可选优化的构建为 113,983 B，自动内联构建为 55,644 B，链接构建仍为 43,999 B。 [实测提交](https://github.com/linzhm/4thGraph/tree/7882fb793b1d354614df9210b59b8c30037f2343) · [PR #109](https://github.com/linzhm/4thGraph/pull/109)
+
 双引擎复放包括固定 BIP340 向量、错误见证、全部 12 种有同索引输出的付款模式、普通输出退出和修改锁定时间。链接版还复用构造器矩阵中的八个自动模板场景，检查输出和输入序号的改动。[实测](../experiments/high-level/window-measurements.json) · [交易矩阵](../experiments/high-level/window-matrix.json)
 
 ```sh
@@ -162,7 +164,7 @@ REGTEST_CHRONICLE_HEIGHT=5 PYTHONPATH=src:. bash tools/verify_node.sh --profile 
 | Forth 批量解码 | 23,484 B | 58,822 B |
 | 手工 v0.17.0 | 22,435 B | 54,626 B |
 
-本节记录提交 70d7ec8 的快照，以下命令在该提交上复现对应字节数。[固定源码](https://github.com/linzhm/4thGraph/tree/70d7ec80ea4694c7d373f3a2368bb56303907dd1)
+本轮表格和实测文件对应提交 `70d7ec8`。从该提交的检出目录运行下列命令，可复现记录中的脚本字节。引入 #109 的共享栈调度后，数据流构建的付款锁为 23,869 B，重建付款为 60,362 B。批量解码构建的付款锁为 23,482 B，重建付款为 58,814 B。 [实测提交](https://github.com/linzhm/4thGraph/tree/70d7ec80ea4694c7d373f3a2368bb56303907dd1)
 
 最短候选的 18,379 B 窗口循环与手工版逐字节相同。每锁剩余的 1,049 B 包括见证与挑战值处理 392 B、联合点乘准备 549 B、清栈与 nonce 点比较 108 B。每个候选复放 27 个向量与错误见证用例、12 种成对付款模式和两种普通输出退出。选中的候选还复放构造器矩阵的八个场景。[实测](../experiments/high-level/dataflow-measurements.json) · [交易矩阵](../experiments/high-level/dataflow-matrix.json)
 
@@ -186,6 +188,8 @@ REGTEST_CHRONICLE_HEIGHT=5 PYTHONPATH=src:. bash tools/verify_node.sh --profile 
 | 上轮数据流与批量解码 | 23,484 B | 58,822 B |
 | 栈与坐标模型边界优化 | 23,190 B | 57,646 B |
 | 手工 v0.17.0 | 22,435 B | 54,626 B |
+
+表格和实测文件对应提交 `e1ee42b`。从该提交的检出目录运行下列命令，可逐字节复现实测脚本。与 `main` 的 `c02df4a` 合并后，选中构建的付款锁为 23,188 B，两进两出的重建交易为 57,638 B。 [实测提交](https://github.com/linzhm/4thGraph/tree/e1ee42b455225934d580d172e562540286c42c56)
 
 18,379 B 的窗口循环与冻结手工版逐字节相同。每锁剩余 755 B，分布在联合点乘准备 441 B、见证和挑战值处理 250 B、清栈和 nonce 点比较 64 B。验签器复放 BIP340 向量、错误见证、12 种成对付款模式和两种普通输出退出。选中候选也通过构造器矩阵的八个场景。[实测](../experiments/high-level/boundary-measurements.json) · [交易矩阵](../experiments/high-level/boundary-matrix.json)
 

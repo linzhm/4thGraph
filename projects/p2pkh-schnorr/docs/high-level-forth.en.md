@@ -98,6 +98,8 @@ The second high-level version splits the generator scalar as `s = s0 + 2^128 s1`
 
 Switching the algorithm under automatic compilation saves 162,287 B per lock. Compiling the same joint word separately and linking it saves another 12,415 B. The linked build uses typed layouts for table access and generic point addition. The hand-tuned control uses compact stack lookups, specialized doubling and mixed addition. These choices account for further implementation differences within the 64-window algorithm.
 
+The table and measurement file record the compiler at commit `7882fb7`. Run the commands below from that checkout to reproduce the recorded Script bytes. With the shared stack scheduler changes in #109, the same replay emits 113,983 B for the build with optional passes disabled and 55,644 B for the automatic inline build. The linked build still emits 43,999 B. [Measurement checkout](https://github.com/linzhm/4thGraph/tree/7882fb793b1d354614df9210b59b8c30037f2343) · [PR #109](https://github.com/linzhm/4thGraph/pull/109)
+
 The replay checks the pinned BIP340 vectors, malformed witnesses, all 12 paired payment modes, native exits and changed locktime in both engines. The linked build additionally runs the eight automatic transaction cases from the constructor matrix, with output and sequence mutation controls. [Measurements](../experiments/high-level/window-measurements.json) · [Transaction matrix](../experiments/high-level/window-matrix.json)
 
 ```sh
@@ -158,7 +160,7 @@ The stack plan now builds the variable table directly. The Forth row code uses m
 | Forth batch decoding | 23,484 B | 58,822 B |
 | Handwritten v0.17.0 | 22,435 B | 54,626 B |
 
-This table records commit 70d7ec8. The commands in this section reproduce that snapshot from the pinned revision. [Pinned source](https://github.com/linzhm/4thGraph/tree/70d7ec80ea4694c7d373f3a2368bb56303907dd1)
+The table and measurement file record the dataflow builds at `70d7ec8`. Run the replay commands from that checkout to reproduce those Script bytes. With the shared scheduler from #109, the dataflow build emits a 23,869 B payment lock and a 60,362 B reconstructed payment. The batch build emits a 23,482 B lock and a 58,814 B payment. [Measurement checkout](https://github.com/linzhm/4thGraph/tree/70d7ec80ea4694c7d373f3a2368bb56303907dd1)
 
 The shortest build retains the identical 18,379 B window script. The remaining 1,049 B per lock comprises 392 B of witness and challenge handling, 549 B of joint preparation, and 108 B of cleanup and nonce comparison. Each candidate replays 27 vector and malformed-witness cases, 12 paired payment modes, and both native exits. The selected build replays eight constructor matrix cases. [Measurements](../experiments/high-level/dataflow-measurements.json) · [Transaction matrix](../experiments/high-level/dataflow-matrix.json)
 
@@ -180,6 +182,8 @@ The stack plan retains the field modulus from affine mapping through joint table
 | Previous dataflow and batch build | 23,484 B | 58,822 B |
 | Optimized stack and model boundaries | 23,190 B | 57,646 B |
 | Handwritten v0.17.0 | 22,435 B | 54,626 B |
+
+The table and measurements record commit `e1ee42b`. Run the commands below from that checkout to reproduce the recorded Script bytes. With the shared scheduler on `main` at `c02df4a`, the selected lock measures 23,188 B and the reconstructed two-input, two-output transaction measures 57,638 B. [Measurement checkout](https://github.com/linzhm/4thGraph/tree/e1ee42b455225934d580d172e562540286c42c56)
 
 The 18,379 B window loop matches the frozen manual implementation byte for byte. The remaining 755 B per lock is split into 441 B of joint preparation, 250 B of witness and challenge handling, and 64 B of cleanup and nonce comparison. The verifier replays the BIP340 vectors, malformed witnesses, 12 paired payment modes and two native exits. The selected build also passes the eight-case constructor matrix. [Measurements](../experiments/high-level/boundary-measurements.json) · [Transaction matrix](../experiments/high-level/boundary-matrix.json)
 
