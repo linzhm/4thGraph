@@ -89,7 +89,7 @@ cell-literal     = integer | quoted-character ;
 - 冒号定义名之后紧跟一个包含 `--` 的栈效果注释。标准 Forth 按普通注释处理，4thGraph 将其用作静态类型合同。签名只能引用当时已知的栈类型。定义体调用在解析到该位置时已定义、导入或内置的词。`IF` 从栈上消费一个 `cell`，两条分支合并时的栈类型和顺序须一致。
 - `work:`、`gate:`、`join:` 在读取时查找计算词。`join:` 的工作步骤、`stage:` 的计算词与值依赖、`relation:` 的两个词在构建对应计划时解析。`stage:` 可以按与依赖顺序不同的次序书写。
 - 并行计划需要两个不同的工作步骤、一个汇合和一个拆分签名角色，可附带一个门。线性计划需要一个初始值、一个或多个 `u32 -- u32` 阶段，以及最终的 `u32 -- route` 阶段。每个线性值只有一个生产者，并且最多消费一次。两阶段支持 `fused`、`serial` 和 `atomic`，更长的链使用 `serial`。`deploy`、`split`、`fused` 为保留的步骤名。两类计划均可附带一个退款规则及独立提交约束。 [交易图](specification.md#交易图)
-- `relation:` 须先执行 `REQUIRE stdlib/verify.fth`。一个关系文件至多声明一个关系，且独立于交易流程声明。它给编译器提供要验证的状态关系。编译器按后端能力、策略和预算选择同一关系的实现。 [关系构建与复放](stdlib.md#验证路径)
+- `relation:` 须先执行 `REQUIRE stdlib/verify.fth`。一个关系文件至多声明一个关系，且独立于交易流程声明。它给编译器提供要验证的状态关系。编译器按后端能力、策略和预算选择同一关系的实现。 [关系构建与复放](stdlib.zh-CN.md#验证路径)
 
 栈效果注释描述词的输入和输出，由 4thGraph 静态核对。`range:`、`work:` 和 `relation:` 则是显式声明。它们分别影响数值检查、交易调度和验证关系。声明词借用 Forth 定义词的写法，每种声明有自己的参数和结束符。Forth 2012 的 `CREATE` 与 `DOES>` 提供了在完整 Forth 系统中实现定义词的机制。 [Forth 2012 CREATE](https://forth-standard.org/standard/core/CREATE) · [Forth 2012 DOES>](https://forth-standard.org/standard/core/DOES)
 
@@ -186,7 +186,7 @@ REQUIRE stdlib/verify.fth
 relation: u32-inc decide ;
 ```
 
-`4thgraph-circuit` 生成 Circom。`4thgraph-verify` 构建交易绑定和后端选择报告。 [完整命令](stdlib.md#验证路径)
+`4thgraph-circuit` 生成 Circom。`4thgraph-verify` 构建交易绑定和后端选择报告。 [完整命令](stdlib.zh-CN.md#验证路径)
 
 ## 7. P2PKH 锁定验证
 
