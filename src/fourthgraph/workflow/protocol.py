@@ -1011,10 +1011,14 @@ def compile_search(program, keys, task_id, *, source_bytes, mode="auto", gate_bo
 
 
 def main():
+    if sys.argv[1:2] == ["preimage-constructor"]:
+        from fourthgraph.workflow.preimage_constructor import main as constructor_main
+        return constructor_main(sys.argv[2:])
     if sys.argv[1:2] == ["pels-witness"]:
         from fourthgraph.workflow.pels import witness_main
         return witness_main(sys.argv[2:])
-    cli = argparse.ArgumentParser(prog=PROJECT_NAME, description=PROJECT_DESCRIPTION)
+    cli = argparse.ArgumentParser(prog=PROJECT_NAME, description=PROJECT_DESCRIPTION,
+                                  epilog="Subcommands: experiment, pels-witness, preimage-constructor.")
     if sys.argv[1:2] == ["experiment"]:
         from fourthgraph.benchmark.experiment import main as experiment_main
         return experiment_main(sys.argv[2:])
@@ -1074,6 +1078,8 @@ def main():
                           "pels_words": tuple(PELS_WORDS),
                           "pels_successor": {"state_option": "--pels-successor-state",
                                              "sighash_policies": ("bip143", "auto")},
+                          "preimage_constructor": {"command": "preimage-constructor", "modes": ("auto", "literal"),
+                                                   "prepared_wasm_receipt": True},
                           "search_objectives": OBJECTIVES,
                           "gate_boundaries": GATE_BOUNDARIES, "targets": {
             name: {"transaction_versions": versions, "era": era} for name, (versions, era) in TARGETS.items()

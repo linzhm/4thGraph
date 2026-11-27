@@ -258,11 +258,15 @@ REQUIRE stdlib/secp256k1.fth
     op-depth op-1sub op-roll op-0 op-1 op-0
 ;
 
+: bip340-pick-variable-point ( script -- script )
+    ( Replace a nonzero lookup depth with the selected X, Y and Z. )
+    op-dup op-pick op-over op-pick op-rot op-1sub op-pick
+;
+
 : bip340-variable-window-add ( script -- script )
     ( The input is zero or the lookup depth with the index and accumulator in place. )
     op-ifdup op-if
-      ( Keep the depth on the main stack while copying X and Y. )
-      op-dup op-pick op-over op-pick op-rot op-1sub op-pick 1 secp256k1-scaled-add-with-field
+      bip340-pick-variable-point 1 secp256k1-scaled-add-with-field
     op-endif
 ;
 
@@ -273,10 +277,23 @@ REQUIRE stdlib/secp256k1.fth
     op-endif
 ;
 
-: bip340-window-addends ( script -- script )
+: bip340-read-window ( script -- script )
     ( Read the pair in one split, then split just those two bytes. )
     ( A nonzero depth is a minimal positive ScriptNum, and a zero byte skips addition. )
     op-fromaltstack op-2 op-split op-toaltstack op-1 op-split op-toaltstack
+;
+
+: bip340-first-window ( script -- script )
+    bip340-read-window
+    ( The accumulator is infinity. A nonzero variable selection replaces it. )
+    op-ifdup op-if
+      bip340-pick-variable-point op-2rot op-2drop op-3 op-roll op-drop
+    op-endif
+    op-fromaltstack bip340-fixed-window-add
+;
+
+: bip340-window-addends ( script -- script )
+    bip340-read-window
     bip340-variable-window-add
     op-fromaltstack bip340-fixed-window-add
 ;
@@ -289,7 +306,7 @@ REQUIRE stdlib/secp256k1.fth
 : bip340-joint-multiply ( script -- script )
     bip340-joint-window-table
     ( The initial accumulator is infinity. Drop the empty stream after the last window. )
-    bip340-window-addends bsv-empty bip340-joint-window-step 63 script-append-repeated
+    bip340-first-window bsv-empty bip340-joint-window-step 63 script-append-repeated
     op-fromaltstack op-drop
     ( Reject infinity. Compare X and Y to r*Z and ry*Z modulo the field prime. )
     op-dup op-verify

@@ -28,7 +28,7 @@ def musig2_coin(label, value):
             return fixture_sign(keys, policy, nonce_label, digest)
 
         return sign_spend(tx, index, parent.serialize(), policy.aggregate_x, signer,
-                          sighash=flag, chronicle_active=bool(flag & CHRONICLE))
+                          sighash=flag, chronicle_active=bool(flag & CHRONICLE), compress_otda=False)
 
     return Coin(Output(value, lock_for_public_key(policy.aggregate_x)), unlock)
 
