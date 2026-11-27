@@ -15,9 +15,9 @@ COMPANION_CODE = asm('OP_NOP OP_IF OP_CHECKSIGVERIFY OP_ELSE OP_CODESEPARATOR') 
 
 COMPACT_PROFILES = (
     'compact', 'compact-v2', 'compact-v3', 'compact-v4', 'compact-v5', 'compact-v6', 'compact-v7', 'compact-v8',
-    'compact-v9',
+    'compact-v9', 'compact-v10',
 )
-MAIN_BUFFER_PROFILES = ('compact-v8', 'compact-v9')
+MAIN_BUFFER_PROFILES = ('compact-v8', 'compact-v9', 'compact-v10')
 BUFFERED_PROFILES = ('compact-v6', 'compact-v7', *MAIN_BUFFER_PROFILES)
 CACHE_PROFILES = (False, True, 'steps', *COMPACT_PROFILES)
 MESSAGE_BYTE_SUFFIX = asm('OP_SPLIT 0x00 OP_CAT OP_BIN2NUM OP_DUP OP_16 OP_MOD OP_DUP OP_TOALTSTACK'
@@ -28,7 +28,10 @@ MESSAGE_PAIRED_NIBBLE_SUFFIX = asm('OP_SPLIT OP_DUP OP_4 OP_RSHIFT OP_BIN2NUM'
                                   ' OP_SWAP OP_15 OP_AND OP_BIN2NUM OP_2DUP OP_TOALTSTACK OP_TOALTSTACK'
                                   ' OP_ADD OP_ROT OP_ADD')
 # Zero stays a one-byte false flag, which the countdown consumes before any arithmetic.
-MESSAGE_RAW_NIBBLES = asm('OP_DUP OP_15 OP_AND OP_TOALTSTACK OP_4 OP_RSHIFT OP_TOALTSTACK')
+MESSAGE_NIBBLE_SPLIT = asm('OP_DUP OP_15 OP_AND OP_TOALTSTACK OP_4 OP_RSHIFT')
+MESSAGE_RAW_NIBBLES = MESSAGE_NIBBLE_SPLIT + asm('OP_TOALTSTACK')
+# Leave the remaining digest and the low nibble on altstack, with the high nibble on main.
+MESSAGE_PAIR_DECODE = asm('OP_1 OP_SPLIT OP_TOALTSTACK') + MESSAGE_NIBBLE_SPLIT
 # For indexes over 16, a length-based split costs the same as a literal and repeats exactly.
 MESSAGE_WIDE_SPLIT = asm('OP_SIZE OP_1SUB OP_SPLIT') + MESSAGE_RAW_NIBBLES
 MESSAGE_WIDE_SPLITS = N - 17
@@ -37,6 +40,7 @@ NIBBLE_SUFFIXES = {
     'compact-v8': MESSAGE_PAIRED_NIBBLE_SUFFIX,
     'compact-v9': MESSAGE_RAW_NIBBLES,
 }
+FIRST_ADDRESS_NORMALIZED_PROFILES = (*NIBBLE_SUFFIXES, 'compact-v10')
 # Twelve table entries above the delta keep its update at an OP_16 pick.
 DELTA_TABLE_OFFSET = 3
 
@@ -55,7 +59,7 @@ def _message_digits(*, step_counts=False, byte_suffix=MESSAGE_BYTE_SUFFIX):
     return bytes(code)
 
 
-def _packed_message_digits():
+def _packed_digest_checksum(*, fold_by_division=False):
     # Sum complemented nibbles without carries into neighboring bytes.
     # Preserve the digest below the working copy for the countdown flags.
     double = asm('OP_DUP OP_CAT')
@@ -63,11 +67,21 @@ def _packed_message_digits():
     even_mask = push(b'\xff\x00') + double * 4
     code = asm('OP_INVERT OP_DUP') + nibble_mask
     code += asm('OP_2DUP OP_AND OP_BIN2NUM OP_ROT OP_4 OP_RSHIFT OP_ROT OP_AND OP_BIN2NUM OP_ADD')
-    code += number(N) + asm('OP_NUM2BIN') + even_mask
     # Pair adjacent byte sums into 16-bit lanes. The total is at most 960,
     # and each power of 2**16 is congruent to one modulo 0xffff.
-    code += asm('OP_2DUP OP_AND OP_BIN2NUM OP_ROT OP_8 OP_LSHIFT OP_ROT OP_AND OP_BIN2NUM OP_ADD')
-    code += number(0xffff) + asm('OP_MOD OP_SWAP')
+    if fold_by_division:
+        # Dividing the little-endian number by 256 shifts each odd byte into
+        # its adjacent even byte. No byte sum can carry into its neighbor.
+        code += asm('OP_DUP 256 OP_DIV OP_ADD') + number(N) + asm('OP_NUM2BIN') + even_mask
+        code += asm('OP_AND OP_BIN2NUM')
+    else:
+        code += number(N) + asm('OP_NUM2BIN') + even_mask
+        code += asm('OP_2DUP OP_AND OP_BIN2NUM OP_ROT OP_8 OP_LSHIFT OP_ROT OP_AND OP_BIN2NUM OP_ADD')
+    return code + number(0xffff) + asm('OP_MOD OP_SWAP')
+
+
+def _packed_message_digits():
+    code = _packed_digest_checksum()
     code += MESSAGE_WIDE_SPLIT * MESSAGE_WIDE_SPLITS
     for index in reversed(range(1, N - MESSAGE_WIDE_SPLITS)):
         code += number(index) + asm('OP_SPLIT') + MESSAGE_RAW_NIBBLES
@@ -75,6 +89,8 @@ def _packed_message_digits():
 
 
 def _buffered_message_digits(profile):
+    if profile == 'compact-v10':
+        return _packed_digest_checksum(fold_by_division=True) + asm('OP_TOALTSTACK')
     if profile == 'compact-v9':
         return _packed_message_digits()
     return _message_digits(step_counts=True, byte_suffix=NIBBLE_SUFFIXES.get(profile, MESSAGE_BYTE_SUFFIX))
@@ -118,7 +134,7 @@ def _compact_builder():
 
 @cache
 def _compact_chain(profile='compact'):
-    if profile == 'compact-v9':
+    if profile in ('compact-v9', 'compact-v10'):
         return _compact_chain('compact-v8')
 
     builder = _compact_builder()
@@ -152,15 +168,28 @@ def _compact_chain(profile='compact'):
 
 def _first_address_offset(chain, profile):
     suffix = 'compact-v8-chain-tail' if profile in MAIN_BUFFER_PROFILES else 'compact-address-increment'
-    return len(chain) - len(_compact_builder().emit(suffix, b''))
+    offset = len(chain) - len(_compact_builder().emit(suffix, b''))
+    if profile == 'compact-v10':
+        offset += len(MESSAGE_PAIR_DECODE)
+    return offset
+
+
+def _message_pair_decode_offset():
+    return len(_compact_builder().emit('compact-buffer-read', b''))
 
 
 def _message_chains(chain, profile):
-    if profile in NIBBLE_SUFFIXES:
+    unit = chain
+    count = 2 * N
+    if profile == 'compact-v10':
+        offset = _message_pair_decode_offset()
+        unit = chain[:offset] + MESSAGE_PAIR_DECODE + chain[offset:] + chain
+        count = N
+    if profile in FIRST_ADDRESS_NORMALIZED_PROFILES:
         offset = _first_address_offset(chain, profile)
-        first = chain[:offset] + asm('OP_BIN2NUM') + chain[offset:]
-        return first + chain * (2 * N - 1)
-    return chain * (2 * N)
+        first = unit[:offset] + asm('OP_BIN2NUM') + unit[offset:]
+        return first + unit * (count - 1)
+    return unit * count
 
 
 def _checksum_digits(depth, *, step_counts=False):
@@ -211,7 +240,7 @@ def _compact_constants(public_seed, *, synthesize, carry_prefixes=False):
 def _buffered_verifier(public_seed, commitment, *, profile):
     # The buffer starts as the signature and ends as the endpoints in chain order.
     main_buffer = profile in MAIN_BUFFER_PROFILES
-    compact = profile in NIBBLE_SUFFIXES
+    compact = profile in FIRST_ADDRESS_NORMALIZED_PROFILES
     prefix = _buffered_message_digits(profile)
     if not main_buffer:
         prefix += asm('OP_SWAP OP_TOALTSTACK')
@@ -233,7 +262,10 @@ def _buffered_verifier(public_seed, commitment, *, profile):
     if main_buffer:
         prefix += number(W + 4) + asm('OP_ROLL')
     checksum = _checksum_digits(W + 4, step_counts=True)
-    if not main_buffer:
+    if profile == 'compact-v10':
+        # The paired chains have consumed the digest. Drop its empty tail.
+        checksum = asm('OP_FROMALTSTACK OP_DROP') + checksum
+    elif not main_buffer:
         checksum = asm('OP_FROMALTSTACK') + checksum + asm('OP_TOALTSTACK')
     finish = asm('OP_SIZE' if main_buffer else 'OP_FROMALTSTACK OP_SIZE') + number(SIGNATURE_BYTES)
     finish += asm('OP_NUMEQUALVERIFY OP_SHA256') + push(commitment) + asm('OP_EQUALVERIFY')
@@ -321,7 +353,8 @@ def locking_script(key, *, transaction=True, cached_constants=False):
 def _payment_script(key, *, cached_constants):
     compact = cached_constants in ('compact-v3', 'compact-v4', 'compact-v5', *BUFFERED_PROFILES)
     shape = authorization_checks(
-        ORDINARY_CODE, COMPANION_CODE, compact=compact, compact_shape=compact and cached_constants in NIBBLE_SUFFIXES,
+        ORDINARY_CODE, COMPANION_CODE, compact=compact,
+        compact_shape=cached_constants in FIRST_ADDRESS_NORMALIZED_PROFILES,
     )
     shape += asm('OP_SIZE') + number(SIGNATURE_BYTES) + asm('OP_NUMEQUALVERIFY')
     shape += asm('OP_SWAP OP_HASH256 OP_DUP OP_TOALTSTACK')

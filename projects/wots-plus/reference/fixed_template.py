@@ -76,11 +76,12 @@ def _encode_with_run(raw, suffix, fragment, count):
 def _compact_fragment_programs(first, chain, last, *, profile):
     from fourthgraph.bsv.pushtx import REVERSE32_ON_STACK
     from script import (
-        MESSAGE_BYTE_SUFFIX, MESSAGE_WIDE_SPLIT, MESSAGE_WIDE_SPLITS, NIBBLE_SUFFIXES, _compact_builder,
+        FIRST_ADDRESS_NORMALIZED_PROFILES, MESSAGE_BYTE_SUFFIX, MESSAGE_WIDE_SPLIT, MESSAGE_WIDE_SPLITS,
+        NIBBLE_SUFFIXES, _compact_builder,
     )
 
     builder = _compact_builder()
-    trim = profile in NIBBLE_SUFFIXES
+    trim = profile in FIRST_ADDRESS_NORMALIZED_PROFILES
     digit_suffix = NIBBLE_SUFFIXES.get(profile, MESSAGE_BYTE_SUFFIX)
     hash_suffix = builder.emit("compact-local-hash-pair", b"") + asm("OP_ENDIF")
     reversal = (_repeat_bytes(asm("OP_1 OP_SPLIT"), N - 1, trim=trim)
@@ -100,7 +101,8 @@ def _compact_fragment_programs(first, chain, last, *, profile):
 @cache
 def compact_pattern(profile="compact"):
     from script import (
-        BUFFERED_PROFILES, NIBBLE_SUFFIXES, _compact_chain, _first_address_offset, _message_chains, _payment_script,
+        BUFFERED_PROFILES, FIRST_ADDRESS_NORMALIZED_PROFILES, MESSAGE_PAIR_DECODE,
+        _compact_chain, _first_address_offset, _message_chains, _message_pair_decode_offset, _payment_script,
     )
 
     marker = bytes(range(KEY_BYTES))
@@ -111,15 +113,21 @@ def compact_pattern(profile="compact"):
     lead, tail = middle.split(_message_chains(chain, profile), 1)
     gap, end = tail.split(chain * (CHAINS - 2 * N), 1)
 
-    # WOTSP-SHA2_256 uses 64 message chains and three checksum chains.
-    # Keep one copy for the checksum and double the other six times.
+    # Keep a single chain for the checksum. Duplicate a chain or chain pair
+    # to fill the 64 message positions.
     if profile in ("compact-v5", *BUFFERED_PROFILES):
         first_program, chain_program, last_program = _compact_fragment_programs(first, chain, last, profile=profile)
     else:
         first_program, chain_program, last_program = map(push, (first, chain, last))
     program = first_program + push(lead) + chain_program + asm("OP_DUP")
-    program += asm("OP_DUP OP_CAT") * 6
-    if profile in NIBBLE_SUFFIXES:
+    copies = 2 * N
+    if profile == "compact-v10":
+        # Insert the byte splitter into the high-nibble chain only.
+        program += asm("OP_DUP") + number(_message_pair_decode_offset()) + asm("OP_SPLIT")
+        program += push(MESSAGE_PAIR_DECODE) + asm("OP_SWAP OP_CAT OP_CAT OP_SWAP OP_CAT")
+        copies = N
+    program += asm("OP_DUP OP_CAT") * (copies.bit_length() - 1)
+    if profile in FIRST_ADDRESS_NORMALIZED_PROFILES:
         # OP_1NEGATE pushes 0x81, the byte encoding of BIN2NUM in the lock.
         program += number(_first_address_offset(chain, profile)) + asm("OP_SPLIT OP_1NEGATE OP_SWAP OP_CAT OP_CAT")
     program += asm("OP_ROT OP_SWAP OP_CAT")

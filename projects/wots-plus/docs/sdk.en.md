@@ -2,7 +2,7 @@
 
 [简体中文](sdk.zh-CN.md) · [Developer guide](developer.en.md#sdk) · [Wallet quickstart](../../../sdk/README.md)
 
-Select `canonical` (default), `cached-constants`, `cached-steps`, `compact`, `compact-v2`, `compact-v3`, `compact-v4`, `compact-v5`, `compact-v6`, `compact-v7`, `compact-v8`, or `compact-v9`. Supply the expected 64-byte public key to recognize a receive script. The signer receives a 32-byte digest and returns a 2,144-byte signature. Persist one-time key consumption before releasing the signature, use a fresh key for change, and keep the signed transaction for retries. With Chronicle active, `compressOtda: true` enables eligible reconstructed unlocks in version-2 transactions.
+Select `canonical` (default), `cached-constants`, `cached-steps`, `compact`, `compact-v2`, `compact-v3`, `compact-v4`, `compact-v5`, `compact-v6`, `compact-v7`, `compact-v8`, `compact-v9`, or `compact-v10`. Supply the expected 64-byte public key to recognize a receive script. The signer receives a 32-byte digest and returns a 2,144-byte signature. Persist one-time key consumption before releasing the signature, use a fresh key for change, and keep the signed transaction for retries. With Chronicle active, `compressOtda: true` enables eligible reconstructed unlocks in version-2 transactions.
 
 <a name="quickstart"></a>
 
@@ -21,7 +21,7 @@ Use authenticated transaction data. Set `config.python` to the absolute path of 
 ```ts
 import { WalletClient } from "./sdk/typescript/index.ts";
 
-const wallet = new WalletClient("wots-plus", { ...config, template: "compact-v9" });
+const wallet = new WalletClient("wots-plus", { ...config, template: "compact-v10" });
 const receiveScript = wallet.createLock({ publicKey: receiveKeyHex });
 const prevout = wallet.prevoutFromFunding(fundingTxHex, fundingVout);
 const recognized = wallet.recognize({ script: prevout.script, publicKey: spendKeyHex });

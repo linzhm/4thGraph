@@ -77,16 +77,19 @@ class WotsTests(unittest.TestCase):
 
     def test_bitwise_digest_decoder_matches_for_every_byte(self):
         reference = _message_digits(step_counts=True)
-        for profile in NIBBLE_SUFFIXES:
+        for profile in (*NIBBLE_SUFFIXES, "compact-v10"):
             bitwise = _buffered_message_digits(profile)
             for value in range(256):
                 with self.subTest(profile=profile, value=value):
                     for digest in (bytes([value]) * N, bytes(value ^ index for index in range(N))):
                         stack = [b"fixture signature", digest]
                         expected_main, expected_counts = evaluate(reference, stack)
-                        main, counts = evaluate(bitwise, stack)
+                        main, alt = evaluate(bitwise, stack)
                         self.assertEqual(main, expected_main)
-                        self.assertEqual(list(map(decode_num, counts)), list(map(decode_num, expected_counts)))
+                        if profile == "compact-v10":
+                            self.assertEqual(alt, [bytes(byte ^ 255 for byte in digest)])
+                        else:
+                            self.assertEqual(list(map(decode_num, alt)), list(map(decode_num, expected_counts)))
 
     def test_compact_authorization_for_every_flag_byte(self):
         _, _, spend = mode_fixture(0x41)

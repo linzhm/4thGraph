@@ -152,9 +152,13 @@ REQUIRE BSV
     compact-buffer-append op-swap compact-address-increment
 ;
 
+: compact-buffer-read ( script -- script )
+    32 bsv-num op-split op-fromaltstack
+;
+
 : compact-v8-chain-start ( script -- script )
     ( The buffer is on the main stack between chains. Park its tail while hashing. )
-    32 bsv-num op-split op-fromaltstack op-swap op-toaltstack
+    compact-buffer-read op-swap op-toaltstack
 ;
 
 : compact-v8-chain-tail ( script -- script )
