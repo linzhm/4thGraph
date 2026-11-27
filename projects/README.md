@@ -27,6 +27,16 @@
 
 Run `bash tools/setup-workspaces.sh` from the repository root to create Git-ignored build, cache, and log directories in each project’s `workspace/`. The project homepage leads to its protocol and integration guide. Reference code, build entry points and test runners live with the project. [Install 4thGraph](../docs/install.md) · [Shared wallet SDK](../sdk/README.md) · [Showcase](../showcase/README.md)
 
+## Project README template
+
+Generate the English and Chinese introductions with the shared template. The tool creates missing READMEs and preserves existing files. It uses the current version manifest for build and verify commands and adds links to available project docs and measurements.
+
+```sh
+python3 tools/project_readme.py my-project --title "My project" --title-zh "我的项目"
+```
+
+Fill the prompts with the project’s algorithm, entry points, reproducible commands and measured results. Adapt the measurement sections to the project. Run `python3 tools/project_readme.py my-project --check` to check that both files exist and that the prompts have been filled or removed. [English template](../tools/templates/project-readme/README.md.in) · [Chinese template](../tools/templates/project-readme/README.zh-CN.md.in) · [Filled Schnorr example](p2pkh-schnorr/README.md)
+
 ## Versioned project data
 
 `versions/index.json` lists each project's versions in order. `current` selects the current version and `next` identifies the next round when its data is available. `sdk_default` records the wallet template version when the SDK uses a versioned selector.

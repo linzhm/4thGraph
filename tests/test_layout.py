@@ -4,8 +4,9 @@ import json
 import os
 from pathlib import Path
 import re
-from shutil import which
+from shutil import copy2, copytree, which
 import subprocess
+import sys
 from tempfile import TemporaryDirectory
 import unittest
 from fourthgraph.bsv.script import assemble
@@ -113,6 +114,51 @@ class LayoutTests(unittest.TestCase):
                     self.assertIn(f"]({guide}#quickstart)", (project / filename).read_text(encoding="utf-8"))
                     self.assertIn(f"](../projects/{name}/{guide}#quickstart)", shared_guide)
                     self.assertIn('<a name="quickstart"></a>', (project / guide).read_text(encoding="utf-8"))
+
+    def test_readme_scaffold_fills_missing_files_without_overwriting(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "projects").mkdir()
+            copytree(ROOT / "tools/templates", root / "tools/templates")
+            tool = root / "tools/project_readme.py"
+            copy2(ROOT / "tools/project_readme.py", tool)
+            project = root / "projects/demo"
+            english = project / "README.md"
+            chinese = project / "README.zh-CN.md"
+
+            def run(*args):
+                return subprocess.run([sys.executable, tool, "demo", *args],
+                                      cwd=root, capture_output=True, text=True)
+
+            generated = run("--title", "Example", "--title-zh", "示例")
+            self.assertEqual(generated.returncode, 0, generated.stderr)
+            self.assertTrue(english.read_text(encoding="utf-8").startswith("# Example\n"))
+            self.assertTrue(chinese.read_text(encoding="utf-8").startswith("# 示例\n"))
+            self.assertNotIn("versions/index.json", english.read_text(encoding="utf-8"))
+            self.assertIn("still contains template prompts", run("--check").stderr)
+
+            edited = "# Example\n\nPublished content.\n"
+            english.write_text(edited, encoding="utf-8")
+            chinese.unlink()
+            version = project / "versions/v1.0.0"
+            version.mkdir(parents=True)
+            (version.parent / "index.json").write_text('{"current":"1.0.0"}', encoding="utf-8")
+            (version / "manifest.json").write_text('{"build":"make build","verify":"make check"}', encoding="utf-8")
+            (version / "measurements.json").touch()
+            docs = project / "docs"
+            docs.mkdir()
+            (docs / "sdk.zh-CN.md").write_text('<a name="quickstart"></a>\n', encoding="utf-8")
+            rebuilt = run("--title-zh", "示例")
+            self.assertEqual(rebuilt.returncode, 0, rebuilt.stderr)
+            self.assertEqual(english.read_text(encoding="utf-8"), edited)
+            result = chinese.read_text(encoding="utf-8")
+            self.assertIn("versions/index.json", result)
+            self.assertIn("versions/v1.0.0/measurements.json", result)
+            self.assertIn("docs/sdk.zh-CN.md#quickstart", result)
+            self.assertIn("make build\nmake check", result)
+            chinese.write_text("# 示例\n\n已填写。\n", encoding="utf-8")
+            checked = run("--check")
+            self.assertEqual(checked.returncode, 0, checked.stderr)
 
     def check_local_links(self, root):
         for path in markdown_files(root):
