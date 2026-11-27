@@ -53,73 +53,34 @@ setup:
 sections:
   use_cases:
     en:
-      - The detached verifier covers BIP340 signer interoperability with empty and variable-length messages.
-        The payment wrapper uses the same algorithm with the 32-byte SHA256d of the current input's signing
-        preimage as the message. The BIP340 equation, the current-input binding, and funded node admission
-        have separate checks. [Payment protocol](docs/spec.en.md) · [Reproduction](#reproduce-the-checks)
-      - Two parties can use BIP327 MuSig2. The lock commits to the aggregate x-only key and verifies the
-        final BIP340 signature through the same wallet interface. The fixtures cover signing-session interruptions
-        and compare the same all-participants policy with native `CHECKMULTISIG`. [MuSig2 and native 2-of-2](docs/threshold-comparison.en.md)
-      - Each Schnorr output carries a 22,435-byte lock. With literal OTDA ALL, every input witness also carries
-        the serialized outputs, so the cost of adding an output grows with the number of inputs. The measured
-        one-input exit to ordinary P2PKH is 416 bytes under BIP143 ALL and 348 bytes under OTDA ALL for
-        both v0.16.0 and v0.17.0. The lock reduction saves bytes in the transaction that creates the Schnorr
-        UTXO. [Recorded measurements](versions/v0.17.0/measurements.json)
+      - The wallet defaults to the published v0.17.0 template. Use the SDK for receiving, spending
+        and authenticating previous outputs. [Wallet SDK](docs/sdk.en.md#quickstart) · [Version index](versions/index.json)
+      - Two participants can authorize the same lock through a BIP327 aggregate key. The external
+        signer manages the signing session. [MuSig2 and native 2-of-2](docs/threshold-comparison.en.md)
+      - The high-level 64-window Forth experiment records the current automatic build and constructor
+        replay. [OTDA measurements](docs/high-level-forth.en.md#otda-constructor) · [Optimization history](docs/high-level-forth.en.md#optimization-history)
     zh-CN:
-      - 独立验签器用空消息和变长消息检查 BIP340 签名器互操作。付款封装沿用同一算法，把当前输入签名预映像的 SHA256d 作为 32 字节消息。BIP340 验签、当前输入绑定和节点对已入金交易的接收各有独立的测试。[付款协议](docs/spec.zh-CN.md)
-        · [复现与验证](#复现方法)
-      - 两方可用 BIP327 MuSig2 共同出款。锁承诺聚合 x-only 公钥，钱包沿用同一接口提交最终 BIP340 签名。夹具覆盖签名会话中断，并与同样要求双方都签字的原生 `CHECKMULTISIG`
-        对照。[MuSig2 与原生 2-of-2](docs/threshold-comparison.zh-CN.md)
-      - 每个 Schnorr 输出携带 22,435 字节的锁。使用原样 OTDA ALL 编码时，每个输入见证还包含本笔交易的序列化输出，因此加一个输出的成本随输入数增加。v0.16.0 与 v0.17.0 在一进一出退出到普通
-        P2PKH 的实测中，BIP143 ALL 均为 416 字节，OTDA ALL 均为 348 字节。锁的缩减体现在创建 Schnorr UTXO 的交易中。[实测记录](versions/v0.17.0/measurements.json)
+      - 钱包默认使用已发布的 v0.17.0 模板。收款、花费和核验上一输出通过 SDK 完成。[钱包 SDK](docs/sdk.zh-CN.md#quickstart) · [版本目录](versions/index.json)
+      - 两方可以用 BIP327 聚合公钥共同授权同一个锁，签名会话由外部签名器管理。[MuSig2 与原生 2-of-2](docs/threshold-comparison.zh-CN.md)
+      - 高阶 Forth 实验记录 64 窗口自动构建和构造器的当前复放结果。[OTDA 实测](docs/high-level-forth.zh-CN.md#otda-constructor) · [优化历史](docs/high-level-forth.zh-CN.md#optimization-history)
   algorithm:
     en:
       - |-
-        1. Parse the BIP340 signature as `r || s`. The wallet derives the even y coordinates of the public key point `P` and nonce point `R` from public data. Script checks the ranges, parity, and the public point's curve equation.
-        2. Compute the BIP340 tagged challenge from the original `r`, public key x, and message, then reduce it modulo the group order `n` to obtain `e`.
-        3. Compute `sG − eP`, reject the point at infinity, and compare both projective coordinates with the even nonce point `R`. The coordinate witnesses let Script use field congruences for this comparison without a square root or inversion.
-      - '[BIP340 verification](https://github.com/bitcoin/bips/blob/master/bip-0340.mediawiki) · [Witness
-        and challenge checks](docs/spec.en.md) · [Forth payment example](reference/schnorr.fth) · [BIP340
-        standard-library source](../../src/fourthgraph/stdlib/bip340.fth)'
-      - '### secp256k1 arithmetic'
-      - v0.15.0 introduced a coordinate map that sends `(X:Y:Z)` to `(u²X:u³Y:Z)` with `21u⁶ = 1 mod p`.
-        It preserves the group law and maps `y² = x³ + 7` to `y² = x³ + 1/3`. The scaled curve uses simpler
-        complete addition formulas. The paired doubling kernel reduces the X coordinate once after both
-        doublings. The challenge still uses the original BIP340 coordinates. [Coordinate scaling and doubling](docs/spec.en.md#coordinate-scaling)
-      - For joint multiplication, the verifier splits `s` at bit 128 and applies the secp256k1 endomorphism
-        `φ(P) = λP` to split `k = n − e` into `k1 + λk2 ≡ k mod n`. The bounds give `|k1|, |k2| < 2¹²⁸`.
-        The verifier accumulates the four components in 64 two-bit windows. v0.16.0 reuses two GLV lattice
-        constants during rounding and reconstruction, and passes the group order from challenge reduction
-        to the split. [Joint multiplication and bound](docs/spec.en.md#joint-scalar-multiplication) ·
-        [Reusable kernels](../../src/fourthgraph/stdlib/secp256k1.fth)
-      - v0.17.0 applies the point-at-infinity identity in the first window. When the variable selector is
-        nonzero, the verifier loads that projective point directly into the accumulator. With a zero
-        selector it keeps infinity. The fixed point uses complete affine addition when selected.
-        [First window](docs/spec.en.md#joint-scalar-multiplication)
-      - The same kernels apply to Script paths that explicitly multiply secp256k1 points by runtime scalars.
-        The current PELS Counter uses fixed public parameters `d = k = 1` for transaction binding. With
-        the candidate preimage digest `H` and the fixed generator coordinate `r`, Script computes `s =
-        (H + r) mod n`, applies low-S normalization, encodes DER, and delegates ECDSA verification to
-        native `OP_CHECKSIG`. All three PELS Counter builds produced byte-identical locks across v0.16.0
-        and v0.17.0. [PELS Counter](../pels-counter/README.md) · [Fixed-key binding](../../src/fourthgraph/bsv/pushtx.py)
+        1. Parse the BIP340 signature as `r || s` and check the coordinate bounds, even ordinates, public-point equation, and scalar bound.
+        2. Hash the original `r`, x-only public key and message with the BIP340 tag, then reduce the hash modulo the group order to obtain `e`.
+        3. Evaluate `sG − eP` with 64 two-bit windows. Require a nonzero projective Z and compare both coordinates with the even nonce point.
+      - The payment wrapper checks the public-key hash and binds the verified message to the actual input.
+        The released verifier uses coordinate scaling, paired doubling and secp256k1 GLV.
+        [Payment protocol and curve formulas](docs/spec.en.md) · [Forth payment source](reference/schnorr.fth)
+      - Contracts performing secp256k1 point arithmetic in Script can reuse these curve kernels.
+        [secp256k1 library](../../src/fourthgraph/stdlib/secp256k1.fth)
     zh-CN:
       - |-
-        1. 将 BIP340 签名读为 `r || s`。钱包用公开数据推导出公钥点 `P` 和 nonce 点 `R` 的偶数 y 坐标。脚本检查范围、奇偶性和公钥点的曲线方程。
-        2. 用原始的 `r`、公钥 x 和消息计算 BIP340 标签哈希，再对群阶 `n` 取模，得到挑战 `e`。
-        3. 计算 `sG − eP`，排除无穷远点，再用域上的同余关系将两个射影坐标与偶数 nonce 点 `R` 比对。坐标见证使脚本无需开方或求逆即可完成比较。
-      - '[BIP340 验签](https://github.com/bitcoin/bips/blob/master/bip-0340.mediawiki) · [见证与挑战校验](docs/spec.zh-CN.md)
-        · [Forth 付款示例](reference/schnorr.fth) · [BIP340 标准库源码](../../src/fourthgraph/stdlib/bip340.fth)'
-      - '### secp256k1 运算'
-      - v0.15.0 用满足 `21u⁶ = 1 mod p` 的常数，把 `(X:Y:Z)` 映射为 `(u²X:u³Y:Z)`。这个映射保持群运算，将 `y² = x³ + 7` 变为 `y²
-        = x³ + 1/3`，使完备点加公式更简洁。连续倍点内核在两次倍点后才对 X 坐标取模。挑战哈希仍使用原始 BIP340 坐标。[坐标缩放与倍点](docs/spec.zh-CN.md#坐标缩放)
-      - 联合乘法从第 128 位拆分 `s`，并用 secp256k1 自同态 `φ(P) = λP` 将 `k = n − e` 拆为满足 `k1 + λk2 ≡ k mod n` 的两个带符号分量。两者的绝对值均小于
-        `2¹²⁸`。验签器用 64 个两位窗口联合累加四个分量。v0.16.0 在舍入和重构时复用两个 GLV 格基常数，并将计算挑战时留在栈上的群阶传给分解内核。[联合乘法与上界](docs/spec.zh-CN.md#联合标量乘法)
-        · [共享曲线内核](../../src/fourthgraph/stdlib/secp256k1.fth)
-      - v0.17.0 利用无穷远点的加法单位元性质。首窗变基索引非零时直接载入选中的射影点，索引为零时保留无穷远点。固定表选中的点仍用完备仿射点加。
-        [首窗累加](docs/spec.zh-CN.md#联合标量乘法)
-      - 在脚本里需要用运行时标量计算 secp256k1 曲线点的路径可以复用这些内核。当前 PELS Counter 的交易绑定使用公开固定参数 `d = k = 1`。脚本用候选预映像的摘要
-        `H` 和生成点的固定横坐标 `r` 计算 `s = (H + r) mod n`，做 low-S 归一化和 DER 编码，再交给原生 `OP_CHECKSIG` 执行 ECDSA 验签。v0.16.0
-        与 v0.17.0 编译的三种 PELS Counter 锁均逐字节一致。[PELS Counter](../pels-counter/README.zh-CN.md) · [固定密钥交易绑定](../../src/fourthgraph/bsv/pushtx.py)
+        1. 将 BIP340 签名读为 `r || s`，检查坐标范围、纵坐标偶性、公钥点曲线方程和标量范围。
+        2. 用原始 `r`、x-only 公钥和消息计算 BIP340 标签哈希，再对群阶取模得到 `e`。
+        3. 用 64 个两位窗口计算 `sG − eP`。检查射影坐标 Z 非零，再比对偶数 nonce 点的两个坐标。
+      - 付款封装校验公钥哈希，并把已验证的消息绑定到实际输入。发布版验签器使用坐标缩放、连续倍点和 secp256k1 GLV。[付款协议与曲线公式](docs/spec.zh-CN.md) · [Forth 付款源码](reference/schnorr.fth)
+      - 在 Script 中执行 secp256k1 点运算的合约可以复用这些曲线内核。[secp256k1 库](../../src/fourthgraph/stdlib/secp256k1.fth)
   reproduction:
     en:
       - |-
@@ -136,13 +97,8 @@ sections:
         The curve tests compare scaled point operations and GLV rounding with independent references and
         replay correct and incorrect results in both engines. [Payment tests](reference/test_schnorr.py)
         · [Curve tests](../../tests/test_secp256k1_library.py)
-      - The high-level Forth experiment compares the plain binary verifier, the automatic 64-window GLV verifier,
-        and the v0.17.0 hand-tuned build. [Build and replay](docs/high-level-forth.en.md)
-        · [64-window results](docs/high-level-forth.en.md#64-window-lowering)
-        · [Joint lowering candidates](docs/high-level-forth.en.md#joint-lowering-candidates)
-        · [Dataflow iteration](docs/high-level-forth.en.md#dataflow-iteration)
-        · [Stack and model boundaries](docs/high-level-forth.en.md#stack-and-model-boundaries)
-        · [Point comparison models](docs/high-level-forth.en.md#point-comparison-models)
+      - The compiler experiment has its own commands and pinned benchmark receipts.
+        [Forth build and replay](docs/high-level-forth.en.md#replay)
     zh-CN:
       - |-
         ```sh
@@ -154,12 +110,7 @@ sections:
         OTDA 有同索引输出时的全部 12 种签名模式，使用交易版本 1 和 2。测试覆盖过时的锁定时间、ALL/NONE/SINGLE 的输出承诺、错误坐标、所有者校验、手续费平衡和 Chronicle
         激活。验签器测试覆盖两张查表及无穷远点。曲线测试用独立参考实现核对缩放点运算及 GLV 舍入，并在双引擎上复放正确和错误的结果。[付款测试](reference/test_schnorr.py)
         · [曲线测试](../../tests/test_secp256k1_library.py)
-      - 高阶 Forth 实验对比普通二进制验签器、自动编译的 64 窗口 GLV 验签器和 v0.17.0 手工版本。[构建与复放](docs/high-level-forth.zh-CN.md)
-        · [64 窗口结果](docs/high-level-forth.zh-CN.md#64-window-lowering)
-        · [联合点乘候选](docs/high-level-forth.zh-CN.md#joint-lowering-candidates)
-        · [数据流优化迭代](docs/high-level-forth.zh-CN.md#dataflow-iteration)
-        · [栈和坐标模型边界](docs/high-level-forth.zh-CN.md#stack-and-model-boundaries)
-        · [点比较的坐标模型](docs/high-level-forth.zh-CN.md#point-comparison-models)
+      - 编译实验提供单独的命令和固定的实测记录。[Forth 构建与复放](docs/high-level-forth.zh-CN.md#replay)
   script_sizes:
     en:
       - |-
@@ -182,26 +133,15 @@ sections:
         · [实测记录](versions/v0.17.0/measurements.json) · [sCrypt 对照](docs/scrypt-comparison.zh-CN.md)
   integration:
     en:
-      - |-
-        1. Create a receive lock with `createLock` using the x-only key or its HASH160. Before spending, recognize the authenticated funding output, check the outpoint and amount, and approve the destinations and fee. The SDK defaults to v0.17.0 and recognizes and spends all releases from v0.6.0 to v0.17.0.
-        2. Use `signPayment` for a single-input payment or `signInput` for a prepared transaction. The signer callback takes the supplied 32 bytes as the BIP340 message and returns the standard 64-byte signature. The SDK verifies it with libsecp256k1 and derives the two public y coordinates.
-        3. The SDK provides the approved preimage and public witness. In eligible Chronicle version-2 spends it uses a constructor when that shortens the input script. Both encodings put the same complete preimage on the stack. The lock verifies BIP340 and binds the digest to the actual input with PUSHTX and native `OP_CHECKSIG`.
-      - '[SDK quickstart](docs/sdk.en.md#quickstart) · [Payment protocol](docs/spec.en.md) · [Current-input
-        binding](../../src/fourthgraph/bsv/pushtx.py)'
-      - '### Build from Forth'
-      - Load `REQUIRE stdlib/bip340.fth` to reuse the detached verifier. The payment example composes
-        it with the ownership and input-binding checks. Run the template check above to confirm the frozen
-        lock and its layout. Use `--write` to regenerate them. [Forth source](reference/schnorr.fth) ·
-        [Version catalog](versions/index.json)
+      - Use `createLock` with the x-only key or its HASH160. Verify the funding outpoint, amount and
+        owner before approving the outputs and fee. Use `signPayment` for a single-input BIP143 ALL
+        payment or `signInput` for a prepared transaction. The signer receives a 32-byte BIP340
+        message and returns a 64-byte signature. [SDK quickstart](docs/sdk.en.md#quickstart)
+      - Load `REQUIRE stdlib/bip340.fth` for the detached verifier. The reference payment code adds
+        ownership and transaction binding. [Forth source](reference/schnorr.fth) · [Version index](versions/index.json)
     zh-CN:
-      - |-
-        1. 调用 `createLock`，用 x-only 公钥或其 HASH160 生成收款锁。花费前识别已经核验的入金输出，检查 outpoint 和金额，再批准收款输出及手续费。SDK 默认创建 v0.17.0 输出，支持识别和花费 v0.6.0 至 v0.17.0 的各版本输出。
-        2. 单输入付款用 `signPayment`，已排好输入输出的交易用 `signInput`。外部签名器将收到的 32 字节作为 BIP340 消息，返回标准 64 字节签名。SDK 用 libsecp256k1 验签并推导两个公开 y 坐标。
-        3. SDK 提供批准的预映像和公开见证。满足条件的 Chronicle 版本 2 交易在能缩短解锁脚本时使用构造器。两种编码都把相同的完整预映像放到栈上。锁验证 BIP340 签名后，通过 PUSHTX 和原生 `OP_CHECKSIG` 把摘要绑定到实际输入。
-      - '[SDK 快速上手](docs/sdk.zh-CN.md#quickstart) · [付款协议](docs/spec.zh-CN.md) · [当前输入绑定](../../src/fourthgraph/bsv/pushtx.py)'
-      - '### 从 Forth 构建'
-      - 用 `REQUIRE stdlib/bip340.fth` 加载独立验签器。付款示例将该验签词与所有者校验、当前输入绑定组合成付款锁。运行上面的模板检查命令即可核对冻结的锁及其布局，用 `--write`
-        重新生成。[Forth 源码](reference/schnorr.fth) · [版本目录](versions/index.json)
+      - 用 x-only 公钥或其 HASH160 调用 `createLock`。批准输出和手续费前，核验入金 outpoint、金额和所有者。单输入 BIP143 ALL 付款用 `signPayment`，已组装交易用 `signInput`。签名器接收 32 字节 BIP340 消息并返回 64 字节签名。[SDK 快速上手](docs/sdk.zh-CN.md#quickstart)
+      - 用 `REQUIRE stdlib/bip340.fth` 加载独立验签器。参考付款代码加入所有者校验和交易绑定。[Forth 源码](reference/schnorr.fth) · [版本目录](versions/index.json)
   transactions:
     en:
       - <a name="measured-sizes"></a>
@@ -220,7 +160,7 @@ sections:
         PYTHONPATH=src:. bash tools/verify_node.sh -- "$SCRIPT_LAB_SDK_PYTHON" -m fourthgraph.benchmark.run \
           --project p2pkh-schnorr --venvs-dir projects/p2pkh-schnorr/workspace --output projects/p2pkh-schnorr/workspace/build/benchmark
         ```
-      - For the same two-input, two-output OTDA ALL payment, the constructor reduces each unlock from
+      - For the same v0.17.0 two-input, two-output OTDA ALL payment, the constructor reduces each unlock from
         45,161 to 4,819 bytes and the transaction from 135,310 to 54,626 bytes. The reconstructed
         payment was mined on default-policy regtest. [Constructor comparison](docs/high-level-forth.en.md#otda-constructor)
       - Under BSV Node 1.2.3's default regtest policy, funding, turnover, and exit entered the mempool
@@ -229,6 +169,8 @@ sections:
         ```sh
         PYTHONPATH=src:. bash tools/verify_node.sh --profile default -- "$SCRIPT_LAB_SDK_PYTHON" -m fourthgraph.benchmark.admission \
           p2pkh-schnorr --template v0.17.0 --turnover --output projects/p2pkh-schnorr/workspace/build/admission.json
+        PYTHONPATH=src:. bash tools/verify_node.sh --profile default -- "$SCRIPT_LAB_SDK_PYTHON" -m fourthgraph.benchmark.admission \
+          p2pkh-schnorr --template v0.17.0-reconstructed --turnover --output projects/p2pkh-schnorr/workspace/build/admission-reconstructed.json
         ```
     zh-CN:
       - <a name="交易实测"></a>
@@ -244,12 +186,14 @@ sections:
         PYTHONPATH=src:. bash tools/verify_node.sh -- "$SCRIPT_LAB_SDK_PYTHON" -m fourthgraph.benchmark.run \
           --project p2pkh-schnorr --venvs-dir projects/p2pkh-schnorr/workspace --output projects/p2pkh-schnorr/workspace/build/benchmark
         ```
-      - 相同的两进两出 OTDA ALL 付款，使用构造器后每个解锁脚本从 45,161 B 降到 4,819 B，整笔交易从 135,310 B 降到 54,626 B，并在默认 regtest 策略下出块。[构造器对照](docs/high-level-forth.zh-CN.md#otda-constructor)
+      - v0.17.0 的同一笔两进两出 OTDA ALL 付款，使用构造器后每个解锁脚本从 45,161 B 降到 4,819 B，整笔交易从 135,310 B 降到 54,626 B，并在默认 regtest 策略下出块。[构造器对照](docs/high-level-forth.zh-CN.md#otda-constructor)
       - 在 BSV Node 1.2.3 的默认 regtest 策略下，两种模式的入金、周转和退出均进入内存池并出块。
       - |-
         ```sh
         PYTHONPATH=src:. bash tools/verify_node.sh --profile default -- "$SCRIPT_LAB_SDK_PYTHON" -m fourthgraph.benchmark.admission \
           p2pkh-schnorr --template v0.17.0 --turnover --output projects/p2pkh-schnorr/workspace/build/admission.json
+        PYTHONPATH=src:. bash tools/verify_node.sh --profile default -- "$SCRIPT_LAB_SDK_PYTHON" -m fourthgraph.benchmark.admission \
+          p2pkh-schnorr --template v0.17.0-reconstructed --turnover --output projects/p2pkh-schnorr/workspace/build/admission-reconstructed.json
         ```
   lifecycle:
     en:
