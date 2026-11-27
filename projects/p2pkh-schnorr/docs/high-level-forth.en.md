@@ -312,7 +312,7 @@ The tuned verifier reduces the challenge just after mapping the affine points. I
 | Shared order | 624 B | 2,939 B | 22,832 B | 56,214 B |
 | Handwritten v0.17.0 | 409 B | 2,763 B | 22,435 B | 54,626 B |
 
-Passing the order adds 8 B before the joint word and saves 31 B in its preparation. The 18,379 B window sequence is byte-identical. The 397 B gap to the handwritten lock comprises 215 B before the joint word, 176 B in preparation, and 6 B after the windows. The two mapped joint words return identical coordinates at scalar boundaries. Both engines replayed the verifier and payment cases and the eight constructor scenarios. [Measurements](../experiments/high-level/shared-order-measurements.json) · [Transaction matrix](../experiments/high-level/shared-order-matrix.json)
+At `91ac397`, passing the order adds 8 B before the joint word and saves 31 B in its preparation. The 18,379 B window sequence is byte-identical. The 397 B gap to the handwritten lock comprises 215 B before the joint word, 176 B in preparation, and 6 B after the windows. The two mapped joint words return identical coordinates at scalar boundaries. Both engines replayed the verifier and payment cases and the eight constructor scenarios. [Measurements](../experiments/high-level/shared-order-measurements.json) · [Transaction matrix](../experiments/high-level/shared-order-matrix.json)
 
 ```sh
 PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
@@ -321,4 +321,25 @@ PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
 REGTEST_CHRONICLE_HEIGHT=5 PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
   "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/experiments/high-level/window_compare.py \
   --joint-lowerings --forth-tuning --matrix-only --output workspace/schnorr-high-level/shared-order-matrix.json
+```
+
+## Scheduling named layouts with dataflow
+
+The comparison compiles the Forth at `91ac397` with the same `dataflow` profile on both sides. The compiler carries declared layout slots across calls. Each of the three variable-table rows drops from 348 B to 264 B. The outer verifier saves another 115 B. The 18,379 B window sequence is byte-identical. [Compiler tests](../../../tests/test_dataflow.py)
+
+| Build | Before the joint word | Joint preparation | Payment lock | 2×2 OTDA ALL with reconstruction |
+| --- | ---: | ---: | ---: | ---: |
+| `91ac397` | 624 B | 2,939 B | 22,832 B | 56,214 B |
+| Layout-aware dataflow | 509 B | 2,687 B | 22,465 B | 54,746 B |
+| Handwritten v0.17.0 | 409 B | 2,763 B | 22,435 B | 54,626 B |
+
+The dual-engine run covers 27 detached cases, 14 payment cases with their locktime mutations, and eight constructor scenarios. [Measurements](../experiments/high-level/layout-dataflow-measurements.json) · [Transaction matrix](../experiments/high-level/layout-dataflow-matrix.json)
+
+```sh
+PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
+  "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/experiments/high-level/window_compare.py \
+  --joint-lowerings --forth-tuning --output workspace/schnorr-high-level/layout-dataflow-measurements.json
+REGTEST_CHRONICLE_HEIGHT=5 PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
+  "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/experiments/high-level/window_compare.py \
+  --joint-lowerings --forth-tuning --matrix-only --output workspace/schnorr-high-level/layout-dataflow-matrix.json
 ```

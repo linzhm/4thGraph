@@ -330,7 +330,7 @@ REGTEST_CHRONICLE_HEIGHT=5 PYTHONPATH=src:. bash tools/verify_node.sh --profile 
 | 共用曲线阶 | 624 B | 2,939 B | 22,832 B | 56,214 B |
 | 手工 v0.17.0 | 409 B | 2,763 B | 22,435 B | 54,626 B |
 
-传递曲线阶在联合点乘调用前增加 8 B，在点乘准备中省下 31 B。18,379 B 的窗口主体逐字节相同。每锁剩余 397 B，联合点乘调用前占 215 B，准备阶段占 176 B，窗口后占 6 B。两个映射点乘词在标量边界返回相同坐标。双引擎复放覆盖验签、付款和八种构造器场景。[实测](../experiments/high-level/shared-order-measurements.json) · [交易矩阵](../experiments/high-level/shared-order-matrix.json)
+在 `91ac397` 上，传递曲线阶在联合点乘调用前增加 8 B，在点乘准备中省下 31 B。18,379 B 的窗口主体逐字节相同。每锁剩余 397 B，联合点乘调用前占 215 B，准备阶段占 176 B，窗口后占 6 B。两个映射点乘词在标量边界返回相同坐标。双引擎复放覆盖验签、付款和八种构造器场景。[实测](../experiments/high-level/shared-order-measurements.json) · [交易矩阵](../experiments/high-level/shared-order-matrix.json)
 
 ```sh
 PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
@@ -339,4 +339,27 @@ PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
 REGTEST_CHRONICLE_HEIGHT=5 PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
   "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/experiments/high-level/window_compare.py \
   --joint-lowerings --forth-tuning --matrix-only --output workspace/schnorr-high-level/shared-order-matrix.json
+```
+
+<a name="scheduling-named-layouts-with-dataflow"></a>
+
+## 让命名布局参与数据流调度
+
+对照使用 `91ac397` 的同一份 Forth 和 `dataflow` 编译配置。编译器让布局输出沿用输入值编号，使变基表三行各从 348 B 降到 264 B。外层验签再省下 115 B。18,379 B 的窗口主体逐字节相同。[编译器测试](../../../tests/test_dataflow.py)
+
+| 构建 | 联合点乘调用前 | 联合点乘准备 | 付款锁 | 两进两出 OTDA ALL，使用构造器 |
+| --- | ---: | ---: | ---: | ---: |
+| `91ac397` | 624 B | 2,939 B | 22,832 B | 56,214 B |
+| 布局参与数据流调度 | 509 B | 2,687 B | 22,465 B | 54,746 B |
+| 手工 v0.17.0 | 409 B | 2,763 B | 22,435 B | 54,626 B |
+
+双引擎复放覆盖 27 个独立验签用例、14 个付款用例及相应的锁定时间篡改用例，以及八种构造器场景。[实测](../experiments/high-level/layout-dataflow-measurements.json) · [交易矩阵](../experiments/high-level/layout-dataflow-matrix.json)
+
+```sh
+PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
+  "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/experiments/high-level/window_compare.py \
+  --joint-lowerings --forth-tuning --output workspace/schnorr-high-level/layout-dataflow-measurements.json
+REGTEST_CHRONICLE_HEIGHT=5 PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
+  "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/experiments/high-level/window_compare.py \
+  --joint-lowerings --forth-tuning --matrix-only --output workspace/schnorr-high-level/layout-dataflow-matrix.json
 ```
