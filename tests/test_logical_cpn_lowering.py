@@ -86,6 +86,7 @@ class LogicalCPNLoweringTests(unittest.TestCase):
         terminal["word"] = "decide-with-delta"
         terminal["metadata"]["witnesses"] = [{"name": "delta", "type": "u32", "visibility": "private"}]
         terminal["metadata"]["evidence"] = [{"policy": "require-zk"}]
+        terminal["metadata"]["constraints"] = [{"kind": "range", "operand": "delta", "range": "private-delta"}]
         frontend, generated = lower_linear(doc, PRIVATE_SOURCE, source_path=SOURCE_PATH)
         self.assertIn("private-witness: decide delta u32 ;", generated)
         self.assertIn("policy: decide require-zk ;", generated)
@@ -108,6 +109,7 @@ class LogicalCPNLoweringTests(unittest.TestCase):
         terminal["word"] = "decide-with-delta"
         terminal["metadata"]["witnesses"] = [{"name": "delta", "type": "u32", "visibility": "public"}]
         terminal["metadata"]["evidence"] = [{"policy": "require-proof", "assignment_disclosure": "allow"}]
+        terminal["metadata"]["constraints"] = [{"kind": "range", "operand": "delta", "range": "private-delta"}]
         frontend, generated = lower_linear(doc, PRIVATE_SOURCE, source_path=SOURCE_PATH)
         self.assertIn("witness: decide delta u32 ;", generated)
         self.assertIn("policy: decide require-proof ;", generated)
@@ -119,6 +121,39 @@ class LogicalCPNLoweringTests(unittest.TestCase):
         circuit, public = emit_stage_circuit(stage)
         self.assertEqual(public, ("route", "state", "bindLo", "bindHi", "witness0"))
         self.assertLess(circuit.index(b"signal input bindHi;"), circuit.index(b"signal input witness0;"))
+
+    def test_range_constraint_requires_actual_unconditional_check_on_the_declared_operand(self):
+        doc = document()
+        terminal = doc["transitions"][-1]
+        terminal["word"] = "decide-with-delta"
+        terminal["metadata"]["witnesses"] = [{"name": "delta", "type": "u32", "visibility": "private"}]
+        terminal["metadata"]["evidence"] = [{"policy": "require-zk"}]
+        constraint = {"kind": "range", "operand": "delta", "range": "private-delta"}
+        terminal["metadata"]["constraints"] = [constraint]
+        lower_linear(doc, PRIVATE_SOURCE, source_path=SOURCE_PATH)
+        for replacement in ({"kind": "range", "operand": "state", "range": "private-delta"},
+                            {"kind": "range", "operand": "delta", "range": "missing"},
+                            {"kind": "range", "operand": "delta", "range": "private-delta", "verify": False},
+                            "delta must be small"):
+            terminal["metadata"]["constraints"] = [replacement]
+            with self.subTest(constraint=replacement), self.assertRaises(CPNError):
+                lower_linear(doc, PRIVATE_SOURCE, source_path=SOURCE_PATH)
+        terminal["metadata"]["constraints"] = [constraint]
+        missing = PRIVATE_SOURCE.replace("check-range private-delta u32+ decide", "u32+ decide")
+        with self.assertRaisesRegex(CPNError, "must begin with the matching check-range"):
+            lower_linear(doc, missing, source_path=SOURCE_PATH)
+        changed_bounds = PRIVATE_SOURCE.replace(
+            "range: private-delta u32 1 5 ;",
+            "range: private-delta u32 1 5 ;\nrange: other-delta u32 2 5 ;",
+        ).replace("check-range private-delta", "check-range other-delta")
+        with self.assertRaisesRegex(CPNError, "must begin with the matching check-range"):
+            lower_linear(doc, changed_bounds, source_path=SOURCE_PATH)
+        conditional = PRIVATE_SOURCE.replace(
+            "check-range private-delta u32+ decide",
+            "dup #2 cell>u32 u32< IF check-range private-delta ELSE check-range private-delta THEN u32+ decide",
+        )
+        with self.assertRaisesRegex(CPNError, "must begin with the matching check-range"):
+            lower_linear(doc, conditional, source_path=SOURCE_PATH)
 
     def test_rejects_unknown_evidence_and_nonterminal_witness(self):
         for evidence in ([{"policy": "require-zk", "recursive": True}],

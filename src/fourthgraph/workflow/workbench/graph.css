@@ -68,6 +68,12 @@ main { padding: 22px 20px 34px; max-width: 1780px; margin: auto; }
 .draft-form input, .draft-form select, .draft-form textarea { width: 100%; min-width: 0; padding: 7px; border: 1px solid var(--line); border-radius: 5px; color: var(--ink); background: white; }
 .draft-form textarea { resize: vertical; font: 12px/1.45 ui-monospace, monospace; }
 .draft-form button { justify-self: start; }
+.draft-list { min-width: 0; padding: 8px; margin: 0; border: 1px solid var(--line); border-radius: 6px; }
+.draft-list legend { color: var(--muted); font-size: 13px; }
+.draft-list-row { display: flex; align-items: start; gap: 5px; margin: 0 0 5px; }
+.draft-list-row button { flex: 0 0 auto; padding: 5px; }
+.draft-advanced summary { color: var(--teal); cursor: pointer; font-size: 13px; }
+.draft-advanced label { margin-top: 6px; }
 .draft-error { color: #a12a23; font-size: 13px; overflow-wrap: anywhere; }
 .draft-edges { margin: 0; padding: 0; list-style: none; }
 .draft-edges li { display: flex; align-items: start; justify-content: space-between; gap: 8px; padding: 6px 0; border-bottom: 1px solid #edf1f4; overflow-wrap: anywhere; }

@@ -24,7 +24,9 @@ def main(argv):
     archive = commands.add_parser("inspect-cctp", help="inspect an archived CCTP 2-to-2 transaction graph")
     archive.add_argument("archive", type=Path)
     archive.add_argument("--policy", type=Path, help="require a matching recipient-policy JSON")
-    archive.add_argument("--logical", action="store_true", help="emit a logical CPN model")
+    output = archive.add_mutually_exclusive_group()
+    output.add_argument("--logical", action="store_true", help="emit a logical CPN model")
+    output.add_argument("--flow-report", action="store_true", help="check bounded archived token flow")
     verify = commands.add_parser("verify", help="check a saved receipt and rerun Script validation offline")
     verify.add_argument("receipt", type=Path)
     verify.add_argument("--report", type=Path, help="compare against the original planning or tuning report")
@@ -38,6 +40,7 @@ def main(argv):
     workbench.add_argument("--output", type=Path, required=True)
     design = commands.add_parser("design", help="create an offline editor for a new logical CPN")
     design.add_argument("--title", default="CPN draft")
+    design.add_argument("--model", type=Path, help="start from a validated logical CPN model")
     design.add_argument("--output", type=Path, required=True)
     if argv[:1] in (["plan"], ["tune"]):
         from fourthgraph.workflow.protocol import main as compiler_main
@@ -77,12 +80,15 @@ def main(argv):
             print(output)
             return
         elif args.command == "inspect-cctp":
-            from fourthgraph.workflow.cctp_archive import inspect_archive, logical_model, read_archive
+            from fourthgraph.workflow.cctp_archive import flow_report, inspect_archive, logical_model, read_archive
 
             source, digest = read_archive(args.archive)
             policy = json.loads(args.policy.read_bytes()) if args.policy else None
-            graph = inspect_archive(source, archive_sha256=digest, policy=policy)
-            report = logical_model(graph) if args.logical else graph
+            if args.flow_report:
+                report = flow_report(source, archive_sha256=digest, policy=policy)
+            else:
+                graph = inspect_archive(source, archive_sha256=digest, policy=policy)
+                report = logical_model(graph) if args.logical else graph
         elif args.command == "workbench":
             from fourthgraph.workflow.cpn_workbench import export_workbench
 
@@ -93,7 +99,7 @@ def main(argv):
         elif args.command == "design":
             from fourthgraph.workflow.cpn_workbench import export_designer
 
-            export_designer(output=args.output, title=args.title)
+            export_designer(output=args.output, title=args.title, model_file=args.model)
             print(args.output)
             return
         else:

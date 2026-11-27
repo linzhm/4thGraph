@@ -2,7 +2,8 @@
 
 import re
 
-from fourthgraph.compiler.source import CompileError, SourceCompiler
+from fourthgraph.compiler.lowering import OPTIMIZATIONS, compile_word
+from fourthgraph.compiler.source import CompileError, SourceCompiler, expanded
 from fourthgraph.workflow.logical_cpn import CPNError, parse_net
 
 IDENTIFIER = re.compile(r"[A-Za-z_][A-Za-z0-9_-]*\Z")
@@ -15,7 +16,7 @@ def _identifier(value, path):
 
 
 def _metadata(metadata, path, *, place):
-    supported = {"visibility"} if place else {"authorization", "evidence", "witnesses"}
+    supported = {"visibility"} if place else {"authorization", "constraints", "evidence", "witnesses"}
     for key, value in metadata.items():
         if key not in supported and value not in (None, [], {}):
             raise CPNError("unsupported_requirement", path + "." + key,
@@ -67,6 +68,42 @@ def _evidence(transition, path, *, terminal):
                                "assignment disclosure must be allow and compatible with the policy")
             result.append(f"assignment-disclosure: {transition.name} allow ;\n")
     return "".join(result)
+
+
+def _constraints(transition, stage, frontend, path):
+    constraints = transition.metadata.get("constraints", [])
+    if not constraints:
+        return
+    if len(constraints) != 1 or not isinstance(constraints[0], dict) or set(constraints[0]) != {
+            "kind", "operand", "range"} or constraints[0]["kind"] != "range":
+        raise CPNError("unsupported_constraint", path, "expected one structured range constraint")
+    operand = _identifier(constraints[0]["operand"], path + "[0].operand").casefold()
+    range_name = _identifier(constraints[0]["range"], path + "[0].range").casefold()
+    names = [transition.inputs[0].name.casefold(), *(name.name for name, _ in stage.witnesses)]
+    if len(names) != len(set(names)):
+        raise CPNError("unsupported_constraint", path, "input and witness names must be distinct")
+    if operand != names[-1]:
+        raise CPNError("unsupported_constraint", path + "[0].operand", "range must apply to the entry stack top")
+    bounds = frontend.ranges.get(range_name)
+    if bounds is None or bounds.base != "u32" or not 0 <= bounds.lower < bounds.upper <= 1 << 32:
+        raise CPNError("unsupported_constraint", path + "[0].range", "expected a declared u32 range")
+    first = next(expanded(stage.word.body), None)
+    if first is None:
+        raise CPNError("unsupported_constraint", path, "the transition word has no range check")
+    check, source = first
+    if (source is None or source.name != "check-range" or check.takes != ("u32",)
+            or check.gives != ("u32",) or check.checked_bounds != (bounds.lower, bounds.upper - 1)):
+        raise CPNError("unsupported_constraint", path, "transition must begin with the matching check-range")
+    for optimization in OPTIMIZATIONS:
+        if check.code not in compile_word(stage.word, optimization).script:
+            raise CPNError("unsupported_constraint", path, f"range check is absent under {optimization}")
+    if stage.policy != "allow-direct" or stage.witnesses:
+        from fourthgraph.verification.circuit_backend import emit_stage_circuit
+
+        try:
+            emit_stage_circuit(stage)
+        except CompileError as error:
+            raise CPNError("unsupported_constraint", path, f"proof circuit cannot lower the check: {error}") from error
 
 
 def lower_linear(document, source, *, source_path=None):
@@ -147,7 +184,9 @@ def lower_linear(document, source, *, source_path=None):
         generated += "".join(_evidence(item, positions[item.name] + ".metadata", terminal=item is ordered[-1])
                              for item in ordered)
         lowered = SourceCompiler(generated, source_path=source_path)
-        lowered.workflow()
+        workflow = lowered.workflow()
+        for transition, stage in zip(ordered, workflow.stages, strict=True):
+            _constraints(transition, stage, lowered, positions[transition.name] + ".metadata.constraints")
     except CompileError as error:
         raise CPNError("source_type_error", "$.source", str(error)) from error
     return lowered, generated

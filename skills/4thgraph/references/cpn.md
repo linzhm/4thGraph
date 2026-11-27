@@ -26,6 +26,8 @@ cp projects/proof-counter/{cpn-linear.json,cpn-words.fth,counter.fth} workspace/
 
 On the terminal transition, `metadata.witnesses` accepts objects with `name`, `type: "u32"` and `visibility: "public"` or `"private"`. For example, `"witnesses": [{"name":"delta","type":"u32","visibility":"private"}]` together with `"evidence": [{"policy":"require-zk"}]` lowers to the corresponding Forth declarations. The word must accept state followed by the declared witnesses. Supply matching circuit setup through the backend catalog. For public assignments, an evidence object can set `"assignment_disclosure":"allow"` under a compatible policy. The planner still checks each candidate.
 
+A transition can also declare one structured range constraint such as `{"kind":"range","operand":"delta","range":"private-delta"}`. The named `u32` range must exist in the Forth source, the operand must be the top item on entry, and the word must begin with its matching `check-range`. The compiler checks that the selected Script and applicable circuit lower that check. Other constraints require their own lowering.
+
 The existing CCTP archive can supply a second, historical input. In a checkout containing commit `11c919a`, run the commands below and import the generated model into the editor. The inspector checks serialized transaction identities, slots, token template and reported token quantities. Its logical boundary marking describes the archived subgraph. Script execution, issuance authorization, block inclusion and current UTXO status require their own evidence.
 
 ```sh
@@ -33,6 +35,8 @@ mkdir -p workspace/cpn-dev
 git show 11c919a:projects/spv-token/fixtures/covenant-backtrace-2x2-regtest.json.xz > workspace/cpn-dev/cctp.json.xz
 4thgraph cpn inspect-cctp workspace/cpn-dev/cctp.json.xz --logical > workspace/cpn-dev/cctp-model.json
 4thgraph cpn check-model workspace/cpn-dev/cctp-model.json > workspace/cpn-dev/cctp-analysis.json
+4thgraph cpn inspect-cctp workspace/cpn-dev/cctp.json.xz --flow-report > workspace/cpn-dev/cctp-flow.json
+4thgraph cpn design --model workspace/cpn-dev/cctp-model.json --output workspace/cpn-dev/cctp.html
 ```
 
 With the regtest dependencies below and Node.js installed, run `bash tools/cpn_demo.sh` from the checkout root and open `workspace/cpn-demo/index.html`. The command compiles one Forth source, funds and verifies three paths, and creates a self-contained HTML file. It leaves the source, catalog, original report and replay receipts in the same directory.

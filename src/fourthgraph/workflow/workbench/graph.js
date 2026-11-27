@@ -19,6 +19,10 @@ const en = [
   "Import failed", "Name must be unique and nonempty.", "Select a node to edit.", "Inputs or outputs must reference a Place.",
   "Metadata is descriptive and has not been checked.", "Initial marking", "Select a Place", "New draft",
   "Incomplete models can be saved. Run the CPN checker before use.",
+  "Visibility", "State carrier", "Forth code", "Constraints", "Signature roles", "External witnesses",
+  "Evidence", "Proof policy", "Recursive requirements", "Add item", "Remove item", "Advanced metadata JSON",
+  "Declarations are draft data and are not yet linked to generated transaction checks.",
+  "The structured field and JSON were changed differently", "Structured item must be a JSON object.",
   "Design a CPN", "Model nodes", "No matching nodes.",
 ];
 const zh = [
@@ -38,6 +42,10 @@ const zh = [
   "导入失败", "名称必须非空且不重复。", "选择节点以编辑。", "输入或输出需要关联 Place。",
   "元信息仅用于描述，尚未验证。", "初始标记", "选择 Place", "新建草稿",
   "未完成的模型也可以保存，使用前请运行 CPN 检查器。",
+  "可见性", "状态载体", "Forth 代码", "约束", "签名角色", "外部见证",
+  "证明证据", "证明策略", "递归要求", "添加条目", "移除条目", "高级元信息 JSON",
+  "这些声明是草稿数据，尚未连接到生成的交易检查。",
+  "结构化字段和 JSON 的修改不一致", "结构化条目必须是 JSON 对象。",
   "设计 CPN", "模型节点", "没有符合条件的节点。",
 ];
 let lang = "en";
@@ -45,7 +53,7 @@ let filter = "all";
 let view = model.editor_start ? "draft" : "logical";
 let selected = model.selected ?? model.candidates[0]?.id ?? null;
 let activeNode = null;
-let draft = {schema_version: 1, places: [], transitions: []};
+let draft = model.draft ?? {schema_version: 1, places: [], transitions: []};
 let draftError = "";
 const $ = id => document.getElementById(id);
 const label = index => (lang === "en" ? en : zh)[index];
@@ -261,6 +269,7 @@ function renderGraph(focus = false) {
   }
   const {width, height, nodes, edges} = geometry;
   const plot = svg("svg", {viewBox: "0 0 " + width + " " + height, "aria-label": label(7)});
+  plot.style.minWidth = Math.max(590, width) + "px";
   const defs = svg("defs", {});
   const marker = svg("marker", {id: "arrow", viewBox: "0 0 10 10", refX: 8, refY: 5, markerWidth: 6,
     markerHeight: 6, orient: "auto"});
@@ -416,6 +425,61 @@ function field(form, name, value, type = "text") {
   return input;
 }
 
+function textArea(form, name, value) {
+  const wrap = element("label", name);
+  const input = element("textarea");
+  input.rows = 3;
+  input.value = value ?? "";
+  wrap.append(input);
+  form.append(wrap);
+  return input;
+}
+
+function metadataList(form, title, values) {
+  const section = element("fieldset", undefined, "draft-list");
+  section.append(element("legend", title));
+  const rows = element("div");
+  section.append(rows);
+  const append = value => {
+    const row = element("div", undefined, "draft-list-row");
+    const structured = typeof value === "object";
+    const input = element("textarea");
+    input.value = structured ? JSON.stringify(value, null, 2) : value;
+    input.setAttribute("aria-label", title);
+    input.dataset.structured = structured ? "true" : "false";
+    input.rows = structured ? 3 : 2;
+    row.append(input, draftButton(label(99), () => row.remove()));
+    rows.append(row);
+  };
+  if (Array.isArray(values)) values.forEach(append);
+  section.append(draftButton(label(98), () => append("")));
+  form.append(section);
+  return () => [...rows.querySelectorAll("input, textarea")].map(input => {
+    if (input.dataset.structured === "true") {
+      const object = JSON.parse(input.value);
+      if (!object || typeof object !== "object" || Array.isArray(object)) throw new Error(label(103));
+      return object;
+    }
+    if (!input.value.trim()) throw new Error(title);
+    return input.value;
+  });
+}
+
+function mergeDraftMetadata(raw, original, changes) {
+  const result = JSON.parse(raw);
+  if (!result || typeof result !== "object" || Array.isArray(result)) throw new Error(label(79));
+  for (const [key, next, before] of changes) {
+    const serialized = JSON.stringify;
+    if (serialized(next) === serialized(before)) continue;
+    if (serialized(result[key]) !== serialized(original[key]) && serialized(result[key]) !== serialized(next)) {
+      throw new Error(label(102) + ": " + key);
+    }
+    if (next === "") delete result[key];
+    else result[key] = next;
+  }
+  return result;
+}
+
 function draftButton(text, action) {
   const button = element("button", text);
   button.type = "button";
@@ -477,20 +541,65 @@ function draftInspector(panel) {
   const initial = isPlace ? field(form, label(68), item.initial ?? 0, "number") : null;
   const capacity = isPlace ? field(form, label(69), item.capacity, "number") : null;
   const word = !isPlace ? field(form, label(70), item.word) : null;
+  const original = item.metadata ?? {};
+  const edits = [];
+  const textEdit = (key, title, multiline = false) => {
+    const before = typeof original[key] === "string" ? original[key] : "";
+    const input = multiline ? textArea(form, title, before) : field(form, title, before);
+    edits.push(() => [key, input.value, before]);
+  };
+  const listEdit = (key, title) => {
+    const before = Array.isArray(original[key]) ? original[key] : [];
+    const read = metadataList(form, title, before);
+    edits.push(() => [key, read(), before]);
+  };
+  if (isPlace) {
+    textEdit("visibility", label(89));
+    textEdit("carrier", label(90));
+  } else {
+    textEdit("forth_source", label(91), true);
+    listEdit("constraints", label(92));
+    listEdit("authorization", label(93));
+    listEdit("witnesses", label(94));
+    listEdit("evidence", label(95));
+    textEdit("recursive_requirements", label(97), true);
+  }
+  const policyBefore = !isPlace && Array.isArray(original.evidence)
+    ? original.evidence.find(entry => entry && typeof entry === "object" && typeof entry.policy === "string")?.policy ?? ""
+    : "";
+  const policy = !isPlace ? field(form, label(96), policyBefore) : null;
   const metadataLabel = element("label", label(79));
   const metadata = element("textarea");
   metadata.rows = 5;
-  metadata.value = JSON.stringify(item.metadata ?? {}, null, 2);
+  metadata.value = JSON.stringify(original, null, 2);
   metadataLabel.append(metadata);
-  form.append(metadataLabel, element("small", label(84), "hint"));
+  const advanced = element("details", undefined, "draft-advanced");
+  advanced.append(element("summary", label(100)), metadataLabel);
+  form.append(advanced, element("small", label(101), "hint"));
+  const errorMessage = element("p", "", "draft-error");
+  errorMessage.setAttribute("role", "alert");
+  form.append(errorMessage);
   const submit = element("button", label(71));
   submit.type = "submit";
   form.append(submit);
   form.addEventListener("submit", event => {
     event.preventDefault();
     try {
-      const value = JSON.parse(metadata.value);
-      if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error(label(79));
+      const value = mergeDraftMetadata(metadata.value, original, edits.map(read => read()));
+      if (policy && policy.value !== policyBefore) {
+        if (value.evidence !== undefined && !Array.isArray(value.evidence)) throw new Error(label(95));
+        const evidence = value.evidence ?? [];
+        const index = evidence.findIndex(entry => entry && typeof entry === "object" &&
+          !Array.isArray(entry) && typeof entry.policy === "string");
+        if (index >= 0) {
+          const entry = {...evidence[index]};
+          if (policy.value.trim()) entry.policy = policy.value.trim();
+          else delete entry.policy;
+          if (Object.keys(entry).length) evidence[index] = entry;
+          else evidence.splice(index, 1);
+        } else if (policy.value.trim()) evidence.push({policy: policy.value.trim()});
+        if (evidence.length || value.evidence !== undefined) value.evidence = evidence;
+      }
       const nextName = name.value.trim();
       const collection = isPlace ? draft.places : draft.transitions;
       if (!nextName || collection.some(other => other !== item && other.name === nextName)) throw new Error(label(81));
@@ -515,7 +624,7 @@ function draftInspector(panel) {
       render();
     } catch (error) {
       draftError = error.message;
-      draftInspector(panel);
+      errorMessage.textContent = error.message;
     }
   });
   panel.append(form);
@@ -663,7 +772,7 @@ function renderCandidates() {
       ...draft.places.map(item => ({kind: "place", item})),
       ...draft.transitions.map(item => ({kind: "transition", item})),
     ].filter(({item}) => item.name.toLowerCase().includes(query));
-    if (!items.length) list.append(element("li", label(91), "empty"));
+    if (!items.length) list.append(element("li", label(106), "empty"));
     for (const {kind, item} of items) {
       const li = element("li"), button = element("button", undefined, "candidate");
       const identity = "draft:" + kind + ":" + item.name;
@@ -729,8 +838,8 @@ function render() {
     $(id).textContent = label(value);
   }
   if (view === "draft") {
-    $("heading").textContent = label(89);
-    $("rail-title").textContent = label(90);
+    $("heading").textContent = label(104);
+    $("rail-title").textContent = label(105);
   }
   $("stats").hidden = view === "draft";
   $("filters").hidden = view === "draft";

@@ -126,10 +126,14 @@ def export_workbench(report_file, receipt_files, *, output, title, selected=None
     write_workbench(payload, output)
 
 
-def export_designer(*, output, title):
+def export_designer(*, output, title, model_file=None):
     """Open a fresh logical CPN draft without inventing a compiled report."""
     payload = {"title": title, "current": None, "sighash": "", "selected": None,
                "candidates": [], "packages": {}, "report": None, "words": {}, "editor_start": True}
+    if model_file is not None:
+        from fourthgraph.workflow.logical_cpn import parse_net
+
+        payload["draft"] = parse_net(json.loads(model_file.read_bytes())).describe()
     write_workbench(payload, output)
 
 

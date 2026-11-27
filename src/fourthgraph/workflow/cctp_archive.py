@@ -149,7 +149,8 @@ def inspect_archive(archive, *, archive_sha256=None, policy=None):
                    "verifier_funding": funding.txid(), "verifier_lock_sha256": policy["verifier_lock_sha256"],
                    "verifying_key_sha256": policy["verifying_key_sha256"]},
         "validation": {"transaction_hashes_and_slots": "checked", "token_template": "marker and common bytes matched",
-                       "script_execution": "not checked", "block_inclusion": "not checked", "unspent_status": "not checked",
+                       "transaction_signatures": "not checked", "script_execution": "not checked",
+                       "block_inclusion": "not checked", "unspent_status": "not checked",
                        "issuance_authorization": "policy asserted by archive or caller"},
         "places": list(places.values()), "transitions": transitions, "edges": edges,
     }
@@ -193,19 +194,100 @@ def logical_model(graph):
     return result["model"]
 
 
+def flow_report(archive, *, archive_sha256=None, policy=None):
+    """Check token quantities and outpoint handoff in the bounded archive graph.
+
+    The graph starts at its explicitly recorded boundary and follows the five
+    archived transactions in order. This checks the bytes and the selected
+    subgraph, without claiming chain validity or the current UTXO set.
+    """
+    graph = inspect_archive(archive, archive_sha256=archive_sha256, policy=policy)
+    model = logical_model(graph)
+    places = {place["name"]: place for place in model["places"]}
+    live = {name for name, place in places.items() if place["initial"]}
+    boundary = sorted(live)
+    produced_by = {}
+    steps, handoffs = [], []
+    issued = 0
+
+    def port_state(port):
+        place = places[port["place"]]
+        state = {"port": port["name"], "outpoint": port["place"], "kind": place["type"],
+                 "satoshis": place["metadata"]["satoshis"],
+                 "script_sha256": place["metadata"]["script_sha256"]}
+        if "token" in place["metadata"]:
+            state.update(place["metadata"]["token"])
+        return state
+
+    for transition in model["transitions"]:
+        consumed = [arc["place"] for arc in transition["inputs"]]
+        created = [arc["place"] for arc in transition["outputs"]]
+        if any(point not in live for point in consumed):
+            raise ValueError(f"{transition['name']}: input is missing or already consumed in this archive")
+        if any(point in live or point in produced_by for point in created):
+            raise ValueError(f"{transition['name']}: output repeats an archive outpoint")
+        inputs, outputs = ([port_state(arc) for arc in side]
+                           for side in (transition["inputs"], transition["outputs"]))
+        token_inputs = [item for item in inputs if item["kind"] == "token"]
+        token_outputs = [item for item in outputs if item["kind"] == "token"]
+        incoming = sum(item["quantity"] for item in token_inputs)
+        outgoing = sum(item["quantity"] for item in token_outputs)
+        is_transfer = transition["metadata"]["kind"] == "transfer"
+        if is_transfer and (len(token_inputs) != 2 or len(token_outputs) != 2 or incoming != outgoing):
+            raise ValueError(f"{transition['name']}: archived 2-to-2 token quantities do not balance")
+        if not is_transfer:
+            issued += outgoing
+        for item in token_inputs:
+            predecessor = produced_by.get(item["outpoint"])
+            if predecessor is not None:
+                handoffs.append({"outpoint": item["outpoint"], "from": predecessor, "to": transition["name"],
+                                 "input_port": item["port"], "quantity": item["quantity"],
+                                 "owner_compressed": item["owner_compressed"]})
+        live.difference_update(consumed)
+        live.update(created)
+        produced_by.update({point: transition["name"] for point in created})
+        steps.append({"name": transition["name"], "kind": transition["metadata"]["kind"],
+                      "txid": transition["metadata"]["actual_txid"], "inputs": inputs, "outputs": outputs,
+                      "token_in": incoming, "token_out": outgoing,
+                      "conservation": "checked" if is_transfer else "issuance"})
+
+    remaining = [places[point] for point in sorted(live) if places[point]["type"] == "token"]
+    remaining_quantity = sum(place["metadata"]["token"]["quantity"] for place in remaining)
+    if issued != remaining_quantity:
+        raise ValueError("selected archive graph does not conserve the issued token quantity")
+    return {
+        "schema_version": 1, "scope": "selected five archive transactions in order",
+        "source": graph["source"], "validation": graph["validation"],
+        "boundary": {"initial_outpoints": boundary,
+                     "meaning": "selected graph inputs; current unspent status is not checked"},
+        "steps": steps, "handoffs": handoffs,
+        "invariants": {"issuance_slot_quantities": list(ISSUANCE_AMOUNTS),
+                       "issued_token_quantity": issued, "remaining_token_quantity": remaining_quantity,
+                       "conserved_within_selected_graph": True,
+                       "unique_consumption_within_selected_graph": True},
+        "remaining_outputs": [{"outpoint": place["name"], "satoshis": place["metadata"]["satoshis"],
+                               **place["metadata"]["token"]} for place in remaining],
+    }
+
+
 def main():
     cli = argparse.ArgumentParser(description=__doc__)
     cli.add_argument("archive", type=Path, help="CCTP covenant-backtrace-2x2-regtest.json.xz or decoded JSON")
     cli.add_argument("--policy", type=Path, help="require an independently supplied recipient-policy JSON")
-    cli.add_argument("--logical", action="store_true", help="emit the typed logical CPN schema")
+    output = cli.add_mutually_exclusive_group()
+    output.add_argument("--logical", action="store_true", help="emit the typed logical CPN schema")
+    output.add_argument("--flow-report", action="store_true", help="emit the bounded token flow and invariants")
     cli.add_argument("--output", type=Path, required=True)
     args = cli.parse_args()
     try:
         archive, digest = read_archive(args.archive)
         policy = json.loads(args.policy.read_text()) if args.policy else None
-        graph = inspect_archive(archive, archive_sha256=digest, policy=policy)
-        if args.logical:
-            graph = logical_model(graph)
+        if args.flow_report:
+            graph = flow_report(archive, archive_sha256=digest, policy=policy)
+        else:
+            graph = inspect_archive(archive, archive_sha256=digest, policy=policy)
+            if args.logical:
+                graph = logical_model(graph)
         args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(json.dumps(graph, indent=2) + "\n")
     except (KeyError, IndexError, OSError, TypeError, ValueError, lzma.LZMAError) as error:

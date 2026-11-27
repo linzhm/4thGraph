@@ -5,7 +5,7 @@ from hashlib import sha256
 import unittest
 
 from fourthgraph.bsv.transaction import Input, Output, Transaction
-from fourthgraph.workflow.cctp_archive import OWNER_PREFIX, TOKEN_PREFIX, inspect_archive, logical_model
+from fourthgraph.workflow.cctp_archive import OWNER_PREFIX, TOKEN_PREFIX, flow_report, inspect_archive, logical_model
 from fourthgraph.workflow.logical_cpn import analyze, parse_net, validate_document
 
 
@@ -77,6 +77,39 @@ class ArchiveGraphTests(unittest.TestCase):
         self.assertEqual(by_name[first["inputs"][0]["place"]]["initial"], 1)
         self.assertEqual(by_name[handed_over]["metadata"]["archive_validation"]["script_execution"], "not checked")
         self.assertEqual(analyze(parse_net(document))["never_enabled"], [])
+
+    def test_bounded_flow_tracks_amount_owner_ports_and_real_handoff(self):
+        report = flow_report(fixture())
+        first, second = report["steps"][-2:]
+        self.assertEqual([item["port"] for item in first["inputs"]], ["vin:0", "vin:1", "vin:2"])
+        self.assertEqual([item["port"] for item in first["outputs"]], ["vout:0", "vout:1"])
+        self.assertEqual([item["quantity"] for item in first["inputs"][1:]], [300, 200])
+        self.assertEqual([item["quantity"] for item in first["outputs"]], [275, 225])
+        self.assertEqual([item["quantity"] for item in second["inputs"][1:]], [275, 150])
+        self.assertEqual([item["quantity"] for item in second["outputs"]], [350, 75])
+        self.assertEqual(first["outputs"][0]["outpoint"], second["inputs"][1]["outpoint"])
+        self.assertEqual(first["outputs"][0]["owner_compressed"], second["inputs"][1]["owner_compressed"])
+        self.assertEqual(first["outputs"][0]["satoshis"], 1000)
+        self.assertEqual(report["invariants"]["issued_token_quantity"], 650)
+        self.assertEqual(report["invariants"]["remaining_token_quantity"], 650)
+        self.assertIn({"outpoint": first["outputs"][0]["outpoint"], "from": first["name"], "to": second["name"],
+                       "input_port": "vin:1", "quantity": 275,
+                       "owner_compressed": first["outputs"][0]["owner_compressed"]}, report["handoffs"])
+        self.assertEqual(report["validation"]["transaction_signatures"], "not checked")
+        self.assertEqual(report["validation"]["script_execution"], "not checked")
+
+    def test_bounded_flow_rejects_inflation_after_transaction_rehash(self):
+        archive = fixture()
+        record = archive["summary"]["transactions"]["alice-to-bob"]
+        original = Transaction.parse(bytes.fromhex(archive["transactions"][record["txid"]]))
+        output = original.outputs[0]
+        pos = len(TOKEN_PREFIX)
+        changed = output.script[:pos] + (276).to_bytes(8, "little") + output.script[pos + 8:]
+        bad = replace(original, outputs=(replace(output, script=changed), original.outputs[1]))
+        record.update(txid=bad.txid(), bytes=len(bad.serialize()))
+        archive["transactions"][bad.txid()] = bad.serialize().hex()
+        with self.assertRaisesRegex(ValueError, "token quantities do not balance"):
+            flow_report(archive)
 
     def test_forged_vout_is_rejected_after_rehash(self):
         archive = fixture()

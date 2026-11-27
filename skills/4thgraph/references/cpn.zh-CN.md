@@ -26,6 +26,8 @@ cp projects/proof-counter/{cpn-linear.json,cpn-words.fth,counter.fth} workspace/
 
 末段迁移的 `metadata.witnesses` 可声明 `name`、`type: "u32"` 及 `visibility: "public"` 或 `"private"`。例如 `"witnesses": [{"name":"delta","type":"u32","visibility":"private"}]` 搭配 `"evidence": [{"policy":"require-zk"}]` 会生成对应的 Forth 声明。计算词按顺序接收状态和声明的见证。匹配电路的设置通过后端目录提供。允许公开赋值时，可在兼容的策略中设置 `"assignment_disclosure":"allow"`。规划器仍会逐项检查候选。
 
+迁移也可声明一条结构化范围约束，例如 `{"kind":"range","operand":"delta","range":"private-delta"}`。Forth 源码须声明对应的 `u32` 范围，该操作数须位于入口栈顶，计算词须以匹配的 `check-range` 开始。编译器核对所选 Script 和适用电路包含该检查。其他约束需要各自的降级实现。
+
 已有 CCTP 归档提供了另一组历史输入。在包含提交 `11c919a` 的检出中运行下列命令，再把生成的模型导入编辑器。检查器核对序列化交易标识、槽位、Token 模板和所记录数量。逻辑模型的初始标记描述归档子图的边界。Script 执行、发行授权、区块包含和当前 UTXO 状态需要各自的证据。
 
 ```sh
@@ -33,6 +35,8 @@ mkdir -p workspace/cpn-dev
 git show 11c919a:projects/spv-token/fixtures/covenant-backtrace-2x2-regtest.json.xz > workspace/cpn-dev/cctp.json.xz
 4thgraph cpn inspect-cctp workspace/cpn-dev/cctp.json.xz --logical > workspace/cpn-dev/cctp-model.json
 4thgraph cpn check-model workspace/cpn-dev/cctp-model.json > workspace/cpn-dev/cctp-analysis.json
+4thgraph cpn inspect-cctp workspace/cpn-dev/cctp.json.xz --flow-report > workspace/cpn-dev/cctp-flow.json
+4thgraph cpn design --model workspace/cpn-dev/cctp-model.json --output workspace/cpn-dev/cctp.html
 ```
 
 装好下文的 regtest 依赖与 Node.js 后，从仓库根目录运行 `bash tools/cpn_demo.sh`，打开 `workspace/cpn-demo/index.html`。这条命令用同一份 Forth 编译、入金并验证三条路径，生成可单独离线打开的 HTML。源码、后端目录、原始报告和复放回执留在同一目录。
