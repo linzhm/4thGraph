@@ -55,7 +55,8 @@ def components(_samples):
         ("v0.5.0", _VerifierVersion.V05, _historical_forth_lock(payment_key, version=_VerifierVersion.V05)),
         ("v0.6.0", _VerifierVersion.V06, _historical_forth_lock(payment_key, version=_VerifierVersion.V06)),
         ("v0.7.0", _VerifierVersion.V07, _historical_forth_lock(payment_key, version=_VerifierVersion.V07)),
-        ("optimized", _VerifierVersion.V08, locking_script(payment_key)),
+        ("v0.8.0", _VerifierVersion.V08, _historical_forth_lock(payment_key, version=_VerifierVersion.V08)),
+        ("optimized", _VerifierVersion.V09, locking_script(payment_key)),
     )
     payment_sizes = {}
     for label, version, lock in profiles:
@@ -84,7 +85,8 @@ def components(_samples):
             for label, options in (("canonical", {}), ("signed_residues", {"signed_residues": True}),
                                    ("compact", {"compact": True}))
         },
-        "checked_equation_script_bytes": len(packed_response_equation_script(key)),
+        "checked_equation_script_bytes": len(packed_response_equation_script(key, compact_packing=True)),
+        "v08_checked_equation_script_bytes": len(packed_response_equation_script(key)),
         "v07_checked_equation_script_bytes": len(checked_equation_script(key, signed_challenge=True)),
         "v06_checked_equation_script_bytes": len(checked_equation_script(key)),
         "v05_checked_equation_script_bytes": len(checked_equation_script(key, paired=False)),

@@ -7,7 +7,10 @@ import random
 import unittest
 
 from fips204 import GAMMA1, PUBLIC_KEY_BYTES, RESPONSE_BITS, _GAMMA2, _pack, _use_hint, verification_equation, verify
-from hint_script import apply_hints_before_rounding_script, apply_hints_script, apply_sparse_hints_script
+from hint_script import (
+    apply_hints_before_rounding_script, apply_hints_script, apply_hints_with_packed_rounding_script,
+    apply_sparse_hints_script,
+)
 from mldsa import authorize_digest, test_only_vector as deterministic_test_vector, verify_openssl
 from ntt_script import (
     checked_equation_script, packed_response_equation_script, ring_product_script, transform_script,
@@ -105,7 +108,8 @@ class ArithmeticTests(unittest.TestCase):
                 sparse = b"".join(index.to_bytes(2, "little") for index in hints)
                 expected = _pack([_use_hint(value, index in hints)
                                   for index, value in enumerate(residues)], 6)
-                for compiler in (apply_sparse_hints_script, apply_hints_before_rounding_script):
+                for compiler in (apply_sparse_hints_script, apply_hints_before_rounding_script,
+                                 apply_hints_with_packed_rounding_script):
                     self.assertEqual(evaluate(compiler(), [kept, rows, sparse]), ([kept, expected], []))
 
     def test_fixed_key_verification_equation(self):

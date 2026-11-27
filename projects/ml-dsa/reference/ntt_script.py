@@ -266,9 +266,10 @@ def checked_equation_script(public_key, *, packed=True, paired=True, signed_chal
     return _compact_equation(rows, integrated=True)
 
 
-def packed_response_equation_script(public_key):
+def packed_response_equation_script(public_key, *, compact_packing=False):
     """Reconstruct rows from one-byte c and an already range-checked wire z."""
-    return _packed_equation(_scaled_key_rows(public_key), paired=True, signed_challenge=True, packed_response=True)
+    return _packed_equation(_scaled_key_rows(public_key), paired=True, signed_challenge=True,
+                            packed_response=True, compact_packing=compact_packing)
 
 
 def _scaled_key_rows(public_key):
@@ -330,7 +331,7 @@ def _packed_bias(lanes, offset):
     return number(offset * sum(_LANE_RADIX ** index for index in range(lanes)))
 
 
-def _packed_equation(rows, *, paired, signed_challenge, packed_response=False):
+def _packed_equation(rows, *, paired, signed_challenge, packed_response=False, compact_packing=False):
     input_count, row_count = len(rows[0]), len(rows)
     offset = _positive_lane_offset() if paired else _LANE_OFFSET
     read_lane = _READ_POSITIVE_LANE if paired else _READ_LANE
@@ -342,7 +343,7 @@ def _packed_equation(rows, *, paired, signed_challenge, packed_response=False):
     code += asm("OP_TOALTSTACK") + number(_LANE_RADIX) + _packed_bias(input_count, offset)
     code += asm("OP_FROMALTSTACK")
     if packed_response:
-        code += _pack_wire_response(input_count, response_bytes)
+        code += _pack_wire_response(input_count, response_bytes, compact_packing=compact_packing)
     else:
         code += _pack_signed_response(input_count, challenge_bytes, signed_challenge=signed_challenge)
     restore = asm("OP_FROMALTSTACK") * DEGREE
@@ -351,12 +352,16 @@ def _packed_equation(rows, *, paired, signed_challenge, packed_response=False):
     order = list(reversed(range(DEGREE)))
     code += (_paired_butterflies(order, inverse=False) if paired
              else _butterflies(order, inverse=False, compact=True))
+    if compact_packing:
+        # Keep the forward bias and modulus above the unconsumed coefficients.
+        code += number(DEGREE) + asm("OP_ROLL") + _Q
     for coefficient in range(DEGREE):
-        code += _take(order, coefficient, compact=True)
-        code += number(len(order) + 1) + asm("OP_PICK OP_ADD")
+        code += _take(order, coefficient, above=2 if compact_packing else 0, compact=True)
+        bias_depth = 2 if compact_packing else len(order) + 1
+        code += number(bias_depth) + asm("OP_PICK OP_ADD")
         code += number(_LANE_BYTES * input_count + extra_byte) + asm("OP_NUM2BIN")
         if packed_response:
-            code += _pack_pointwise_rows(rows, coefficient, input_count)
+            code += _pack_pointwise_rows(rows, coefficient, input_count, shared_modulus=compact_packing)
         else:
             # The biased values are congruent to the forward NTT values mod q.
             code += (read_lane + asm("OP_SWAP")) * input_count + asm("OP_DROP")
@@ -370,12 +375,13 @@ def _packed_equation(rows, *, paired, signed_challenge, packed_response=False):
 
     # All forward coefficients have been consumed. The altstack holds one
     # packed coefficient per inverse butterfly input, with row zero low.
-    code += asm("OP_2DROP") + _packed_bias(row_count, offset) + restore
+    code += asm("OP_2DROP OP_DROP") if compact_packing else asm("OP_2DROP")
+    code += _packed_bias(row_count, offset) + restore
     order = list(reversed(range(DEGREE)))
     code += (_paired_butterflies(order, inverse=True) if paired
              else _butterflies(order, inverse=True, compact=True))
     if packed_response:
-        return bytes(code) + _serialize_positive_rows(order, row_count)
+        return bytes(code) + _serialize_positive_rows(order, row_count, fixed_bias=compact_packing)
     return bytes(code) + _serialize_inverse_rows(order, row_count, positive=paired)
 
 
@@ -393,9 +399,15 @@ def _pack_signed_response(input_count, challenge_bytes, *, signed_challenge):
     return code + asm("OP_2DROP") * (input_count // 2) + asm("OP_DROP") * (input_count % 2)
 
 
-def _pack_wire_response(input_count, response_bytes):
+def _pack_wire_response(input_count, response_bytes, *, compact_packing=False):
     unsigned = push(b"\x00") + asm("OP_CAT OP_BIN2NUM")
-    code = asm("OP_TOALTSTACK") + number(GAMMA1) + number(1 << RESPONSE_BITS) + asm("OP_FROMALTSTACK")
+    bias = number(GAMMA1)
+    if compact_packing:
+        # Complementing each 18-bit u makes it z + gamma1 - 1. Subtract
+        # that constant across the four packed response lanes at once.
+        unsigned = asm("OP_INVERT") + unsigned
+        bias = _packed_bias(input_count - 1, GAMMA1 - 1)
+    code = asm("OP_TOALTSTACK") + bias + number(1 << RESPONSE_BITS) + asm("OP_FROMALTSTACK")
     code += number(DEGREE) + asm("OP_SPLIT")
     split = number(response_bytes) + asm("OP_SPLIT OP_SWAP") + unsigned + asm("OP_SWAP")
     code += split * (input_count - 2) + unsigned
@@ -404,36 +416,45 @@ def _pack_wire_response(input_count, response_bytes):
     # Each z tail is an unsigned little-endian integer. Pull its low 18 bits
     # and advance the tail while forming the wide NTT input lane.
     challenge = asm("OP_4 OP_ROLL OP_1 OP_SPLIT OP_SWAP OP_BIN2NUM")
-    response = asm("OP_5 OP_ROLL OP_DUP OP_7 OP_PICK OP_MOD OP_8 OP_PICK OP_SWAP OP_SUB")
+    response = asm("OP_5 OP_ROLL OP_DUP OP_7 OP_PICK OP_MOD")
+    response += b"" if compact_packing else asm("OP_8 OP_PICK OP_SWAP OP_SUB")
     response += asm("OP_SWAP OP_7 OP_PICK OP_DIV OP_ROT OP_10 OP_PICK OP_MUL OP_ROT OP_ADD")
-    code += (challenge + response * (input_count - 1) + asm("OP_TOALTSTACK")) * DEGREE
+    pack = challenge + response * (input_count - 1)
+    if compact_packing:
+        pack += asm("OP_7 OP_PICK OP_SUB")
+    code += (pack + asm("OP_TOALTSTACK")) * DEGREE
     return code + asm("OP_2DROP OP_2DROP OP_2DROP OP_DROP")
 
 
-def _pack_pointwise_rows(rows, coefficient, input_count):
+def _pack_pointwise_rows(rows, coefficient, input_count, *, shared_modulus=False):
     # Keep q below the forward lanes for all four dot products. Serialize
     # the reduced rows to fixed-width lanes and concatenate them for INTT.
-    code = _Q + asm("OP_SWAP")
+    code = b"" if shared_modulus else _Q + asm("OP_SWAP")
     code += (_READ_POSITIVE_LANE + asm("OP_SWAP")) * (input_count - 1) + asm("OP_BIN2NUM")
     for row_index, row in enumerate(reversed(rows)):
         last = row_index == len(rows) - 1
         code += _dot_product(row, coefficient, consume=last)
-        code += asm("OP_SWAP") if last else number(input_count + 1) + asm("OP_PICK")
+        if last:
+            code += asm("OP_OVER") if shared_modulus else asm("OP_SWAP")
+        else:
+            code += number(input_count + 1) + asm("OP_PICK")
         code += asm("OP_MOD") + number(_LANE_BYTES) + asm("OP_NUM2BIN OP_TOALTSTACK")
     code += asm("OP_FROMALTSTACK") + asm("OP_FROMALTSTACK OP_CAT") * (len(rows) - 1)
     return code + asm("OP_BIN2NUM OP_TOALTSTACK")
 
 
-def _serialize_positive_rows(order, lanes):
+def _serialize_positive_rows(order, lanes, *, fixed_bias=False):
     # q stays just below the row accumulators, at a fixed depth for each lane.
-    code = bytearray(_Q + asm("OP_0") * lanes)
+    code = bytearray(number(DEGREE) + asm("OP_ROLL") if fixed_bias else b"")
+    code += _Q + asm("OP_0") * lanes
     with_tail = number(lanes + 2) + asm("OP_PICK OP_MOD OP_3 OP_NUM2BIN")
     with_tail += number(lanes + 1) + asm("OP_ROLL OP_SWAP OP_CAT OP_SWAP")
     last = asm("OP_BIN2NUM") + number(lanes + 1) + asm("OP_PICK OP_MOD OP_3 OP_NUM2BIN")
     last += number(lanes) + asm("OP_ROLL OP_SWAP OP_CAT")
     for index in range(DEGREE):
-        code += _take(order, index, above=lanes + 1, compact=True)
-        depth = number(len(order) + lanes + 2) + asm("OP_PICK")
+        code += _take(order, index, above=lanes + 1 + int(fixed_bias), compact=True)
+        bias_depth = lanes + 2 if fixed_bias else len(order) + lanes + 2
+        depth = number(bias_depth) + asm("OP_PICK")
         code += depth + asm("OP_ADD") + number(_LANE_BYTES * lanes) + asm("OP_NUM2BIN")
         code += (_READ_POSITIVE_LANE + with_tail) * (lanes - 1) + last
     return bytes(code) + asm("OP_CAT") * (lanes - 1) + asm("OP_NIP OP_NIP")

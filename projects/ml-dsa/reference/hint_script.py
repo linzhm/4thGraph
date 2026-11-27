@@ -118,9 +118,7 @@ def apply_sparse_hints_script():
     return code + asm("OP_SIZE OP_0 OP_NUMEQUALVERIFY OP_DROP OP_NIP OP_NIP")
 
 
-@cache
-def apply_hints_before_rounding_script():
-    """Patch the hinted residues, then round and encode all four rows."""
+def _patch_hinted_residues():
     code = asm("OP_OVER OP_SIZE") + number(_ROWS * POLYNOMIAL_BYTES) + asm("OP_NUMEQUALVERIFY OP_DROP")
     period = MODULUS - 1
     # The high digit is periodic modulo q-1 and changes by one for a
@@ -132,7 +130,13 @@ def apply_hints_before_rounding_script():
     hint += number(_LOW_MODULUS) + asm("OP_MOD OP_1") + number(_GAMMA2 + 1) + asm("OP_WITHIN OP_IF")
     hint += number(_LOW_MODULUS) + asm("OP_ELSE") + number(period - _LOW_MODULUS) + asm("OP_ENDIF OP_ADD")
     hint += number(period) + asm("OP_MOD OP_3 OP_NUM2BIN OP_SWAP OP_CAT OP_CAT OP_SWAP OP_ENDIF")
-    code += hint * HINT_WEIGHT_LIMIT + asm("OP_SIZE OP_0 OP_NUMEQUALVERIFY OP_DROP")
+    return code + hint * HINT_WEIGHT_LIMIT + asm("OP_SIZE OP_0 OP_NUMEQUALVERIFY OP_DROP")
+
+
+@cache
+def apply_hints_before_rounding_script():
+    """Patch the hinted residues, then round and encode all four rows."""
+    code = _patch_hinted_residues()
 
     # Keep the rounding constants beneath the output buffer and input tail.
     code += asm("OP_TOALTSTACK") + number(_GAMMA2 - 1) + number(_LOW_MODULUS) + number(_HIGH_MODULUS)
@@ -149,3 +153,56 @@ def apply_hints_before_rounding_script():
     group += _PACK_W1_GROUP + asm("OP_ROT OP_SWAP OP_CAT OP_SWAP")
     code += group * (_ROWS * DEGREE // 4)
     return code + asm("OP_DROP OP_TOALTSTACK OP_2DROP OP_DROP OP_FROMALTSTACK")
+
+
+@cache
+def apply_hints_with_packed_rounding_script():
+    """Round checked, hint-adjusted residues in parallel and encode w1."""
+    lane_bits = 8 * COEFFICIENT_BYTES
+    coefficients = 64
+    width = coefficients * COEFFICIENT_BYTES
+    repeated_lane = sum(1 << (lane_bits * index) for index in range(coefficients))
+    shift = 11
+    scale = 1 << shift
+    divisor = _LOW_MODULUS // scale
+    reciprocal_scale = 1 << 18
+    reciprocal = (reciprocal_scale + divisor - 1) // divisor
+    max_biased = MODULUS - 1 + _GAMMA2 - 1
+    maximum = max_biased // scale
+    assert _LOW_MODULUS == scale * divisor
+    assert max_biased < 1 << lane_bits
+    assert maximum * reciprocal < 1 << lane_bits
+    assert all(value * reciprocal // reciprocal_scale == value // divisor for value in range(maximum + 1))
+
+    # [rounding bias, first mask, digit mask, wrap bias, wrap mask, packing
+    # factor, output, remaining residues]. All masks retain one field per lane.
+    code = _patch_hinted_residues() + asm("OP_TOALTSTACK")
+    code += number((_GAMMA2 - 1) * repeated_lane)
+    code += push((((1 << (lane_bits - shift)) - 1) * repeated_lane).to_bytes(width, "little"))
+    code += push((63 * repeated_lane).to_bytes(width, "little"))
+    code += number((64 - _HIGH_MODULUS) * repeated_lane)
+    code += push((64 * repeated_lane).to_bytes(width, "little"))
+    # The four desired products start at bits 56, 62, 68, and 74.
+    packing_factor = sum(1 << (2 + (lane_bits - 6) * index) for index in range(4))
+    code += number(packing_factor) + asm("OP_0 OP_FROMALTSTACK")
+
+    fit = number(width) + asm("OP_NUM2BIN")
+    chunk = number(width) + asm("OP_SPLIT OP_SWAP OP_BIN2NUM OP_8 OP_PICK OP_ADD")
+    # Numeric shifts move every lane. The masks clear bits shifted in from
+    # the neighboring lane. Before each shift the lane still fits in 24 bits.
+    chunk += number(scale) + asm("OP_DIV") + fit + asm("OP_7 OP_PICK OP_AND OP_BIN2NUM")
+    chunk += number(reciprocal) + asm("OP_MUL") + number(reciprocal_scale) + asm("OP_DIV")
+    chunk += fit + asm("OP_6 OP_PICK OP_AND")
+    # Isolate the lanes equal to 44 and subtract 44 from those lanes.
+    chunk += asm("OP_DUP OP_BIN2NUM OP_6 OP_PICK OP_ADD") + fit
+    chunk += asm("OP_5 OP_PICK OP_AND OP_BIN2NUM") + number(64) + asm("OP_DIV")
+    chunk += number(_HIGH_MODULUS) + asm("OP_MUL OP_SWAP OP_BIN2NUM OP_SWAP OP_SUB") + fit
+
+    # Multiplication moves four six-bit digits into bytes 7 through 9.
+    # The other products fall outside those 24 bits.
+    group = asm("OP_12 OP_SPLIT OP_SWAP OP_BIN2NUM OP_4 OP_PICK OP_MUL")
+    group += number(17) + asm("OP_NUM2BIN OP_7 OP_SPLIT OP_NIP OP_3 OP_SPLIT OP_DROP")
+    group += asm("OP_3 OP_ROLL OP_SWAP OP_CAT OP_ROT OP_ROT")
+    chunk += group * (coefficients // 4) + asm("OP_DROP")
+    code += chunk * (_ROWS * DEGREE // coefficients)
+    return code + asm("OP_DROP OP_TOALTSTACK OP_2DROP OP_2DROP OP_2DROP OP_FROMALTSTACK")
