@@ -284,7 +284,7 @@ LEGACY_DECLARATIONS = {"independent-submit": "independent-submit:", "verify:": "
                        "bsv-effect:": "stack-effect comment after the definition name"}
 LEGACY_IMPLICIT_END = ("work:", "join:", "gate:", "split-authority:", "recovery:")
 BSV_SOURCE = DECLARATIONS.keys() | LEGACY_DECLARATIONS.keys()
-BSV_SCRIPT = BSV_PRIMITIVES.keys() | ROUTES.keys() | {"bytes-hex", "check-range"}
+BSV_SCRIPT = BSV_PRIMITIVES.keys() | ROUTES.keys() | {"bytes-hex", "check-range", "merkle-sha256-root"}
 OPTIONAL_WORDSETS = ("core-ext", "file-ext")
 
 
@@ -304,6 +304,13 @@ def capabilities():
         "bsv": {"source": sorted(BSV_SOURCE), "script": sorted(BSV_SCRIPT),
                 "native_opcodes": sorted(name.upper() for name in NATIVE_OPCODES),
                 "native_opcode_import": "REQUIRE BSV",
+                "parameterized_script_words": {
+                    "merkle-sha256-root": {
+                        "syntax": "merkle-sha256-root <depth:0..32> <tag:hex-byte>",
+                        "takes": ("bytes", "bytes", "u32"),
+                        "gives": ("bytes",),
+                    },
+                },
                 "source_syntax": {
                     "position": "top-level",
                     "reserved_word_prefix": "bsv-",

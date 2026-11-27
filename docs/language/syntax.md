@@ -28,10 +28,11 @@ symbol           = ascii-letter, { alphanumeric | "_" | "-" } ;
 definition       = ":", word-name, stack-effect, { instruction }, ";" ;
 stack-effect     = "(", { stack-type }, "--", { stack-type }, ")" ;
 instruction      = straight-instruction | branch | counted-loop ;
-straight-instruction = call | cell-literal | byte-literal | range-check ;
+straight-instruction = call | cell-literal | byte-literal | range-check | merkle-root ;
 call             = word-name ;
 byte-literal     = "bytes-hex", hex-pairs ;
 range-check      = "check-range", symbol ;
+merkle-root      = "merkle-sha256-root", cell-literal, hex-pair ;
 branch           = "if", { instruction }, [ "else", { instruction } ], "then" ;
 counted-loop     = ( "do" | "?do" ), { instruction }, "loop" ;
 
@@ -61,7 +62,8 @@ integer          = decimal | "#", decimal
 decimal          = [ "-" ], digit, { digit } ;
 signed-hex       = [ "-" ], hex-digit, { hex-digit } ;
 signed-binary    = [ "-" ], binary-digit, { binary-digit } ;
-hex-pairs        = hex-digit, hex-digit, { hex-digit, hex-digit } ;
+hex-pair         = hex-digit, hex-digit ;
+hex-pairs        = hex-pair, { hex-pair } ;
 cell-literal     = integer | quoted-character ;
 ```
 
@@ -135,6 +137,10 @@ lock: values-match ( left:bytes right:bytes )
 ### 3.2 原生 Script 指令
 
 在 BSV Script 源码开头使用 `REQUIRE BSV` 加载受支持的 Genesis 和 Chronicle 共有原生 `OP_*` 词，以及 `verify`。这些词使用同一套静态类型检查。`OP_CAT` 的栈效果为 `bytes bytes -- bytes`，`OP_ADD` 的栈效果为 `script-int script-int -- script-int`。`OP_EQUAL` 和 `OP_CHECKSIG` 正常返回时产生 `1` 或 `0`。标准 Forth 比较词 `=` 产生 `-1` 或 `0`。`OP_EQUALVERIFY` 在字节不等时中止，`OP_CHECKSIG` 根据花费交易验证签名。支持的指令见 `4thgraph --capabilities` 输出的 `bsv.native_opcodes`。
+
+### 3.3 有界 SHA-256 Merkle 路径
+
+参数化词 `merkle-sha256-root <depth> <tag>` 的栈效果为 `( bytes bytes u32 -- bytes )`。操作数依次是 32 字节叶摘要、按叶到根顺序拼接的 32 字节兄弟摘要和从零开始的索引。深度为 0–32 的字面值，标签为一个十六进制字节。该词检查长度和索引范围，再按 `SHA256(tag || left || right)` 逐层计算。调用方提供索引并将结果与预期承诺比较。 [Winterfell 示例](../../projects/stark-winterfell-sha256/opening.fth)
 
 ## 4. 公开导出
 

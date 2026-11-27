@@ -1,0 +1,18 @@
+{
+  "version": "0.1.0",
+  "previous": null,
+  "artifacts": [],
+  "fixtures": [
+    "hash-vectors.txt"
+  ],
+  "evidence": [
+    "measurements.json",
+    "hash-checks.json"
+  ],
+  "requires": {
+    "stark-counter": "0.1.0"
+  },
+  "integration": "docs/verification.en.md",
+  "build": "cargo build --release --locked --manifest-path projects/stark-winterfell-sha256/reference/Cargo.toml --target-dir projects/stark-winterfell-sha256/workspace/target",
+  "verify": "cargo test --release --locked --manifest-path projects/stark-winterfell-sha256/reference/Cargo.toml --target-dir projects/stark-winterfell-sha256/workspace/target\nPYTHONPATH=src:. python3 projects/stark-counter/reference/replay.py \\\n  --binary projects/stark-winterfell-sha256/workspace/target/release/fourthgraph-stark-sha256 \\\n  --measurements projects/stark-winterfell-sha256/versions/v0.1.0/measurements.json \\\n  --output projects/stark-winterfell-sha256/workspace/build/replay.json --check\nPYTHONPATH=src:. python3 projects/stark-winterfell-sha256/reference/hash_replay.py --check"
+}

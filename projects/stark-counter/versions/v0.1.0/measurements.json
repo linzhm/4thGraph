@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "script": {
+    "arithmetic_entry_bytes": 8198,
+    "sha256": "f1059c45611da852f87e7936532d316222e1d1d161681e6370cb02ad071c085d",
+    "source_sha256": "55f0877f102ce2a1114d358c415e623cd1b48f8c5f97384aac6ca2b4213eb6bf",
+    "imports": {
+      "../proof-counter/counter.fth": "1fbeee94c39c9b70105c6620893d1ab73b5bf30a193f3b6833d1639c702d96ef"
+    }
+  },
+  "statements": [
+    {
+      "name": "ordinary",
+      "current": 19,
+      "next": 1042,
+      "proof_bytes": 36620,
+      "proof_sha256": "4d2c8f44b76dbd18f96bfa7e47d194d2641d5a327fd881811bba9c1d176e2328",
+      "statement_rejections": [
+        "wrong_current",
+        "wrong_next",
+        "other_valid_statement"
+      ]
+    },
+    {
+      "name": "ends-at-max",
+      "current": 4294966272,
+      "next": 4294967295,
+      "proof_bytes": 34806,
+      "proof_sha256": "3da8bae284383aeb44739225bf5b82ebac8493ea7c8e1ee742dc70044f570b57",
+      "statement_rejections": [
+        "wrong_current",
+        "wrong_next",
+        "other_valid_statement"
+      ]
+    },
+    {
+      "name": "wraps-at-end",
+      "current": 4294966273,
+      "next": 0,
+      "proof_bytes": 35307,
+      "proof_sha256": "37fe12e0c483ca0f6e669829eb6e47f6e195049ff827217e11fe073557245c05",
+      "statement_rejections": [
+        "wrong_current",
+        "wrong_next",
+        "other_valid_statement"
+      ]
+    },
+    {
+      "name": "wraps-at-start",
+      "current": 4294967295,
+      "next": 1022,
+      "proof_bytes": 36232,
+      "proof_sha256": "b813d16af651407f5be75272e29805f2b0514845fcd6163f668c1dbbb6d70e99",
+      "statement_rejections": [
+        "wrong_current",
+        "wrong_next",
+        "other_valid_statement"
+      ]
+    }
+  ],
+  "other_rejections": [
+    "mutated",
+    "truncated",
+    "trailing_byte",
+    "out_of_range_current"
+  ]
+}

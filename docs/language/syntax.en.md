@@ -28,10 +28,11 @@ symbol           = ascii-letter, { alphanumeric | "_" | "-" } ;
 definition       = ":", word-name, stack-effect, { instruction }, ";" ;
 stack-effect     = "(", { stack-type }, "--", { stack-type }, ")" ;
 instruction      = straight-instruction | branch | counted-loop ;
-straight-instruction = call | cell-literal | byte-literal | range-check ;
+straight-instruction = call | cell-literal | byte-literal | range-check | merkle-root ;
 call             = word-name ;
 byte-literal     = "bytes-hex", hex-pairs ;
 range-check      = "check-range", symbol ;
+merkle-root      = "merkle-sha256-root", cell-literal, hex-pair ;
 branch           = "if", { instruction }, [ "else", { instruction } ], "then" ;
 counted-loop     = ( "do" | "?do" ), { instruction }, "loop" ;
 
@@ -61,7 +62,8 @@ integer          = decimal | "#", decimal
 decimal          = [ "-" ], digit, { digit } ;
 signed-hex       = [ "-" ], hex-digit, { hex-digit } ;
 signed-binary    = [ "-" ], binary-digit, { binary-digit } ;
-hex-pairs        = hex-digit, hex-digit, { hex-digit, hex-digit } ;
+hex-pair         = hex-digit, hex-digit ;
+hex-pairs        = hex-pair, { hex-pair } ;
 cell-literal     = integer | quoted-character ;
 ```
 
@@ -139,6 +141,10 @@ lock: values-match ( left:bytes right:bytes )
 ### 3.2 Native Script opcodes
 
 Use `REQUIRE BSV` at the top of a Script source to load `verify` and the supported subset of native `OP_*` words common to Genesis and Chronicle. These words use the compiler's static type checking. `OP_CAT` has stack effect `bytes bytes -- bytes`, and `OP_ADD` has stack effect `script-int script-int -- script-int`. When `OP_EQUAL` or `OP_CHECKSIG` returns normally, it produces `1` or `0`. The standard Forth comparison `=` produces `-1` or `0`. `OP_EQUALVERIFY` aborts if the byte strings differ, and `OP_CHECKSIG` checks the signature against the spending transaction. The `bsv.native_opcodes` field in `4thgraph --capabilities` lists the supported opcodes.
+
+### 3.3 Bounded SHA-256 Merkle paths
+
+The parameterized word `merkle-sha256-root <depth> <tag>` has stack effect `( bytes bytes u32 -- bytes )`. Its operands are a 32-byte leaf digest, concatenated 32-byte siblings in leaf-to-root order, and the zero-based index. The literal depth is 0–32 and `tag` is one hexadecimal byte. The word checks the byte widths and index domain, then folds each pair as `SHA256(tag || left || right)`. The caller supplies the index and compares the resulting root against the expected commitment. [Winterfell example](../../projects/stark-winterfell-sha256/opening.fth)
 
 ## 4. Public exports
 

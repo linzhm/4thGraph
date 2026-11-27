@@ -11,6 +11,8 @@
 | [证明计数器](proof-counter/README.zh-CN.md) | 用 Script、Circom 或证明后端构建同一个公开状态转换 |
 | [BLS12-381 Groth16](groth16-bls12-381/README.zh-CN.md) | 编译模块化 Forth 验证器并回放入金花费 |
 | [BN254 Groth16](groth16-bn254/README.zh-CN.md) | 构建固定声明的 Forth 验证器并在 Chronicle 回放 |
+| [Winterfell BLAKE3 STARK](stark-counter/README.zh-CN.md) | 使用参考哈希配置为公开计数器出证并复放 |
+| [Winterfell SHA-256 STARK](stark-winterfell-sha256/README.zh-CN.md) | 构建 SHA-256 配置并对照 BSV 轨迹开封锁 |
 
 ## 付款与签名方案
 

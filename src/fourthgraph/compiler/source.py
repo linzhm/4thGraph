@@ -13,6 +13,7 @@ from fourthgraph import PROJECT_VERSION
 from fourthgraph.bsv.script import asm, number
 
 from fourthgraph.compiler import pels_language
+from fourthgraph.compiler.merkle import MAX_MERKLE_DEPTH, MERKLE_ROOT, merkle_sha256_root
 from fourthgraph.compiler.ranges import NUMERIC_TYPES, RangeType, Slot, primitive_outputs, range_bound, script_num_checks
 from fourthgraph.compiler.stack_schedule import emit_steps
 from fourthgraph.stdlib import (
@@ -412,6 +413,18 @@ def resolve(tokens, token, words, ranges):
         if not re.fullmatch(r"(?:[0-9a-fA-F]{2})+", value.text):
             raise value.error("BYTES-HEX requires whole bytes written as hexadecimal pairs")
         return Literal("bytes", bytes.fromhex(value.text))
+    if name == MERKLE_ROOT:
+        depth = required(tokens, token, "literal Merkle depth")
+        try:
+            literal = cell_literal(depth.text)
+        except ValueError as error:
+            raise depth.error(str(error)) from error
+        if literal is None or not 0 <= literal.value <= MAX_MERKLE_DEPTH:
+            raise depth.error(f"Merkle depth must be a literal from 0 to {MAX_MERKLE_DEPTH}")
+        tag = required(tokens, token, "Merkle parent tag")
+        if not re.fullmatch(r"[0-9a-fA-F]{2}", tag.text):
+            raise tag.error("Merkle parent tag must be one hexadecimal byte")
+        return merkle_sha256_root(literal.value, bytes.fromhex(tag.text))
     if name == "check-range":
         target = required(tokens, token, "declared range name")
         if target.name not in ranges:
