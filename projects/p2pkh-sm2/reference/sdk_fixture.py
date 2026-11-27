@@ -60,3 +60,14 @@ def cases():
     )
     yield dict(public_key=encode_public(mul(2)), signer=raw_signer(2), profile="v1.7.0",
                bytes=98362, sighash=0x61, outputs=mixed_outputs, reconstructed=True)
+
+    latest_outputs = tuple(
+        Output(3_300, locking_script_from_public_key(encode_public(mul(scalar)),
+                                                    version=SIGNED_WINDOW_TEMPLATE_VERSION))
+        for scalar in (9, 10, 11)
+    )
+    latest_case = dict(public_key=encode_public(mul(2)), signer=raw_signer(2), profile="v1.7.0",
+                       bytes=98362, outputs=latest_outputs)
+    for flag in (0x61, 0xe1):
+        yield dict(latest_case, sighash=flag, reconstructed=True)
+    yield dict(latest_case, sighash=0x61, compress_otda=False, reconstructed=False)

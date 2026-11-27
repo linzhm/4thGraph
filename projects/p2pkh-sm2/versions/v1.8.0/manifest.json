@@ -6,7 +6,8 @@
   ],
   "fixtures": [],
   "evidence": [
-    "measurements.json"
+    "measurements.json",
+    "latest-template-coverage.json"
   ],
   "integration": "docs/sdk.en.md",
   "build": "python projects/p2pkh-sm2/reference/generate_otda_constructor.py --mixed /tmp/sm2-otda-mixed.json",

@@ -55,6 +55,14 @@ The wallet uses a shared OTDA constructor when an ALL payment includes outputs o
 
 The comparison uses the same inputs, output order and signing preimages. [Constructor](versions/v1.8.0/mixed-otda-constructor.json) · [Reproduction](reference/README.md#mixed-otda-constructor) · [Recorded measurements](versions/v1.8.0/measurements.json)
 
+<a name="latest-template-coverage"></a>
+
+### Payments using template 7
+
+The matrix uses v1.7.0 for every SM2 prevout and recipient. The v1.7.0 and v1.8.0 wallet revisions produced identical transaction IDs and sizes for all 34 cases. The shared constructor requires both templates `6` and `7` among the signed outputs, so the additional savings in this matrix are zero.
+
+The existing single-template OTDA constructor still reduces eligible transactions compared with literal preimages. BSV Node 1.2.3 and chain-gang verified both encodings in every case. The matrix covers all 12 sighash types, paired and unpaired SINGLE, different input and output counts, multiple prevouts from one funding transaction, native P2PKH inputs and outputs, and a transaction with 253 outputs. [Per-case sizes and transaction IDs](versions/v1.8.0/latest-template-coverage.json) · [Reproduction](reference/README.md#latest-template-coverage)
+
 <a name="v170"></a>
 
 ## v1.7.0

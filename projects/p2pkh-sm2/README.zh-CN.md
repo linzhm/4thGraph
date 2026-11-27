@@ -51,6 +51,14 @@ v1.1.0 为首个公开版本 v1.0.0 的锁定模板 `1` 默认启用 OTDA 重建
 
 对比使用相同的输入、输出顺序和签名预映像。[构造器](versions/v1.8.0/mixed-otda-constructor.json) · [复现方式](reference/README.zh-CN.md#mixed-otda-constructor) · [测量记录](versions/v1.8.0/measurements.json)
 
+<a name="latest-template-coverage"></a>
+
+### 只用模板 7 的付款
+
+矩阵中的 SM2 上一输出和收款输出都用 v1.7.0。v1.7.0 和 v1.8.0 钱包代码在 34 个用例中生成的交易 ID 和大小完全一致。共享构造器要求签名覆盖的输出同时包含模板 `6` 和 `7`，因此在这个矩阵中的额外节省为 0 字节。
+
+模板 7 现有的单模板 OTDA 重建仍能缩短符合条件的交易。BSV Node 1.2.3 和 chain-gang 逐例验证了原样编码与自动编码。矩阵覆盖 12 种签名模式、配对与无配对 SINGLE、不同输入输出数量、同一笔入金的多个上一输出、原生 P2PKH 输入和输出，以及 253 个输出的交易。[逐用例大小与交易 ID](versions/v1.8.0/latest-template-coverage.json) · [复现方式](reference/README.zh-CN.md#latest-template-coverage)
+
 <a name="v170"></a>
 
 ## v1.7.0

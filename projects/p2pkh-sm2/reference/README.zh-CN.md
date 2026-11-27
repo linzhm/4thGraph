@@ -112,6 +112,20 @@ cmp /tmp/sm2-otda-mixed.json projects/p2pkh-sm2/versions/v1.8.0/mixed-otda-const
 
 混合付款测试对照共享构造器、独立构造器和原样编码，并让两个引擎验证完整输入。BSV Node 还会用 Chronicle 激活前创建的上一输出验证共享编码。[测试](test_otda_constructor.py) · [测量记录](../versions/v1.8.0/measurements.json)
 
+<a name="latest-template-coverage"></a>
+
+## 复现最新模板交易覆盖
+
+在仓库根目录用固定依赖的 SM2 Python 环境运行。两个引擎逐例验证自动与原样编码，测试脚本记录可复现的交易 ID 和大小。
+
+```sh
+bash tools/verify_node.sh -- python projects/p2pkh-sm2/reference/test_otda_matrix.py \
+  --report /tmp/sm2-latest-template-coverage.json
+cmp /tmp/sm2-latest-template-coverage.json projects/p2pkh-sm2/versions/v1.8.0/latest-template-coverage.json
+```
+
+报告对比模板 7 现有构造器和原样预映像。所有 SM2 上一输出和可识别的 SM2 收款输出均使用模板 7。[覆盖报告](../versions/v1.8.0/latest-template-coverage.json)
+
 ## SignedData 付款接入
 
 外部签名器可以按 GB/T 35275-2026 返回 DER 编码的 `SignedData`。封装携带签名值、

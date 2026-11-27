@@ -120,6 +120,20 @@ cmp /tmp/sm2-otda-mixed.json projects/p2pkh-sm2/versions/v1.8.0/mixed-otda-const
 
 The mixed payment test compares the shared, separate and literal encodings. Both engines verify the complete inputs, and BSV Node also verifies the shared encoding against prevouts created before Chronicle activation. [Tests](test_otda_constructor.py) · [Measurements](../versions/v1.8.0/measurements.json)
 
+<a name="latest-template-coverage"></a>
+
+## Reproduce latest-template transaction coverage
+
+Run the matrix from the repository root with the pinned SM2 Python environment. Both engines verify the automatic and literal encoding of each case, and the runner writes deterministic transaction IDs and sizes.
+
+```sh
+bash tools/verify_node.sh -- python projects/p2pkh-sm2/reference/test_otda_matrix.py \
+  --report /tmp/sm2-latest-template-coverage.json
+cmp /tmp/sm2-latest-template-coverage.json projects/p2pkh-sm2/versions/v1.8.0/latest-template-coverage.json
+```
+
+The report compares the existing template 7 constructor with a literal preimage. All SM2 prevouts and recognized SM2 destinations use template 7. [Coverage report](../versions/v1.8.0/latest-template-coverage.json)
+
 ## SignedData payment interop
 
 [GB/T 35275-2026](https://openstd.samr.gov.cn/bzgk/std/newGbInfo?hcno=28A18B702BDC318803E598F5E502E2CC)
