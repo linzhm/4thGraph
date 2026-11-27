@@ -5,7 +5,7 @@ from hashlib import sha256
 
 from fourthgraph.bsv.evaluate import evaluate
 from fourthgraph.bsv.script import asm, decode_num, encode_num, number, push
-from .curve_windows import CURVES, SECP256K1, fixed_table, scalar_plans
+from .curve_windows import CURVES, GLV_PACKED, GLV_REFERENCE, GLV_SCALED, JOINT_STRATEGIES, SECP256K1, fixed_table, scalar_plans
 from .lowering import compile_word
 from .script_builder import ScriptBuilder
 from .source import SourceCompiler, named_token
@@ -188,6 +188,13 @@ def joint_source():
     return files("fourthgraph.compiler").joinpath("secp256k1-joint.fth").read_text(encoding="utf-8")
 
 
+@cache
+def packed_joint_source():
+    from importlib.resources import files
+    packed = files("fourthgraph.compiler").joinpath("secp256k1-joint-packed.fth").read_text(encoding="utf-8")
+    return joint_source() + "\n" + packed
+
+
 def joint_vocabulary(library):
     from .wordsets import cell_comparison
 
@@ -211,11 +218,90 @@ def joint_vocabulary(library):
     return vocabulary
 
 
-def link_joint_word(vocabulary, optimization):
+@cache
+def _joint_library():
+    return ScriptBuilder("REQUIRE stdlib/secp256k1.fth\nREQUIRE stdlib/secp256k1-window.fth")
+
+
+@cache
+def _scale_script(optimization):
+    source = SourceCompiler("REQUIRE stdlib/weierstrass.fth")
+    return compile_word(source.words["weierstrass-scale"], optimization).script
+
+
+def _pack_windows(*lanes):
+    return bytes(sum(((value >> shift) & 3) << (2 * lane) for lane, value in enumerate(lanes))
+                 for shift in range(126, -1, -2))
+
+
+def _optimized_joint_words(vocabulary, optimization, *, scaled):
+    library = _joint_library()
+    prefix = "secp256k1-scaled-" if scaled else "secp256k1-"
+    words = vocabulary | {
+        "pack-windows": script_word("script-int script-int script-int script-int", "bytes",
+                                    library.emit("secp-window-pack-windows", b""), _pack_windows),
+        "double-pair": numeric_fragment(library.emit(prefix + "double-pair-with-field", b"", 1), 4, 4),
+        "add-fixed-affine": numeric_fragment(library.emit(prefix + "add-affine-with-field", b"", 1), 6, 4),
+    }
+    points = fixed_table(SECP256K1, split_bits=128)
+    scale_public = restore = b""
+    if scaled:
+        model = SECP256K1.normalized_a0()
+        transform = _scale_script(optimization)
+        forward = b"".join(map(number, model.factors()))
+        scale_public = (number(model.field) + asm("OP_ROT OP_ROT OP_1") + forward + transform
+                        + asm("OP_DROP OP_ROT OP_DROP"))
+        restore = b"".join(map(number, model.factors(inverse=True))) + transform
+        words["add-points"] = numeric_fragment(library.emit(prefix + "add-with-field", b"", 1), 7, 4)
+        points = tuple(model.affine(point) for point in points)
+    words["map-public"] = numeric_fragment(scale_public, 2, 2)
+    words["restore-model"] = numeric_fragment(restore, 4, 4)
+    table = b"".join(padded(coord, 33) for point in points for coord in (point or (0, 0)))
+    words.update((_constant("fixed-affine-table", "bytes", table),))
+    return words, points
+
+
+def _stack_joint_script(frontend, words, points, optimization):
+    """Compile a loop whose immutable prefix is 15 projective and 15 affine entries."""
+    library = _joint_library()
+    prepare = compile_word(frontend.words["prepare-windows"], optimization).script
+    # The common depth encoder targets this exact stack layout. The runtime variable
+    # table is in ascending order, the fixed table descending, both without index 0.
+    entries = len(points) - 1
+    prepare += library.emit("secp-window-window-depths", b"") + asm("OP_TOALTSTACK 99 OP_SPLIT OP_NIP")
+    prepare += asm("33 OP_SPLIT OP_SWAP OP_BIN2NUM OP_SWAP") * (entries * 3) + asm("OP_DROP")
+    prepare += b"".join(number(coordinate) for point in reversed(points[1:]) for coordinate in point)
+    prepare += number(SECP256K1.field) + asm("OP_0 OP_1 OP_0")
+
+    read = library.emit("secp-window-read-window", b"")
+    variable = library.emit("secp-window-pick-variable-point", b"")
+    fixed = asm("OP_DUP OP_TOALTSTACK OP_PICK OP_FROMALTSTACK OP_PICK")
+    fixed += words["add-fixed-affine"].code
+    fixed = asm("OP_FROMALTSTACK OP_IFDUP OP_IF") + fixed + asm("OP_ENDIF")
+    initial = read + asm("OP_IFDUP OP_IF") + variable + asm("OP_2ROT OP_2DROP 3 OP_ROLL OP_DROP OP_ENDIF") + fixed
+    step = words["double-pair"].code + read + asm("OP_IFDUP OP_IF")
+    step += variable + words["add-points"].code + asm("OP_ENDIF") + fixed
+    point_slots = entries * (3 + 2)
+    state = tuple(range(point_slots + 4))
+    cleanup = asm("OP_FROMALTSTACK OP_DROP") + emit_steps(state, (), state[point_slots:], compact=True)
+    return prepare + initial + step * 63 + cleanup + words["restore-model"].code
+
+
+def link_joint_word(vocabulary, optimization, *, strategy=GLV_REFERENCE):
     """Link the GLV word when the caller has validated its point and scalars."""
     name = "secp256k1-joint-window-2"
-    frontend = LayoutCompiler(joint_source(), vocabulary=vocabulary)
-    kernel = compile_word(frontend.words[name], optimization).script
+    if strategy == GLV_REFERENCE:
+        frontend = LayoutCompiler(joint_source(), vocabulary=vocabulary)
+        kernel = compile_word(frontend.words[name], optimization).script
+    else:
+        if strategy not in JOINT_STRATEGIES:
+            raise ValueError("unknown secp256k1 joint lowering")
+        words, points = _optimized_joint_words(vocabulary, optimization, scaled=strategy == GLV_SCALED)
+        frontend = LayoutCompiler(packed_joint_source(), vocabulary=words)
+        if strategy == GLV_PACKED:
+            kernel = compile_word(frontend.words["packed-joint"], optimization).script
+        else:
+            kernel = _stack_joint_script(frontend, words, points, optimization)
     return {name: numeric_fragment(kernel, 4, 4)}
 
 
@@ -238,20 +324,34 @@ layout: cube-x ( p:script-int x:script-int yy:script-int -- p yy x x x )
 """
 
 
-def compile_joint_generator_point(curve, *, optimization="stack"):
+def compile_joint_generator_point(curve, strategy="auto", *, optimization="stack"):
     """Validate the affine point and scalars before returning p, X, Y, Z."""
-    plan = next(plan for plan in scalar_plans(curve, joint=True) if plan.name == "glv-joint-window-2")
-    if not plan.eligible or curve != SECP256K1:
+    options = [plan for plan in scalar_plans(curve, joint=True) if plan.eligible]
+    if not options:
         raise ValueError("joint GLV lowering requires secp256k1")
-    library = ScriptBuilder("REQUIRE stdlib/secp256k1.fth")
+    if strategy != "auto" and strategy not in {plan.name for plan in options}:
+        raise ValueError("joint multiplication requires a secp256k1 GLV strategy")
+    library = _joint_library()
     vocabulary = joint_vocabulary(library)
     vocabulary["add-points"] = numeric_fragment(library.emit("secp256k1-add-with-field", b"", 1), 7, 4)
-    text = joint_source() + JOINT_CHECKS.format(field=curve.field, order_plus_one=curve.order + 1)
-    frontend = LayoutCompiler(text, vocabulary=vocabulary)
-    script = compile_word(frontend.words["joint-multiply"], optimization).script
-    row = {"algorithm": plan.name, "window_bits": plan.window_bits, "windows": plan.windows,
-           "lanes": plan.lanes, "script_bytes": len(script), "sha256": sha256(script).hexdigest()}
-    return CurveBuild(plan.name, script, (row,))
+    checks = JOINT_CHECKS.format(field=curve.field, order_plus_one=curve.order + 1)
+    scores, scripts = [], {}
+    for plan in options:
+        if strategy != "auto" and plan.name != strategy:
+            continue
+        if plan.name == GLV_REFERENCE:
+            frontend = LayoutCompiler(joint_source() + checks, vocabulary=vocabulary)
+        else:
+            linked = link_joint_word(vocabulary, optimization, strategy=plan.name)
+            frontend = LayoutCompiler("REQUIRE BSV\n" + checks, vocabulary=vocabulary | linked)
+        script = compile_word(frontend.words["joint-multiply"], optimization).script
+        scripts[plan.name] = script
+        scores.append({"algorithm": plan.name, "window_bits": plan.window_bits, "windows": plan.windows,
+                       "lanes": plan.lanes, "script_bytes": len(script), "sha256": sha256(script).hexdigest(),
+                       "coordinate_model": "a=0,3*b=1" if plan.name == GLV_SCALED else "original",
+                       "table_layout": {GLV_REFERENCE: "projective-bytes", GLV_PACKED: "packed-bytes"}.get(plan.name, "stack")})
+    winner = min(scores, key=lambda row: row["script_bytes"])["algorithm"]
+    return CurveBuild(winner, scripts[winner], tuple(scores))
 
 
 def compile_curve_multiply(curve, operation, strategy="auto", *, optimization="stack"):
@@ -259,9 +359,7 @@ def compile_curve_multiply(curve, operation, strategy="auto", *, optimization="s
         return compile_fixed_generator(curve, strategy, optimization=optimization)
     if operation != "joint":
         raise ValueError("curve multiplication operation must be generator or joint")
-    if strategy not in ("auto", "glv-joint-window-2"):
-        raise ValueError("joint multiplication requires the secp256k1 GLV strategy")
-    return compile_joint_generator_point(curve, optimization=optimization)
+    return compile_joint_generator_point(curve, strategy, optimization=optimization)
 
 
 def multiplication_word(curve_name, operation, strategy):

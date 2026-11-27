@@ -12,7 +12,7 @@ LEGACY_GROTH16_ENTRY = "groth16-verify"
 WALLET_BACKEND = "wallet-construction"
 
 
-def p256_vocabulary():
+def numeric_stack_vocabulary():
     from fourthgraph.bsv.script import asm, number
 
     from fourthgraph.compiler.wordsets import Primitive, script_word
@@ -155,6 +155,16 @@ LIBRARIES = {
         p256_export("p256-add", ("p", "b3", "x1", "y1", "z1", "x2", "y2", "z2")),
         p256_export("p256-double", ("p", "b3", "x", "y", "z")),
     )),
+    "std/weierstrass": Library(ROOT / "stdlib/weierstrass.fth", (
+        Export("weierstrass-scale", ("script-int",) * 6, ("script-int",) * 4, ("host", "script"), (
+            Parameter("p", "script-int", "Positive field prime"),
+            Parameter("X", "script-int", "Homogeneous X coordinate"),
+            Parameter("Y", "script-int", "Homogeneous Y coordinate"),
+            Parameter("Z", "script-int", "Homogeneous Z coordinate"),
+            Parameter("u2", "script-int", "The square of the nonzero scale"),
+            Parameter("u3", "script-int", "The cube of the nonzero scale"),
+        ), "The caller provides a positive modulus and consistent scale factors. A zero modulus aborts."),
+    )),
     "std/hash-chain": Library(ROOT / "stdlib/hash-chain.fth", tuple(
         script_fragment(name, (Parameter("data", "bytes", "Initial byte string"),), takes=("script", "cell"),
                         build_parameters=(Parameter("count", "cell", count),),
@@ -238,6 +248,7 @@ LIBRARIES = {
         ), takes=("script", "cell"),
                         failure="Supply a valid point on the scaled curve. Field placement 0 uses stack bottom and 1 uses the slot below the point."),
     ), WALLET_BACKEND),
+    "std/secp256k1-window": Library(ROOT / "stdlib/secp256k1-window.fth", backend=WALLET_BACKEND),
     "std/bip340": Library(ROOT / "stdlib/bip340.fth", (
         script_fragment("bip340-verify", (
             Parameter("message", "bytes", "BIP340 message of any supported length"),

@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from functools import cache
 
 from fourthgraph.bsv.script import SECP256K1_FIELD
+from fourthgraph.stdlib.weierstrass import CoordinateScale
 
 
 @dataclass(frozen=True)
@@ -14,12 +15,23 @@ class Curve:
     b: int
     generator: tuple[int, int]
     endomorphism: tuple[int, int] | None = None  # beta, lambda
+    scale_root: int | None = None
 
     def contains(self, point):
         if point is None:
             return True
         x, y = point
         return 0 <= x < self.field and 0 <= y < self.field and (y*y - x*x*x - self.a*x - self.b) % self.field == 0
+
+    def normalized_a0(self):
+        """Return the certified model change for the specialized a=0, 3*b=1 kernels."""
+        if self.scale_root is None:
+            return None
+        scale = CoordinateScale(self.field, self.scale_root)
+        a, b = scale.coefficients(self.a, self.b)
+        if a or 3 * b % self.field != 1:
+            raise ValueError(f"invalid a=0, 3*b=1 model for {self.name}")
+        return scale
 
 
 SECP256K1 = Curve(
@@ -28,6 +40,7 @@ SECP256K1 = Curve(
      0x483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8),
     (0x7ae96a2b657c07106e64479eac3434e99cf0497512f58995c1396c28719501ee,
      0x5363ad4cc05c30e0a5261c028812645a122e22ea20816678df02967c1b23bd72),
+    scale_root=0x7e8c32a50d81affef6014528bdbdfe776653b213d485953c3801f2356ad9d755,
 )
 P256 = Curve(
     "p256", 0xffffffff00000001000000000000000000000000ffffffffffffffffffffffff,
@@ -44,6 +57,11 @@ SM2 = Curve(
      0xbc3736a2f4f6779c59bdcee36b692153d0a9877cc62a474002df32e52139f0a0),
 )
 CURVES = {curve.name: curve for curve in (SECP256K1, P256, SM2)}
+GLV_REFERENCE = "glv-joint-window-2"
+GLV_PACKED = "glv-joint-packed-2"
+GLV_STACK = "glv-joint-stack-2"
+GLV_SCALED = "glv-joint-scaled-2"
+JOINT_STRATEGIES = (GLV_REFERENCE, GLV_PACKED, GLV_STACK, GLV_SCALED)
 
 
 @dataclass(frozen=True)
@@ -63,10 +81,12 @@ def scalar_plans(curve, *, joint=False):
     fixed = tuple(ScalarPlan(f"fixed-window-{width}", 1, width, 256 // width, not joint,
                              "requires a single fixed generator" if joint else None)
                   for width in (2, 4))
-    eligible = joint and curve.endomorphism is not None
-    glv = ScalarPlan("glv-joint-window-2", 4, 2, 64, eligible,
-                     None if eligible else "requires a curve with a supported GLV endomorphism and a joint product")
-    return binary, *fixed, glv
+    eligible = joint and curve == SECP256K1
+    glv = tuple(ScalarPlan(strategy, 4, 2, 64,
+                           eligible and (strategy != GLV_SCALED or curve.normalized_a0() is not None),
+                           None if eligible else "requires the registered secp256k1 GLV implementation")
+                for strategy in JOINT_STRATEGIES)
+    return binary, *fixed, *glv
 
 
 def _add(curve, left, right):

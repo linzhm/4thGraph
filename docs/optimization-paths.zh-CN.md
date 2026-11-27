@@ -81,11 +81,13 @@ REGTEST_CHRONICLE_HEIGHT=10 bash tools/verify_node.sh -- python -m unittest \
 
 secp256k1 的联合点乘入口检查两个标量的范围和传入的仿射点，再对生成点与公钥点做联合乘法，返回 `p X Y Z`。GLV 路径使用本曲线的自同态，并在四个 128 位分量上使用两位窗口。P-256 和 SM2 使用已登记的固定基计划。
 
+联合点乘的 `auto` 会比较原始 64 窗口、预打包索引的字节表、栈上查表，以及缩放坐标下的栈上查表。优化候选使用合并倍点，固定仿射点使用混合点加。CLI 报告记录坐标模型、查表布局、脚本字节数和哈希。也可指定候选以固定复现路径。
+
 在 Forth 源文件中，`curve-multiply:` 可将选出的脚本绑定为带类型的词。`auto` 与 CLI 使用同样的字节比较，调用声明的词时执行输入检查。
 
 ```forth
 curve-multiply: mul-p256-generator p256 generator auto ;
-curve-multiply: mul-secp256k1-joint secp256k1 joint glv-joint-window-2 ;
+curve-multiply: mul-secp256k1-joint secp256k1 joint auto ;
 ```
 
 复跑使用 OpenSSL 提供独立的点乘结果，并在项目验证环境中运行 BSV Node 和 chain-gang。
@@ -98,3 +100,9 @@ PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
 ```
 
 [BIP340 源码和实测对照](../projects/p2pkh-schnorr/docs/high-level-forth.zh-CN.md#64-window-lowering)
+
+### 坐标模型选择
+
+`REQUIRE stdlib/weierstrass.fth` 提供 `weierstrass-scale ( p X Y Z u2 u3 -- p X' Y' Z )`。它对短 Weierstrass 曲线的齐次坐标应用 `(u²X, u³Y, Z)`，对应系数为 `a' = a·u⁴` 和 `b' = b·u⁶`，均在模 `p` 下计算。编译器验证 secp256k1 登记的缩放因子后，才使用 `a=0, 3*b=1` 内核。固定表在编译期转换，输入点在执行时映射，输出恢复为原始模型。[基础库 Forth 词](../src/fourthgraph/stdlib/weierstrass.fth)
+
+P-256 使用同一套坐标模型接口及原 `a=-3` 内核。它的六次幂判定为 `(3b)^((p-1)/6) ≠ 1 mod p`，所以没有 `3*b=1` 的缩放模型。该域中保持 `a=-3` 的缩放也会保持 `b`。
