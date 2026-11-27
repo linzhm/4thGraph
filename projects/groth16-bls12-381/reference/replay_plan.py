@@ -94,31 +94,55 @@ def replay_funded(plan, era, lock, witnesses, plan_digest):
 
 def main():
     cli = argparse.ArgumentParser(description=__doc__)
-    cli.add_argument("--release", default="0.9.0", help="a release number or 'current' (default: 0.9.0)")
+    cli.add_argument("--release", default="0.9.0",
+                     help="a release number, version with witness layout, or 'current' (default: 0.9.0)")
     cli.add_argument("--output", type=Path, help="output directory")
     cli.add_argument("--script-era", choices=SCRIPT_ERAS, default="genesis")
     cli.add_argument("--funded", action="store_true", help="also run the funded replay in an isolated regtest")
     args = cli.parse_args()
     try:
         index = json.loads((VERSIONS / "index.json").read_bytes())
-        release = index["current"] if args.release == "current" else args.release
+        requested = index["current"] if args.release == "current" else args.release.removeprefix("v")
+        release, separator, requested_layout = requested.partition("-")
         if release not in index["versions"]:
             raise ValueError(f"unknown release {release!r}")
-        raw_plan = (VERSIONS / f"v{release}" / "replay-plan.json").read_bytes()
+        release_dir = VERSIONS / f"v{release}"
+        manifest = json.loads((release_dir / "manifest.json").read_bytes())
+        planned_layout = requested_layout if separator else manifest.get("witness_layout")
+        variants = manifest.get("replay_plans")
+        if variants is None:
+            plan_file = "replay-plan.json"
+        else:
+            if planned_layout not in variants:
+                raise ValueError(f"release {release} has no pinned layout {planned_layout!r}")
+            plan_file = variants[planned_layout]
+        raw_plan = (release_dir / plan_file).read_bytes()
         plan = json.loads(raw_plan)
         check("plan release", plan["version"], release)
+        layout = plan["witness_layout"]
+        if planned_layout is not None:
+            check("pinned witness layout", layout, planned_layout)
+        release_id = f"v{release}-{layout}"
+        plan_digest = digest(raw_plan)
         artifact, witnesses = build(plan, args.script_era)
-        report = (replay_funded(plan, args.script_era, bytes.fromhex(artifact["script_hex"]), witnesses, digest(raw_plan))
+        report = (replay_funded(plan, args.script_era, bytes.fromhex(artifact["script_hex"]), witnesses, plan_digest)
                   if args.funded else None)
     except (OSError, ValueError, subprocess.CalledProcessError) as error:
         cli.error(str(error))
 
-    output = args.output or PROJECT / "workspace/build" / f"pinned-v{release}" / args.script_era
+    directory_label = release_id if "witness_layout" in manifest or separator else f"v{release}"
+    output = args.output or PROJECT / "workspace/build" / f"pinned-{directory_label}" / args.script_era
     output.mkdir(parents=True, exist_ok=True)
+    release_info = {
+        "version": release, "witness_layout": layout, "release_id": release_id, "script_era": args.script_era,
+        "replay_plan_sha256": plan_digest, "artifact_sha256": artifact["artifact_sha256"],
+    }
+    (output / "release.json").write_text(json.dumps(release_info, indent=2) + "\n", encoding="utf-8")
     (output / "lock.json").write_text(json.dumps(artifact, indent=2) + "\n", encoding="utf-8")
     for name, witness in witnesses.items():
         (output / f"{name}-witness.hex").write_text(witness.hex() + "\n", encoding="utf-8")
     if report is not None:
+        report["release_id"] = release_id
         (output / "replay.json").write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
     print(output)
 

@@ -1,0 +1,72 @@
+{
+  "version": "0.14.0",
+  "source_revision": "38a6f10e42836104ff6556562a5f52d759e3cefd",
+  "source": "forth/verifier.fth",
+  "source_sha256": "9117b329603338b96be824390c9a9b29246d2a9fe43035d5c83c40b467f36fcb",
+  "input_sources_sha256": "6df6df04c0072841cc6caafecc301adc8a5a70a630dafc0aa11e0f1643c50f53",
+  "fixture_sha256": "51f6524a32d8ec5d4eac1c97398dc97c1d0594caae0284b8faa36a02574c5cc6",
+  "verification_key_sha256": "b2a207af971ac1b35fb7dac203e029e22871970816297fdbc303dbf7d77045d1",
+  "entry": "verify-proof",
+  "witness_layout": "affine-witness",
+  "stack_schedule": "compact",
+  "transaction_version": 2,
+  "witnesses": {
+    "wrap": {
+      "bytes": 35493,
+      "sha256": "6c7b18396072f3246f2856c09210dfd7f63b0cddf523b4f4483d58aa21a4cf96"
+    },
+    "other": {
+      "bytes": 35493,
+      "sha256": "b7923cfbf5cfa1cde4d06af436232fd20a7e35adccdcde61821255919ab41202"
+    }
+  },
+  "script_eras": {
+    "genesis": {
+      "chronicle_activation_height": 1000,
+      "lock_bytes": 206463,
+      "path_bytes": 241964,
+      "script_sha256": "59d8c8b77f1adb9e7a7bc710033583461de4b7498cdeb2c8a92a9a9c40ee8097",
+      "artifact_sha256": "fb1c7615a09caac0a106cae730dbea84d16345f3f223ba5ba56e66ad7b8a0bfd",
+      "arithmetic_plan": {
+        "fp2_rules": [
+          "expand-cross-products"
+        ],
+        "residue_association": "accumulator-frobenius-first",
+        "fp2_selection": "callsite",
+        "msm": "signed-radix4",
+        "msm_table": "deferred-doubling-slopes",
+        "miller_reductions": "split-chord-residue",
+        "miller_kernel": "direct-normalized",
+        "g1_reductions": "paired-doubles",
+        "g1_z_batch": 16,
+        "compact_booleans": true
+      }
+    },
+    "chronicle": {
+      "chronicle_activation_height": 2,
+      "lock_bytes": 205803,
+      "path_bytes": 241304,
+      "script_sha256": "d0c84d647891f7dd06a31572bf0bf94f8e0a5e4f1eb067ec24360b4229076bc7",
+      "artifact_sha256": "ac7cff91b56b53a54b9728a23b2cc0ec92c16b4e052cc6d8c6766a271a37ef1c",
+      "arithmetic_plan": {
+        "fp2_rules": [
+          "expand-cross-products"
+        ],
+        "residue_association": "accumulator-frobenius-first",
+        "fp2_selection": "callsite",
+        "msm": "signed-radix4",
+        "msm_table": "deferred-doubling-slopes",
+        "miller_reductions": "split-chord-residue",
+        "miller_kernel": "direct-normalized",
+        "g1_reductions": "paired-doubles",
+        "g1_z_batch": 16,
+        "compact_booleans": true
+      }
+    }
+  },
+  "source_modules": {
+    "miller.fth": "ee7d0e9562e0e1d636af814977742888d486c74696728df39b0823d1433cbc9a",
+    "public-inputs.fth": "96d36387417997beec7e1f5051c6eb161e683e8a14d54ffd421f30d62b78fd97",
+    "residue.fth": "bc86d5d4270e58f230bdf155f9eade088a0a33356c0bbfe425e3acdfcaa6122e"
+  }
+}

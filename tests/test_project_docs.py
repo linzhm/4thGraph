@@ -93,6 +93,15 @@ class ProjectDocsTests(unittest.TestCase):
             checked = run(root, TOOL, "--all", "--check")
             self.assertEqual(checked.returncode, 0, checked.stderr)
 
+            (release / "manifest.json").write_text(
+                json.dumps(dict(build="make build", verify="make verify", witness_layout="affine-inline")),
+                encoding="utf-8",
+            )
+            generated = run(root, TOOL, "example", "--write")
+            self.assertEqual(generated.returncode, 0, generated.stderr)
+            self.assertIn("# Example v1.0.0-affine-inline", english.read_text(encoding="utf-8"))
+            self.assertIn("# 示例 v1.0.0-affine-inline", (project / "README.zh-CN.md").read_text(encoding="utf-8"))
+
             updated = dict(MANIFEST, summary={"en": "Updated overview.", "zh-CN": "更新的介绍。"})
             manifest.write_text(safe_dump(updated, allow_unicode=True), encoding="utf-8")
             stale = run(root, TOOL, "--all", "--check")

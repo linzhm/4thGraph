@@ -48,11 +48,23 @@ REGTEST_CHRONICLE_HEIGHT=1000 bash tools/verify_node.sh --profile raised -- \
   python3 projects/groth16-bls12-381/reference/replay_plan.py --release current --funded
 ```
 
-For Chronicle set the activation height to `2` and add `--script-era chronicle`. The runner writes the checked lock and both witnesses under `projects/groth16-bls12-381/workspace/build/pinned-v0.13.0/`, with a replay report for funded runs. The pinned plan verifies file and bytecode digests. [v0.13.0 replay plan](../versions/v0.13.0/replay-plan.json)
+For Chronicle set the activation height to `2` and add `--script-era chronicle`. The runner writes the checked lock, both witnesses and `release.json` under `projects/groth16-bls12-381/workspace/build/pinned-v0.13.0-affine-inline/`, with a replay report for funded runs. The release metadata links the full version label and layout to the verified artifact digest. [v0.13.0-affine-inline replay plan](../versions/v0.13.0/replay-plan.json)
 
 v0.12.0 retains the v0.11.0 MSM and Miller plan and compares G1 reduction after each doubling against reduction after a pair of consecutive doublings. Pairing these reductions saves 1,282 bytes in either era. The serialized lock and witness total 238,122 bytes on Genesis and 237,217 bytes on Chronicle for the five bounded dynamic inputs in the fixture. The measured stack peak stays at 29,891 bytes and verification takes longer in the paired timing samples. [v0.12.0 measurements](../versions/v0.12.0/measurements.json)
 
 v0.13.0 compares G1 Z batches of 1, 4, 8 and 16 doublings with and without compact numeric boolean lowering. The search selects 16 with the boolean pass enabled. The serialized lock and witness total 237,225 bytes on Genesis and 236,566 bytes on Chronicle. Both fixture witnesses retain their hashes and the measured stack peak is 29,891 bytes. Paired verification timings are mixed across the two engines and Script eras. The report records the medians for batch sizes 4, 8 and 16 against v0.12.0. [v0.13.0 measurements](../versions/v0.13.0/measurements.json)
+
+## v0.14.0 layouts
+
+Use `--release v0.14.0-projective-cofactor` or `--release v0.14.0-affine-witness` in the build and funded commands above. The full release label pins the witness encoding and arithmetic plan. The numeric release number remains the version directory and catalog key. Genesis and Chronicle each have their own lock digest within the selected plan. [Release manifest](../versions/v0.14.0/manifest.json)
+
+`projective-cofactor` uses homogeneous G2 Miller lines and verifies G1 membership of A and C by checking two effective-cofactor preimages. It reuses the v0.13.0 modular Forth source, signed MSM tables, split Miller reductions and boolean lowering. `affine-witness` uses the v0.13.0 affine arithmetic plan and supplies the committed Γ and Δ line table at spend time. [Measurements and funded replay](../versions/v0.14.0/measurements.json)
+
+| Release label | Genesis lock | Chronicle lock | Witness per spend | Peak stack payload |
+| --- | ---: | ---: | ---: | ---: |
+| `v0.13.0-affine-inline` | 227,839 B | 227,180 B | 9,378 B | 29,891 B |
+| `v0.14.0-projective-cofactor` | 235,788 B | 235,009 B | 1,263 B | 35,690 B |
+| `v0.14.0-affine-witness` | 206,463 B | 205,803 B | 35,493 B | 61,595 B |
 
 ## nChain and sCrypt comparison
 

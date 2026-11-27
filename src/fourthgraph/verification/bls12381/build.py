@@ -7,12 +7,14 @@ import json
 from pathlib import Path
 
 from fourthgraph.verification.bls12381.affine_witness import (
-    AffineStages, LAYOUTS, MILLER_KERNELS, MILLER_REDUCTIONS, MSM_STRATEGIES, MSM_TABLES, affine_witness,
+    AFFINE_LAYOUTS, AffineStages, LAYOUTS, MILLER_KERNELS, MILLER_REDUCTIONS, MSM_STRATEGIES, MSM_TABLES, affine_witness,
     line_packet, msm_windows, slope_packet_bytes,
 )
 from fourthgraph.verification.bls12381.field import FP2_ENTRY, FP2_RULES, fp2_alternatives, fp2_kernel
+from fourthgraph.verification.bls12381.projective_cofactor import CofactorStages
 from fourthgraph.verification.bls12381.verifier import (
-    PACKET_BYTES, ScriptVerifier, VerifierStages, _FIXED_WITNESS, dynamic_slots, input_sources, public_signals,
+    G1_PREIMAGE_BYTES, PACKET_BYTES, ScriptVerifier, VerifierStages, _FIXED_WITNESS, dynamic_slots, input_sources,
+    public_signals,
 )
 from fourthgraph.compiler.formula_experiment import validate_rules
 from fourthgraph.compiler.source import MAX_EXPANSION, PROJECT_VERSION, CompileError, Shuffle, SourceCompiler, check_word_expansion, expanded
@@ -35,6 +37,7 @@ WITNESS_PACKETS = ("pairing_line_packet_bytes", "slope_packet_bytes", "proof_pac
 RESIDUE_ASSOCIATIONS = ("left", "right", "accumulator-frobenius-first")
 G1_REDUCTIONS = ("per-double", "paired-doubles")
 MAX_G1_Z_BATCH = 16  # At most sixteen Y factors are multiplied before reducing Z.
+PROJECTIVE_MILLER_KERNEL = "direct-projective"
 
 
 @dataclass(frozen=True)
@@ -64,8 +67,9 @@ class ArithmeticPlan:
             raise ValueError("doubling-slope tables require signed radix-4 MSM")
         if self.miller_reductions not in MILLER_REDUCTIONS:
             raise ValueError(f"Miller reductions must be one of {', '.join(MILLER_REDUCTIONS)}")
-        if self.miller_kernel not in MILLER_KERNELS:
-            raise ValueError(f"Miller kernel must be one of {', '.join(MILLER_KERNELS)}")
+        kernels = (*MILLER_KERNELS, PROJECTIVE_MILLER_KERNEL)
+        if self.miller_kernel not in kernels:
+            raise ValueError(f"Miller kernel must be one of {', '.join(kernels)}")
         if self.g1_reductions not in G1_REDUCTIONS:
             raise ValueError(f"G1 reductions must be one of {', '.join(G1_REDUCTIONS)}")
         if type(self.g1_z_batch) is not int or not 1 <= self.g1_z_batch <= MAX_G1_Z_BATCH:
@@ -75,7 +79,9 @@ class ArithmeticPlan:
 
     @property
     def uses_affine_miller(self):
-        return self.miller_reductions != MILLER_REDUCTIONS[0] or self.miller_kernel != MILLER_KERNELS[0]
+        return self.miller_kernel != PROJECTIVE_MILLER_KERNEL and (
+            self.miller_reductions != MILLER_REDUCTIONS[0] or self.miller_kernel != MILLER_KERNELS[0]
+        )
 
     def document(self):
         document = asdict(self)
@@ -191,6 +197,17 @@ class ForthVerifier(ScriptVerifier):
         super().__init__(verification_key)
         if witness_layout not in LAYOUTS:
             raise ValueError(f"unknown witness layout {witness_layout!r}")
+        if witness_layout == "projective-cofactor":
+            plan = plan or ArithmeticPlan(
+                fp2_selection="callsite", msm="signed-radix4", msm_table="deferred-doubling-slopes",
+                miller_reductions="split-chord-residue", miller_kernel=PROJECTIVE_MILLER_KERNEL, compact_booleans=True,
+            )
+            if plan.miller_kernel != PROJECTIVE_MILLER_KERNEL:
+                raise ValueError("projective-cofactor requires the direct-projective Miller kernel")
+            if plan.g1_reductions != G1_REDUCTIONS[0] or plan.g1_z_batch != 1:
+                raise ValueError("Jacobian G1 reduction options do not apply to projective-cofactor")
+        elif plan is not None and plan.miller_kernel == PROJECTIVE_MILLER_KERNEL:
+            raise ValueError("the direct-projective Miller kernel requires projective-cofactor")
         if plan is not None and plan.msm == "signed-radix4" and witness_layout == "projective":
             raise ValueError("signed radix-4 MSM requires an affine witness layout")
         if plan is not None and plan.uses_affine_miller and witness_layout == "projective":
@@ -239,6 +256,9 @@ class ForthVerifier(ScriptVerifier):
                        g1_z_batch=plan.g1_z_batch, compact_booleans=plan.compact_booleans)
         if self.witness_layout == "projective":
             stages = VerifierStages(self.key, sources, **options)
+        elif self.witness_layout == "projective-cofactor":
+            stages = CofactorStages(self.key, sources, msm=self.msm, msm_table=plan.msm_table,
+                                    miller_reductions=plan.miller_reductions, **options)
         else:
             stages = AffineStages(self.key, sources, lines_in_witness=self.witness_layout == "affine-witness",
                                   msm=self.msm, msm_table=plan.msm_table,
@@ -269,6 +289,8 @@ class ForthVerifier(ScriptVerifier):
     def witness(self, signals, proof, *, sources=_FIXED_WITNESS):
         if self.witness_layout == "projective":
             return super().witness(signals, proof, sources=sources)
+        if self.witness_layout == "projective-cofactor":
+            return self._projective_witness(signals, proof, sources, cofactor_preimages=True)
         config = self.sources(None if sources is _FIXED_WITNESS else sources)
         return affine_witness(self.key, config, tuple(signals), proof,
                               lines_in_witness=self.witness_layout == "affine-witness", msm=self.msm)
@@ -293,7 +315,10 @@ class ForthVerifier(ScriptVerifier):
             result["libraries"] = tuple(map(asdict, self.libraries))
         if self.script_era == "chronicle":
             result.update(minimum_era="chronicle", minimum_utxo_era="chronicle")
-        if self.witness_layout != "projective":
+        if self.witness_layout == "projective-cofactor":
+            result.update(schema_version=3, witness_layout=self.witness_layout, g1_preimage_bytes=G1_PREIMAGE_BYTES,
+                          proof_packet_bytes=result["proof_packet_bytes"] + G1_PREIMAGE_BYTES)
+        elif self.witness_layout in AFFINE_LAYOUTS:
             windows = sum(1 for _ in msm_windows(self.key, self.sources(signals), strategy=self.msm))
             result.update(schema_version=3, witness_layout=self.witness_layout, proof_packet_bytes=PACKET_BYTES,
                           slope_packet_bytes=slope_packet_bytes(windows), msm_slope_count=windows)
@@ -314,13 +339,17 @@ class LayoutCandidate:
 def layout_candidates(verification_key, source, sources=None, owner=None, *, compact=True, script_era="genesis",
                       entry=None, source_path=None, plan=None):
     """Build the applicable layouts under the same proof and deployment policy."""
+    cofactor = plan is not None and plan.miller_kernel == PROJECTIVE_MILLER_KERNEL
     signed_msm = plan is not None and plan.msm == "signed-radix4"
     affine = signed_msm or (plan is not None and plan.uses_affine_miller)
+    primary_layout = "projective-cofactor" if cofactor else "affine-inline" if affine else "projective"
     primary = ForthVerifier(verification_key, source, entry=entry, source_path=source_path, script_era=script_era,
-                            witness_layout="affine-inline" if affine else "projective", plan=plan)
+                            witness_layout=primary_layout, plan=plan)
     sources = primary.sources(sources)
-    if dynamic_slots(sources):
-        layouts = LAYOUTS[1:] if affine else LAYOUTS
+    if cofactor:
+        layouts = (primary_layout,)
+    elif dynamic_slots(sources):
+        layouts = AFFINE_LAYOUTS if affine else ("projective", *AFFINE_LAYOUTS)
     elif affine:
         feature = "signed radix-4 MSM" if signed_msm else "the Miller plan"
         raise ValueError(f"{feature} requires at least one spend-time public input")

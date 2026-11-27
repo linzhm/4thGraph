@@ -8,7 +8,9 @@ from pathlib import Path
 
 from fourthgraph.verification.bls12381.affine_witness import LAYOUTS
 from fourthgraph.replay.groth16_bls12381 import FIXTURE
-from fourthgraph.verification.bls12381.verifier import AFFINE_BYTES, FIELD_BYTES, Dynamic, public_packet, public_signals
+from fourthgraph.verification.bls12381.verifier import (
+    AFFINE_BYTES, FIELD_BYTES, PACKET_BYTES, Dynamic, public_packet, public_signals,
+)
 from fourthgraph.verification.bls12381.build import (
     OBJECTIVES, SCRIPT_ERAS, ArithmeticPlan, ForthVerifier, SOURCE, layout_candidates, select_layout,
 )
@@ -31,7 +33,7 @@ def fixture():
     return key, cases
 
 
-def witness_controls(witnesses, packets, index, proof_packet_bytes, *, layout):
+def witness_controls(witnesses, packets, index, proof_packet_bytes, *, layout, line_packet_bytes=0):
     prefix = witnesses[index][:-len(push(packets[index]))]
     proof_start = len(prefix) - proof_packet_bytes
     # (0,2) is on G1 and has order 3.
@@ -41,10 +43,21 @@ def witness_controls(witnesses, packets, index, proof_packet_bytes, *, layout):
         "g1_outside_subgroup": (prefix[:proof_start] + torsion + prefix[proof_start + len(torsion):]
                                 + push(packets[index])),
     }
-    if layout == "projective":
+    if layout in ("projective", "projective-cofactor"):
         other_prefix = witnesses[1 - index][:-len(push(packets[1 - index]))]
         controls["crossed_statement_with_valid_msm"] = (
             prefix[:-AFFINE_BYTES] + other_prefix[-AFFINE_BYTES:] + push(packets[1 - index])
+        )
+    if layout == "projective-cofactor":
+        for index_in_proof, name in enumerate(("a", "c")):
+            start = proof_start + PACKET_BYTES + index_in_proof * AFFINE_BYTES
+            controls[f"torsion_preimage_{name}"] = (
+                prefix[:start] + torsion + prefix[start + AFFINE_BYTES:] + push(packets[index])
+            )
+    if line_packet_bytes:
+        start = len(push(bytes(line_packet_bytes))) - line_packet_bytes
+        controls["modified_committed_lines"] = (
+            prefix[:start] + bytes([prefix[start] ^ 1]) + prefix[start + 1:] + push(packets[index])
         )
     return controls
 
@@ -95,7 +108,8 @@ def main():
         draft = Transaction((Input(deployment.txid_wire(), 0),),
                             (Output(LOCK_VALUE - SPEND_FEE, native.output.script),), version=version)
         invalid = witness_controls(witnesses, packets, index, artifact["proof_packet_bytes"],
-                                   layout=verifier.witness_layout)
+                                   layout=verifier.witness_layout,
+                                   line_packet_bytes=artifact.get("pairing_line_packet_bytes", 0))
         controls = {
             name: verify_spend(node, activation, draft.with_script(0, witness), deployment, deployed["height"],
                                expected=False)
