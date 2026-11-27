@@ -69,8 +69,8 @@ python -m unittest -v test_r1_baseline.BaselineAutoTests
 用 `--auto-rounds N`，最多比较 32 个候选。
 
 构建已选方案时，用 `--replay-plan` 指定保存的计划，或直接传入带 `optimization.plan`
-的 `--auto` 报告。重放核对编译器版本、Forth 源码和依赖摘要，逐项执行固定序列，再核对
-锁模板和 OTDA 重建程序摘要。默认的 20 字节零值标记模板参数槽；`--owner-hash160 HEX`
+的 `--auto` 报告。重放核对编译器版本、实际编译器源码摘要以及 Forth 源码和依赖摘要，
+逐项执行固定序列，再核对锁模板和 OTDA 重建程序摘要。默认的 20 字节零值标记模板参数槽；`--owner-hash160 HEX`
 只替换这个槽。钱包发布仍以版本清单为准。
 
 ```sh
@@ -81,6 +81,9 @@ done
 ```
 
 [BIP143 ALL](plans/bip143-all.json) · [OTDA ALL](plans/otda-all.json) · [OTDA SINGLE](plans/otda-single.json)
+
+这些计划以 `c02df4a` 上的编译器验收。初版固定计划及早期矩阵数据可以从原始提交复跑。
+同一工具链版本号下，编译器源码变化也会产生新的计划身份。[初版方案与编译器](https://github.com/linzhm/4thGraph/tree/9b13dfbbd50487ca868831788f653e2b75f9cd5a)
 
 花费测试使用固定版 chain-gang，覆盖 BIP143 ALL、OTDA ALL、配对和无配对的
 OTDA SINGLE。正例使用测试签名和实际夹具父输出。改动花费的锁定时间后，测试必须观察到

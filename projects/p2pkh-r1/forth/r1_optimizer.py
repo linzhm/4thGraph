@@ -3,6 +3,7 @@
 from dataclasses import dataclass, replace
 from functools import cache, partial
 from hashlib import sha256
+from importlib.resources import files
 
 from compile_r1 import (AUTO_OBJECTIVES, BASELINE_DEPENDENCIES, BASELINE_SOURCE_SHA256, PAYMENT_ENTRY, compile_source,
                         dependencies, payment_window_boundaries)
@@ -110,7 +111,7 @@ def info(state):
 
 
 DEFAULT_COMPILER_STATES = 160
-PLAN_SCHEMA = "4thgraph.r1-optimization-plan/1"
+PLAN_SCHEMA = "4thgraph.r1-optimization-plan/2"
 
 
 class UnrecognizedBaseline(ValueError):
@@ -213,7 +214,15 @@ def selection_cost(linked, objective):
 
 
 def plan_snapshot(optimizer):
+    # Different compiler revisions can share PROJECT_VERSION. Identify the
+    # compiler's packaged sources by content, independent of install location.
+    sources = sorted((path for path in files("fourthgraph.compiler").iterdir()
+                      if path.is_file() and path.name.endswith((".py", ".fth"))), key=lambda path: path.name)
+    identity = sha256()
+    for path in sources:
+        identity.update(path.name.encode() + b"\0" + sha256(path.read_bytes()).digest())
     return {"compiler_version": PROJECT_VERSION, "entry": PAYMENT_ENTRY,
+            "compiler_sha256": identity.hexdigest(),
             "source_sha256": BASELINE_SOURCE_SHA256, "window_backend": optimizer.backend.source_identity}
 
 
@@ -230,6 +239,8 @@ def constructor_report(linked):
 
 def replay_plan(source, owner, plan, *, source_path):
     fields = {"schema", "snapshot", "objective", "order", "expected"}
+    if isinstance(plan, dict) and plan.get("schema") == "4thgraph.r1-optimization-plan/1":
+        raise ValueError("R1 v1 plans require their original compiler checkout")
     if (not isinstance(plan, dict) or plan.keys() != fields
             or plan["schema"] != PLAN_SCHEMA or plan["objective"] not in AUTO_OBJECTIVES):
         raise ValueError("invalid R1 optimization plan")

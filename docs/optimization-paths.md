@@ -33,6 +33,8 @@ With `--auto-rounds 6`, the search compiled 32 distinct candidates in five round
 
 ## R1 ordered method exploration
 
+The initial matrix and search figures below use the original compiler snapshot. [Original build and plans](https://github.com/linzhm/4thGraph/tree/9b13dfbbd50487ca868831788f653e2b75f9cd5a)
+
 Each matrix cell applies the row method followed by the column method. Both matrices use the same Forth and two-input, two-output fixture. The first starts with separate generic tables. The second starts with a proven affine G kernel so that compact storage and its zero-digit guard can be compared in each order. The five methods select a joint window, specialize fixed G calls, compact the G table, shorten the zero guard, and run explicit stack search on the point-add kernels visible at that step.
 
 Applying affine specialization before stack search emits a 41,927 B lock. Applying stack search first leaves the new affine kernel on its default lowering and emits 41,366 B. Compact storage and the guard commute from the affine seed and emit the same 41,165 B lock. This compact plan leads on the BIP143 ALL path at 165,575 B. The joint window leads on the OTDA ALL path at 176,617 B, compared with 176,807 B for the compact plan.
@@ -45,7 +47,7 @@ The next method-search revision adds an OTDA packing choice for repeated fragmen
 
 The expanded search also compares a narrower separate Q window, repeats constructed on the main stack, and one dictionary lookup for consecutive copies of an identical kernel. The two packing choices are admitted only when the emitted constructor is smaller on the current state. All retained candidates are ranked using complete verified transactions. The report distinguishes reaching the state budget from exhausting the graph. The ten-method run reached the 64-state budget and independently verified 61 distinct artifacts. Narrowing Q made the generic split's OTDA ALL path 8,229 B larger even though its constructor shrank. Main-stack repetition reduced the compact affine candidate's OTDA path by 16 B. Adjacent references reduced the winning joint-window OTDA path by another 2 B, to 176,577 B under ALL and 176,506 B under paired SINGLE. The best BIP143 ALL path was 165,575 B.
 
-The R1 project's explicit ordered `--auto` experiment shares the same lowering and method registry. Its payment objectives score the candidate-dependent lock and constructor bytes for a two-input, two-output target. With the default 160-state experiment budget, all four objectives reached exhaustion at 152 states. `--replay-plan` builds one saved sequence and checks both artifact hashes. With chain-gang 0.13.2, the three saved payment plans reproduced the exact lock and constructor bytes and the full funding-plus-spend totals of 165,575 B for BIP143 ALL, 176,577 B for OTDA ALL, and 176,506 B for paired OTDA SINGLE. [Plans and commands](../projects/p2pkh-r1/forth/README.md)
+With the compiler at `c02df4a`, all three payment searches exhausted their 152 states within the 160-state budget. Each chose a 41,114 B lock. The OTDA goals also chose main-stack repetition and adjacent kernel packing. `--replay-plan` checks the compiler source digest, applies the saved sequence and verifies both artifact hashes. Chain-gang 0.13.2 measured 165,371 B for BIP143 ALL, 176,547 B for OTDA ALL, and 176,476 B for paired OTDA SINGLE across funding and spending. [Plans and commands](../projects/p2pkh-r1/forth/README.md)
 
 ## Ordered formula rules
 

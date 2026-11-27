@@ -161,9 +161,9 @@ class BaselineAutoTests(unittest.TestCase):
 
     def test_ordered_auto_reports_target_and_emits_the_selected_constructor(self):
         cases = {
-            "bip143-all": (41_165, 5591, ["affine-g", "compact-g", "ifdup"]),
-            "otda-all": (42_382, 3042, ["joint-window", "pack-prefix-repeat", "pack-adjacent-kernels"]),
-            "otda-single": (42_382, 3042, ["joint-window", "pack-prefix-repeat", "pack-adjacent-kernels"]),
+            "bip143-all": (41_114, 5590, ["affine-g", "compact-g", "ifdup"]),
+            "otda-all": (41_114, 5563, ["affine-g", "compact-g", "ifdup", "pack-stack-repeat", "pack-adjacent-kernels"]),
+            "otda-single": (41_114, 5563, ["affine-g", "compact-g", "ifdup", "pack-stack-repeat", "pack-adjacent-kernels"]),
         }
         blocked = {"tx_engine": None, "r1_method_matrix": None, "replay_r1": None}
         with patch.dict(sys.modules, blocked):
@@ -195,7 +195,8 @@ class BaselineAutoTests(unittest.TestCase):
         plan_path = self.source_path.with_name("plans") / "bip143-all.json"
         plan = json.loads(plan_path.read_bytes())
         cases = (
-            ({**plan, "snapshot": {**plan["snapshot"], "compiler_version": "unknown"}}, "snapshot differs"),
+            ({**plan, "schema": "4thgraph.r1-optimization-plan/1"}, "requires? their original compiler checkout"),
+            ({**plan, "snapshot": {**plan["snapshot"], "compiler_sha256": "0" * 64}}, "snapshot differs"),
             ({**plan, "order": ["compact-g", "affine-g"]}, "method 'compact-g' at step 1"),
             ({**plan, "expected": {}}, "emitted different lock or reconstruction"),
         )
@@ -214,9 +215,9 @@ class BaselineAutoTests(unittest.TestCase):
         from r1_method_matrix import replay
 
         cases = {
-            "bip143-all": (165_575, 129, 119, 4_653),
-            "otda-all": (176_577, 65, 131, 169_934),
-            "otda-single": (176_506, 65, 131, 85_166),
+            "bip143-all": (165_371, 129, 119, 4_717),
+            "otda-all": (176_547, 129, 119, 164_861),
+            "otda-single": (176_476, 129, 119, 82_630),
         }
         receipts = {}
         for target, expected in cases.items():

@@ -47,7 +47,7 @@ class R1MSMTests(unittest.TestCase):
             "split-4": (41986, 3940),
             "joint-2": (42378, 3058),
             "split-5x4": (41721, 5510),
-            "split-4-affine-g": (41538, 4068),
+            "split-4-affine-g": (41474, 4067),
         }
         for name in (*CALIBRATION, "split-4-affine-g"):
             with self.subTest(candidate=name):
@@ -61,31 +61,31 @@ class R1MSMTests(unittest.TestCase):
                     self.assertEqual(cost["multiplications_removed_on_nonzero_path"], 192)
                     self.assertEqual(cost["guard_bytes_added"], 320)
 
-    def test_frozen_template_matches_the_reviewed_construction(self):
-        (frozen_lock, frozen_pattern), release = frozen_build()
-        compiler = R1MSMCompiler()
-        (lock, pattern), report = local_build(compiler, compiler.plan(release["construction"]), 32)
+    def test_frozen_template_keeps_the_reviewed_source_and_artifact(self):
+        (lock, pattern), release = frozen_build()
         historical, _ = read_report(VERSIONS_DIRECTORY / "v0.6.0/comparison.json")
         self.assertEqual(release["build_source"], {field: historical[field]
                                                    for field in ("source_sha256", "dependencies")})
-        self.assertEqual(frozen_lock, lock)
-        self.assertEqual(frozen_pattern, pattern)
-        self.assertEqual(release["estimated"], report["estimated"])
         self.assertEqual((len(lock.script), len(pattern.program), lock.owner_start), (41364, 5658, 208))
+        for owner in (bytes(20), bytes(range(20))):
+            self.assertEqual(pattern.match(lock.lock(owner)), (owner,))
 
     def test_scan_proposes_the_smaller_affine_guard(self):
         compiler = R1MSMCompiler()
-        (baseline, _), release = frozen_build()
-        scan = compiler.scan(compiler.plan(release["construction"]))
+        _, release = frozen_build()
+        original = compiler.plan(release["construction"])
+        baseline, _ = compiler.link(compiler.lower(original))
+        scan = compiler.scan(original)
         opportunity = next(row for row in scan["opportunities"] if row["id"] == "affine-g-ifdup")
         self.assertEqual(opportunity["calls"], 51)
         self.assertEqual(opportunity["missing"], [])
         plan = compiler.plan(opportunity["try"])
         (lock, pattern), report = local_build(compiler, plan, 32)
-        (next_lock, next_pattern), next_version = frozen_build("v0.7.0")
+        _, next_version = frozen_build("v0.7.0")
         self.assertEqual(report["point_vectors"], 32)
         self.assertEqual(next_version["construction"], opportunity["try"])
-        self.assertEqual((next_lock, next_pattern), (lock, pattern))
+        self.assertTrue(report["reconstruction_byte_match"])
+        self.assertEqual(pattern.match(lock.lock(bytes(20))), (bytes(20),))
         self.assertEqual(len(baseline.script) - len(lock.script), 102)
         self.assertEqual(opportunity["estimated"]["window_loop_bytes_saved"], 102)
 
@@ -135,12 +135,11 @@ class R1MSMTests(unittest.TestCase):
         b = split["point-add-stack-search", "affine-g"]["artifact"]
         self.assertNotEqual(a, b)
         self.assertEqual(evidence["artifacts"][a]["compile"]["lock_bytes"], 41_927)
-        self.assertEqual(evidence["artifacts"][b]["compile"]["lock_bytes"], 41_366)
+        self.assertEqual(evidence["artifacts"][b]["compile"]["lock_bytes"], 41_315)
         shared = affine["compact-g", "ifdup"]["artifact"]
         self.assertEqual(shared, affine["ifdup", "compact-g"]["artifact"])
         self.assertEqual(evidence["rankings"]["bip143-all"][0]["artifact"], shared)
-        self.assertEqual(evidence["rankings"]["otda-all"][0]["artifact"],
-                         split["joint-window", "joint-window"]["artifact"])
+        self.assertEqual(evidence["rankings"]["otda-all"][0]["artifact"], shared)
 
 
 if __name__ == "__main__":
