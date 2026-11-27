@@ -7,7 +7,7 @@
 | Layer | Responsibility |
 | --- | --- |
 | Forth and standard library | The [Forth baseline](language/README.md) defines source semantics, syntax, and public words. PELS is a family of transaction commitment templates. R1 is an owner-authorization example that binds a public-key hash and verifies a signature for the current spend. |
-| Compiler and planner | Verify the source contract, compare eligible transaction boundaries, choose compatible Script fragments, and link each lock. Keep exact Script bytes, parameter layout, signature anchors, and any symbolic transaction plan. |
+| Compiler and planner | Verify the source contract, compare eligible transaction boundaries, choose compatible Script fragments, and link each lock. Emit exact Script bytes and the metadata for the selected build entry point. |
 | Assembler and wallet | Bind the plan to actual parent outputs, prepare the selected path's signing material, obtain host authorization when required, and assemble its witness. Consume the exact Script and manifest selected at compile time. The wallet may use a paired project WASM module. |
 | Independent evaluation | Evaluate pure formula fixtures on fixed vectors. Verify complete spends against their actual parents with pinned chain-gang. Record BSV Node cross-checks when requested. Treat estimates, offline verification, admission, and confirmation as distinct measurements. |
 
@@ -19,7 +19,11 @@ The typed AST and dependency graph record how a result arises. Record a separate
 
 ## Build and spend boundary
 
-Every lock build exposes exact Script bytes, a listing, parameter layout, signing anchors, and the selected plan. For wallet use the same project build pairs the Script with WASM, a manifest, executable fixtures, and the test receipt. The module consumes actual prevouts and the selected named path through `recognize`, `prepare_spend`, and `assemble_unlock`. The host checks the request and signs when required. Final independent validation uses the completed transaction and its real parents.
+- **Standalone compilation.** `4thgraph SOURCE --entry WORD` emits the Script bytes, stack signature, and build metadata such as source and artifact hashes.
+- **Workflow builds.** The build report describes the selected layout, transaction graph, and output Script. Use `--cpn-plan` to export the canonical transaction plan.
+- **Wallet project bundles.** A versioned bundle pairs the exact lock template and instruction listing with a WASM module, manifest, and executable fixtures. The manifest records template parameter slots and signing anchors where applicable. The bundle's verification run produces a test receipt.
+
+The wallet module uses actual prevouts and the selected named path through `recognize`, `prepare_spend`, and `assemble_unlock`. The host checks the request and signs when required. Final independent validation uses the completed transaction and its real parents.
 
 The functional profile identifies a supported family. A template version identifies the exact accepted bytes and witness layout. The candidate identifies one proposed spend. Keep approved versions available for earlier outputs and record the applicable digest algorithm, chain context, and `scriptCode` per path.
 
@@ -42,4 +46,4 @@ Move an item to complete when its code, build command, and observed acceptance r
 - BIP143 ALL project WASM packages, with R1 and PELS Counter as fixture examples. [Wallet examples PR #89](https://github.com/linzhm/4thGraph/pull/89)
 - Exact-byte promotion of the existing dynamic BIP143 successor into the standard library. The state-label fixture uses two linked spends. R1 consumes the same library as an integration example. [Dynamic successor PR #90](https://github.com/linzhm/4thGraph/pull/90)
 
-The combined install check built one clean wheel from the review branches. It contained the formula fixtures, the WASI runtime, and both PELS library entry points. Outside the checkout, the installed formula runner replayed the Bézier baseline and stack plan on the same 625 vectors. The same installation replayed the packaged R1 receipt with pinned chain-gang 0.13.2.
+From the combined review branches, one wheel supplied the formula fixtures, the WASI runtime, and both PELS library entry points. Outside the checkout, the installed package passed all 625 Bézier vectors under both plans and replayed one R1 fixture spend with chain-gang 0.13.2. [Pinned commits, build commands, and replay results](architecture-wheel-replay.md)
