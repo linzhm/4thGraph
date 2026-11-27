@@ -92,59 +92,59 @@ REQUIRE stdlib/secp256k1.fth
 : bip340-window-row ( script cell -- script )
     ( The build argument is the depth of P.x. The top point is iQ. )
     ( Append iQ+P, iQ+2P and iQ+3P using the original affine P. )
-    swap 2 bip340-copy-point over 3 + bip340-copy-affine secp256k1-add-affine
-    2 bip340-copy-point over 6 + bip340-copy-affine secp256k1-add-affine
-    2 bip340-copy-point swap 9 + bip340-copy-affine secp256k1-add-affine
+    swap 2 bip340-copy-point over 3 + bip340-copy-affine 0 secp256k1-scaled-add-affine-with-field
+    2 bip340-copy-point over 6 + bip340-copy-affine 0 secp256k1-scaled-add-affine-with-field
+    2 bip340-copy-point swap 9 + bip340-copy-affine 0 secp256k1-scaled-add-affine-with-field
 ;
 
 : bip340-fixed-window-table ( script -- script )
-    ( H = 2^128*G. Affine entries are iH+jG, indexed by 4*i+j for indices 1..15. )
+    ( H = 2^128*G. Affine entries are the scaled images of iH+jG. )
     ( Push in descending index order so lookup depth increases with the index. )
     ( 3H + 3G )
-    bytes-hex 22f196effb7457a126d4ba1737d777b4ccb27ef9c5f71bc070662075e6fdb2a5 bsv-num-be
-    bytes-hex 698ae27abfd7e8022f475b9de5f656154d62c7b03709a9ffeb906106a64ea398 bsv-num-be
+    bytes-hex c08069beccafc29c6706b7eccd2e704074530db893f98e7e0913952fe327f956 bsv-num-be
+    bytes-hex e66f1389d1228ca131e0707e67b094844a942d639cbd6a69e14e42f129204533 bsv-num-be
     ( 3H + 2G )
-    bytes-hex 542a9e2c19b3cf8142d488691ce254c712bb38cc3ef541d87148da7f12a35efc bsv-num-be
-    bytes-hex 3c0836ac490413be3b801372e3f8c933ddb79683b5e734484cf6063b6a7570bc bsv-num-be
+    bytes-hex 1b09c95c145ac4cafb3411f7b2b83afb1a0e9187602fdcc242b7d039b7353937 bsv-num-be
+    bytes-hex d91b9324e364110e7abda266a1cd6be9c9e0acfd15c55ba3631f2a382b8127da bsv-num-be
     ( 3H + 1G )
-    bytes-hex cd8a35d25c3fb20209d4ec50084d510321d330a428875fbf9e768da89f7145f9 bsv-num-be
-    bytes-hex 27d7773283d0cef6c3878a53167e6665cd74a9ffc0dc2d68df8d3084831d6a36 bsv-num-be
+    bytes-hex 25666b4cfb79b2e3fd2b60586a0e089d6d28aea2d00c51ac5bdcd2f5dfbf69be bsv-num-be
+    bytes-hex 698952b11202a36a8597f267e77838dbb07d44ec3797ac38a909fb3a614d7dbb bsv-num-be
     ( 3H + 0G )
-    bytes-hex 38381dbe2e509f228ba93363f2451f08fd845cb351d954be18e2b8edd23809fa bsv-num-be
-    bytes-hex e4a32d0a0fb917dcb09405a5520eb1cc3681fccb32d8f24dbd707518331fed52 bsv-num-be
+    bytes-hex ab76f76bd3bdea038a1ceefd70230f592394a3480cbb77f3dd6ec887c9c32f60 bsv-num-be
+    bytes-hex b9c35d18b5230e5501c4de1c0e5d481747e9e16daa4dce93269e25d423da7899 bsv-num-be
     ( 2H + 3G )
-    bytes-hex 96bacf8f2b441e5fdc49d808b8dc940ac57141efeb781e0ecad616853f8cd25a bsv-num-be
-    bytes-hex 66f36fc677b9f4e10b9ceca3c17d7d81a968ca68382562d31eab7991be7de2c3 bsv-num-be
+    bytes-hex 2f021825b4a2b617454b76195550211327d534bfa21cc63e613618b2d65f5fd5 bsv-num-be
+    bytes-hex cd9ca68aa2b3ae054b888d9dc4cbe473ec8116582df11cc7becbe2f46d643f5c bsv-num-be
     ( 2H + 2G )
-    bytes-hex aca2e3e005a5d3391dede3942da3a5eeeb21e55d2ea3603514fe6d77e6d70daa bsv-num-be
-    bytes-hex 0484fd61c94008dea9dbafe7db6689f97edc7184ae19fc3466ed28c4df600f39 bsv-num-be
+    bytes-hex 415e055a974971b95fe98f323f190bdaf2378332e18b7aee41bf9dbfbbb8691a bsv-num-be
+    bytes-hex f5ee32d835ea3e128717f135deb5f62cb5332ae31455cac2e59649be8e46889f bsv-num-be
     ( 2H + 1G )
-    bytes-hex 2c0e4587cd0123c6505c7ce5bd2623d6ea8b0fa8270f23bf042f7989ce279a45 bsv-num-be
-    bytes-hex a02f612707d42762f45baa5c946801ebc881dbf3c5348ebeaa5491ed79858da8 bsv-num-be
+    bytes-hex 0a7002b30eb9a8d74356e594b0a227084640ae6c4052e9b6b940c71c9ec6fb0f bsv-num-be
+    bytes-hex 27ce87e2025045aa2382e6afc93b1337bebc1164e38b4c46774d566160a0a4a1 bsv-num-be
     ( 2H + 0G )
-    bytes-hex 4d49aefd784e8158fcafebe77fd9af59d89858ade7627eaee6847df84cf27076 bsv-num-be
-    bytes-hex cd32fc59a10dd135e723f210359ca6f06e0f2d1a7df4d8466b90b66203aa781e bsv-num-be
+    bytes-hex dcc614ca6913f9eaaf78cb2d45e29fdddc3cd8811c88ef04964db664590f2686 bsv-num-be
+    bytes-hex 31cfbcd20906dc85436f02d037770817ca5e8982e0900d7915ff4fbdd78c5fd1 bsv-num-be
     ( 1H + 3G )
-    bytes-hex d2083f9e07d640f2764fc7912d2f204420eceb4f0c00dd6eadba3cee444245e0 bsv-num-be
-    bytes-hex 4733802b0021932f71d0e9fb7d183b9bf8ad81dabf702624d9c332a8ce3b1f59 bsv-num-be
+    bytes-hex fa08163740e55dee891326dfdf30d553d09555497c4d85bb1d7a14444bbb86a0 bsv-num-be
+    bytes-hex 81ef831878fdd91a23a31463aa85321947f2527f339b6cb305687ae873a3cf62 bsv-num-be
     ( 1H + 2G )
-    bytes-hex d8cc055daffd5f37e6b42b7e9efe1edb7829273eb01b3379c3ee61f64cdbddf5 bsv-num-be
-    bytes-hex 1b6888517b304a07b392b1b73e355c3f7ca79ac797de7eaffe116e1069c1cf2e bsv-num-be
+    bytes-hex f686879fa354ac91f418e19ed6f243f838aba0da749ccdbac2c3acd82c24f761 bsv-num-be
+    bytes-hex fbee66c5cae8aac24a2ea18a0ba9f77875b4d1984cfca189053c5c3e331d5756 bsv-num-be
     ( 1H + 1G )
-    bytes-hex 8b300e513eff872cdaa6d12df54a3e332f27ce937be77e3e63c5e885114cbf09 bsv-num-be
-    bytes-hex 1cec30677f43c0cc446f0d466b8238ea08f6a7aa9aaf716926c6ff28b3b10a39 bsv-num-be
+    bytes-hex a70483e0b6c8e92d1c3621df08d515697d4cb95ef32220a7f10f27a713dffcb3 bsv-num-be
+    bytes-hex 7f8b470ebba7e4be292d7b5a3268132e6969c7d7623aed98110d81db637488b9 bsv-num-be
     ( 1H + 0G )
-    bytes-hex 8f68b9d2f63b5f339239c1ad981f162ee88c5678723ea3351b7b444c9ec4c0da bsv-num-be
-    bytes-hex 662a9f2dba063986de1d90c2b6be215dbbea2cfe95510bfdf23cbf79501fff82 bsv-num-be
+    bytes-hex 53627daf9bc9923562d2467ccd24596bf7dc8345317ac0d8a192ff23df70e140 bsv-num-be
+    bytes-hex 551c750058e66c83da017e7f8f61dbcd78e92bc9123f1045d68935db616540e4 bsv-num-be
     ( 0H + 3G )
-    bytes-hex f9308a019258c31049344f85f89d5229b531c845836f99b08601f113bce036f9 bsv-num-be
-    bytes-hex 388f7b0f632de8140fe337e62a37f3566500a99934c2231b6cb9fd7584b8e672 bsv-num-be
+    bytes-hex 11f9f794e1e908f08d1a7292b789cff6809e4e3655a18b95448940f8eaa098bf bsv-num-be
+    bytes-hex 594a0da00be1ffee31066c84281127e2b34cad3f2bcd4f1e47021503cc23c4fa bsv-num-be
     ( 0H + 2G )
-    bytes-hex c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5 bsv-num-be
-    bytes-hex 1ae168fea63dc339a3c58419466ceaeef7f632653266d0e1236431a950cfe52a bsv-num-be
+    bytes-hex 44d6beceecc78aa4a4fa56454f8f222d4de63d42438216b9002f185a7bbf7a98 bsv-num-be
+    bytes-hex e424c163bad80762ab0759ab9c4c2d1b8e0ef275ba1e6031809977256cd6ca28 bsv-num-be
     ( 0H + 1G )
-    bytes-hex 79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798 bsv-num-be
-    bytes-hex 483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8 bsv-num-be
+    bytes-hex 42d3bd21aea1c1e79058d690970ffc5eede9cebbe465250e53e9965741a42898 bsv-num-be
+    bytes-hex ab90aa570a2cf6d7845ec0ca06cc6bd9b9c687e0c37ab3091840a43560b247b3 bsv-num-be
 ;
 
 : bip340-check-half ( script -- script )
@@ -179,7 +179,8 @@ REQUIRE stdlib/secp256k1.fth
     ( The affine y coordinates agree when the scalar signs agree. Save +1 or -1. )
     4 script-pick-depth 2 script-pick-depth op-numequal op-2 op-mul op-1sub op-toaltstack
     op-toaltstack op-toaltstack op-toaltstack
-    op-3dup secp256k1-double 2 bip340-copy-point 8 bip340-copy-affine secp256k1-add-affine
+    op-3dup 0 secp256k1-scaled-double-with-field
+    2 bip340-copy-point 8 bip340-copy-affine 0 secp256k1-scaled-add-affine-with-field
     ( P, 2P, 3P. Restore Q to start its row. )
     3 script-restore-items 11 bip340-window-row
     ( The signed endomorphism maps 2P and 3P to the next row starts. )
@@ -250,6 +251,7 @@ REQUIRE stdlib/secp256k1.fth
 
 : bip340-joint-window-table ( script -- script )
     ( field r ry px py s k -> r ry TV1..TV15 TF15..TF1 field X Y Z. Save depth pairs on the altstack. )
+    op-toaltstack op-toaltstack secp256k1-scale-affine-pair op-fromaltstack op-fromaltstack
     bip340-variable-bases bip340-variable-window-table bip340-fixed-window-table
     op-fromaltstack bip340-half-radix op-2dup op-div op-toaltstack op-mod
     3 script-restore-items bip340-pack-windows bip340-window-depths op-toaltstack
@@ -261,14 +263,14 @@ REQUIRE stdlib/secp256k1.fth
     ( The input is zero or the lookup depth with the index and accumulator in place. )
     op-ifdup op-if
       ( Keep the depth on the main stack while copying X and Y. )
-      op-dup op-pick op-over op-pick op-rot op-1sub op-pick 1 secp256k1-add-with-field
+      op-dup op-pick op-over op-pick op-rot op-1sub op-pick 1 secp256k1-scaled-add-with-field
     op-endif
 ;
 
 : bip340-fixed-window-add ( script -- script )
     ( The input is zero or the depth of the affine x coordinate. )
     op-ifdup op-if
-      op-dup op-toaltstack op-pick op-fromaltstack op-pick 1 secp256k1-add-affine-with-field
+      op-dup op-toaltstack op-pick op-fromaltstack op-pick 1 secp256k1-scaled-add-affine-with-field
     op-endif
 ;
 
@@ -282,7 +284,7 @@ REQUIRE stdlib/secp256k1.fth
 
 : bip340-joint-window-step ( script -- script )
     ( Accumulator = 4*accumulator + one point from each table. )
-    1 secp256k1-double-pair-with-field bip340-window-addends
+    1 secp256k1-scaled-double-pair-with-field bip340-window-addends
 ;
 
 : bip340-joint-multiply ( script -- script )

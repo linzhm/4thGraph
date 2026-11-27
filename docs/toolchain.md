@@ -139,7 +139,7 @@ lock = builder.emit("bip340-verify", b"")
 
 验签片段要求主栈从底到顶为消息、公钥 x、公钥 y、64 字节签名、nonce y。坐标用 32 字节无符号大端编码，两个 y 均取偶数。验签成功留下一个真值，失败终止执行。调用者可在备用栈保留自己的数据。
 
-点加直接展开交叉项，并在栈项最后一次使用时移动该项。射影点加为 103 字节，右侧为仿射点的专用点加为 95 字节。倍点复用两项输出的中间值，编译为 58 字节。BIP340 验签词用 secp256k1 自同态分解公开挑战标量，在 64 个两位窗口中联合累加四个 128 位标量。[曲线运算](../src/fourthgraph/stdlib/secp256k1.fth) · [验签实现](../src/fourthgraph/stdlib/bip340.fth)
+标准库的 `secp256k1-scale-affine-pair` 将两个仿射点映射到 `3b = 1` 的同构曲线。缩放坐标使用 `secp256k1-scaled-add-with-field`、`secp256k1-scaled-add-affine-with-field`、`secp256k1-scaled-double-with-field` 和 `secp256k1-scaled-double-pair-with-field`。构建参数 0 表示域素数在主栈底，1 表示域素数紧邻待运算坐标下方。采用位置 1 时，缩放曲线的两种点加分别为 85 和 78 字节，连续两次倍点为 101 字节。BIP340 验签词用自同态分解公开挑战标量，在 64 个两位窗口中联合累加四个 128 位标量。[曲线运算](../src/fourthgraph/stdlib/secp256k1.fth) · [验签实现](../src/fourthgraph/stdlib/bip340.fth)
 
 独立的 P2PKH-Schnorr 示例把所有者承诺和交易绑定组合进付款锁，并通过统一钱包 SDK 构造和识别输出。[付款示例](../projects/p2pkh-schnorr/README.zh-CN.md) · [统一钱包 SDK](../sdk/README.zh-CN.md)
 

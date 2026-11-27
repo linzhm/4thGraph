@@ -253,7 +253,7 @@ class SchnorrTests(unittest.TestCase):
         self.assertEqual(raw, reference[:offset] + owner + reference[offset + 20:])
         self.assertEqual(compiled_template(owner), (raw, offset))
         self.assertEqual(recognize_template(raw), (TEMPLATE_VERSION, owner))
-        self.assertLess(len(raw), len(lock_for_owner(bytes(20), version="v0.13.0")))
+        self.assertLess(len(raw), len(lock_for_owner(bytes(20), version="v0.14.0")))
 
     def test_mixed_template_spend(self):
         public = self.public_keys[0]
@@ -268,6 +268,7 @@ class SchnorrTests(unittest.TestCase):
             "v0.11.0": "88b7b3a46548ca376a29fe04bb0deb11f2a503d9cf5de92e89604aa490660fdc",
             "v0.12.0": "0c867581a116fd86be8aaa6f3c700742d265df4473e77ba9f2344c13122841e2",
             "v0.13.0": "0c09881b86ddfa644701e4f2bd6bdeee5930095fcdfdaf07e2ce38be2f960f27",
+            "v0.14.0": "c70c3b816478caa5fa6086a770484e629d1df75c1477d8436875ea78c1f09f76",
         }
         for version, checksum in versions.items():
             raw = lock_for_public_key(public, version=version)
@@ -426,6 +427,12 @@ class SchnorrTests(unittest.TestCase):
         table = contract.emit("bip340-joint-window-table", b"")
         step = contract.emit("bip340-joint-window-step", b"")
         depths = contract.emit("bip340-window-depths", b"")
+        (scale_bytes,), alt = evaluate(contract.emit("secp256k1-scale-root", b""))
+        self.assertEqual(alt, [])
+        scale = decode_num(scale_bytes)
+        self.assertEqual(21 * pow(scale, 6, FIELD) % FIELD, 1)
+        scale_x, scale_y = pow(scale, 2, FIELD), pow(scale, 3, FIELD)
+        unscale_x, unscale_y = pow(scale_x, -1, FIELD), pow(scale_y, -1, FIELD)
 
         def check_point(coordinates, scalar):
             x, y, z = (decode_num(item) % FIELD for item in coordinates)
@@ -434,7 +441,8 @@ class SchnorrTests(unittest.TestCase):
                 self.assertNotEqual(y, 0)
             else:
                 inverse = pow(z, -1, FIELD)
-                self.assertEqual((x * inverse % FIELD, y * inverse % FIELD), affine_generator_multiple(scalar))
+                affine = (x * inverse * unscale_x % FIELD, y * inverse * unscale_y % FIELD)
+                self.assertEqual(affine, affine_generator_multiple(scalar))
 
         def fixed_depth(index):
             return 3 + 2 * index if index else 0
@@ -471,7 +479,7 @@ class SchnorrTests(unittest.TestCase):
             windows = self.window_stream(scalar_lanes)
             self.assertEqual(alt, [depth_pairs(windows)])
             self.assertEqual(len(built), 81)
-            self.assertEqual(list(map(decode_num, built[:2])), original[1:3])
+            self.assertEqual(list(map(decode_num, built[:2])), [123 * scale_x % FIELD, 456 * scale_y % FIELD])
             self.assertEqual(list(map(decode_num, built[-4:])), [FIELD, 0, 1, 0])
             for index in range(1, 16):
                 with self.subTest(public_multiple=public_multiple, table_index=index):
@@ -479,7 +487,8 @@ class SchnorrTests(unittest.TestCase):
                     start = 2 + 3 * (index - 1)
                     check_point(built[start:start + 3], high * q + low * p)
                     start = 47 + 2 * (15 - index)
-                    self.assertEqual(tuple(map(decode_num, built[start:start + 2])),
+                    x, y = map(decode_num, built[start:start + 2])
+                    self.assertEqual((x * unscale_x % FIELD, y * unscale_y % FIELD),
                                      affine_generator_multiple(high * HALF_RADIX + low))
 
             for fixed, variable in product(range(16), repeat=2):

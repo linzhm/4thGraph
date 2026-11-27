@@ -2,9 +2,9 @@
 
 [简体中文](spec.zh-CN.md) · [Project overview](../README.md)
 
-The owner field is HASH160 of the 32-byte BIP340 x-only public key. The rest of the file is fixed. Fill the owner slot identified in the manifest when creating a receive output. When recognizing an output, compare its length and all fixed bytes before taking the owner hash. [Frozen template](../versions/v0.14.0/template.hex) · [Layout](../versions/v0.14.0/layout.json)
+The owner field is HASH160 of the 32-byte BIP340 x-only public key. The rest of the file is fixed. Fill the owner slot identified in the manifest when creating a receive output. When recognizing an output, compare its length and all fixed bytes before taking the owner hash. [Frozen template](../versions/v0.15.0/template.hex) · [Layout](../versions/v0.15.0/layout.json)
 
-Versions 0.6.0 through 0.14.0 use the same `scriptCode` fragments for the current-input binding and the same witness encoding. A wallet can spend outputs from different versions in one transaction. [Version catalog](../versions/index.json)
+Versions 0.6.0 through 0.15.0 use the same `scriptCode` fragments for the current-input binding and the same witness encoding. A wallet can spend outputs from different versions in one transaction. [Version catalog](../versions/index.json)
 
 The wallet builds the BSV sighash preimage for the current input. The external signer receives SHA256d of that preimage as the 32-byte BIP340 message and returns the standard signature bytes. The lock verifies the signature and binds the same message to the current input with PUSHTX. BIP143 ALL is the wallet default. A wallet must supply trusted Chronicle activation context for OTDA and a same-index output for SINGLE. [Forth contract](../reference/schnorr.fth)
 
@@ -20,18 +20,24 @@ After checking the witness lengths, the verifier hashes the original `r`, public
 
 The detached verifier consumes message, public x, public y, signature, and nonce y. Use it for conformance tests. Use the fixed payment template to lock a UTXO. The copied official CSV fixture is pinned to the Bitcoin BIPs commit below. [Official test vectors](https://github.com/bitcoin/bips/blob/200f9b26fe0a2f235a2af8b30c4be9f12f6bc9cb/bip-0340/test-vectors.csv)
 
+## Coordinate scaling
+
+The verifier uses the original secp256k1 coordinates for the witness checks and challenge hash. For point arithmetic it maps `(X:Y:Z)` to `(u²X:u³Y:Z)` over the same field, using a fixed nonzero `u` with `21u⁶ = 1 mod p`. This maps `y² = x³ + 7` to `y² = x³ + 1/3`, preserves the group law, and fixes infinity. The public and nonce points are scaled in Script. The fixed table contains the scaled generator multiples. Endpoint comparisons are performed on the scaled curve. [Shared curve kernels](../../../src/fourthgraph/stdlib/secp256k1.fth)
+
+To derive the constant, set `t = 21⁻¹ mod p` and `m = (p−1)/3`. Here `t^m = 1`, `3` is invertible modulo `m`, and `p ≡ 3 mod 4`. Compute `A = t^(3⁻¹ mod m) mod p` and `B = t^((p+1)/4) mod p`. Then `A³ = B² = t` and `u = B/A` has `u² = A` and `u³ = B`. [Scale constant and independent arithmetic tests](../../../tests/test_secp256k1_library.py)
+
 <a name="compact-doubling"></a>
 
 ## Compact doubling
 
-The accumulator uses homogeneous coordinates with `X³ = Y²Z − 7Z³` modulo the field prime. Substituting equal points into complete addition gives the cross terms `2XY`, `2XZ`, and `2YZ`. Applying the curve equation gives the following coordinates for the doubled point. [Forth kernel](../../../src/fourthgraph/stdlib/secp256k1.fth)
+For the scaled curve, `X³ = Y²Z − Z³/3` modulo the field prime. Substituting equal points into complete addition gives the cross terms `2XY`, `2XZ`, and `2YZ`. Applying the curve equation gives the following coordinates for the doubled point. [Forth kernel](../../../src/fourthgraph/stdlib/secp256k1.fth)
 
-- Set `a = Y²`, `t = 21Z²`, and `q = 3t`.
+- Set `a = Y²`, `t = Z²`, and `q = 3t`.
 - Compute `X' = 2XY(a − q)`, `Y' = a(a + 2q) − q*t`, and `Z' = 8Y³Z` modulo the field prime.
 
 For infinity `(0:Y:0)` with nonzero `Y`, the result is `(0:Y⁴:0)`.
 
-In each pair of doublings, the first doubling reduces `Y'` and `Z'` immediately. The second doubling computes `Y''` and `Z''` solely from those two coordinates, and `X''` is linear in `X'`. One reduction after the pair therefore suffices for X. The absolute value of the factor multiplying X in each doubling is below `126p³`. Starting with coordinates of absolute value below the field prime `p`, the unreduced X after two doublings is bounded by `126²p⁷`, which fits in a 226-byte ScriptNum.
+In each pair of doublings, the first doubling reduces `Y'` and `Z'` immediately. The second doubling computes `Y''` and `Z''` solely from those two coordinates, and `X''` is linear in `X'`. One reduction after the pair therefore suffices for X. On the scaled curve the absolute value of the factor multiplying X in each doubling is below `6p³`. Starting with reduced coordinates, the unreduced X after two doublings is bounded by `36p⁷`, which fits in a 225-byte ScriptNum.
 
 ## Joint scalar multiplication
 
@@ -39,7 +45,7 @@ Let `k = n − e` and `B = 2^128`. The lock splits `s` into `s0 + B*s1` and uses
 
 The lattice basis obeys `ai + bi*λ ≡ 0 (mod n)` and has determinant `n`. The lock computes `c1 = round(k*b2/n)` and `c2 = round(-k*b1/n)` with exact integer division. Subtracting the two basis multiples from `(k, 0)` gives the signed pair `(k1, k2)`. Each coordinate error is bounded by half the sum of the absolute basis components in that coordinate. The lock also checks both magnitudes against `B`. When `e = 0`, the split of `k = n` gives zero in both components. [Scalar split](../../../src/fourthgraph/stdlib/secp256k1.fth)
 
-The verifier computes `s0*G + s1*H + k1*P + k2*φ(P)` in 64 two-bit windows. It uses a fixed affine table for `G,H` and a projective table for `P,φ(P)` with the respective signs applied. Each row of the variable table is constructed by repeatedly adding the validated affine point P. Each window selects one entry from each table with `4*highDigit + lowDigit`. After the first window, the accumulator doubles twice before each selection. The initial accumulator is infinity. Index zero skips addition. Variable table construction and fixed point accumulation use complete addition specialized to a right-hand point with `Z = 1`. [Mixed addition](../../../src/fourthgraph/stdlib/secp256k1.fth)
+The verifier computes the scaled image of `s0*G + s1*H + k1*P + k2*φ(P)` in 64 two-bit windows. The fixed affine table contains scaled images of `G,H` combinations. The projective table uses scaled `P,φ(P)` with the respective signs applied. Each row of the variable table is constructed by repeatedly adding the scaled affine point P. Each window selects one entry from each table with `4*highDigit + lowDigit`. After the first window, the accumulator doubles twice before each selection. The initial accumulator is infinity. Index zero skips addition. Variable table construction and fixed point accumulation use complete addition specialized to a right-hand point with `Z = 1`. [Mixed addition](../../../src/fourthgraph/stdlib/secp256k1.fth)
 
 The verifier packs the four 128-bit components into a 64-byte value. For lane `ℓ` in `(s0, s1, |k1|, |k2|)` and two-bit digit `d = 4q + r` counted from the least significant end, the concatenated little-endian encoding places that digit at bit-pair position `j = 64ℓ + 4(15 − q) + r`. Six masked swaps implement `rotl8(j, 2) XOR 0xf0 = 4d + ℓ`. Each resulting byte carries the fixed digit in its low nibble and the variable digit in its high nibble. [Index packing](../../../src/fourthgraph/stdlib/bip340.fth)
 
