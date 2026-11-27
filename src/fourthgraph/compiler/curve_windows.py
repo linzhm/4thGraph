@@ -80,12 +80,12 @@ class SignedRadix4Window:
     maximum_magnitude: int
     carry: bool
 
-    def split(self, scalar, *, add=add, sub=sub, divide=divmod):
-        """Return the digit and the remaining scalar using host or Script operations."""
+    def split(self, scalar, *, add=add, sub=sub, divide=divmod, shifted=False):
+        """Return the digit and quotient, optionally keeping the carry window's digit offset by one."""
         if not self.carry:
             return scalar, 0
         high, low = divide(add(scalar, 1), 4)
-        return sub(low, 1), high
+        return (low if shifted else sub(low, 1)), high
 
 
 def signed_radix4(maximum):

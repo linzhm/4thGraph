@@ -79,7 +79,9 @@ class ScalarRecodingTests(unittest.TestCase):
             for value in inputs:
                 remaining, reconstructed = value, 0
                 for index, window in enumerate(plan):
+                    shifted, quotient = window.split(remaining, shifted=True)
                     digit, remaining = window.split(remaining)
+                    self.assertEqual((shifted, quotient), (digit + int(window.carry), remaining))
                     self.assertLessEqual(abs(digit), window.maximum_magnitude)
                     self.assertGreaterEqual(digit, -1 if window.carry else 0)
                     reconstructed += digit << (index * 2)
