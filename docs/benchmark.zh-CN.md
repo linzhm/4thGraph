@@ -98,3 +98,32 @@ done
 测试先用节点钱包入金，再记录内存池判定，并检查生成的区块是否实际包含交易。
 生成的证据区分入金、激活和退出。这里测量本地节点的代表性退出场景，
 矿工节点的策略需要另行验证。
+
+## 优化回归矩阵
+
+在仓库根目录运行。先执行 `python -m pip install -e .` 安装 4thGraph，再安装 [Chronicle 固定版本](../tools/requirements-chronicle.txt)、
+`ecdsa==0.19.1`、`coincurve==21.0.0` 和 `cryptography>=43`。ML-DSA
+测试签名需要 OpenSSL 3.5 或以上版本。
+
+```sh
+python -m unittest -v tests.test_optimization_matrix
+bash tools/verify_node.sh -- python -m unittest -v tests.test_optimization_matrix
+```
+
+如果已安装的同版本构建缺少 Chronicle 上下文接口，可运行
+`python -m pip install --force-reinstall --no-deps -r tools/requirements-chronicle.txt`
+切换到仓库固定提交。
+
+第一条命令使用 chain-gang 验证完整交易，第二条命令额外使用 BSV Node 1.2.3
+逐输入核对。可用 `python -m tests.test_optimization_matrix <项目目录名>`
+单独运行一个项目。
+
+支付用例跨交易版本、输入输出数量、上一输出索引和混合 sighash 模式，分别检查
+正常交易、锁定时间变化、末尾输出变化和缺失见证。4thGraph 的计数器用例跨初始
+状态和费用规则，核对各编译候选对正确后继、错误状态和错误金额的判定。
+
+赞助支付矩阵覆盖每个支付模板的 12 种 ForkID 和 Chronicle OTDA sighash 组合。
+用例交替使用交易版本 1 和 2，并使用 252 和 253 字节的找零脚本跨越 CompactSize
+边界。每行检查原始交易、更改同索引输出和非同索引输出、追加输入，以及修改赞助输入
+的序列号。延迟激活即使使用 SIGHASH_NONE 也必须保留同索引输出。计数器矩阵还验证
+连续花费两次，并拒绝将第二跳见证用于初始输出。
