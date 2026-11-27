@@ -2,6 +2,24 @@
 
 [项目主页与实测结果](../README.zh-CN.md#实测结果) · [版本索引](../versions/index.json) · [历史基准](history.md)
 
+## 无窗口的 Forth 参考基线
+
+[普通 R1 入口](r1-baseline.fth) 分别用同一个 256 位倍加词计算 `vQ` 和 `uG`。由 ScriptBuilder 展开固定的位循环。坐标采用现有 `r1-add-points` 的齐次表示，倍点也调用同一个完整点加公式。见证校验、范围、逆元检查和原生交易绑定沿用现有 R1 语义。基线构建省略 `--optimize`。
+
+[带后继断言的 R1 入口](r1-baseline-counter.fth) 调用独立的 [PELS 片段](pels-successor.fth)。调用方只提供从旧状态和输入金额计算后继状态、金额的规则。片段封装 BIP143 ALL 原像解析、单输入检查、CompactSize 和完整输出承诺比对。计数器规定唯一后继、计数加一（u32 回绕）、扣除固定 1,000 sat 并延续同一份合约代码。入口的单个 `OP_CODESEPARATOR` 位于五字节状态之后，原生签名验证覆盖整个合约体。两处检查使用同一个完整原像。
+
+从仓库根目录执行：
+
+```sh
+PYTHONPATH=src:. python projects/p2pkh-r1/forth/compile_r1.py --entry r1-baseline-lock
+PYTHONPATH=src:. python projects/p2pkh-r1/forth/compile_r1.py \
+  --entry r1-baseline-counter --counter-state 0
+PYTHONPATH=src:.:projects/p2pkh-r1/forth:projects/p2pkh-r1/reference \
+  bash tools/verify_node.sh -- python -m unittest test_r1_baseline test_compile_r1 test_msm
+```
+
+前两条命令输出锁十六进制、字节数和源码依赖摘要。测试用合成父输出验证 BIP143、OTDA、无配对 SINGLE、连续计数及重新签名的错误后继。结果覆盖脚本验证。两种锁都是实验参考入口，发布钱包模板继续使用版本清单。
+
 `msm.fth` 用显式的 P‑256 双标量乘法表达窗口计算。编译器扫描固定生成元、标量范围和曲线点校验，比较各构造的实际锁与付款字节数，并逐字节核对 OTDA 重建。
 
 `compare --candidate v0.6.0` 直接读取并核对冻结的锁和 OTDA 重建程序，占用一个本地候选名额和一个付款复放名额。传入构造名时从 Forth 编译。v0.6.0 和 v0.7.0 使用同一份两进两出夹具。 [v0.6.0 清单](../versions/v0.6.0/manifest.json) · [v0.7.0 清单](../versions/v0.7.0/manifest.json)
