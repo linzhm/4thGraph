@@ -294,6 +294,19 @@ class FormulaExperiments(unittest.TestCase):
         self.assertEqual(row["test"]["spend"]["diagnostic"], "fixture rejection")
         self.assertEqual(report["ranking"], [])
 
+    def test_spend_engine_error_does_not_count_as_a_rejected_witness(self):
+        self._require_pinned_chain()
+        request = {"fixture": "square", "evaluation": "spend", "plans": [{}]}
+        with patch("fourthgraph.bsv.chain_gang.validate_at_heights",
+                   side_effect=[None, RuntimeError("engine unavailable")]):
+            report = run(request)
+        row, = report["candidates"]
+        receipt = row["test"]["spend"]
+        self.assertEqual((receipt["status"], receipt["expected"], receipt["observed"]),
+                         ("failed", "rejected", "error"))
+        self.assertEqual(receipt["diagnostic"], "engine unavailable")
+        self.assertEqual(report["ranking"], [])
+
     def test_invalid_candidates_and_limits(self):
         report=run({"fixture":"square","plans":[{"passes":["search"]},{},{"passes":[]}]})
         self.assertEqual(report["candidates"][0]["test"]["status"],"not_run")

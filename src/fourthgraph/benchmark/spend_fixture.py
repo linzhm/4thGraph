@@ -3,6 +3,7 @@
 from hashlib import sha256
 from importlib.metadata import PackageNotFoundError
 
+from fourthgraph.bsv.differential import is_chain_gang_script_rejection
 from fourthgraph.bsv.script import asm, number
 from fourthgraph.bsv.transaction import Input, Output, Transaction
 from .validation import CONTEXT_PIN, chain_metadata
@@ -50,7 +51,7 @@ def _verdict(validate, transaction, parent):
         validate(transaction, (parent,), **CONTEXT)
         return "accepted", None
     except (ValueError, RuntimeError) as exc:
-        return "rejected", str(exc)
+        return ("rejected" if is_chain_gang_script_rejection(exc) else "error"), str(exc)
 
 
 def check_spends(fixture, script):
