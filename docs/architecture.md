@@ -34,6 +34,8 @@ For independent acceptance, use a neutral point-addition caller and reuse the st
 
 Optimize methods with interacting regions through bounded ordered pairs. A method declares its scope and prerequisites and applies to the current state. A 5×5 experiment applies the row method before the column method and records the reverse order as a separate cell. Use another frozen seed to compare methods with a shared prerequisite. Keep plan identity even when both paths emit the same artifact, and reuse verification when the exact linked bytes and fixture agree. Rank the verified spend by target. [R1 matrix example](optimization-paths.md#r1-ordered-method-exploration)
 
+The compiler can also continue beyond pairs. It expands legal methods from each state until there is no new state or a budget is reached. Deduplicate expansion using the complete state that determines future applicability, such as bindings, representation and proven facts. A report keeps converging edges and can replay the search under the same budget.
+
 ## Build and spend boundary
 
 - **Standalone compilation.** `4thgraph SOURCE --entry WORD` emits the Script bytes, stack signature, and build metadata such as source and artifact hashes.

@@ -365,11 +365,20 @@ def dump(value, output=None):
 
 
 def main():
+    from fourthgraph.benchmark.method_matrix import MAX_ORDER_DEPTH, MAX_ORDER_STATES
+
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
-    matrix = sub.add_parser("method-matrix", help="compile and verify the ordered R1 method pairs")
-    matrix.add_argument("--output", type=Path)
-    matrix.add_argument("--replay", type=Path, help="require exact agreement with a previous method-matrix report")
+    for name, help_text in (("method-matrix", "compile and verify the ordered R1 method pairs"),
+                            ("method-search", "expand eligible R1 method sequences and verify their costs")):
+        command = sub.add_parser(name, help=help_text)
+        command.add_argument("--output", type=Path)
+        command.add_argument("--replay", type=Path, help="require exact agreement with a previous report")
+        if name == "method-search":
+            command.add_argument("--max-depth", type=int, choices=range(1, MAX_ORDER_DEPTH + 1),
+                                 metavar=f"1..{MAX_ORDER_DEPTH}")
+            command.add_argument("--max-states", type=int, choices=range(1, MAX_ORDER_STATES + 1),
+                                 metavar=f"1..{MAX_ORDER_STATES}")
     for name in ("scan", "local", "build", "compare"):
         command = sub.add_parser(name)
         command.add_argument("--source", type=Path,
@@ -395,17 +404,30 @@ def main():
             command.add_argument("--markdown", type=Path)
             command.add_argument("--reference", type=Path, help="previous R1 comparison report (schema version 2)")
     args = parser.parse_args()
-    if args.command == "method-matrix":
-        from r1_method_matrix import SCHEMA, run_experiment
+    if args.command in ("method-matrix", "method-search"):
+        from r1_method_matrix import SCHEMA, SEARCH_SCHEMA, run_experiment
 
+        search = args.command == "method-search"
         try:
             previous = json.loads(args.replay.read_text()) if args.replay else None
-            if args.replay and (not isinstance(previous, dict) or previous.get("schema") != SCHEMA):
-                raise ValueError("expected an R1 method-matrix report")
-            report = run_experiment()
+            schema = SEARCH_SCHEMA if search else SCHEMA
+            if args.replay and (not isinstance(previous, dict) or previous.get("schema") != schema):
+                raise ValueError(f"expected an R1 {args.command} report")
+            budget = None
+            if search:
+                requested = {"max_depth": args.max_depth, "max_states": args.max_states}
+                if previous is None:
+                    budget = {"max_depth": args.max_depth or MAX_ORDER_DEPTH,
+                              "max_states": args.max_states or MAX_ORDER_STATES}
+                else:
+                    budget = previous["search"]["budget"]
+                    if set(budget) != set(requested) or any(
+                            value is not None and value != budget[key] for key, value in requested.items()):
+                        raise ValueError("method search replay requires the recorded budget")
+            report = run_experiment(search_budget=budget)
             if args.replay and previous != json.loads(json.dumps(report)):
-                raise ValueError("method-matrix replay differs from the recorded evidence")
-        except (OSError, ValueError) as error:
+                raise ValueError(f"{args.command} replay differs from the recorded evidence")
+        except (KeyError, OSError, TypeError, ValueError) as error:
             parser.error(str(error))
         dump(report, args.output)
         return 0 if report["status"] == "passed" else 1

@@ -38,6 +38,8 @@ Applying affine specialization before stack search emits a 41,927 B lock. Applyi
 
 The run records all 50 ordered pairs. The 25 eligible cells link to nine distinct lock and reconstruction artifacts, each verified against actual fixture prevouts by pinned chain-gang. The report ranks targets separately and can be reproduced with `method-matrix --replay`. [Build and replay](../projects/p2pkh-r1/forth/README.md)
 
+The `method-search` command starts from the generic split state and expands every applicable method, including independent G-window widening. The measured run on six registered methods exhausted the reachable graph after 19 compiler states and 114 attempted transitions. The longest discovered prefix had five methods. BIP143 ALL selected affine G, compact G and the shortened guard in sequence, while both OTDA modes selected the single joint-window step. `--replay` uses the original budget.
+
 ## Ordered formula rules
 
 Use these rules on closed formulas whose caller establishes canonical ScriptNum encodings and the declared input intervals.

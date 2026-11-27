@@ -1,4 +1,4 @@
-"""Compare ordered pairs of R1 optimizations against fixed Forth and payment inputs."""
+"""Explore ordered R1 methods against fixed Forth and payment inputs."""
 
 from dataclasses import dataclass, replace
 from functools import cache, partial
@@ -11,7 +11,7 @@ from compile_r1 import (BASELINE_DEPENDENCIES, BASELINE_SOURCE_SHA256, ENTRY_SOU
 from fourthgraph import PROJECT_VERSION
 from fourthgraph.benchmark import method_matrix
 from fourthgraph.benchmark.experiment import digest as digest_report
-from fourthgraph.benchmark.method_matrix import IneligibleMethod, Method, explore_pairs
+from fourthgraph.benchmark.method_matrix import IneligibleMethod, Method, explore_orders, explore_pairs
 from fourthgraph.benchmark.cases import native_coin, synthetic_parent
 from fourthgraph.benchmark.validation import (
     ACTIVATION_HEIGHT, CONTEXT_PIN, SPEND_HEIGHT, UTXO_HEIGHT, chain_metadata, stack_profile,
@@ -27,12 +27,17 @@ from replay_r1 import FIXTURE, FIXTURE_PATH, MODES, signer, spend
 
 
 SCHEMA = "4thgraph.r1-method-matrix/1"
+SEARCH_SCHEMA = "4thgraph.r1-method-search/1"
 METHODS = {
     "joint-window": ("window schedule and G/Q tables", "no fixed-G specialization"),
     "affine-g": ("G table call and point-add kernel", "separate G table and proof for nonzero digits"),
     "compact-g": ("G table representation, lookup and cleanup", "affine G specialization"),
     "ifdup": ("zero-digit guard feeding the affine call", "affine G specialization"),
     "point-add-stack-search": ("point-add kernels visible at this step", "typed point-add formulas"),
+}
+SEARCH_METHODS = {
+    **METHODS,
+    "widen-g-window": ("fixed G digit extraction, table and call schedule", "separate G table with sufficient slots"),
 }
 TERMINAL = ("rewrite", "share", "stack", "search")
 STALE_ERROR = "Error evaluating the script `Top of stack is false`"
@@ -69,6 +74,15 @@ def apply(method, state, *, backend, scheduled):
         if not strategy.affine_g:
             raise IneligibleMethod("the zero-digit skip guard needs the affine G call")
         return replace(state, strategy=replace(strategy, affine_guard_ifdup=True))
+    if method == "widen-g-window":
+        if strategy.joint:
+            raise IneligibleMethod("the joint window cannot widen G independently of Q")
+        wider = replace(strategy, width=6, q_width=strategy.q_width or strategy.width)
+        try:
+            backend.plan(wider.name)
+        except ValueError as error:
+            raise IneligibleMethod(str(error)) from error
+        return replace(state, strategy=wider)
     if method != "point-add-stack-search":
         raise ValueError(f"unknown R1 method {method!r}")
     return replace(state, projective=scheduled["projective"],
@@ -127,7 +141,7 @@ def replay(lock, pattern):
     return rows
 
 
-def run_experiment():
+def run_experiment(*, search_budget=None):
     engine = chain_metadata()
     if engine["commit"] != CONTEXT_PIN:
         raise ValueError("expected pinned chain-gang")
@@ -182,15 +196,23 @@ def run_experiment():
         status = "verified" if receipts[key]["test"]["status"] == "passed" else "test_failed"
         return {"status": status, "artifact": key}
 
+    registry = METHODS if search_budget is None else SEARCH_METHODS
     methods = {name: Method(region, requires, partial(apply, name, backend=backend, scheduled=scheduled))
-               for name, (region, requires) in METHODS.items()}
-    seeds = {"from_split": start, "from_affine": methods["affine-g"].apply(start)}
-    matrices = explore_pairs(seeds, methods, describe=info, evaluate=build)
+               for name, (region, requires) in registry.items()}
+    if search_budget is None:
+        seeds = {"from_split": start, "from_affine": methods["affine-g"].apply(start)}
+        matrices = explore_pairs(seeds, methods, describe=info, evaluate=build)
+        rows = [(seed, row) for seed, matrix in matrices.items() for row in (matrix["baseline"], *matrix["cells"])]
+        exploration = {"schema": SCHEMA, "matrices": matrices}
+    else:
+        search = explore_orders(start, methods, describe=info, evaluate=build, **search_budget)
+        rows = [("from_split", row) for row in search["states"]]
+        exploration = {"schema": SEARCH_SCHEMA, "search": search}
+
     plans = {}
-    for seed, matrix in matrices.items():
-        for row in (matrix["baseline"], *matrix["cells"]):
-            if row["status"] == "verified":
-                plans.setdefault(row["artifact"], {"seed": seed, "order": row["order"], "artifact": row["artifact"]})
+    for seed, row in rows:
+        if row["status"] == "verified":
+            plans.setdefault(row["artifact"], {"seed": seed, "order": row["order"], "artifact": row["artifact"]})
     rankings = {
         mode: sorted(plans.values(), key=lambda plan: receipts[plan["artifact"]]["test"]["modes"][mode]["total_bytes"])
         for mode in MODES
@@ -203,7 +225,7 @@ def run_experiment():
         tools.update({f"p2pkh-r1/{path.relative_to(project)}": digest(path.read_bytes())
                       for path in sorted((project / directory).glob("*.py"))})
     report = {
-        "schema": SCHEMA, "compiler_version": PROJECT_VERSION, "python": platform.python_version(),
+        **exploration, "compiler_version": PROJECT_VERSION, "python": platform.python_version(),
         "source_sha256": digest(source), "imports": imports, "target_terminal_passes": TERMINAL,
         "fixture": {"sha256": digest(FIXTURE_PATH.read_bytes()), "shape": [2, 2],
                     "transaction_version": FIXTURE["transaction_version"], "engine": engine,
@@ -211,11 +233,9 @@ def run_experiment():
                     "utxo_height": UTXO_HEIGHT},
         "tool_sha256": digest_report(tools),
         "methods": {name: {"region": method.region, "requires": method.requires} for name, method in methods.items()},
-        "matrices": matrices, "artifacts": receipts, "rankings": rankings,
+        "artifacts": receipts, "rankings": rankings,
     }
     failures = {"compile_failed", "test_failed"}
-    status = "failed" if any(
-        row["status"] in failures for matrix in matrices.values() for row in (matrix["baseline"], *matrix["cells"])
-    ) else "passed"
+    status = "failed" if any(row["status"] in failures for _, row in rows) else "passed"
     report["status"] = status
     return {**report, "run_id": digest_report(report)}

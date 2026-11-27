@@ -89,6 +89,21 @@ python "$project/forth/msm_experiment.py" method-matrix --replay /tmp/r1-methods
 [矩阵结果（中）](../../../docs/optimization-paths.zh-CN.md#r1-有序方法探索) ·
 [Matrix results (EN)](../../../docs/optimization-paths.md#r1-ordered-method-exploration)
 
+### 自动扩展方法顺序
+
+`method-search` 从通用分表起步，逐层尝试当前状态可用的方法。方法数量由登记
+和前提决定。每个完整编译器状态只扩展一次，报告保留通往同一状态的其他顺序
+和不适用原因。允许在状态变化后再次应用同一方法。搜索默认最多 8 步和 64 个
+状态，合法状态用尽时提前停止。可用 `--max-depth` 和 `--max-states` 缩小预算。
+
+```sh
+python "$project/forth/msm_experiment.py" method-search --output /tmp/r1-method-search.json
+python "$project/forth/msm_experiment.py" method-search --replay /tmp/r1-method-search.json
+```
+
+重放使用回执里的预算。排名使用同一份两进两出夹具的实测资金交易加花费字节，
+BIP143 ALL、OTDA ALL 和配对 OTDA SINGLE 各自选出最小路径。
+
 `msm.fth` 用显式的 P‑256 双标量乘法表达窗口计算。编译器扫描固定生成元、标量范围和曲线点校验，比较各构造的实际锁与付款字节数，并逐字节核对 OTDA 重建。
 
 `compare --candidate v0.6.0` 直接读取并核对冻结的锁和 OTDA 重建程序，占用一个本地候选名额和一个付款复放名额。传入构造名时从 Forth 编译。v0.6.0 和 v0.7.0 使用同一份两进两出夹具。 [v0.6.0 清单](../versions/v0.6.0/manifest.json) · [v0.7.0 清单](../versions/v0.7.0/manifest.json)
