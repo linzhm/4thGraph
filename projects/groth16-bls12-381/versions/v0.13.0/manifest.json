@@ -5,7 +5,9 @@
   "fixtures": [],
   "evidence": [
     "measurements.json",
-    "replay-plan.json"
+    "replay-plan.json",
+    "nchain-comparison.json",
+    "public-comparison.json"
   ],
   "shared_data": [
     "versions/v0.1.0/input-sources.json"

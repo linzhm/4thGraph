@@ -84,6 +84,6 @@ sections:
       - v0.13.0 批量处理 Jacobian Z 坐标的缩放，并省去布尔指令前的重复数值转换。Genesis 路径再减 897 B，Chronicle 再减 651 B。[v0.13.0 实测](versions/v0.13.0/measurements.json)
   reproduction:
     en:
-      - The current pinned plan checks the Forth module hashes, lock bytes and both witnesses before writing artifacts. The funded replay mines both valid spends and rejects swapped statements and G1 points outside the subgroup. [Verification guide](docs/verification.en.md) · [nChain comparison](versions/v0.11.0/nchain-comparison.json)
+      - The current pinned plan checks the Forth module hashes, lock bytes and both witnesses before writing artifacts. The funded replay mines both valid spends and rejects swapped statements and G1 points outside the subgroup. [Verification guide](docs/verification.en.md) · [nChain and sCrypt comparison](docs/verification.en.md#nchain-and-scrypt-comparison)
     zh-CN:
-      - 当前锁定计划在输出产物前校验 Forth 模块摘要、锁脚本和两份见证。入金回放将有效花费打包入块，并拒绝互换公开声明和 G1 点不在子群内的用例。[验证与复现指南](docs/verification.zh-CN.md) · [nChain 同夹具对照](versions/v0.11.0/nchain-comparison.json)
+      - 当前锁定计划在输出产物前校验 Forth 模块摘要、锁脚本和两份见证。入金回放将有效花费打包入块，并拒绝互换公开声明和 G1 点不在子群内的用例。[验证与复现指南](docs/verification.zh-CN.md) · [nChain 与 sCrypt 对照](docs/verification.zh-CN.md#nchain-与-scrypt-对照)

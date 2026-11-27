@@ -54,7 +54,45 @@ v0.12.0 沿用 v0.11.0 的 MSM 和 Miller 计划，比较每次 G1 倍点归约�
 
 v0.13.0 比较 1、4、8、16 次 G1 倍点的 Z 坐标分批方案，每种分别测试布尔优化。搜索选中启用布尔优化的 16 次分批方案。锁加见证为 Genesis 237,225 B、Chronicle 236,566 B。两份见证哈希一致，实测栈峰值为 29,891 B。配对验证耗时有升有降，报告记录了 4、8、16 次分批方案与 v0.12.0 的中位数。[v0.13.0 实测](../versions/v0.13.0/measurements.json)
 
-nChain 对照使用相同的 BLS12-381 验证密钥、两份证明和五个有界动态输入。v0.11.0 路径为 239,404 B，nChain `fc20fb7` 三种布局、三档取模阈值中最短的路径为 394,212–396,635 B。nChain 投影布局的见证为 1,112–1,134 B。[同夹具对照实测](../versions/v0.11.0/nchain-comparison.json)
+## nChain 与 sCrypt 对照
+
+Genesis regtest 使用同一把 BLS12-381 验证密钥、两份证明、五个有界的花费时公开输入和同一交易版本。序列化脚本路径包含锁定脚本、解锁脚本及各自的 CompactSize 长度。区间对应两份证明。[v0.13.0 入金回放](../versions/v0.13.0/nchain-comparison.json)
+
+| 实现和布局 | 锁定脚本 | 解锁脚本 | 序列化脚本路径 |
+| --- | ---: | ---: | ---: |
+| 4thGraph v0.13.0，仿射坐标，链上计算配对线函数 | 227,839 B | 9,378 B | 237,225 B |
+| nChain 仿射，固定配对梯度放在锁中 | 385,600 B | 8,604–11,027 B | 394,212–396,635 B |
+| nChain 仿射，配对梯度放在见证中 | 373,355 B | 21,926–24,349 B | 395,289–397,712 B |
+| nChain 投影坐标 | 448,202 B | 1,112–1,134 B | 449,322–449,344 B |
+
+4thGraph 的路径比受测 nChain 的最短路径少 39.8–40.2%。nChain 的投影坐标布局解锁脚本最小。8 笔有效花费全部出块，8 个交叉声明用例均被 BSV Node 和 chain-gang 拒绝。nChain 使用未修改的 `fc20fb7`，取模阈值为前次三档扫描选出的 6,400 位。[nChain 源码](https://github.com/nchain-innovation/zkscript_package/tree/fc20fb743edbc5bc5aba9d16625d50d1f50a3ef4) · [前次扫描数据](../versions/v0.11.0/nchain-comparison.json)
+
+下表使用各方公开示例原有的密钥和声明，按交易的指定输入和输出统计字节数。sCrypt BLS12-381 示例公布了部署交易，因此这里有锁定脚本数据。sCrypt 因数分解教程采用 BN254 和一个固定公开输入。[交易 ID 与摘要](../versions/v0.13.0/public-comparison.json) · [nChain 论文](https://eprint.iacr.org/2024/1498) · [sCrypt BLS12-381 示例](https://scryptplatform.medium.com/guest-post-elliptic-curve-bls12-381-support-on-bitcoin-bc7bfa605135) · [sCrypt BN254 教程](https://docs.scrypt.io/bsv-docs/tutorials/zkp/)
+
+| 公开示例 | 网络和曲线 | 锁定脚本 | 解锁脚本 | 序列化脚本路径 |
+| --- | --- | ---: | ---: | ---: |
+| nChain Groth16 | BSV 主网，BLS12-381 | 482,601 B | 39,876 B | 522,485 B |
+| sCrypt 编写的 BLS12-381 库示例 | BSV 测试网，BLS12-381 | 27,549,371 B | — | — |
+| sCrypt 因数分解教程 | BSV 测试网，BN254 | 1,515,332 B | 264 B | 1,515,604 B |
+
+从仓库根目录用固定 chain-gang 绑定的 Python 环境执行。nChain 生成器的依赖装在独立的 Python 3.12 环境里。最后一条命令下载公开交易或读取缓存，校验交易 ID 和脚本字节数。
+
+```sh
+checkout="$PWD"
+ref="$checkout/projects/groth16-bls12-381/reference"
+out="$checkout/projects/groth16-bls12-381/workspace/build/comparison"
+git clone https://github.com/nchain-innovation/zkscript_package "$out/nchain"
+git -C "$out/nchain" checkout --detach fc20fb743edbc5bc5aba9d16625d50d1f50a3ef4
+(
+  cd "$out/nchain"
+  python3.12 -m venv .venv
+  .venv/bin/python -m pip install -r requirements.txt
+  PYTHONPATH=src:. .venv/bin/python "$ref/prepare_nchain.py" "$out/nchain-scripts.json"
+)
+REGTEST_CHRONICLE_HEIGHT=1000 bash tools/verify_node.sh --profile raised -- \
+  python3 "$ref/replay_nchain.py" "$out/nchain-scripts.json" "$out/nchain-replay.json"
+PYTHONPATH=src:. python3 "$ref/check_public_comparison.py"
+```
 
 ## 高层 Forth 实验
 

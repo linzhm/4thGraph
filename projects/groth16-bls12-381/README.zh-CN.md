@@ -68,4 +68,4 @@ REGTEST_CHRONICLE_HEIGHT=1000 bash tools/verify_node.sh --profile raised -- \
   python3 projects/groth16-bls12-381/reference/replay_plan.py --release 0.13.0 --funded
 ```
 
-当前锁定计划在输出产物前校验 Forth 模块摘要、锁脚本和两份见证。入金回放将有效花费打包入块，并拒绝互换公开声明和 G1 点不在子群内的用例。[验证与复现指南](docs/verification.zh-CN.md) · [nChain 同夹具对照](versions/v0.11.0/nchain-comparison.json)
+当前锁定计划在输出产物前校验 Forth 模块摘要、锁脚本和两份见证。入金回放将有效花费打包入块，并拒绝互换公开声明和 G1 点不在子群内的用例。[验证与复现指南](docs/verification.zh-CN.md) · [nChain 与 sCrypt 对照](docs/verification.zh-CN.md#nchain-与-scrypt-对照)
