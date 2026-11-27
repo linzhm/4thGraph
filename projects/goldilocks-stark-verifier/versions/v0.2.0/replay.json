@@ -1,0 +1,300 @@
+{
+  "profile": "goldilocks",
+  "field_modulus": "18446744069414584321",
+  "extension_degree": 2,
+  "trace_rows": 16,
+  "log_blowup": 3,
+  "queries": 64,
+  "script_era": "genesis",
+  "compiler_version": "0.2.7",
+  "compiler_plan": "affine",
+  "forth_sha256": "afc13e4b6a970cbcedb1ea41d9ddab8eea8c24eb9d38291eec61f3c16fb3b2c8",
+  "forth_template_sha256": "0ec520a011783c6741846857ca974ef951b58a1619cd5aaa06e2c5b1bdbe161b",
+  "libraries": [
+    {
+      "name": "std/bsv",
+      "sha256": "92f4510c9d3e8e0371d9b41d08f9f7e639324c9795e6d0a1c3f9779e9179b404",
+      "interface_sha256": "8f13bbd5b91b3741175765fe94333e7ecdcae74ef43f7e5e15e83a5dae3a166d"
+    },
+    {
+      "name": "std/stark-sha256",
+      "sha256": "81e693ac7925f398780982ea26d192ad7d4987e7fad04beae7b34257c1b00848",
+      "interface_sha256": "12c15f9054a11e7283d52bb308de4aaeeb9dd133650c44ffc75ec4b0be35bc1d"
+    }
+  ],
+  "public": [
+    "0",
+    "1",
+    "987"
+  ],
+  "proof_bytes": 71984,
+  "proof_sha256": "9004411ee4457c0583a0da4517e95a75a25461fe1ed401e23638a1cf08aa52d8",
+  "lock_bytes": 137656,
+  "lock_sha256": "5e71ffa02df515e723721b78cb4c35e36f111155da87e79361c130a5eb6664a3",
+  "unlock_bytes": 73013,
+  "unlock_sha256": "1bb0a34d905ca3a0a8aa17f770fafd79bf7f67e7fcd9bfad9682fb80bad79498",
+  "script_checks": {
+    "verdicts": {
+      "valid": true,
+      "wrapping_statement": true,
+      "wrong_statement": false,
+      "wrong_air_same_statement": false,
+      "trace_merkle_path": false,
+      "quotient_merkle_path": false,
+      "fri_merkle_path": false,
+      "last_query_merkle_path": false,
+      "fri_final_coefficient": false,
+      "reciprocal": false,
+      "noncanonical_opening": false,
+      "truncated_packet": false,
+      "trailing_packet_data": false,
+      "extra_stack_item": false
+    },
+    "valid_stack_peaks": {
+      "main_items": 63,
+      "alt_items": 0,
+      "combined_payload_bytes": 77267
+    }
+  },
+  "regtest": {
+    "node_version": 101020300,
+    "chain_gang": {
+      "version": "0.13.2",
+      "commit": "74676b9c002c452e7f21a9ed9265f4972bef03f6"
+    },
+    "chronicle_activation_height": 2,
+    "regtest_policy": "long-script",
+    "transaction_version": 2,
+    "deployment": {
+      "txid": "fc50d24484ddc4052c6d81575740e00934f229f86abded5f53b7a13f5ee5b7f2",
+      "bytes": 137793,
+      "mempool": true,
+      "mined": true,
+      "block": "7a03b70129b3e8e1d2fab18ffad374fd9188370555a69c21224de73d8811acc8",
+      "height": 103
+    },
+    "spends": {
+      "wrong_statement": {
+        "node_scripts": [
+          false
+        ],
+        "node_rpc_ms": 10.514751000073375,
+        "admission": {
+          "txid": "ab993dab90d61fc2ede027562c6da132f5095108e81dd30c7bef07259775b2c1",
+          "bytes": 73112,
+          "mempool": false,
+          "mined": false,
+          "rpc_code": -26,
+          "rpc_message": "16: mandatory-script-verify-flag-failed (Script failed an OP_NUMEQUALVERIFY operation)"
+        },
+        "chain_gang": false,
+        "chain_gang_ms": 1.2625020001451048,
+        "chain_gang_error": "Error evaluating the script `Numbers are not equal`"
+      },
+      "wrong_air_same_statement": {
+        "node_scripts": [
+          false
+        ],
+        "node_rpc_ms": 9.439286000088032,
+        "admission": {
+          "txid": "cc4ca80d4306e2bcc1c84d0ccef54711cd76f337e6ba4807fe728e164d87f0b1",
+          "bytes": 73112,
+          "mempool": false,
+          "mined": false,
+          "rpc_code": -26,
+          "rpc_message": "16: mandatory-script-verify-flag-failed (Script failed an OP_NUMEQUALVERIFY operation)"
+        },
+        "chain_gang": false,
+        "chain_gang_ms": 0.5882240000119054,
+        "chain_gang_error": "Error evaluating the script `Numbers are not equal`"
+      },
+      "trace_merkle_path": {
+        "node_scripts": [
+          false
+        ],
+        "node_rpc_ms": 14.323491999903126,
+        "admission": {
+          "txid": "e0aaba31724a7f6da0f61be6c6d064d4e4f3c454514c9c19ea7708b9bfe32bee",
+          "bytes": 73112,
+          "mempool": false,
+          "mined": false,
+          "rpc_code": -26,
+          "rpc_message": "16: mandatory-script-verify-flag-failed (Script failed an OP_EQUALVERIFY operation)"
+        },
+        "chain_gang": false,
+        "chain_gang_ms": 1.109976999941864,
+        "chain_gang_error": "Error evaluating the script `OP_EQUALVERIFY operands are not equal`"
+      },
+      "quotient_merkle_path": {
+        "node_scripts": [
+          false
+        ],
+        "node_rpc_ms": 10.793890000059037,
+        "admission": {
+          "txid": "3eebb0e467ca2ccb34ef864bd96c2bf04685a6103e29f8d75feafa1b3db2fb0b",
+          "bytes": 73112,
+          "mempool": false,
+          "mined": false,
+          "rpc_code": -26,
+          "rpc_message": "16: mandatory-script-verify-flag-failed (Script failed an OP_EQUALVERIFY operation)"
+        },
+        "chain_gang": false,
+        "chain_gang_ms": 0.7011510001575516,
+        "chain_gang_error": "Error evaluating the script `OP_EQUALVERIFY operands are not equal`"
+      },
+      "fri_merkle_path": {
+        "node_scripts": [
+          false
+        ],
+        "node_rpc_ms": 13.458739000043352,
+        "admission": {
+          "txid": "3fbe8b4ac91ddb84fee26dfc0fa5a5b0de5be476c58c2f8feafee8b57f37d335",
+          "bytes": 73112,
+          "mempool": false,
+          "mined": false,
+          "rpc_code": -26,
+          "rpc_message": "16: mandatory-script-verify-flag-failed (Script failed an OP_EQUALVERIFY operation)"
+        },
+        "chain_gang": false,
+        "chain_gang_ms": 0.7924730000468116,
+        "chain_gang_error": "Error evaluating the script `OP_EQUALVERIFY operands are not equal`"
+      },
+      "last_query_merkle_path": {
+        "node_scripts": [
+          false
+        ],
+        "node_rpc_ms": 73.60934500002259,
+        "admission": {
+          "txid": "20f6dc84f92fd222d726c8e291419baea3c5a031964836e12d7d4818b27ed49d",
+          "bytes": 73112,
+          "mempool": false,
+          "mined": false,
+          "rpc_code": -26,
+          "rpc_message": "16: mandatory-script-verify-flag-failed (Script failed an OP_EQUALVERIFY operation)"
+        },
+        "chain_gang": false,
+        "chain_gang_ms": 15.124155999956201,
+        "chain_gang_error": "Error evaluating the script `OP_EQUALVERIFY operands are not equal`"
+      },
+      "fri_final_coefficient": {
+        "node_scripts": [
+          false
+        ],
+        "node_rpc_ms": 14.653524000095786,
+        "admission": {
+          "txid": "71e710200dfff80fd93aee738b128b8aa04ab9d7ed21d92acae2fd7529e3794e",
+          "bytes": 73112,
+          "mempool": false,
+          "mined": false,
+          "rpc_code": -26,
+          "rpc_message": "16: mandatory-script-verify-flag-failed (Script failed an OP_EQUALVERIFY operation)"
+        },
+        "chain_gang": false,
+        "chain_gang_ms": 0.7400639999559644,
+        "chain_gang_error": "Error evaluating the script `OP_EQUALVERIFY operands are not equal`"
+      },
+      "reciprocal": {
+        "node_scripts": [
+          false
+        ],
+        "node_rpc_ms": 9.110338000027696,
+        "admission": {
+          "txid": "58d05691863ed8229cad7f64b715f42a00b856f06ad65aff5767b8ed53f7b1b2",
+          "bytes": 73112,
+          "mempool": false,
+          "mined": false,
+          "rpc_code": -26,
+          "rpc_message": "16: mandatory-script-verify-flag-failed (Script failed an OP_NUMEQUALVERIFY operation)"
+        },
+        "chain_gang": false,
+        "chain_gang_ms": 0.8093799999642215,
+        "chain_gang_error": "Error evaluating the script `Numbers are not equal`"
+      },
+      "noncanonical_opening": {
+        "node_scripts": [
+          false
+        ],
+        "node_rpc_ms": 8.578371999874435,
+        "admission": {
+          "txid": "d9487c5a9e82e43d0520d6b851562defed57bb0a7a0a3ce3b44642fad4c8d49c",
+          "bytes": 73112,
+          "mempool": false,
+          "mined": false,
+          "rpc_code": -26,
+          "rpc_message": "16: mandatory-script-verify-flag-failed (Script failed an OP_VERIFY operation)"
+        },
+        "chain_gang": false,
+        "chain_gang_ms": 0.4356120000466035,
+        "chain_gang_error": "Error evaluating the script `OP_VERIFY failed`"
+      },
+      "truncated_packet": {
+        "node_scripts": [
+          false
+        ],
+        "node_rpc_ms": 9.037188999855061,
+        "admission": {
+          "txid": "a13597566f171e06bbf1ccfb239904e17a361982d1ace82ae8af24957d7c5bc2",
+          "bytes": 73111,
+          "mempool": false,
+          "mined": false,
+          "rpc_code": -26,
+          "rpc_message": "16: mandatory-script-verify-flag-failed (Script failed an OP_NUMEQUALVERIFY operation)"
+        },
+        "chain_gang": false,
+        "chain_gang_ms": 0.35979399990537786,
+        "chain_gang_error": "Error evaluating the script `Numbers are not equal`"
+      },
+      "trailing_packet_data": {
+        "node_scripts": [
+          false
+        ],
+        "node_rpc_ms": 7.520785999986401,
+        "admission": {
+          "txid": "60551a811e48e516c966804d46c53ad3d47a34c5c8ed86e91ec8d83ddd74375a",
+          "bytes": 73113,
+          "mempool": false,
+          "mined": false,
+          "rpc_code": -26,
+          "rpc_message": "16: mandatory-script-verify-flag-failed (Script failed an OP_NUMEQUALVERIFY operation)"
+        },
+        "chain_gang": false,
+        "chain_gang_ms": 0.3946750000523025,
+        "chain_gang_error": "Error evaluating the script `Numbers are not equal`"
+      },
+      "extra_stack_item": {
+        "node_scripts": [
+          false
+        ],
+        "node_rpc_ms": 9.829323000076329,
+        "admission": {
+          "txid": "bc5b1dfe880d9ec46c3590a75899b2f33d8f657367afbbbc0fa3a61ba891f215",
+          "bytes": 73113,
+          "mempool": false,
+          "mined": false,
+          "rpc_code": -26,
+          "rpc_message": "16: mandatory-script-verify-flag-failed (Script failed an OP_NUMEQUALVERIFY operation)"
+        },
+        "chain_gang": false,
+        "chain_gang_ms": 0.363069000059113,
+        "chain_gang_error": "Error evaluating the script `Numbers are not equal`"
+      },
+      "valid": {
+        "node_scripts": [
+          true
+        ],
+        "node_rpc_ms": 71.3007199999538,
+        "admission": {
+          "txid": "4f9d37ea9ff4fc776f4ce027dd38b328f0193a27f56bd47dd04b71f6e6b71614",
+          "bytes": 73112,
+          "mempool": true,
+          "mined": true,
+          "block": "340af8495779c080009f6a17917260b82e1ef3712402a15540ae0291da927161",
+          "height": 104
+        },
+        "chain_gang": true,
+        "chain_gang_ms": 38.13054399984139,
+        "chain_gang_error": null
+      }
+    }
+  }
+}

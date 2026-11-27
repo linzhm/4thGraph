@@ -98,7 +98,7 @@ def sign_spend(tx, parent, witness, keys, *, flag=FLAG):
     return tx.with_script(0, witness + push(keys.sign(request) + bytes([flag])))
 
 
-def verify_spend(node, activation, tx, parent, parent_height, *, expected):
+def verify_spend(node, activation, tx, parent, parent_height, *, expected, timeout_us=10_000):
     if Transaction.parse(tx.serialize()) != tx or tx.inputs[0].txid != parent.txid_wire():
         raise ValueError("invalid replay transaction framing")
     context = {"spend_height": node.call("getblockcount", []) + 1, "utxo_heights": (parent_height,),
@@ -111,7 +111,7 @@ def verify_spend(node, activation, tx, parent, parent_height, *, expected):
         chain_ok, chain_error = False, str(error)
     chain_ms = (perf_counter() - start) * 1000
     start = perf_counter()
-    scripts = node.verdicts(tx, (parent,), timeout_us=10_000, **context)
+    scripts = node.verdicts(tx, (parent,), timeout_us=timeout_us, **context)
     node_ms = (perf_counter() - start) * 1000
     admission = submit_and_mine(node, tx)
     if scripts != [expected] or chain_ok != expected or admission["mined"] != expected or admission["mempool"] != expected:

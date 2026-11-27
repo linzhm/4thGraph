@@ -1,0 +1,242 @@
+{
+  "objective": "lock_plus_unlock_bytes",
+  "selected": "affine",
+  "candidates": [
+    {
+      "profile": "babybear",
+      "field_modulus": "2013265921",
+      "extension_degree": 4,
+      "trace_rows": 16,
+      "log_blowup": 3,
+      "queries": 64,
+      "script_era": "genesis",
+      "compiler_version": "0.2.7",
+      "compiler_plan": "baseline",
+      "forth_sha256": "6f119e90e5f7c299efc7771665f66509a0484587df1f338fd8976af0d1bb49ba",
+      "forth_template_sha256": "0ec520a011783c6741846857ca974ef951b58a1619cd5aaa06e2c5b1bdbe161b",
+      "libraries": [
+        {
+          "name": "std/bsv",
+          "sha256": "92f4510c9d3e8e0371d9b41d08f9f7e639324c9795e6d0a1c3f9779e9179b404",
+          "interface_sha256": "8f13bbd5b91b3741175765fe94333e7ecdcae74ef43f7e5e15e83a5dae3a166d"
+        },
+        {
+          "name": "std/stark-sha256",
+          "sha256": "81e693ac7925f398780982ea26d192ad7d4987e7fad04beae7b34257c1b00848",
+          "interface_sha256": "12c15f9054a11e7283d52bb308de4aaeeb9dd133650c44ffc75ec4b0be35bc1d"
+        }
+      ],
+      "public": [
+        "0",
+        "1",
+        "987"
+      ],
+      "proof_bytes": 71504,
+      "proof_sha256": "bf8f723e51a386559f590761dc48b0006bf6b8e7e7aebc1797bcb8217c47a0b2",
+      "lock_bytes": 358385,
+      "lock_sha256": "a5f1c2773b709486fb82c52d46b3c18fb04f163fed33c9dfecd4adde60edb578",
+      "unlock_bytes": 72533,
+      "unlock_sha256": "39746b103f2ece85b079a8d9006a529f3729dc7757f85bffa99ec105b46da4aa",
+      "script_checks": {
+        "verdicts": {
+          "valid": true,
+          "wrapping_statement": true,
+          "wrong_statement": false,
+          "wrong_air_same_statement": false,
+          "trace_merkle_path": false,
+          "quotient_merkle_path": false,
+          "fri_merkle_path": false,
+          "last_query_merkle_path": false,
+          "fri_final_coefficient": false,
+          "reciprocal": false,
+          "noncanonical_opening": false,
+          "truncated_packet": false,
+          "trailing_packet_data": false,
+          "extra_stack_item": false
+        },
+        "valid_stack_peaks": {
+          "main_items": 216,
+          "alt_items": 0,
+          "combined_payload_bytes": 73138
+        }
+      }
+    },
+    {
+      "profile": "babybear",
+      "field_modulus": "2013265921",
+      "extension_degree": 4,
+      "trace_rows": 16,
+      "log_blowup": 3,
+      "queries": 64,
+      "script_era": "genesis",
+      "compiler_version": "0.2.7",
+      "compiler_plan": "schedule",
+      "forth_sha256": "3a2f8e0cb6e3e05bfc179088bf77f3920ddd50b52b86e5c5bd56ad02377d5316",
+      "forth_template_sha256": "0ec520a011783c6741846857ca974ef951b58a1619cd5aaa06e2c5b1bdbe161b",
+      "libraries": [
+        {
+          "name": "std/bsv",
+          "sha256": "92f4510c9d3e8e0371d9b41d08f9f7e639324c9795e6d0a1c3f9779e9179b404",
+          "interface_sha256": "8f13bbd5b91b3741175765fe94333e7ecdcae74ef43f7e5e15e83a5dae3a166d"
+        },
+        {
+          "name": "std/stark-sha256",
+          "sha256": "81e693ac7925f398780982ea26d192ad7d4987e7fad04beae7b34257c1b00848",
+          "interface_sha256": "12c15f9054a11e7283d52bb308de4aaeeb9dd133650c44ffc75ec4b0be35bc1d"
+        }
+      ],
+      "public": [
+        "0",
+        "1",
+        "987"
+      ],
+      "proof_bytes": 71504,
+      "proof_sha256": "bf8f723e51a386559f590761dc48b0006bf6b8e7e7aebc1797bcb8217c47a0b2",
+      "lock_bytes": 357357,
+      "lock_sha256": "0a1a85e449637e7e8fb6ead125c84b3adacca6ae386a6a77b27a99168adff3af",
+      "unlock_bytes": 72533,
+      "unlock_sha256": "39746b103f2ece85b079a8d9006a529f3729dc7757f85bffa99ec105b46da4aa",
+      "script_checks": {
+        "verdicts": {
+          "valid": true,
+          "wrapping_statement": true,
+          "wrong_statement": false,
+          "wrong_air_same_statement": false,
+          "trace_merkle_path": false,
+          "quotient_merkle_path": false,
+          "fri_merkle_path": false,
+          "last_query_merkle_path": false,
+          "fri_final_coefficient": false,
+          "reciprocal": false,
+          "noncanonical_opening": false,
+          "truncated_packet": false,
+          "trailing_packet_data": false,
+          "extra_stack_item": false
+        },
+        "valid_stack_peaks": {
+          "main_items": 216,
+          "alt_items": 0,
+          "combined_payload_bytes": 73138
+        }
+      }
+    },
+    {
+      "profile": "babybear",
+      "field_modulus": "2013265921",
+      "extension_degree": 4,
+      "trace_rows": 16,
+      "log_blowup": 3,
+      "queries": 64,
+      "script_era": "genesis",
+      "compiler_version": "0.2.7",
+      "compiler_plan": "lookup",
+      "forth_sha256": "7d1dac97a3b802555c6c8a5e4886ba8ff9f68b1fe0c74cd3865222382cb27598",
+      "forth_template_sha256": "0ec520a011783c6741846857ca974ef951b58a1619cd5aaa06e2c5b1bdbe161b",
+      "libraries": [
+        {
+          "name": "std/bsv",
+          "sha256": "92f4510c9d3e8e0371d9b41d08f9f7e639324c9795e6d0a1c3f9779e9179b404",
+          "interface_sha256": "8f13bbd5b91b3741175765fe94333e7ecdcae74ef43f7e5e15e83a5dae3a166d"
+        },
+        {
+          "name": "std/stark-sha256",
+          "sha256": "81e693ac7925f398780982ea26d192ad7d4987e7fad04beae7b34257c1b00848",
+          "interface_sha256": "12c15f9054a11e7283d52bb308de4aaeeb9dd133650c44ffc75ec4b0be35bc1d"
+        }
+      ],
+      "public": [
+        "0",
+        "1",
+        "987"
+      ],
+      "proof_bytes": 71504,
+      "proof_sha256": "bf8f723e51a386559f590761dc48b0006bf6b8e7e7aebc1797bcb8217c47a0b2",
+      "lock_bytes": 342839,
+      "lock_sha256": "13e0855ca56e7f54b846c6b8dedb436600cb6c1bbca269d18ed0d026e2674a4c",
+      "unlock_bytes": 72533,
+      "unlock_sha256": "39746b103f2ece85b079a8d9006a529f3729dc7757f85bffa99ec105b46da4aa",
+      "script_checks": {
+        "verdicts": {
+          "valid": true,
+          "wrapping_statement": true,
+          "wrong_statement": false,
+          "wrong_air_same_statement": false,
+          "trace_merkle_path": false,
+          "quotient_merkle_path": false,
+          "fri_merkle_path": false,
+          "last_query_merkle_path": false,
+          "fri_final_coefficient": false,
+          "reciprocal": false,
+          "noncanonical_opening": false,
+          "truncated_packet": false,
+          "trailing_packet_data": false,
+          "extra_stack_item": false
+        },
+        "valid_stack_peaks": {
+          "main_items": 203,
+          "alt_items": 0,
+          "combined_payload_bytes": 74819
+        }
+      }
+    },
+    {
+      "profile": "babybear",
+      "field_modulus": "2013265921",
+      "extension_degree": 4,
+      "trace_rows": 16,
+      "log_blowup": 3,
+      "queries": 64,
+      "script_era": "genesis",
+      "compiler_version": "0.2.7",
+      "compiler_plan": "affine",
+      "forth_sha256": "c0819c2f62450c15aac5722271314d4723620b04951a4ac57900338cffa8a19c",
+      "forth_template_sha256": "0ec520a011783c6741846857ca974ef951b58a1619cd5aaa06e2c5b1bdbe161b",
+      "libraries": [
+        {
+          "name": "std/bsv",
+          "sha256": "92f4510c9d3e8e0371d9b41d08f9f7e639324c9795e6d0a1c3f9779e9179b404",
+          "interface_sha256": "8f13bbd5b91b3741175765fe94333e7ecdcae74ef43f7e5e15e83a5dae3a166d"
+        },
+        {
+          "name": "std/stark-sha256",
+          "sha256": "81e693ac7925f398780982ea26d192ad7d4987e7fad04beae7b34257c1b00848",
+          "interface_sha256": "12c15f9054a11e7283d52bb308de4aaeeb9dd133650c44ffc75ec4b0be35bc1d"
+        }
+      ],
+      "public": [
+        "0",
+        "1",
+        "987"
+      ],
+      "proof_bytes": 71504,
+      "proof_sha256": "bf8f723e51a386559f590761dc48b0006bf6b8e7e7aebc1797bcb8217c47a0b2",
+      "lock_bytes": 292315,
+      "lock_sha256": "9339581211fdbd4158394f19c9d40c40ba6b0f6b55d22e91acb72dc33ab5b716",
+      "unlock_bytes": 72533,
+      "unlock_sha256": "39746b103f2ece85b079a8d9006a529f3729dc7757f85bffa99ec105b46da4aa",
+      "script_checks": {
+        "verdicts": {
+          "valid": true,
+          "wrapping_statement": true,
+          "wrong_statement": false,
+          "wrong_air_same_statement": false,
+          "trace_merkle_path": false,
+          "quotient_merkle_path": false,
+          "fri_merkle_path": false,
+          "last_query_merkle_path": false,
+          "fri_final_coefficient": false,
+          "reciprocal": false,
+          "noncanonical_opening": false,
+          "truncated_packet": false,
+          "trailing_packet_data": false,
+          "extra_stack_item": false
+        },
+        "valid_stack_peaks": {
+          "main_items": 115,
+          "alt_items": 0,
+          "combined_payload_bytes": 74722
+        }
+      }
+    }
+  ]
+}

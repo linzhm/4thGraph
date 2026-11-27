@@ -44,6 +44,7 @@ VERIFY_FORMS = {
     asm("OP_EQUAL"): asm("OP_EQUALVERIFY"),
     asm("OP_CHECKSIG"): asm("OP_CHECKSIGVERIFY"),
 }
+NUMERIC_VERIFY_FORMS = VERIFY_FORMS | {asm("OP_NUMEQUAL"): asm("OP_NUMEQUALVERIFY")}
 
 
 @dataclass(frozen=True)
@@ -182,11 +183,12 @@ class Graph:
         return self._emit_order(self.live_definitions(returns), returns, last_use=last_use, compact=compact,
                                 trace=trace)
 
-    def emit_assertions(self, checks, *, compact=False, reorder=False):
+    def emit_assertions(self, checks, *, compact=False, reorder=False, optimize=False):
         """Consume required flags in source order.
 
         Reordering requires that each operation be total and observe only
         its explicit operands. Keep the shorter of the two schedules.
+        Optimization compares numeric predicate fusion and grouped staging.
         """
         checks = set(checks)
         if checks.difference(self.inputs, self.definitions):
@@ -196,16 +198,22 @@ class Graph:
             steps.append((node.script, node.args, (value,)))
             if value in checks:
                 steps.append((VERIFY, (value,), ()))
-        if compact and self.packet_reads:
-            steps = self._stream_packet_reads(steps)
-        source = emit_steps(self.inputs, steps, (), compact=compact, commutative=self.commutative)
-        if not reorder:
-            return source
-        steps = list(self._assertion_dependencies(checks))
-        if compact and self.packet_reads:
-            steps = self._stream_packet_reads(steps)
-        dependencies = emit_steps(self.inputs, steps, (), compact=compact, commutative=self.commutative)
-        return min(source, dependencies, key=len)
+        orders = [steps]
+        if reorder:
+            orders.append(list(self._assertion_dependencies(checks)))
+        scripts = []
+        for order in orders:
+            if compact and self.packet_reads:
+                order = self._stream_packet_reads(order)
+            scripts.append(emit_steps(self.inputs, order, (), compact=compact, commutative=self.commutative))
+            if optimize:
+                # Compare both staging strategies because saving bytes on an
+                # individual operation can change later stack positions.
+                scripts.extend(emit_steps(self.inputs, order, (), compact=True,
+                                          group_operands=grouped, trim_suffix=grouped, numeric_verify=True,
+                                          commutative=self.commutative)
+                               for grouped in (False, True))
+        return min(scripts, key=len)
 
     def _stream_packet_reads(self, steps):
         uses = Counter(arg for _, args, _ in steps for arg in args)
@@ -355,20 +363,20 @@ class ResidueBlock:
         return dividend
 
 
-def fuse_verifications(steps, uses):
+def fuse_verifications(steps, uses, forms=VERIFY_FORMS):
     fused = []
     for script, args, results in steps:
         if script == VERIFY and len(args) == 1 and not results and fused:
             previous, operands, flag = fused[-1]
-            if flag == args and uses[args[0]] == 1 and previous in VERIFY_FORMS:
-                fused[-1] = (VERIFY_FORMS[previous], operands, ())
+            if flag == args and uses[args[0]] == 1 and previous in forms:
+                fused[-1] = (forms[previous], operands, ())
                 continue
         fused.append((script, args, results))
     return fused
 
 
 def emit_steps(inputs, steps, returns, *, last_use=True, compact=False, trim_suffix=False, group_operands=False,
-               commutative=COMMUTATIVE):
+               commutative=COMMUTATIVE, numeric_verify=False):
     """Schedule already ordered operations with any number of results."""
     uses = Counter(returns)
     uses.update(arg for _, args, _ in steps for arg in args)
@@ -380,7 +388,8 @@ def emit_steps(inputs, steps, returns, *, last_use=True, compact=False, trim_suf
                     if not args and len(results) == 1 and script in SINGLE_BYTE_NUMBERS
                     and results[0] not in returned}
     stack = Layout(inputs, uses, literals=literals, commutative=commutative)
-    for script, args, results in fuse_verifications(steps, uses):
+    forms = NUMERIC_VERIFY_FORMS if numeric_verify else VERIFY_FORMS
+    for script, args, results in fuse_verifications(steps, uses, forms):
         if not args and len(results) == 1 and results[0] in literals:
             continue
         stack.execute(script, args, results, last_use=last_use, compact=compact, group_operands=group_operands)

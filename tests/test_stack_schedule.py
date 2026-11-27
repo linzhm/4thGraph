@@ -4,6 +4,10 @@ import unittest
 
 from fourthgraph.bsv.evaluate import ScriptError, evaluate
 from fourthgraph.bsv.script import asm, decode_num, encode_num, push
+from fourthgraph.compiler.graph_source import render_assertion_graph
+from fourthgraph.compiler.linear_form import WeightedDifferences
+from fourthgraph.compiler.packed_lookup import PackedLookup
+from fourthgraph.compiler.script_builder import ScriptBuilder
 from fourthgraph.compiler.stack_schedule import Graph, Value, emit_steps
 
 
@@ -116,6 +120,71 @@ class StackScheduleTests(unittest.TestCase):
                         else:
                             with self.assertRaises(ScriptError):
                                 evaluate(script, stack)
+
+    def test_forth_assertion_graph_round_trips_with_numeric_verification(self):
+        graph = Graph(1)
+        packet, = graph.inputs
+        a = graph.packet_slice(packet, 0, 1)
+        b = graph.packet_slice(packet, 1, 1)
+        total = graph.define(asm("OP_ADD"), (a, b))
+        flag = graph.define(asm("OP_NUMEQUAL"), (total, graph.integer(7)))
+        prefix = b"caller"
+        for schedule in ("ordered", "compact"):
+            with self.subTest(schedule=schedule):
+                src = render_assertion_graph(graph, (flag,), "check-total", schedule=schedule, input_names=("packet",))
+                builder = ScriptBuilder(src + ": lock ( -- script ) bsv-empty check-total op-1 ;\n")
+                script = builder.emit("lock")
+                expected = graph.emit_assertions((flag,), compact=True, optimize=schedule == "compact") + asm("OP_1")
+                self.assertEqual(script, expected)
+                self.assertEqual(asm("OP_NUMEQUALVERIFY") in script, schedule == "compact")
+                self.assertEqual(evaluate(script, [prefix, b"\x03\x04"]), ([prefix, b"\x01"], []))
+                for packet in (b"\x03\x05", b"\x07"):
+                    with self.assertRaises(ScriptError):
+                        evaluate(script, [prefix, packet])
+
+    def test_forth_assertion_graph_reports_undefined_fragments_and_labels(self):
+        for body, error in (
+            ("v apply bad-word let a a assert", "declared"),
+            ("v apply op-1 let v v assert", "repeated"),
+            ("v slice 0 0 let a a assert", "positive width"),
+            ("v v assert", "one named value"),
+        ):
+            with self.subTest(body=body), self.assertRaisesRegex(ValueError, error):
+                ScriptBuilder(f"assertion-graph: check-total compact {{: v :}} {body} ;")
+
+    def test_packed_lookup_enforces_table_bounds(self):
+        graph = Graph(1)
+        index, = graph.inputs
+        rows = (b"a\x00", b"bc", b"\x80\xff")
+        looked_up = PackedLookup.from_rows(rows).emit(graph, index)
+        script = graph.emit((looked_up,), compact=True)
+        for i, expected in enumerate(rows):
+            self.assertEqual(evaluate(script, [b"caller", encode_num(i)]), ([b"caller", expected], []))
+        for i in (-1, len(rows), 10**18):
+            with self.assertRaises(ScriptError):
+                evaluate(script, [encode_num(i)])
+        with self.assertRaises(ValueError):
+            PackedLookup.from_rows((b"a", b"bc"))
+
+    def test_weighted_differences_combine_repeated_columns_in_a_ring(self):
+        modulus = 97
+
+        def add(left, right):
+            return (left + right) % modulus
+
+        def subtract(left, right):
+            return (left - right) % modulus
+
+        def multiply(left, right):
+            return (left * right) % modulus
+
+        openings, weights, columns = (9, 27, 32), (11, 13, 16), (1, 0, 1)
+        form = WeightedDifferences.lower(openings, weights, columns, zero=0, add=add, multiply=multiply)
+        self.assertEqual(dict(form.weights), {0: 13, 1: 27})
+        for row in ((0, 0), (-2, 94), (modulus - 1, modulus)):
+            expected = sum(w * (opening - row[column]) for opening, w, column in zip(openings, weights, columns))
+            actual = form.evaluate(row, scale=multiply, subtract=subtract)
+            self.assertEqual(actual, expected % modulus)
 
     def test_packet_slices_use_the_unread_suffix(self):
         prefix, packet = b"caller", b"ab--cdxyz"

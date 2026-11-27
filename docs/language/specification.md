@@ -215,3 +215,21 @@ PYTHONPATH=src:. python -m fourthgraph.workflow.protocol projects/workflow-examp
 电路源码声明 `advance ( u32 -- u32 )` 和 `decide ( u32 -- route )` 两个带栈效果注释的定义。后端支持整数字面值、字面 `cell>u32`、现有栈排列、`u32+`、`u32<`、路由字面值和以字面值或 `u32<` 标志驱动的 `IF`。`u32<` 的 Forth 真值为 `-1`，电路在选择分支时用相应的布尔位。生成超出操作或线宽预算的电路，以及无法生成约束的词，都会报告源码行列。
 
 生成的约束将 `next` 与 `route` 作为公开输出。交易绑定还使用 `current`、`bindLo` 和 `bindHi`。Circom 和 snarkjs 负责生成 R1CS 以及计算和检查完整赋值，4thGraph 把透明验证器和后继锁编译为 Script。详见 [重跑命令](../toolchain.md#从-forth-生成约束)。
+
+### Forth 断言图
+
+`ScriptBuilder` 中的 `assertion-graph:` 用具名输入、读取和局部值描述只作断言的直线型 Script。输入名称按运行时栈从底到顶排列。`slice OFFSET WIDTH` 读取具名字节串的定长子串。`apply WORD` 调用先声明的构建词，构建词类型为 `( script -- script )`。它发出的片段在运行时按所列顺序消费全部显式操作数并返回一个值。片段只使用显式操作数和自身的临时栈项。用 `let NAME` 命名结果，用 `VALUE assert` 声明必须成立的值。编译后的图消费声明的输入，成功后不留额外栈项。
+
+```forth
+assertion-graph: check-pair compact {: packet :}
+    packet slice 0 1 let left
+    packet slice 1 1 let right
+    left right apply op-equal let equal
+    equal assert
+;
+: verify-pair ( -- script )
+    bsv-empty check-pair op-1
+;
+```
+
+`ordered` 使用原顺序调度和有序字节切片。`compact` 再比较相邻操作数成组搬运，以及仅供断言使用的数值比较融合。它以完整发码字节数选择结果。用 `4thgraph script-build SOURCE --entry verify-pair --output lock.bin` 可编译一个无构建参数的 Forth 入口。 [编译器源码](../../src/fourthgraph/compiler/graph_source.py) · [通用回归用例](../../tests/test_stack_schedule.py) · [STARK 迭代实测](../optimization-paths.zh-CN.md#stark-验证器迭代)

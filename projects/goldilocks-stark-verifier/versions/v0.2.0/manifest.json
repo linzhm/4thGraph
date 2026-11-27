@@ -1,0 +1,23 @@
+{
+  "version": "0.2.0",
+  "previous": "0.1.0",
+  "artifacts": [
+    "verifier.fth",
+    "lock.bin"
+  ],
+  "fixtures": [],
+  "evidence": [
+    "measurements.json",
+    "replay.json"
+  ],
+  "shared_data": [
+    "versions/v0.1.0/statements.json",
+    "versions/v0.1.0/valid.proof",
+    "versions/v0.1.0/wrap.proof",
+    "versions/v0.1.0/wrong-air.proof",
+    "versions/v0.1.0/unlock.bin"
+  ],
+  "integration": "docs/spec.en.md",
+  "build": "PYTHONPATH=src:. python projects/goldilocks-stark-verifier/reference/verify.py generate --plan affine",
+  "verify": "bash tools/verify_node.sh --profile long-script -- python projects/goldilocks-stark-verifier/reference/verify.py replay --plan affine"
+}

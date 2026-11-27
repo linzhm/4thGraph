@@ -179,3 +179,20 @@ For a linked call that declares an output as the same value as an input, the sch
 ### Projective comparisons across models
 
 The shared Weierstrass formulas offer two ways to check an affine reference point against scaled projective coordinates. A zero-tested residual can include the inverse scale directly, because dropping the intermediate reduction changes the difference by a multiple of the field prime. The signed remainder can change sign, and its zero test remains equivalent. Alternatively, map both affine inputs with the same forward scale and compare within that model. The formula compiler binds the known factors, checks the intermediate ScriptNum bound and compares their emitted cost. Both checks retain the requirement that `Z` is nonzero. [Shared formulas](../src/fourthgraph/stdlib/weierstrass-model.fth) · [Schnorr comparison](../projects/p2pkh-schnorr/docs/high-level-forth.en.md#point-comparison-models)
+
+## STARK verifier iteration
+
+Both profiles generate a complete Forth verifier for the same public statement `(0, 1, 987)`. Each candidate uses the v0.1.0 proofs and the same packet format. The Python comparison checks two accepted statements and 12 rejection controls before ranking by combined lock and unlock bytes. [BabyBear measurements](../projects/plonky3-stark-verifier/versions/v0.2.0/measurements.json) · [Goldilocks measurements](../projects/goldilocks-stark-verifier/versions/v0.2.0/measurements.json)
+
+| Cumulative plan | Reusable compiler change | BabyBear lock | Goldilocks lock |
+| --- | --- | ---: | ---: |
+| `baseline` | Original assertion order and arithmetic | 358,385 B | 153,829 B |
+| `schedule` | Compare grouped operand staging and fuse a numeric comparison used solely by `assert` into `OP_NUMEQUALVERIFY` | 357,357 B | 153,058 B |
+| `lookup` | Lower a fixed-width packed table to a single index calculation and exact row read | 342,839 B | 141,059 B |
+| `affine` | Factor repeated weighted differences into a shared affine form before reading per-query samples | **292,315 B** | **137,656 B** |
+
+`PackedLookup` derives a row offset from a ScriptNum index and aborts on out-of-range indices. The proof verifier stores the coset point and inverse subgroup point together and selects the row using the Fiat–Shamir index. `WeightedDifferences` rewrites a sum of weighted differences as a shared weighted sum of claims minus a weighted sum of samples. It combines weights for repeated sample columns. The rewrite uses only linearity over the coefficient ring. [Packed lookup](../src/fourthgraph/compiler/packed_lookup.py) · [Weighted differences](../src/fourthgraph/compiler/linear_form.py)
+
+The selected plan puts the tables on the main stack. Observed combined payload peaks move from 73,138 B to 74,722 B for BabyBear and from 73,430 B to 77,267 B for Goldilocks. Peak main stack item counts move from 216 to 115 and from 88 to 63, respectively. Measurements of these peaks use the development evaluator. Funded deployments and valid spends were mined on isolated BSV Node 1.2.3 regtest with the long-script profile. Pinned chain-gang and the node both reject all 12 controls per profile. [BabyBear replay](../projects/plonky3-stark-verifier/versions/v0.2.0/replay.json) · [Goldilocks replay](../projects/goldilocks-stark-verifier/versions/v0.2.0/replay.json)
+
+From the repository root, use `reference/verify.py compare` in either project to regenerate the candidate report. Use `generate` to write `verifier.fth` and compile that file with `4thgraph script-build --entry stark-lock --output lock.bin`. [Named assertion graphs](language/specification.md#forth-断言图) · [BabyBear Forth](../projects/plonky3-stark-verifier/versions/v0.2.0/verifier.fth) · [Goldilocks Forth](../projects/goldilocks-stark-verifier/versions/v0.2.0/verifier.fth)
