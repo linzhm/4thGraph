@@ -1,6 +1,6 @@
 <!-- Generated from manifest.yaml with Copier. -->
 
-# BLS12-381 Groth16 verifier v0.9.0
+# BLS12-381 Groth16 verifier v0.10.0
 
 [简体中文](README.zh-CN.md) · [4thGraph](../../README.md) · [Project index](../README.md) · [Versions](versions/index.json)
 
@@ -8,7 +8,7 @@
 
 Import the 4thGraph Groth16 standard library in Forth, build a proof lock and witness, and replay funded BSV spends.
 
-[Algorithm and execution](#algorithm-and-execution) · [Reproduce the checks](#reproduce-the-checks) · [Measurements data](versions/v0.9.0/measurements.json)
+[Algorithm and execution](#algorithm-and-execution) · [Reproduce the checks](#reproduce-the-checks) · [Measurements data](versions/v0.10.0/measurements.json)
 
 | Entry point | Purpose |
 | --- | --- |
@@ -31,6 +31,8 @@ The search also compares signed and unsigned public-input MSM by the serialized 
 
 The signed MSM experiment compares explicit point tables with slope-based reconstruction and recompiles a Forth source edit. [Table and source measurements](versions/v0.9.0/measurements.json)
 
+The same high-level Forth source compiles with deferred MSM table reductions and compares three Miller reduction schedules. [MSM and Miller measurements](versions/v0.10.0/measurements.json)
+
 ## Reproduce the checks
 
 Run from the repository root with Python 3.11 or later. The build uses the Python standard library. Funded replay uses the pinned chain-gang binding and an isolated Linux BSV Node 1.2.3.
@@ -41,7 +43,7 @@ python3 -m pip install ecdsa -r tools/requirements-chronicle.txt
 
 ```sh
 PYTHONPATH=src:. python3 projects/groth16-verifier/experiments/high-level/optimize.py \
-  --residue-association accumulator-frobenius-first --msm signed-radix4
+  --residue-association accumulator-frobenius-first --fp2-selection callsite --msm signed-radix4
 REGTEST_CHRONICLE_HEIGHT=1000 bash tools/verify_node.sh --profile raised -- \
   python3 -m fourthgraph.replay.bls12381_verifier \
   --source projects/groth16-verifier/experiments/high-level/verifier.fth \

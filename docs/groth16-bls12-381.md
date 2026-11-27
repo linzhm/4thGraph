@@ -73,6 +73,10 @@
 
 有符号计划还可选 `msm_table: doubling-slopes`。锁为每个公开输入编码起始基点和由验证密钥预计算的切线斜率，Script 逐个窗口恢复二倍点和下一窗口的四倍点。两个表表示共用有符号数位及花费见证。高层 Forth 的 `bls12-381-check-g1-c-then-a` 按 C、A 的顺序执行两项 G1 检查。[点表与 Forth 实测](../projects/groth16-verifier/versions/v0.9.0/measurements.json)
 
+`msm_table: deferred-doubling-slopes` 在倍点链上传递未归约的整数，并在每个窗口选出累加点后归约坐标。有进位的窗口直接使用偏移后的余数进行选点和符号判断。两种斜率表读取相同的见证字段。
+
+`miller_reductions` 在两种仿射布局中选择 Fp12 累加器的归约时机。`per-operation` 分别归约平方和各乘法，`per-step` 在三次稀疏线乘法后统一归约，`per-round` 在一轮的平方、切线、可选割线和余数因子全部合并后归约。斜率核验和最终剩余式断言独立执行。后两项可用更多栈内字节换取更短的锁。[归约调度实测](../projects/groth16-verifier/versions/v0.10.0/measurements.json)
+
 ## 构建和复放
 
 在仓库根目录执行，依赖见 [4thGraph 安装命令](toolchain.md#复放与编译)。示例从版本库自带的测试夹具导出一份验证密钥、证明和公开输入。
