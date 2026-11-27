@@ -42,7 +42,7 @@ PYTHONPATH=src:. python -m fourthgraph.workflow.protocol script-build \
   "$out/verifier.fth" --entry stark-lock --output "$out/lock.bin"
 ```
 
-Pass three public field elements with `generate --public SEED_A SEED_B RESULT` to emit a different fixed statement. Run `compare` for the four lowering plans and `build --plan baseline --output "$project/workspace/baseline"` to reproduce the v0.1.0 lock bytes. Use a separate output directory when the statement, plan, or proof changes. Commands verify that any existing artifacts and reports match before reusing a directory. [Generated verifier](../versions/v0.2.0/verifier.fth) · [Optimization rounds](../../../docs/optimization-paths.md#stark-verifier-iteration)
+Pass three public field elements with `generate --public SEED_A SEED_B RESULT` to emit a different fixed statement. Run `compare` for the four lowering plans and `build --plan baseline --output "$project/workspace/baseline"` to reproduce the v0.1.0 lock bytes. Use a separate output directory when the statement, plan, or proof changes. Commands verify that any existing artifacts and reports match before reusing a directory. When the directory contains only a binary lock or witness, run `generate` in a fresh directory. [Generated verifier](../versions/v0.2.0/verifier.fth) · [Optimization rounds](../../../docs/optimization-paths.md#stark-verifier-iteration)
 
 ## Regenerate an upstream proof
 

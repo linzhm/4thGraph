@@ -39,10 +39,13 @@ def check_artifact(path, raw):
 
 def check_output(directory, artifacts):
     hashes = {name: digest(raw) for name, raw in artifacts.items()}
+    source_only = artifacts.keys() == {"verifier.fth"}
+    source_confirmed = False
     for name, raw in artifacts.items():
         path = directory / name
         if path.exists() or path.is_symlink():
             check_artifact(path, raw)
+            source_confirmed |= name == "verifier.fth"
     for name in ARTIFACT_REPORTS:
         path = directory / name
         if not path.exists() and not path.is_symlink():
@@ -53,6 +56,12 @@ def check_output(directory, artifacts):
         for artifact, expected in hashes.items():
             if report.get(ARTIFACT_HASH_FIELDS[artifact]) != expected:
                 raise output_conflict(path, artifact)
+        source_confirmed |= "verifier.fth" in hashes
+    if source_only and not source_confirmed:
+        for name in ("lock.bin", "unlock.bin"):
+            path = directory / name
+            if path.exists() or path.is_symlink():
+                raise ValueError(f"{path} has no source or report to confirm its origin. Choose another --output directory.")
 
 
 def publish_output(directory, artifacts, *, command=None, report=None):

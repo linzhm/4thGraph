@@ -12,6 +12,17 @@ PROJECTS = Path(__file__).resolve().parents[1] / "projects"
 
 
 class StarkVerifierTests(unittest.TestCase):
+    def test_generate_rejects_binary_only_output_directories(self):
+        for name in ("lock.bin", "unlock.bin"):
+            with self.subTest(artifact=name), TemporaryDirectory() as temporary:
+                output = Path(temporary)
+                existing = output / name
+                existing.write_bytes(b"existing binary")
+                with self.assertRaisesRegex(ValueError, "no source or report"):
+                    publish_output(output, {"verifier.fth": b"new source"})
+                self.assertEqual(existing.read_bytes(), b"existing binary")
+                self.assertFalse((output / "verifier.fth").exists())
+
     def test_output_rejects_conflicting_artifacts_and_preserves_replay(self):
         artifacts = {"verifier.fth": b"forth", "lock.bin": b"lock", "unlock.bin": b"unlock"}
         report = {"forth_sha256": digest(b"forth"), "lock_sha256": digest(b"lock"),
