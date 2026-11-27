@@ -29,7 +29,13 @@ const signedHex = wallet.signPayment({
 }, ({ payload }) => signer.signBip340(payload));
 ```
 
-For a prepared transaction, use `signInput` and supply the current input index and its authenticated prevout. For Chronicle OTDA, supply `chronicleActive` from the actual chain context. SINGLE requires a same-index output. For version-2 OTDA ALL or paired SINGLE, the wallet uses a shorter preimage constructor where available. Set `compressOtda: false` (`compress_otda=False` in Python) to request a literal push. The same methods are available in Python, Rust, and Go. [Shared API table](../../../sdk/docs/reference.md#calls-and-data)
+## Prepared transactions and OTDA
+
+`signPayment` builds a single-input, version-2 BIP143 ALL payment. For a prepared transaction, call `signInput` with the actual input index and authenticated prevout. Approve the output order, amounts, input sequences, locktime, and total fee before signing. Supply `chronicleActive` from the actual chain context for OTDA. SINGLE requires a same-index output. [Shared API table](../../../sdk/docs/reference.md#calls-and-data) · [Sighash coverage](spec.en.md#unlock-stack-and-sighash)
+
+In version-2 OTDA ALL or paired SINGLE, the wallet selects a preimage constructor when it shortens the serialized input. Set `compressOtda: false` (`compress_otda=False` in Python) to request a literal push. Use the final signed transaction ID when building a child. The default wallet recognizes the catalogued templates. The tuned 64-window build has a separate constructor replay. [Release index](../versions/index.json) · [Constructor comparison](high-level-forth.en.md#otda-constructor)
+
+<a name="integrate-musig2"></a>
 
 ## Integrate MuSig2
 
