@@ -201,3 +201,27 @@ REGTEST_CHRONICLE_HEIGHT=5 PYTHONPATH=src:. bash tools/verify_node.sh --profile 
   "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/experiments/high-level/window_compare.py \
   --joint-lowerings --matrix-only --output workspace/schnorr-high-level/boundary-matrix.json
 ```
+
+<a name="point-comparison-models"></a>
+
+## 点比较的坐标模型
+
+基线来自 #113 的 `641153b` 提交。三条路径使用同一份批量见证代码、同一数据流编译选项、窗口循环、付款绑定和原像构造方式。第一条先还原点乘结果再比较 nonce 点。第二条把逆缩放并入模等式。第三条在点乘前一起映射公钥点和 nonce 点，复用缩放因子，并把已知域模数传给联合点乘词，最后在缩放模型中比较。[共享模型公式](../../../src/fourthgraph/stdlib/weierstrass-model.fth)
+
+| 比较方式 | 窗口前 | 窗口后 | 付款锁 | 两进两出 OTDA ALL，使用模板构造器 |
+| --- | ---: | ---: | ---: | ---: |
+| 先还原坐标再比较 | 3,861 B | 138 B | 23,188 B | 57,638 B |
+| 逆缩放并入模等式 | 3,861 B | 127 B | 23,177 B | 57,594 B |
+| 两个仿射点一起缩放 | 3,890 B | 82 B | 23,161 B | 57,530 B |
+| 手工 v0.17.0 | 3,172 B | 74 B | 22,435 B | 54,626 B |
+
+四个构建的 18,379 B 窗口循环逐字节相同。一起缩放在循环前多用 29 B，循环后少用 56 B。每锁还差 726 B，联合点乘调用前占 374 B，建表等联合点乘准备占 344 B，窗口后占 8 B。双引擎复放独立验签向量、错误见证、成对签名模式和普通输出退出，最短候选也通过构造器矩阵的八个场景。[实测](../experiments/high-level/model-output-measurements.json) · [交易矩阵](../experiments/high-level/model-output-matrix.json)
+
+```sh
+PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
+  "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/experiments/high-level/window_compare.py \
+  --joint-lowerings --output workspace/schnorr-high-level/model-output-measurements.json
+REGTEST_CHRONICLE_HEIGHT=5 PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
+  "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/experiments/high-level/window_compare.py \
+  --joint-lowerings --matrix-only --output workspace/schnorr-high-level/model-output-matrix.json
+```

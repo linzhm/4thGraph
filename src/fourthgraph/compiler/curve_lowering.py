@@ -272,10 +272,11 @@ def _variable_stack_table(frontend, words, optimization):
     return min((plain, schedule(True)), key=len) if optimization == DATAFLOW else plain
 
 
-def _stack_joint_script(frontend, words, points, optimization):
+def _stack_joint_script(frontend, words, points, optimization, *, scaled_output=False, mapped_input=False):
     """Compile a loop whose immutable prefix is 15 projective and 15 affine entries."""
     library = _joint_library()
-    prepare = compile_word(frontend.words["prepare-stack-windows"], optimization).script
+    preparation = "prepare-mapped-windows" if mapped_input else "prepare-stack-windows"
+    prepare = compile_word(frontend.words[preparation], optimization).script
     # The common depth encoder targets this exact stack layout. The runtime variable
     # table is in ascending order, the fixed table descending, both without index 0.
     entries = len(points) - 1
@@ -296,12 +297,21 @@ def _stack_joint_script(frontend, words, points, optimization):
     state = tuple(range(point_slots + 4))
     cleanup = asm("OP_FROMALTSTACK OP_DROP") + emit_steps(state, (), state[point_slots:], compact=True,
                                                           trim_suffix=optimization == DATAFLOW)
-    return prepare + initial + step * 63 + cleanup + words["restore-model"].code
+    output = b"" if scaled_output else words["restore-model"].code
+    return prepare + initial + step * 63 + cleanup + output
 
 
-def link_joint_word(vocabulary, optimization, *, strategy=GLV_REFERENCE):
-    """Link the GLV word when the caller has validated its point and scalars."""
+def link_joint_word(vocabulary, optimization, *, strategy=GLV_REFERENCE, scaled_output=False, mapped_input=False):
+    """Link GLV for checked inputs and an explicitly declared coordinate model.
+
+    A mapped input includes the registered field p above Px, Py, s, k. A
+    scaled output returns p, X, Y, Z in the kernel's model.
+    """
     name = "secp256k1-joint-window-2"
+    if (scaled_output or mapped_input) and strategy != GLV_SCALED:
+        raise ValueError("scaled coordinates require the scaled joint strategy")
+    if mapped_input and not scaled_output:
+        raise ValueError("mapped inputs use the model-preserving joint word")
     if strategy == GLV_REFERENCE:
         frontend = SourceCompiler(joint_source(), vocabulary=vocabulary)
         kernel = compile_word(frontend.words[name], optimization).script
@@ -314,8 +324,13 @@ def link_joint_word(vocabulary, optimization, *, strategy=GLV_REFERENCE):
             kernel = compile_word(frontend.words["packed-joint"], optimization).script
         else:
             frontend = SourceCompiler(stack_joint_source(), vocabulary=words)
-            kernel = _stack_joint_script(frontend, words, points, optimization)
-    return {name: numeric_fragment(kernel, 4, 4)}
+            kernel = _stack_joint_script(frontend, words, points, optimization, scaled_output=scaled_output,
+                                         mapped_input=mapped_input)
+    if mapped_input:
+        name = "secp256k1-joint-mapped-point"
+    elif scaled_output:
+        name = "secp256k1-joint-scaled-point"
+    return {name: numeric_fragment(kernel, 5 if mapped_input else 4, 4)}
 
 
 JOINT_CHECKS = """
