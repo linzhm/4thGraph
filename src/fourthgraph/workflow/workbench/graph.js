@@ -24,6 +24,9 @@ const en = [
   "Declarations are draft data and are not yet linked to generated transaction checks.",
   "The structured field and JSON were changed differently", "Structured item must be a JSON object.",
   "Design a CPN", "Model nodes", "No matching nodes.",
+  "Recorded replay", "Recorded transactions; chain state is not live.", "Previous", "Next", "Reset",
+  "Before deployment", "Step", "Consumed", "Produced", "Transaction ID", "Recorded block height",
+  "Graph and recorded outpoint differ", "Funding input", "Recorded transaction bytes",
 ];
 const zh = [
   "比较 CPN 路径", "候选", "可构建", "已淘汰", "已复放", "全部", "搜索路径…", "CPN 图",
@@ -47,6 +50,9 @@ const zh = [
   "这些声明是草稿数据，尚未连接到生成的交易检查。",
   "结构化字段和 JSON 的修改不一致", "结构化条目必须是 JSON 对象。",
   "设计 CPN", "模型节点", "没有符合条件的节点。",
+  "已记录复放", "展示已记录交易，链状态非实时。", "上一步", "下一步", "重置",
+  "部署前", "步骤", "消耗", "生成", "交易 ID", "记录的区块高度",
+  "图与记录的 outpoint 不一致", "入金输入", "记录的交易字节",
 ];
 let lang = "en";
 let filter = "all";
@@ -55,6 +61,7 @@ let selected = model.selected ?? model.candidates[0]?.id ?? null;
 let activeNode = null;
 let draft = model.draft ?? {schema_version: 1, places: [], transitions: []};
 let draftError = "";
+let replayIndex = -1;
 const $ = id => document.getElementById(id);
 const label = index => (lang === "en" ? en : zh)[index];
 
@@ -259,6 +266,94 @@ function layout({nodes, edges}) {
   return {width: Math.max(layers.size * 184 + 12, 450), height, nodes: queue, edges};
 }
 
+function currentReplay() {
+  if (view !== "physical") return null;
+  const pkg = model.packages[selected];
+  const graph = byId.get(selected)?.graph;
+  if (!pkg?.receipt || !graph || !Array.isArray(pkg.receipt.spends)) return null;
+  const rows = [{...pkg.receipt.deployment, step: "deploy"}, ...pkg.receipt.spends];
+  if (replayIndex < 0 || replayIndex >= rows.length) return {rows};
+  const row = rows[replayIndex];
+  const template = graph.transactions.find(item => item.step === row.step);
+  if (!template || !pkg.transactions?.[row.step]) return {rows, row, invalid: true};
+  const record = pkg.transactions[row.step];
+  const consumed = (row.previous ?? []).map((outpoint, vin) => {
+    const source = template.inputs[vin]?.from;
+    const actual = source && pkg.transactions[source.step]?.outputs[source.vout]?.outpoint;
+    return {outpoint, vin, place: source && actual === outpoint ? "utxo:" + source.step + ":" + source.vout : null,
+      mismatch: source ? actual !== outpoint : row.step !== "deploy"};
+  });
+  const produced = (record.outputs ?? []).map((output, slot) => {
+    const port = template.outputs[slot];
+    const expected = row.txid + ":" + slot;
+    return {outpoint: output.outpoint, slot,
+      place: port && output.outpoint === expected ? "utxo:" + row.step + ":" + port.vout : null,
+      mismatch: !port || port.vout !== slot || output.outpoint !== expected};
+  });
+  return {rows, row, consumed, produced, invalid: row.step !== "deploy" && template.inputs.length !== consumed.length ||
+    template.outputs.length !== produced.length};
+}
+
+function renderReplay() {
+  const container = $("replay");
+  const state = currentReplay();
+  container.hidden = state === null;
+  container.replaceChildren();
+  if (!state) return;
+  const header = element("div", undefined, "replay-header");
+  const title = element("div");
+  title.append(element("h3", label(107)), element("p", label(108), "hint"));
+  const controls = element("div", undefined, "replay-controls");
+  const previous = draftButton(label(109), () => { replayIndex--; activeNode = null; render(); });
+  previous.disabled = replayIndex < 0;
+  const next = draftButton(label(110), () => { replayIndex++; activeNode = null; render(); });
+  next.disabled = replayIndex >= state.rows.length - 1;
+  const reset = draftButton(label(111), () => { replayIndex = -1; activeNode = null; render(); });
+  reset.disabled = replayIndex < 0;
+  controls.append(previous, next, reset);
+  header.append(title, controls);
+  container.append(header);
+  if (!state.row) {
+    container.append(element("p", label(112), "replay-step"));
+    return;
+  }
+  const row = state.row;
+  container.append(element("p", label(113) + " " + (replayIndex + 1) + " / " + state.rows.length + " · " + row.step, "replay-step"));
+  const facts = element("dl", undefined, "replay-facts");
+  const height = row.bsv_node?.height;
+  for (const [name, value] of [[116, row.txid], [117, height], [120, row.bytes == null ? null : bytes(row.bytes)]]) {
+    if (value === null || value === undefined) continue;
+    facts.append(element("dt", label(name)), element("dd", value, name === 116 ? "mono outpoint" : ""));
+  }
+  container.append(facts);
+  if (state.invalid) container.append(element("p", label(118), "draft-error"));
+  for (const [heading, entries] of [[114, state.consumed ?? []], [115, state.produced ?? []]]) {
+    const section = element("div", undefined, "replay-places");
+    section.append(element("strong", label(heading)));
+    const list = element("ul");
+    for (const entry of entries) {
+      const item = element("li");
+      const prefix = heading === 114 ? "vin " + entry.vin : "vout " + entry.slot;
+      if (entry.place) {
+        const button = draftButton(prefix + " · " + entry.outpoint, () => {
+          activeNode = entry.place;
+          renderGraph(true);
+          renderInspector();
+        });
+        item.append(button);
+      } else {
+        item.append(element("span", prefix + " · " + entry.outpoint, "mono outpoint"));
+        if (entry.mismatch) item.append(element("small", label(118), "draft-error"));
+        else if (heading === 114 && row.step === "deploy") item.append(element("small", label(119), "hint"));
+      }
+      list.append(item);
+    }
+    if (!entries.length) list.append(element("li", "—"));
+    section.append(list);
+    container.append(section);
+  }
+}
+
 function renderGraph(focus = false) {
   const canvas = $("canvas");
   const graph = graphModel();
@@ -288,8 +383,13 @@ function renderGraph(focus = false) {
     wire.append(svg("title", {}, source.title + " · " + output + " → " + target.title + " · " + input));
     plot.append(wire);
   }
+  const replay = currentReplay();
+  const consumed = new Set(replay?.consumed?.map(item => item.place).filter(Boolean) ?? []);
+  const produced = new Set(replay?.produced?.map(item => item.place).filter(Boolean) ?? []);
   for (const node of nodes) {
-    const group = svg("g", {class: "node " + node.kind + (node.spendable ? "" : " unspendable"),
+    const event = node.id === "tx:" + replay?.row?.step ? " replay-current" :
+      consumed.has(node.id) ? " replay-consumed" : produced.has(node.id) ? " replay-produced" : "";
+    const group = svg("g", {class: "node " + node.kind + (node.spendable ? "" : " unspendable") + event,
       role: "button", tabindex: 0, "aria-label": node.kind + " " + node.title, "aria-pressed": node.id === activeNode});
     group.append(svg("rect", {x: node.x, y: node.y, width: boxWidth, height: node.height,
       rx: node.kind === "place" ? 26 : 7}));
@@ -808,8 +908,10 @@ function renderCandidates() {
     button.addEventListener("click", () => {
       selected = row.id;
       activeNode = null;
+      replayIndex = -1;
       renderCandidates();
       list.querySelector('[aria-pressed="true"]')?.focus();
+      renderReplay();
       renderGraph();
       renderInspector();
     });
@@ -858,10 +960,11 @@ function render() {
   }));
   segments("filters", [["all", 5], ["eligible", 2], ["excluded", 3]], filter, key => { filter = key; render(); });
   const choices = model.editor_start ? [["draft", 60]] : [["logical", 8], ["physical", 9], ["draft", 60]];
-  segments("views", choices, view, key => { activeNode = null; view = key; render(); });
+  segments("views", choices, view, key => { activeNode = null; replayIndex = -1; view = key; render(); });
   draftTools();
   for (const button of document.querySelectorAll("[data-lang]")) button.setAttribute("aria-pressed", button.dataset.lang === lang);
   renderCandidates();
+  renderReplay();
   renderGraph();
   renderInspector();
 }

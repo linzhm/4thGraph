@@ -87,6 +87,9 @@ svg .node > rect { fill: white; stroke: #244157; stroke-width: 1.7; }
 svg .place > rect { stroke: var(--teal); }
 svg .unspendable > rect { stroke-dasharray: 6 4; }
 svg .node[aria-pressed="true"] > rect, svg .node:hover > rect { fill: var(--active); stroke-width: 2.4; }
+svg .node.replay-current > rect { fill: #e4f1f9; stroke: #275f82; stroke-width: 2.8; }
+svg .node.replay-consumed > rect { fill: #fff0dc; stroke: #a35b0b; stroke-width: 2.8; }
+svg .node.replay-produced > rect { fill: #dff4eb; stroke: #008557; stroke-width: 2.8; }
 svg .node:focus-visible { outline: none; }
 svg .node:focus-visible > rect { stroke: #00998b; stroke-width: 3; }
 svg .node text { fill: var(--ink); pointer-events: none; }
@@ -98,6 +101,24 @@ svg .socket { stroke: #fff; stroke-width: 1.2; fill: var(--teal); }
 .place-swatch, .transition-swatch { display: inline-block; width: 22px; height: 13px; border: 2px solid var(--teal); border-radius: 10px; }
 .transition-swatch { border-color: var(--ink); border-radius: 3px; margin-left: 10px; }
 #port-hint { color: var(--muted); font-weight: 400; margin-left: auto; }
+.replay { border-top: 1px solid var(--line); padding: 14px 18px; }
+.replay[hidden] { display: none; }
+.replay-header { display: flex; justify-content: space-between; flex-wrap: wrap; align-items: center; gap: 8px; }
+.replay-header .hint { margin: 2px 0 0; }
+.replay-controls { display: flex; flex-wrap: wrap; gap: 6px; }
+.replay-controls button { padding: 5px 9px; border: 1px solid var(--teal); border-radius: 6px; background: white; color: var(--teal); }
+.replay-controls button:disabled { border-color: var(--line); color: #758593; cursor: default; }
+.replay-step { margin-top: 8px; font-weight: 700; }
+.replay-facts { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 3px 10px; margin: 8px 0; font-size: 12px; }
+.replay-facts dt { color: var(--muted); }
+.replay-facts dd { margin: 0; overflow-wrap: anywhere; }
+.replay-places { margin: 7px 0; font-size: 12px; }
+.replay-places strong { display: inline-block; padding: 2px 6px; border-radius: 4px; background: #fff0dc; }
+.replay-places:last-child strong { background: #dff4eb; }
+.replay-places ul { list-style: none; padding: 0; margin: 4px 0; }
+.replay-places li { display: flex; flex-wrap: wrap; gap: 5px; }
+.replay-places button { border: 0; background: transparent; color: var(--teal); padding: 2px 0; text-align: left; font: 12px/1.5 ui-monospace, monospace; overflow-wrap: anywhere; text-decoration: underline; }
+.replay-places .outpoint { overflow-wrap: anywhere; }
 .inspector h2 { margin-bottom: 13px; }
 .path { padding: 8px; background: var(--active); border-radius: 6px; font-weight: 700; overflow-wrap: anywhere; }
 .metrics { margin: 12px 0; }

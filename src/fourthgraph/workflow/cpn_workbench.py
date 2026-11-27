@@ -102,6 +102,7 @@ def export_workbench(report_file, receipt_files, *, output, title, selected=None
                 raise ValueError(f"{file.name}: missing recorded validation and mining evidence")
             step = row.get("step", "deploy")
             recorded[step] = {
+                "txid": tx.txid(), "bytes": len(tx.serialize()), "height": row["bsv_node"]["height"],
                 "inputs": row["previous"],
                 "outputs": [{"outpoint": f"{tx.txid()}:{slot}", "satoshis": item.value, "script_bytes": len(item.script),
                              **carried_state(item, kind, step, receipt["build"])}

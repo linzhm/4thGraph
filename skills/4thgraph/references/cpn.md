@@ -47,6 +47,8 @@ Select `path/handoff~stack` to trace `next: u32` across two transactions. In the
 
 Use `4thgraph cpn workbench REPORT --receipt RECEIPT --output index.html` for an existing build. Repeat `--receipt` to associate different measured candidates. Add `--source SOURCE` to display the Forth definition from the matching source and imports. Download the plan, planning report and available receipt from the inspector. With pinned chain-gang installed, the recipient can run `4thgraph cpn verify receipt.json --report report.json` offline. Keep the Forth source, catalog and setup together when the recipient also needs to rebuild.
 
+In the transaction view, use the recorded replay controls to step through deployment and each spend. The graph marks the current transition and its consumed and produced Places. The replay panel shows the recorded txid, height, byte count and ordered outpoints. These are observations in the saved receipt, so a fresh node lookup is needed for the current chain state.
+
 ## Direct Script from a clean checkout
 
 Run from the checkout root with Python 3.11 or later in a virtual environment. The first command installs the dependencies for test keys, funded replay and offline verification. Use an installed CLI built from this checkout. [CLI installation](../../../docs/install.md)

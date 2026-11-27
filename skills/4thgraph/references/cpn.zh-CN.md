@@ -47,6 +47,8 @@ git show 11c919a:projects/spv-token/fixtures/covenant-backtrace-2x2-regtest.json
 
 对现有构建运行 `4thgraph cpn workbench REPORT --receipt RECEIPT --output index.html`。重复传入 `--receipt` 可关联多个实测候选。传入 `--source SOURCE` 可显示经摘要核对的 Forth 定义。从详情下载固定计划、规划报告和已有回执。接收方可用固定版本的 chain-gang 执行 `4thgraph cpn verify receipt.json --report report.json` 离线复核。需要重建时，再一同保留 Forth 源码、目录与设置文件。
 
+在交易视图中使用已记录复放控件，可逐步查看部署和每次花费。图上会标出当前 Transition 以及消费、产生的 Place；面板展示回执中的 txid、区块高度、交易字节和有序 outpoint。这里展示的是已保存的观察结果，当前链状态需要重新查询节点。
+
 ## 从干净检出开始跑纯 Script
 
 在仓库根目录运行，使用 Python 3.11 或更新版本的虚拟环境。第一条命令安装生成测试公钥、入金复放和离线复验所需的依赖。使用由同一份检出构建的 CLI。 [安装 CLI](../../../docs/install.zh-CN.md)

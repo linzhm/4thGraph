@@ -5,6 +5,9 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
 
+from fourthgraph.bsv.evaluate import ScriptError, evaluate as evaluate_script
+from fourthgraph.bsv.script import encode_num
+from fourthgraph.compiler.lowering import OPTIMIZATIONS, compile_word
 from fourthgraph.replay.workflow import TestKeys
 from fourthgraph.verification.circuit_backend import emit_stage_circuit
 from fourthgraph.workflow.logical_cpn import CPNError
@@ -154,6 +157,26 @@ class LogicalCPNLoweringTests(unittest.TestCase):
         )
         with self.assertRaisesRegex(CPNError, "must begin with the matching check-range"):
             lower_linear(doc, conditional, source_path=SOURCE_PATH)
+
+    def test_range_boundaries_survive_all_script_optimizations(self):
+        doc = document()
+        terminal = doc["transitions"][-1]
+        terminal["word"] = "decide-with-delta"
+        terminal["metadata"]["witnesses"] = [{"name": "delta", "type": "u32", "visibility": "private"}]
+        terminal["metadata"]["evidence"] = [{"policy": "require-zk"}]
+        terminal["metadata"]["constraints"] = [{"kind": "range", "operand": "delta", "range": "private-delta"}]
+        frontend, _ = lower_linear(doc, PRIVATE_SOURCE, source_path=SOURCE_PATH)
+        word = frontend.workflow().stages[-1].word
+        for optimization in OPTIMIZATIONS:
+            script = compile_word(word, optimization).script
+            for delta in (1, 4):
+                with self.subTest(optimization=optimization, delta=delta):
+                    stack, alt = evaluate_script(script, [encode_num(19), encode_num(delta)])
+                    self.assertEqual(stack, [encode_num(1)])
+                    self.assertEqual(alt, [])
+            for delta in (0, 5):
+                with self.subTest(optimization=optimization, delta=delta), self.assertRaises(ScriptError):
+                    evaluate_script(script, [encode_num(19), encode_num(delta)])
 
     def test_rejects_unknown_evidence_and_nonterminal_witness(self):
         for evidence in ([{"policy": "require-zk", "recursive": True}],
