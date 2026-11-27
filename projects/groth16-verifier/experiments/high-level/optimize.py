@@ -11,7 +11,7 @@ from fourthgraph.bsv.evaluate import ScriptError, evaluate
 from fourthgraph.bsv.transaction import blob
 from fourthgraph.compiler.formula_experiment import enumerate_orders
 from fourthgraph.replay.bls12381_verifier import FIXTURE, SOURCES, fixture, witness_controls
-from fourthgraph.verification.bls12381.affine_witness import MSM_STRATEGIES, MSM_TABLES
+from fourthgraph.verification.bls12381.affine_witness import MILLER_REDUCTIONS, MSM_STRATEGIES, MSM_TABLES
 from fourthgraph.verification.bls12381.build import (
     RESIDUE_ASSOCIATIONS, SCRIPT_ERAS, ArithmeticPlan, ForthVerifier,
 )
@@ -80,6 +80,8 @@ def main():
                      help="hold the residue multiplication order fixed while comparing Fp2 lowerings")
     cli.add_argument("--msm", choices=MSM_STRATEGIES, help="restrict the MSM witness and lowering strategy")
     cli.add_argument("--msm-table", choices=MSM_TABLES, help="restrict the MSM point table representation")
+    cli.add_argument("--miller-reductions", choices=MILLER_REDUCTIONS, help="restrict the Miller reduction schedule")
+    cli.add_argument("--fp2-selection", choices=("uniform", "callsite"), help="restrict the Fp2 kernel selection")
     cli.add_argument("--output", type=Path, default=PROJECT / "workspace/build/high-level")
     args = cli.parse_args()
     args.output.mkdir(parents=True, exist_ok=True)
@@ -90,12 +92,17 @@ def main():
     reference_source = reference_path.read_bytes()
     formula, kernel_digest = fp2_kernel(())
     associations = (args.residue_association,) if args.residue_association else RESIDUE_ASSOCIATIONS
-    plans = [ArithmeticPlan(rules, association) for rules, association
-             in product(enumerate_orders(formula), associations)]
-    plans.extend(ArithmeticPlan(FP2_RULES, association, "callsite") for association in associations)
+    plans = []
+    if args.fp2_selection != "callsite":
+        plans.extend(ArithmeticPlan(rules, association) for rules, association
+                     in product(enumerate_orders(formula), associations))
+    if args.fp2_selection != "uniform":
+        plans.extend(ArithmeticPlan(FP2_RULES, association, "callsite") for association in associations)
     strategies = (args.msm,) if args.msm else MSM_STRATEGIES
     tables = (args.msm_table,) if args.msm_table else MSM_TABLES
-    plans = [replace(plan, msm=msm, msm_table=table) for msm, table, plan in product(strategies, tables, plans)
+    reductions = (args.miller_reductions,) if args.miller_reductions else MILLER_REDUCTIONS
+    plans = [replace(plan, msm=msm, msm_table=table, miller_reductions=reduction)
+             for msm, table, reduction, plan in product(strategies, tables, reductions, plans)
              if msm == "signed-radix4" or table == "points"]
     if not plans:
         cli.error("doubling-slope tables require signed radix-4 MSM")

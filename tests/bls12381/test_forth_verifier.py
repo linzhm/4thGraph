@@ -142,7 +142,9 @@ class ForthVerifierTests(unittest.TestCase):
                                plan=ArithmeticPlan(msm="signed-radix4"))
         derived = ForthVerifier(json.dumps(key), self.source, witness_layout="affine-witness",
                                 plan=ArithmeticPlan(msm="signed-radix4", msm_table="doubling-slopes"))
-        for verifier in (unsigned, signed, derived):
+        deferred = ForthVerifier(json.dumps(key), self.source, witness_layout="affine-witness",
+                                 plan=replace(derived.plan, msm_table="deferred-doubling-slopes"))
+        for verifier in (unsigned, signed, derived, deferred):
             lock = verifier.compile(sources)
             for s, t in ((0, 0), (1, 0), (0, 1), (0, 3), (R - 1, 2)):
                 with self.subTest(plan=verifier.plan, signals=(s, t)):
@@ -161,7 +163,7 @@ class ForthVerifierTests(unittest.TestCase):
                         old_witness = unsigned.witness((s, t), proof, sources=sources)
                         with self.assertRaises((RuntimeError, ValueError)):
                             check_spend(parent, spend.with_script(0, old_witness))
-                    if verifier is derived and t == 3:
+                    if verifier in (derived, deferred) and t == 3:
                         self.assertEqual(witness, signed.witness((s, t), proof, sources=sources))
 
     def test_affine_layout_shares_public_packet_with_successor_check(self):
@@ -199,7 +201,9 @@ class ForthVerifierTests(unittest.TestCase):
                         check_spend(parent, spend)
 
     def test_affine_compact_checks_trace_lines_and_residue(self):
-        verifier = ForthVerifier(self.key, self.source, witness_layout="affine-witness")
+        verifier = ForthVerifier(self.key, self.source, witness_layout="affine-witness",
+                                 plan=ArithmeticPlan(msm="signed-radix4", msm_table="deferred-doubling-slopes",
+                                                     miller_reductions="per-round"))
         signals, proof = self.cases[0]
         lock = verifier.compile(SOURCES)
         artifact = verifier.artifact(SOURCES, None, lock)
@@ -221,6 +225,8 @@ class ForthVerifierTests(unittest.TestCase):
             ("lines", line_start, bytes([witness[line_start] ^ 1])),
             ("slope", slope_start, (1).to_bytes(FIELD_BYTES, "little")),
             ("out-of-range slope", slope_start, Q.to_bytes(FIELD_BYTES, "little")),
+            ("Miller slope", slope_start + artifact["msm_slope_count"] * FIELD_BYTES,
+             bytes(FIELD_BYTES)),
             ("zero residue", residue_start, bytes(residue_bytes)),
         )
         for name, offset, replacement in controls:

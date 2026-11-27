@@ -59,23 +59,36 @@ class BLS12381Tests(unittest.TestCase):
         inputs = field.graph.inputs
         element = fp12(inputs)
         squared = tower.square12(element)
-        lined = tower.mul_line(squared, pairs(inputs[12:]))
+        line = pairs(inputs[12:])
+        lined = tower.mul_line(squared, line)
         product = tower.mul12(lined, element)
+        step = tower.mul_lines(squared, (line,) * 3)
+        round_without_chord = tower.miller_round(element, (line,) * 3, None)
+        round_with_chord = tower.miller_round(element, (line,) * 6, element)
         self.assertEqual(field.reduce(product[0][0][0]), product[0][0][0])
-        outputs = (*flatten(squared), *flatten(lined), *flatten(product))
+        outputs = tuple(chain.from_iterable(map(flatten, (squared, lined, product, step,
+                                                         round_without_chord, round_with_chord))))
         script = field.graph.emit(outputs, compact=True)
 
         limbs = (Q - 1, -Q + 1, 0, -7, 1, -1, -Q + 1, 2, Q - 2, 0, 3, -4)
         line_limbs = (Q - 1, -Q + 1, -(Q - 1)**2, (Q - 1)**2, Q - 1, 0)
         value = fp12(limbs)
         squared = HOST.square12(value)
-        lined = HOST.mul_line(squared, pairs(line_limbs))
+        line = pairs(line_limbs)
+        lined = HOST.mul_line(squared, line)
         product = HOST.mul12(lined, value)
+        after_lines = squared
+        for count in range(6):
+            after_lines = HOST.mul_line(after_lines, line)
+            if count == 2:
+                step = after_lines
+        round_with_chord = HOST.mul12(after_lines, value)
+        expected = tuple(chain.from_iterable(map(flatten, (squared, lined, product, step, step, round_with_chord))))
         stack, alt = evaluate(script, list(map(encode_num, limbs + line_limbs)))
         signed = tuple(map(decode_num, stack))
         self.assertEqual(alt, [])
         self.assertTrue(all(abs(limb) < Q for limb in signed))
-        self.assertEqual(tuple(limb % Q for limb in signed), (*flatten(squared), *flatten(lined), *flatten(product)))
+        self.assertEqual(tuple(limb % Q for limb in signed), expected)
 
     def test_nchain_and_residue_exponent_kernels(self):
         # Symbolically track the signed-seed nChain hard exponent straight-line program.

@@ -292,6 +292,26 @@ class Tower:
         cross = self.mul6(self.add6(even, odd), (c0, self.add2(c2, c3), ZERO2))
         return self.add6(t0, self.mul_v(t1)), self.sub6(self.sub6(cross, t0), t1)
 
+    def mul_lines(self, acc, lines):
+        return self._fp12(self._mul_lines, acc, lines)
+
+    def _mul_lines(self, acc, lines):
+        for line in lines:
+            acc = self._mul_line(acc, line)
+        return acc
+
+    def miller_round(self, acc, lines, extra_factor):
+        """Square, apply three tangent lines, and include optional chord lines and residue."""
+        return self._fp12(self._miller_round, acc, lines, extra_factor)
+
+    def _miller_round(self, acc, lines, extra_factor):
+        # A round multiplies the square of a reduced accumulator by at most
+        # six evaluated lines (limbs below Q²) and one reduced residue.
+        # Even allowing a factor of 2¹⁶ for the coefficient sums in each
+        # operation, one round fits within 6,000 bits per unreduced limb.
+        acc = self._mul_lines(self._square12(acc), lines)
+        return acc if extra_factor is None else self._mul12(acc, extra_factor)
+
     def frobenius12(self, a):
         return tuple(
             tuple(self.mul2(self.conjugate2(coefficient), FROBENIUS[2 * index + parity])

@@ -16,7 +16,8 @@ from fourthgraph.compiler.curve_windows import SignedRadix4Window, double_from_a
 
 LAYOUTS = ("projective", "affine-inline", "affine-witness")
 MSM_STRATEGIES = ("unsigned-radix4", "signed-radix4")
-MSM_TABLES = ("points", "doubling-slopes")
+MSM_TABLES = ("points", "doubling-slopes", "deferred-doubling-slopes")
+MILLER_REDUCTIONS = ("per-operation", "per-step", "per-round")
 IDENTITY = (0, 0)
 PAIRING_STEPS = len(SEED_BITS) + SEED_BITS.count("1")
 
@@ -121,7 +122,7 @@ class PackedFields:
         return value
 
 
-def add_msm_window(f, acc, point, digit, slope, *, bounded=False):
+def add_msm_window(f, acc, point, digit, slope, *, bounded=False, defer_reductions=False, shifted=False):
     """Check the selected affine addition, including the two identity cases."""
     x, y = acc
     px, py = point
@@ -132,7 +133,10 @@ def add_msm_window(f, acc, point, digit, slope, *, bounded=False):
     # A reduced coordinate and a bounded digit are zero in Fp exactly when
     # their Script integer is zero.
     finite = f.op("OP_0NOTEQUAL", y) if bounded else f.nonzero(y)
-    active = f.op("OP_0NOTEQUAL", digit) if bounded else f.nonzero(digit)
+    if shifted:
+        active = f.op("OP_NUMNOTEQUAL", digit, 1)
+    else:
+        active = f.op("OP_0NOTEQUAL", digit) if bounded else f.nonzero(digit)
     regular = f.op("OP_BOOLOR", distinct_x, same_y)
     has_slope = f.op("OP_BOOLAND", active, f.op("OP_BOOLAND", finite, regular))
     denominator = f.select(distinct_x, dx, f.mul(2, y))
@@ -140,14 +144,21 @@ def add_msm_window(f, acc, point, digit, slope, *, bounded=False):
     mismatch = f.sub(f.mul(slope, denominator), numerator)
     f.all((f.equal(f.select(has_slope, mismatch, slope), 0),))
 
-    nx = f.reduce(f.sub(f.sub(f.mul(slope, slope), x), px))
-    ny = f.reduce(f.sub(f.mul(slope, f.sub(x, nx)), y))
+    nx = f.sub(f.sub(f.mul(slope, slope), x), px)
+    if not defer_reductions:
+        nx = f.reduce(nx)
+    ny = f.sub(f.mul(slope, f.sub(x, nx)), y)
+    if not defer_reductions:
+        ny = f.reduce(ny)
     # BOOLOR returns a normalized 0 or 1, so it can also mask a coordinate.
-    return tuple(
+    selected = tuple(
         f.select(active, f.select(finite, f.mul(regular, result) if bounded else f.select(regular, result, 0),
                                   base), old)
         for result, base, old in zip((nx, ny), point, acc, strict=True)
     )
+    # The selected table point may have unreduced coordinates. Reduce either
+    # branch before the next window uses the zero test on the accumulator.
+    return tuple(map(f.reduce, selected)) if defer_reductions else selected
 
 
 def checked_b_line(curve, point, other, slope, *, doubling):
@@ -168,17 +179,25 @@ def checked_b_line(curve, point, other, slope, *, doubling):
     return (nx, ny), (curve.sub(curve.mul(slope, x), y), slope)
 
 
-def double_msm_point(field, point, trusted_point):
+def double_msm_point(field, point, trusted_point, *, defer_reductions):
     host = Curve(HOST)
     _, (_, slope) = host.affine_line(trusted_point, trusted_point, doubling=True)
     # Give the compiler the slope as a shared Script value. A constant-folded
     # square here would materialize a second full-width field literal.
-    return double_from_affine_slope(field, point, field.value(slope))
+    slope = field.value(slope)
+    if defer_reductions:
+        # A full public scalar needs at most 256 table doublings. The x
+        # recurrence increases by at most one bit per doubling after the
+        # slope square, and y uses only a constant times x plus its old value.
+        with field.residue_block():
+            return double_from_affine_slope(field, point, slope)
+    return double_from_affine_slope(field, point, slope)
 
 
 class AffineStages(VerifierStages):
     def __init__(self, key, sources, *, lines_in_witness, chronicle=False, optimize=False, fp2_rules=FP2_RULES,
-                 fp2_selection="uniform", msm=MSM_STRATEGIES[0], msm_table=MSM_TABLES[0]):
+                 fp2_selection="uniform", msm=MSM_STRATEGIES[0], msm_table=MSM_TABLES[0],
+                 miller_reductions=MILLER_REDUCTIONS[0]):
         self.witness_items = 2 if lines_in_witness else 1
         super().__init__(key, sources, chronicle=chronicle, optimize=optimize, extra_inputs=self.witness_items,
                          fp2_rules=fp2_rules, fp2_selection=fp2_selection)
@@ -187,6 +206,7 @@ class AffineStages(VerifierStages):
         self.lines_in_witness = lines_in_witness
         self.msm = msm
         self.msm_table = msm_table
+        self.miller_reductions = miller_reductions
         self.windows = tuple(msm_windows(key, sources, strategy=msm))
         inputs = self.field.graph.inputs
         self.trace = PackedFields(self.field, inputs[self.witness_items - 1])
@@ -230,7 +250,8 @@ class AffineStages(VerifierStages):
         f = self.field
         scalars = {index: value for (index, _), value in zip(self.slots, public, strict=True)}
         acc = fold_msm(self.key, self.sources) or IDENTITY
-        derive = self.msm_table == "doubling-slopes"
+        derive = self.msm_table != "points"
+        defer_reductions = self.msm_table == "deferred-doubling-slopes"
         bases = {}
 
         def divmod_script(value, radix):
@@ -238,24 +259,30 @@ class AffineStages(VerifierStages):
 
         for offset, window in enumerate(self.windows):
             index, points, step = window.index, window.points, window.signed
-            digit, scalars[index] = step.split(scalars[index], add=f.add, sub=f.sub, divide=divmod_script)
+            shifted = defer_reductions and step.carry
+            digit, scalars[index] = step.split(scalars[index], add=f.add, sub=f.sub, divide=divmod_script,
+                                              shifted=shifted)
             point = points[0]
             if derive:
                 point = bases.get(index)
                 if point is None:
                     point = tuple(map(f.value, points[0]))
             if len(points) == 2:
-                twice = f.op("OP_NUMEQUAL", digit, 2)
-                doubled = double_msm_point(f, point, points[0]) if derive else points[1]
+                twice = f.op("OP_NUMEQUAL", digit, 3 if shifted else 2)
+                doubled = (double_msm_point(f, point, points[0], defer_reductions=defer_reductions)
+                           if derive else points[1])
                 px, py = (f.select(twice, high, low) for low, high in zip(point, doubled, strict=True))
                 if derive and step.carry:
                     # The next radix-4 window's base is four times this base.
-                    bases[index] = double_msm_point(f, doubled, points[1])
-                if step.carry:
+                    bases[index] = double_msm_point(f, doubled, points[1], defer_reductions=defer_reductions)
+                if shifted:
+                    py = f.op("OP_IF OP_NEGATE OP_ENDIF", py, f.op("OP_NOT", digit))
+                elif step.carry:
                     negative = f.op("OP_LESSTHAN", digit, 0)
                     py = f.select(negative, f.sub(0, py), py)
                 point = px, py
-            acc = add_msm_window(f, acc, point, digit, self.trace.read(offset), bounded=True)
+            acc = add_msm_window(f, acc, point, digit, self.trace.read(offset), bounded=True,
+                                 defer_reductions=defer_reductions, shifted=shifted)
         return Curve(self.tower).negate(acc), f.op("OP_0NOTEQUAL", acc[1])
 
     def miller_loop(self, pairing_key, proof, *, bits=SEED_BITS):
@@ -268,8 +295,12 @@ class AffineStages(VerifierStages):
         prepared = iter(vk_lines(self.key))
         step = 0
         acc, current = z, b
+        per_round = self.miller_reductions == "per-round"
+        per_step = self.miller_reductions == "per-step"
         for bit in bits:
-            acc = tower.square12(acc)
+            if not per_round:
+                acc = tower.square12(acc)
+            round_lines = []
             for doubling in ((True, False) if bit == "1" else (True,)):
                 offset = len(self.windows) + step * 2
                 slope = self.trace.read(offset), self.trace.read(offset + 1)
@@ -286,11 +317,20 @@ class AffineStages(VerifierStages):
                         tuple(f.select(vk_finite, limb, identity) for limb, identity in zip(pair, unit, strict=True))
                         for pair, unit in zip(gamma_line, ((1, 0), (0, 0), (0, 0)), strict=True)
                     )
-                acc = tower.mul_line(acc, evaluated_line(tower, a, line))
-                acc = tower.mul_line(acc, evaluated_line(tower, minus_c, delta))
-                acc = tower.mul_line(acc, gamma_line)
+                if per_round or per_step:
+                    lines = evaluated_line(tower, a, line), evaluated_line(tower, minus_c, delta), gamma_line
+                    if per_round:
+                        round_lines.extend(lines)
+                    else:
+                        acc = tower.mul_lines(acc, lines)
+                else:
+                    acc = tower.mul_line(acc, evaluated_line(tower, a, line))
+                    acc = tower.mul_line(acc, evaluated_line(tower, minus_c, delta))
+                    acc = tower.mul_line(acc, gamma_line)
                 step += 1
-            if bit == "1":
+            if per_round:
+                acc = tower.miller_round(acc, round_lines, z if bit == "1" else None)
+            elif bit == "1":
                 acc = tower.mul12(acc, z)
         bx, by = (tower.conjugate2(value) for value in b)
         psi = tower.mul2(bx, PSI_X), tower.scale2(tower.mul2(by, PSI_Y), -1)

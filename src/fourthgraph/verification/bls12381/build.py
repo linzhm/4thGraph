@@ -7,7 +7,8 @@ import json
 from pathlib import Path
 
 from fourthgraph.verification.bls12381.affine_witness import (
-    AffineStages, LAYOUTS, MSM_STRATEGIES, MSM_TABLES, affine_witness, line_packet, msm_windows, slope_packet_bytes,
+    AffineStages, LAYOUTS, MILLER_REDUCTIONS, MSM_STRATEGIES, MSM_TABLES, affine_witness, line_packet, msm_windows,
+    slope_packet_bytes,
 )
 from fourthgraph.verification.bls12381.field import FP2_ENTRY, FP2_RULES, fp2_alternatives, fp2_kernel
 from fourthgraph.verification.bls12381.verifier import (
@@ -41,6 +42,7 @@ class ArithmeticPlan:
     fp2_selection: str = "uniform"
     msm: str = MSM_STRATEGIES[0]
     msm_table: str = MSM_TABLES[0]
+    miller_reductions: str = MILLER_REDUCTIONS[0]
 
     def __post_init__(self):
         object.__setattr__(self, "fp2_rules", validate_rules(self.fp2_rules))
@@ -52,8 +54,10 @@ class ArithmeticPlan:
             raise ValueError(f"MSM must be one of {', '.join(MSM_STRATEGIES)}")
         if self.msm_table not in MSM_TABLES:
             raise ValueError(f"MSM table must be one of {', '.join(MSM_TABLES)}")
-        if self.msm_table == "doubling-slopes" and self.msm != "signed-radix4":
+        if self.msm_table != "points" and self.msm != "signed-radix4":
             raise ValueError("doubling-slope tables require signed radix-4 MSM")
+        if self.miller_reductions not in MILLER_REDUCTIONS:
+            raise ValueError(f"Miller reductions must be one of {', '.join(MILLER_REDUCTIONS)}")
 
     def document(self):
         document = asdict(self)
@@ -63,13 +67,15 @@ class ArithmeticPlan:
             del document["msm"]
         if self.msm_table == MSM_TABLES[0]:
             del document["msm_table"]
+        if self.miller_reductions == MILLER_REDUCTIONS[0]:
+            del document["miller_reductions"]
         return document
 
     @classmethod
     def read(cls, path):
         plan = json.loads(path.read_bytes())
         required = {"fp2_rules", "residue_association"}
-        optional = {"fp2_selection", "msm", "msm_table"}
+        optional = {"fp2_selection", "msm", "msm_table", "miller_reductions"}
         if not isinstance(plan, dict) or not required <= plan.keys() <= required | optional:
             raise ValueError("arithmetic plan requires fp2_rules and residue_association")
         return cls(**plan)
@@ -160,6 +166,8 @@ class ForthVerifier(ScriptVerifier):
             raise ValueError(f"unknown witness layout {witness_layout!r}")
         if plan is not None and plan.msm == "signed-radix4" and witness_layout == "projective":
             raise ValueError("signed radix-4 MSM requires an affine witness layout")
+        if plan is not None and plan.miller_reductions != MILLER_REDUCTIONS[0] and witness_layout == "projective":
+            raise ValueError("grouped Miller reductions require an affine witness layout")
         if script_era not in SCRIPT_ERAS:
             raise ValueError(f"unknown Script era {script_era!r}")
         self.witness_layout = witness_layout
@@ -205,7 +213,8 @@ class ForthVerifier(ScriptVerifier):
             stages = VerifierStages(self.key, sources, **options)
         else:
             stages = AffineStages(self.key, sources, lines_in_witness=self.witness_layout == "affine-witness",
-                                  msm=self.msm, msm_table=plan.msm_table, **options)
+                                  msm=self.msm, msm_table=plan.msm_table,
+                                  miller_reductions=plan.miller_reductions, **options)
         stack = []
         for instruction, _ in self.instructions:
             if isinstance(instruction, Shuffle):
@@ -277,14 +286,17 @@ def layout_candidates(verification_key, source, sources=None, owner=None, *, com
                       entry=None, source_path=None, plan=None):
     """Build the applicable layouts under the same proof and deployment policy."""
     signed_msm = plan is not None and plan.msm == "signed-radix4"
+    grouped_miller = plan is not None and plan.miller_reductions != MILLER_REDUCTIONS[0]
+    affine = signed_msm or grouped_miller
     primary = ForthVerifier(verification_key, source, entry=entry, source_path=source_path, script_era=script_era,
-                            witness_layout="affine-inline" if signed_msm else "projective", plan=plan)
+                            witness_layout="affine-inline" if affine else "projective", plan=plan)
     sources = primary.sources(sources)
     if dynamic_slots(sources):
-        layouts = LAYOUTS[1:] if signed_msm else LAYOUTS
+        layouts = LAYOUTS[1:] if affine else LAYOUTS
+    elif affine:
+        feature = "signed radix-4 MSM" if signed_msm else "grouped Miller reductions"
+        raise ValueError(f"{feature} requires at least one spend-time public input")
     else:
-        if signed_msm:
-            raise ValueError("signed radix-4 MSM requires at least one spend-time public input")
         layouts = (primary.witness_layout,)
     candidates = []
     for layout in layouts:
