@@ -23,7 +23,7 @@ You can pass an authenticated prevout directly. `prevoutFromFunding` reads seria
 
 Wallet signing defaults to BIP143 ALL (`0x41`), and `SINGLE` requires an output at the same index. Set `chronicleActive` from the trusted chain context before choosing OTDA. The callback receives `algorithm`, `payloadKind` (`digest` or `message`), `signatureFormat`, `sighash`, `payload`, and the SM2 `userId` when present. Use the operation and encoding for your scheme. [Signing schemes](../README.md#scheme-integrations)
 
-Leave the reconstruction option unset to use the scheme's default. SM2 automatically uses reconstruction when it shortens the OTDA unlock. In Go, `CompressOTDA` is a `*bool`, with `nil` for the default. In Rust, `compress_otda` is an `Option<bool>`, with `None` for the default. Use a pointer to `false`, `Some(false)`, or `false` in TypeScript and Python to reproduce the literal SM2 encoding.
+Leave the reconstruction option unset to use the scheme's default. SM2 and Schnorr automatically use reconstruction when it shortens the OTDA unlock. In Go, `CompressOTDA` is a `*bool`, with `nil` for the default. In Rust, `compress_otda` is an `Option<bool>`, with `None` for the default. Use a pointer to `false`, `Some(false)`, or `false` in TypeScript and Python to reproduce the literal encoding.
 
 <a name="one-time-signing"></a>
 

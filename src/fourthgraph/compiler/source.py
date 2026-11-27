@@ -14,8 +14,9 @@ from fourthgraph.bsv.script import asm, number
 
 from fourthgraph.compiler import pels_language
 from fourthgraph.compiler.ranges import NUMERIC_TYPES, RangeType, Slot, primitive_outputs, range_bound, script_num_checks
+from fourthgraph.compiler.stack_schedule import emit_steps
 from fourthgraph.stdlib import (
-    LIBRARIES, WALLET_BACKEND, LibraryImport, interface_digest, p256_vocabulary, read_library, required_source,
+    LIBRARIES, WALLET_BACKEND, LibraryImport, interface_digest, numeric_stack_vocabulary, read_library, required_source,
 )
 from fourthgraph.workflow.transaction_graph import CompileError, ParentOutput, Port, StageGraph, StageNode, Template, TransactionGraph
 from fourthgraph.compiler.wordsets import (
@@ -545,8 +546,8 @@ class SourceCompiler:
             name = Path(relpath(path, base)).as_posix()
             if name in LIBRARIES:
                 name = f"./{name}"
-        backend_words = ({word: primitive for word, primitive in p256_vocabulary().items() if word not in self.words}
-                         if name == "std/p256" else {})
+        backend_words = ({word: primitive for word, primitive in numeric_stack_vocabulary().items() if word not in self.words}
+                         if name in ("std/p256", "std/weierstrass") else {})
         self.words.update(backend_words)
         try:
             self.read_source(content, path, name)
@@ -717,6 +718,43 @@ class SourceCompiler:
         self.definitions[name.name] = name
         self.imported_words.pop(name.name, None)
 
+    def declare_curve_multiply(self, at):
+        from fourthgraph.compiler.curve_lowering import multiplication_word
+
+        name = named_token(self.tokens, at, "curve multiplication word")
+        curve = named_token(self.tokens, at, "curve name")
+        operation = named_token(self.tokens, at, "curve multiplication operation")
+        strategy = named_token(self.tokens, at, "curve multiplication strategy")
+        end_declaration(self.tokens, at)
+        if name.name.startswith("bsv-") or name.name in self.words or name.name in BUILTIN_WORDS:
+            raise name.error(f"invalid or duplicate curve multiplication word {name.text!r}")
+        try:
+            primitive = multiplication_word(curve.name, operation.name, strategy.name)
+        except ValueError as error:
+            raise at.error(str(error)) from error
+        self.words[name.name] = Word(primitive.takes, primitive.gives, (Located(primitive, at),),
+                                     primitive.location, name=name.name)
+        self.definitions[name.name] = name
+
+    def declare_layout(self, at):
+        name = named_token(self.tokens, at, "layout name")
+        terms = self.tokens.stack_effect()
+        if not terms or terms.count("--") != 1 or name.name in self.words or name.name in BUILTIN_WORDS:
+            raise at.error("expected a new layout name and a named stack effect")
+        split = terms.index("--")
+        inputs = [term.split(":") for term in terms[:split]]
+        if any(len(pair) != 2 or not pair[0] or pair[1] not in self.stack_types for pair in inputs):
+            raise at.error("layout inputs require names and declared base types")
+        labels = {label: index for index, (label, _) in enumerate(inputs)}
+        if len(labels) != len(inputs) or any(value not in labels for value in terms[split + 1:]):
+            raise at.error("layout results must name declared inputs")
+        takes = tuple(kind for _, kind in inputs)
+        order = tuple(labels[value] for value in terms[split + 1:])
+        gives = tuple(takes[index] for index in order)
+        code = emit_steps(tuple(range(len(takes))), (), order, compact=True)
+        self.words[name.name] = Primitive(takes, gives, code, lambda *items: tuple(items[index] for index in order),
+                                          "typed layout permutation", repeatable=True)
+
     def declaration(self, token):
         tokens = self.tokens
         match token.name:
@@ -728,6 +766,10 @@ class SourceCompiler:
                 self.declare_range(token)
             case "bytes-param:":
                 self.declare_bytes_param(token)
+            case "curve-multiply:":
+                self.declare_curve_multiply(token)
+            case "layout:":
+                self.declare_layout(token)
             case "lock:":
                 self.define_lock(token)
             case ":":

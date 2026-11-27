@@ -69,6 +69,11 @@ class InstallTests(unittest.TestCase):
             self.assertTrue(p256["script_hex"].endswith(fragment["script_hex"]))
             self.assertEqual({library["name"] for library in p256["libraries"]}, {"std/bsv", "std/p256"})
 
+            joint = json.loads(run("4thgraph", "curve-multiply", "--curve", "secp256k1", "--operation", "joint"))
+            winner = min(joint["candidates"], key=lambda candidate: candidate["script_bytes"])
+            self.assertEqual(joint["selected"], winner["algorithm"])
+            self.assertEqual(len(bytes.fromhex(joint["script_hex"])), winner["script_bytes"])
+
             catalog = json.loads(run("4thgraph", "--capabilities"))["libraries"]
             wallet_probe = """
 from dataclasses import asdict
@@ -95,7 +100,7 @@ print(json.dumps({
                 [sys.executable, "-I", "-c", wallet_probe, str(workspace / "bin" / "4thgraph")], **options,
             ))
             evidence = wallet["imports"]
-            expected = {"std/bip340", "std/bsv", "std/script-fragments", "std/secp256k1"}
+            expected = {"std/bip340", "std/bsv", "std/script-fragments", "std/secp256k1", "std/secp256k1-window"}
             self.assertEqual(len(evidence), len(expected))
             self.assertEqual({item["name"] for item in evidence}, expected)
             for item in evidence:

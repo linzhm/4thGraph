@@ -1,0 +1,10 @@
+{
+  "template": "P2PKH-Schnorr",
+  "version": "v0.17.0",
+  "script_bytes": 22435,
+  "owner_hash160": {
+    "offset": 189,
+    "length": 20
+  },
+  "base_script_sha256": "8ccf6e1e0070112603e45e0521a9194efcf61c601d55aadef9c0e20466e734c2"
+}

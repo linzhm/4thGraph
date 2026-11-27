@@ -16,7 +16,7 @@ from bip340 import FIELD, ORDER, lift_x, to_bytes, verify
 from payment import lock_for_public_key, sign_payment, sign_spend
 from schnorr_script import (
     TEMPLATE_DIRS, TEMPLATE_VERSION, _contract, authorization_codes, compile_unlock, compiled_template,
-    lock_for_owner, owner_hash, recognize, recognize_template, verifier,
+    lock_for_owner, owner_hash, recognize, recognize_template, reconstruction_for_version, verifier,
 )
 from fourthgraph.benchmark.cases import native_coin
 from fourthgraph.benchmark.validation import Node, chain_verdict
@@ -154,12 +154,12 @@ class SchnorrTests(unittest.TestCase):
             with self.subTest(case=case):
                 self.check_detached(unlock, False)
 
-    def sign_two_inputs(self, tx, sighash, parents=None):
+    def sign_two_inputs(self, tx, sighash, parents=None, *, compress_otda=None):
         parents = self.parents if parents is None else parents
         for i, (parent, public, key) in enumerate(zip(parents, self.public_keys, self.keys, strict=True)):
             tx = sign_spend(tx, i, parent.serialize(), public,
                             lambda message: key.sign_schnorr(message, aux_randomness=bytes(32)),
-                            sighash=sighash, chronicle_active=bool(sighash & CHRONICLE))
+                            sighash=sighash, chronicle_active=bool(sighash & CHRONICLE), compress_otda=compress_otda)
         return tx
 
     def test_sighash_type_encoding(self):
@@ -206,6 +206,50 @@ class SchnorrTests(unittest.TestCase):
                 changed = replace(signed, outputs=(*recipients[:-1], replace(recipients[-1], value=6_599)))
                 self.check_spend(changed, self.parents, [False, False])
 
+    def test_otda_constructor_matches_every_frozen_output_template(self):
+        for version in TEMPLATE_DIRS:
+            with self.subTest(version=version):
+                pattern = reconstruction_for_version(version)
+                fixed, alt = evaluate(pattern.program, [b"outer"])
+                self.assertEqual((fixed, alt), ([b"outer", *pattern.fixed_parts], []))
+                for owner in (bytes(20), bytes(range(20)), bytes([255]) * 20):
+                    lock = lock_for_owner(owner, version=version)
+                    self.assertEqual(pattern.match(lock), (owner,))
+                    self.assertEqual(fixed[1] + owner + fixed[2], lock)
+                    self.assertIsNone(pattern.match(lock[:-1] + b"\x51"))
+
+    def test_otda_constructor_preserves_literal_witness_and_mixed_outputs(self):
+        older = Output(8_500, lock_for_public_key(self.public_keys[0], version="v0.16.0"))
+        native = native_coin("schnorr/constructor/native", 1_000).output
+        outputs = self.unsigned.outputs[0], native, older
+        for version, flag, expected in (
+            (1, 0x61, (False, False)), (2, 0x41, (False, False)),
+            (2, 0x61, (True, True)), (2, 0xe1, (True, True)), (2, 0x62, (False, False)),
+            (2, 0x63, (True, False)), (2, 0xe3, (True, False)),
+        ):
+            with self.subTest(version=version, flag=hex(flag)):
+                tx = replace(self.unsigned, version=version, outputs=outputs)
+                literal = self.sign_two_inputs(tx, flag, compress_otda=False)
+                signed = self.sign_two_inputs(tx, flag)
+                for i, (encoded, original) in enumerate(zip(signed.inputs, literal.inputs, strict=True)):
+                    self.assertEqual(evaluate(encoded.script), evaluate(original.script))
+                    if expected[i]:
+                        self.assertLess(len(encoded.script), len(original.script))
+                    else:
+                        self.assertEqual(encoded.script, original.script)
+                self.check_spend(signed, self.parents, [True, True])
+                if any(expected):
+                    self.check_spend(literal, self.parents, [True, True])
+                if flag & 31 == 1:
+                    self.check_spend(replace(signed, outputs=tuple(reversed(outputs))), self.parents, [False, False])
+        activation = int(os.environ.get("SCRIPT_LAB_CHRONICLE_HEIGHT", "2"))
+        context = dict(spend_height=activation + 1, activation_height=activation,
+                       utxo_heights=(activation - 1,) * 2)
+        rebuilt = self.sign_two_inputs(replace(self.unsigned, outputs=outputs), 0x61)
+        validate_at_heights(rebuilt, self.parents, **context)
+        if self.node:
+            self.assertEqual(self.node.verdicts(rebuilt, self.parents, **context), [True, True])
+
     def test_bip143_spend_before_chronicle(self):
         signed = self.sign_two_inputs(self.unsigned, 0x41)
         activation_height = int(os.environ.get("SCRIPT_LAB_CHRONICLE_HEIGHT", "2"))
@@ -237,6 +281,10 @@ class SchnorrTests(unittest.TestCase):
             sign_payment(parent, 1, (target,), 99, public, unexpected)
         with self.assertRaisesRegex(ValueError, "active spend context"):
             sign_spend(self.unsigned, 0, parent, public, unexpected, sighash=0x61)
+        with self.assertRaisesRegex(ValueError, "active spend context"):
+            sign_spend(self.unsigned, 0, parent, public, unexpected, compress_otda=True)
+        with self.assertRaisesRegex(ValueError, "must be a boolean"):
+            sign_spend(self.unsigned, 0, parent, public, unexpected, compress_otda=1)
         with self.assertRaisesRegex(ValueError, "same-index"):
             sign_spend(replace(self.unsigned, outputs=(target,)), 1, self.parents[1].serialize(),
                        self.public_keys[1], unexpected, sighash=0x43)
@@ -253,7 +301,7 @@ class SchnorrTests(unittest.TestCase):
         self.assertEqual(raw, reference[:offset] + owner + reference[offset + 20:])
         self.assertEqual(compiled_template(owner), (raw, offset))
         self.assertEqual(recognize_template(raw), (TEMPLATE_VERSION, owner))
-        self.assertLess(len(raw), len(lock_for_owner(bytes(20), version="v0.15.0")))
+        self.assertLess(len(raw), len(lock_for_owner(bytes(20), version="v0.16.0")))
 
     def test_mixed_template_spend(self):
         public = self.public_keys[0]
@@ -270,6 +318,7 @@ class SchnorrTests(unittest.TestCase):
             "v0.13.0": "0c09881b86ddfa644701e4f2bd6bdeee5930095fcdfdaf07e2ce38be2f960f27",
             "v0.14.0": "c70c3b816478caa5fa6086a770484e629d1df75c1477d8436875ea78c1f09f76",
             "v0.15.0": "abf968180a0f6a84422bfe02d9e4b5533b2cdf7a1df9a59bf5afae6343965c26",
+            "v0.16.0": "1b4d0170a8a4677242400ca046319b8d20c26881391503475178e013d6cba2c3",
         }
         for version, checksum in versions.items():
             raw = lock_for_public_key(public, version=version)
@@ -427,6 +476,7 @@ class SchnorrTests(unittest.TestCase):
         split = contract.emit("secp256k1-lambda-split", b"")
         order = number(ORDER) + asm("OP_TOALTSTACK")
         table = contract.emit("bip340-joint-window-table", order)
+        first = contract.emit("bip340-first-window", b"")
         step = contract.emit("bip340-joint-window-step", b"")
         depths = contract.emit("bip340-window-depths", b"")
         (scale_bytes,), alt = evaluate(contract.emit("secp256k1-scale-root", b""))
@@ -500,10 +550,12 @@ class SchnorrTests(unittest.TestCase):
                     remaining = b"\x25\x21"
                     stream = bytes([variable_depth(variable), fixed_depth(fixed)]) + remaining
                     setup = push(stream) + asm("OP_TOALTSTACK")
-                    selected, alt = evaluate(setup + step, built)
-                    self.assertEqual(alt, [remaining])
-                    self.assertEqual(selected[:-3], built[:-3])
-                    check_point(selected[-3:], high * HALF_RADIX + low + vhigh * q + vlow * p)
+                    scalar = high * HALF_RADIX + low + vhigh * q + vlow * p
+                    for window in (first, step):
+                        selected, alt = evaluate(setup + window, built)
+                        self.assertEqual(alt, [remaining])
+                        self.assertEqual(selected[:-3], built[:-3])
+                        check_point(selected[-3:], scalar)
         self.assertEqual(signs, set(product((False, True), repeat=2)))
 
     def test_joint_multiplication_scalar_edges(self):

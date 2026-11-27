@@ -76,3 +76,13 @@ python3 tools/verify_project_contract.py workspace/settlement/manifest.json \
 ```
 
 返回错误时还检查响应不含待签材料和解锁脚本。既有用例覆盖三入口的正常返回、缺少前序、输入类型错误、未知模板或路径、错误公钥、缺签、已覆盖输出变化和错误后继。`pels-counter` 分别运行两个状态阶段，第二步使用第一步实际组装的交易作为父交易。新增同类用例只需扩充表并重建本地包，新 manifest 显式绑定更新后的夹具摘要。[R1 用例](../projects/p2pkh-r1/contract/cases.json) · [计数实例用例](../projects/pels-counter/contract/cases.json)
+
+<a name="preimage-constructor"></a>
+
+## 预映像构造器选择
+
+WASM 项目的 `prepare_spend` 依据已批准的交易、真实上一输出和已执行的签名路径计算完整预映像，把原始字节及 SHA256d 交给宿主。需要钱包授权的路径把该摘要交给签名器。PELS 使用完整预映像绑定当前输入。
+
+消费完整预映像栈项的锁，可以用 `4thgraph preimage-constructor request.json` 单独编译压栈部分。请求包含线格式的 `parent_hex`、`transaction_hex`、`input_index`、整数 `sighash`、批准路径的 `script_code_hex`，以及可信链上下文中的 `chronicle_active`。可选 `templates` 每项提供 `script_hex` 和按顺序列出的 `fields`，字段使用字节偏移 `offset` 和长度 `length`。需要伴随路径时提供批准的 `companion_code_hex`。构造器后续解锁脚本的字节数由 `witness_tail_bytes` 计入。
+
+把 WASM 的 `prepare_spend` 结果放在 `prepared` 中，编译器会核对交易哈希、outpoint、输入索引、sighash、原像和摘要。每个候选都要执行并在主栈留下由原始字节组成的完整预映像，备用栈须为空。功能构造器适用于 Chronicle 已激活的版本 2 OTDA ALL 和有同索引输出的 SINGLE。编译器按包含 CompactSize 的解锁脚本字段长度选出最短程序，报告 `program_hex` 和候选记录。可用 `mode: "literal"` 锁定原样对照，用 `max_payload_bytes` 限制构造器的实测栈载荷。当前由编译器和 Schnorr 钱包选构造器，WASM 仍执行标准准备接口计算原像和摘要。接收打包上下文的路径用该路径声明的编码器。[编译入口](../src/fourthgraph/workflow/preimage_constructor.py) · [双引擎交易矩阵](../projects/p2pkh-schnorr/experiments/high-level/constructor-matrix.json)

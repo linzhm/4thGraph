@@ -19,7 +19,9 @@ All sizes are in bytes. At a common rate of one satoshi per byte, the transactio
 
 For the 2×2 fixtures, median chain-gang verification was **6.93 ms** for MuSig2 and **0.39 ms** for native BIP143, and **5.61 ms** and **0.39 ms** for OTDA. BSV Node loopback RPC medians were **21.22 ms** and **0.70 ms** for BIP143, and **36.34 ms** and **0.71 ms** for OTDA. These host-specific medians use 15 measurements after one warmup and include input preparation and verification. Node timings include local RPC overhead.
 
-For OTDA ALL, the current template puts the complete committed outputs in each preimage. When exiting into ordinary P2PKH outputs, each MuSig2 OTDA unlock falls to 336 bytes. Native `CHECKMULTISIG` constructs the signature digest in the node and requires only the dummy item and two signatures in the unlocking script.
+The OTDA ALL rows use literal preimages, each containing the complete committed outputs. [Constructor measurements](high-level-forth.en.md#otda-constructor)
+
+When exiting into ordinary P2PKH outputs, each MuSig2 OTDA unlock falls to 336 bytes. Native `CHECKMULTISIG` constructs the signature digest in the node and requires only the dummy item and two signatures in the unlocking script.
 
 ## Off-chain signing cost and acceptance
 

@@ -6,9 +6,8 @@ from hashlib import sha256
 import json
 from pathlib import Path
 
-from fourthgraph.stdlib import LIBRARIES
-
 from fourthgraph.verification.bls12381.affine_witness import AffineStages, LAYOUTS, affine_witness, line_packet, msm_windows, slope_packet_bytes
+from fourthgraph.verification.bls12381.field import FP2_ENTRY, FP2_RULES, fp2_kernel
 from fourthgraph.verification.bls12381.verifier import (
     PACKET_BYTES, ScriptVerifier, VerifierStages, _FIXED_WITNESS, dynamic_slots, input_sources, public_signals,
 )
@@ -106,9 +105,9 @@ class ForthVerifier(ScriptVerifier):
     def lower(self, sources, *, compact):
         chronicle = self.script_era == "chronicle"
         if self.witness_layout == "projective":
-            stages = VerifierStages(self.key, sources, chronicle=chronicle)
+            stages = VerifierStages(self.key, sources, chronicle=chronicle, optimize=compact)
         else:
-            stages = AffineStages(self.key, sources, chronicle=chronicle,
+            stages = AffineStages(self.key, sources, chronicle=chronicle, optimize=compact,
                                   lines_in_witness=self.witness_layout == "affine-witness")
         stack = []
         for instruction, _ in self.instructions:
@@ -120,7 +119,7 @@ class ForthVerifier(ScriptVerifier):
                 start = len(stack) - len(instruction.takes)
                 value = getattr(stages, instruction.method)(*stack[start:])
                 stack[start:] = (value,) if len(instruction.gives) == 1 else value
-        return stages.compile(compact=compact) + asm("OP_VERIFY OP_1")
+        return stages.compile(compact=compact) + asm("OP_1" if compact else "OP_VERIFY OP_1")
 
     def witness(self, signals, proof, *, sources=_FIXED_WITNESS):
         if self.witness_layout == "projective":
@@ -132,6 +131,11 @@ class ForthVerifier(ScriptVerifier):
     def artifact(self, signals, owner, script, *, compact=True):
         result = super().artifact(signals, owner, script, compact=compact)
         result["compiler_version"] = PROJECT_VERSION
+        result["stack_schedule"] = "compact" if compact else "baseline"
+        if compact:
+            _, kernel_digest = fp2_kernel()
+            result["fp2_kernel"] = {"entry": FP2_ENTRY, "source_sha256": kernel_digest,
+                                    "ordered_rules": FP2_RULES}
         result["forth_entry"] = self.entry
         result["entry_interface"] = describe_export(MODULE, GROTH16_VERIFY)
         result["entry_interface_sha256"] = interface_digest(MODULE, LIBRARIES[MODULE])
@@ -204,7 +208,8 @@ def main():
     cli.add_argument("--entry", help=f"Forth definition to compile (default: {ENTRY})")
     cli.add_argument("--verification-key", type=Path, required=True)
     cli.add_argument("--input-sources", type=Path, help="ordered JSON of fixed scalars, nulls, widths, or inclusive bounds")
-    cli.add_argument("--stack-schedule", choices=("compact", "baseline"), default="compact")
+    cli.add_argument("--stack-schedule", choices=("compact", "baseline"), default="compact",
+                     help="compact uses optimized field arithmetic and early checks (default: compact)")
     cli.add_argument("--script-era", choices=SCRIPT_ERAS, default="genesis",
                      help="allow Chronicle opcodes for outputs created after its activation")
     layout = cli.add_mutually_exclusive_group()
