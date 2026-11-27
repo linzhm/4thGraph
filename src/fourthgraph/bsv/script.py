@@ -60,17 +60,13 @@ def tile_top(count):
     return bytes(prefix) + b"".join(reversed(suffix))
 
 
-def without_codeseparators(script):
-    """Remove CODESEPARATOR opcodes outside pushed data for OTDA scriptCode."""
-    separators = OPS['OP_CODESEPARATOR']
-    clean = bytearray()
+def script_operations(script):
+    """Yield complete Script instructions, including each push's data."""
     cursor = 0
     while cursor < len(script):
         start = cursor
         opcode = script[cursor]
         cursor += 1
-        if opcode == separators:
-            continue
         if opcode <= 75:
             cursor += opcode
         elif opcode <= 78:
@@ -81,7 +77,16 @@ def without_codeseparators(script):
             cursor = end + int.from_bytes(script[cursor:end], 'little')
         if cursor > len(script):
             raise ValueError('truncated Script push payload')
-        clean.extend(script[start:cursor])
+        yield script[start:cursor]
+
+
+def without_codeseparators(script):
+    """Remove CODESEPARATOR opcodes outside pushed data for OTDA scriptCode."""
+    separator = asm('OP_CODESEPARATOR')
+    clean = bytearray()
+    for operation in script_operations(script):
+        if operation != separator:
+            clean.extend(operation)
     return bytes(clean)
 
 

@@ -4,7 +4,31 @@ from collections import ChainMap, Counter
 from dataclasses import dataclass
 from heapq import nsmallest
 
-from fourthgraph.bsv.script import asm, number
+from fourthgraph.bsv.script import asm, number, script_operations
+
+
+PAIR_MOVES = {
+    (number(3), asm("OP_PICK")): asm("OP_2OVER"),
+    (number(3), asm("OP_ROLL")): asm("OP_2SWAP"),
+    (number(5), asm("OP_ROLL")): asm("OP_2ROT"),
+}
+
+
+def compact_pair_moves(script):
+    """Replace two equal-depth stack moves with one pair instruction."""
+    operations = tuple(script_operations(script))
+    result = bytearray()
+    index = 0
+    while index < len(operations):
+        operands = operations[index:index + 2]
+        replacement = PAIR_MOVES.get(operands)
+        if replacement is not None and operands == operations[index + 2:index + 4]:
+            result.extend(replacement)
+            index += 4
+        else:
+            result.extend(operations[index])
+            index += 1
+    return bytes(result)
 
 COMMUTATIVE = frozenset(map(asm, ("OP_ADD", "OP_MUL", "OP_MIN", "OP_MAX", "OP_NUMEQUAL", "OP_EQUAL")))
 NUMERIC_BOOLEANS = frozenset(map(asm, ("OP_BOOLAND", "OP_BOOLOR")))
