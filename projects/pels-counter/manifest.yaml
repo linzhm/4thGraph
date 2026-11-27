@@ -1,0 +1,185 @@
+$schema: ../template/manifest.schema.json
+schema_version: 1
+title:
+  en: PELS Counter
+  zh-CN: PELS 计数器
+summary:
+  en: The [development fixture package](../../docs/project-contracts.md) pairs the exact Script
+    with a WASM module. 4thGraph compiles `advance` into a covenant that requires one successor with the incremented `u32`
+    and the same covenant code. The [core PELS source](pels-counter-core.fth) takes the successor's amount
+    from the witness and binds that amount to the actual successor. Its spends use different fees chosen
+    by the transaction builder. The [original tutorial](pels-counter.fth) adds a 1,000 sat fee rule.
+  zh-CN: 此实例的 [开发夹具包](../../docs/project-contracts.zh-CN.md)配对精确 Script 与 WASM。4thGraph 把 `advance` 编译到完整合约锁。每次花费只允许一个后继输出，后继的 `u32` 计数加一，并沿用同一段合约代码。[入门版](pels-counter.fth)固定每笔花费的手续费为
+    1,000 聪。[核心版](pels-counter-core.fth)由花费见证提供后继金额，锁再把金额绑定到实际输出。
+entry_points:
+  - name: pels_counter.py build
+    description:
+      en: Compile the counter transition and emit the initial lock.
+      zh-CN: 编译计数状态转换并生成初始锁。
+  - name: pels_counter.py replay
+    description:
+      en: Fund and replay counter updates on isolated regtest.
+      zh-CN: 在隔离 regtest 上入金并复放计数更新。
+setup:
+  en:
+    - Run the release commands from the repository root. The lock build uses Python 3.11 or later. The
+      funded replay uses the pinned Chronicle binding. [Regtest infrastructure](../../docs/infrastructure.md)
+    - |-
+      ```sh
+      python -m pip install ecdsa -r tools/requirements-chronicle.txt
+      ```
+  zh-CN:
+    - 从仓库根目录运行版本命令。构建锁需要 Python 3.11 或更新版本，入金复放还需固定的 Chronicle 绑定。[Regtest 环境](../../docs/infrastructure.md)
+    - |-
+      ```sh
+      python -m pip install ecdsa -r tools/requirements-chronicle.txt
+      ```
+sections:
+  algorithm:
+    en:
+      - '**[Build the lock](#build)** · [Fund and replay on regtest](#spend-and-verify-on-regtest) · [Compare
+        fee rules](#declare-a-fee-constraint)'
+      - Run the commands from the repository root with Git and Python 3.11 or later. The counter build
+        commands use the Python standard library.
+      - The build combines PUSHTX and witness candidates and selects the least serialized bytes for the
+        deployment lock field and first spend. The `optimization` record lists the typed transition, the
+        lowering rules, and the cost of each candidate. A single input determines `hashPrevouts` and `hashSequence`.
+        An exact successor determines `hashOutputs`. The transaction template fixes the BIP143 ALL sighash
+        type (`0x41`), so the reconstructed witness omits these four fields. When the compiler can link
+        a stable script size, it also supplies the script's CompactSize. The smallest PUSHTX candidate
+        derives the compressed public key from the fixed `r` in the DER signature.
+      - The successor assertions fix the next counter and the code that the next output preserves. The
+        source supplies the amount rule separately. The compiler can also omit a duplicate code fragment
+        from the witness. It links the two positions and checks that their emitted byte ranges match.
+        The lock restores the omitted copy before hashing the successor and the transaction preimage.
+        The replay includes a forged successor with matching tampered witness data to check that the actual
+        input's code still governs the spend.
+      - In the lock, `OP_CODESEPARATOR` places the counter data outside `scriptCode`. The original witness
+        carries the full BIP143 ALL preimage. Reconstructed witnesses supply the version, outpoint, `scriptCode`,
+        previous amount, sequence, and locktime. Script builds the required successor and inserts its
+        hash into the preimage. Every layout authenticates the full preimage against the actual spend
+        with native `OP_CHECKSIG`. [PELS construction](https://patents.google.com/patent/EP4374535A1/en)
+    zh-CN:
+      - '**[构建完整锁](#build)** · [Regtest 入金和复放](#spend-and-verify-on-regtest) · [调整手续费规则](#declare-a-fee-constraint)'
+      - JSON 的 `script_hex` 是计数为 0 的完整锁，`satoshis` 是初始输出金额。Forth 递增词编译为 8 字节，完整锁还要核对实际后继输出。`optimization`
+        记录了状态转换、编译改写及候选见证的字节成本。
+  reproduction:
+    en:
+      - '### Build'
+      - |-
+        ```sh
+        export PYTHONPATH=src:.
+        counter=projects/pels-counter/pels_counter.py
+        python3 "$counter" build
+        ```
+      - The JSON gives the counter-zero lock in `script_hex` and the starting output amount in `satoshis`.
+        The Forth increment compiles to 8 bytes. The full lock includes the checks that bind the successor
+        output to the actual transaction.
+      - '### Spend and verify on regtest'
+      - On Linux x86-64, install curl, Rust/Cargo, and a C toolchain for the pinned chain-gang package.
+        The node launcher downloads and verifies BSV Node. [Regtest infrastructure](../../docs/infrastructure.md)
+      - |-
+        ```sh
+        bash tools/setup-workspaces.sh
+        export PYTHONPATH=src:.
+        counter=projects/pels-counter/pels_counter.py
+        python3 -m venv projects/pels-counter/workspace/venv
+        . projects/pels-counter/workspace/venv/bin/activate
+        python -m pip install ecdsa -r tools/requirements-chronicle.txt
+
+        report=projects/pels-counter/workspace/build/pels-counter.json
+        bash tools/verify_node.sh --profile default -- python "$counter" replay --output "$report"
+        ```
+      - The replay deploys state `0`, then spends it as `0 → 1 → 2`. The outputs hold 1,020,000, 1,019,000,
+        and 1,018,000 sat, respectively. For each update, the report records the transaction hex, both
+        engines' verdicts, and the mined block. The rejection cases include a wrong count, changed successor
+        code or amount, an extra output, and a changed locktime with the old witness. Add `--compare`
+        to replay every candidate in one run.
+      - To build the first spend separately, pass the raw deployment transaction to the `spend` command.
+        The following command uses `jq` to read it from the replay report.
+      - |-
+        ```sh
+        python3 "$counter" spend --parent "$(jq -r '.deployment.raw' "$report")"
+        ```
+      - The result includes `transaction_hex`, the input and output counter values, the fee, and the transaction
+        ID. With the replay's deployment it reconstructs the first spend byte for byte. The parent lock
+        determines the witness layout, including for deployments built with the original 705-byte lock.
+    zh-CN:
+      - <a name="build"></a>
+      - '### 构建完整锁'
+      - 从仓库根目录运行，构建只需要 Python 3.11 或更新版本的标准库。
+      - |-
+        ```sh
+        export PYTHONPATH=src:.
+        counter=projects/pels-counter/pels_counter.py
+        python3 "$counter" build
+        ```
+      - <a name="spend-and-verify-on-regtest"></a>
+      - '### Regtest 入金和复放'
+      - 在 Linux x86-64 上准备 curl、Rust/Cargo 和 C 编译工具链。启动脚本会下载并校验 BSV Node。[Regtest 环境](../../docs/infrastructure.md)
+      - |-
+        ```sh
+        bash tools/setup-workspaces.sh
+        export PYTHONPATH=src:.
+        counter=projects/pels-counter/pels_counter.py
+        python3 -m venv projects/pels-counter/workspace/venv
+        . projects/pels-counter/workspace/venv/bin/activate
+        python -m pip install ecdsa -r tools/requirements-chronicle.txt
+
+        report=projects/pels-counter/workspace/build/pels-counter.json
+        bash tools/verify_node.sh --profile default -- python "$counter" replay --output "$report"
+        ```
+      - 复放先为状态 `0` 入金，再把 `0 → 1 → 2` 两笔交易挖入区块。三个状态的输出金额依次是 1,020,000、1,019,000 和 1,018,000 聪。报告保存原始交易、BSV
+        Node 和 chain-gang 的判定以及入块证据。错误计数、不同的后继代码或金额、额外输出以及换了锁定时间却沿用旧见证的交易应被拒绝。加上 `--compare` 可复放所有合格候选。
+      - 要单独生成第一笔花费，用 `jq` 从报告读取原始部署交易。输出包含整笔交易的十六进制、输入与输出计数、手续费和交易 ID。
+      - |-
+        ```sh
+        PYTHONPATH=src:. python3 "$counter" spend --parent "$(jq -r '.deployment.raw' "$report")"
+        ```
+  integration:
+    en:
+      - '### Declare a fee constraint'
+      - 'The default source fixes the fee at 1,000 sat. PELS sources can declare an inclusive interval
+        with `pels-fee: 1000 2000 ;`. Equal endpoints let the compiler derive the fee from the rule. Distinct
+        endpoints let the spender supply a fee. Script checks that value, derives the positive successor
+        amount, and binds the entire successor to the actual transaction.'
+      - |-
+        ```sh
+        source=projects/pels-counter/pels-counter-bounded-fee.fth
+        python3 "$counter" --source "$source" build
+        bash tools/verify_node.sh --profile default -- \
+          python "$counter" --source "$source" replay --compare \
+          --output projects/pels-counter/workspace/build/pels-counter-bounded-fee.json
+        ```
+      - Use the same `--source` with `spend --parent <raw-tx> --fee 1500` to construct a spend inside
+        that interval. The replay checks both fee bounds, rejects claims outside the interval, and rejects
+        a changed successor that disagrees with an allowed fee.
+      - '### Compare the core PELS rule'
+      - Use the Python environment from the regtest section.
+      - |-
+        ```sh
+        bash tools/setup-workspaces.sh
+        export PYTHONPATH=src:.
+        counter=projects/pels-counter/pels_counter.py
+        source=projects/pels-counter/pels-counter-core.fth
+        python3 "$counter" --source "$source" build
+        bash tools/verify_node.sh --profile default -- \
+          python "$counter" --source "$source" replay --compare \
+          --output projects/pels-counter/workspace/build/pels-counter-core.json
+        ```
+      - Pass `--amount <satoshis>` with `spend --parent <raw-tx>` to supply the amount of the sole successor.
+        Replay evaluates different amounts, then rejects mutations that disagree with the witness, the
+        increment, or the preserved code.
+    zh-CN:
+      - <a name="declare-a-fee-constraint"></a>
+      - '### 调整手续费规则'
+      - '在源码写入 `pels-fee: 1000 2000 ;` 可指定闭区间。上下界相同时，编译器直接取该值。上下界不同时，花费者提供手续费，锁验证手续费和扣除之后的后继金额，并承诺整个后继输出。沿用上面的环境，运行有界手续费示例。'
+      - |-
+        ```sh
+        source=projects/pels-counter/pels-counter-bounded-fee.fth
+        PYTHONPATH=src:. python3 "$counter" --source "$source" build
+        bash tools/verify_node.sh --profile default -- \
+          python "$counter" --source "$source" replay --compare \
+          --output projects/pels-counter/workspace/build/pels-counter-bounded-fee.json
+        ```
+      - 单独构建花费时可以传入 `spend --parent <raw-tx> --fee 1500`。要让花费者直接指定后继金额，改用核心版并传入 `--amount <satoshis>`。[核心版的复放命令与见证细节](README.md#compare-the-core-pels-rule)

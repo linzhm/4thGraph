@@ -58,7 +58,7 @@ def engine_tx(tx):
     return result
 
 
-def chain_valid(tx, parents, *, expect_bad_prevout=False):
+def chain_valid(tx, parents, *, expect_bad_prevout=False, expect_push_only=False):
     spend = engine_tx(tx)
     funding = [engine_tx(parent) for parent in parents]
-    return chain_gang_valid(spend, funding, expect_bad_prevout=expect_bad_prevout)
+    return chain_gang_valid(spend, funding, expect_bad_prevout=expect_bad_prevout, expect_push_only=expect_push_only)

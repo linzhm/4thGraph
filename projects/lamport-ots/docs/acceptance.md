@@ -7,7 +7,8 @@ test keys. [Wire and payment rules](spec.md)
 ## Transaction-bound payment profiles
 
 The same domain runs for `full-key`, `committed-key`, `committed-key-forth` and
-`committed-key-forth-compact`.
+the two compact Forth profiles, `committed-key-forth-compact` and
+`committed-key-forth-v0.2.0`.
 It fixes the input being signed at index one of a two-input transaction
 with one or two outputs. The fixture crosses all twelve advertised sighash
 bytes, versions 1 and 2, and both output shapes. It keeps the initial witness
@@ -40,6 +41,14 @@ committed profile runs 96 BSV Node activation cases across modes, transaction
 versions and creation/spend eras. A development evaluator test checks all 256
 possible byte values and one mixed digest for the Forth reconstruction word.
 [Current execution record](validation.md)
+
+The reconstruction suite repeats the 408-row authorization domain with compact
+outputs for each of the two reconstructible profiles. Six v2-to-v1 edits per
+profile retain functional unlocking and expect the explicit push-only rejection.
+Focused cases compare literal and reconstructed witness stacks, including mixed
+output order, and verify literal fallback. The v0.2.0 guard is compared with the
+preceding guard for all 256 first-byte values in each selector branch and for
+nonzero high type bytes. [Fixtures](../reference/test_acceptance.py)
 
 ## Digest-only and legacy locks
 

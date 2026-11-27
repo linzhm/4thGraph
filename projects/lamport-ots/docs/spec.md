@@ -28,11 +28,12 @@ the proof length before evaluating the Lamport verifier.
 | `committed-key` | SHA-256 of the ordered public key | 256 pairs of selected secret and sibling hash, 16,384 bytes |
 | `committed-key-forth` | Same 32-byte commitment | Same 16,384-byte proof |
 | `committed-key-forth-compact` | Same 32-byte commitment | Same 16,384-byte proof |
+| `committed-key-forth-v0.2.0` | Same 32-byte commitment | Same 16,384-byte proof |
 
 For committed profiles, record i is `x[i][b[i]] || y[i][1-b[i]]`. The lock
 hashes the secret and orders the two hashes as `y[i][0] || y[i][1]` according to
 digest bit i. The hash of the concatenated pairs must match the commitment. The
-wallet needs the full ordered public key to construct this proof. All four
+wallet needs the full ordered public key to construct this proof. All five
 profiles enforce the same preimage and selector rules and leave one true item
 and an empty altstack on success. [Forth implementation and costs](optimization.md)
 
@@ -61,6 +62,12 @@ blanked, the active input's script replaced with `68ac`, and a type-specific
 input/output selection. Its preimage has variable length and omits the prevout
 amount. The node authenticates the serialized fields through the fixed-r
 signature relation described in [security.md](security.md).
+
+An opted-in version-2 unlock can reconstruct P for OTDA ALL or paired SINGLE,
+including ANYONECANPAY, from matching compact Forth and v0.2.0 outputs. The functional
+unlock leaves the identical preimage, proof and selector on the main stack and
+an empty altstack. The verifier binds the resulting preimage to the spending
+input in the same way as a literal push. [Reconstruction design](optimization.md#otda-unlocking-reconstruction)
 
 ALL covers all outputs, NONE covers no outputs, and SINGLE covers the output
 at the signing input index when it exists. The current outpoint, sequence,

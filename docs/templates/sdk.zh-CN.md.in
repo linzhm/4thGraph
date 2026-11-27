@@ -1,0 +1,17 @@
+# 项目 SDK 接入
+
+[English](sdk.en.md) · [项目介绍](../README.zh-CN.md) · [协议](spec.zh-CN.md)
+
+<a name="quickstart"></a>
+
+## 快速上手
+
+<!-- docs-template: 给出先决条件、工作目录和实际运行过的最小调用序列。 -->
+
+## API 与签名边界
+
+<!-- docs-template: 说明参数和返回值格式、钱包和签名器的职责及预期错误，链接公开入口。 -->
+
+## 验证接入
+
+<!-- docs-template: 提供复放命令、夹具和预期结果，并链接所测的 SDK 或发布版本。 -->

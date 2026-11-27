@@ -1,0 +1,66 @@
+{
+  "payment_shape": {
+    "inputs": 2,
+    "outputs": 2
+  },
+  "lock_bytes": 100663,
+  "otda_program_bytes": 9363,
+  "baseline": "1.5.0",
+  "bsv_node_version": "1.2.3",
+  "chain_gang_commit": "8b60b71a12a69fdcb465d3e627dbf6f43d6ed081",
+  "validation": "Peerless regtest script replay with supplied prevouts",
+  "sm3_script_bytes": {
+    "v1.5.0": {
+      "SM3_ZA": 36840,
+      "SM3_MESSAGE": 31200
+    },
+    "v1.6.0": {
+      "SM3_ZA": 31277,
+      "SM3_MESSAGE": 26679
+    }
+  },
+  "payments": {
+    "bip143-all": {
+      "v1.5.0": {
+        "txid": "bfa999346896d7d4185d066fd41a4cd3c094de43e7ec041f86e3f9462dbd25b1",
+        "transaction_bytes": 222198,
+        "unlock_bytes": [
+          291,
+          291
+        ],
+        "peak_stack_payload_bytes": 3643
+      },
+      "v1.6.0": {
+        "txid": "a8d7efb52f06e08245583f1307e77c86d5a530ddfaee9a318390f495abaacf4b",
+        "transaction_bytes": 202030,
+        "unlock_bytes": [
+          291,
+          291
+        ],
+        "peak_stack_payload_bytes": 3642
+      }
+    },
+    "otda-all": {
+      "v1.5.0": {
+        "txid": "14cc3639992d39b85c8a73578d11fefef08f8b36ec793783434605b682e3a174",
+        "transaction_bytes": 245354,
+        "unlock_bytes": [
+          11869,
+          11869
+        ],
+        "peak_stack_payload_bytes": 443368
+      },
+      "v1.6.0": {
+        "txid": "1ef90f55d78adeb4027f3bd8335cc66801e06a5d5aae62921c2acba9d51b0cbe",
+        "transaction_bytes": 220814,
+        "unlock_bytes": [
+          9683,
+          9683
+        ],
+        "peak_stack_payload_bytes": 403032
+      }
+    }
+  },
+  "source": "README.md#v160",
+  "compiler_commit": "889ff6e5d37e0e0215fba306353a8a22795c327a"
+}

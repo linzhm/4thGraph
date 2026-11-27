@@ -64,7 +64,8 @@ class Node:
         return reply["result"]
 
     def verdicts(self, tx, parents, *, spend_height=SPEND_HEIGHT, activation_height=ACTIVATION_HEIGHT,
-                 utxo_heights=None, timeout_us=5000):
+                 utxo_heights=None, timeout_us=5000, expected_rejection=None):
+        """Return input verdicts and check the exact reason for errors when specified."""
         raw = tx.serialize().hex()
         if utxo_heights is None:
             utxo_heights = (UTXO_HEIGHT,) * len(tx.inputs)
@@ -82,6 +83,9 @@ class Node:
         for row, request in zip(result, inputs, strict=True):
             if row["flags"] != request["flags"] or row["result"] not in {"ok", "error"}:
                 raise ValueError(f"unexpected BSV Node result: {row}")
+            if (expected_rejection is not None and row["result"] == "error"
+                    and row.get("description") != expected_rejection):
+                raise ValueError(f"expected BSV Node rejection {expected_rejection!r}, got {row}")
         return [row["result"] == "ok" for row in result]
 
 

@@ -4,6 +4,8 @@
 
 收款时可选择 `full-key`（默认）、`committed-key` 或两个实验模板 `committed-key-forth` 和 `committed-key-forth-compact`。识别时传入完整有序公钥。SDK 也能识别旧版输出，其花费模式为 BIP143 ALL。[模板与交易成本](../README.zh-CN.md#选择付款模板)
 
+显式选择 `committed-key-forth-v0.2.0` 可创建 6,525 字节的候选锁。SDK 从完整有序公钥计算承诺并填入固定模板。[固定布局](../versions/v0.2.0/layout.json)
+
 <a name="quickstart"></a>
 
 ## 接入付款
@@ -36,6 +38,10 @@ const signedHex = wallet.signPayment({
 ```
 
 已构造的交易用 `signInput`，传入交易、本次输入索引和对应的 prevout。Rust、Go、Python 的等价入口在[调用表](../../../sdk/docs/reference.zh-CN.md#calls-and-data)。
+
+## 重建 OTDA 签名原文
+
+确认 Chronicle 花费环境后，在签名请求里设置 `chronicleActive: true`、`compressOtda: true` 和 `0x61` 等 OTDA sighash。Python 使用 `compress_otda=True`，Go 使用 `CompressOTDA`。v2 交易中，OTDA ALL 或有配对的 OTDA SINGLE 可重建其覆盖的紧凑 Forth 和 v0.2.0 输出，含 ANYONECANPAY。一个见证可使用两种模板字典。钱包选用最短编码，传给签名器的摘要与原样编码相同。[编码及测量（英文）](optimization.md#otda-unlocking-reconstruction)
 
 ## 随付款请求保存密钥状态
 

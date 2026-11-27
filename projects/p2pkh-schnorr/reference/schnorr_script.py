@@ -5,12 +5,15 @@ from hashlib import new, sha256
 import json
 from pathlib import Path
 
+from fourthgraph.bsv.otda_reconstruction import Reconstruction, push_repeated_bytes
 from fourthgraph.compiler.script_builder import ScriptBuilder
 SOURCE = Path(__file__).with_name("schnorr.fth")
 VERSIONS_DIR = SOURCE.resolve().parents[1] / "versions"
-TEMPLATE_VERSION = "v0.7.0"
+TEMPLATE_VERSION = "v0.17.0"
 TEMPLATE_DIRS = {
-    version: VERSIONS_DIR / version for version in (TEMPLATE_VERSION, "v0.6.0")
+    version: VERSIONS_DIR / version
+    for version in (TEMPLATE_VERSION, "v0.16.0", "v0.15.0", "v0.14.0", "v0.13.0", "v0.12.0", "v0.11.0", "v0.10.0",
+                    "v0.9.0", "v0.8.0", "v0.7.0", "v0.6.0")
 }
 TEMPLATE_DIR = TEMPLATE_DIRS[TEMPLATE_VERSION]
 
@@ -37,6 +40,22 @@ def compile_unlock(preimage, companion, public_x, public_y, signature, nonce_y):
     """Instantiate the Forth unlocking word with approved, encoded witness data."""
     return _contract().emit("schnorr-unlock", preimage, int(companion),
                             public_x, public_y, signature, nonce_y)
+
+
+def compile_reconstructed_unlock(program, public_x, public_y, signature, nonce_y):
+    """Run the preimage constructor, then push the ordinary Schnorr witness."""
+    return program + _contract().emit("schnorr-witness-tail", 0, public_x, public_y, signature, nonce_y)
+
+
+def output_reconstruction(raw, start):
+    """Build the fixed parts of an owner-parameterized Schnorr output."""
+    fixed = (raw[:start], raw[start + 20:])
+    return Reconstruction(b"".join(map(push_repeated_bytes, fixed)), fixed, (20,))
+
+
+@cache
+def reconstruction_for_version(version):
+    return output_reconstruction(*_canonical(version))
 
 
 def compiled_template(owner=bytes(20)):

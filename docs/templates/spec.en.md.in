@@ -1,0 +1,19 @@
+# Project protocol specification
+
+[简体中文](spec.zh-CN.md) · [Project overview](../README.md)
+
+## Scope and version
+
+<!-- docs-template: Name the supported version and the operation specified here. Link its manifest and implementation. -->
+
+## Inputs and encodings
+
+<!-- docs-template: Define the inputs, field widths, ordering and units. State who supplies each value. -->
+
+## Validation and failures
+
+<!-- docs-template: Trace the verification steps, covered commitments and rejection conditions. Link the acceptance tests. -->
+
+## Compatibility and evidence
+
+<!-- docs-template: State support for earlier formats and link fixtures or replays covering the documented behavior. -->

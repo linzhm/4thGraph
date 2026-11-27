@@ -100,7 +100,7 @@ def signing_options(project, options, default=0x41):
     compress = boolean(options, "compressOtda")
     if sighash & CHRONICLE and not chronicle_active:
         raise ValueError("Chronicle authorization requires an active spend context")
-    if compress and project not in ("p2pkh-sm2", "wots-plus", "p2pkh-r1"):
+    if compress and project not in ("p2pkh-sm2", "wots-plus", "p2pkh-r1", "lamport-ots", "p2pkh-schnorr"):
         raise ValueError("this SDK project does not support OTDA reconstruction")
     if compress and not chronicle_active:
         raise ValueError("functional unlocking requires an active spend context")

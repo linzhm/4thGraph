@@ -3,6 +3,9 @@ from dataclasses import dataclass, replace
 from hashlib import sha256
 
 
+MAX_MONEY = 2_100_000_000_000_000
+
+
 def hash256(b): return sha256(sha256(b).digest()).digest()
 
 def compact(n):
@@ -12,7 +15,7 @@ def compact(n):
 def blob(b): return compact(len(b))+b
 
 def amount(n):
-    if type(n) is not int or not 0<=n<=2_100_000_000_000_000: raise ValueError('invalid satoshi amount')
+    if type(n) is not int or not 0<=n<=MAX_MONEY: raise ValueError('invalid satoshi amount')
     return n.to_bytes(8,'little')
 
 
@@ -103,8 +106,8 @@ def preimage_all(tx, index, previous_amount, script_code=b'\xac'):
     return preimage_forkid(tx, index, previous_amount, script_code, FORKID | SIGHASH_ALL)
 
 
-def preimage_otda(tx, index, script_code, sighash):
-    """Serialize OTDA with a caller-supplied, already cleaned scriptCode."""
+def otda_input_parts(tx, index, script_code, sighash):
+    """Serialize the committed input records in OTDA signing order."""
     if sighash not in OTDA_TYPES or not 0 <= index < len(tx.inputs):
         raise ValueError('invalid OTDA sighash or input index')
     base = sighash & 31
@@ -117,12 +120,19 @@ def preimage_otda(tx, index, script_code, sighash):
         script = script_code if i == index else b''
         sequence = txin.sequence if i == index or base == SIGHASH_ALL else 0
         serialized_inputs.append(txin.outpoint() + blob(script) + sequence.to_bytes(4, 'little'))
+    return tuple(serialized_inputs)
+
+
+def preimage_otda(tx, index, script_code, sighash):
+    """Serialize OTDA with a caller-supplied, already cleaned scriptCode."""
+    serialized_inputs = otda_input_parts(tx, index, script_code, sighash)
+    base = sighash & 31
     if base == SIGHASH_NONE:
         outputs = ()
     elif base == SIGHASH_SINGLE:
         outputs = (b'\xff'*8 + b'\0',)*index + (tx.outputs[index].serialize(),)
     else:
         outputs = tuple(output.serialize() for output in tx.outputs)
-    return (tx.version.to_bytes(4, 'little') + compact(len(inputs)) + b''.join(serialized_inputs) +
+    return (tx.version.to_bytes(4, 'little') + compact(len(serialized_inputs)) + b''.join(serialized_inputs) +
             compact(len(outputs)) + b''.join(outputs) + tx.locktime.to_bytes(4, 'little') +
             sighash.to_bytes(4, 'little'))

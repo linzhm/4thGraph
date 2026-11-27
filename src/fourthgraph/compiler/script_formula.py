@@ -1,7 +1,8 @@
 """Compile straight-line Forth formulas over bounded Script integers."""
 
 from collections import Counter
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from functools import cached_property
 
 from fourthgraph.bsv.script import asm, number
 
@@ -13,6 +14,16 @@ from .wordsets import PRIMITIVES, cell_literal
 ARITHMETIC = {"int+", "int-", "int*", "int-rem"}
 SYNTAX = ARITHMETIC | {"let", "int-from-bottom"}
 GENESIS_NUM_BYTES = 750_000
+FORMULA_PASSES = ("rewrite", "share", "stack", "search")
+
+
+def validate_formula_passes(passes):
+    passes = tuple(passes)
+    if len(set(passes)) != len(passes) or set(passes).difference(FORMULA_PASSES):
+        raise ValueError(f"unknown or repeated formula pass in {passes!r}")
+    if "search" in passes and "stack" not in passes:
+        raise ValueError("formula search requires stack scheduling")
+    return tuple(name for name in FORMULA_PASSES if name in passes)
 
 
 @dataclass(frozen=True)
@@ -24,10 +35,56 @@ class Step:
 
 
 @dataclass(frozen=True)
+class Origin:
+    word: str
+    line: int
+    column: int
+    module: str | None
+
+    @classmethod
+    def at(cls, token):
+        return cls(token.text, token.line, token.column, token.module)
+
+
+@dataclass(frozen=True)
 class Formula:
     input_count: int
     steps: tuple[Step, ...]
     returns: tuple[int, ...]
+    origins: tuple[tuple[Origin, ...], ...] = field(default=(), compare=False, repr=False)
+
+    @cached_property
+    def _inline_steps(self):
+        if any(step.operation == "int-from-bottom" for step in self.steps):
+            raise ValueError("inlining requires a formula without stack-relative inputs")
+        live = set(self.returns)
+        ordered = []
+        for index in reversed(range(self.input_count, len(self.steps))):
+            if index in live:
+                step = self.steps[index]
+                live.update(step.args)
+                ordered.append((index, step))
+        return tuple(reversed(ordered))
+
+    def inline(self, operands, lower):
+        """Instantiate a closed formula in a caller's arithmetic graph.
+
+        The caller supplies operands that satisfy the declared intervals and
+        preserves their stack representation in its arithmetic lowering.
+        """
+        operands = tuple(operands)
+        if len(operands) != self.input_count:
+            raise ValueError("formula operand count does not match its stack effect")
+        for step, value in zip(self.steps[:self.input_count], operands, strict=True):
+            if type(value) is int and not step.bounds.bounds[0] <= value <= step.bounds.bounds[1]:
+                raise ValueError("formula constant is outside its input interval")
+        values = dict(enumerate(operands))
+        for index, step in self._inline_steps:
+            if step.operation == "literal":
+                values[index] = step.immediate
+            else:
+                values[index] = lower(step.operation, *(values[arg] for arg in step.args))
+        return tuple(values[index] for index in self.returns)
 
     def bind_input(self, index, value):
         """Substitute a proven constant and remove its runtime stack slot."""
@@ -48,17 +105,36 @@ class Formula:
                 step = Step(step.operation, bounds, args)
             slots.append(len(steps))
             steps.append(step)
-        return Formula(inputs, tuple(steps), tuple(slots[index] for index in self.returns))
+        origins = self.origins
+        if origins:
+            origins = (*origins[:index], *origins[index+1:self.input_count], origins[index],
+                       *origins[self.input_count:])
+        return Formula(inputs, tuple(steps), tuple(slots[index] for index in self.returns), origins)
 
-    def lower(self, *, optimize, specialized=False):
+    def lower(self, *, optimize=False, specialized=False, passes=None, trace=None):
         args = self.input_count, self.steps, self.returns
-        baseline, _ = emit(*args, optimize=False)
-        candidates = {"baseline": (baseline, {})}
+        if passes is not None:
+            if optimize or specialized:
+                raise ValueError("explicit formula passes cannot be combined with automatic selection or specialization")
+            passes = validate_formula_passes(passes)
+            code, rules = emit(*args, rewrite="rewrite" in passes, share="share" in passes,
+                               stack="stack" in passes, search="search" in passes, trace=trace)
+            return code, {
+                "passes": passes, "script_bytes": len(code), "rewrites": rules,
+                "max_magnitude_bits": magnitude_bits(self.steps),
+            }
+        plans = {"baseline": {}}
         if optimize:
-            candidates["schedule"] = emit(*args, optimize=True)
-            candidates["rewrite-and-schedule"] = emit(*args, optimize=True, rewrite=True, specialized=specialized)
+            plans["schedule"] = {"share": True, "stack": True, "search": True}
+            plans["rewrite-and-schedule"] = {**plans["schedule"], "rewrite": True, "specialized": specialized}
+        candidates = {name: emit(*args, **options, trace=None if optimize else trace)
+                      for name, options in plans.items()}
         selected = min(candidates, key=lambda name: len(candidates[name][0]))
         code, rules = candidates[selected]
+        if optimize and trace is not None:
+            traced, _ = emit(*args, **plans[selected], trace=trace)
+            if traced != code:
+                raise AssertionError("traced formula does not reproduce the selected Script")
         return code, {
             "selected": selected, "candidates": {name: len(result[0]) for name, result in candidates.items()},
             "rewrites": rules, "max_magnitude_bits": magnitude_bits(self.steps),
@@ -103,10 +179,12 @@ def cross_products(step, steps):
     return None
 
 
-def emit(input_count, steps, returns, *, optimize, rewrite=False, specialized=False):
-    graph = Graph(input_count, share=optimize)
+def emit(input_count, steps, returns, *, rewrite=False, share=False, stack=False, search=False,
+         specialized=False, trace=None):
+    graph = Graph(input_count, share=share)
     values = list(graph.inputs)
     rules = Counter()
+    expansions = []
 
     def product(a, b):
         for constant, other in ((a, b), (b, a)):
@@ -116,7 +194,7 @@ def emit(input_count, steps, returns, *, optimize, rewrite=False, specialized=Fa
                 return values[other]
         return graph.define(PRIMITIVES["int*"].code, (values[a], values[b]))
 
-    for step in steps[input_count:]:
+    for index, step in enumerate(steps[input_count:], start=input_count):
         args = tuple(values[arg] for arg in step.args)
         if step.operation == "literal":
             code = number(step.immediate)
@@ -130,6 +208,8 @@ def emit(input_count, steps, returns, *, optimize, rewrite=False, specialized=Fa
                 code = PRIMITIVES["int+"].code
                 args = tuple(product(a, b) for a, b in pairs)
                 rules["expand-cross-products"] += 1
+                if trace is not None:
+                    expansions.append({"formula_step": index, "intermediates": [value.slot for value in args]})
             elif rewrite and step.operation == "int*" and any(
                     part.operation == "literal" and part.immediate == 2 for part in (left, right)):
                 code = asm("OP_DUP OP_ADD")
@@ -142,9 +222,18 @@ def emit(input_count, steps, returns, *, optimize, rewrite=False, specialized=Fa
                 code = cached_integer(right.immediate) + code
                 args = (args[0],)
                 rules["fuse-cached-divisor-load"] += 1
+            elif rewrite and step.operation == "int-rem":
+                value = graph.remainder(*args, reuse=True)
+                if value == args[0]:
+                    rules["reuse-same-divisor-remainder"] += 1
+                values.append(value)
+                continue
         values.append(graph.define(code, args))
     outputs = tuple(values[result] for result in returns)
-    code = graph.search_order(outputs) if optimize else graph.emit(outputs, last_use=False)
+    code = (graph.search_order(outputs, trace=trace) if search
+            else graph.emit(outputs, last_use=stack, compact=stack, trace=trace))
+    if trace is not None:
+        trace.update(formula_slots=[value.slot for value in values], cross_product_expansions=expansions)
     return code, dict(rules)
 
 
@@ -161,12 +250,14 @@ def read_formula(tokens, at, ranges):
     if required(tokens, entry, "'{:'").name != "{:":
         raise entry.error("expected '{:' before formula input names")
     locals_ = {}
+    origins = []
     steps = [Step("input", ranges[kind].slot) for kind in inputs]
     for index in range(len(inputs)):
         local = named_token(tokens, entry, "formula input")
         if local.name in locals_ or local.name in SYNTAX:
             raise local.error(f"invalid or duplicate formula input {local.text!r}")
         locals_[local.name] = index
+        origins.append([Origin.at(local)])
     if required(tokens, entry, "':}'").name != ":}":
         raise entry.error("formula input names must match the stack effect")
     stack = []
@@ -180,6 +271,7 @@ def read_formula(tokens, at, ranges):
             if local.name in locals_ or local.name in SYNTAX or not stack:
                 raise local.error("LET needs a stack value and a new local name")
             locals_[local.name] = stack.pop()
+            origins[locals_[local.name]].append(Origin.at(local))
             unused[local.name] = local
             continue
         if name in locals_:
@@ -213,6 +305,7 @@ def read_formula(tokens, at, ranges):
             step = Step("literal", Slot("script-int", (literal.value, literal.value)), immediate=literal.value)
         stack.append(len(steps))
         steps.append(step)
+        origins.append([Origin.at(token)])
     else:
         raise entry.error("unterminated formula")
     if unused:
@@ -223,4 +316,4 @@ def read_formula(tokens, at, ranges):
         raise entry.error("formula results do not fit the declared stack effect and ranges")
     if magnitude_bits(steps) >= GENESIS_NUM_BYTES * 8:
         raise entry.error("formula integers may exceed the BSV Genesis ScriptNum limit")
-    return entry, Formula(len(inputs), tuple(steps), tuple(stack))
+    return entry, Formula(len(inputs), tuple(steps), tuple(stack), tuple(map(tuple, origins)))

@@ -3,12 +3,14 @@
 from dataclasses import replace
 from hashlib import sha256
 import json
+from pathlib import Path
 import unittest
 
 from fourthgraph.verification.bls12381.verifier import (
-    HOST, R, Curve, Dynamic, ScriptVerifier, bind_public_output, input_sources, public_output, public_packet,
+    FIELD_BYTES, HOST, Q, R, Curve, Dynamic, ScriptVerifier, bind_public_output, input_sources, public_output,
+    public_packet,
 )
-from fourthgraph.verification.bls12381.build import ForthVerifier, SOURCE, layout_candidates, select_layout
+from fourthgraph.verification.bls12381.build import ArithmeticPlan, ForthVerifier, SOURCE, layout_candidates, select_layout
 from fourthgraph.compiler.source import CompileError
 from fourthgraph.workflow.protocol import artifact_digest
 from fourthgraph.replay.bls12381_verifier import SOURCES, fixture
@@ -19,27 +21,36 @@ from fourthgraph.stdlib import GROTH16_ENTRY, LEGACY_GROTH16_ENTRY, capabilities
 from .test_backend import check_spend, g1_json, g2_json, spend_fixture
 
 
+HIGH_LEVEL = (Path(__file__).resolve().parents[2]
+              / "projects/groth16-bls12-381/experiments/high-level/verifier.fth")
+
+
 class ForthVerifierTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.key, cls.cases = fixture()
         cls.source = SOURCE.read_bytes()
 
-    def test_matches_original_fixed_hybrid_and_dynamic(self):
+    def test_compact_and_baseline_fixed_hybrid_and_dynamic(self):
         verifier = ForthVerifier(self.key, self.source)
         original = ScriptVerifier(self.key)
         signals, proof = self.cases[0]
-        profiles = ((signals, True), (SOURCES[:3] + signals[3:], True), (SOURCES, True), (SOURCES, False))
-        for sources, compact in profiles:
-            with self.subTest(sources=sources, compact=compact):
-                lock = verifier.compile(sources, compact=compact)
-                self.assertEqual(lock, original.compile(sources, compact=compact) + asm("OP_VERIFY OP_1"))
-                self.assertEqual(verifier.witness(signals, proof, sources=sources),
-                                 original.witness(signals, proof, sources=sources))
-                artifact = verifier.artifact(sources, None, lock, compact=compact)
+        for sources in (signals, SOURCES[:3] + signals[3:], SOURCES):
+            with self.subTest(sources=sources):
+                suffix = asm("OP_VERIFY OP_1")
+                baseline = verifier.compile(sources, compact=False)
+                self.assertEqual(baseline, original.compile(sources, compact=False) + suffix)
+                lock = verifier.compile(sources)
+                self.assertLess(len(lock), len(original.compile(sources) + suffix))
+                witness = original.witness(signals, proof, sources=sources)
+                self.assertEqual(verifier.witness(signals, proof, sources=sources), witness)
+                for script in (baseline, lock):
+                    check_spend(*spend_fixture(script, witness))
+                artifact = verifier.artifact(sources, None, lock)
                 self.assertEqual(artifact["source_sha256"], sha256(self.source).hexdigest())
                 self.assertEqual(artifact["artifact_sha256"], artifact_digest(artifact))
                 self.assertEqual(artifact["forth_entry"], GROTH16_ENTRY)
+                self.assertEqual(artifact["stack_schedule"], "compact")
 
     def test_legacy_source_and_module_share_the_asserting_verifier(self):
         current = ForthVerifier(self.key, b"REQUIRE groth16-bls12-381/verifier.fth")
@@ -76,6 +87,52 @@ class ForthVerifierTests(unittest.TestCase):
         with self.assertRaisesRegex(CompileError, r"line 5, column 3: body leaves .*groth16-checked-g1"):
             ForthVerifier(self.key, invalid)
 
+    def test_modular_forth_reuses_the_same_script_and_can_pair_g1_doublings(self):
+        modular = HIGH_LEVEL.parents[2] / "forth/verifier.fth"
+        plan = ArithmeticPlan(residue_association="accumulator-frobenius-first",
+                              msm="signed-radix4", msm_table="deferred-doubling-slopes",
+                              miller_reductions="split-chord-residue", miller_kernel="direct-normalized")
+        old = ForthVerifier(self.key, HIGH_LEVEL.read_bytes(), source_path=HIGH_LEVEL, entry="verify-proof",
+                            witness_layout="affine-inline", plan=plan)
+        new = ForthVerifier(self.key, modular.read_bytes(), source_path=modular, entry="verify-proof",
+                            witness_layout="affine-inline", plan=plan)
+        lock = new.compile(SOURCES)
+        self.assertEqual(lock, old.compile(SOURCES))
+        self.assertEqual({library.name for library in new.libraries},
+                         {"miller.fth", "public-inputs.fth", "residue.fth", "std/bsv"})
+        paired = ForthVerifier(self.key, modular.read_bytes(), source_path=modular, entry="verify-proof",
+                               witness_layout="affine-inline", plan=replace(plan, g1_reductions="paired-doubles"))
+        compact = paired.compile(SOURCES)
+        self.assertLess(len(compact), len(lock))
+        for signals, proof in self.cases:
+            check_spend(*spend_fixture(compact, paired.witness(signals, proof, sources=SOURCES)))
+
+    def test_high_level_requires_the_complete_miller_plan(self):
+        source = HIGH_LEVEL.read_bytes()
+        for before, after in ((b"16 0 DO", b"15 0 DO"), (b"16 0 DO", b"17 0 DO")):
+            with self.subTest(loop=after):
+                invalid = ForthVerifier(self.key, source.replace(before, after), entry="verify-proof")
+                with self.assertRaisesRegex(ValueError, "round plan must match the BLS12-381 seed"):
+                    invalid.compile(self.cases[0][0])
+
+    def test_high_level_requires_both_residue_checks(self):
+        source = HIGH_LEVEL.read_bytes()
+        for word in (b"bls12-381-require-fp6", b"bls12-381-require-nonzero"):
+            with self.subTest(word=word):
+                with self.assertRaises(CompileError):
+                    ForthVerifier(self.key, source.replace(word, b""), entry="verify-proof")
+        with self.assertRaisesRegex(CompileError, "requires an explicit BLS12-381 residue product"):
+            ForthVerifier(self.key, self.source, plan=ArithmeticPlan(residue_association="right"))
+
+    def test_split_g1_checks_require_a_and_c(self):
+        source = HIGH_LEVEL.read_bytes().replace(b"bls12-381-check-g1-c-then-a", b"bls12-381-check-g1-points")
+        source = source.replace(b"swap bls12-381-check-g1-points",
+                                b"swap bls12-381-check-g1-a bls12-381-check-g1-c")
+        for word in (b"bls12-381-check-g1-a", b"bls12-381-check-g1-c"):
+            with self.subTest(word=word), self.assertRaises(CompileError):
+                ForthVerifier(self.key, source.replace(word, b""), entry="verify-proof")
+        ForthVerifier(self.key, source, entry="verify-proof")
+
     def test_reports_unsupported_words(self):
         invalid = self.source.replace(b"swap bls12", b"1 drop swap bls12")
         with self.assertRaisesRegex(CompileError, r"line 8, column 5: '1' cannot compile"):
@@ -100,22 +157,34 @@ class ForthVerifierTests(unittest.TestCase):
             "vk_delta_2": g2_json(q),
         }
         sources = Dynamic(), Dynamic(2)
-        verifier = ForthVerifier(json.dumps(key), self.source, witness_layout="affine-witness")
-        lock = verifier.compile(sources)
-        cases = ((0, 0), (1, 0), (0, 1), (R - 1, 2))
-        for s, t in cases:
-            with self.subTest(signals=(s, t)):
-                # VK_x=[1-s+t]P, and A=[3-s+t]P makes the test pairing exact.
-                proof = {**metadata, "pi_a": g1_json(curve.mul_host(p, (3 - s + t) % R)),
-                         "pi_b": g2_json(q), "pi_c": g1_json(p)}
-                witnesses = verifier.witness((s, t), json.dumps(proof), sources=sources)
-                parent, spend = spend_fixture(lock, witnesses)
-                check_spend(parent, spend)
-                if s == R - 1:
-                    packet = push(public_packet(sources, (s, t)))
-                    malformed = witnesses[:-len(packet)] + push(R.to_bytes(32, "little") + bytes([t]))
-                    with self.assertRaises((RuntimeError, ValueError)):
-                        check_spend(parent, spend.with_script(0, malformed))
+        unsigned = ForthVerifier(json.dumps(key), self.source, witness_layout="affine-witness")
+        signed = ForthVerifier(json.dumps(key), self.source, witness_layout="affine-witness",
+                               plan=ArithmeticPlan(msm="signed-radix4"))
+        derived = ForthVerifier(json.dumps(key), self.source, witness_layout="affine-witness",
+                                plan=ArithmeticPlan(msm="signed-radix4", msm_table="doubling-slopes"))
+        deferred = ForthVerifier(json.dumps(key), self.source, witness_layout="affine-witness",
+                                 plan=replace(derived.plan, msm_table="deferred-doubling-slopes"))
+        for verifier in (unsigned, signed, derived, deferred):
+            lock = verifier.compile(sources)
+            for s, t in ((0, 0), (1, 0), (0, 1), (0, 3), (R - 1, 2)):
+                with self.subTest(plan=verifier.plan, signals=(s, t)):
+                    # VK_x=[1-s+t]P, and A=[3-s+t]P makes the test pairing exact.
+                    proof = json.dumps({**metadata, "pi_a": g1_json(curve.mul_host(p, (3 - s + t) % R)),
+                                        "pi_b": g2_json(q), "pi_c": g1_json(p)})
+                    witness = verifier.witness((s, t), proof, sources=sources)
+                    parent, spend = spend_fixture(lock, witness)
+                    check_spend(parent, spend)
+                    if s == R - 1:
+                        packet = push(public_packet(sources, (s, t)))
+                        malformed = witness[:-len(packet)] + push(R.to_bytes(32, "little") + bytes([t]))
+                        with self.assertRaises((RuntimeError, ValueError)):
+                            check_spend(parent, spend.with_script(0, malformed))
+                    if verifier is signed and t == 3:
+                        old_witness = unsigned.witness((s, t), proof, sources=sources)
+                        with self.assertRaises((RuntimeError, ValueError)):
+                            check_spend(parent, spend.with_script(0, old_witness))
+                    if verifier in (derived, deferred) and t == 3:
+                        self.assertEqual(witness, signed.witness((s, t), proof, sources=sources))
 
     def test_affine_layout_shares_public_packet_with_successor_check(self):
         verifier = ForthVerifier(self.key, self.source, witness_layout="affine-inline")
@@ -150,6 +219,41 @@ class ForthVerifierTests(unittest.TestCase):
                 else:
                     with self.assertRaises((RuntimeError, ValueError)):
                         check_spend(parent, spend)
+
+    def test_affine_compact_checks_trace_lines_and_residue(self):
+        verifier = ForthVerifier(self.key, self.source, witness_layout="affine-witness",
+                                 plan=ArithmeticPlan(msm="signed-radix4", msm_table="deferred-doubling-slopes",
+                                                     miller_reductions="split-chord-residue",
+                                                     miller_kernel="direct-normalized"))
+        signals, proof = self.cases[0]
+        lock = verifier.compile(SOURCES)
+        artifact = verifier.artifact(SOURCES, None, lock)
+        witness = verifier.witness(signals, proof, sources=SOURCES)
+        parent, spend = spend_fixture(lock, witness)
+        check_spend(parent, spend)
+
+        line_size = artifact["pairing_line_packet_bytes"]
+        slope_size = artifact["slope_packet_bytes"]
+        line_push = len(push(bytes(line_size)))
+        line_start = line_push - line_size
+        slope_start = line_push + len(push(bytes(slope_size))) - slope_size
+        residue_bytes = 12 * FIELD_BYTES
+        public_push = len(push(public_packet(SOURCES, signals)))
+        residue_start = len(witness) - public_push - residue_bytes
+        # The first public scalar is zero, so its first window requires slope zero.
+        self.assertEqual(witness[slope_start:slope_start + FIELD_BYTES], bytes(FIELD_BYTES))
+        controls = (
+            ("lines", line_start, bytes([witness[line_start] ^ 1])),
+            ("slope", slope_start, (1).to_bytes(FIELD_BYTES, "little")),
+            ("out-of-range slope", slope_start, Q.to_bytes(FIELD_BYTES, "little")),
+            ("Miller slope", slope_start + artifact["msm_slope_count"] * FIELD_BYTES,
+             bytes(FIELD_BYTES)),
+            ("zero residue", residue_start, bytes(residue_bytes)),
+        )
+        for name, offset, replacement in controls:
+            with self.subTest(name=name), self.assertRaises((RuntimeError, ValueError)):
+                bad = witness[:offset] + replacement + witness[offset + len(replacement):]
+                check_spend(parent, spend.with_script(0, bad))
 
     def test_objectives_report_serialized_cost_and_use_the_selected_witness(self):
         candidates = layout_candidates(self.key, self.source, SOURCES)

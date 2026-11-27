@@ -1,0 +1,913 @@
+{
+  "candidates": [
+    {
+      "passes": [],
+      "ordered_rules": [],
+      "kernel_bytes": {
+        "sm2-window-double-five": 1064,
+        "sm2-window-add-projective": 378,
+        "sm2-window-add-affine": 305
+      },
+      "window_kernel_bytes": 89780,
+      "checks": 16,
+      "rule_applications": {
+        "sm2-double-with-prime": [],
+        "sm2-window-add-projective": [],
+        "sm2-window-add-affine": []
+      }
+    },
+    {
+      "passes": [
+        "stack"
+      ],
+      "ordered_rules": [],
+      "kernel_bytes": {
+        "sm2-window-double-five": 369,
+        "sm2-window-add-projective": 149,
+        "sm2-window-add-affine": 118
+      },
+      "window_kernel_bytes": 32703,
+      "checks": 16,
+      "rule_applications": {
+        "sm2-double-with-prime": [],
+        "sm2-window-add-projective": [],
+        "sm2-window-add-affine": []
+      }
+    },
+    {
+      "passes": [
+        "stack"
+      ],
+      "ordered_rules": [
+        "common-values"
+      ],
+      "kernel_bytes": {
+        "sm2-window-double-five": 389,
+        "sm2-window-add-projective": 152,
+        "sm2-window-add-affine": 121
+      },
+      "window_kernel_bytes": 34035,
+      "checks": 16,
+      "rule_applications": {
+        "sm2-double-with-prime": [
+          {
+            "rule": "common-values",
+            "applications": 3
+          }
+        ],
+        "sm2-window-add-projective": [
+          {
+            "rule": "common-values",
+            "applications": 2
+          }
+        ],
+        "sm2-window-add-affine": [
+          {
+            "rule": "common-values",
+            "applications": 2
+          }
+        ]
+      }
+    },
+    {
+      "passes": [
+        "stack"
+      ],
+      "ordered_rules": [
+        "double-as-add"
+      ],
+      "kernel_bytes": {
+        "sm2-window-double-five": 384,
+        "sm2-window-add-projective": 149,
+        "sm2-window-add-affine": 118
+      },
+      "window_kernel_bytes": 33468,
+      "checks": 16,
+      "rule_applications": {
+        "sm2-double-with-prime": [
+          {
+            "rule": "double-as-add",
+            "applications": 4
+          }
+        ],
+        "sm2-window-add-projective": [
+          {
+            "rule": "double-as-add",
+            "applications": 0
+          }
+        ],
+        "sm2-window-add-affine": [
+          {
+            "rule": "double-as-add",
+            "applications": 0
+          }
+        ]
+      }
+    },
+    {
+      "passes": [
+        "stack"
+      ],
+      "ordered_rules": [
+        "double-as-add",
+        "factor-products"
+      ],
+      "kernel_bytes": {
+        "sm2-window-double-five": 399,
+        "sm2-window-add-projective": 149,
+        "sm2-window-add-affine": 118
+      },
+      "window_kernel_bytes": 34233,
+      "checks": 16,
+      "rule_applications": {
+        "sm2-double-with-prime": [
+          {
+            "rule": "double-as-add",
+            "applications": 4
+          },
+          {
+            "rule": "factor-products",
+            "applications": 4
+          }
+        ],
+        "sm2-window-add-projective": [
+          {
+            "rule": "double-as-add",
+            "applications": 0
+          },
+          {
+            "rule": "factor-products",
+            "applications": 0
+          }
+        ],
+        "sm2-window-add-affine": [
+          {
+            "rule": "double-as-add",
+            "applications": 0
+          },
+          {
+            "rule": "factor-products",
+            "applications": 0
+          }
+        ]
+      }
+    },
+    {
+      "passes": [
+        "stack"
+      ],
+      "ordered_rules": [
+        "factor-products",
+        "double-as-add"
+      ],
+      "kernel_bytes": {
+        "sm2-window-double-five": 384,
+        "sm2-window-add-projective": 149,
+        "sm2-window-add-affine": 118
+      },
+      "window_kernel_bytes": 33468,
+      "checks": 16,
+      "rule_applications": {
+        "sm2-double-with-prime": [
+          {
+            "rule": "factor-products",
+            "applications": 0
+          },
+          {
+            "rule": "double-as-add",
+            "applications": 4
+          }
+        ],
+        "sm2-window-add-projective": [
+          {
+            "rule": "factor-products",
+            "applications": 0
+          },
+          {
+            "rule": "double-as-add",
+            "applications": 0
+          }
+        ],
+        "sm2-window-add-affine": [
+          {
+            "rule": "factor-products",
+            "applications": 0
+          },
+          {
+            "rule": "double-as-add",
+            "applications": 0
+          }
+        ]
+      }
+    },
+    {
+      "passes": [
+        "stack",
+        "search"
+      ],
+      "ordered_rules": [],
+      "kernel_bytes": {
+        "sm2-window-double-five": 369,
+        "sm2-window-add-projective": 145,
+        "sm2-window-add-affine": 110
+      },
+      "window_kernel_bytes": 32079,
+      "checks": 16,
+      "rule_applications": {
+        "sm2-double-with-prime": [],
+        "sm2-window-add-projective": [],
+        "sm2-window-add-affine": []
+      }
+    },
+    {
+      "passes": [
+        "stack",
+        "search"
+      ],
+      "ordered_rules": [
+        "common-values"
+      ],
+      "kernel_bytes": {
+        "sm2-window-double-five": 364,
+        "sm2-window-add-projective": 140,
+        "sm2-window-add-affine": 107
+      },
+      "window_kernel_bytes": 31408,
+      "checks": 16,
+      "rule_applications": {
+        "sm2-double-with-prime": [
+          {
+            "rule": "common-values",
+            "applications": 3
+          }
+        ],
+        "sm2-window-add-projective": [
+          {
+            "rule": "common-values",
+            "applications": 2
+          }
+        ],
+        "sm2-window-add-affine": [
+          {
+            "rule": "common-values",
+            "applications": 2
+          }
+        ]
+      }
+    },
+    {
+      "passes": [
+        "stack",
+        "search"
+      ],
+      "ordered_rules": [
+        "double-as-add"
+      ],
+      "kernel_bytes": {
+        "sm2-window-double-five": 354,
+        "sm2-window-add-projective": 145,
+        "sm2-window-add-affine": 110
+      },
+      "window_kernel_bytes": 31314,
+      "checks": 16,
+      "rule_applications": {
+        "sm2-double-with-prime": [
+          {
+            "rule": "double-as-add",
+            "applications": 4
+          }
+        ],
+        "sm2-window-add-projective": [
+          {
+            "rule": "double-as-add",
+            "applications": 0
+          }
+        ],
+        "sm2-window-add-affine": [
+          {
+            "rule": "double-as-add",
+            "applications": 0
+          }
+        ]
+      }
+    },
+    {
+      "passes": [
+        "stack",
+        "search"
+      ],
+      "ordered_rules": [
+        "double-as-add",
+        "factor-products"
+      ],
+      "kernel_bytes": {
+        "sm2-window-double-five": 359,
+        "sm2-window-add-projective": 145,
+        "sm2-window-add-affine": 110
+      },
+      "window_kernel_bytes": 31569,
+      "checks": 16,
+      "rule_applications": {
+        "sm2-double-with-prime": [
+          {
+            "rule": "double-as-add",
+            "applications": 4
+          },
+          {
+            "rule": "factor-products",
+            "applications": 4
+          }
+        ],
+        "sm2-window-add-projective": [
+          {
+            "rule": "double-as-add",
+            "applications": 0
+          },
+          {
+            "rule": "factor-products",
+            "applications": 0
+          }
+        ],
+        "sm2-window-add-affine": [
+          {
+            "rule": "double-as-add",
+            "applications": 0
+          },
+          {
+            "rule": "factor-products",
+            "applications": 0
+          }
+        ]
+      }
+    },
+    {
+      "passes": [
+        "stack",
+        "search"
+      ],
+      "ordered_rules": [
+        "factor-products",
+        "double-as-add"
+      ],
+      "kernel_bytes": {
+        "sm2-window-double-five": 354,
+        "sm2-window-add-projective": 145,
+        "sm2-window-add-affine": 110
+      },
+      "window_kernel_bytes": 31314,
+      "checks": 16,
+      "rule_applications": {
+        "sm2-double-with-prime": [
+          {
+            "rule": "factor-products",
+            "applications": 0
+          },
+          {
+            "rule": "double-as-add",
+            "applications": 4
+          }
+        ],
+        "sm2-window-add-projective": [
+          {
+            "rule": "factor-products",
+            "applications": 0
+          },
+          {
+            "rule": "double-as-add",
+            "applications": 0
+          }
+        ],
+        "sm2-window-add-affine": [
+          {
+            "rule": "factor-products",
+            "applications": 0
+          },
+          {
+            "rule": "double-as-add",
+            "applications": 0
+          }
+        ]
+      }
+    },
+    {
+      "passes": [
+        "rewrite",
+        "share",
+        "stack"
+      ],
+      "ordered_rules": [],
+      "kernel_bytes": {
+        "sm2-window-double-five": 364,
+        "sm2-window-add-projective": 134,
+        "sm2-window-add-affine": 121
+      },
+      "window_kernel_bytes": 31824,
+      "checks": 16,
+      "rule_applications": {
+        "sm2-double-with-prime": [],
+        "sm2-window-add-projective": [],
+        "sm2-window-add-affine": []
+      }
+    },
+    {
+      "passes": [
+        "rewrite",
+        "share",
+        "stack"
+      ],
+      "ordered_rules": [
+        "common-values"
+      ],
+      "kernel_bytes": {
+        "sm2-window-double-five": 364,
+        "sm2-window-add-projective": 134,
+        "sm2-window-add-affine": 121
+      },
+      "window_kernel_bytes": 31824,
+      "checks": 16,
+      "rule_applications": {
+        "sm2-double-with-prime": [
+          {
+            "rule": "common-values",
+            "applications": 3
+          }
+        ],
+        "sm2-window-add-projective": [
+          {
+            "rule": "common-values",
+            "applications": 2
+          }
+        ],
+        "sm2-window-add-affine": [
+          {
+            "rule": "common-values",
+            "applications": 2
+          }
+        ]
+      }
+    },
+    {
+      "passes": [
+        "rewrite",
+        "share",
+        "stack"
+      ],
+      "ordered_rules": [
+        "double-as-add"
+      ],
+      "kernel_bytes": {
+        "sm2-window-double-five": 384,
+        "sm2-window-add-projective": 134,
+        "sm2-window-add-affine": 121
+      },
+      "window_kernel_bytes": 32844,
+      "checks": 16,
+      "rule_applications": {
+        "sm2-double-with-prime": [
+          {
+            "rule": "double-as-add",
+            "applications": 4
+          }
+        ],
+        "sm2-window-add-projective": [
+          {
+            "rule": "double-as-add",
+            "applications": 0
+          }
+        ],
+        "sm2-window-add-affine": [
+          {
+            "rule": "double-as-add",
+            "applications": 0
+          }
+        ]
+      }
+    },
+    {
+      "passes": [
+        "rewrite",
+        "share",
+        "stack"
+      ],
+      "ordered_rules": [
+        "double-as-add",
+        "factor-products"
+      ],
+      "kernel_bytes": {
+        "sm2-window-double-five": 369,
+        "sm2-window-add-projective": 134,
+        "sm2-window-add-affine": 121
+      },
+      "window_kernel_bytes": 32079,
+      "checks": 16,
+      "rule_applications": {
+        "sm2-double-with-prime": [
+          {
+            "rule": "double-as-add",
+            "applications": 4
+          },
+          {
+            "rule": "factor-products",
+            "applications": 4
+          }
+        ],
+        "sm2-window-add-projective": [
+          {
+            "rule": "double-as-add",
+            "applications": 0
+          },
+          {
+            "rule": "factor-products",
+            "applications": 0
+          }
+        ],
+        "sm2-window-add-affine": [
+          {
+            "rule": "double-as-add",
+            "applications": 0
+          },
+          {
+            "rule": "factor-products",
+            "applications": 0
+          }
+        ]
+      }
+    },
+    {
+      "passes": [
+        "rewrite",
+        "share",
+        "stack"
+      ],
+      "ordered_rules": [
+        "factor-products",
+        "double-as-add"
+      ],
+      "kernel_bytes": {
+        "sm2-window-double-five": 384,
+        "sm2-window-add-projective": 134,
+        "sm2-window-add-affine": 121
+      },
+      "window_kernel_bytes": 32844,
+      "checks": 16,
+      "rule_applications": {
+        "sm2-double-with-prime": [
+          {
+            "rule": "factor-products",
+            "applications": 0
+          },
+          {
+            "rule": "double-as-add",
+            "applications": 4
+          }
+        ],
+        "sm2-window-add-projective": [
+          {
+            "rule": "factor-products",
+            "applications": 0
+          },
+          {
+            "rule": "double-as-add",
+            "applications": 0
+          }
+        ],
+        "sm2-window-add-affine": [
+          {
+            "rule": "factor-products",
+            "applications": 0
+          },
+          {
+            "rule": "double-as-add",
+            "applications": 0
+          }
+        ]
+      }
+    },
+    {
+      "passes": [
+        "rewrite",
+        "share",
+        "stack",
+        "search"
+      ],
+      "ordered_rules": [],
+      "kernel_bytes": {
+        "sm2-window-double-five": 339,
+        "sm2-window-add-projective": 119,
+        "sm2-window-add-affine": 107
+      },
+      "window_kernel_bytes": 29041,
+      "checks": 16,
+      "rule_applications": {
+        "sm2-double-with-prime": [],
+        "sm2-window-add-projective": [],
+        "sm2-window-add-affine": []
+      }
+    },
+    {
+      "passes": [
+        "rewrite",
+        "share",
+        "stack",
+        "search"
+      ],
+      "ordered_rules": [
+        "common-values"
+      ],
+      "kernel_bytes": {
+        "sm2-window-double-five": 339,
+        "sm2-window-add-projective": 119,
+        "sm2-window-add-affine": 107
+      },
+      "window_kernel_bytes": 29041,
+      "checks": 16,
+      "rule_applications": {
+        "sm2-double-with-prime": [
+          {
+            "rule": "common-values",
+            "applications": 3
+          }
+        ],
+        "sm2-window-add-projective": [
+          {
+            "rule": "common-values",
+            "applications": 2
+          }
+        ],
+        "sm2-window-add-affine": [
+          {
+            "rule": "common-values",
+            "applications": 2
+          }
+        ]
+      }
+    },
+    {
+      "passes": [
+        "rewrite",
+        "share",
+        "stack",
+        "search"
+      ],
+      "ordered_rules": [
+        "double-as-add"
+      ],
+      "kernel_bytes": {
+        "sm2-window-double-five": 354,
+        "sm2-window-add-projective": 119,
+        "sm2-window-add-affine": 107
+      },
+      "window_kernel_bytes": 29806,
+      "checks": 16,
+      "rule_applications": {
+        "sm2-double-with-prime": [
+          {
+            "rule": "double-as-add",
+            "applications": 4
+          }
+        ],
+        "sm2-window-add-projective": [
+          {
+            "rule": "double-as-add",
+            "applications": 0
+          }
+        ],
+        "sm2-window-add-affine": [
+          {
+            "rule": "double-as-add",
+            "applications": 0
+          }
+        ]
+      }
+    },
+    {
+      "passes": [
+        "rewrite",
+        "share",
+        "stack",
+        "search"
+      ],
+      "ordered_rules": [
+        "double-as-add",
+        "factor-products"
+      ],
+      "kernel_bytes": {
+        "sm2-window-double-five": 344,
+        "sm2-window-add-projective": 119,
+        "sm2-window-add-affine": 107
+      },
+      "window_kernel_bytes": 29296,
+      "checks": 16,
+      "rule_applications": {
+        "sm2-double-with-prime": [
+          {
+            "rule": "double-as-add",
+            "applications": 4
+          },
+          {
+            "rule": "factor-products",
+            "applications": 4
+          }
+        ],
+        "sm2-window-add-projective": [
+          {
+            "rule": "double-as-add",
+            "applications": 0
+          },
+          {
+            "rule": "factor-products",
+            "applications": 0
+          }
+        ],
+        "sm2-window-add-affine": [
+          {
+            "rule": "double-as-add",
+            "applications": 0
+          },
+          {
+            "rule": "factor-products",
+            "applications": 0
+          }
+        ]
+      }
+    },
+    {
+      "passes": [
+        "rewrite",
+        "share",
+        "stack",
+        "search"
+      ],
+      "ordered_rules": [
+        "factor-products",
+        "double-as-add"
+      ],
+      "kernel_bytes": {
+        "sm2-window-double-five": 354,
+        "sm2-window-add-projective": 119,
+        "sm2-window-add-affine": 107
+      },
+      "window_kernel_bytes": 29806,
+      "checks": 16,
+      "rule_applications": {
+        "sm2-double-with-prime": [
+          {
+            "rule": "factor-products",
+            "applications": 0
+          },
+          {
+            "rule": "double-as-add",
+            "applications": 4
+          }
+        ],
+        "sm2-window-add-projective": [
+          {
+            "rule": "factor-products",
+            "applications": 0
+          },
+          {
+            "rule": "double-as-add",
+            "applications": 0
+          }
+        ],
+        "sm2-window-add-affine": [
+          {
+            "rule": "factor-products",
+            "applications": 0
+          },
+          {
+            "rule": "double-as-add",
+            "applications": 0
+          }
+        ]
+      }
+    }
+  ],
+  "selected": {
+    "passes": [
+      "rewrite",
+      "share",
+      "stack",
+      "search"
+    ],
+    "ordered_rules": [],
+    "kernel_bytes": {
+      "sm2-window-double-five": 339,
+      "sm2-window-add-projective": 119,
+      "sm2-window-add-affine": 107
+    },
+    "window_kernel_bytes": 29041,
+    "checks": 16,
+    "rule_applications": {
+      "sm2-double-with-prime": [],
+      "sm2-window-add-projective": [],
+      "sm2-window-add-affine": []
+    }
+  },
+  "lowering": {
+    "sm2-double-with-prime": {
+      "passes": [
+        "rewrite",
+        "share",
+        "stack",
+        "search"
+      ],
+      "script_bytes": 67,
+      "rewrites": {
+        "multiply-by-two-as-addition": 4
+      },
+      "max_magnitude_bits": 1547
+    },
+    "sm2-window-add-projective": {
+      "passes": [
+        "rewrite",
+        "share",
+        "stack",
+        "search"
+      ],
+      "script_bytes": 119,
+      "rewrites": {
+        "expand-cross-products": 3
+      },
+      "max_magnitude_bits": 1534
+    },
+    "sm2-window-add-affine": {
+      "passes": [
+        "rewrite",
+        "share",
+        "stack",
+        "search"
+      ],
+      "script_bytes": 107,
+      "rewrites": {},
+      "max_magnitude_bits": 1281
+    }
+  },
+  "kernel_sha256": {
+    "sm2-window-double-five": "bb63dc4c0c57fd25d3902db08f100093dfc3149f65401b10392bac31b363bfe6",
+    "sm2-window-add-projective": "3cc5491ef68d133958586c583b4f513ab43f27b9f98ef31e09838c93ac54b02e",
+    "sm2-window-add-affine": "65d45ae3dd9ab943ca555f72dd8d2545464e309971b169f472f700a857a1c5b6"
+  },
+  "target_stack_plan": {
+    "sm2-double-with-prime": {
+      "order": "beam",
+      "search": "completed",
+      "inputs": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "returns": [
+        0,
+        19,
+        25,
+        28
+      ],
+      "schedule_sha256": "92ca80614f74f99014c8e9fd7884dfb3e1f5699a0ba0c9508709a54f5be1a1a2"
+    },
+    "sm2-window-add-projective": {
+      "order": "beam",
+      "search": "completed",
+      "inputs": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "returns": [
+        0,
+        1,
+        49,
+        53,
+        57
+      ],
+      "schedule_sha256": "27e2b772af275e274299a2b7dd88c80c991cd24bdb2aed846a8852641dc2a8df"
+    },
+    "sm2-window-add-affine": {
+      "order": "beam",
+      "search": "completed",
+      "inputs": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ],
+      "returns": [
+        0,
+        1,
+        33,
+        37,
+        41
+      ],
+      "schedule_sha256": "13d2eb4d6536076d07b2f69fe42e137f86a45714fab428507f931f69ec345641"
+    }
+  }
+}

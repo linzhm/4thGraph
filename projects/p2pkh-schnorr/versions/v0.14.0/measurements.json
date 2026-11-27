@@ -1,0 +1,226 @@
+{
+  "template_version": "0.14.0",
+  "compiler_base": "889ff6e5d37e0e0215fba306353a8a22795c327a",
+  "engines": {
+    "bsv_node_version": 101020300,
+    "chain_gang": {
+      "version": "0.13.2",
+      "commit": "74676b9c002c452e7f21a9ed9265f4972bef03f6"
+    },
+    "verification_profile": "raised",
+    "admission_profile": "default"
+  },
+  "verifier_comparison": {
+    "lock_bytes": {
+      "v0.13.0": 24055,
+      "v0.14.0": 23899
+    },
+    "detached_verifier_bytes": {
+      "v0.13.0": 23245,
+      "v0.14.0": 23089
+    },
+    "detached_verifier_sha256": {
+      "v0.13.0": "e6cc586af02b8e30f51c39ca09db376ff32a416344b4a887556a999d2f7d00e2",
+      "v0.14.0": "20f2d7a2dd8924b75a46dafbb576baf04e81d32f1e2f9aea7db311f0a250bb07"
+    },
+    "preimage_encoding": "literal",
+    "native_p2pkh_exit_shape": {
+      "inputs": 1,
+      "outputs": 1
+    },
+    "native_p2pkh_exit_both_versions": {
+      "bip143": {
+        "tx_bytes": 416,
+        "unlock_bytes": 329,
+        "output_lock_bytes": 25
+      },
+      "otda": {
+        "tx_bytes": 348,
+        "unlock_bytes": 261,
+        "output_lock_bytes": 25
+      }
+    },
+    "official_bip340_vectors": 19,
+    "paired_timings": {
+      "sampling": "rotate candidate order; use the same official BIP340 witnesses for detached verification and shared deterministic keys for payments",
+      "warmups_per_candidate": 8,
+      "timed_runs_per_candidate": 56,
+      "median_ms": {
+        "v0.13.0": {
+          "detached": {
+            "chain_gang": 2.696,
+            "bsv_node": 10.684
+          },
+          "bip143": {
+            "chain_gang": 2.829,
+            "bsv_node": 11.041
+          },
+          "otda": {
+            "chain_gang": 2.857,
+            "bsv_node": 10.88
+          }
+        },
+        "v0.14.0": {
+          "detached": {
+            "chain_gang": 2.695,
+            "bsv_node": 10.557
+          },
+          "bip143": {
+            "chain_gang": 2.848,
+            "bsv_node": 10.958
+          },
+          "otda": {
+            "chain_gang": 2.823,
+            "bsv_node": 10.896
+          }
+        }
+      }
+    }
+  },
+  "schnorr_payment_shape": {
+    "inputs": 2,
+    "outputs": 2
+  },
+  "templates": {
+    "v0.13.0": {
+      "bip143-all": {
+        "spend_txid": "16b7a158521367adebab7d16998459bccbeee85b3769dc38ef5b6a75d545d7cf",
+        "lock_bytes_per_output": 24055,
+        "unlock_bytes_by_input": [
+          329,
+          329
+        ],
+        "payment_bytes": 48886,
+        "extra_input_bytes": 372,
+        "extra_output_bytes": 24066,
+        "fund_and_exit_bytes": 49111,
+        "one_turnover_bytes": 97997,
+        "first_input_peak_stack_payload_bytes": 3396,
+        "bsv_node_inputs": [
+          true,
+          true
+        ],
+        "chain_gang_transaction": true,
+        "locktime_mutation": {
+          "txid": "c07911b1b107e92d2b1ba6a66e93b7249809006ea29a606cf9c493bfa6717c59",
+          "bsv_node_inputs": [
+            false,
+            false
+          ],
+          "chain_gang_transaction": false
+        }
+      },
+      "otda-all": {
+        "spend_txid": "5f51f84acd7631aa8245425a4e83c39b8f8d275bdcf4a3b8d96a84f789ab78cd",
+        "lock_bytes_per_output": 24055,
+        "unlock_bytes_by_input": [
+          48401,
+          48401
+        ],
+        "payment_bytes": 145030,
+        "extra_input_bytes": 48567,
+        "extra_output_bytes": 72206,
+        "fund_and_exit_bytes": 49125,
+        "one_turnover_bytes": 194155,
+        "first_input_peak_stack_payload_bytes": 96634,
+        "bsv_node_inputs": [
+          true,
+          true
+        ],
+        "chain_gang_transaction": true,
+        "locktime_mutation": {
+          "txid": "ae60fe54adb3fb78f7adc80cf49d5714644c5a418fce01fc893c4786ca954d59",
+          "bsv_node_inputs": [
+            false,
+            false
+          ],
+          "chain_gang_transaction": false
+        }
+      }
+    },
+    "v0.14.0": {
+      "bip143-all": {
+        "spend_txid": "716da6a8e18a94305c3afde032db8a6d54252ed7b316aa637cc61bec04b6af63",
+        "lock_bytes_per_output": 23899,
+        "unlock_bytes_by_input": [
+          329,
+          329
+        ],
+        "payment_bytes": 48574,
+        "extra_input_bytes": 372,
+        "extra_output_bytes": 23910,
+        "fund_and_exit_bytes": 48799,
+        "one_turnover_bytes": 97374,
+        "first_input_peak_stack_payload_bytes": 3399,
+        "bsv_node_inputs": [
+          true,
+          true
+        ],
+        "chain_gang_transaction": true,
+        "locktime_mutation": {
+          "txid": "9a92c1fcdc817fa31e2fb93e59bd5bcbf0d84c8c5317aeddc54839806e44f17f",
+          "bsv_node_inputs": [
+            false,
+            false
+          ],
+          "chain_gang_transaction": false
+        },
+        "default_regtest_admission": {
+          "funding": {
+            "mempool": true,
+            "mined": true
+          },
+          "turnover": {
+            "mempool": true,
+            "mined": true
+          },
+          "exit": {
+            "mempool": true,
+            "mined": true
+          }
+        }
+      },
+      "otda-all": {
+        "spend_txid": "2131ebd0030d7c94d67f5bd10e9cbcdfe630ebf9d7ffcf76787bc10e3d829b64",
+        "lock_bytes_per_output": 23899,
+        "unlock_bytes_by_input": [
+          48089,
+          48089
+        ],
+        "payment_bytes": 144094,
+        "extra_input_bytes": 48255,
+        "extra_output_bytes": 71738,
+        "fund_and_exit_bytes": 48813,
+        "one_turnover_bytes": 192908,
+        "first_input_peak_stack_payload_bytes": 96010,
+        "bsv_node_inputs": [
+          true,
+          true
+        ],
+        "chain_gang_transaction": true,
+        "locktime_mutation": {
+          "txid": "9515f901add76f5ef429cf2a189550cc4fc76451b0eeaa796a78af42b18f5285",
+          "bsv_node_inputs": [
+            false,
+            false
+          ],
+          "chain_gang_transaction": false
+        },
+        "default_regtest_admission": {
+          "funding": {
+            "mempool": true,
+            "mined": true
+          },
+          "turnover": {
+            "mempool": true,
+            "mined": true
+          },
+          "exit": {
+            "mempool": true,
+            "mined": true
+          }
+        }
+      }
+    }
+  }
+}

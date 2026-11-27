@@ -2,11 +2,26 @@
   "version": "0.1.0",
   "previous": null,
   "artifacts": [
-    "build.json"
+    "build.json",
+    "contract/manifest.json",
+    "contract/advance.wasm",
+    "contract/template.asm",
+    "contract/template.script"
   ],
-  "fixtures": [],
-  "evidence": [],
+  "fixtures": [
+    "contract/cases.json"
+  ],
+  "evidence": [
+    "contract/receipt.json"
+  ],
   "integration": "README.md#build",
   "build": "PYTHONPATH=src:. python projects/pels-counter/pels_counter.py build",
-  "verify": "PYTHONPATH=src:. bash tools/verify_node.sh --profile default -- python projects/pels-counter/pels_counter.py replay --output /tmp/pels-replay.json"
+  "verify": "PYTHONPATH=src:. bash tools/verify_node.sh --profile default -- python projects/pels-counter/pels_counter.py replay --output /tmp/pels-replay.json",
+  "project_contract": {
+    "abi": "4thgraph.project-contract/1",
+    "manifest": "contract/manifest.json",
+    "sha256": "5b9f758728c5b520ed97297a2b167561eb1ba1014e33e980d93b8f387569b78b",
+    "receipt": "contract/receipt.json",
+    "receipt_sha256": "02d9745cccb8224707ff6ea6540f213ed38aefa6c3bcc8458cc959a43a058077"
+  }
 }

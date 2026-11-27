@@ -1,0 +1,84 @@
+{
+  "abi": "4thgraph.project-contract/1",
+  "anchors": [
+    {
+      "bytes": 1,
+      "offset": 41357,
+      "op": "OP_CODESEPARATOR"
+    },
+    {
+      "bytes": 1,
+      "offset": 41359,
+      "op": "OP_CHECKSIGVERIFY"
+    },
+    {
+      "bytes": 1,
+      "offset": 41361,
+      "op": "OP_CODESEPARATOR"
+    },
+    {
+      "bytes": 1,
+      "offset": 41363,
+      "op": "OP_CHECKSIG"
+    }
+  ],
+  "fixture": "r1-ordinary",
+  "fixtures": {
+    "bytes": 2833,
+    "file": "cases.json",
+    "sha256": "3b3a0890ebc087c4beb81905cbe4ac582a51a501fc3dee1c91de8bb3a6d8f0ef"
+  },
+  "forth_inputs": {
+    "dependencies": [
+      {
+        "interface_sha256": null,
+        "name": "r1.fth",
+        "sha256": "c79cf9ba9a20d9a9c01274ae6676e2ae51b0de2de365266ebe3467c706ba13e3"
+      },
+      {
+        "interface_sha256": "8f13bbd5b91b3741175765fe94333e7ecdcae74ef43f7e5e15e83a5dae3a166d",
+        "name": "std/bsv",
+        "sha256": "92f4510c9d3e8e0371d9b41d08f9f7e639324c9795e6d0a1c3f9779e9179b404"
+      }
+    ],
+    "source_sha256": "08df84282d5624ff8a010a9a24631a974322d75c72b3634ff6c6306c2d6451d5"
+  },
+  "listing": {
+    "bytes": 589096,
+    "file": "template.asm",
+    "sha256": "774b0aabef429d5ad0fc63f7e24b1ea4f27dcdd8aa64612797d3b00159e24cc3"
+  },
+  "module": {
+    "bytes": 4792861,
+    "file": "holder.wasm",
+    "sha256": "e8bbca9ad2fa894e5b509270241f04905286da19bf752e328485c44594c2cdfa"
+  },
+  "parameters": [
+    {
+      "length": 20,
+      "name": "owner_hash160",
+      "offset": 208
+    }
+  ],
+  "paths": {
+    "ordinary-all": {
+      "mode": 65,
+      "script_code_offset": 41362,
+      "signatures": 1
+    }
+  },
+  "profile": "p2pkh-r1",
+  "role": "owner",
+  "script": {
+    "bytes": 41364,
+    "file": "template.script",
+    "sha256": "d4dc90255e60d8dff51e1f8464391304d4b0946457445e62f558c66e84edb27a"
+  },
+  "template_version": "0.6.0",
+  "wasm_builder": "go version go1.25.14 linux/amd64",
+  "wasm_sources": {
+    "projects/p2pkh-r1/contract/main.go": "70c0c389ffc40bb39b5a020ea0db4212e4aafa3a3f9e3138804e7de15f73362b",
+    "sdk/go/contractabi/contract.go": "037876c2f42c84197484850b3736b989a53acddb0066ef4a27b42e884f33895e",
+    "sdk/go/contractabi/reactor_wasip1.go": "7e5a7bdbe241de4ff6c57dfc658aeb6bac9e102d8f0359ae246d8d98caf5e132"
+  }
+}

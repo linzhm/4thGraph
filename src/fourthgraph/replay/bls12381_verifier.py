@@ -9,7 +9,9 @@ from pathlib import Path
 from fourthgraph.verification.bls12381.affine_witness import LAYOUTS
 from fourthgraph.replay.groth16_bls12381 import FIXTURE
 from fourthgraph.verification.bls12381.verifier import AFFINE_BYTES, FIELD_BYTES, Dynamic, public_packet, public_signals
-from fourthgraph.verification.bls12381.build import OBJECTIVES, SCRIPT_ERAS, ForthVerifier, SOURCE, layout_candidates, select_layout
+from fourthgraph.verification.bls12381.build import (
+    OBJECTIVES, SCRIPT_ERAS, ArithmeticPlan, ForthVerifier, SOURCE, layout_candidates, select_layout,
+)
 from fourthgraph.replay.groth16_bn254 import LOCK_VALUE, SPEND_FEE, fund, verify_spend
 from fourthgraph.workflow.protocol import FLAG, UTXO
 from fourthgraph.replay.workflow import stack_peaks
@@ -29,12 +31,31 @@ def fixture():
     return key, cases
 
 
+def witness_controls(witnesses, packets, index, proof_packet_bytes, *, layout):
+    prefix = witnesses[index][:-len(push(packets[index]))]
+    proof_start = len(prefix) - proof_packet_bytes
+    # (0,2) is on G1 and has order 3.
+    torsion = bytes(FIELD_BYTES) + (2).to_bytes(FIELD_BYTES, "little")
+    controls = {
+        "crossed_statement": prefix + push(packets[1 - index]),
+        "g1_outside_subgroup": (prefix[:proof_start] + torsion + prefix[proof_start + len(torsion):]
+                                + push(packets[index])),
+    }
+    if layout == "projective":
+        other_prefix = witnesses[1 - index][:-len(push(packets[1 - index]))]
+        controls["crossed_statement_with_valid_msm"] = (
+            prefix[:-AFFINE_BYTES] + other_prefix[-AFFINE_BYTES:] + push(packets[1 - index])
+        )
+    return controls
+
+
 def main():
     cli = argparse.ArgumentParser(description=__doc__)
     cli.add_argument("--source", type=Path, default=SOURCE)
     cli.add_argument("--entry", help="Forth definition to compile and replay")
     cli.add_argument("--tx-version", type=int, choices=(1, 2), default=2)
     cli.add_argument("--script-era", choices=SCRIPT_ERAS, default="genesis")
+    cli.add_argument("--arithmetic-plan", type=Path, help="replay an explicit Fp2 and residue lowering plan")
     layout = cli.add_mutually_exclusive_group()
     layout.add_argument("--objective", choices=OBJECTIVES)
     layout.add_argument("--witness-layout", choices=LAYOUTS)
@@ -49,14 +70,15 @@ def main():
     activation = int(os.environ["SCRIPT_LAB_CHRONICLE_HEIGHT"])
     key, cases = fixture()
     source = args.source.read_bytes()
+    plan = ArithmeticPlan.read(args.arithmetic_plan) if args.arithmetic_plan else None
     if args.objective:
         candidates = layout_candidates(key, source, SOURCES, script_era=args.script_era, entry=args.entry,
-                                       source_path=args.source)
+                                       source_path=args.source, plan=plan)
         verifier, artifact = select_layout(candidates, args.objective)
         lock = bytes.fromhex(artifact["script_hex"])
     else:
         verifier = ForthVerifier(key, source, witness_layout=args.witness_layout or "projective",
-                                 script_era=args.script_era, entry=args.entry, source_path=args.source)
+                                 script_era=args.script_era, entry=args.entry, source_path=args.source, plan=plan)
         lock = verifier.compile(SOURCES)
         artifact = verifier.artifact(SOURCES, None, lock)
     packets = [public_packet(SOURCES, signals) for signals, _ in cases]
@@ -72,20 +94,8 @@ def main():
             raise ValueError(f"could not deploy verifier: {deployed}")
         draft = Transaction((Input(deployment.txid_wire(), 0),),
                             (Output(LOCK_VALUE - SPEND_FEE, native.output.script),), version=version)
-        prefix = witnesses[index][:-len(push(packets[index]))]
-        other_prefix = witnesses[1 - index][:-len(push(packets[1 - index]))]
-        proof_start = len(prefix) - artifact["proof_packet_bytes"]
-        # (0,2) is on G1 and has order 3.
-        torsion = bytes(FIELD_BYTES) + (2).to_bytes(FIELD_BYTES, "little")
-        invalid = {
-            "crossed_statement": prefix + push(packets[1 - index]),
-            "g1_outside_subgroup": (prefix[:proof_start] + torsion + prefix[proof_start + len(torsion):]
-                                    + push(packets[index])),
-        }
-        if verifier.witness_layout == "projective":
-            invalid["crossed_statement_with_valid_msm"] = (
-                prefix[:-AFFINE_BYTES] + other_prefix[-AFFINE_BYTES:] + push(packets[1 - index])
-            )
+        invalid = witness_controls(witnesses, packets, index, artifact["proof_packet_bytes"],
+                                   layout=verifier.witness_layout)
         controls = {
             name: verify_spend(node, activation, draft.with_script(0, witness), deployment, deployed["height"],
                                expected=False)

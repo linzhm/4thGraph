@@ -1,18 +1,56 @@
-# P2PKH-R1
+<!-- Generated from manifest.yaml with Copier. -->
+
+# P2PKH-R1 v0.6.0
 
 [English](README.md) · [4thGraph](../../README.zh-CN.md) · [项目目录](../README.zh-CN.md) · [版本](versions/index.json)
 
+## 开发入口
+
+**[钱包 SDK 快速上手](docs/sdk.zh-CN.md#quickstart)** · [统一钱包 SDK](../../sdk/README.zh-CN.md#quickstart)
+
 P2PKH-R1 让 BSV 钱包接入已有的 P‑256 签名器。输出锁定到收款公钥的 HASH160，花费时提供未压缩公钥和 64 字节的 ECDSA 签名 `r || s`。
 
-**[钱包 SDK 快速上手](docs/sdk.zh-CN.md#quickstart)** · [协议规范](docs/spec.zh-CN.md) · [安全分析](docs/developer.zh-CN.md#security) · [验收记录](reference/acceptance.md)
+[协议](docs/spec.zh-CN.md) · [算法与执行](#算法与执行) · [复现方法](#复现方法) · [完整交易与栈测量](#完整交易与栈测量) · [实测数据](versions/v0.6.0/measurements.json)
+
+| 入口 | 用途 |
+| --- | --- |
+| `locking_script_from_public_key` | 用未压缩的 P-256 公钥构造选定的钱包模板。 |
+| `sign_payment` | 用外部 P-256 摘要签名器为付款授权。 |
+
+## 算法与执行
+
+[协议规范](docs/spec.zh-CN.md) · [安全分析](docs/developer.zh-CN.md#security) · [验收记录](reference/acceptance.md)
+
+付款锁检查公开的公钥与所有者 HASH160 是否匹配，在 Script 中验证 P-256 签名，并将已签摘要绑定到当前输入。[线格式规范](docs/spec.zh-CN.md)
+
+## 复现方法
+
+在编译器实验环境中从仓库根目录运行版本命令。[依赖与复放配置](forth/README.md)
+
+```sh
+PYTHONPATH=src:.:projects/p2pkh-r1/reference python projects/p2pkh-r1/forth/msm_experiment.py build --candidate split-5x4-affine-g
+PYTHONPATH=src:.:projects/p2pkh-r1/reference bash tools/verify_node.sh --profile raised -- python projects/p2pkh-r1/forth/msm_experiment.py compare --workflow explicit --matrix --candidate v0.5.0 --candidate v0.6.0 --budget 2 --full-budget 2
+```
+
+选定的编译器版本和钱包默认模板分别归档。完整复放流程见编译器指南，付款矩阵见验收记录。[编译器实验](forth/README.md) · [付款验收](reference/acceptance.md)
+
+## 开发和钱包接入
+
+### 钱包接入
+
+参考钱包用 **v0.2.0** 创建新输出，也能花费已有的 v0.1.0 输出。统一 SDK 支持 TypeScript、Rust、Go 和 Python。接入已有 P‑256 签名器时，核对设备的摘要接口和签名编码，并跨签名进程持久保存随机数重复检测记录。 [SDK 指南](docs/sdk.zh-CN.md) · [参考钱包](reference/README.md) · [钱包模板](versions/v0.2.0/layout.json)
+
+R1 在入金时创建完整付款锁，收款人可用一次花费付款。Deferred R1 用较小的入金锁，并在独立的交易中启用。 [Deferred 流程](../p2pkh-r1-deferred/README.zh-CN.md)
+
+## 完整交易与栈测量
 
 <a name="version-history"></a>
-<a name="完整交易与栈测量"></a>
+
 <a name="forth-探索版"></a>
 
-## 实测结果
+### 实测结果
 
-### v0.5.0 → v0.6.0
+#### v0.5.0 → v0.6.0
 
 **v0.6.0** 将 `split-5x4-affine-g` 固定为最新的编译器模板。每个完整锁缩短 **357 B**，BIP143 ALL 付款缩短 **714 B**。OTDA 重建程序增加 148 B，两种 OTDA 付款各缩短 **418 B**。付款均为两进两出。 [冻结产物与哈希](versions/v0.6.0/layout.json) · [构建与复放](forth/README.md)
 
@@ -48,9 +86,3 @@ v0.4.0 的 Forth 用命名值写公式，例如先算 `xx = x1*x2` 和 `yy = y1*
 对三个交叉项都这样展开，关闭优化时点加从 392 B 降到 345 B。把这一等价改写加入编译器后，保留原式并开启优化，配合栈调度就能生成 123 B 的点加和 42,536 B 的完整锁。同一份源码关闭优化时，完整锁为 117,775 B。下一轮继续用高阶双标量乘法表达算法，把窗口和固定表特化交给编译器。 [公式源码](forth/r1.fth) · [历史基准](forth/history.md)
 
 </details>
-
-## 钱包接入
-
-参考钱包用 **v0.2.0** 创建新输出，也能花费已有的 v0.1.0 输出。统一 SDK 支持 TypeScript、Rust、Go 和 Python。接入已有 P‑256 签名器时，核对设备的摘要接口和签名编码，并跨签名进程持久保存随机数重复检测记录。 [SDK 指南](docs/sdk.zh-CN.md) · [参考钱包](reference/README.md) · [钱包模板](versions/v0.2.0/layout.json)
-
-R1 在入金时创建完整付款锁，收款人可用一次花费付款。Deferred R1 用较小的入金锁，并在独立的交易中启用。 [Deferred 流程](../p2pkh-r1-deferred/README.zh-CN.md)

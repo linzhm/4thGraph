@@ -27,12 +27,13 @@ symbol           = ascii-letter, { alphanumeric | "_" | "-" } ;
 
 definition       = ":", word-name, stack-effect, { instruction }, ";" ;
 stack-effect     = "(", { stack-type }, "--", { stack-type }, ")" ;
-instruction      = straight-instruction | branch ;
+instruction      = straight-instruction | branch | counted-loop ;
 straight-instruction = call | cell-literal | byte-literal | range-check ;
 call             = word-name ;
 byte-literal     = "bytes-hex", hex-pairs ;
 range-check      = "check-range", symbol ;
 branch           = "if", { instruction }, [ "else", { instruction } ], "then" ;
+counted-loop     = ( "do" | "?do" ), { instruction }, "loop" ;
 
 declaration      = bytes-param | lock | range | work | join | gate | split-authority | recovery
                  | independent | workflow-input | stage | relation ;
@@ -91,9 +92,10 @@ A `word-name` is a single token. Control words, source declarations, and the `bs
 
 - Top-level directives and declarations take effect as the compiler reads the source. Definition bodies call computation, conversion, construction, and verification words.
 - A stack-effect comment containing `--` follows the name in a colon definition. Standard Forth treats it as a comment. 4thGraph uses it as a static type contract. The signature can use the types known at that point, and the body can call definitions and imports already in scope or built-in words. `IF` consumes a `cell`. Both branches must leave the same ordered stack types at the join.
+- `limit start DO ... LOOP` and `limit start ?DO ... LOOP` take literal `cell` bounds. The compiler unrolls the body from start up to the exclusive limit and checks each iteration's stack effect. `I` is the innermost loop index. Equal bounds take zero iterations with `?DO`. Dynamic or descending bounds and expansions beyond the budget raise a build error.
 - The compiler resolves the computation words in `work:`, `gate:`, and `join:` as it reads them. It resolves the work steps named by `join:`, the computation words and value dependencies of `stage:`, and both words in `relation:` when building the corresponding plan. Stage declaration order can differ from dependency order.
 - A parallel plan needs two distinct work steps, a join, and a split signer role. A gate is optional. A linear plan needs an initial value, one or more `u32 -- u32` stages, and a final `u32 -- route` stage. Each linear value has one producer and at most one consumer. Two-stage plans support `fused`, `serial`, and `atomic`. Longer chains use `serial`. The step names `deploy`, `split`, and `fused` are reserved. Both plan styles can include a recovery rule and independent submission constraints. [Transaction graph (Chinese)](specification.md#交易图)
-- `relation:` requires `REQUIRE stdlib/verify.fth`. A source file can declare one relation independently of workflow declarations. The relation identifies the state transition to verify. The compiler selects an implementation based on available backends, policy, and budget. [Build and replay a relation (Chinese)](stdlib.md#验证路径)
+- `relation:` requires `REQUIRE stdlib/verify.fth`. A source file can declare one relation independently of workflow declarations. The relation identifies the state transition to verify. The compiler selects an implementation based on available backends, policy, and budget. [Build and replay a relation](stdlib.md#verification-paths)
 
 4thGraph statically checks the inputs and outputs described by stack-effect comments. Declarations such as `range:`, `work:`, and `relation:` control numeric checks, transaction scheduling, and verification relations. They follow the Forth practice of defining words with their own arguments and terminators. Full Forth systems provide `CREATE` and `DOES>` for implementing defining words. [Forth 2012 CREATE](https://forth-standard.org/standard/core/CREATE) · [Forth 2012 DOES>](https://forth-standard.org/standard/core/DOES)
 
@@ -121,6 +123,8 @@ In a stack effect, the left side of `--` lists the items a word reads and the ri
 In Script construction words, `op-toaltstack` and `op-fromaltstack` emit `OP_TOALTSTACK` and `OP_FROMALTSTACK` respectively. At Script runtime, these instructions move a value from the main stack to the alt stack or back.
 
 Use `over` and `2dup` to copy existing stack items and `swap`, `rot`, and `nip` to rearrange the main stack. Gforth workflows can use `DO … LOOP` for host iteration. Script construction words can use `bsv-repeat-code` to expand a fixed number of copies of an instruction fragment. [Forth 2012 Core](https://forth-standard.org/standard/core) · [Forth 2012 DO](https://forth-standard.org/standard/core/DO)
+
+`bsv-tile-top ( script cell -- script )` appends code that replaces the runtime top byte item with a positive build-time number of copies concatenated together. The emitted code constructs the copies by doubling and appending.
 
 Operations use postfix notation (RPN). `2 3 +` pushes both values, then `+` consumes them and leaves `5`. `+`, `-`, and `*` use wrapping 64-bit `cell` arithmetic. `=`, `<`, and `>` produce Forth flags. Use `u32+` for unsigned 32-bit addition and `int+`, `int-`, and `int*` for ScriptNum arithmetic. For byte strings, `bytes-cat` concatenates and `bytes=` compares. `OP_SIZE` preserves the input and leaves its length. `OP_SPLIT` consumes the input and offset and leaves two pieces. [Language semantics (Chinese)](specification.md)
 
@@ -190,7 +194,7 @@ REQUIRE stdlib/verify.fth
 relation: u32-inc decide ;
 ```
 
-`4thgraph-circuit` emits Circom. `4thgraph-verify` builds the transaction binding and the backend selection report. [Full commands (Chinese)](stdlib.md#验证路径)
+`4thgraph-circuit` emits Circom. `4thgraph-verify` builds the transaction binding and the backend selection report. [Full commands](stdlib.md#verification-paths)
 
 ## 7. P2PKH locking check
 

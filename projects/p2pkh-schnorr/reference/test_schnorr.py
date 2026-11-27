@@ -3,6 +3,7 @@
 import csv
 from dataclasses import replace
 from hashlib import sha256
+from itertools import product
 import os
 from random import Random
 import unittest
@@ -15,11 +16,13 @@ from bip340 import FIELD, ORDER, lift_x, to_bytes, verify
 from payment import lock_for_public_key, sign_payment, sign_spend
 from schnorr_script import (
     TEMPLATE_DIRS, TEMPLATE_VERSION, _contract, authorization_codes, compile_unlock, compiled_template,
-    lock_for_owner, owner_hash, recognize, recognize_template, verifier,
+    lock_for_owner, owner_hash, recognize, recognize_template, reconstruction_for_version, verifier,
 )
+from fourthgraph.benchmark.cases import native_coin
 from fourthgraph.benchmark.validation import Node, chain_verdict
+from fourthgraph.bsv.chain_gang import validate_at_heights
 from fourthgraph.bsv.evaluate import ScriptError, evaluate
-from fourthgraph.bsv.script import decode_num, encode_num, number, push
+from fourthgraph.bsv.script import asm, decode_num, encode_num, number, push
 from fourthgraph.bsv.spend_authorization import SpendAuthorization, prepare_authorization
 from fourthgraph.bsv.transaction import CHRONICLE, Input, Output, Transaction
 
@@ -63,6 +66,8 @@ def malformed_witnesses(public, message, signature):
         ("off-curve public ordinate", detached_unlock(message, public, signature, y=(y + 2) % FIELD)),
         ("noncanonical public ordinate", detached_unlock(message, public, signature, y=FIELD)),
         ("odd nonce ordinate", detached_unlock(message, public, signature, nonce_y=FIELD - nonce_y)),
+        ("both ordinates odd",
+         detached_unlock(message, public, signature, y=FIELD - y, nonce_y=FIELD - nonce_y)),
         ("off-curve nonce ordinate", detached_unlock(message, public, signature, nonce_y=(nonce_y + 2) % FIELD)),
         ("noncanonical nonce ordinate", detached_unlock(message, public, signature, nonce_y=FIELD)),
         ("short signature", detached_unlock(message, public, signature[:-1])),
@@ -151,13 +156,25 @@ class SchnorrTests(unittest.TestCase):
             with self.subTest(case=case):
                 self.check_detached(unlock, False)
 
-    def sign_two_inputs(self, tx, sighash, parents=None):
+    def sign_two_inputs(self, tx, sighash, parents=None, *, compress_otda=None):
         parents = self.parents if parents is None else parents
         for i, (parent, public, key) in enumerate(zip(parents, self.public_keys, self.keys, strict=True)):
             tx = sign_spend(tx, i, parent.serialize(), public,
                             lambda message: key.sign_schnorr(message, aux_randomness=bytes(32)),
-                            sighash=sighash, chronicle_active=bool(sighash & CHRONICLE))
+                            sighash=sighash, chronicle_active=bool(sighash & CHRONICLE), compress_otda=compress_otda)
         return tx
+
+    def test_sighash_type_encoding(self):
+        check = _contract().emit("check-sighash", b"")
+        for flag in range(256):
+            packed = bytes([flag]) + bytes(3)
+            if flag in MODES:
+                self.assertEqual(evaluate(check, [packed]), ([bytes([flag])], []))
+            else:
+                with self.subTest(flag=flag), self.assertRaises(ScriptError):
+                    evaluate(check, [packed])
+        with self.assertRaises(ScriptError):
+            evaluate(check, [b"\x41\x01\x00\x00"])
 
     def test_all_twelve_paired_payment_modes(self):
         for version in (1, 2):
@@ -172,6 +189,78 @@ class SchnorrTests(unittest.TestCase):
                     changed = replace(tx, outputs=(output, tx.outputs[1]))
                     expected = {1: [False, False], 2: [True, True], 3: [False, True]}[sighash & 31]
                     self.check_spend(changed, self.parents, expected)
+
+    def test_payment_to_native_p2pkh_outputs(self):
+        recipients = tuple(native_coin(f"schnorr/recipient/{index}", 6_600).output for index in range(3))
+        for version, sighash in ((1, 0x41), (2, 0x61)):
+            with self.subTest(version=version, sighash=hex(sighash)):
+                unsigned = replace(self.unsigned, version=version, outputs=recipients)
+                signed = self.sign_two_inputs(unsigned, sighash)
+                self.assertEqual(signed.outputs, recipients)
+                ordinary, companion = authorization_codes()
+                for index, txin in enumerate(signed.inputs):
+                    auth = prepare_authorization(unsigned, index, 10_000, sighash,
+                                                 ordinary_code=ordinary, companion_code=companion)
+                    fields, alt = evaluate(txin.script)
+                    self.assertEqual(txin.script, auth.witness(fields[1]))
+                    self.assertFalse(alt)
+                self.check_spend(signed, self.parents, [True, True])
+                changed = replace(signed, outputs=(*recipients[:-1], replace(recipients[-1], value=6_599)))
+                self.check_spend(changed, self.parents, [False, False])
+
+    def test_otda_constructor_matches_every_frozen_output_template(self):
+        for version in TEMPLATE_DIRS:
+            with self.subTest(version=version):
+                pattern = reconstruction_for_version(version)
+                fixed, alt = evaluate(pattern.program, [b"outer"])
+                self.assertEqual((fixed, alt), ([b"outer", *pattern.fixed_parts], []))
+                for owner in (bytes(20), bytes(range(20)), bytes([255]) * 20):
+                    lock = lock_for_owner(owner, version=version)
+                    self.assertEqual(pattern.match(lock), (owner,))
+                    self.assertEqual(fixed[1] + owner + fixed[2], lock)
+                    self.assertIsNone(pattern.match(lock[:-1] + b"\x51"))
+
+    def test_otda_constructor_preserves_literal_witness_and_mixed_outputs(self):
+        older = Output(8_500, lock_for_public_key(self.public_keys[0], version="v0.16.0"))
+        native = native_coin("schnorr/constructor/native", 1_000).output
+        outputs = self.unsigned.outputs[0], native, older
+        for version, flag, expected in (
+            (1, 0x61, (False, False)), (2, 0x41, (False, False)),
+            (2, 0x61, (True, True)), (2, 0xe1, (True, True)), (2, 0x62, (False, False)),
+            (2, 0x63, (True, False)), (2, 0xe3, (True, False)),
+        ):
+            with self.subTest(version=version, flag=hex(flag)):
+                tx = replace(self.unsigned, version=version, outputs=outputs)
+                literal = self.sign_two_inputs(tx, flag, compress_otda=False)
+                signed = self.sign_two_inputs(tx, flag)
+                for i, (encoded, original) in enumerate(zip(signed.inputs, literal.inputs, strict=True)):
+                    self.assertEqual(evaluate(encoded.script), evaluate(original.script))
+                    if expected[i]:
+                        self.assertLess(len(encoded.script), len(original.script))
+                    else:
+                        self.assertEqual(encoded.script, original.script)
+                self.check_spend(signed, self.parents, [True, True])
+                if any(expected):
+                    self.check_spend(literal, self.parents, [True, True])
+                if flag & 31 == 1:
+                    self.check_spend(replace(signed, outputs=tuple(reversed(outputs))), self.parents, [False, False])
+        activation = int(os.environ.get("SCRIPT_LAB_CHRONICLE_HEIGHT", "2"))
+        context = dict(spend_height=activation + 1, activation_height=activation,
+                       utxo_heights=(activation - 1,) * 2)
+        rebuilt = self.sign_two_inputs(replace(self.unsigned, outputs=outputs), 0x61)
+        validate_at_heights(rebuilt, self.parents, **context)
+        if self.node:
+            self.assertEqual(self.node.verdicts(rebuilt, self.parents, **context), [True, True])
+
+    def test_bip143_spend_before_chronicle(self):
+        signed = self.sign_two_inputs(self.unsigned, 0x41)
+        activation_height = int(os.environ.get("SCRIPT_LAB_CHRONICLE_HEIGHT", "2"))
+        # Genesis starts at height 1. The default Chronicle height leaves one eligible block.
+        height = activation_height - 1
+        context = dict(spend_height=height, activation_height=activation_height, utxo_heights=(height, height))
+        validate_at_heights(signed, self.parents, **context)
+        if self.node:
+            self.assertEqual(self.node.verdicts(signed, self.parents, **context), [True, True])
 
     def test_payment_and_preflight(self):
         parent = self.parents[0].serialize()
@@ -194,6 +283,10 @@ class SchnorrTests(unittest.TestCase):
             sign_payment(parent, 1, (target,), 99, public, unexpected)
         with self.assertRaisesRegex(ValueError, "active spend context"):
             sign_spend(self.unsigned, 0, parent, public, unexpected, sighash=0x61)
+        with self.assertRaisesRegex(ValueError, "active spend context"):
+            sign_spend(self.unsigned, 0, parent, public, unexpected, compress_otda=True)
+        with self.assertRaisesRegex(ValueError, "must be a boolean"):
+            sign_spend(self.unsigned, 0, parent, public, unexpected, compress_otda=1)
         with self.assertRaisesRegex(ValueError, "same-index"):
             sign_spend(replace(self.unsigned, outputs=(target,)), 1, self.parents[1].serialize(),
                        self.public_keys[1], unexpected, sighash=0x43)
@@ -210,27 +303,39 @@ class SchnorrTests(unittest.TestCase):
         self.assertEqual(raw, reference[:offset] + owner + reference[offset + 20:])
         self.assertEqual(compiled_template(owner), (raw, offset))
         self.assertEqual(recognize_template(raw), (TEMPLATE_VERSION, owner))
-        self.assertLess(len(raw), 30_398)
+        self.assertLess(len(raw), len(lock_for_owner(bytes(20), version="v0.16.0")))
 
     def test_mixed_template_spend(self):
-        version = "v0.6.0"
         public = self.public_keys[0]
-        raw = lock_for_public_key(public, version=version)
-        self.assertEqual(sha256(lock_for_owner(bytes(20), version=version)).hexdigest(),
-                         "12c75b80b65e983369998e8c2ba581979bb1d4cc67c99a4f8694394447a6a877")
-        self.assertEqual(recognize_template(raw), (version, owner_hash(public)))
-        self.assertIsNone(recognize_template(raw[:-1] + b"\x51"))
         first, second = self.parents
-        legacy = replace(first.outputs[1], script=raw)
-        parents = (replace(first, outputs=(first.outputs[0], legacy)), second)
         first_input, second_input = self.unsigned.inputs
-        inputs = (replace(first_input, txid=parents[0].txid_wire()), second_input)
-        unsigned = replace(self.unsigned, inputs=inputs)
-        for sighash in MODES:
-            with self.subTest(sighash=hex(sighash)):
-                signed = self.sign_two_inputs(unsigned, sighash, parents)
-                self.check_spend(signed, parents, [True, True])
-                self.check_spend(replace(signed, locktime=1), parents, [False, False])
+        versions = {
+            "v0.6.0": "12c75b80b65e983369998e8c2ba581979bb1d4cc67c99a4f8694394447a6a877",
+            "v0.7.0": "b1aff80ac6a66e83cf915f6636b54fd7853b2803543d2410a19840efb50ad966",
+            "v0.8.0": "eafc3937ba802a3fcfeae3bf7a814a747be3c797906c86e330cd68001f3509e5",
+            "v0.9.0": "8c58eb80a5adb4aaf1256db2f12e0f4bbc551885e919200350621481a45de0a3",
+            "v0.10.0": "48411a610a80dbeba846332ef28f78c7ee3dedeaa131e82faa89f6cd24b88f83",
+            "v0.11.0": "88b7b3a46548ca376a29fe04bb0deb11f2a503d9cf5de92e89604aa490660fdc",
+            "v0.12.0": "0c867581a116fd86be8aaa6f3c700742d265df4473e77ba9f2344c13122841e2",
+            "v0.13.0": "0c09881b86ddfa644701e4f2bd6bdeee5930095fcdfdaf07e2ce38be2f960f27",
+            "v0.14.0": "c70c3b816478caa5fa6086a770484e629d1df75c1477d8436875ea78c1f09f76",
+            "v0.15.0": "abf968180a0f6a84422bfe02d9e4b5533b2cdf7a1df9a59bf5afae6343965c26",
+            "v0.16.0": "1b4d0170a8a4677242400ca046319b8d20c26881391503475178e013d6cba2c3",
+        }
+        for version, checksum in versions.items():
+            raw = lock_for_public_key(public, version=version)
+            self.assertEqual(sha256(lock_for_owner(bytes(20), version=version)).hexdigest(), checksum)
+            self.assertEqual(recognize_template(raw), (version, owner_hash(public)))
+            self.assertIsNone(recognize_template(raw[:-1] + b"\x51"))
+            legacy = replace(first.outputs[1], script=raw)
+            parents = (replace(first, outputs=(first.outputs[0], legacy)), second)
+            inputs = (replace(first_input, txid=parents[0].txid_wire()), second_input)
+            unsigned = replace(self.unsigned, inputs=inputs)
+            for sighash in MODES:
+                with self.subTest(version=version, sighash=hex(sighash)):
+                    signed = self.sign_two_inputs(unsigned, sighash, parents)
+                    self.check_spend(signed, parents, [True, True])
+                    self.check_spend(replace(signed, locktime=1), parents, [False, False])
 
     def test_forth_unlock_preserves_witness_encoding(self):
         witness = (b"x" * 32, b"y" * 32, b"s" * 64, b"r" * 32)
@@ -241,6 +346,20 @@ class SchnorrTests(unittest.TestCase):
                     auth = SpendAuthorization(0x63 if companion else 0x41, preimage, companion)
                     self.assertEqual(compile_unlock(preimage, companion, *witness),
                                      auth.witness(b"".join(witness)))
+
+    def test_fixed_width_byte_reversal(self):
+        contract = _contract()
+        reverse = contract.emit("script-reverse32", b"")
+        setup = push(b"saved") + asm("OP_TOALTSTACK")
+        for value in (bytes(range(32)), bytes(32), b"\xff" + bytes(31)):
+            self.assertEqual(evaluate(setup + reverse, [b"prefix", value]),
+                             ([b"prefix", value[::-1]], [b"saved"]))
+
+        reverse_fields = contract.emit("bip340-reverse-challenge-fields", b"")
+        data = bytes(range(192))
+        expected = b"".join(data[start:start + 32][::-1] for start in range(0, 192, 32))
+        self.assertEqual(evaluate(setup + reverse_fields, [b"prefix", data]),
+                         ([b"prefix", expected], [b"saved"]))
 
     def test_forth_lock_accepts_unpaired_otda_companion(self):
         unsigned = replace(self.unsigned, outputs=self.unsigned.outputs[:1])
@@ -264,6 +383,7 @@ class SchnorrTests(unittest.TestCase):
         contract = _contract()
         double = contract.emit("secp256k1-double", b"")
         pair = contract.emit("secp256k1-double-pair", b"")
+        pair_adjacent = contract.emit("secp256k1-double-pair-with-field", b"", 1)
         add = contract.emit("secp256k1-add", b"")
         points = [(0, 1, 0)]
         for scalar in range(1, 17):
@@ -286,6 +406,8 @@ class SchnorrTests(unittest.TestCase):
                 self.assertEqual((separate_alt, combined_alt), ([], []))
                 self.assertEqual([decode_num(item) % FIELD for item in separate],
                                  [decode_num(item) % FIELD for item in combined])
+                adjacent = [b"outer", encode_num(FIELD), *map(encode_num, point)]
+                self.assertEqual(evaluate(pair_adjacent, adjacent), ([b"outer", *combined], []))
 
     def test_lambda_scalar_split(self):
         split = _contract().emit("secp256k1-lambda-split", b"")
@@ -306,8 +428,11 @@ class SchnorrTests(unittest.TestCase):
         self.assertEqual(len(signs), 4)
 
     def test_affine_add_matches_complete_addition(self):
-        full = _contract().emit("secp256k1-add", b"")
-        mixed = _contract().emit("secp256k1-add-affine", b"")
+        contract = _contract()
+        full = contract.emit("secp256k1-add", b"")
+        mixed = contract.emit("secp256k1-add-affine", b"")
+        full_adjacent = contract.emit("secp256k1-add-with-field", b"", 1)
+        mixed_adjacent = contract.emit("secp256k1-add-affine-with-field", b"", 1)
         for a in (0, 1, -1, 7):
             for b in (1, -1, 7):
                 with self.subTest(a=a, b=b):
@@ -319,13 +444,57 @@ class SchnorrTests(unittest.TestCase):
                     else:
                         left = (0, 1, 0)
                     stack = [encode_num(FIELD), b"outer", *map(encode_num, (*left, bx, by))]
-                    self.assertEqual(evaluate(mixed, stack), evaluate(full, [*stack, encode_num(1)]))
+                    expected, alt = evaluate(mixed, stack)
+                    self.assertEqual((expected, alt), evaluate(full, [*stack, encode_num(1)]))
+                    adjacent = [stack[1], stack[0], *stack[2:]]
+                    expected_adjacent = ([expected[1], expected[0], *expected[2:]], alt)
+                    self.assertEqual(evaluate(mixed_adjacent, adjacent), expected_adjacent)
+                    self.assertEqual(evaluate(full_adjacent, [*adjacent, encode_num(1)]), expected_adjacent)
+
+    @staticmethod
+    def window_stream(scalars):
+        return bytes(sum(((value >> shift) & 3) << (2 * lane) for lane, value in enumerate(scalars))
+                     for shift in range(126, -1, -2))
+
+    def test_window_stream_packing(self):
+        pack = _contract().emit("bip340-pack-windows", b"")
+        pack_fixed_scalar = _contract().emit("secp-window-pack-fixed-scalar", b"")
+
+        def check_packing(lanes, expected):
+            low, high, first, second = lanes
+            fixed = (low | (high << 128), first, second)
+            for script, values in ((pack, lanes), (pack_fixed_scalar, fixed)):
+                self.assertEqual(evaluate(script, [b"outer", *map(encode_num, values)]),
+                                 ([b"outer", expected], []))
+
+        for lane in range(4):
+            for digit in range(64):
+                with self.subTest(lane=lane, digit=digit):
+                    values = [0] * 4
+                    values[lane] = 3 << (2 * digit)
+                    expected = bytearray(64)
+                    expected[63 - digit] = 3 << (2 * lane)
+                    check_packing(values, bytes(expected))
+        rng = Random(340)
+        vectors = ([0] * 4, [HALF_RADIX - 1] * 4,
+                   *(tuple(rng.getrandbits(128) for _ in range(4)) for _ in range(64)))
+        for scalars in vectors:
+            check_packing(scalars, self.window_stream(scalars))
 
     def test_joint_window_table_and_selectors(self):
         contract = _contract()
         split = contract.emit("secp256k1-lambda-split", b"")
-        table = contract.emit("bip340-joint-window-table", b"")
+        order = number(ORDER) + asm("OP_TOALTSTACK")
+        table = contract.emit("bip340-joint-window-table", order)
+        first = contract.emit("bip340-first-window", b"")
         step = contract.emit("bip340-joint-window-step", b"")
+        depths = contract.emit("bip340-window-depths", b"")
+        (scale_bytes,), alt = evaluate(contract.emit("secp256k1-scale-root", b""))
+        self.assertEqual(alt, [])
+        scale = decode_num(scale_bytes)
+        self.assertEqual(21 * pow(scale, 6, FIELD) % FIELD, 1)
+        scale_x, scale_y = pow(scale, 2, FIELD), pow(scale, 3, FIELD)
+        unscale_x, unscale_y = pow(scale_x, -1, FIELD), pow(scale_y, -1, FIELD)
 
         def check_point(coordinates, scalar):
             x, y, z = (decode_num(item) % FIELD for item in coordinates)
@@ -334,45 +503,74 @@ class SchnorrTests(unittest.TestCase):
                 self.assertNotEqual(y, 0)
             else:
                 inverse = pow(z, -1, FIELD)
-                self.assertEqual((x * inverse % FIELD, y * inverse % FIELD), affine_generator_multiple(scalar))
+                affine = (x * inverse * unscale_x % FIELD, y * inverse * unscale_y % FIELD)
+                self.assertEqual(affine, affine_generator_multiple(scalar))
 
-        for public_multiple, s, k in ((1, ORDER - 1, 13), (-1, HALF_RADIX, ORDER),
-                                      (2, 0, ORDER // 2), (11, HALF_RADIX + 17, ORDER // 3)):
+        def fixed_depth(index):
+            return 3 + 2 * index if index else 0
+
+        def variable_depth(index):
+            return 82 - 3 * index if index else 0
+
+        def depth_pairs(windows):
+            return bytes(depth for digit in windows
+                         for depth in (variable_depth(digit >> 4), fixed_depth(digit & 15)))
+
+        depth_vectors = [bytes(64), b"\xff" * 64]
+        depth_vectors.extend(bytes(range(start, start + 64)) for start in range(0, 256, 64))
+        for windows in depth_vectors:
+            self.assertEqual(evaluate(depths, [windows]), ([depth_pairs(windows)], []))
+
+        cases = (
+            (1, ORDER - 1, 13), (-1, HALF_RADIX, ORDER),
+            (2, 0, ORDER // 2), (5, HALF_RADIX + 17, ORDER // 4),
+            (-7, HALF_RADIX - 1, ORDER // 7), (11, ORDER - 2, ORDER // 8),
+        )
+        signs = set()
+        for public_multiple, s, k in cases:
             px, py = affine_generator_multiple(public_multiple)
             original = [FIELD, 123, 456, px, py, s, k]
             scalars, _ = evaluate(split, [encode_num(k)])
             k1, k2 = map(decode_num, scalars)
+            if k1 and k2:
+                signs.add((k1 < 0, k2 < 0))
             p = -public_multiple if k1 < 0 else public_multiple
             q = LAMBDA * (-public_multiple if k2 < 0 else public_multiple)
             built, alt = evaluate(table, list(map(encode_num, original)))
-            self.assertEqual(alt, [])
-            self.assertEqual(len(built), 86)
-            self.assertEqual(list(map(decode_num, built[:3])), original[:3])
-            self.assertEqual(list(map(decode_num, built[-8:])),
-                             [s % HALF_RADIX, s // HALF_RADIX, abs(k1), abs(k2), 1 << 126, 0, 1, 0])
+            scalar_lanes = (s % HALF_RADIX, s // HALF_RADIX, abs(k1), abs(k2))
+            windows = self.window_stream(scalar_lanes)
+            self.assertEqual(alt, [depth_pairs(windows)])
+            self.assertEqual(len(built), 81)
+            self.assertEqual(list(map(decode_num, built[:2])), [123 * scale_x % FIELD, 456 * scale_y % FIELD])
+            self.assertEqual(list(map(decode_num, built[-4:])), [FIELD, 0, 1, 0])
             for index in range(1, 16):
                 with self.subTest(public_multiple=public_multiple, table_index=index):
                     high, low = divmod(index, 4)
-                    check_point(built[3 * index:3 * index + 3], high * q + low * p)
-                    start = 48 + 2 * (index - 1)
-                    self.assertEqual(tuple(map(decode_num, built[start:start + 2])),
+                    start = 2 + 3 * (index - 1)
+                    check_point(built[start:start + 3], high * q + low * p)
+                    start = 47 + 2 * (15 - index)
+                    x, y = map(decode_num, built[start:start + 2])
+                    self.assertEqual((x * unscale_x % FIELD, y * unscale_y % FIELD),
                                      affine_generator_multiple(high * HALF_RADIX + low))
 
-            selectors = {(i, 0) for i in range(16)} | {(0, i) for i in range(16)} | {(i, 15 - i) for i in range(16)}
-            for fixed, variable in sorted(selectors):
+            for fixed, variable in product(range(16), repeat=2):
                 with self.subTest(public_multiple=public_multiple, fixed=fixed, variable=variable):
                     high, low = divmod(fixed, 4)
                     vhigh, vlow = divmod(variable, 4)
-                    digits = [low, high, vlow, vhigh]
-                    initial = [*digits, 1, 0, 1, 0]
-                    selected, alt = evaluate(step, built[:-8] + list(map(encode_num, initial)))
-                    self.assertEqual(alt, [])
-                    self.assertEqual(selected[:-8], built[:-8])
-                    self.assertEqual(list(map(decode_num, selected[-8:-3])), [*digits, 0])
-                    check_point(selected[-3:], high * HALF_RADIX + low + vhigh * q + vlow * p)
+                    remaining = b"\x25\x21"
+                    stream = bytes([variable_depth(variable), fixed_depth(fixed)]) + remaining
+                    setup = push(stream) + asm("OP_TOALTSTACK")
+                    scalar = high * HALF_RADIX + low + vhigh * q + vlow * p
+                    for window in (first, step):
+                        selected, alt = evaluate(setup + window, built)
+                        self.assertEqual(alt, [remaining])
+                        self.assertEqual(selected[:-3], built[:-3])
+                        check_point(selected[-3:], scalar)
+        self.assertEqual(signs, set(product((False, True), repeat=2)))
 
     def test_joint_multiplication_scalar_edges(self):
-        multiply = _contract().emit("bip340-joint-multiply", b"")
+        order = number(ORDER) + asm("OP_TOALTSTACK")
+        multiply = _contract().emit("bip340-joint-multiply", order)
         px, py = affine_generator_multiple(1)
         cases = ((0, ORDER), (0, ORDER - 1), (1, ORDER), (1, ORDER - 1),
                  (HALF_RADIX - 1, 1), (HALF_RADIX, ORDER - HALF_RADIX),

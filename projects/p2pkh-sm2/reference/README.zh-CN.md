@@ -61,20 +61,155 @@ OTDA，包括混用签名模式的输入、全 SM2 的两进两出付款、由�
 [标准向量](../versions/v1.0.0/sm2-standard.json) · [BSV Node 源码](https://github.com/bitcoin-sv/bitcoin-sv/tree/6504a3aff65ba97c0f6c80962b033e35ecbfed4b)
 · [chain-gang 源码](https://github.com/linzhm/chain-gang/tree/8b60b71a12a69fdcb465d3e627dbf6f43d6ed081)
 
+<a name="point-kernels"></a>
+
+## 复现点运算字节码
+
+逐字节比对时，使用含编译器提交 `64624db` 的固定 SM2 源码快照。后续版本的栈调度器可能为同一公式生成不同字节。验收套件用有符号坐标向量分别检查当前编译结果和固定内核，并按布局指纹核验完整锁定脚本。[固定源码快照](https://github.com/linzhm/4thGraph/tree/1462b96d8ba2bf9edf365857d8785f342a91b227)
+
+模板 `5` 用 Forth 优化编译器编译齐次坐标点运算公式，沿用模板 `3` 和 `4` 的有符号余数与无穷远点处理。在仓库根目录生成并比对已固定的字节码。
+
+```sh
+PYTHONPATH=src:. python projects/p2pkh-sm2/reference/point_kernels.py /tmp/sm2-point-kernels.json
+cmp /tmp/sm2-point-kernels.json projects/p2pkh-sm2/versions/v1.5.0/point-kernels.json
+```
+
+模板 `8` 使用独立的五次倍点字节码。它只检查一次无穷远点，并复用域模数。在仓库根目录生成并比对。
+
+```sh
+PYTHONPATH=src:. python projects/p2pkh-sm2/reference/point_kernels.py --window /tmp/sm2-window-kernel.json
+cmp /tmp/sm2-window-kernel.json projects/p2pkh-sm2/versions/v1.9.0/window-kernel.json
+```
+
+模板 `9` 为固定生成元使用仿射点加内核。
+
+```sh
+PYTHONPATH=src:. python projects/p2pkh-sm2/reference/point_kernels.py --affine /tmp/sm2-affine-kernel.json
+cmp /tmp/sm2-affine-kernel.json projects/p2pkh-sm2/versions/v1.10.0/affine-kernel.json
+```
+
+[点运算公式](point-formulas.fth) · [编译入口](point_kernels.py)
+
+<a name="window-tuning"></a>
+
+## 复现模板 10 的编译优化
+
+模板 `10` 把 `3b` 和域模数保留在标量乘法的累加点下方。锁定脚本在进入窗口或构建公钥表的投影加点前自行放入这两个常量。每次运算返回带符号余数，继续满足下次调用的坐标范围。固定生成元表提供右操作数的仿射坐标。五次倍点在进入公式前检查无穷远点。
+
+固定比较使用提交 `64624db` 上的 4thGraph `0.2.7`，评估显式终端编译阶段和有限条有序规则。每个候选都与模板 `9` 的运算结果逐字节比对，共 16 个用例，涵盖无穷远点、倍点、逆点、负投影比例和带符号余数的边界。`rewrite`、`share`、`stack`、`search` 组合的窗口代码最短。加入 `common-values` 后持平，其余试验规则组合更长。在固定快照执行以下命令可以复现选定内核与栈调度的哈希。[固定源码快照](https://github.com/linzhm/4thGraph/tree/1462b96d8ba2bf9edf365857d8785f342a91b227)
+
+```sh
+export PYTHONPATH=src:.
+python -m fourthgraph.workflow.protocol --version
+python projects/p2pkh-sm2/reference/tune_window.py /tmp/sm2-window-tuning.json
+cmp /tmp/sm2-window-tuning.json projects/p2pkh-sm2/versions/v1.11.0/window-tuning.json
+python projects/p2pkh-sm2/reference/point_kernels.py --carried /tmp/sm2-window-kernels.json
+cmp /tmp/sm2-window-kernels.json projects/p2pkh-sm2/versions/v1.11.0/window-kernels.json
+```
+
+[窗口公式](point-window.fth) · [4thGraph skill](../../../skills/4thgraph/SKILL.md) · [整笔交易实测](../versions/v1.11.0/measurements.json)
+
+<a name="byte-tuning"></a>
+
+## 复现定长字节字段的编译绑定
+
+锁定脚本把两个签名分量、两个公钥坐标、SM2 消息摘要和交易哈希拼接。编译器链接的批量反转片段为 149 字节，包含 192 字节的精确长度检查。编译器逐字段反转的候选占 779 字节。批量路径保留六个字段的顺序，将各字段转换为无符号数值。PUSHTX 的 DER 编码把单个 32 字节值扩展成六份，复用同一段反转代码后取第一份结果，缩小 OTDA 构造器。特殊 SINGLE 路径用重复的种子字节生成精确的 32 字节全零字段。
+
+```sh
+PYTHONPATH=src:. python projects/p2pkh-sm2/reference/byte_fields.py /tmp/sm2-byte-kernels.json \
+  --report /tmp/sm2-byte-tuning.json
+cmp /tmp/sm2-byte-kernels.json projects/p2pkh-sm2/versions/v1.11.0/byte-kernels.json
+cmp /tmp/sm2-byte-tuning.json projects/p2pkh-sm2/versions/v1.11.0/byte-tuning.json
+```
+
+[Forth 调用](byte-fields.fth) · [编译绑定记录](../versions/v1.11.0/byte-tuning.json) · [字节布局库](../../../docs/optimization-paths.zh-CN.md#批量换序与重复常量)
+
 <a name="otda-constructor"></a>
 
 ## 复现 OTDA 构造器
 
-钱包加载固定构造器，并按布局清单核对字节数和 SHA-256。离线生成器先使用 SM3 的具名片段和点运算块。为模板 `2` 生成构造器时，它评估复制片段的缓存收益，尝试按使用频率排列缓存，并选择序列化后最短的编码。在仓库根目录生成并比对文件。
+钱包加载固定构造器，并按布局清单核对字节数和 SHA-256。离线生成器从点运算块开始，从模板中查找可复用片段。模板 `1` 至 `5` 还预先提供 SM3 的具名片段。为模板 `2` 至 `10` 生成构造器时，它评估复制片段的缓存收益，并尝试按使用频率排列缓存。模板 `10` 使用标准库的 `script-pick-depth` 从已有缓存复制片段来初始化后续条目，再比较一批缓存删减和新增方案。重复片段会比较逐次加倍、在主栈保留重复单元，以及加倍后裁剪。裁剪方案的临时数据需放得进待重建的后缀尺寸。各方案先逐字节复原同一锁定脚本，再按序列化长度排序。
+
+上一轮探测用 Chronicle 切片指令把构造器缩至 7,340 字节，但 BSV Node 拒绝了测试中标为激活前创建的上一输出。选定的 7,417 字节方案使用 `OP_SPLIT`，通过了不同创建高度的上一输出回放和最新模板交易矩阵。在仓库根目录生成并比对文件。
 
 ```sh
 python projects/p2pkh-sm2/reference/generate_otda_constructor.py /tmp/sm2-otda.hex
 cmp /tmp/sm2-otda.hex projects/p2pkh-sm2/versions/v1.1.0/otda-constructor.hex
 python projects/p2pkh-sm2/reference/generate_otda_constructor.py --version 2 /tmp/sm2-otda-v2.hex
 cmp /tmp/sm2-otda-v2.hex projects/p2pkh-sm2/versions/v1.2.0/otda-constructor.hex
+python projects/p2pkh-sm2/reference/generate_otda_constructor.py --version 3 /tmp/sm2-otda-v3.hex
+cmp /tmp/sm2-otda-v3.hex projects/p2pkh-sm2/versions/v1.3.0/otda-constructor.hex
+python projects/p2pkh-sm2/reference/generate_otda_constructor.py --version 4 /tmp/sm2-otda-v4.hex
+cmp /tmp/sm2-otda-v4.hex projects/p2pkh-sm2/versions/v1.4.0/otda-constructor.hex
+python projects/p2pkh-sm2/reference/generate_otda_constructor.py --version 5 /tmp/sm2-otda-v5.hex
+cmp /tmp/sm2-otda-v5.hex projects/p2pkh-sm2/versions/v1.5.0/otda-constructor.hex
+python projects/p2pkh-sm2/reference/generate_otda_constructor.py --version 6 /tmp/sm2-otda-v6.hex
+cmp /tmp/sm2-otda-v6.hex projects/p2pkh-sm2/versions/v1.6.0/otda-constructor.hex
+python projects/p2pkh-sm2/reference/generate_otda_constructor.py --version 7 /tmp/sm2-otda-v7.hex
+cmp /tmp/sm2-otda-v7.hex projects/p2pkh-sm2/versions/v1.7.0/otda-constructor.hex
+python projects/p2pkh-sm2/reference/generate_otda_constructor.py --version 8 /tmp/sm2-otda-v8.hex
+cmp /tmp/sm2-otda-v8.hex projects/p2pkh-sm2/versions/v1.9.0/otda-constructor.hex
+python projects/p2pkh-sm2/reference/generate_otda_constructor.py --version 9 /tmp/sm2-otda-v9.hex
+cmp /tmp/sm2-otda-v9.hex projects/p2pkh-sm2/versions/v1.10.0/otda-constructor.hex
+python projects/p2pkh-sm2/reference/generate_otda_constructor.py --version 10 /tmp/sm2-otda-v10.hex \
+  --report /tmp/sm2-constructor-tuning.json
+cmp /tmp/sm2-otda-v10.hex projects/p2pkh-sm2/versions/v1.11.0/otda-constructor.hex
+cmp /tmp/sm2-constructor-tuning.json projects/p2pkh-sm2/versions/v1.11.0/constructor-tuning.json
 ```
 
 构造器测试逐字节比对预映像、公钥和签名三项栈值，并由 BSV Node 和 chain-gang 验证完整花费。[布局与指纹](../versions/v1.1.0/layout.json) · [钱包接入](../docs/sdk.zh-CN.md)
+
+模板 `10` 的重建交易签入至少四个输入时，编译器也会比较输入前缀的两种编码。缓存方案在每个输入的 32 字节交易 ID 后追加相同的字节串，复用 OTDA 序列化器提供的实际签名输入。计入压栈、复制和清理指令后，钱包选择较短的编码。最新矩阵覆盖混入原生 P2PKH 输入、不同序列号和配对 SINGLE。[输入前缀编译器](../../../src/fourthgraph/compiler/preimage.py) · [尺寸对比](../versions/v1.11.0/measurements.json)
+
+<a name="mixed-otda-constructor"></a>
+
+## 复现共享 OTDA 构造器
+
+生成器用现有片段编码器压缩拼接后的两个后缀，再把重建结果拆开，按模板编号依次输出两组前缀和后缀。钱包用这些片段按交易顺序序列化输出。在仓库根目录生成并逐字节比对 JSON。
+
+```sh
+python projects/p2pkh-sm2/reference/generate_otda_constructor.py --mixed /tmp/sm2-otda-mixed.json
+cmp /tmp/sm2-otda-mixed.json projects/p2pkh-sm2/versions/v1.8.0/mixed-otda-constructor.json
+```
+
+混合付款测试对照共享构造器、独立构造器和原样编码，并让两个引擎验证完整输入。BSV Node 还会用 Chronicle 激活前创建的上一输出验证共享编码。[测试](test_otda_constructor.py) · [测量记录](../versions/v1.8.0/measurements.json)
+
+<a name="latest-template-coverage"></a>
+
+## 复现最新模板交易覆盖
+
+在仓库根目录用固定依赖的 SM2 Python 环境运行。两个引擎逐例验证自动与原样编码，测试脚本记录可复现的交易 ID 和大小。
+
+```sh
+bash tools/verify_node.sh -- python projects/p2pkh-sm2/reference/test_otda_matrix.py \
+  --template 10 --report /tmp/sm2-latest-template-coverage.json
+cmp /tmp/sm2-latest-template-coverage.json projects/p2pkh-sm2/versions/v1.11.0/latest-template-coverage.json
+```
+
+将命令改用 `--template 9`、`--template 8` 或 `--template 7` 可复现以前的报告。每次运行中，SM2 上一输出和可识别的 SM2 收款输出均使用同一种模板。模板 `10` 的 38 例矩阵包括十二进一出和二十四进一出的 OTDA ALL，也覆盖 ALL 和 SINGLE 的重复输入尾部。[模板 9 覆盖报告](../versions/v1.10.0/latest-template-coverage.json) · [模板 8 覆盖报告](../versions/v1.9.0/latest-template-coverage.json) · [模板 7 覆盖报告](../versions/v1.8.0/latest-template-coverage.json)
+
+尺寸对比还复放四十进一出的 OTDA ALL。每笔交易的输入和输出使用同一个 SM2 模板，两个版本都用报告中指定的编译器提交构建。
+
+```sh
+bash tools/verify_node.sh -- python projects/p2pkh-sm2/reference/measure_template_sizes.py \
+  --compiler-commit a003c4f2e20b3ad53a46c378568531dd4b6c5856 --report /tmp/sm2-template-sizes.json
+cmp /tmp/sm2-template-sizes.json projects/p2pkh-sm2/versions/v1.11.0/measurements.json
+```
+
+<a name="p2pkh-sponsorship"></a>
+
+## 复现有资金的 P2PKH 补费
+
+每组策略启动一个全新的隔离 regtest 节点。两份报告分别记录内存池接收和入块结果。放宽策略组还通过 BSV Node 和 chain-gang 验证完整脚本。
+
+```sh
+bash tools/verify_node.sh --profile default -- python projects/p2pkh-sm2/reference/verify_fee_sponsorship.py \
+  --template 10 --report /tmp/sm2-p2pkh-default.json
+bash tools/verify_node.sh --profile raised -- python projects/p2pkh-sm2/reference/verify_fee_sponsorship.py \
+  --template 10 --report /tmp/sm2-p2pkh-raised.json
+```
+
+入金交易 ID 和签名受本地生成的区块影响。复现时可核对接收、入块结果和字节数。
 
 ## SignedData 付款接入
 

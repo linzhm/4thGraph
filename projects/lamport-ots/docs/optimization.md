@@ -34,6 +34,22 @@ The compact profile keeps the 6,088-byte Forth reconstruction core and uses the 
 
 For the first input of each 2×2 fixture, the main-stack peak increases from 8 to 32 items and the altstack peak drops from 34 to 5. Combined payload peaks at 16,707 bytes in both BIP143 fixtures. OTDA's shorter signing preimage lowers its peak from 44,795 to 43,947 bytes. The development evaluator counts payload and stack items. A focused test checks that each native call receives the original signature and public-key bytes in both paths. [Binding code](../../../src/fourthgraph/bsv/pushtx.py) · [Verification](validation.md#compact-binding-replay-on-latest-main)
 
+## OTDA unlocking reconstruction
+
+The compact lock repeats the 190-byte Forth byte step 32 times. The unlocking program pushes the step once and doubles it with five `OP_DUP OP_CAT` pairs. A 928-byte program produces the two fixed parts of the 6,830-byte lock as data. The shared reconstruction helper inserts each output's commitment in its original position and emits the serialized outputs in order. It matches every fixed byte before using the pattern and copies unmatched outputs verbatim. The signer still authorizes the exact preimage. The program reproduces the same `[preimage, proof, selector]` stack. [Template construction](../reference/script.py) · [Shared reconstruction](../../../src/fourthgraph/bsv/otda_reconstruction.py)
+
+The wallet offers reconstruction as an opt-in encoding for Chronicle version-2 transactions. It covers OTDA ALL and paired OTDA SINGLE, including their ANYONECANPAY variants. It uses the literal encoding for other modes and whenever the reconstructed witness is at least as large as the literal one. A serialized witness change changes the txid. [SDK options](sdk.en.md#reconstruct-otda-preimages) · [Security and recovery](security.md#unconfirmed-parent-txids)
+
+For OTDA ALL 2×2, each input falls from 30,171 to 17,526 bytes. The transaction drops by **25,290 bytes (34.1%)** to 48,830. The benchmark still observes a 43,947-byte peak combined stack payload because Script consumes the full reconstructed preimage. In a native P2PKH exit the wallet uses the literal encoding because no output matches the compact lock.
+
+## Version 0.2.0 candidate
+
+The candidate splits both 32-byte proof fields before hashing the selected secret. This leaves the selected hash above its sibling, so `OP_NOTIF` swaps them for a clear bit. The same byte mask produces a canonical boolean. One fewer `OP_SWAP` in each of 256 pair steps saves 256 bytes, and the compiled digest-byte fragment shrinks from 190 to 182 bytes.
+
+The sighash guard requires `(type & 0x5c) == 0x40` and a nonzero `(type & 3)`. This requires ForkID, clears the three reserved bits and admits the three base modes with Chronicle and ANYONECANPAY as independent options. The companion branch masks off ANYONECANPAY and requires `0x43`. The guard still requires zero high type bytes and applies the same preimage shape and scriptCode checks. These changes save another 49 bytes in the guard. [Forth source](../reference/committed-verifier.fth) · [Authorization code](../../../src/fourthgraph/bsv/pushtx.py)
+
+The SDK creates `committed-key-forth-v0.2.0` from a pinned 6,525-byte template with one 32-byte commitment field. Its 871-byte OTDA program is pinned alongside it. With reconstruction enabled, the wallet compares both single-template programs and a mixed program for old compact and v0.2.0 outputs, then selects the shortest usable encoding. In the 2×2 workloads this saves 610 bytes in BIP143 ALL and 724 bytes in reconstructed OTDA ALL relative to the previous compact profile. Direct exits to native P2PKH still carry a 16,384-byte proof per Lamport input. [Pinned layout](../versions/v0.2.0/layout.json) · [Versioned measurements](../versions/v0.2.0/measurements.json)
+
 ## Transaction and lifecycle costs
 
 `0x41` is BIP143 ALL. `0x61` is Chronicle OTDA ALL. The 2×2 workload spends two Lamport outputs and creates two new ones under the same template. Marginal columns compare with the 3×2 and 2×3 workloads. In the lifecycle workloads a native P2PKH input funds two Lamport outputs, then both exit to native P2PKH. The turnover path adds one Lamport-to-Lamport payment before exit. All sizes are serialized bytes.
@@ -48,6 +64,12 @@ For the first input of each 2×2 fixture, the main-stack peak increases from 8 t
 | `committed-key-forth` | `0x61` | 30,595 | 75,392 | 30,761 | 21,159 | 47,539 | 122,932 |
 | `committed-key-forth-compact` | `0x41` | 16,549 | 46,876 | 16,592 | 6,841 | 47,102 | 93,978 |
 | `committed-key-forth-compact` | `0x61` | 30,171 | 74,120 | 30,337 | 20,523 | 47,115 | 121,236 |
+| Compact, reconstruction enabled | `0x41` | 16,549 | 46,876 | 16,592 | 6,841 | 47,102 | 93,978 |
+| Compact, reconstruction enabled | `0x61` | 17,526 | 48,830 | 17,692 | 6,945 | 47,116 | 95,946 |
+| v0.2.0 | `0x41` | 16,549 | 46,266 | 16,592 | 6,536 | 46,492 | 92,758 |
+| v0.2.0 | `0x61` | 29,561 | 72,290 | 29,727 | 19,608 | 46,506 | 118,795 |
+| v0.2.0, reconstruction enabled | `0x41` | 16,549 | 46,266 | 16,592 | 6,536 | 46,491 | 92,757 |
+| v0.2.0, reconstruction enabled | `0x61` | 17,469 | 48,106 | 17,635 | 6,640 | 46,506 | 94,611 |
 
 The Forth lock saves **1,408 B (2.9%)** for 2×2 BIP143 ALL and **4,224 B (5.3%)** for 2×2 OTDA ALL relative to the original commitment profile. With the same serialization field widths and `I` Lamport inputs and `O` changed Lamport outputs, the BIP143 ALL savings are `704 × O`. OTDA ALL increases that to `704 × O × (1 + I)` because each ordinary Lamport input carries the serialized outputs in its preimage. The formula assumes the same mode and widths on all affected witnesses. Adding only inputs to a BIP143 consolidation into ordinary outputs yields identical spend bytes for the two committed profiles.
 
@@ -58,6 +80,5 @@ The compact profile saves another 424 bytes in BIP143 and 1,272 bytes in OTDA AL
 ## Further optimization
 
 - The 16,384-byte proof dominates BIP143 input cost. Reducing it requires changing what the verifier receives or changing the signature construction. The existing WOTS+ project is a useful comparison when input size matters. Compare full transactions and verification work before selecting either construction. [WOTS+ project measurements](../../wots-plus/README.md)
-- OTDA preimage reconstruction targets a different source of witness bytes. It is most relevant when many inputs carry large output scripts. The shared reconstruction code and WOTS+ experiments give implementation baselines for a follow-up with explicit sighash coverage. [OTDA reconstruction code](../../../src/fourthgraph/bsv/otda_reconstruction.py) · [WOTS+ experiments](../../wots-plus/README.md)
 
-Each profile has its own output script bytes. A transaction that changes profiles has a different txid when all other transaction bytes are equal, so the new outpoint requires its own authorization. Keep keys unique across profiles. BSV Node 1.2.3 accepted and mined funding, one turnover and exit for each Forth profile under default regtest transaction policy for both ALL modes. Promoting a profile would require a frozen template and evidence for the intended deployment policy. [Security and recovery](security.md) · [Funded regtest results](validation.md#funded-regtest)
+Each profile has its own output script bytes. A transaction that changes profiles has a different txid when all other transaction bytes are equal, so the new outpoint requires its own authorization. Keep keys unique across profiles. BSV Node 1.2.3 accepted and mined funding, one turnover and exit for each Forth profile under default regtest transaction policy for both ALL modes. The version catalog lists v0.2.0 as the next candidate. [Security and recovery](security.md) · [Funded regtest results](validation.md#funded-regtest) · [Version catalog](../versions/index.json)

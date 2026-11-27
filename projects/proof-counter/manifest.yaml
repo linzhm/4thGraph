@@ -1,0 +1,68 @@
+$schema: ../template/manifest.schema.json
+schema_version: 1
+title:
+  en: Proof counter
+  zh-CN: 证明计数器
+summary:
+  en: Compile and verify a public counter transition with direct Script or a proof backend.
+  zh-CN: 用直接 Script 或证明后端编译并验证公开计数器的状态转换。
+entry_points:
+  - name: 4thgraph-circuit
+    description:
+      en: Compile the public Forth relation to a Circom circuit.
+      zh-CN: 将 Forth 公开关系编译为 Circom 电路。
+setup:
+  en:
+    - Run the release commands from the repository root with Python 3.11 or later. The funded replay uses
+      the pinned Chronicle binding and an isolated node. [Regtest infrastructure](../../docs/infrastructure.md)
+    - |-
+      ```sh
+      python -m pip install ecdsa -r tools/requirements-chronicle.txt
+      ```
+  zh-CN:
+    - 使用 Python 3.11 或更新版本，从仓库根目录运行版本命令。入金复放使用固定的 Chronicle 绑定和隔离节点。[Regtest 环境](../../docs/infrastructure.md)
+    - |-
+      ```sh
+      python -m pip install ecdsa -r tools/requirements-chronicle.txt
+      ```
+sections:
+  algorithm:
+    en:
+      - '**[Generate a circuit](#generate-a-circuit)** · [Verification paths](../../docs/language/stdlib.md#verification-paths)
+        · [Fixed-statement experiment](reference/fixed-statement/README.md)'
+      - '[The public relation](verify-state.fth) imports shared [counter rules](counter.fth). Use the
+        same rules for direct Script and Circom. The [Forth workflow](workflow.fth) uses the counter as
+        a stage.'
+    zh-CN:
+      - '**[生成电路](#generate-a-circuit)** · [可用的验证路径](../../docs/language/stdlib.zh-CN.md#验证路径) · [Groth16
+        固定声明对照](reference/fixed-statement/README.md)'
+      - '[公开关系](verify-state.fth)导入同一份[计数规则](counter.fth)，供直接 Script 验证和 Circom 后端使用。[工作流示例](workflow.fth)把计数器用作一个交易阶段。'
+  reproduction:
+    en:
+      - '### Generate a circuit'
+      - Run from the repository root with Python 3.11 or later.
+      - |-
+        ```sh
+        bash tools/setup-workspaces.sh
+        PYTHONPATH=src:. python3 -m fourthgraph.verification.circuit_backend \
+          projects/proof-counter/verify-state.fth \
+          --output projects/proof-counter/workspace/build/counter.circom
+        ```
+      - The generated `counter.circom` contains the transition and route constraints with public signals
+        for the spend binding. To generate a Groth16 proof, use a witness and setup artifacts that match
+        the compiled circuit. See the [verification paths](../../docs/language/stdlib.md#verification-paths)
+        for builds with keys and funded replay. The [BLS12-381 fixed-statement experiment](reference/fixed-statement/README.md)
+        records a verifier comparison with the same public statement.
+    zh-CN:
+      - <a name="generate-a-circuit"></a>
+      - '### 生成电路'
+      - 使用 Python 3.11 或更新版本，从仓库根目录运行。
+      - |-
+        ```sh
+        bash tools/setup-workspaces.sh
+        PYTHONPATH=src:. python3 -m fourthgraph.verification.circuit_backend \
+          projects/proof-counter/verify-state.fth \
+          --output projects/proof-counter/workspace/build/counter.circom
+        ```
+      - 生成的 `counter.circom` 包含状态转换和路由的约束，以及用于绑定实际花费的公开信号。生成 Groth16 证明还需匹配这份电路的设置文件和见证。[使用公钥构建与入金复放](../../docs/language/stdlib.zh-CN.md#验证路径)
+        · [BLS12-381 验证器](../../docs/groth16-bls12-381.md)

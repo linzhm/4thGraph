@@ -1,0 +1,94 @@
+{
+  "fixture": "counter-successors",
+  "steps": 2,
+  "cases": [
+    {
+      "id": "recognize",
+      "entry": "recognize",
+      "expect": {
+        "status": "Match",
+        "parameters": "$parameters"
+      }
+    },
+    {
+      "id": "missing-prevout",
+      "entry": "recognize",
+      "patch": {
+        "prevout": {
+          "outpoint": ""
+        }
+      },
+      "expect": {
+        "status": "MissingContext"
+      }
+    },
+    {
+      "id": "wrong-request-type",
+      "entry": "prepare_spend",
+      "patch": {
+        "input_index": "zero"
+      },
+      "expect": {
+        "status": "InvalidRequest"
+      }
+    },
+    {
+      "id": "unsupported",
+      "entry": "recognize",
+      "patch": {
+        "prevout": {
+          "lock": "51"
+        }
+      },
+      "expect": {
+        "status": "NoMatch"
+      }
+    },
+    {
+      "id": "prepare",
+      "entry": "prepare_spend",
+      "expect": {
+        "status": "Prepared",
+        "prepared": "$prepared"
+      }
+    },
+    {
+      "id": "wrong-successor",
+      "entry": "prepare_spend",
+      "patch": {
+        "transaction": "$changed_tx"
+      },
+      "expect": {
+        "status": "InvalidSuccessor"
+      }
+    },
+    {
+      "id": "unexpected-authorization",
+      "entry": "assemble_unlock",
+      "patch": {
+        "authorizations": [
+          "00"
+        ]
+      },
+      "expect": {
+        "status": "InvalidAuthorization"
+      }
+    },
+    {
+      "id": "assemble",
+      "entry": "assemble_unlock",
+      "expect": {
+        "status": "Assembled",
+        "unlock": "$expected_unlock"
+      }
+    },
+    {
+      "id": "advance",
+      "entry": "host_spend",
+      "expect": {
+        "status": "Verified",
+        "signer_calls": 0
+      }
+    }
+  ]
+}

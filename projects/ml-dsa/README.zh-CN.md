@@ -1,4 +1,6 @@
-# 纯模式 ML-DSA-44
+<!-- Generated from manifest.yaml with Copier. -->
+
+# 纯模式 ML-DSA-44 v0.11.0
 
 [English](README.md) · [4thGraph](../../README.zh-CN.md) · [项目目录](../README.zh-CN.md) · [版本](versions/index.json)
 
@@ -8,23 +10,13 @@
 
 用原始 ML-DSA-44 公钥生成付款锁，再用纯模式和空上下文签署付款消息。
 
-[协议规范](docs/developer.zh-CN.md#protocol) · [安全分析](docs/developer.zh-CN.md#security) · [复现与验证](#复现方法) · [交易成本](#完整交易与栈测量)
-
-当前版本为 v0.11.0。
-
-## 算法特点
-
-ML-DSA 是 NIST 在 FIPS 204 中标准化的后量子数字签名算法，源自 CRYSTALS-Dilithium，安全性基于模格问题的计算困难性。ML-DSA-44 面向 NIST 第 2 类安全目标，在三套标准参数中公钥和签名最小，分别为 1,312 和 2,420 字节。名称中的两个 4 对应 4 × 4 的公开矩阵。[NIST FIPS 204](https://csrc.nist.gov/pubs/fips/204/final)
-
-验签先检查签名编码、响应范数和提示值，再用数论变换（NTT）进行多项式运算，并用 SHAKE256 重算并核对挑战。本项目在生成 BSV 付款锁时，会为固定公钥预计算矩阵和变换后的公钥多项式。[Script 验签实现](reference/script.py)
+[协议](docs/developer.zh-CN.md) · [算法与执行](#算法与执行) · [复现方法](#复现方法) · [完整交易与栈测量](#完整交易与栈测量) · [实测数据](versions/v0.11.0/measurements.json)
 
 | 入口 | 用途 |
-|---|---|
+| --- | --- |
 | `fips204.verify(public_key, message, signature, context=...)` | Python 纯模式消息验签 |
 | `script.verify_message_script(public_key, message_bytes, context=...)` | 生成固定公钥、消息长度和上下文的消息验签脚本 |
 | `script.locking_script(public_key)` | 生成绑定当前花费输入的付款锁 |
-
-挑战采样遵循 FIPS 204 附录 C 表 3 的 221 字节上限，耗尽时验签失败。消息验签和付款绑定分别有测试向量。 [采样实现](reference/challenge_script.py) · [确定性向量](versions/v0.1.0/deterministic.json)
 
 ## 使用场景与取舍
 
@@ -32,17 +24,30 @@ ML-DSA 是 NIST 在 FIPS 204 中标准化的后量子数字签名算法，源自
 
 实测夹具的固定公钥付款锁约为 252 kB。如果计划对这种输出实际入金，应先在目标节点或矿工环境验证脚本大小、整笔交易上限及验证策略。[出块测量方法](../../docs/benchmark.zh-CN.md)
 
-## 开发和钱包接入
+## 算法与执行
 
-1. 调用 `locking_script(public_key)` 生成新版付款输出，并保存经认证的完整公钥。钱包可用同一公钥识别和花费此前十一版锁。用 `locking_script(public_key, legacy=True)` 可复现最初的 v0.1.0 锁。签名前核对 outpoint、金额、确认数和预期收款输出。
-2. 单输入付款用 `sign_payment`，已排好输入输出的交易逐输入调用 `sign_spend`。付款支持 BIP143 与 Chronicle OTDA 的十二种签名模式，无配对 OTDA SINGLE 使用伴随绑定。
-3. 外部签名器把收到的 32 字节作为纯模式的消息，使用空上下文并返回 2,420 字节签名。钱包验签后构造解锁脚本。通用消息验签可另行指定上下文和消息长度。
+[协议规范](docs/developer.zh-CN.md#protocol) · [安全分析](docs/developer.zh-CN.md#security) · [复现与验证](#复现方法) · [交易成本](#完整交易与栈测量)
 
-[付款接口](reference/payment.py) · [付款验收矩阵](reference/payment-acceptance.md) · [验证绑定实现](../../src/fourthgraph/bsv/pushtx.py)
+ML-DSA 是 NIST 在 FIPS 204 中标准化的后量子数字签名算法，源自 CRYSTALS-Dilithium，安全性基于模格问题的计算困难性。ML-DSA-44 面向 NIST 第 2 类安全目标，在三套标准参数中公钥和签名最小，分别为 1,312 和 2,420 字节。名称中的两个 4 对应 4 × 4 的公开矩阵。[NIST FIPS 204](https://csrc.nist.gov/pubs/fips/204/final)
+
+验签先检查签名编码、响应范数和提示值，再用数论变换（NTT）进行多项式运算，并用 SHAKE256 重算并核对挑战。本项目在生成 BSV 付款锁时，会为固定公钥预计算矩阵和变换后的公钥多项式。[Script 验签实现](reference/script.py)
+
+挑战采样遵循 FIPS 204 附录 C 表 3 的 221 字节上限，耗尽时验签失败。消息验签和付款绑定分别有测试向量。 [采样实现](reference/challenge_script.py) · [确定性向量](versions/v0.1.0/deterministic.json)
 
 ## 复现方法
 
-在仓库根目录使用 Python 3.12 和 OpenSSL 3.5 或以上版本。OpenSSL 夹具使用公开测试种子。
+从仓库根目录使用 Python 3.12、OpenSSL 3.5 或更新版本及固定的 Chronicle 依赖。
+
+```sh
+python -m pip install -r tools/requirements-chronicle.txt
+```
+
+```sh
+PYTHONPATH=src:.:projects/ml-dsa/reference python -c 'from benchmark_adapter import components; print(components(None))'
+PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- python -m unittest discover -s projects/ml-dsa/reference
+```
+
+OpenSSL 夹具使用公开测试种子。
 
 ```sh
 python -m pip install -r tools/requirements-chronicle.txt
@@ -54,6 +59,8 @@ python projects/ml-dsa/reference/test_challenge_script.py -v
 python projects/ml-dsa/reference/test_boundaries.py -v
 python projects/ml-dsa/reference/test_payment.py -v
 ```
+
+两个引擎均通过 276 项组件边界判定和 18 项完整付款边界判定。[边界测试](reference/payment-acceptance.md#boundary-rejection)
 
 测试覆盖 80 条 Wycheproof 标准验签用例、15 条 NIST ACVP 外部纯模式向量及 640 个付款判定组合。详见[统一节点回归](../../docs/chronicle-regression.md)。Linux 节点重放使用统一入口的脚本策略配置。
 
@@ -67,7 +74,9 @@ PYTHONPATH=src:. python projects/ml-dsa/reference/check_acvp.py "$ACVP_PROMPT" "
 
 [固定 Wycheproof 语料](https://github.com/C2SP/wycheproof/blob/8e7fa6f87e6993d7b613cf48b46512a32df8084a/testvectors_v1/mldsa_44_standard_verify_test.json) · [NIST ACVP 验签语料](https://github.com/usnistgov/ACVP-Server/tree/master/gen-val/json-files/ML-DSA-sigVer-FIPS204)
 
-## 脚本大小
+## 脚本尺寸
+
+<a name="脚本大小"></a>
 
 下表用相同夹具比较编译后的 Script 字节数。公钥内容会使锁的长度略有变化，OTDA ALL 的每个输入还会携带整笔交易的输出。
 
@@ -96,6 +105,14 @@ v0.9.0 对响应编码按位取反，再一次性扣除四个打包响应系数�
 v0.10.0 并行比较候选字节，再二分定位每次 SampleInBall 选取时第一个可接受的字节。含符号位在内的预算仍是 221 字节，采样本身节省 8,683 字节。SHAKE 并行交换各 lane 内的字节组，并用更短的移位指令完成部分 Keccak 旋转，整锁再省 6,648 字节。[v0.10.0 测量](versions/v0.10.0/measurements.json)
 
 v0.11.0 将非零接受掩码减一后与原掩码异或，利用结果的最短字节长度定位首个合格候选，采样节省 4,560 字节。SHAKE 在 Script 中生成填充和容量区的零字节，并将首块直接吸收到空状态，再省 1,398 字节。[v0.11.0 测量](versions/v0.11.0/measurements.json)
+
+## 开发和钱包接入
+
+1. 调用 `locking_script(public_key)` 生成新版付款输出，并保存经认证的完整公钥。钱包可用同一公钥识别和花费此前十一版锁。用 `locking_script(public_key, legacy=True)` 可复现最初的 v0.1.0 锁。签名前核对 outpoint、金额、确认数和预期收款输出。
+2. 单输入付款用 `sign_payment`，已排好输入输出的交易逐输入调用 `sign_spend`。付款支持 BIP143 与 Chronicle OTDA 的十二种签名模式，无配对 OTDA SINGLE 使用伴随绑定。
+3. 外部签名器把收到的 32 字节作为纯模式的消息，使用空上下文并返回 2,420 字节签名。钱包验签后构造解锁脚本。通用消息验签可另行指定上下文和消息长度。
+
+[付款接口](reference/payment.py) · [付款验收矩阵](reference/payment-acceptance.md) · [验证绑定实现](../../src/fourthgraph/bsv/pushtx.py)
 
 ## 完整交易与栈测量
 

@@ -1,6 +1,7 @@
 """Build BSV Script for a fixed BN254 Groth16 verification key and statement."""
 
 import argparse
+from dataclasses import asdict
 from hashlib import sha256
 import json
 import os
@@ -8,9 +9,10 @@ from pathlib import Path
 import subprocess
 from tempfile import TemporaryDirectory
 
-from fourthgraph.compiler.source import PROJECT_NAME
+from fourthgraph.compiler.source import MAX_EXPANSION, PROJECT_NAME, CompileError, SourceCompiler, check_word_expansion, expanded
+from fourthgraph.compiler.wordsets import Primitive, TYPES
 from fourthgraph.verification.r1cs import FIELD, scalar
-from fourthgraph.workflow.protocol import FLAG, artifact_digest, authorize, is_compressed_public_key
+from fourthgraph.workflow.protocol import FLAG, artifact_digest, authorize, build_artifact, is_compressed_public_key
 from fourthgraph.bsv.script import asm
 
 RUNAR_REVISION = "dbcc4269f8e0895c4738cf86948b05b7d62a2010"
@@ -105,14 +107,21 @@ class ScriptVerifier:
             request = {"VK": str(key_path), "Public": signals, "Proof": proof}
             return bytes.fromhex(json.loads(checked([self.adapter], stdin=json.dumps(request))))
 
-    def compile(self, signals, owner):
+    @staticmethod
+    def owner_guard(owner):
         if not is_compressed_public_key(owner):
             raise ValueError("owner must be a valid compressed secp256k1 public key")
+        return authorize(owner)
+
+    def compile_predicate(self, signals):
         template = self.emit(signals)
         prefix = asm("OP_0 OP_CHECKSIGVERIFY")
         if not template.startswith(prefix):
             raise ValueError("unexpected owner constructor slot in Rúnar artifact")
-        return authorize(owner) + template[len(prefix):]
+        return template[len(prefix):]
+
+    def compile(self, signals, owner):
+        return self.owner_guard(owner) + self.compile_predicate(signals)
 
     def witness(self, signals, proof):
         return self.emit(signals, runar_proof(proof))
@@ -128,8 +137,58 @@ class ScriptVerifier:
         return {**artifact, "artifact_sha256": artifact_digest(artifact)}
 
 
+
+BN254_ENTRY = "verify-bn254-proof"
+BN254_WORDS = {
+    "bn254-owner-guard": Primitive((), ("bn254-authority",), None,
+                                   lambda verifier, _signals, owner: (verifier.owner_guard(owner),),
+                                   "BIP143 owner authorization", build_only=True),
+    "bn254-fixed-public-inputs": Primitive((), ("bn254-statement",), None,
+                                           lambda _verifier, signals, _owner: (public_signals(json.dumps(signals)),),
+                                           "compile-time public inputs", build_only=True),
+    "bn254-msm-and-pairing": Primitive(("bn254-authority", "bn254-statement"), ("bn254-verified",), None,
+                                       lambda verifier, _signals, _owner, guard, statement: (
+                                           guard + verifier.compile_predicate(statement),
+                                       ),
+                                       "Rúnar Groth16 lock with bound public inputs", build_only=True),
+}
+BN254_TYPES = TYPES | {kind for word in BN254_WORDS.values() for kind in (*word.takes, *word.gives)}
+
+
+class ForthVerifier(ScriptVerifier):
+    """Connect typed Forth build stages to the pinned BN254 backend."""
+
+    def __init__(self, adapter, verification_key, directory, source, *, source_path=None):
+        super().__init__(adapter, verification_key, directory)
+        self.source = source
+        frontend = SourceCompiler(source.decode("utf-8"), vocabulary=BN254_WORDS, stack_types=BN254_TYPES,
+                                  backend="groth16-bn254", source_path=source_path)
+        word = frontend.words.get(BN254_ENTRY)
+        if word is None or (word.takes, word.gives) != ((), ("bn254-verified",)):
+            raise CompileError(f"{BN254_ENTRY} requires the stack effect -- bn254-verified")
+        check_word_expansion(word, MAX_EXPANSION)
+        self.instructions = tuple(expanded(word.body))
+        for instruction, token in self.instructions:
+            if all(instruction is not stage for stage in BN254_WORDS.values()):
+                raise token.error(f"{token.text!r} cannot build a BN254 verifier lock")
+        self.libraries = frontend.library_imports
+
+    def compile(self, signals, owner):
+        stack = []
+        for instruction, _ in self.instructions:
+            start = len(stack) - len(instruction.takes)
+            stack[start:] = instruction.run(self, signals, owner, *stack[start:])
+        return stack[0]
+
+    def artifact(self, signals, owner, script):
+        document = super().artifact(signals, owner, script)
+        document.update(forth_entry=BN254_ENTRY, libraries=tuple(map(asdict, self.libraries)))
+        return build_artifact(document, self.source)
+
+
 def main():
     cli = argparse.ArgumentParser(description=__doc__)
+    cli.add_argument("--source", type=Path, help="typed BN254 Forth verifier source")
     cli.add_argument("--runar", type=Path, required=True, help="path to the pinned Rúnar checkout")
     cli.add_argument("--go", default="go")
     cli.add_argument("--verification-key", type=Path, required=True, help="snarkjs verification_key.json")
@@ -147,7 +206,9 @@ def main():
         with TemporaryDirectory(prefix="4thgraph-groth16-") as temporary:
             adapter = Path(temporary) / "adapter"
             build_adapter(args.runar, adapter, go=args.go)
-            verifier = ScriptVerifier(adapter, args.verification_key.read_bytes(), temporary)
+            key = args.verification_key.read_bytes()
+            verifier = (ForthVerifier(adapter, key, temporary, args.source.read_bytes(), source_path=args.source)
+                        if args.source else ScriptVerifier(adapter, key, temporary))
             signals, owner = public_signals(args.public.read_bytes()), bytes.fromhex(args.owner)
             script = verifier.compile(signals, owner)
             artifact = verifier.artifact(signals, owner, script)

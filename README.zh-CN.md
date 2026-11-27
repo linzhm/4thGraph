@@ -6,7 +6,7 @@
 
 4thGraph 是面向 BSV 的合约描述语言（SDL）和工具链。你可以在同一个项目里定义花费条件、管理 UTXO 状态、构建相互依赖的交易，并为适合在链下完成的计算生成零知识证明，在链上验证结果。
 
-**[用 Agent 开始](#start-with-agent)** · [可运行项目](#project-index) · [钱包 SDK](sdk/README.zh-CN.md) · [文档](docs/README.zh-CN.md) · [实测结果](#results)
+**[用 Agent 开始](#start-with-agent)** · [开发与调优](#develop-and-tune) · [可运行项目](#project-index) · [钱包 SDK](sdk/README.zh-CN.md) · [文档](docs/README.zh-CN.md) · [实测结果](#results)
 
 ---
 
@@ -72,6 +72,35 @@ flowchart LR
 
 [手工配置 CLI 与 Agent skill](docs/install.md)
 
+<a name="develop-and-tune"></a>
+
+## 用 Agent 开发和调优
+
+先用高层 Forth 写合约的花费条件和状态转换，固定基线及验收夹具。工具把可复跑的调优路径并列展示，Agent 选择本轮值得比较的候选。
+
+```mermaid
+flowchart TD
+    forth["高层 Forth · 输出、状态和授权"] --> baseline["冻结基线、夹具和目标"]
+    baseline --> source["Forth 实现 · 固定编译计划"]
+    baseline --> passes["编译 pass 和顺序 · 固定源码"]
+    baseline --> layout["合法的交易与见证布局 · 固定合约"]
+    source --> agent["Agent 选择候选批次和预算"]
+    passes --> agent
+    layout --> agent
+    agent --> evaluate["编译候选并用固定评估器验证"]
+    evaluate --> report["输出判定、成本和产物哈希"]
+    report --> agent
+    report --> selected["保存选定计划并复跑结果"]
+```
+
+下面列出 Agent 可以选择并复跑的已登记路径。
+
+```sh
+PYTHONPATH=src:. python3 -m fourthgraph.workflow.protocol experiment capabilities
+```
+
+按指南提交候选批次、核对固定评估结果并复跑选中的构建。 [Agent skill](skills/4thgraph/SKILL.md)
+
 <a name="capabilities"></a><a name="project-index"></a><a name="p2pkh-example"></a><a name="p2pk-example"></a>
 
 ## 按开发目标选择项目
@@ -102,11 +131,11 @@ flowchart LR
 
 | 层次 | 开发者写什么，工具交付什么 |
 | --- | --- |
-| **语言与标准库** | 用带类型的 Forth 词描述计算，用合约声明描述参与角色、交易依赖和状态转换。编译器检查栈效果和数值范围。[SDL 规范](docs/language/specification.md) · [中文语法](docs/language/syntax.md) · [English syntax](docs/language/syntax.en.md) · [标准库](docs/language/stdlib.md) |
+| **语言与标准库** | 用带类型的 Forth 词描述计算，用合约声明描述参与角色、交易依赖和状态转换。编译器检查栈效果和数值范围。[SDL 规范](docs/language/specification.md) · [中文语法](docs/language/syntax.md) · [English syntax](docs/language/syntax.en.md) · [标准库](docs/language/stdlib.zh-CN.md) |
 | **编译与规划** | 编译器生成 BSV Script，规划器比较满足约束的交易布局及成本。证明后端为支持的关系生成电路和验证器。[工具链手册](docs/toolchain.md) |
 | **运行与验证** | 运行器绑定实际父输出、请求签名并组装见证。复放报告把构建产物与实际交易、BSV Node 和 chain-gang 的判定对应起来。[仓库目录](docs/repository-layout.md) · [复放流程](docs/toolchain.md#复放与编译) |
 
-**递归证明是研究方向。** 上图的 Token 转账逐笔验证直接父输出与本次状态转换。递归方案还要在新证明中核验前序证明，并把前序证明认证的状态绑定到本次实际花费的输出。[当前工具链支持的验证路径](docs/language/stdlib.md#验证路径)
+**递归证明是研究方向。** 上图的 Token 转账逐笔验证直接父输出与本次状态转换。递归方案还要在新证明中核验前序证明，并把前序证明认证的状态绑定到本次实际花费的输出。[当前工具链支持的验证路径](docs/language/stdlib.zh-CN.md#验证路径)
 
 ---
 

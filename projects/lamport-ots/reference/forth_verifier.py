@@ -27,13 +27,25 @@ SCRIPT_WORDS = {
     "copy-digest-byte": runtime_word("bytes bytes bytes bytes", "bytes bytes bytes bytes bytes",
                                      "OP_3 OP_PICK"),
     "swap-if": runtime_word("bytes bytes cell", "bytes bytes", "OP_IF OP_SWAP OP_ENDIF"),
+    "swap-if-clear": runtime_word("bytes bytes cell", "bytes bytes", "OP_NOTIF OP_SWAP OP_ENDIF"),
 }
 
 
 @cache
-def committed_verifier_code():
-    compiler = SourceCompiler(SOURCE.read_text(encoding="ascii"), vocabulary=SCRIPT_WORDS, source_path=SOURCE)
+def _compiler():
+    return SourceCompiler(SOURCE.read_text(encoding="ascii"), vocabulary=SCRIPT_WORDS, source_path=SOURCE)
+
+
+@cache
+def committed_verifier_parts(*, packed=False):
+    compiler = _compiler()
     start = lower(compiler.words["start-commitment"])
-    one_byte = lower(compiler.words["committed-byte"])
+    one_byte = lower(compiler.words["packed-byte" if packed else "committed-byte"])
     finish = lower(compiler.words["finish-commitment"])
+    return start, one_byte, finish
+
+
+@cache
+def committed_verifier_code():
+    start, one_byte, finish = committed_verifier_parts()
     return start + one_byte * 32 + finish

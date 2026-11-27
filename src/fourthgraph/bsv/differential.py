@@ -15,6 +15,9 @@ _NODE_SCRIPT_REJECTIONS = {
     'Script failed an OP_VERIFY operation',
 }
 _CHRONICLE_INACTIVE_REJECTION = 'Illegal use of SIGHASH_CHRONICLE'
+# Exact wording of SCRIPT_ERR_SIG_PUSHONLY in BSV Node 1.2.3.
+_NODE_PUSH_ONLY_REJECTION = 'Only non-push operators allowed in signatures'
+_CHAIN_GANG_PUSH_ONLY_REJECTION = 'A provided data is not valid `Unlock script must be push-only`'
 _CHAIN_GANG_SCRIPT_REJECTIONS = {
     f'Error evaluating the script `{reason}`'
     for reason in (
@@ -53,7 +56,7 @@ def require_chain_gang_pin(requirements):
     return pin
 
 
-def chain_gang_valid(spend, funding, *, expect_bad_prevout=False):
+def chain_gang_valid(spend, funding, *, expect_bad_prevout=False, expect_push_only=False):
     """Validate parsed transactions and recognize only expected rejection reasons."""
     try:
         spend.validate(funding)
@@ -61,15 +64,21 @@ def chain_gang_valid(spend, funding, *, expect_bad_prevout=False):
         reason = str(error)
         if expect_bad_prevout:
             expected = _CHAIN_GANG_PREVOUT_REJECTION.fullmatch(reason) is not None
+        elif expect_push_only:
+            expected = reason == _CHAIN_GANG_PUSH_ONLY_REJECTION
         else:
-            expected = reason in _CHAIN_GANG_SCRIPT_REJECTIONS
+            expected = is_chain_gang_script_rejection(error)
         if not expected:
             raise
         return False
     return True
 
 
-def node_script_valid(response, flags, *, chronicle_active=True):
+def is_chain_gang_script_rejection(error):
+    return isinstance(error, ValueError) and str(error) in _CHAIN_GANG_SCRIPT_REJECTIONS
+
+
+def node_script_valid(response, flags, *, chronicle_active=True, expect_push_only=False):
     """Check one verifyscript result, including its flags and rejection reason."""
     if response.get('error') is not None:
         raise AssertionError(f'verifyscript RPC error: {response["error"]}')
@@ -79,7 +88,10 @@ def node_script_valid(response, flags, *, chronicle_active=True):
     status = result.get('result')
     if status == 'ok':
         return True
-    reasons = _NODE_SCRIPT_REJECTIONS if chronicle_active else {_CHRONICLE_INACTIVE_REJECTION}
+    if expect_push_only:
+        reasons = {_NODE_PUSH_ONLY_REJECTION}
+    else:
+        reasons = _NODE_SCRIPT_REJECTIONS if chronicle_active else {_CHRONICLE_INACTIVE_REJECTION}
     if status == 'error' and result.get('description') in reasons:
         return False
     raise AssertionError(f'verifyscript returned an unexpected outcome: {result}')

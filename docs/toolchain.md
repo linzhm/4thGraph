@@ -4,7 +4,7 @@ A Forth compiler for BSV Script and multi-transaction workflows.
 
 当前构建版本为 **v0.2.7**。编译与复放产物可写入 `workspace/build/`。运行 `bash tools/setup-workspaces.sh` 初始化。
 
-用 `REQUIRE stdlib/<file>.fth` 加载 4thGraph 标准库。计数器、原生支付、P-256 内核、BIP340 和 BLS12-381 Groth16 已提供库入口。同一份 Forth 源码可以组合库词，也可以通过 `relation:` 让编译器在符合条件的 Script 与证明路径间选择。 [语法书](language/syntax.md) · [标准库与验证路径](language/stdlib.md)
+用 `REQUIRE stdlib/<file>.fth` 加载 4thGraph 标准库。计数器、原生支付、P-256 内核、BIP340 和 BLS12-381 Groth16 已提供库入口。同一份 Forth 源码可以组合库词，也可以通过 `relation:` 让编译器在符合条件的 Script 与证明路径间选择。 [语法书](language/syntax.md) · [标准库与验证路径](language/stdlib.zh-CN.md)
 
 同一份 Forth 源码可以生成融合版和拆分版。示例计算 `a = 2x`、`b = y + 1`，两支结果和汇合的和都按 `u32` 表示。回绕后的和小于 20 时走复核，其余走结算。两种后继各锁给一个配置的公钥。编译器以 Forth 2012 Core 为语义基线，`+` 使用 64 位 cell，`u32+` 固定按 32 位回绕。 [示例源码](../projects/workflow-examples/example.fth) · [语言与 BSV 扩展规范](language/specification.md)
 
@@ -139,7 +139,9 @@ lock = builder.emit("bip340-verify", b"")
 
 验签片段要求主栈从底到顶为消息、公钥 x、公钥 y、64 字节签名、nonce y。坐标用 32 字节无符号大端编码，两个 y 均取偶数。验签成功留下一个真值，失败终止执行。调用者可在备用栈保留自己的数据。
 
-点加直接展开交叉项，并在栈项最后一次使用时移动该项。射影点加为 103 字节，右侧为仿射点的专用点加为 95 字节。倍点复用两项输出的中间值，编译为 58 字节。BIP340 验签词用 secp256k1 自同态分解公开挑战标量，在 64 个两位窗口中联合累加四个 128 位标量。[曲线运算](../src/fourthgraph/stdlib/secp256k1.fth) · [验签实现](../src/fourthgraph/stdlib/bip340.fth)
+标准库的 `secp256k1-scale-affine-pair` 将两个仿射点映射到 `3b = 1` 的同构曲线。缩放坐标使用 `secp256k1-scaled-add-with-field`、`secp256k1-scaled-add-affine-with-field`、`secp256k1-scaled-double-with-field` 和 `secp256k1-scaled-double-pair-with-field`。构建参数 0 表示域素数在主栈底，1 表示域素数紧邻待运算坐标下方。采用位置 1 时，缩放曲线的两种点加分别为 85 和 78 字节，连续两次倍点为 101 字节。BIP340 验签词用自同态分解公开挑战标量，在 64 个两位窗口中联合累加四个 128 位标量。[曲线运算](../src/fourthgraph/stdlib/secp256k1.fth) · [验签实现](../src/fourthgraph/stdlib/bip340.fth)
+
+`secp256k1-lambda-split` 使用两个格基常数进行舍入和重构。调用者栈上已有群阶时，可用 `secp256k1-lambda-split-with-order`，按 `k n` 的顺序提供输入。这两个词分别编译为 112 和 78 字节。[分解与上界](../projects/p2pkh-schnorr/docs/spec.zh-CN.md#联合标量乘法)
 
 独立的 P2PKH-Schnorr 示例把所有者承诺和交易绑定组合进付款锁，并通过统一钱包 SDK 构造和识别输出。[付款示例](../projects/p2pkh-schnorr/README.zh-CN.md) · [统一钱包 SDK](../sdk/README.zh-CN.md)
 
@@ -291,8 +293,16 @@ Forth 声明先生成阶段 DAG，记录值的生产者、消费者、类型及�
 
 | 示例 | 编译与复放 |
 | --- | --- |
-| [三段串行](../projects/workflow-examples/serial-graph.fth) | 递增、翻倍、路由。两笔状态交易分别约束后继金额和脚本。下游沿真实父输入回查部署根 |
+| [三阶段串行与前缀融合](../projects/workflow-examples/serial-graph.fth) | 递增、翻倍、路由。可分别提交，或在首笔花费融合前两阶段。下游沿实际父输入回查部署根 |
 | [准备、并行与汇合](../projects/workflow-examples/fork-join-graph.fth) | 同一份源码可将准备步骤与拆分合并，也可独立提交准备交易。工作 A 和 B 在两种布局中都独立签署及提交 |
+
+三阶段线性工作流支持 BIP143 的 `--mode fused-prefix`。首笔花费需要前两个阶段的授权，提交两阶段的共同结果供最后阶段单独花费。`independent-submit` 约束前两个阶段中的任一阶段时，融合在排序前排除。最后阶段可保留独立提交要求。该布局要求工作流没有恢复分支。默认三阶段布局仍为串行，`--search --explain` 才会自动比较前缀融合与串行。
+
+```sh
+PYTHONPATH=src:. python3 -m fourthgraph.replay.prefix_workflow projects/workflow-examples/serial-graph.fth
+```
+
+离线回执验证部署与全部实际子交易，并为每个步骤记录执行的 Forth 阶段、父交易 ID、前序锁摘要和交易字节。
 
 ## 两阶段状态工作流的三种布局
 
@@ -381,7 +391,7 @@ PYTHONPATH=src:. python -m fourthgraph.verification.bls12381.build src/fourthgra
   --proof proof.json --witness-output witness.hex
 ```
 
-`--input-sources` 决定哪些槽在部署时固定，`--public` 和 `--proof` 为见证生成提供完整声明和证明。省略 `--input-sources` 会生成完整 Fr 范围的动态锁。动态和混合路径可用 `--stack-schedule baseline` 对照默认的紧凑栈调度。
+`--input-sources` 决定哪些槽在部署时固定，`--public` 和 `--proof` 为见证生成提供完整声明和证明。省略 `--input-sources` 会生成完整 Fr 范围的动态锁。固定、混合和动态路径均可用 `--stack-schedule baseline` 生成对照脚本。构建产物记录选用的模式。 [验证器编译模式](groth16-bls12-381.md#forth-词)
 
 测试夹具来自 `projects/proof-counter/workflow.fth`，使用 `circom2@0.2.22 --prime bls12381` 和 `snarkjs@0.7.5` 的本地测试专用设置。签名密钥也是测试专用。已导出的夹具让完整复放无需重新出证，同一个程序可分别复放 v1 和 v2。
 

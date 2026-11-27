@@ -1,0 +1,14 @@
+{
+  "version": "0.1.0",
+  "previous": null,
+  "artifacts": [],
+  "fixtures": [
+    "fixture.json"
+  ],
+  "evidence": [
+    "measurements.json"
+  ],
+  "integration": "docs/verification.en.md",
+  "build": "bash projects/groth16-bn254/reference/build.sh workspace/runar",
+  "verify": "REGTEST_CHRONICLE_HEIGHT=2 bash tools/verify_node.sh --profile long-script -- \\\n  python3 -m fourthgraph.replay.groth16_bn254 --runar workspace/runar \\\n  --verifier-source projects/groth16-bn254/verifier.fth \\\n  --fixture projects/groth16-bn254/versions/v0.1.0/fixture.json \\\n  --output projects/groth16-bn254/workspace/build/replay.json"
+}

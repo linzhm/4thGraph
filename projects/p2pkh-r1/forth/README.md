@@ -2,6 +2,127 @@
 
 [项目主页与实测结果](../README.zh-CN.md#实测结果) · [版本索引](../versions/index.json) · [历史基准](history.md)
 
+## 组装 PELS 与 R1 数学库
+
+[r1-pels-lock.fth](r1-pels-lock.fth) 是组合示例。除了放入合约的计数与金额策略，顶层只调用 `pels-verify` 和 `r1-verify-owner`。公开词的构建期参数和运行时栈契约写在对应定义上。
+
+- [PELS 原像构造](pels-verify.fth)、[后继输出](pels-successor.fth)和[原生绑定](pels-binding.fth)可独立引入。此实例使用单输入、唯一后继和 BIP143 ALL。见证携带 `hashOutputs` 前后的原像字段。库用旧状态、输入金额和执行中的 `scriptCode` 构造后继，计算并插入输出承诺，然后用原生签名校验认证完整消息。同一词返回这个已认证的摘要。 [nChain 原始构造 §7.1–7.3](https://patents.google.com/patent/EP4374535A1/en)
+- R1 数学由[模运算](r1-math-field.fth)、[仿射点](r1-math-point.fth)、[逐位标量乘法](r1-math-scalar.fth)和[验签](r1-math-verify.fth)组成。它自行用扩展欧几里得求逆，并分别计算两次标量乘法。[持有人适配词](r1-verify-owner.fth)负责字节解码与 owner hash。运行时见证为公开密钥、签名、原像尾和原像头四项。
+- [解锁端](pels_r1.py)的 `prepare_authorization(unsigned, parent)` 接受已拼好的未签交易与实际父交易，给出 32 字节 `digest`。调用方审核交易并选定正确的合约输出后，可把摘要交给外部签名器。返回对象的 `unlocking_script(public_key, signature)` 拼接见证。链上会从这些字段重建并认证原像。
+
+从仓库根目录运行：
+
+```sh
+PYTHONPATH=src:. python projects/p2pkh-r1/forth/compile_r1.py \
+  --entry r1-pels-lock --counter-state 0 --owner-hash160 "$owner"
+PYTHONPATH=src:. python projects/p2pkh-r1/forth/pels_r1.py \
+  --parent parent.hex --unsigned unsigned.hex
+PYTHONPATH=src:.:projects/p2pkh-r1/forth:projects/p2pkh-r1/reference \
+  bash tools/verify_node.sh --profile long-script -- python -m unittest test_r1_pels
+```
+
+第一条命令输出锁及每个顶层词的字节偏移、长度和 SHA‑256。编译器核对这些片段拼接后与完整产物逐字节相同。第二条输出待签摘要的十六进制。第三条在隔离 regtest 检查完整花费，使用 opt-in 的每输入 15 秒验证预算。直接展开的仿射参考锁约 9.9 MB，验证数据覆盖显式父输出的脚本执行。默认节点时间预算、交易入池和出块属于独立验收。
+
+## 无窗口的 Forth 参考基线
+
+[普通 R1 入口](r1-baseline.fth) 分别用同一个 256 位倍加词计算 `vQ` 和 `uG`。由 ScriptBuilder 展开固定的位循环。坐标采用现有 `r1-add-points` 的齐次表示，倍点也调用同一个完整点加公式。见证校验、范围、逆元检查和原生交易绑定沿用现有 R1 语义。基线构建省略 `--optimize`。
+
+[带后继断言的 R1 入口](r1-baseline-counter.fth) 调用独立的 [PELS 片段](pels-successor.fth)。调用方只提供从旧状态和输入金额计算后继状态、金额的规则。片段封装 BIP143 ALL 原像解析、单输入检查、CompactSize 和完整输出承诺比对。计数器规定唯一后继、计数加一（u32 回绕）、扣除固定 1,000 sat 并延续同一份合约代码。入口的单个 `OP_CODESEPARATOR` 位于五字节状态之后，原生签名验证覆盖整个合约体。两处检查使用同一个完整原像。
+
+从仓库根目录执行：
+
+```sh
+PYTHONPATH=src:. python projects/p2pkh-r1/forth/compile_r1.py --entry r1-baseline-lock
+PYTHONPATH=src:. python projects/p2pkh-r1/forth/compile_r1.py \
+  --entry r1-baseline-counter --counter-state 0
+PYTHONPATH=src:.:projects/p2pkh-r1/forth:projects/p2pkh-r1/reference \
+  bash tools/verify_node.sh -- python -m unittest test_r1_baseline test_compile_r1 test_msm
+```
+
+前两条命令输出锁十六进制、字节数和源码依赖摘要。测试用合成父输出验证 BIP143、OTDA、无配对 SINGLE、连续计数及重新签名的错误后继。结果覆盖脚本验证。两种锁都是实验参考入口，发布钱包模板继续使用版本清单。
+
+### 同一份 baseline-lock 的自动选型
+
+默认、`--optimize` 和 `--auto` 读取同一份 `r1-baseline.fth` 及其依赖。
+项目的 `--auto` 实验按前提展开有序方法，通过目标字节模型选择实现，输出精确锁和
+OTDA 重建程序。编译器保留原入口的准备、结果检查和交易绑定，报告记录有序计划、
+各状态的字节估算、链接区域和停止原因。只有源码与导入摘要匹配已验版本时才允许
+替换窗口区域。普通锁编译可以继续走现有公式路径，OTDA 目标要求能生成相配的
+重建程序。
+[实测与边界（中）](../../../docs/optimization-paths.zh-CN.md#r1-同源自动选型) ·
+[Measurements and scope (EN)](../../../docs/optimization-paths.md#r1-same-source-automatic-selection)
+
+```sh
+project=projects/p2pkh-r1
+export PYTHONPATH="src:.:$project/reference:$project/forth"
+python "$project/forth/compile_r1.py" --entry r1-baseline-lock > /tmp/r1-baseline.json
+python "$project/forth/compile_r1.py" --entry r1-baseline-lock --optimize > /tmp/r1-formula.json
+python "$project/forth/compile_r1.py" --entry r1-baseline-lock --auto --auto-target bip143-all > /tmp/r1-auto-bip143.json
+python "$project/forth/compile_r1.py" --entry r1-baseline-lock --auto --auto-target otda-all > /tmp/r1-auto-otda.json
+python -m unittest -v test_r1_baseline.BaselineAutoTests
+```
+
+目标包含默认的 `lock`、`bip143-all`、`otda-all` 和配对的 `otda-single`。
+交易目标按两进两出形状计入四份锁和相应的重建程序，排序分数是候选相关的字节
+估算。实际字节与交易判定由花费夹具独立验收。有序实验默认最多 8 步和
+160 个状态，可用 `--auto-depth` 和 `--auto-states` 改预算。历史的仅窗口对照
+用 `--auto-rounds N`，最多比较 32 个候选。
+
+构建已选方案时，用 `--replay-plan` 指定保存的计划，或直接传入带 `optimization.plan`
+的 `--auto` 报告。重放核对编译器版本、实际编译器源码摘要以及 Forth 源码和依赖摘要，
+逐项执行固定序列，再核对锁模板和 OTDA 重建程序摘要。默认的 20 字节零值标记模板参数槽；`--owner-hash160 HEX`
+只替换这个槽。钱包发布仍以版本清单为准。
+
+```sh
+for target in bip143-all otda-all otda-single; do
+  python "$project/forth/compile_r1.py" --entry r1-baseline-lock \
+    --replay-plan "$project/forth/plans/$target.json" > "/tmp/r1-fixed-$target.json"
+done
+```
+
+[BIP143 ALL](plans/bip143-all.json) · [OTDA ALL](plans/otda-all.json) · [OTDA SINGLE](plans/otda-single.json)
+
+回放时使用各计划记录的 `compiler_sha256` 校验编译器源码。同一工具链版本号下，源码变化也会产生新的指纹。更新指纹前，按原计划重建锁和构造器并核对已记录的产物哈希。初版固定计划及早期矩阵数据可以从原始提交复跑。[初版方案与编译器](https://github.com/linzhm/4thGraph/tree/9b13dfbbd50487ca868831788f653e2b75f9cd5a)
+
+花费测试使用固定版 chain-gang，覆盖 BIP143 ALL、OTDA ALL、配对和无配对的
+OTDA SINGLE。正例使用测试签名和实际夹具父输出。改动花费的锁定时间后，测试必须观察到
+交易绑定失败。用上文的隔离 regtest 启动器运行同一组测试时，BSV Node 也核对这些判定。
+这个入口供编译实验使用，钱包继续使用版本清单。
+
+### 两两交换优化方法
+
+`method-matrix` 固定同一份 `r1-baseline-lock`，分别从通用分表和已有仿射
+证明的分表起步。每张矩阵比较五种方法的 25 个有序对，行先列后，对角线检查
+重复应用。报告记录每一步的前提、应用后的状态和不适用原因。相同的锁和
+OTDA 重建程序共享验收回执，各个计划仍可独立追踪。
+
+```sh
+project=projects/p2pkh-r1
+export PYTHONPATH="src:.:$project/reference:$project/forth"
+python "$project/forth/msm_experiment.py" method-matrix --output /tmp/r1-methods.json
+python "$project/forth/msm_experiment.py" method-matrix --replay /tmp/r1-methods.json
+```
+
+这个探索入口用固定版 chain-gang 验收两进两出夹具。BIP143 ALL、OTDA ALL
+和配对 OTDA SINGLE 各自按资金交易加花费的实际字节排名。
+[矩阵结果（中）](../../../docs/optimization-paths.zh-CN.md#r1-有序方法探索) ·
+[Matrix results (EN)](../../../docs/optimization-paths.md#r1-ordered-method-exploration)
+
+### 自动扩展方法顺序
+
+`method-search` 从通用分表起步，逐层尝试当前状态可用的方法。方法数量由登记
+和前提决定。每个完整编译器状态只扩展一次，报告保留通往同一状态的其他顺序
+和不适用原因。允许在状态变化后再次应用同一方法。搜索默认最多 8 步和 64 个
+状态，合法状态用尽时提前停止。可用 `--max-depth` 和 `--max-states` 缩小预算。
+
+```sh
+python "$project/forth/msm_experiment.py" method-search --output /tmp/r1-method-search.json
+python "$project/forth/msm_experiment.py" method-search --replay /tmp/r1-method-search.json
+```
+
+重放使用回执里的预算。排名使用同一份两进两出夹具的实测资金交易加花费字节，
+BIP143 ALL、OTDA ALL 和配对 OTDA SINGLE 各自选出最小路径。
+
 `msm.fth` 用显式的 P‑256 双标量乘法表达窗口计算。编译器扫描固定生成元、标量范围和曲线点校验，比较各构造的实际锁与付款字节数，并逐字节核对 OTDA 重建。
 
 `compare --candidate v0.6.0` 直接读取并核对冻结的锁和 OTDA 重建程序，占用一个本地候选名额和一个付款复放名额。传入构造名时从 Forth 编译。v0.6.0 和 v0.7.0 使用同一份两进两出夹具。 [v0.6.0 清单](../versions/v0.6.0/manifest.json) · [v0.7.0 清单](../versions/v0.7.0/manifest.json)

@@ -1,0 +1,16 @@
+{
+  "version": "0.2.0",
+  "previous": "0.1.0",
+  "artifacts": [
+    "layout.json",
+    "template.hex",
+    "otda-reconstruct.hex"
+  ],
+  "fixtures": [],
+  "evidence": [
+    "measurements.json"
+  ],
+  "integration": "docs/sdk.en.md",
+  "build": "PYTHONPATH=src:. python projects/lamport-ots/reference/generate_template.py --check",
+  "verify": "bash projects/lamport-ots/reference/verify.sh"
+}

@@ -1,4 +1,6 @@
-# Pure ML-DSA-44
+<!-- Generated from manifest.yaml with Copier. -->
+
+# Pure ML-DSA-44 v0.11.0
 
 [简体中文](README.zh-CN.md) · [4thGraph](../../README.md) · [Project index](../README.md) · [Versions](versions/index.json)
 
@@ -8,11 +10,23 @@
 
 Make a lock from the raw ML-DSA-44 public key and sign the payment message in Pure mode with an empty context.
 
+[Protocol](docs/developer.en.md) · [Algorithm and execution](#algorithm-and-execution) · [Reproduce the checks](#reproduce-the-checks) · [Complete transactions and stack measurements](#complete-transactions-and-stack-measurements) · [Measurements data](versions/v0.11.0/measurements.json)
+
+| Entry point | Purpose |
+| --- | --- |
+| `fips204.verify(public_key, message, signature, context=...)` | Verify a byte message and optional context in Python. |
+| `script.verify_message_script(public_key, message_bytes, context=...)` | Compile the Script verifier. The public key, byte length and context are fixed at generation. The message and signature go on the stack. |
+| `script.locking_script(public_key)` | Bind the same verifier to the current input. It verifies the signature over a 32-byte transaction digest with the empty context. |
+
+## Use cases and trade-offs
+
+Evaluate Pure ML-DSA-44 when measuring FIPS 204 signer interoperability or large-script resource limits. A lab can start with the detached conformance vectors and then run the payment wrapper with the same kind of public key and a dedicated payment signer. The wrapper passes a 32-byte payment message to Pure ML-DSA-44 with an empty context. Key and signature validation, transaction binding, and node admission each have their own evidence. [Reproduction steps](#reproduce-the-checks)
+
+The fixed-key payment lock is about 252 kB in the measured fixtures. Evaluate script size, transaction size and validation policy on the target node or miner before choosing this format for a funded workflow. [Funded regtest method](../../docs/benchmark.md#funded-regtest-measurements)
+
+## Algorithm and execution
+
 [Protocol](docs/developer.en.md#protocol) · [Security](docs/developer.en.md#security) · [Verify](#reproduce-the-checks) · [Transaction costs](#complete-transactions-and-stack-measurements)
-
-**Status** · v0.11.0.
-
-## Algorithm overview
 
 ML-DSA is the post-quantum digital signature algorithm standardized in NIST
 FIPS 204. It derives from CRYSTALS-Dilithium and relies on the computational
@@ -28,12 +42,6 @@ and SHAKE256 to recompute the challenge and check it against the encoded one.
 When building a BSV payment lock, the Script compiler precomputes the matrix
 and transformed public-key polynomials for the fixed key. [Script verifier](reference/script.py)
 
-| Entry point | Purpose |
-|---|---|
-| `fips204.verify(public_key, message, signature, context=...)` | Verify a byte message and optional context in Python. |
-| `script.verify_message_script(public_key, message_bytes, context=...)` | Compile the Script verifier. The public key, byte length and context are fixed at generation. The message and signature go on the stack. |
-| `script.locking_script(public_key)` | Bind the same verifier to the current input. It verifies the signature over a 32-byte transaction digest with the empty context. |
-
 The payment wrapper supports all twelve BIP143 and Chronicle OTDA sighash
 combinations. Unpaired OTDA `SINGLE` uses the companion BIP143 binding.
 The wallet checks the funding output before requesting an
@@ -41,13 +49,7 @@ external signature. The caller authenticates the funding transaction and
 approves the transaction intent.
 [Transaction-binding construction](../../src/fourthgraph/bsv/pushtx.py)
 
-## Use cases and trade-offs
-
-Evaluate Pure ML-DSA-44 when measuring FIPS 204 signer interoperability or large-script resource limits. A lab can start with the detached conformance vectors and then run the payment wrapper with the same kind of public key and a dedicated payment signer. The wrapper passes a 32-byte payment message to Pure ML-DSA-44 with an empty context. Key and signature validation, transaction binding, and node admission each have their own evidence. [Reproduction steps](#reproduce-the-checks)
-
-The fixed-key payment lock is about 252 kB in the measured fixtures. Evaluate script size, transaction size and validation policy on the target node or miner before choosing this format for a funded workflow. [Funded regtest method](../../docs/benchmark.md#funded-regtest-measurements)
-
-## Sampling boundary
+### Sampling boundary
 
 Python and Script use the same 221-byte SHAKE256 output budget specified by
 FIPS 204 Appendix C, Table 3. It includes eight sign bytes and up to 213
@@ -57,11 +59,21 @@ Script sampler discards its intermediate stack values before failing.
 
 ## Reproduce the checks
 
+Run the release commands from the repository root with Python 3.12, OpenSSL 3.5 or later, and the pinned Chronicle SDK dependencies.
+
+```sh
+python -m pip install -r tools/requirements-chronicle.txt
+```
+
+```sh
+PYTHONPATH=src:.:projects/ml-dsa/reference python -c 'from benchmark_adapter import components; print(components(None))'
+PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- python -m unittest discover -s projects/ml-dsa/reference
+```
+
 The OpenSSL fixture uses a public test seed and deterministic signing.
 
 ```sh
 python -m unittest discover -s projects/ml-dsa/reference -p test_mldsa.py -v
-python -m pip install -r tools/requirements-chronicle.txt
 python projects/ml-dsa/reference/check_chain_gang.py -v
 python projects/ml-dsa/reference/test_shake_script.py -v
 python projects/ml-dsa/reference/test_signature_script.py -v
@@ -69,6 +81,8 @@ python projects/ml-dsa/reference/test_challenge_script.py -v
 python projects/ml-dsa/reference/test_boundaries.py -v
 python projects/ml-dsa/reference/test_payment.py -v
 ```
+
+Both engines matched 276 component boundary checks and 18 complete-payment boundary checks. [Boundary checks](reference/payment-acceptance.md#boundary-rejection)
 
 The Python verifier matched OpenSSL-generated test fixtures and all 80
 standard ML-DSA-44 Wycheproof cases. The bounded Python verifier and the

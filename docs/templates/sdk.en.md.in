@@ -1,0 +1,17 @@
+# Project SDK integration
+
+[简体中文](sdk.zh-CN.md) · [Project overview](../README.md) · [Protocol](spec.en.md)
+
+<a name="quickstart"></a>
+
+## Quickstart
+
+<!-- docs-template: Give the prerequisites, working directory, and a tested minimal call sequence. -->
+
+## API and signer boundary
+
+<!-- docs-template: Define argument and result formats, the responsibilities of the wallet and signer, and expected failures. Link the public entry points. -->
+
+## Verify the integration
+
+<!-- docs-template: Provide the replay command, fixture and expected result. Link the tested SDK or release version. -->

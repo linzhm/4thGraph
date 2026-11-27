@@ -6,7 +6,7 @@
 
 ## 收款和花费
 
-在统一 SDK 中选择项目 `p2pkh-schnorr`，默认使用 `v0.7.0` 模板。创建收款脚本时传入 32 字节 x-only 公钥或其 20 字节 HASH160。客户端在 Forth 编译产物中填入所有者哈希，识别时核对实际脚本的全部固定字节，也可以提供预期公钥。SDK 根据上一输出的脚本识别并花费两个版本的 UTXO。如需按原版创建输出，可将钱包的 `template` 设为 `v0.6.0`。
+在统一 SDK 中选择项目 `p2pkh-schnorr`，默认使用 `v0.17.0` 模板。创建收款脚本时传入 32 字节 x-only 公钥或其 20 字节 HASH160。客户端在 Forth 编译产物中填入所有者哈希，识别时核对实际脚本的全部固定字节，也可以提供预期公钥。SDK 根据上一输出的脚本识别并花费十二个版本的 UTXO。如需创建旧版输出，可将钱包的 `template` 设为相应版本。[版本目录](../versions/index.json)
 
 签名请求的算法为 `schnorr-secp256k1`，数据类型为 `message`，签名格式为 `bip340`。把 32 字节载荷作为消息交给 BIP340 签名器，直接返回签名器给出的 64 字节。SDK 验证签名并推导见证所需的公开坐标，再调用 Forth 的 `schnorr-unlock` 生成解锁脚本。[Forth 源码](../reference/schnorr.fth)
 
@@ -29,7 +29,7 @@ const signedHex = wallet.signPayment({
 }, ({ payload }) => signer.signBip340(payload));
 ```
 
-签署已组装的交易时，用 `signInput` 传入当前输入索引和已核验的上一输出。使用 Chronicle OTDA 时，根据实际链上下文填写 `chronicleActive`。SINGLE 需要同索引输出。Python、Rust 和 Go 也提供对应的接口。[统一调用表](../../../sdk/docs/reference.zh-CN.md#calls-and-data)
+签署已组装的交易时，用 `signInput` 传入当前输入索引和已核验的上一输出。使用 Chronicle OTDA 时，根据实际链上下文填写 `chronicleActive`。SINGLE 需要同索引输出。版本 2 交易的 OTDA ALL 或有同索引输出的 SINGLE 会在能缩短解锁脚本时使用预映像构造器。需要原样压栈时设置 `compressOtda: false`，Python 对应 `compress_otda=False`。Python、Rust 和 Go 也提供对应的接口。[统一调用表](../../../sdk/docs/reference.zh-CN.md#calls-and-data)
 
 <a name="integrate-musig2"></a>
 
