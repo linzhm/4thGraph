@@ -76,6 +76,45 @@ class DataflowTests(unittest.TestCase):
             values = [b"caller", *map(encode_num, inputs)]
             self.assertEqual(evaluate(grouped, values), ([b"caller", *map(encode_num, (*kept, *args))], []))
 
+    def test_scheduler_moves_an_operand_preserved_by_the_called_word(self):
+        # Both operations consume p, x and return the very same p with 2*x.
+        double = asm("OP_DUP OP_ADD")
+        steps = ((double, (0, 1), (0, 2)), (double, (0, 2), (0, 3)))
+        compact = emit_steps((0, 1), steps, (0, 3), compact=True, group_operands=True)
+        self.assertEqual(compact, double * 2)
+        self.assertLess(len(compact), len(emit_steps((0, 1), steps, (0, 3), compact=True)))
+        out = evaluate(compact, [b"caller", encode_num(19), encode_num(-3)])
+        self.assertEqual(out, ([b"caller", encode_num(19), encode_num(-12)], []))
+
+    def test_dataflow_tiles_bounded_concat_chains_without_observed_intermediates(self):
+        compiler = SourceCompiler("""
+            REQUIRE BSV
+            lock: repeat-checked ( seed:bytes expected:bytes )
+                seed 3 bytes-check-size dup
+                5 0 DO over bytes-cat LOOP nip expected bytes=
+            ;
+            lock: repeat-unchecked ( seed:bytes expected:bytes )
+                seed dup 5 0 DO over bytes-cat LOOP nip expected bytes=
+            ;
+            lock: keep-intermediate ( seed:bytes twice:bytes four:bytes )
+                seed 3 bytes-check-size dup bytes-cat
+                dup dup bytes-cat four bytes= verify twice bytes=
+            ;
+        """)
+        checked = compile_word(compiler.words["repeat-checked"], DATAFLOW)
+        plain = compile_word(compiler.words["repeat-checked"], "stack")
+        self.assertIn("tile-repeated-bytes", [rewrite.rule for rewrite in checked.rewrites])
+        self.assertLess(len(checked.script), len(plain.script))
+        self.assertEqual(evaluate(checked.script, [b"abc", b"abc" * 6]), ([encode_num(-1)], []))
+        self.assertEqual(evaluate(checked.script, [b"abc", b"abc" * 5]), ([b""], []))
+        with self.assertRaises(ScriptError):
+            evaluate(checked.script, [b"ab", b"ab" * 6])
+        for name in ("repeat-unchecked", "keep-intermediate"):
+            code = compile_word(compiler.words[name], DATAFLOW)
+            self.assertNotIn("tile-repeated-bytes", [rewrite.rule for rewrite in code.rewrites])
+        code = compile_word(compiler.words["keep-intermediate"], DATAFLOW).script
+        self.assertEqual(evaluate(code, [b"abc", b"abc" * 2, b"abc" * 4]), ([encode_num(-1)], []))
+
     def test_assertion_fusion_requires_an_unobserved_flag(self):
         source = SourceCompiler("""
             REQUIRE BSV

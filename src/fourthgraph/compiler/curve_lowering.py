@@ -7,6 +7,7 @@ from fourthgraph.bsv.evaluate import evaluate
 from fourthgraph.bsv.script import asm, decode_num, encode_num, number, push
 from .curve_windows import CURVES, GLV_PACKED, GLV_REFERENCE, GLV_SCALED, JOINT_STRATEGIES, SECP256K1, fixed_table, scalar_plans
 from .lowering import DATAFLOW, compile_word
+from .modular_scale import lower_modular_scale
 from .script_builder import ScriptBuilder
 from .source import SourceCompiler
 from .stack_schedule import emit_steps
@@ -205,23 +206,6 @@ def _joint_library():
     return ScriptBuilder("REQUIRE stdlib/secp256k1.fth\nREQUIRE stdlib/secp256k1-window.fth")
 
 
-@cache
-def _scale_script(name, optimization):
-    source = SourceCompiler("REQUIRE stdlib/weierstrass.fth")
-    return compile_word(source.words[name], optimization).script
-
-
-def _scaled_coordinates(model, optimization, *, affine=False, inverse=False):
-    name = "weierstrass-scale-affine" if affine else "weierstrass-scale"
-    factors = b"".join(map(number, model.factors(inverse=inverse)))
-    reduced = factors + _scale_script(name, optimization)
-    # u^3 times a reduced coordinate takes at most four field widths. This
-    # alternative fits within 129 ScriptNum bytes on the supported 256-bit field.
-    root = number(pow(model.root, -1, model.field) if inverse else model.root)
-    from_root = root + _scale_script(name + "-root", optimization)
-    return min((reduced, from_root), key=len)
-
-
 def _pack_windows(*lanes):
     return bytes(sum(((value >> shift) & 3) << (2 * lane) for lane, value in enumerate(lanes))
                  for shift in range(126, -1, -2))
@@ -241,8 +225,11 @@ def _optimized_joint_words(vocabulary, optimization, *, scaled):
     scale_public = restore = b""
     if scaled:
         model = SECP256K1.normalized_a0()
-        scale_public = _scaled_coordinates(model, optimization, affine=True)
-        restore = _scaled_coordinates(model, optimization, inverse=True)
+        # Validated affine inputs and the point kernels supply reduced coordinates.
+        # The 256-bit model fits a full u^3 times a coordinate in 129 bytes.
+        bounds = {"coordinate_bound": model.field - 1, "scriptnum_bytes": 129}
+        scale_public = lower_modular_scale(model.field, model.root, optimization, affine=True, **bounds)
+        restore = lower_modular_scale(model.field, pow(model.root, -1, model.field), optimization, **bounds)
         words["add-points"] = numeric_fragment(library.emit(prefix + "add-with-field", b"", 1), 7, 4)
         points = tuple(model.affine(point) for point in points)
     words["map-affine-in-field"] = numeric_fragment(scale_public, 3, 3)
@@ -255,27 +242,34 @@ def _optimized_joint_words(vocabulary, optimization, *, scaled):
 def _variable_stack_table(frontend, words, optimization):
     """Schedule the three nonzero rows around the shared P, 2P and 3P."""
     p, px, py, qx, qy = inputs = (0, 1, 2, 3, 4)
-    steps = []
-    next_slot = len(inputs)
-
-    def emit(code, args, count):
-        nonlocal next_slot
-        outputs = tuple(range(next_slot, next_slot + count))
-        steps.append((code, args, outputs))
-        next_slot += count
-        return outputs
-
-    one, = emit(number(1), (), 1)
-    P, Q = (px, py, one), (qx, qy, one)
-    drop_field = asm("3 OP_ROLL OP_DROP")
-    P2 = emit(words["double-point"].code + drop_field, (p, *P), 3)
-    P3 = emit(words["add-fixed-affine"].code + drop_field, (p, *P2, px, py), 3)
     map_row = compile_word(frontend.words["map-row-start"], optimization).script
     row = compile_word(frontend.words["stack-table-row"], optimization).script
-    Q2, Q3 = (emit(map_row, (p, py, qy, *point), 3) for point in (P2, P3))
-    rows = [emit(row, (p, px, py, *point), 12) for point in (Q, Q2, Q3)]
-    return emit_steps(inputs, steps, (p, *P, *P2, *P3, *(slot for row in rows for slot in row)), compact=True,
-                      trim_suffix=optimization == DATAFLOW, group_operands=optimization == DATAFLOW)
+
+    def schedule(preserve_field):
+        steps = []
+        next_slot = len(inputs)
+
+        def emit(code, args, count, retained=()):
+            nonlocal next_slot
+            outputs = tuple(range(next_slot, next_slot + count))
+            steps.append((code, args, (*retained, *outputs)))
+            next_slot += count
+            return outputs
+
+        one, = emit(number(1), (), 1)
+        P, Q = (px, py, one), (qx, qy, one)
+        retained = (p,) if preserve_field else ()
+        drop = b"" if preserve_field else asm("3 OP_ROLL OP_DROP")
+        P2 = emit(words["double-point"].code + drop, (p, *P), 3, retained)
+        P3 = emit(words["add-fixed-affine"].code + drop, (p, *P2, px, py), 3, retained)
+        Q2, Q3 = (emit(map_row, (p, py, qy, *point), 3) for point in (P2, P3))
+        rows = [emit(row, (p, px, py, *point), 12) for point in (Q, Q2, Q3)]
+        returns = (p, *P, *P2, *P3, *(slot for values in rows for slot in values))
+        return emit_steps(inputs, steps, returns, compact=True, trim_suffix=optimization == DATAFLOW,
+                          group_operands=optimization == DATAFLOW)
+
+    plain = schedule(False)
+    return min((plain, schedule(True)), key=len) if optimization == DATAFLOW else plain
 
 
 def _stack_joint_script(frontend, words, points, optimization):
