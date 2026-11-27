@@ -9,5 +9,6 @@
 | **PELS Counter** | [Build and replay](../projects/pels-counter/README.md) covers the funded `0 → 1 → 2` sequence and rejected mutations |
 | **BIP340** | P2PKH-Schnorr v0.16.0 measures 21,705 B for the standalone verifier and 22,515 B per payment lock. [Schnorr results](../projects/p2pkh-schnorr/README.md#measured-sizes) · [Measurements](../projects/p2pkh-schnorr/versions/v0.16.0/measurements.json) · [BIP340 vectors](../projects/p2pkh-schnorr/versions/v0.6.0/bip340-vectors.csv) |
 | **BLS12-381 Groth16** | [Fixed-statement comparison](../projects/proof-counter/reference/fixed-statement/README.md) and [recorded benchmark](../projects/proof-counter/versions/v0.1.0/measurements.json) |
+| **Lamport OTS** | The v0.2.0 candidate measures 6,525 B per lock and 48,106 B per two-input, two-output OTDA ALL payment with reconstruction. [Lamport results](../projects/lamport-ots/README.md) · [Versioned measurements](../projects/lamport-ots/versions/v0.2.0/measurements.json) |
 
 The [wallet benchmark](../docs/benchmark.md) specifies transaction shapes, measurement and engine pins for cross-project comparisons.

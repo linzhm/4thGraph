@@ -1,0 +1,14 @@
+{
+  "version": "0.2.0",
+  "commitment_offset": 5991,
+  "lock": {
+    "file": "template.hex",
+    "bytes": 6525,
+    "sha256": "04cdbb64996418011e61bfaebc456a5f85d2cedd47e67e86f134b5fe3c7a67c4"
+  },
+  "reconstruction": {
+    "file": "otda-reconstruct.hex",
+    "bytes": 871,
+    "sha256": "6c590d28652405eb090ee162c12a24b176519d1d82ff467131056a4f27355df6"
+  }
+}
