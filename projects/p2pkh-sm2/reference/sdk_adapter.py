@@ -1,12 +1,11 @@
 """P2PKH-SM2 lock recognition and external raw or SignedData authorization."""
-from assemble import SCHEDULED_TEMPLATE_VERSION, TEMPLATE_VERSION
+from assemble import TEMPLATE_PROFILES, TEMPLATE_VERSION
 from p2pkh_sm2 import identify, locking_script_from_owner_hash, locking_script_from_public_key
 from p2pkh_sm2 import public_key_hash160, sign_input, sign_previous as authorize_previous
 from signed_data import signed_data_signer
 
 
-PROFILES = {TEMPLATE_VERSION: "v1.0.0", SCHEDULED_TEMPLATE_VERSION: "v1.2.0"}
-VERSIONS = {profile: version for version, profile in PROFILES.items()}
+VERSIONS = {profile: version for version, profile in TEMPLATE_PROFILES.items()}
 
 
 def template_version(profile):
@@ -32,7 +31,7 @@ def recognize(script, public_key):
     version, owner = result
     if public_key is not None and owner != public_key_hash160(public_key):
         return None
-    return {"template": PROFILES[version], "ownerHash160": owner.hex()}
+    return {"template": TEMPLATE_PROFILES[version], "ownerHash160": owner.hex()}
 
 
 def sign_spend(tx, index, funding_raw, public_key, signer, sighash, options):

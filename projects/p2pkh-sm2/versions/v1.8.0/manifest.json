@@ -1,0 +1,19 @@
+{
+  "version": "1.8.0",
+  "previous": "1.7.0",
+  "artifacts": [
+    "mixed-otda-constructor.json"
+  ],
+  "fixtures": [],
+  "evidence": [
+    "measurements.json",
+    "latest-template-coverage.json"
+  ],
+  "integration": "docs/sdk.en.md",
+  "build": "python projects/p2pkh-sm2/reference/generate_otda_constructor.py --mixed /tmp/sm2-otda-mixed.json",
+  "verify": "bash projects/p2pkh-sm2/reference/verify.sh",
+  "shared_data": [
+    "versions/v1.6.0/layout.json",
+    "versions/v1.7.0/layout.json"
+  ]
+}
