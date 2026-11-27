@@ -195,3 +195,25 @@ REGTEST_CHRONICLE_HEIGHT=5 PYTHONPATH=src:. bash tools/verify_node.sh --profile 
   "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/experiments/high-level/window_compare.py \
   --joint-lowerings --matrix-only --output workspace/schnorr-high-level/boundary-matrix.json
 ```
+
+## Point comparison models
+
+The baseline is built from commit `641153b` of PR #113. The comparison keeps the same batched witness, dataflow compilation, window loop, payment binding, and reconstruction method. The first candidate restores the multiplication result to the original model before checking the nonce point. The second moves the inverse scale inside the modular zero tests. The third maps the public and nonce points together before multiplication, and compares in the scaled model. It uses the same scale factors and passes the field prime into the joint word. [Shared model formulas](../../../src/fourthgraph/stdlib/weierstrass-model.fth)
+
+| Comparison | Before the windows | After the windows | Payment lock | 2×2 OTDA ALL with reconstruction |
+| --- | ---: | ---: | ---: | ---: |
+| Restore before comparison | 3,861 B | 138 B | 23,188 B | 57,638 B |
+| Inverse scale inside the residual | 3,861 B | 127 B | 23,177 B | 57,594 B |
+| Map both affine points together | 3,890 B | 82 B | 23,161 B | 57,530 B |
+| Handwritten v0.17.0 | 3,172 B | 74 B | 22,435 B | 54,626 B |
+
+All four builds use the same 18,379 B window sequence. The paired map adds 29 B before the loop and saves 56 B after it. The remaining 726 B per lock comprises 374 B before the joint word, 344 B in joint preparation, and 8 B after the windows. Both engines replay the detached vectors and malformed witnesses, all paired signature modes and native exits. The smallest candidate also passes the eight constructor cases. [Measurements](../experiments/high-level/model-output-measurements.json) · [Transaction matrix](../experiments/high-level/model-output-matrix.json)
+
+```sh
+PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
+  "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/experiments/high-level/window_compare.py \
+  --joint-lowerings --output workspace/schnorr-high-level/model-output-measurements.json
+REGTEST_CHRONICLE_HEIGHT=5 PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
+  "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/experiments/high-level/window_compare.py \
+  --joint-lowerings --matrix-only --output workspace/schnorr-high-level/model-output-matrix.json
+```

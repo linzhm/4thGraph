@@ -14,7 +14,7 @@ from fourthgraph.bsv.transaction import Input, Output, Transaction
 from fourthgraph.compiler.curve_lowering import compile_fixed_generator, compile_joint_generator_point
 from fourthgraph.compiler.curve_windows import CURVES, GLV_REFERENCE, JOINT_STRATEGIES, P256, SECP256K1, SM2, fixed_table, scalar_plans
 from fourthgraph.compiler.lowering import DATAFLOW, compile_word
-from fourthgraph.compiler.modular_scale import lower_modular_scale
+from fourthgraph.compiler.modular_scale import lower_affine_pair_scale, lower_modular_scale, lower_scaled_residuals
 from fourthgraph.compiler.source import CompileError, SourceCompiler
 from fourthgraph.stdlib.weierstrass import CoordinateScale
 
@@ -117,6 +117,41 @@ class CurveWindowsTests(unittest.TestCase):
         for x, y in ((-19, model.field - 1), (0, 12), (-1, 0)):
             source = [b"caller", *map(encode_num, (model.field, x, y))]
             self.assertEqual(evaluate(optimized, source), evaluate(fallback, source))
+
+    def test_affine_pair_map_matches_two_independent_scales(self):
+        for curve in CURVES.values():
+            field = curve.field
+            root = field // 2
+            first, second = curve.generator, (1 - field, -15)
+            inputs = [b"caller", *map(encode_num, (field, *first, *second))]
+            single = lower_modular_scale(field, root, DATAFLOW, affine=True,
+                                         coordinate_bound=field - 1, scriptnum_bytes=129)
+            for budget in (65, 129):
+                code = lower_affine_pair_scale(field, root, DATAFLOW, coordinate_bound=field - 1, scriptnum_bytes=budget)
+                output, alt = evaluate(code, inputs)
+                left, _ = evaluate(single, inputs[1:4])
+                right, _ = evaluate(single, [inputs[1], *inputs[4:]])
+                self.assertEqual((output, alt), ([b"caller", *left, *right[1:]], []))
+
+    def test_fused_residuals_preserve_modular_zero_tests(self):
+        model = SECP256K1.normalized_a0()
+        cases = ((7, 3, (2, -2, 4, -4, 1)),
+                 (model.field, pow(model.root, -1, model.field), (-9, 7, -100, 120, -3)))
+        with self.assertRaisesRegex(ValueError, "within the ScriptNum budget"):
+            lower_scaled_residuals(model.field, model.root, DATAFLOW, coordinate_bound=model.field - 1, scriptnum_bytes=32)
+        for field, root, values in cases:
+            x_factor, y_factor = pow(root, 2, field), pow(root, 3, field)
+            separate = lower_modular_scale(field, root, DATAFLOW, coordinate_bound=field - 1, scriptnum_bytes=129)
+            known = (3 * x_factor % field, 5 * y_factor % field, 3, 5, 1)
+            for budget in (65, 129):
+                fused = lower_scaled_residuals(field, root, DATAFLOW, coordinate_bound=field - 1, scriptnum_bytes=budget)
+                for rx, ry, x, y, z in (values, known, (0, 0, 0, 1, 0)):
+                    result, alt = evaluate(fused, [b"caller", *map(encode_num, (rx, ry, field, x, y, z))])
+                    mapped, _ = evaluate(separate, list(map(encode_num, (field, x, y, z))))
+                    self.assertEqual((result[0], decode_num(result[1]), alt), (b"caller", z, []))
+                    before = tuple((decode_num(v) - r * z) % field == 0 for v, r in zip(mapped[1:3], (rx, ry)))
+                    after = tuple(decode_num(v) == 0 for v in result[2:])
+                    self.assertEqual(before, after)
 
     @unittest.skipUnless(which("openssl"), "requires OpenSSL for independent point multiplication")
     def test_curve_registry_and_fixed_tables(self):

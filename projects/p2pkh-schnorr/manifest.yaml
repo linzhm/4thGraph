@@ -142,6 +142,7 @@ sections:
         · [Joint lowering candidates](docs/high-level-forth.en.md#joint-lowering-candidates)
         · [Dataflow iteration](docs/high-level-forth.en.md#dataflow-iteration)
         · [Stack and model boundaries](docs/high-level-forth.en.md#stack-and-model-boundaries)
+        · [Point comparison models](docs/high-level-forth.en.md#point-comparison-models)
     zh-CN:
       - |-
         ```sh
@@ -158,6 +159,7 @@ sections:
         · [联合点乘候选](docs/high-level-forth.zh-CN.md#joint-lowering-candidates)
         · [数据流优化迭代](docs/high-level-forth.zh-CN.md#dataflow-iteration)
         · [栈和坐标模型边界](docs/high-level-forth.zh-CN.md#stack-and-model-boundaries)
+        · [点比较的坐标模型](docs/high-level-forth.zh-CN.md#point-comparison-models)
   script_sizes:
     en:
       - |-

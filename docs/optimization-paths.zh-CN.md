@@ -141,3 +141,7 @@ P-256 使用同一套坐标模型接口及原 `a=-3` 内核。它的六次幂判
 `dataflow` 会识别将同一个值连续拼接的 `bytes-cat` 序列。它要求输入字节宽度已知，而且每个中间结果都只在这一段中使用。编译器比较替换前后整个 Script 的字节数，把搬栈成本一并计算。六份拼接用例从 `stack` 的 21 B 降到 16 B。直接构造 Script 片段时也可调用 `bsv-tile-top`。[回归用例](../tests/test_dataflow.py)
 
 链接调用若声明某个输出与输入是同一个值，调度器可把原值移入调用，即使返回后仍要使用它。模缩放 lowering 根据已登记的根、模数、坐标范围和 ScriptNum 预算比较预计算因子与运行时求幂。证据不足或中间值超出预算时，使用预计算因子的实现。Schnorr 建表会比较保留模数和复制模数两种调度，选较短的脚本。[模缩放 lowering](../src/fourthgraph/compiler/modular_scale.py)
+
+### 跨模型的点比较
+
+共享 Weierstrass 公式提供两种比较缩放齐次点与仿射参考点的办法。其一是把逆缩放直接并入模等式，省去坐标恢复时的中间约减。这样可能改变有符号余数的正负，是否为零保持等价。其二是用同一份正向缩放因子映射两个仿射点，再在缩放模型中比较。公式编译器绑定已知因子、验证中间值的 ScriptNum 上界，并比较生成字节数。两条路径都检查 `Z` 非零。[共享公式](../src/fourthgraph/stdlib/weierstrass-model.fth) · [Schnorr 对照](../projects/p2pkh-schnorr/docs/high-level-forth.zh-CN.md#point-comparison-models)

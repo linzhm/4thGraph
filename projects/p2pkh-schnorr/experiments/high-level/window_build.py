@@ -1,17 +1,38 @@
 """Compile BIP340 with the packaged GLV lowering and the same generated point formula."""
 from compare import HERE, compile_candidate
-from fourthgraph.compiler.curve_lowering import joint_source, joint_vocabulary, link_joint_word
-from fourthgraph.compiler.curve_windows import GLV_REFERENCE
+from fourthgraph.compiler.curve_lowering import joint_source, joint_vocabulary, link_joint_word, numeric_fragment
+from fourthgraph.compiler.curve_windows import GLV_REFERENCE, GLV_SCALED, SECP256K1
+from fourthgraph.compiler.modular_scale import lower_affine_pair_scale, lower_scaled_residuals
 from fourthgraph.compiler.wordsets import Primitive
 
 
-def compile_window_candidate(plan, *, trace=False, linked=False, strategy=GLV_REFERENCE, joint_code=None, batch=False):
+def compile_window_candidate(plan, *, trace=False, linked=False, strategy=GLV_REFERENCE, joint_code=None, batch=False,
+                             comparison="restored"):
     if strategy != GLV_REFERENCE and not linked:
         raise ValueError("optimized joint lowerings require a linked word")
+    if comparison not in ("restored", "fused", "paired"):
+        raise ValueError("unknown projective comparison")
+    scaled_output = comparison != "restored"
+    mapped_input = comparison == "paired"
+    if scaled_output and (strategy != GLV_SCALED or not batch):
+        raise ValueError("comparison in a scaled model requires batched inputs and the scaled joint strategy")
+
     def link(vocabulary, optimization):
-        words = link_joint_word(vocabulary, optimization, strategy=strategy)
+        words = link_joint_word(vocabulary, optimization, strategy=strategy, scaled_output=scaled_output,
+                                mapped_input=mapped_input)
         if joint_code is not None:
-            joint_code.append(words["secp256k1-joint-window-2"].code)
+            kernel, = words.values()
+            joint_code.append(kernel.code)
+        if scaled_output:
+            model = SECP256K1.normalized_a0()
+            bounds = {"coordinate_bound": model.field - 1, "scriptnum_bytes": 129}
+            if mapped_input:
+                transform = lower_affine_pair_scale(model.field, model.root, optimization, **bounds)
+                words["map-affine-pair"] = numeric_fragment(transform, 5, 5)
+            else:
+                inverse = pow(model.root, -1, model.field)
+                compare = lower_scaled_residuals(model.field, inverse, optimization, **bounds)
+                words["scaled-nonce-residuals"] = numeric_fragment(compare, 6, 3)
         return words
 
     def vocabulary(library):
@@ -28,7 +49,7 @@ def compile_window_candidate(plan, *, trace=False, linked=False, strategy=GLV_RE
                                                     "six fixed-width fields", may_fail=True)
         return words
 
-    suffix = "-batch" if batch else ""
+    suffix = f"-{comparison}" if scaled_output else "-batch" if batch else ""
     return compile_candidate(plan, trace=trace, source=HERE / f"window-verifier{suffix}.fth", entry=f"window-bip340{suffix}",
                              extra_vocabulary=vocabulary,
                              source_prefix="" if linked else joint_source(),

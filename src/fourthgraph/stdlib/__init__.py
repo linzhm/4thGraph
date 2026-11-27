@@ -101,6 +101,20 @@ def weierstrass_export(*, affine, root):
                   requirements + " A zero modulus or oversized ScriptNum aborts.")
 
 
+def weierstrass_model_exports():
+    factor = Parameter("factors", "field-elements", "Square and cube of the scale into the reference model")
+    root = Parameter("root", "field-element", "Scale into the reference model")
+    shapes = (
+        ("weierstrass-scaled-residuals", "Affine reference, field, and homogeneous X, Y, Z",
+         "Returns Z and two signed residues for modular zero tests."),
+        ("weierstrass-scale-pair", "Field followed by two affine points",
+         "Returns the field and both points in the same new model."),
+    )
+    return tuple(script_fragment(name + suffix, (Parameter("points", "coordinates", shape), parameter),
+                                 failure="Supply a positive field and bounded coordinates. " + result)
+                 for name, shape, result in shapes for suffix, parameter in (("", factor), ("-root", root)))
+
+
 def wallet_library(module, entries, *, accumulator="bytes", parameters=()):
     exports = tuple(Export(entry, (accumulator,), (accumulator,), (WALLET_BACKEND,),
                            (Parameter("prefix", accumulator, "Serialized Script to extend"),),
@@ -180,6 +194,7 @@ LIBRARIES = {
     "std/weierstrass": Library(ROOT / "stdlib/weierstrass.fth", tuple(
         weierstrass_export(affine=affine, root=root) for affine in (False, True) for root in (False, True)
     )),
+    "std/weierstrass-model": Library(ROOT / "stdlib/weierstrass-model.fth", weierstrass_model_exports(), WALLET_BACKEND),
     "std/hash-chain": Library(ROOT / "stdlib/hash-chain.fth", tuple(
         script_fragment(name, (Parameter("data", "bytes", "Initial byte string"),), takes=("script", "cell"),
                         build_parameters=(Parameter("count", "cell", count),),
