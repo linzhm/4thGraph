@@ -1,0 +1,21 @@
+{
+  "profile": "p2pkh-r1",
+  "template_version": "0.6.0",
+  "role": "owner",
+  "module": "holder.wasm",
+  "parameters": [
+    {
+      "name": "owner_hash160",
+      "offset": 208,
+      "length": 20
+    }
+  ],
+  "paths": {
+    "ordinary-all": {
+      "script_code_offset": 41362,
+      "mode": 65,
+      "signatures": 1
+    }
+  },
+  "fixture": "r1-ordinary"
+}
