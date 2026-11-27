@@ -50,6 +50,28 @@ class WorkflowTests(unittest.TestCase):
             if blocker:
                 self.assertEqual(explanation["candidates"]["fused-prefix"]["exclusions"][0]["code"], blocker)
 
+    def test_prefix_replay_rejects_wrong_signature_when_stages_share_an_authorizer(self):
+        path = SOURCE.parents[1] / "workflow-examples" / "serial-graph.fth"
+        source = path.read_text().replace("scaled alice", "scaled operator").replace("route bob", "route operator")
+        with TemporaryDirectory() as scratch:
+            shared = Path(scratch) / path.name
+            shared.write_text(source)
+            report = replay_prefix(shared)
+        self.assertIn("wrong_authorization", report["layouts"]["fused-prefix"]["rejected"])
+
+    def test_prefix_replay_propagates_engine_errors_during_negative_checks(self):
+        path = SOURCE.parents[1] / "workflow-examples" / "serial-graph.fth"
+
+        def validate(*args, **kwargs):
+            try:
+                validate_at_heights(*args, **kwargs)
+            except ValueError as error:
+                raise RuntimeError("engine unavailable") from error
+
+        with patch("fourthgraph.replay.prefix_workflow.validate_at_heights", side_effect=validate):
+            with self.assertRaisesRegex(RuntimeError, "engine unavailable"):
+                replay_prefix(path)
+
     def test_auto_target_ranks_legal_families_after_layout_checks(self):
         source = SOURCE.read_bytes()
         program = SourceCompiler(source.decode(), source_path=SOURCE).workflow()

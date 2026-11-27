@@ -8,6 +8,7 @@ from pathlib import Path
 
 from fourthgraph.benchmark.validation import CONTEXT_PIN, chain_metadata
 from fourthgraph.bsv.chain_gang import validate_at_heights
+from fourthgraph.bsv.differential import is_chain_gang_script_rejection
 from fourthgraph.bsv.script import asm
 from fourthgraph.bsv.transaction import Input, Output, Transaction
 from fourthgraph.compiler.source import FUSED_PREFIX, SourceCompiler
@@ -61,7 +62,8 @@ def replay(source, current=19):
             bad_output = replace(output, script=output.script[:34] + state.to_bytes(5, "little") + output.script[39:])
             bad_draft = replace(draft, tx=replace(draft.tx, outputs=(bad_output,)))
             bad_state = bad_draft.seal(keys.sign)
-            wrong_signer = draft.seal(lambda request: keys.sign(replace(request, authorizer=last.authorizers[0])))
+            wrong_role = next(role for role in keys.public if role not in first.authorizers)
+            wrong_signer = draft.seal(lambda request: keys.sign(replace(request, authorizer=wrong_role)))
             terminal_draft = contract.prepare(last.name, done)
             altered_parent = replace(done[first.name], locktime=1)
             bad_parent = replace(terminal_draft, payload=((altered_parent.serialize(),),)).seal(keys.sign)
@@ -71,7 +73,9 @@ def replay(source, current=19):
             for name, (tx, parent, height) in checks.items():
                 try:
                     validate_at_heights(tx, (parent,), spend_height=height, activation_height=100, utxo_heights=(height-1,))
-                except (ValueError, RuntimeError):
+                except ValueError as error:
+                    if not is_chain_gang_script_rejection(error):
+                        raise
                     rejected.append(name)
                 else:
                     raise ValueError(f"chain-gang accepted {name}")
