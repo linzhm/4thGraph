@@ -284,7 +284,7 @@ REGTEST_CHRONICLE_HEIGHT=5 PYTHONPATH=src:. bash tools/verify_node.sh --profile 
 | `Q`、`2Q`、`3Q` 共用映射 | 3,017 B | 22,902 B | 56,494 B |
 | 手工 v0.17.0 | 2,763 B | 22,435 B | 54,626 B |
 
-两份自动版使用同一 `dataflow` 配置及交易夹具，18,379 B 的窗口主体逐字节相同。每锁剩余 467 B，联合点乘调用前占 207 B，联合点乘准备占 254 B，窗口后占 6 B。BSV Node 和 chain-gang 复放了独立验签、付款和八种构造器场景。[实测](../experiments/high-level/window-beta-measurements.json) · [交易矩阵](../experiments/high-level/window-beta-matrix.json)
+`380ecae` 上的两份自动版使用同一 `dataflow` 配置及交易夹具，18,379 B 的窗口主体逐字节相同。每锁剩余 467 B，联合点乘调用前占 207 B，联合点乘准备占 254 B，窗口后占 6 B。BSV Node 和 chain-gang 复放了独立验签、付款和八种构造器场景。[实测](../experiments/high-level/window-beta-measurements.json) · [交易矩阵](../experiments/high-level/window-beta-matrix.json)
 
 ```sh
 PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
@@ -293,4 +293,27 @@ PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
 REGTEST_CHRONICLE_HEIGHT=5 PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
   "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/experiments/high-level/window_compare.py \
   --joint-lowerings --forth-tuning --matrix-only --output workspace/schnorr-high-level/window-beta-matrix.json
+```
+
+<a name="packing-the-fixed-base-scalar-directly"></a>
+
+## 固定基标量直接打包
+
+栈表准备把已检查的非负标量 `s` 一次编码成 33 字节小端 ScriptNum，再切出两个 16 字节半段。即使第 255 位为 1，最后一个字节也单独保留符号。两个半段和 GLV 分解所得的两个标量幅值按原顺序进入同一个转置词。这省去了对 `2^128` 的整数除法、取余，以及两个半段各自的数值编码。[Forth 打包源码](../../../src/fourthgraph/stdlib/secp256k1-window.fth)
+
+| 构建 | 联合点乘准备 | 付款锁 | 两进两出 OTDA ALL，使用构造器 |
+| --- | ---: | ---: | ---: |
+| `380ecae` 的数值拆分 | 3,017 B | 22,902 B | 56,494 B |
+| 直接切分字节 | 2,970 B | 22,855 B | 56,306 B |
+| 手工 v0.17.0 | 2,763 B | 22,435 B | 54,626 B |
+
+两份自动版使用同一 `dataflow` 配置及交易夹具，18,379 B 的窗口主体逐字节相同。每锁剩余 420 B，联合点乘调用前和准备阶段各占 207 B，窗口后占 6 B。打包测试覆盖四个分量的每个两位位置、全零、全一及固定的混合输入。双引擎复放覆盖验签、付款和八种构造器场景。[实测](../experiments/high-level/fixed-scalar-measurements.json) · [交易矩阵](../experiments/high-level/fixed-scalar-matrix.json)
+
+```sh
+PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
+  "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/experiments/high-level/window_compare.py \
+  --joint-lowerings --forth-tuning --output workspace/schnorr-high-level/fixed-scalar-measurements.json
+REGTEST_CHRONICLE_HEIGHT=5 PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
+  "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/experiments/high-level/window_compare.py \
+  --joint-lowerings --forth-tuning --matrix-only --output workspace/schnorr-high-level/fixed-scalar-matrix.json
 ```
