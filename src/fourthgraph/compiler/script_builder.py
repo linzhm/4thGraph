@@ -4,7 +4,8 @@ from pathlib import Path
 
 from fourthgraph.bsv.script import OPS, number, push, tile_top
 
-from .source import CompileError, Located, SourceCompiler, Word, evaluate
+from .graph_source import read_assertion_graph
+from .source import CompileError, Located, SourceCompiler, Word, evaluate, named_token
 from .script_formula import read_formula, validate_formula_passes
 from fourthgraph.stdlib import WALLET_BACKEND
 from .wordsets import script_word
@@ -72,6 +73,27 @@ class ScriptBuilder(SourceCompiler):
         return cls(path.read_text(encoding="utf-8"), source_path=path, **options)
 
     def declaration(self, token):
+        if token.name == "assertion-graph:":
+            name = named_token(self.tokens, token, "assertion graph name")
+            if name.name.startswith("bsv-") or name.name in self.words:
+                raise name.error(f"invalid or duplicate assertion graph {name.text!r}")
+            fragments = {}
+
+            def emit_fragment(word):
+                if word.name not in fragments:
+                    definition = self.words.get(word.name)
+                    if definition is None or (definition.takes, definition.gives) != (("script",), ("script",)):
+                        raise word.error("a graph fragment must be a declared ( script -- script ) word")
+                    if not isinstance(definition, Word):
+                        definition = Word(("script",), ("script",), (Located(definition, word),), "build")
+                    (fragments[word.name],) = evaluate(definition, b"")
+                return fragments[word.name]
+
+            code = read_assertion_graph(self.tokens, name, emit_fragment)
+            append = build_word("script", "script", lambda prefix: prefix + code)
+            self.words[name.name] = Word(("script",), ("script",), (Located(append, name),), "build", name=name.name)
+            self.definitions[name.name] = name
+            return
         if token.name != "formula:":
             super().declaration(token)
             return
@@ -106,3 +128,22 @@ class ScriptBuilder(SourceCompiler):
             raise CompileError(f"{entry} must produce one Script")
         result, = evaluate(word, *args, build_call=build_call)
         return result
+
+
+def main(argv=None):
+    """Compile a parameterless Forth Script constructor without a project backend."""
+    import argparse
+    from hashlib import sha256
+    import json
+
+    parser = argparse.ArgumentParser(prog="4thgraph script-build", description=main.__doc__)
+    parser.add_argument("source", type=Path)
+    parser.add_argument("--entry", required=True)
+    parser.add_argument("--output", type=Path, required=True)
+    args = parser.parse_args(argv)
+    try:
+        script = ScriptBuilder.from_file(args.source).emit(args.entry)
+        args.output.write_bytes(script)
+    except (OSError, ValueError) as error:
+        parser.error(str(error))
+    print(json.dumps({"script_bytes": len(script), "script_sha256": sha256(script).hexdigest()}))

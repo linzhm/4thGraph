@@ -179,3 +179,20 @@ P-256 使用同一套坐标模型接口及原 `a=-3` 内核。它的六次幂判
 ### 跨模型的点比较
 
 共享 Weierstrass 公式提供两种比较缩放齐次点与仿射参考点的办法。其一是把逆缩放直接并入模等式，省去坐标恢复时的中间约减。这样可能改变有符号余数的正负，是否为零保持等价。其二是用同一份正向缩放因子映射两个仿射点，再在缩放模型中比较。公式编译器绑定已知因子、验证中间值的 ScriptNum 上界，并比较生成字节数。两条路径都检查 `Z` 非零。[共享公式](../src/fourthgraph/stdlib/weierstrass-model.fth) · [Schnorr 对照](../projects/p2pkh-schnorr/docs/high-level-forth.zh-CN.md#point-comparison-models)
+
+## STARK 验证器迭代
+
+两个项目为同一公开声明 `(0, 1, 987)` 生成完整 Forth 验证器。各候选均使用 v0.1.0 证明和同一见证格式。Python 比较程序先检查两个有效声明和 12 个反例，再按锁定与解锁脚本的合计字节数排序。 [BabyBear 实测](../projects/plonky3-stark-verifier/versions/v0.2.0/measurements.json) · [Goldilocks 实测](../projects/goldilocks-stark-verifier/versions/v0.2.0/measurements.json)
+
+| 累计方案 | 通用编译器改进 | BabyBear 锁 | Goldilocks 锁 |
+| --- | --- | ---: | ---: |
+| `baseline` | 原断言顺序及算术 | 358,385 B | 153,829 B |
+| `schedule` | 比较成组搬运策略，只有 `assert` 消费数值相等结果时融合为 `OP_NUMEQUALVERIFY` | 357,357 B | 153,058 B |
+| `lookup` | 将定宽打包表下沉为一次索引计算及一行精确读取 | 342,839 B | 141,059 B |
+| `affine` | 将重复使用的加权差值分解为共享的仿射形式 | **292,315 B** | **137,656 B** |
+
+`PackedLookup` 将 ScriptNum 索引换算为字节偏移，越界即失败。验证器在同一行保存陪集点和子群点的逆，用 Fiat–Shamir 索引选行。`WeightedDifferences` 将加权差之和化为共享的声称开口加权和，减去采样值加权和。多项引用同一列时合并其权重。此变换依赖系数环上的线性关系。 [查表 lowering](../src/fourthgraph/compiler/packed_lookup.py) · [加权差 lowering](../src/fourthgraph/compiler/linear_form.py)
+
+所选方案在主栈保留查表数据。开发评估器测得 BabyBear 的双栈载荷峰值从 73,138 B 变为 74,722 B，Goldilocks 从 73,430 B 变为 77,267 B。主栈峰值项数分别从 216 降到 115 和从 88 降到 63。在 BSV Node 1.2.3 的隔离 regtest 和 long-script 配置下，两套的部署和有效花费均入块。节点与固定版 chain-gang 对每套的 12 个反例均给出拒绝判定。 [BabyBear 回执](../projects/plonky3-stark-verifier/versions/v0.2.0/replay.json) · [Goldilocks 回执](../projects/goldilocks-stark-verifier/versions/v0.2.0/replay.json)
+
+从仓库根目录运行任一项目的 `reference/verify.py compare` 可重做候选对比。用 `generate` 生成 `verifier.fth`，再用 `4thgraph script-build --entry stark-lock --output lock.bin` 编译该文件。 [Forth 断言图](language/specification.md#forth-断言图) · [BabyBear Forth](../projects/plonky3-stark-verifier/versions/v0.2.0/verifier.fth) · [Goldilocks Forth](../projects/goldilocks-stark-verifier/versions/v0.2.0/verifier.fth)

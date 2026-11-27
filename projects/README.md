@@ -13,6 +13,8 @@
 | [BN254 Groth16](groth16-bn254/README.md) | Build the fixed-statement Forth verifier and replay on Chronicle |
 | [Winterfell BLAKE3 STARK](stark-counter/README.md) | Prove and replay the public counter with the reference hash profile |
 | [Winterfell SHA-256 STARK](stark-winterfell-sha256/README.md) | Build the SHA-256 profile and compare compiled trace openings on BSV |
+| [Plonky3 + SHA-256 FRI STARK verifier](plonky3-stark-verifier/README.md) | Verify a native BabyBear Fibonacci proof in BSV Script |
+| [Goldilocks + SHA-256 FRI STARK verifier](goldilocks-stark-verifier/README.md) | Verify the same Fibonacci AIR over Goldilocks and its quadratic extension |
 
 ## Payments and signing schemes
 

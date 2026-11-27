@@ -309,6 +309,7 @@ LIBRARIES = {
         ), failure="An invalid witness or signature aborts. A valid signature leaves one true item."),
     ), WALLET_BACKEND),
     "std/groth16-bls12-381": Library(ROOT / library_resource("std/groth16-bls12-381"), (GROTH16_VERIFY,), "groth16-bls12-381"),
+    "std/stark-sha256": Library(ROOT / "stdlib/stark-sha256.fth", backend=WALLET_BACKEND),
     "std/verify": Library(ROOT / "stdlib/verify.fth", declarations=("relation:",)),
     "std/wallet/pels-binding": Library(ROOT / library_resource("std/wallet/pels-binding"), backend=WALLET_BACKEND),
     "std/wallet/pels-successor": Library(ROOT / library_resource("std/wallet/pels-successor"), (

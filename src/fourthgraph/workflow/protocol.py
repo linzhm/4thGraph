@@ -1011,6 +1011,9 @@ def compile_search(program, keys, task_id, *, source_bytes, mode="auto", gate_bo
 
 
 def main():
+    if sys.argv[1:2] == ["script-build"]:
+        from fourthgraph.compiler.script_builder import main as script_build_main
+        return script_build_main(sys.argv[2:])
     if sys.argv[1:2] == ["curve-multiply"]:
         from fourthgraph.workflow.curve_cli import main as curve_main
         return curve_main(sys.argv[2:])
@@ -1021,7 +1024,7 @@ def main():
         from fourthgraph.workflow.pels import witness_main
         return witness_main(sys.argv[2:])
     cli = argparse.ArgumentParser(prog=PROJECT_NAME, description=PROJECT_DESCRIPTION,
-                                  epilog="Subcommands: experiment, pels-witness, preimage-constructor, curve-multiply.")
+                                  epilog="Subcommands: experiment, script-build, pels-witness, preimage-constructor, curve-multiply.")
     if sys.argv[1:2] == ["experiment"]:
         from fourthgraph.benchmark.experiment import main as experiment_main
         return experiment_main(sys.argv[2:])
@@ -1081,6 +1084,8 @@ def main():
                                                        "both": [f"{flag:02x}" for flag in SIGHASH_FAMILIES.values()]},
                           "pels_sighash_policies": (*SIGHASH_FAMILY_OPTIONS, "auto"),
                           "pels_words": tuple(PELS_WORDS),
+                          "script_build": {"command": "script-build", "declarations": ("formula:", "assertion-graph:"),
+                                           "entry_effect": "( -- script )"},
                           "pels_successor": {"state_option": "--pels-successor-state",
                                              "sighash_policies": ("bip143", "auto")},
                           "preimage_constructor": {"command": "preimage-constructor", "modes": ("auto", "literal"),

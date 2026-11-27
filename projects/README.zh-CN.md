@@ -13,6 +13,8 @@
 | [BN254 Groth16](groth16-bn254/README.zh-CN.md) | 构建固定声明的 Forth 验证器并在 Chronicle 回放 |
 | [Winterfell BLAKE3 STARK](stark-counter/README.zh-CN.md) | 使用参考哈希配置为公开计数器出证并复放 |
 | [Winterfell SHA-256 STARK](stark-winterfell-sha256/README.zh-CN.md) | 构建 SHA-256 配置并对照 BSV 轨迹开封锁 |
+| [Plonky3 + SHA-256 FRI STARK 验证器](plonky3-stark-verifier/README.zh-CN.md) | 用 BSV Script 验证原生 BabyBear Fibonacci 证明 |
+| [Goldilocks + SHA-256 FRI STARK 验证器](goldilocks-stark-verifier/README.zh-CN.md) | 在 Goldilocks 和二次扩域上验证同一个 Fibonacci AIR |
 
 ## 付款与签名方案
 

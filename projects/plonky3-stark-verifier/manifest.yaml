@@ -1,0 +1,48 @@
+$schema: ../template/manifest.schema.json
+schema_version: 1
+title:
+  en: Plonky3 + SHA-256 FRI STARK verifier
+  zh-CN: Plonky3 + SHA-256 FRI STARK 验证器
+summary:
+  en: Verify native Plonky3 BabyBear proofs for a fixed 16-row Fibonacci AIR using a BSV Script lock.
+  zh-CN: 生成 BSV Script 锁，验证原生 Plonky3 生成的 BabyBear 证明，约束固定的 16 行 Fibonacci AIR。
+entry_points:
+  - name: stark-lock
+    description:
+      en: Compile the generated Forth source to a BSV Script lock. [Generated verifier](versions/v0.2.0/verifier.fth)
+      zh-CN: 将生成的 Forth 源码编译为 BSV Script 锁。 [生成的验证器](versions/v0.2.0/verifier.fth)
+  - name: reference/verify.py
+    description:
+      en: Generate Forth, build a lock and witness, compare lowering plans, or replay recorded cases.
+      zh-CN: 生成 Forth，构建锁和见证，对比编译方案，或复放固定用例。
+setup:
+  en:
+    - From the repository root, use Python 3.11 or later. The regtest command requires the pinned chain-gang binding and `ecdsa`.
+    - '`python -m pip install ecdsa -r tools/requirements-chronicle.txt`'
+  zh-CN:
+    - 从仓库根目录使用 Python 3.11 或更新版本。regtest 回放另需固定版本的 chain-gang 绑定和 `ecdsa`。
+    - '`python -m pip install ecdsa -r tools/requirements-chronicle.txt`'
+sections:
+  algorithm:
+    en:
+      - The lock fixes both seeds and the last right value at build time. Script derives Fiat–Shamir challenges, checks the out-of-domain AIR quotient, authenticates both PCS rows and all FRI paths, and folds each of 64 queries to the final constant. [Protocol and packet layout](docs/spec.en.md)
+      - The profile uses BabyBear and its quartic extension. The shared Rust reference prover uses pinned Plonky3 0.5.3, with tagged SHA-256 Merkle hashing and a matching SHA-256 challenger. [Native prover](reference/prover/src/main.rs)
+    zh-CN:
+      - 构建时把两个初值和末行右列值写入锁。Script 自行推导 Fiat–Shamir 挑战，校验 AIR 域外商等式、两组 PCS 行承诺及所有 FRI 路径，并把 64 个查询分别折叠至末轮常数。 [协议与字节布局](docs/spec.zh-CN.md)
+      - 方案采用 BabyBear 基域及四次扩域。共享的 Rust 参考证明器固定使用 Plonky3 0.5.3，并配置带标签的 SHA-256 Merkle 哈希和对应 transcript。 [原生证明器](reference/prover/src/main.rs)
+  reproduction:
+    en:
+      - Run `PYTHONPATH=src:. python projects/plonky3-stark-verifier/reference/verify.py check` for the local Script fixtures. Funded replay mined the valid spend and rejected 12 controls, including a different AIR with the same public statement. [Regtest receipt](versions/v0.2.0/replay.json)
+    zh-CN:
+      - 运行 `PYTHONPATH=src:. python projects/plonky3-stark-verifier/reference/verify.py check` 检查本地 Script 夹具。入金回放确认有效花费入块，另有 12 个负例被拒绝，其中包括公开声明相同、AIR 不同的证明。 [Regtest 回执](versions/v0.2.0/replay.json)
+  integration:
+    en:
+      - |-
+        `generate` writes a complete `verifier.fth` from the public inputs in Python. Compile it independently with `4thgraph script-build`. Use `compare` to replay all four compiler plans with the same witness. [Forth build and compiler options](docs/spec.en.md#generate-and-compile-forth)
+    zh-CN:
+      - 用 Python 的 `generate` 根据公开输入输出完整 `verifier.fth`，可独立交给 `4thgraph script-build` 编译。`compare` 用同一见证复放四种编译方案。 [Forth 构建与编译选项](docs/spec.zh-CN.md#生成与编译-forth)
+  script_sizes:
+    en:
+      - For the public statement `(0, 1, 987)`, the lock is **292,315 B** and the unlock is **72,533 B**. The exported proof alone is 71,504 B. [Replay measurements](versions/v0.2.0/replay.json) · [Lock](versions/v0.2.0/lock.bin) · [Unlock](versions/v0.1.0/unlock.bin)
+    zh-CN:
+      - 公开声明为 `(0, 1, 987)` 时，锁定脚本为 **292,315 B**，解锁脚本为 **72,533 B**，原生导出的证明为 71,504 B。 [复放实测](versions/v0.2.0/replay.json) · [锁定脚本](versions/v0.2.0/lock.bin) · [解锁脚本](versions/v0.1.0/unlock.bin)
