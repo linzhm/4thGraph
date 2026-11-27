@@ -3,15 +3,16 @@
 import argparse
 from hashlib import sha256
 import json
-import os
 from pathlib import Path
 
-from fourthgraph.benchmark.validation import Node, chain_metadata, chain_verdict
+from fourthgraph.benchmark.validation import chain_verdict
 from fourthgraph.bsv.evaluate import ScriptError, evaluate
 from fourthgraph.bsv.script import asm, number, push
 from fourthgraph.bsv.transaction import Input, Output, Transaction
 from fourthgraph.compiler.lowering import compile_word
 from fourthgraph.compiler.source import SourceCompiler
+
+from native_replay import native_engines
 
 PROJECT = Path(__file__).resolve().parents[1]
 
@@ -71,15 +72,12 @@ def replay(node):
             "script_sha256": sha256(script).hexdigest(),
             "rejections": rejected,
         })
-    result = {
+    return {
         "schema_version": 1,
         "scope": "SHA-256 primitives with synthetic previous outputs",
         "engines": ["development evaluator", "BSV Node", "chain-gang"] if node else ["development evaluator"],
         "vectors": rows,
     }
-    if node:
-        result["native"] = {"bsv_node_version": node.version, "chain_gang": chain_metadata()}
-    return result
 
 
 def main():
@@ -89,8 +87,10 @@ def main():
     parser.add_argument("--output", type=Path, default=PROJECT / "workspace/build/hash-checks.json")
     args = parser.parse_args()
     try:
-        node = Node(os.environ["REGTEST_URL"], os.environ["REGTEST_COOKIE"]) if args.native else None
+        node, native = native_engines() if args.native else (None, None)
         result = replay(node)
+        if native is not None:
+            result["native"] = native
         if args.check:
             expected = json.loads((PROJECT / "versions/v0.1.0/hash-checks.json").read_text())
             if result["vectors"] != expected["vectors"]:

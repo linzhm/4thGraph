@@ -42,7 +42,7 @@ proof=projects/stark-winterfell-sha256/workspace/wrap.proof
 | Wraps at last step | 35,977 B |
 | Wraps at first step | 36,719 B |
 
-The independent Script replay verifies five digest vectors and twelve malformed or changed inputs with synthetic previous outputs. In the pinned Linux environment with chain-gang installed, run from the repository root. [Dependency pin](../../../tools/requirements-chronicle.txt) · [Native replay evidence](../versions/v0.1.0/hash-checks.json)
+The independent Script replay verifies five digest vectors and twelve malformed or changed inputs with synthetic previous outputs. All native replay and comparison commands require the chain-gang commit in `tools/requirements-chronicle.txt`. Run from the repository root in that environment. [Dependency pin](../../../tools/requirements-chronicle.txt) · [Native replay evidence](../versions/v0.1.0/hash-checks.json)
 
 ```sh
 PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \

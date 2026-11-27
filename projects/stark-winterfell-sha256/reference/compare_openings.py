@@ -4,14 +4,13 @@ import argparse
 from dataclasses import replace
 from hashlib import sha256
 import json
-import os
 from pathlib import Path
 from statistics import median
 import subprocess
 from tempfile import TemporaryDirectory
 from time import perf_counter_ns
 
-from fourthgraph.benchmark.validation import Node, chain_metadata, chain_verdict
+from fourthgraph.benchmark.validation import chain_verdict
 from fourthgraph.bsv.evaluate import evaluate
 from fourthgraph.bsv.script import asm, encode_num, number, push
 from fourthgraph.bsv.transaction import Input, Output, Transaction, compact
@@ -19,6 +18,7 @@ from fourthgraph.compiler.lowering import compile_word
 from fourthgraph.compiler.merkle import merkle_sha256_root
 from fourthgraph.compiler.source import SourceCompiler
 
+from native_replay import native_engines
 from opening_replay import PROJECT, RELEASE, SOURCE, mutations, script_verdict
 
 ORIGINAL = PROJECT / "versions/v0.1.0"
@@ -148,7 +148,7 @@ def main():
         parser.error("--samples must be positive")
 
     try:
-        node = Node(os.environ["REGTEST_URL"], os.environ["REGTEST_COOKIE"])
+        node, native = native_engines()
         reference, checked, specialized = comparison_word()
         records = json.loads((RELEASE / "opening-checks.json").read_text())["openings"]
         args.output.parent.mkdir(parents=True, exist_ok=True)
@@ -161,7 +161,7 @@ def main():
             "same_witness_and_root": True,
             "v01_checked_parent_bytes": checked, "v02_specialized_parent_bytes": specialized,
             "synthetic_previous_outputs": True, "paired_samples_per_opening": args.samples, "results": results,
-            "bsv_node_version": node.version, "chain_gang": chain_metadata(),
+            **native,
         }
         args.output.write_text(json.dumps(report, indent=2) + "\n")
     except (KeyError, OSError, ValueError, subprocess.CalledProcessError) as error:

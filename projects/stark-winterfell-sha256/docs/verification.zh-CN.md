@@ -42,7 +42,7 @@ proof=projects/stark-winterfell-sha256/workspace/wrap.proof
 | 最后一步回绕 | 35,977 B |
 | 第一步回绕 | 36,719 B |
 
-独立 Script 复放使用合成前输出，验证五个摘要向量及十二个格式错误或被改动的输入。安装固定的 chain-gang 后，在仓库根目录运行。 [依赖固定值](../../../tools/requirements-chronicle.txt) · [原生复放证据](../versions/v0.1.0/hash-checks.json)
+独立 Script 复放使用合成前输出，验证五个摘要向量及十二个格式错误或被改动的输入。原生复放与比较命令均要求使用 `tools/requirements-chronicle.txt` 指定的 chain-gang 提交。安装后在仓库根目录运行。[依赖固定值](../../../tools/requirements-chronicle.txt) · [原生复放证据](../versions/v0.1.0/hash-checks.json)
 
 ```sh
 PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \

@@ -3,17 +3,18 @@
 import argparse
 from hashlib import sha256
 import json
-import os
 from pathlib import Path
 import subprocess
 from tempfile import TemporaryDirectory
 
-from fourthgraph.benchmark.validation import Node, chain_metadata, chain_verdict
+from fourthgraph.benchmark.validation import chain_verdict
 from fourthgraph.bsv.evaluate import ScriptError, evaluate
 from fourthgraph.bsv.script import encode_num, number, push
 from fourthgraph.bsv.transaction import Input, Output, Transaction
 from fourthgraph.compiler.lowering import compile_word
 from fourthgraph.compiler.source import SourceCompiler
+
+from native_replay import native_engines
 
 PROJECT = Path(__file__).resolve().parents[1]
 RELEASE = PROJECT / "versions/v0.2.0"
@@ -115,15 +116,15 @@ def main():
     parser.add_argument("--output", type=Path, default=PROJECT / "workspace/build/opening-replay.json")
     args = parser.parse_args()
     try:
-        node = Node(os.environ["REGTEST_URL"], os.environ["REGTEST_COOKIE"]) if args.native else None
+        node, native = native_engines() if args.native else (None, None)
         args.output.parent.mkdir(parents=True, exist_ok=True)
         with TemporaryDirectory(dir=args.output.parent) as scratch:
             records = replay(args.binary.resolve(), Path(scratch), node)
         if args.check and records != json.loads((RELEASE / "opening-checks.json").read_text())["openings"]:
             raise ValueError("opening replay differs from the selected v0.2.0 record")
         report = {"schema_version": 1, "openings": records}
-        if node:
-            report["native"] = {"bsv_node_version": node.version, "chain_gang": chain_metadata()}
+        if native is not None:
+            report["native"] = native
         args.output.write_text(json.dumps(report, indent=2) + "\n")
     except (KeyError, OSError, ValueError, subprocess.CalledProcessError) as error:
         parser.error(str(error))
