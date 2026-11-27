@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass, replace
 
-from fourthgraph.bsv.transaction import Output
+from fourthgraph.bsv.transaction import MAX_MONEY, Output
 from fourthgraph.compiler.wordsets import Literal, PRIMITIVES, script_word
 
 
@@ -26,7 +26,7 @@ class TransactionField:
 
 
 FIELDS = {id(TX_LOCKTIME): TransactionField("locktime", 0xffffffff),
-          id(TX_PREVOUT_AMOUNT): TransactionField("previous_amount", 2_100_000_000_000_000)}
+          id(TX_PREVOUT_AMOUNT): TransactionField("previous_amount", MAX_MONEY)}
 
 
 def output_assertion(instructions, stack, at):
@@ -54,6 +54,8 @@ class SpendConstraints:
 
 def read_constraints(block, at):
     """Evaluate concrete business expressions and retain the verified predicates."""
+    from fourthgraph.compiler.source import LockBranch
+
     values = {}
     required = {}
 
@@ -65,46 +67,55 @@ def read_constraints(block, at):
         elif type(assertion) is not int or assertion == 0:
             raise source.error("expected a true Forth value or a PELS assertion")
 
-    for step in block.steps:
+    def evaluate_step(step):
         node, source = step.node, step.source or at
         location = source.module, source.line, source.column
         args = tuple(values[key] for key in step.args)
         if isinstance(node, Literal):
-            result = (node.value,)
-        elif node is TX_OUTPUT:
+            return (node.value,)
+        if isinstance(node, LockBranch):
+            flag = args[-1]
+            if type(flag) is not int:
+                raise source.error("PELS IF needs a build-time Forth flag")
+            return evaluate_block(node.yes if flag else node.no)
+        if node is TX_OUTPUT:
             output = Output(*args)
             try:
                 output.serialize()
             except (TypeError, ValueError) as error:
                 raise source.error("tx-output requires a valid satoshi amount and output script") from error
-            result = (output,)
-        elif node is INPUTS_EQUAL:
+            return (output,)
+        if node is INPUTS_EQUAL:
             if type(args[0]) is not int or args[0] != 1:
                 raise source.error("this PELS lock needs exactly one input")
-            result = (Assertion("inputs", 1, location),)
-        elif getattr(node, "run", None) is OUTPUTS_EQUAL.run:
-            result = (Assertion("outputs", args[:-1], location),)
-        elif id(node) in FIELDS:
-            result = (FIELDS[id(node)],)
-        elif node is PRIMITIVES["="] and any(isinstance(value, TransactionField) for value in args):
+            return (Assertion("inputs", 1, location),)
+        if getattr(node, "run", None) is OUTPUTS_EQUAL.run:
+            return (Assertion("outputs", args[:-1], location),)
+        if id(node) in FIELDS:
+            return (FIELDS[id(node)],)
+        if node is PRIMITIVES["="] and any(isinstance(value, TransactionField) for value in args):
             fact, expected = args if isinstance(args[0], TransactionField) else args[::-1]
             if type(expected) is not int or not 0 <= expected <= fact.maximum:
                 raise source.error(f"{fact.name} requires a constant in [0, {fact.maximum}]")
-            result = (Assertion(fact.name, expected, location),)
-        elif node is PRIMITIVES["op_verify"]:
+            return (Assertion(fact.name, expected, location),)
+        if node is PRIMITIVES["op_verify"]:
             verify(args[0], source)
-            result = ()
-        else:
-            if (node.location != "script" or node.requires_checksig
-                    or any(type(value) not in (bytes, int) for value in args)):
-                raise source.error("PELS output expressions need build-time Forth values")
-            try:
-                result = node.run(*args)
-            except (TypeError, ValueError, ArithmeticError) as error:
-                raise source.error(str(error)) from error
-        values.update(zip(step.results, result, strict=True))
+            return ()
+        if (node.location != "script" or node.requires_checksig
+                or any(type(value) not in (bytes, int) for value in args)):
+            raise source.error("PELS output expressions need build-time Forth values")
+        try:
+            return node.run(*args)
+        except (TypeError, ValueError, ArithmeticError) as error:
+            raise source.error(str(error)) from error
 
-    verify(values[block.returns[0]], at)
+    def evaluate_block(block):
+        for step in block.steps:
+            values.update(zip(step.results, evaluate_step(step), strict=True))
+        return tuple(values[key] for key in block.returns)
+
+    flag, = evaluate_block(block)
+    verify(flag, at)
     if "inputs" not in required or "outputs" not in required:
         raise at.error("a PELS lock must verify one input and the complete ordered outputs")
     facts = {key: assertion.expected for key, assertion in required.items()}

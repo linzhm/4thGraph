@@ -4,9 +4,13 @@
 
 Use `REQUIRE stdlib/pels.fth` to express the required input count, complete ordered outputs, and transaction field assertions in Forth. The standalone compiler covers one input and build-time output expressions. The [settlement fixture](../projects/workflow-examples/pels-settle.fth) requires a payment, a receipt, and locktime 42.
 
+An `IF` flag must resolve to a Forth cell at build time. The compiler evaluates the selected branch and retains the assertions verified on that branch.
+
 ## Compile targets
 
 Choose the transaction version in `--target` and the preimage policy in `--sighash-family`. The policies are `bip143`, `otda`, `both`, and `auto`. The compiler checks required coverage before comparing linked lock and witness fields, including serialized length prefixes. A previous-output amount assertion requires BIP143 in this implementation.
+
+The compiler checks that the output total stays within the currency limit and any fixed prevout amount. Witness assembly checks the same output total against the actual prevout for each sighash family.
 
 ```sh
 export PYTHONPATH=src:.

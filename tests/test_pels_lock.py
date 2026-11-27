@@ -11,7 +11,7 @@ import unittest
 
 from fourthgraph.benchmark.validation import CONTEXT_PIN, chain_metadata
 from fourthgraph.bsv.script import push
-from fourthgraph.bsv.transaction import Input, Output, Transaction, preimage_forkid
+from fourthgraph.bsv.transaction import MAX_MONEY, Input, Output, Transaction, preimage_forkid
 from fourthgraph.compiler.lowering import compile_word
 from fourthgraph.compiler.source import CompileError, SourceCompiler, evaluate
 from fourthgraph.workflow.pels import assemble_pels, compile_pels
@@ -46,8 +46,8 @@ def build(source=SOURCE, target="chronicle-v2", family="auto"):
     return build_artifact(compile_pels(constraints, target, family), source.encode())
 
 
-def transactions(artifact, outputs=OUTPUTS):
-    parent = Transaction((Input(bytes(32), 0),), (Output(11_000, bytes.fromhex(artifact["script_hex"])),))
+def transactions(artifact, outputs=OUTPUTS, *, prevout_value=11_000):
+    parent = Transaction((Input(bytes(32), 0),), (Output(prevout_value, bytes.fromhex(artifact["script_hex"])),))
     tx = Transaction((Input(parent.txid_wire(), 0),), outputs, version=artifact["transaction_versions"][-1], locktime=42)
     return parent, tx
 
@@ -67,6 +67,41 @@ class PelsLockTests(unittest.TestCase):
         word = SourceCompiler(SOURCE, bindings={"recipient-lock": b"\x51"}).words["settle"]
         with self.assertRaisesRegex(CompileError, "requires a PELS transaction target"):
             compile_word(word)
+
+    def test_constant_branches_keep_only_selected_constraints(self):
+        original = build()
+        source = SOURCE.replace("9999 1+", "9999 1 IF 0 IF 2 + ELSE 1+ THEN ELSE 0 verify 2 + THEN")
+        source = source.replace("tx-locktime 42 = verify", "0 IF tx-locktime 43 = verify ELSE tx-locktime 42 = verify THEN 1")
+        branched = build(source)
+        self.assertEqual(branched["constraints"], original["constraints"])
+        self.assertEqual(branched["script_hex"], original["script_hex"])
+
+        dynamic = SOURCE.replace("tx-locktime 42 = verify", "tx-locktime 42 = IF 1 ELSE 0 THEN verify")
+        with self.assertRaisesRegex(CompileError, "PELS IF needs a build-time Forth flag"):
+            build(dynamic)
+
+    def test_compile_checks_output_total(self):
+        fixed_amount = SOURCE.replace("tx-locktime 42 = verify", "tx-prevout-amount 10000 = verify")
+        self.assertEqual(build(fixed_amount)["constraints"]["previous_amount"], 10_000)
+        with self.assertRaisesRegex(CompileError, "output total exceeds the fixed prevout amount"):
+            build(fixed_amount.replace("0 bytes-hex", "1 bytes-hex"))
+
+        max_amount = SOURCE.replace("9999 1+", str(MAX_MONEY))
+        self.assertEqual(build(max_amount)["constraints"]["outputs"][0]["satoshis"], MAX_MONEY)
+        with self.assertRaisesRegex(CompileError, "output total exceeds the maximum satoshi amount"):
+            build(max_amount.replace("0 bytes-hex", "1 bytes-hex"))
+
+    def test_witness_checks_actual_prevout_amount_for_both_paths(self):
+        artifact = build(family="both")
+        funded_parent, funded = transactions(artifact, prevout_value=10_000)
+        short_parent, underfunded = transactions(artifact, prevout_value=9_999)
+        for family in artifact["paths"]:
+            with self.subTest(family=family):
+                signed, _ = assemble_pels(artifact, funded_parent, funded, family)
+                self.assertEqual(signed.with_script(0, b""), funded)
+                self.assertTrue(signed.inputs[0].script)
+                with self.assertRaisesRegex(ValueError, "output total exceeds the actual prevout amount"):
+                    assemble_pels(artifact, short_parent, underfunded, family)
 
     def test_provenance_distinguishes_source_constraints_and_emitted_bytes(self):
         program = SourceCompiler(SOURCE, bindings={"recipient-lock": b"\x51"})

@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 
 from fourthgraph.bsv.script import asm, push
-from fourthgraph.bsv.transaction import Output, Transaction, amount, blob, hash256, preimage_forkid, preimage_otda
+from fourthgraph.bsv.transaction import MAX_MONEY, Output, Transaction, amount, blob, hash256, preimage_forkid, preimage_otda
 from fourthgraph.workflow.forkid_lowering import (
     LINKED_OUTPOINT_OFFSET, SCRIPT_CODE_OFFSET, DualLinkedContext, LinkedContext, PREIMAGE_FIXED_BYTES,
 )
@@ -73,6 +73,11 @@ def make_candidate(family, layout, versions, output_count, outputs, locktime, pr
 def compile_pels(constraints, target, family, *, explain=False):
     versions, era = TARGETS[target]
     outputs = b"".join(output.serialize() for output in constraints.outputs)
+    total = sum(output.value for output in constraints.outputs)
+    if total > MAX_MONEY:
+        raise CompileError("PELS output total exceeds the maximum satoshi amount")
+    if constraints.previous_amount is not None and total > constraints.previous_amount:
+        raise CompileError("PELS output total exceeds the fixed prevout amount")
     locktime = None if constraints.locktime is None else constraints.locktime.to_bytes(4, "little")
     prev_amount = None if constraints.previous_amount is None else amount(constraints.previous_amount)
 
@@ -156,6 +161,8 @@ def assemble_pels(artifact, parent, unsigned, family=None):
         raise ValueError("locktime does not satisfy the compiled lock")
     if constraints["previous_amount"] is not None and prevout.value != constraints["previous_amount"]:
         raise ValueError("prevout amount does not satisfy the compiled lock")
+    if sum(output.value for output in unsigned.outputs) > prevout.value:
+        raise ValueError("PELS output total exceeds the actual prevout amount")
     code = script[path["script_code_offset"]:]
     flag = SIGHASH_FAMILIES[family]
     if code != BINDING_CODE or path["sighash"] != flag:
