@@ -47,6 +47,14 @@ def write_markdown(root, relative, target):
     return path
 
 
+def readme_tool_fixture(root):
+    (root / "projects").mkdir()
+    copytree(ROOT / "tools/templates/project-readme", root / "tools/templates/project-readme")
+    tool = root / "tools/project_readme.py"
+    copy2(ROOT / "tools/project_readme.py", tool)
+    return tool
+
+
 class LayoutTests(unittest.TestCase):
     def test_r1_canonical_bytes_unchanged(self):
         project=ROOT/'projects/p2pkh-r1'
@@ -118,10 +126,7 @@ class LayoutTests(unittest.TestCase):
     def test_readme_scaffold_fills_missing_files_without_overwriting(self):
         with TemporaryDirectory() as directory:
             root = Path(directory)
-            (root / "projects").mkdir()
-            copytree(ROOT / "tools/templates", root / "tools/templates")
-            tool = root / "tools/project_readme.py"
-            copy2(ROOT / "tools/project_readme.py", tool)
+            tool = readme_tool_fixture(root)
             project = root / "projects/demo"
             english = project / "README.md"
             chinese = project / "README.zh-CN.md"
@@ -159,6 +164,71 @@ class LayoutTests(unittest.TestCase):
             chinese.write_text("# 示例\n\n已填写。\n", encoding="utf-8")
             checked = run("--check")
             self.assertEqual(checked.returncode, 0, checked.stderr)
+
+    def test_readme_manifest_regenerates_both_languages_and_checks_drift(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            tool = readme_tool_fixture(root)
+            project = root / "projects/demo"
+            manifest = project / "manifest.json"
+
+            def run(*args):
+                return subprocess.run([sys.executable, tool, "demo", *args],
+                                      cwd=root, capture_output=True, text=True)
+
+            initialized = run("--init", "--title", "Example", "--title-zh", "示例")
+            self.assertEqual(initialized.returncode, 0, initialized.stderr)
+            self.assertFalse((project / "README.md").exists())
+            data = json.loads(manifest.read_text(encoding="utf-8"))
+            self.assertEqual(data["schema_version"], 1)
+            self.assertEqual(data["title"], {"en": "Example", "zh-CN": "示例"})
+
+            data["summary"] = {"en": "Overview.", "zh-CN": "项目介绍。"}
+            data["entry_points"] = []
+            data["sections"] = {
+                "algorithm": {"en": ["Compute the result."], "zh-CN": ["计算结果。"]},
+                "reproduction": {"en": ["Run the tests."], "zh-CN": ["运行测试。"]},
+            }
+            encoded = json.dumps(data, ensure_ascii=False)
+            manifest.write_text(encoded, encoding="utf-8")
+            self.assertNotEqual(run("--init").returncode, 0)
+            self.assertEqual(manifest.read_text(encoding="utf-8"), encoded)
+            release = project / "versions/v1.0.0"
+            release.mkdir(parents=True)
+            (release.parent / "index.json").write_text('{"current":"1.0.0"}', encoding="utf-8")
+            (release / "manifest.json").write_text('{"build":"make build","verify":"make verify"}',
+                                                  encoding="utf-8")
+            generated = run("--write")
+            self.assertEqual(generated.returncode, 0, generated.stderr)
+            english = project / "README.md"
+            chinese = project / "README.zh-CN.md"
+            first = english.read_text(encoding="utf-8")
+            self.assertIn("# Example v1.0.0", first)
+            self.assertIn("Compute the result.", first)
+            self.assertNotIn("## Script sizes", first)
+            self.assertIn("# 示例 v1.0.0", chinese.read_text(encoding="utf-8"))
+            self.assertIn("make build\nmake verify", first)
+            english.write_text(first + "\nDrift.\n", encoding="utf-8")
+            self.assertIn("differs from its manifest", run("--check").stderr)
+            self.assertEqual(run("--write").returncode, 0)
+            self.assertEqual(english.read_text(encoding="utf-8"), first)
+            checked = run("--check")
+            self.assertEqual(checked.returncode, 0, checked.stderr)
+
+            data["summary"].pop("zh-CN")
+            manifest.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+            invalid = run("--write")
+            self.assertNotEqual(invalid.returncode, 0)
+            self.assertIn("summary is missing zh-CN", invalid.stderr)
+            self.assertEqual(english.read_text(encoding="utf-8"), first)
+
+    def test_generated_project_readmes_match_their_manifests(self):
+        tool = ROOT / "tools/project_readme.py"
+        for manifest in sorted((ROOT / "projects").glob("*/manifest.json")):
+            with self.subTest(project=manifest.parent.name):
+                checked = subprocess.run([sys.executable, tool, manifest.parent.name, "--check"],
+                                         cwd=ROOT, capture_output=True, text=True)
+                self.assertEqual(checked.returncode, 0, checked.stderr)
 
     def check_local_links(self, root):
         for path in markdown_files(root):

@@ -1,3 +1,5 @@
+<!-- Generated from manifest.json by tools/project_readme.py. -->
+
 # P2PKH-Schnorr v0.16.0
 
 [简体中文](README.zh-CN.md) · [4thGraph](../../README.md) · [Project index](../README.md) · [Versions](versions/index.json)
@@ -6,17 +8,15 @@
 
 **[Wallet SDK quickstart](docs/sdk.en.md#quickstart)** · [Unified wallet SDK](../../sdk/README.md#quickstart)
 
-Create a BSV payment lock from the HASH160 of a BIP340 x-only public key. The key is 32 bytes, the owner hash is 20 bytes, and the external signer returns a 64-byte BIP340 signature. v0.16.0 is the current experimental payment template. [BIP340](https://github.com/bitcoin/bips/blob/master/bip-0340.mediawiki)
+Create a BSV payment lock from the HASH160 of a BIP340 x-only public key. The key is 32 bytes, the owner hash is 20 bytes, and the external signer returns a 64-byte BIP340 signature. This is an experimental payment template. [BIP340](https://github.com/bitcoin/bips/blob/master/bip-0340.mediawiki)
 
-[Payment protocol](docs/spec.en.md) · [Verification algorithm](#algorithm-and-execution) · [Reproduction](#reproduce-the-checks) · [Transaction costs](#complete-transactions-and-stack-measurements)
+[Protocol](docs/spec.en.md) · [Algorithm and execution](#algorithm-and-execution) · [Reproduce the checks](#reproduce-the-checks) · [Complete transactions and stack measurements](#complete-transactions-and-stack-measurements) · [Measurements data](versions/v0.16.0/measurements.json)
 
 | Entry point | Purpose |
 | --- | --- |
 | `bip340-verify ( script -- script )` | Build a detached verifier. At execution it accepts a byte message, public key x and y, a BIP340 signature, and the nonce point's y coordinate. |
 | `schnorr-lock ( script bytes -- script )` | Build a payment lock from a 20-byte owner hash. The lock checks ownership, verifies the BIP340 signature, and binds the signed digest to the current input. |
 | `schnorr-unlock` | Build the input script from the signed preimage, mode selector, signature, and public coordinate witnesses. |
-
-[Forth payment example](reference/schnorr.fth) · [BIP340 standard-library source](../../src/fourthgraph/stdlib/bip340.fth)
 
 ## Use cases and trade-offs
 
@@ -32,7 +32,7 @@ Each Schnorr output carries a 22,515-byte lock. Under OTDA ALL, every input witn
 2. Compute the BIP340 tagged challenge from the original `r`, public key x, and message, then reduce it modulo the group order `n` to obtain `e`.
 3. Compute `sG − eP`, reject the point at infinity, and compare both projective coordinates with the even nonce point `R`. The coordinate witnesses let Script use field congruences for this comparison without a square root or inversion.
 
-[BIP340 verification](https://github.com/bitcoin/bips/blob/master/bip-0340.mediawiki) · [Witness and challenge checks](docs/spec.en.md)
+[BIP340 verification](https://github.com/bitcoin/bips/blob/master/bip-0340.mediawiki) · [Witness and challenge checks](docs/spec.en.md) · [Forth payment example](reference/schnorr.fth) · [BIP340 standard-library source](../../src/fourthgraph/stdlib/bip340.fth)
 
 ### secp256k1 arithmetic
 
@@ -42,9 +42,9 @@ For joint multiplication, the verifier splits `s` at bit 128 and applies the sec
 
 The same kernels apply to Script paths that explicitly multiply secp256k1 points by runtime scalars. The current PELS Counter uses fixed public parameters `d = k = 1` for transaction binding. With the candidate preimage digest `H` and the fixed generator coordinate `r`, Script computes `s = (H + r) mod n`, applies low-S normalization, encodes DER, and delegates ECDSA verification to native `OP_CHECKSIG`. All three PELS Counter builds produced byte-identical locks across v0.15.0 and v0.16.0. [PELS Counter](../pels-counter/README.md) · [Fixed-key binding](../../src/fourthgraph/bsv/pushtx.py)
 
-<a name="validate-the-baseline"></a>
-
 ## Reproduce the checks
+
+<a name="validate-the-baseline"></a>
 
 Run from the repository root with Python 3.12. The SDK replay also uses Node.js 22, Go, and Rust/Cargo. The suites use public fixture keys and replay against pinned chain-gang and an isolated BSV Node regtest.
 
@@ -52,10 +52,16 @@ Run from the repository root with Python 3.12. The SDK replay also uses Node.js 
 bash tools/setup-workspaces.sh
 python3.12 -m venv projects/p2pkh-schnorr/workspace/p2pkh-schnorr
 projects/p2pkh-schnorr/workspace/p2pkh-schnorr/bin/python -m pip install -r projects/p2pkh-schnorr/reference/requirements.txt
-export SCRIPT_LAB_SDK_PYTHON="$PWD/projects/p2pkh-schnorr/workspace/p2pkh-schnorr/bin/python"
-PYTHONPATH=src:. "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/reference/generate_template.py --check
-PYTHONPATH="$PWD/projects/p2pkh-schnorr/reference" \
-  bash tools/verify_node.sh -- "$SCRIPT_LAB_SDK_PYTHON" -m unittest -v test_schnorr test_musig2
+. projects/p2pkh-schnorr/workspace/p2pkh-schnorr/bin/activate
+export SCRIPT_LAB_SDK_PYTHON="$VIRTUAL_ENV/bin/python"
+```
+
+```sh
+PYTHONPATH=src:. python projects/p2pkh-schnorr/reference/generate_template.py --check
+PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- python -m unittest discover -s projects/p2pkh-schnorr/reference
+```
+
+```sh
 PYTHONPATH="$PWD/tests" REGTEST_CHRONICLE_HEIGHT=5 \
   bash tools/verify_node.sh -- "$SCRIPT_LAB_SDK_PYTHON" -m unittest -v test_secp256k1_library
 bash tools/verify_node.sh -- bash sdk/verify_wallet.sh p2pkh-schnorr
@@ -86,9 +92,9 @@ The v0.16.0 owner field starts at byte offset 189. Across 56 alternating detache
 
 Load `REQUIRE stdlib/bip340.fth` to reuse the detached verifier. The payment example composes it with the ownership and input-binding checks. Run the template check above to confirm the frozen lock and its layout. Use `--write` to regenerate them. [Forth source](reference/schnorr.fth) · [Version catalog](versions/index.json)
 
-<a name="measured-sizes"></a>
-
 ## Complete transactions and stack measurements
+
+<a name="measured-sizes"></a>
 
 The v0.16.0 fixtures spend two Schnorr outputs and create two Schnorr outputs. BSV Node 1.2.3 and pinned chain-gang verify complete inputs with explicit prevouts. The development evaluator measures stack peaks for input zero. The main and alternate item peaks and combined payload peak are recorded independently. Transaction and payload sizes are in bytes. [Recorded measurements](versions/v0.16.0/measurements.json) · [Benchmark method](../../docs/benchmark.md)
 

@@ -29,13 +29,24 @@
 
 ## 项目 README 模板
 
-用共享模板生成中英文介绍。工具创建缺失的 README，保留已有文件，并从当前版本清单带入构建和验证命令，链接已有的项目文档与实测数据。
+项目级 `projects/<name>/manifest.json` 是中英文 README 的共同来源。先初始化清单，再填入项目介绍和复放证据，最后生成并检查两份 README。
 
 ```sh
-python3 tools/project_readme.py my-project --title "My project" --title-zh "我的项目"
+python3 tools/project_readme.py my-project --init --title "My project" --title-zh "我的项目"
+# 编辑 projects/my-project/manifest.json
+python3 tools/project_readme.py my-project --write
+python3 tools/project_readme.py my-project --check
 ```
 
-按提示补齐算法、入口、复现命令和实测结果，并按项目特点调整测量章节。运行 `python3 tools/project_readme.py my-project --check` 检查两份文件及模板提示是否已处理。[中文模板](../tools/templates/project-readme/README.zh-CN.md.in) · [英文模板](../tools/templates/project-readme/README.md.in) · [已填写的 Schnorr 示例](p2pkh-schnorr/README.zh-CN.md)
+| 字段 | 内容 |
+| --- | --- |
+| `schema_version` | 格式版本，当前为 `1`。 |
+| `title`、`summary` | `en` 和 `zh-CN` 各一行。 |
+| `entry_points` | 共用的入口名称及中英文说明。 |
+| `sections` | 按固定键组织的中英文 Markdown 内容块。保留 `algorithm` 和 `reproduction`，其余按项目需要填写。 |
+| `setup` | 可选的双语准备步骤，放在构建和验证命令之前。 |
+
+段落、表格和代码块可分别写入一个内容块，相对链接从项目目录解析。生成器从 `versions/index.json` 读取当前版本，从该版本清单取得构建和验证命令，并链接已有的协议、SDK 和实测文件。`--check` 报告未处理的模板提示和 README 与生成结果的差异。现有项目可在采用清单前继续直接维护 README。[JSON Schema](../tools/templates/project-readme/manifest.schema.json) · [起始清单](../tools/templates/project-readme/manifest.example.json) · [Schnorr 清单](p2pkh-schnorr/manifest.json) · [生成的 README](p2pkh-schnorr/README.zh-CN.md)
 
 ## 版本数据
 

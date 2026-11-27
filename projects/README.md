@@ -29,13 +29,24 @@ Run `bash tools/setup-workspaces.sh` from the repository root to create Git-igno
 
 ## Project README template
 
-Generate the English and Chinese introductions with the shared template. The tool creates missing READMEs and preserves existing files. It uses the current version manifest for build and verify commands and adds links to available project docs and measurements.
+The project-level `projects/<name>/manifest.json` is the source for both READMEs. Initialize it, fill in the introduction and replay evidence, then generate and check the README pair.
 
 ```sh
-python3 tools/project_readme.py my-project --title "My project" --title-zh "我的项目"
+python3 tools/project_readme.py my-project --init --title "My project" --title-zh "我的项目"
+# Edit projects/my-project/manifest.json
+python3 tools/project_readme.py my-project --write
+python3 tools/project_readme.py my-project --check
 ```
 
-Fill the prompts with the project’s algorithm, entry points, reproducible commands and measured results. Adapt the measurement sections to the project. Run `python3 tools/project_readme.py my-project --check` to check that both files exist and that the prompts have been filled or removed. [English template](../tools/templates/project-readme/README.md.in) · [Chinese template](../tools/templates/project-readme/README.zh-CN.md.in) · [Filled Schnorr example](p2pkh-schnorr/README.md)
+| Field | Contents |
+| --- | --- |
+| `schema_version` | Format version, currently `1`. |
+| `title`, `summary` | One line each in `en` and `zh-CN`. |
+| `entry_points` | Shared interface names with bilingual descriptions. |
+| `sections` | Named sections containing Markdown blocks in both languages. Keep `algorithm` and `reproduction`. Include the other sections that apply. |
+| `setup` | Optional bilingual Markdown blocks before the build and verify commands. |
+
+Use separate Markdown blocks for paragraphs, tables, and fenced code. Resolve relative links from the project directory. The generator reads the current version from `versions/index.json` and takes the build and verify commands from that release's manifest. It links available protocol, SDK, and measurement files. `--check` reports unfinished prompts and any difference from the generated READMEs. Existing projects can continue to maintain their READMEs directly until they adopt a manifest. [JSON Schema](../tools/templates/project-readme/manifest.schema.json) · [Starter manifest](../tools/templates/project-readme/manifest.example.json) · [Schnorr manifest](p2pkh-schnorr/manifest.json) · [Generated README](p2pkh-schnorr/README.md)
 
 ## Versioned project data
 

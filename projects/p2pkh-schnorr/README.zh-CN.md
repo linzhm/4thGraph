@@ -1,3 +1,5 @@
+<!-- Generated from manifest.json by tools/project_readme.py. -->
+
 # P2PKH-Schnorr v0.16.0
 
 [English](README.md) · [4thGraph](../../README.zh-CN.md) · [项目目录](../README.zh-CN.md) · [版本](versions/index.json)
@@ -6,17 +8,15 @@
 
 **[钱包 SDK 快速上手](docs/sdk.zh-CN.md#quickstart)** · [统一钱包 SDK](../../sdk/README.zh-CN.md#quickstart)
 
-在 BSV 上向 BIP340 x-only 公钥的 HASH160 付款。公钥为 32 字节，所有者哈希为 20 字节，外部签名器返回 64 字节 BIP340 签名。v0.16.0 是当前的实验付款模板。[BIP340](https://github.com/bitcoin/bips/blob/master/bip-0340.mediawiki)
+在 BSV 上向 BIP340 x-only 公钥的 HASH160 付款。公钥为 32 字节，所有者哈希为 20 字节，外部签名器返回 64 字节 BIP340 签名。这是一个实验付款模板。[BIP340](https://github.com/bitcoin/bips/blob/master/bip-0340.mediawiki)
 
-[付款协议](docs/spec.zh-CN.md) · [验签算法](#算法与执行) · [复现与验证](#复现方法) · [交易成本](#完整交易与栈测量)
+[协议](docs/spec.zh-CN.md) · [算法与执行](#算法与执行) · [复现方法](#复现方法) · [完整交易与栈测量](#完整交易与栈测量) · [实测数据](versions/v0.16.0/measurements.json)
 
 | 入口 | 用途 |
 | --- | --- |
 | `bip340-verify ( script -- script )` | 构造独立验签器。执行时接收字节消息、公钥 x 和 y、BIP340 签名及 nonce 点的 y 坐标。 |
 | `schnorr-lock ( script bytes -- script )` | 用 20 字节所有者哈希构造付款锁。执行时校验所有者和 BIP340 签名，并把已签摘要绑定到当前输入。 |
 | `schnorr-unlock` | 用签名预映像、模式选择值、签名和公开坐标见证构造解锁脚本。 |
-
-[Forth 付款示例](reference/schnorr.fth) · [BIP340 标准库源码](../../src/fourthgraph/stdlib/bip340.fth)
 
 ## 使用场景与取舍
 
@@ -32,7 +32,7 @@
 2. 用原始的 `r`、公钥 x 和消息计算 BIP340 标签哈希，再对群阶 `n` 取模，得到挑战 `e`。
 3. 计算 `sG − eP`，排除无穷远点，再用域上的同余关系将两个射影坐标与偶数 nonce 点 `R` 比对。坐标见证使脚本无需开方或求逆即可完成比较。
 
-[BIP340 验签](https://github.com/bitcoin/bips/blob/master/bip-0340.mediawiki) · [见证与挑战校验](docs/spec.zh-CN.md)
+[BIP340 验签](https://github.com/bitcoin/bips/blob/master/bip-0340.mediawiki) · [见证与挑战校验](docs/spec.zh-CN.md) · [Forth 付款示例](reference/schnorr.fth) · [BIP340 标准库源码](../../src/fourthgraph/stdlib/bip340.fth)
 
 ### secp256k1 运算
 
@@ -42,9 +42,9 @@ v0.15.0 用满足 `21u⁶ = 1 mod p` 的常数，把 `(X:Y:Z)` 映射为 `(u²X:
 
 在脚本里需要用运行时标量计算 secp256k1 曲线点的路径可以复用这些内核。当前 PELS Counter 的交易绑定使用公开固定参数 `d = k = 1`。脚本用候选预映像的摘要 `H` 和生成点的固定横坐标 `r` 计算 `s = (H + r) mod n`，做 low-S 归一化和 DER 编码，再交给原生 `OP_CHECKSIG` 执行 ECDSA 验签。v0.15.0 与 v0.16.0 编译的三种 PELS Counter 锁均逐字节一致。[PELS Counter](../pels-counter/README.zh-CN.md) · [固定密钥交易绑定](../../src/fourthgraph/bsv/pushtx.py)
 
-<a name="复现验收"></a>
-
 ## 复现方法
+
+<a name="复现验收"></a>
 
 在仓库根目录使用 Python 3.12。SDK 复放还用到 Node.js 22、Go 和 Rust/Cargo。测试使用公开夹具密钥、固定版本的 chain-gang 及隔离的 BSV Node regtest。
 
@@ -52,10 +52,16 @@ v0.15.0 用满足 `21u⁶ = 1 mod p` 的常数，把 `(X:Y:Z)` 映射为 `(u²X:
 bash tools/setup-workspaces.sh
 python3.12 -m venv projects/p2pkh-schnorr/workspace/p2pkh-schnorr
 projects/p2pkh-schnorr/workspace/p2pkh-schnorr/bin/python -m pip install -r projects/p2pkh-schnorr/reference/requirements.txt
-export SCRIPT_LAB_SDK_PYTHON="$PWD/projects/p2pkh-schnorr/workspace/p2pkh-schnorr/bin/python"
-PYTHONPATH=src:. "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/reference/generate_template.py --check
-PYTHONPATH="$PWD/projects/p2pkh-schnorr/reference" \
-  bash tools/verify_node.sh -- "$SCRIPT_LAB_SDK_PYTHON" -m unittest -v test_schnorr test_musig2
+. projects/p2pkh-schnorr/workspace/p2pkh-schnorr/bin/activate
+export SCRIPT_LAB_SDK_PYTHON="$VIRTUAL_ENV/bin/python"
+```
+
+```sh
+PYTHONPATH=src:. python projects/p2pkh-schnorr/reference/generate_template.py --check
+PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- python -m unittest discover -s projects/p2pkh-schnorr/reference
+```
+
+```sh
 PYTHONPATH="$PWD/tests" REGTEST_CHRONICLE_HEIGHT=5 \
   bash tools/verify_node.sh -- "$SCRIPT_LAB_SDK_PYTHON" -m unittest -v test_secp256k1_library
 bash tools/verify_node.sh -- bash sdk/verify_wallet.sh p2pkh-schnorr
@@ -86,9 +92,9 @@ v0.16.0 的所有者槽位从字节偏移 189 开始。两个版本交替各测 
 
 用 `REQUIRE stdlib/bip340.fth` 加载独立验签器。付款示例将该验签词与所有者校验、当前输入绑定组合成付款锁。运行上面的模板检查命令即可核对冻结的锁及其布局，用 `--write` 重新生成。[Forth 源码](reference/schnorr.fth) · [版本目录](versions/index.json)
 
-<a name="交易实测"></a>
-
 ## 完整交易与栈测量
+
+<a name="交易实测"></a>
 
 v0.16.0 夹具花费两个 Schnorr 输出，再创建两个 Schnorr 输出。BSV Node 1.2.3 和固定版本的 chain-gang 通过显式提供上一输出来验证完整输入。栈数据由开发求值器从第一个输入的成功路径取得。主栈项数、备用栈项数和两栈载荷分别取各自的峰值。交易和载荷以字节计。[实测记录](versions/v0.16.0/measurements.json) · [基准口径](../../docs/benchmark.zh-CN.md)
 

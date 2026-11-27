@@ -1,47 +1,9 @@
-# $title
+$generated# $title
 
 [简体中文](README.zh-CN.md) · [4thGraph](../../README.md) · [Project index](../README.md)$version_link
 
 ## Developer resources
 
-[Reproduction](#reproduce-the-checks) · [Measurements](#complete-transactions-and-stack-measurements)$developer_links
+$quickstart$summary
 
-<!-- project-readme: State what the project does, the current implementation or standard, and the primary entry point. -->
-
-| Entry point | Purpose |
-| --- | --- |
-<!-- project-readme: Add the public entry points and their input and output formats. Link their source. -->
-
-## Use cases and trade-offs
-
-<!-- project-readme: Describe when to use the project and the costs, dependencies, or assumptions that affect that choice. -->
-
-## Algorithm and execution
-
-<!-- project-readme: Explain what the algorithm verifies, which inputs it needs, and how the implementation computes the result. For a transaction protocol, show where the spend is bound to the actual input. Link the specification and implementation. -->
-
-## Reproduce the checks
-$commands
-<!-- project-readme: Add prerequisites and commands runnable from the repository root. Describe the fixtures, test coverage, engine versions and expected results. -->
-
-## Script sizes
-
-| Component | Bytes | Fixture |
-| --- | ---: | --- |
-<!-- project-readme: Report measured component sizes in bytes. Identify the version and fixture, and link the measurement record. Remove this section when component sizes do not apply. -->
-
-## Developer and wallet integration
-
-<!-- project-readme: Show the call sequence and input/output formats. Explain what runs in the SDK, signer, Script or node. For non-wallet projects, describe the equivalent application or toolchain entry points. -->
-
-## Complete transactions and stack measurements
-
-| Mode | Inputs × outputs | Previous locks | Unlocks | New locks | Total bytes | Main / alt items | Stack payload bytes |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-<!-- project-readme: Give transaction shapes, sighash, lock and unlock sizes, total bytes and stack peaks when available. Link reproducible evidence. For non-transaction projects, adapt this section to the end-to-end measurement. -->
-
-## Marginal and lifecycle costs
-
-| Mode | Added-input shape | Added-input bytes | Added-output shape | Added-output bytes | Fund and exit | One turnover |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: |
-<!-- project-readme: State the baseline shape and the cost of adding inputs or outputs. Separate script bytes from other serialization. Publish lifecycle measurements when available. Remove this section when it does not apply. -->
+$navigation$entry_points$sections
