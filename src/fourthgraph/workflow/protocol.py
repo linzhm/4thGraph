@@ -1004,6 +1004,9 @@ def compile_search(program, keys, task_id, *, source_bytes, mode="auto", gate_bo
 
 
 def main():
+    if sys.argv[1:2] == ["experiment"]:
+        from fourthgraph.benchmark.experiment import main as experiment_main
+        return experiment_main(sys.argv[2:])
     cli = argparse.ArgumentParser(prog=PROJECT_NAME, description=PROJECT_DESCRIPTION)
     cli.add_argument("source", type=Path, nargs="?")
     action = cli.add_mutually_exclusive_group()

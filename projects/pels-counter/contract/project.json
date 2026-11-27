@@ -1,0 +1,21 @@
+{
+  "profile": "pels-counter",
+  "template_version": "0.1.0/full-preimage-fixed-fee",
+  "role": "counter",
+  "module": "advance.wasm",
+  "parameters": [
+    {
+      "name": "counter_u32_le",
+      "offset": 1,
+      "length": 5
+    }
+  ],
+  "paths": {
+    "advance": {
+      "script_code_offset": 7,
+      "mode": 65,
+      "signatures": 0
+    }
+  },
+  "fixture": "counter-successors"
+}

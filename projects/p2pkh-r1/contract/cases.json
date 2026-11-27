@@ -1,0 +1,140 @@
+{
+  "fixture": "r1-ordinary",
+  "steps": 1,
+  "cases": [
+    {
+      "id": "own",
+      "entry": "recognize",
+      "expect": {
+        "status": "Match",
+        "parameters": "$parameters"
+      }
+    },
+    {
+      "id": "missing-prevout",
+      "entry": "recognize",
+      "patch": {
+        "prevout": {
+          "outpoint": ""
+        }
+      },
+      "expect": {
+        "status": "MissingContext"
+      }
+    },
+    {
+      "id": "wrong-request-type",
+      "entry": "prepare_spend",
+      "patch": {
+        "input_index": "zero"
+      },
+      "expect": {
+        "status": "InvalidRequest"
+      }
+    },
+    {
+      "id": "foreign-template",
+      "entry": "recognize",
+      "patch": {
+        "prevout": {
+          "lock": "51"
+        }
+      },
+      "expect": {
+        "status": "NoMatch"
+      }
+    },
+    {
+      "id": "need-key",
+      "entry": "recognize",
+      "patch": {
+        "pubkey": ""
+      },
+      "expect": {
+        "status": "MissingContext"
+      }
+    },
+    {
+      "id": "other-owner",
+      "entry": "recognize",
+      "patch": {
+        "pubkey": "$other_key"
+      },
+      "expect": {
+        "status": "NotOwned"
+      }
+    },
+    {
+      "id": "prepare",
+      "entry": "prepare_spend",
+      "expect": {
+        "status": "Prepared",
+        "prepared": "$prepared"
+      }
+    },
+    {
+      "id": "unknown-path",
+      "entry": "prepare_spend",
+      "patch": {
+        "path": "unknown"
+      },
+      "expect": {
+        "status": "UnsupportedPath"
+      }
+    },
+    {
+      "id": "assemble",
+      "entry": "assemble_unlock",
+      "expect": {
+        "status": "Assembled",
+        "unlock": "$expected_unlock"
+      }
+    },
+    {
+      "id": "missing-signature",
+      "entry": "assemble_unlock",
+      "patch": {
+        "authorizations": []
+      },
+      "expect": {
+        "status": "InvalidAuthorization"
+      }
+    },
+    {
+      "id": "changed-candidate",
+      "entry": "assemble_unlock",
+      "patch": {
+        "transaction": "$changed_tx"
+      },
+      "expect": {
+        "status": "CandidateMismatch"
+      }
+    },
+    {
+      "id": "wrong-owner-before-sign",
+      "entry": "host_spend",
+      "patch": {
+        "pubkey": "$other_key"
+      },
+      "expect": {
+        "status": "NotOwned",
+        "signer_calls": 0
+      }
+    },
+    {
+      "id": "spend",
+      "entry": "host_spend",
+      "expect": {
+        "status": "Verified",
+        "signer_calls": 1
+      }
+    },
+    {
+      "id": "covered-output-changed",
+      "entry": "verify_changed_output",
+      "expect": {
+        "status": "Rejected"
+      }
+    }
+  ]
+}
