@@ -55,7 +55,7 @@ def compare_output_regions(builds, base):
     """The model adapters may move across the linked call, so use the loop as the boundary."""
     loop = manual_window_sequence(ScriptBuilder("REQUIRE stdlib/bip340.fth"))
     regions = {}
-    for name in (base, base + "/fused", base + "/paired"):
+    for name in (base, base + "/fused", base + "/paired", base + "/tuned"):
         detached, _ = builds[name]
         offset = detached.find(loop)
         if offset < 0:
@@ -100,7 +100,7 @@ def main():
             variants[label] = detached, lock
             scaled_joint_codes[label] = joint_code[0]
             rewrites[label] = info["runtime_rewrites"]
-        for comparison in ("fused", "paired"):
+        for comparison in ("fused", "paired", "tuned"):
             label = f"{batch_label}/{comparison}"
             joint_code = []
             detached, lock, info, _ = compile_window_candidate(dataflow, linked=True, strategy=GLV_SCALED,

@@ -198,7 +198,7 @@ REGTEST_CHRONICLE_HEIGHT=5 PYTHONPATH=src:. bash tools/verify_node.sh --profile 
 
 ## Point comparison models
 
-The baseline is built from commit `641153b` of PR #113. The comparison keeps the same batched witness, dataflow compilation, window loop, payment binding, and reconstruction method. The first candidate restores the multiplication result to the original model before checking the nonce point. The second moves the inverse scale inside the modular zero tests. The third maps the public and nonce points together before multiplication, and compares in the scaled model. It uses the same scale factors and passes the field prime into the joint word. [Shared model formulas](../../../src/fourthgraph/stdlib/weierstrass-model.fth)
+The baseline is built from commit `641153b` of PR #113. The comparison at `90dd9d6` keeps the same batched witness, dataflow compilation, window loop, payment binding, and reconstruction method. The first candidate restores the multiplication result to the original model before checking the nonce point. The second moves the inverse scale inside the modular zero tests. The third maps the public and nonce points together before multiplication, and compares in the scaled model. It uses the same scale factors and passes the field prime into the joint word. [Shared model formulas](../../../src/fourthgraph/stdlib/weierstrass-model.fth)
 
 | Comparison | Before the windows | After the windows | Payment lock | 2×2 OTDA ALL with reconstruction |
 | --- | ---: | ---: | ---: | ---: |
@@ -216,4 +216,25 @@ PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
 REGTEST_CHRONICLE_HEIGHT=5 PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
   "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/experiments/high-level/window_compare.py \
   --joint-lowerings --matrix-only --output workspace/schnorr-high-level/model-output-matrix.json
+```
+
+## Source tuning for the 64-window verifier
+
+The tuned Forth carries the same field prime through the four coordinate bounds, the public curve equation, and the paired coordinate map. The script checks the original encodings and both ordinate parities before mapping, then checks the two modular residuals and rejects `Z = 0`. The compiler uses the same `dataflow` profile and secp256k1 joint word as the paired build. [Tuned Forth](../experiments/high-level/window-verifier-tuned.fth)
+
+| Build | Before the windows | After the windows | Payment lock | 2×2 OTDA ALL with reconstruction |
+| --- | ---: | ---: | ---: | ---: |
+| Paired coordinates at `90dd9d6` | 3,890 B | 82 B | 23,161 B | 57,530 B |
+| Paired coordinates, tuned Forth | 3,723 B | 80 B | 22,992 B | 56,854 B |
+| Handwritten v0.17.0 | 3,172 B | 74 B | 22,435 B | 54,626 B |
+
+The joint word and its 18,379 B window sequence are byte-identical between the automatic builds. The remaining 557 B per lock comprises 207 B before the joint word, 344 B in joint preparation, and 6 B after the windows. The dual-engine replay covers 27 standalone cases, 14 payment cases and their locktime mutations, and eight constructor cases for the tuned lock. [Measurements](../experiments/high-level/forth-tuning-measurements.json) · [Transaction matrix](../experiments/high-level/forth-tuning-matrix.json)
+
+```sh
+PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
+  "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/experiments/high-level/window_compare.py \
+  --joint-lowerings --output workspace/schnorr-high-level/forth-tuning-measurements.json
+REGTEST_CHRONICLE_HEIGHT=5 PYTHONPATH=src:. bash tools/verify_node.sh --profile raised -- \
+  "$SCRIPT_LAB_SDK_PYTHON" projects/p2pkh-schnorr/experiments/high-level/window_compare.py \
+  --joint-lowerings --matrix-only --output workspace/schnorr-high-level/forth-tuning-matrix.json
 ```

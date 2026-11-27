@@ -10,10 +10,10 @@ def compile_window_candidate(plan, *, trace=False, linked=False, strategy=GLV_RE
                              comparison="restored"):
     if strategy != GLV_REFERENCE and not linked:
         raise ValueError("optimized joint lowerings require a linked word")
-    if comparison not in ("restored", "fused", "paired"):
+    if comparison not in ("restored", "fused", "paired", "tuned"):
         raise ValueError("unknown projective comparison")
     scaled_output = comparison != "restored"
-    mapped_input = comparison == "paired"
+    mapped_input = comparison in ("paired", "tuned")
     if scaled_output and (strategy != GLV_SCALED or not batch):
         raise ValueError("comparison in a scaled model requires batched inputs and the scaled joint strategy")
 
